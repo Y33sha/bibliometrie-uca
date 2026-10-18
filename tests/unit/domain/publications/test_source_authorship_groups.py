@@ -6,7 +6,10 @@ import pytest
 
 from domain.publications.source_authorship_groups import (
     Author,
+    GroupingMethod,
     ResidualModel,
+    Signature,
+    align_publication,
     comparison_levels,
     full_first_name,
     gap,
@@ -19,6 +22,94 @@ from domain.publications.source_authorship_groups import (
 
 def _author(last="dupont", first="jean", orcid="", idref="", gap=0):
     return Author(last_name=last, first_name=first, orcid=orcid, idref=idref, gap=gap)
+
+
+def _notice(notice, names, start=0):
+    """Signatures d'une notice, numérotées `notice * 100 + position`, à partir de couples (patronyme, prénom)."""
+    return [
+        Signature(notice * 100 + pos, notice, pos, last, first)
+        for pos, (last, first) in enumerate(names, start)
+    ]
+
+
+def _greedy(matrix):
+    """Affectation gloutonne, suffisante pour des matrices sans conflit."""
+    taken_rows, taken_cols, out = set(), set(), []
+    cells = sorted(
+        ((v, i, j) for i, row in enumerate(matrix) for j, v in enumerate(row)), reverse=True
+    )
+    for _, i, j in cells:
+        if i not in taken_rows and j not in taken_cols:
+            taken_rows.add(i)
+            taken_cols.add(j)
+            out.append((i, j))
+    return out
+
+
+def _grouped(groups):
+    """Signatures de chaque groupe de plus d'une signature, avec la méthode de chaque membre."""
+    return sorted(
+        sorted((m.signature, m.method) for m in g.members) for g in groups if len(g.members) > 1
+    )
+
+
+class TestAlignPublication:
+    def test_noms_uniques_lies_a_la_liste_la_plus_longue(self):
+        notices = {
+            1: _notice(1, [("martin", "a"), ("petit", "b"), ("durand", "c")]),
+            2: _notice(2, [("martin", "a"), ("durand", "c")]),
+        }
+        groups = align_publication(notices)
+        assert _grouped(groups) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
+            [(102, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
+        ]
+
+    def test_homonymes_lies_dans_l_ordre(self):
+        names = [("martin", "a"), ("zhang", "y"), ("zhang", "y"), ("durand", "c")]
+        groups = align_publication({1: _notice(1, names), 2: _notice(2, names)})
+        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(groups)
+        assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _grouped(groups)
+
+    def test_un_lien_qui_croise_l_ordre_est_ecarte(self):
+        """Patronyme unique à l'autre bout de la liste : sans filtre d'ordre, « Ferrer » serait lié à « Ferrer » malgré les auteurs liés entre eux."""
+        reference = [("martin", "a"), ("petit", "b"), ("durand", "c"), ("ferrer", "j")]
+        other = [("ferrer", "a"), ("martin", "a"), ("petit", "b"), ("durand", "c")]
+        notices = {1: _notice(1, reference), 2: _notice(2, other)}
+        assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] not in _grouped(
+            align_publication(notices)
+        )
+        assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] in _grouped(
+            align_publication(notices, ordered=False)
+        )
+
+    def test_le_residu_lie_une_variante_avec_score_et_marge(self):
+        model = ResidualModel(
+            weights={
+                "ln": {"mots inclus": 9.0, "else": -3.0},
+                "fn": {"initiales concordantes": 3.0, "else": -1.0},
+                "orcid": {},
+                "idref": {},
+                "gap": {"même trou": 6.0, "trou voisin": 4.0, "ailleurs": -1.0},
+            }
+        )
+        reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
+        other = [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")]
+        groups = align_publication(
+            {1: _notice(1, reference), 2: _notice(2, other)}, model=model, assign=_greedy
+        )
+        variant = next(g for g in groups if g.reference.id == 101)
+        member = next(m for m in variant.members if m.signature == 201)
+        assert member.method == GroupingMethod.MODEL
+        assert member.score == pytest.approx(18.0)
+        assert member.margin is not None and member.margin > 0
+
+    def test_au_maximum_une_signature_par_notice(self):
+        names = [("zhang", "y"), ("zhang", "y"), ("zhang", "y")]
+        notices = {1: _notice(1, names), 2: _notice(2, names[:2]), 3: _notice(3, names[:1])}
+        for group in align_publication(notices):
+            notices_of_group = [m.notice for m in group.members]
+            assert len(notices_of_group) == len(set(notices_of_group))
 
 
 class TestFullFirstName:

@@ -5,7 +5,7 @@ Les notices d'une publication se traitent de la plus longue liste d'auteurs à l
 
 import math
 from bisect import bisect_left
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
@@ -197,3 +197,252 @@ def plan_group_ids(
             plan[index] = old_id
             used.add(old_id)
     return plan
+
+
+@dataclass(frozen=True)
+class Signature:
+    """Signature à grouper : notice, position dans la liste, noms normalisés, identifiants."""
+
+    id: int
+    notice: int
+    position: int
+    last_name: str
+    first_name: str
+    orcid: str = ""
+    idref: str = ""
+
+
+@dataclass(frozen=True)
+class Member:
+    """Appartenance d'une signature à un groupe ; `score` et `margin` en bits pour `GroupingMethod.MODEL`."""
+
+    signature: int
+    notice: int
+    method: GroupingMethod
+    score: float | None = None
+    margin: float | None = None
+
+
+@dataclass
+class Group:
+    """Groupe formé : sa signature de référence et ses membres."""
+
+    index: int
+    reference: Signature
+    members: list[Member]
+
+
+type Assign = Callable[[Sequence[Sequence[float]]], Iterable[tuple[int, int]]]
+"""Affectation de gain maximal sur une matrice de gains : paires (ligne, colonne)."""
+
+
+def _name_key(s: Signature) -> str:
+    return s.last_name
+
+
+def _full_name_key(s: Signature) -> tuple[str, str] | None:
+    full = full_first_name(s.first_name)
+    return (s.last_name, full) if s.last_name and full else None
+
+
+def _initial_key(s: Signature) -> tuple[str, str] | None:
+    return (s.last_name, s.first_name[:1]) if s.last_name and s.first_name else None
+
+
+class _NoticeLinks:
+    """Liens de la règle entre une notice et les groupes déjà formés."""
+
+    def __init__(self, sigs: Sequence[Signature], groups: Sequence[Group]) -> None:
+        self.sigs = sigs
+        self.groups = groups
+        self.rank = {g.index: r for r, g in enumerate(groups)}
+        self.links: dict[int, int] = {}
+        self.methods: dict[int, GroupingMethod] = {}
+        self.forbidden: set[tuple[int, int]] = set()
+
+    def link(self, s: Signature, g: Group, method: GroupingMethod) -> None:
+        if (s.id, g.index) not in self.forbidden:
+            self.links[s.id] = g.index
+            self.methods[s.id] = method
+
+    def linked_groups(self) -> set[int]:
+        return set(self.links.values())
+
+    def unique_pairs(self, key: Callable[[Signature], object], method: GroupingMethod) -> None:
+        """Lie une signature et un groupe quand leur clé est unique des deux côtés, parmi les signatures et groupes sans lien."""
+        taken = self.linked_groups()
+        by_sig: dict[object, list[Signature]] = {}
+        by_group: dict[object, list[Group]] = {}
+        for s in self.sigs:
+            if s.id not in self.links and (k := key(s)):
+                by_sig.setdefault(k, []).append(s)
+        for g in self.groups:
+            if g.index not in taken and (k := key(g.reference)):
+                by_group.setdefault(k, []).append(g)
+        for k, ss in by_sig.items():
+            gs = by_group.get(k, [])
+            if len(ss) == 1 and len(gs) == 1:
+                self.link(ss[0], gs[0], method)
+
+    def shared_identifier(self) -> None:
+        """Lie une signature au groupe qui partage son ORCID ou son IdRef, à patronyme égal."""
+        by_name: dict[str, list[Group]] = {}
+        for g in self.groups:
+            by_name.setdefault(g.reference.last_name, []).append(g)
+        for s in self.sigs:
+            if s.id in self.links or not s.last_name:
+                continue
+            taken = self.linked_groups()
+            for g in by_name.get(s.last_name, ()):
+                ref = g.reference
+                if g.index not in taken and (
+                    (s.orcid and s.orcid == ref.orcid) or (s.idref and s.idref == ref.idref)
+                ):
+                    self.link(s, g, GroupingMethod.IDENTIFIER)
+                    if s.id in self.links:
+                        break
+
+    def name_steps(self) -> None:
+        self.unique_pairs(_name_key, GroupingMethod.NAME)
+        self.unique_pairs(_full_name_key, GroupingMethod.NAME)
+        self.unique_pairs(_initial_key, GroupingMethod.NAME)
+        self.shared_identifier()
+
+    def order_filter(self) -> None:
+        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres."""
+        kept = longest_ordered(
+            (s.position, self.rank[self.links[s.id]], s.id) for s in self.sigs if s.id in self.links
+        )
+        for s in self.sigs:
+            if s.id in self.links and s.id not in kept:
+                self.forbidden.add((s.id, self.links.pop(s.id)))
+                del self.methods[s.id]
+
+    def gaps(self) -> tuple[dict[int, int], dict[int, int]]:
+        """Trou de chaque signature et de chaque groupe restés sans lien."""
+        taken = self.linked_groups()
+        anchor_positions = sorted(s.position for s in self.sigs if s.id in self.links)
+        anchor_ranks = sorted(self.rank[g] for g in taken)
+        sig_gaps = {
+            s.id: gap(anchor_positions, s.position) for s in self.sigs if s.id not in self.links
+        }
+        group_gaps = {
+            g.index: gap(anchor_ranks, self.rank[g.index])
+            for g in self.groups
+            if g.index not in taken
+        }
+        return sig_gaps, group_gaps
+
+    def order_in_gaps(self) -> None:
+        """Dans chaque trou, patronyme et initiale en nombre égal des deux côtés : lien dans l'ordre des positions."""
+        sig_gaps, group_gaps = self.gaps()
+        by_sig: dict[tuple[str, str, int], list[Signature]] = {}
+        by_group: dict[tuple[str, str, int], list[Group]] = {}
+        for s in self.sigs:
+            if s.id in sig_gaps and s.last_name:
+                by_sig.setdefault((s.last_name, s.first_name[:1], sig_gaps[s.id]), []).append(s)
+        for g in self.groups:
+            if g.index in group_gaps and g.reference.last_name:
+                ref = g.reference
+                key = (ref.last_name, ref.first_name[:1], group_gaps[g.index])
+                by_group.setdefault(key, []).append(g)
+        for k, ss in by_sig.items():
+            gs = by_group.get(k, [])
+            if len(ss) > 1 and len(ss) == len(gs):
+                for s, g in zip(ss, gs, strict=True):
+                    self.link(s, g, GroupingMethod.ORDER)
+
+
+def _author(s: Signature, gap_index: int) -> Author:
+    return Author(s.last_name, s.first_name, s.orcid, s.idref, gap_index)
+
+
+def _residual_links(
+    notice: _NoticeLinks, signatures: Mapping[int, Signature], model: ResidualModel, assign: Assign
+) -> dict[int, tuple[int, float, float]]:
+    """Liens du résidu : signature → (indice de groupe, score, marge).
+
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe. Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
+    """
+    sig_gaps, group_gaps = notice.gaps()
+    rest_sigs = [s for s in notice.sigs if s.id in sig_gaps]
+    rest_groups = [g for g in notice.groups if g.index in group_gaps]
+    if not rest_sigs or not rest_groups:
+        return {}
+    threshold = link_threshold(len(rest_groups))
+    gains: dict[tuple[int, int], float] = {}
+    for s in rest_sigs:
+        x = _author(s, sig_gaps[s.id])
+        for g in rest_groups:
+            members = [_author(signatures[m.signature], group_gaps[g.index]) for m in g.members]
+            if not any(
+                abs(x.gap - y.gap) <= 1
+                or x.last_name[:2] == y.last_name[:2]
+                or (x.orcid and x.orcid == y.orcid)
+                or (x.idref and x.idref == y.idref)
+                for y in members
+            ):
+                continue
+            gain = max(model.score(x, y) for y in members) - threshold
+            if gain > 0:
+                gains[(s.id, g.index)] = gain
+    if not gains:
+        return {}
+    rows = sorted({s for s, _ in gains})
+    cols = sorted({g for _, g in gains})
+    matrix = [[gains.get((s, g), 0.0) for g in cols] for s in rows]
+    out: dict[int, tuple[int, float, float]] = {}
+    for i, j in assign(matrix):
+        gain = matrix[i][j]
+        if gain <= 0:
+            continue
+        others = [matrix[i][c] for c in range(len(cols)) if c != j]
+        others += [matrix[r][j] for r in range(len(rows)) if r != i]
+        out[rows[i]] = (cols[j], gain + threshold, gain - max(others, default=0.0))
+    return out
+
+
+def align_publication(
+    notices: Mapping[int, Sequence[Signature]],
+    *,
+    ordered: bool = True,
+    model: ResidualModel | None = None,
+    assign: Assign | None = None,
+) -> list[Group]:
+    """Groupes de signatures d'une publication.
+
+    Les notices se traitent de la plus longue à la plus courte, puis par identifiant, chacune face aux groupes déjà formés. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu.
+    """
+    signatures = {s.id: s for sigs in notices.values() for s in sigs}
+    groups: list[Group] = []
+    for i, notice_id in enumerate(sorted(notices, key=lambda n: (-len(notices[n]), n))):
+        sigs = sorted(notices[notice_id], key=lambda s: (s.position, s.id))
+        links: dict[int, int] = {}
+        methods: dict[int, GroupingMethod] = {}
+        scores: dict[int, tuple[float, float]] = {}
+        if i:
+            notice = _NoticeLinks(sigs, groups)
+            notice.name_steps()
+            if ordered:
+                notice.order_filter()
+                notice.name_steps()
+                notice.order_filter()
+                notice.order_in_gaps()
+                if model is not None and assign is not None:
+                    residual = _residual_links(notice, signatures, model, assign)
+                    for sig, (g, score, margin) in residual.items():
+                        notice.links[sig] = g
+                        notice.methods[sig] = GroupingMethod.MODEL
+                        scores[sig] = (score, margin)
+            links, methods = notice.links, notice.methods
+        by_index = {g.index: g for g in groups}
+        for s in sigs:
+            if s.id in links:
+                score, margin = scores.get(s.id, (None, None))
+                member = Member(s.id, notice_id, methods[s.id], score, margin)
+                by_index[links[s.id]].members.append(member)
+            else:
+                member = Member(s.id, notice_id, GroupingMethod.REFERENCE)
+                groups.append(Group(len(groups), s, [member]))
+        groups.sort(key=lambda g: (g.reference.position, g.index))
+    return groups
