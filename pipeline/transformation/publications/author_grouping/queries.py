@@ -122,7 +122,7 @@ class AuthorGroupingQueries:
 
     def delete_orphan_groups(self, conn: Connection) -> int:
         """Supprime les groupes des publications supprimées, et leurs appartenances. Rend le nombre de groupes supprimés."""
-        return conn.execute(
+        count = conn.execute(
             text("""
                 WITH orphans AS (
                     DELETE FROM source_authorship_groups g
@@ -135,6 +135,7 @@ class AuthorGroupingQueries:
                 SELECT count(*) FROM orphans
             """)
         ).scalar_one()
+        return int(count)
 
     def fetch_dirty_publication_ids(self, conn: Connection) -> list[int]:
         """Publications marquées `authorships_dirty`."""

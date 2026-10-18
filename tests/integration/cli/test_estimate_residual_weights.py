@@ -1,0 +1,65 @@
+"""Estimation des poids du modèle du résidu : export du résidu de la règle, et réécriture du fichier de poids."""
+
+import pyarrow.parquet as pq
+
+from interfaces.cli.dev import estimate_residual_weights as script
+from pipeline.transformation.publications.author_grouping.residual_weights import (
+    RESIDUAL_WEIGHTS,
+)
+from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+
+def _notice(conn, publication_id, source, source_id, names):
+    notice = insert_source_publication(conn, publication_id, source=source, source_id=source_id)
+    for pos, (last, first) in enumerate(names):
+        insert_signature(
+            conn,
+            notice,
+            source=source,
+            author_position=pos,
+            identity_id=upsert_split_identity(conn, last, first),
+        )
+    return notice
+
+
+def test_l_export_ecrit_le_residu_de_la_regle_et_les_signatures(sa_sync_conn, tmp_path):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    hal = _notice(
+        conn,
+        publication,
+        "hal",
+        "hal-1",
+        [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")],
+    )
+    openalex = _notice(
+        conn,
+        publication,
+        "openalex",
+        "W1",
+        [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")],
+    )
+    residual_path, signatures_path = tmp_path / "residual.parquet", tmp_path / "signatures.parquet"
+
+    script.export(conn, residual_path, signatures_path)
+
+    residual = sorted(
+        (r["side"], r["slot"], r["gap"], r["ln"], r["fn"])
+        for r in pq.read_table(residual_path).to_pylist()
+    )
+    # Listes de même longueur : la notice HAL, de plus petit identifiant, fonde les groupes.
+    assert hal < openalex
+    slot = f"{publication}:{openalex}"
+    assert residual == [
+        ("groupe", slot, 1, "garcia navarro", "j e"),
+        ("signature", slot, 1, "navarro", "j e garcia"),
+    ]
+    assert pq.read_table(signatures_path).num_rows == 6
+
+
+def test_le_fichier_de_poids_reecrit_se_relit_a_l_identique():
+    namespace: dict[str, object] = {}
+    exec(script._render(RESIDUAL_WEIGHTS), namespace)  # noqa: S102
+    assert namespace["RESIDUAL_WEIGHTS"] == RESIDUAL_WEIGHTS

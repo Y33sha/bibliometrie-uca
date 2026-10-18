@@ -235,6 +235,9 @@ class Group:
 type Assign = Callable[[Sequence[Sequence[float]]], Iterable[tuple[int, int]]]
 """Affectation de gain maximal sur une matrice de gains : paires (ligne, colonne)."""
 
+type ResidualSink = Callable[[int, Sequence[Author], Sequence[Author]], None]
+"""Reçoit le résidu de la règle pour une notice : son identifiant, ses signatures sans lien, puis les signatures de référence des groupes sans lien, chacune avec son trou."""
+
 
 def _name_key(s: Signature) -> str:
     return s.last_name
@@ -408,10 +411,11 @@ def align_publication(
     ordered: bool = True,
     model: ResidualModel | None = None,
     assign: Assign | None = None,
+    on_residual: ResidualSink | None = None,
 ) -> list[Group]:
     """Groupes de signatures d'une publication.
 
-    Les notices se traitent de la plus longue à la plus courte, puis par identifiant, chacune face aux groupes déjà formés. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu.
+    Les notices se traitent de la plus longue à la plus courte, puis par identifiant, chacune face aux groupes déjà formés. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
     signatures = {s.id: s for sigs in notices.values() for s in sigs}
     groups: list[Group] = []
@@ -428,12 +432,23 @@ def align_publication(
                 notice.name_steps()
                 notice.order_filter()
                 notice.order_in_gaps()
+                if on_residual is not None:
+                    sig_gaps, group_gaps = notice.gaps()
+                    on_residual(
+                        notice_id,
+                        [_author(s, sig_gaps[s.id]) for s in sigs if s.id in sig_gaps],
+                        [
+                            _author(g.reference, group_gaps[g.index])
+                            for g in groups
+                            if g.index in group_gaps
+                        ],
+                    )
                 if model is not None and assign is not None:
                     residual = _residual_links(notice, signatures, model, assign)
-                    for sig, (g, score, margin) in residual.items():
+                    for sig, (g, link_score, link_margin) in residual.items():
                         notice.links[sig] = g
                         notice.methods[sig] = GroupingMethod.MODEL
-                        scores[sig] = (score, margin)
+                        scores[sig] = (link_score, link_margin)
             links, methods = notice.links, notice.methods
         by_index = {g.index: g for g in groups}
         for s in sigs:

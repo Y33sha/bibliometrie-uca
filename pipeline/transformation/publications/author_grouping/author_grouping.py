@@ -37,7 +37,7 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
 
 BATCH_SIZE = 1000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
-_AUTHOR = "author"
+AUTHOR = "author"
 
 
 def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
@@ -48,12 +48,12 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
 
 def _role_class(roles: list[str] | None) -> str:
     """Classe d'alignement d'une signature : les auteurs ensemble, les autres rôles chacun à part."""
-    roles = roles or [_AUTHOR]
-    return _AUTHOR if _AUTHOR in roles else ",".join(sorted(roles))
+    roles = roles or [AUTHOR]
+    return AUTHOR if AUTHOR in roles else ",".join(sorted(roles))
 
 
-def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
-    """Groupes des signatures d'une publication, classe de rôle par classe de rôle.
+def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Signature]]]:
+    """Signatures d'une publication par classe de rôle, puis par notice.
 
     Une signature sans position prend la position 0 pour l'alignement, qui la range alors par identifiant.
     """
@@ -66,9 +66,14 @@ def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
                 row.id, row.notice, position, row.last_name, row.first_name, row.orcid, row.idref
             )
         )
+    return by_class
+
+
+def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
+    """Groupes des signatures d'une publication, classe de rôle par classe de rôle."""
     groups: list[Group] = []
-    for role_class, notices in sorted(by_class.items()):
-        if role_class == _AUTHOR:
+    for role_class, notices in sorted(notices_by_role(rows).items()):
+        if role_class == AUTHOR:
             groups += align_publication(notices, model=_MODEL, assign=assign)
         else:
             groups += align_publication(notices, ordered=False)

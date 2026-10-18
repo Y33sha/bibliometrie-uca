@@ -48,6 +48,8 @@ dev = [
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
     "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/runtime/observability/progression.py)
     "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle des groupes d'auteurs
+    "duckdb==1.5.6",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
+    "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
 ]
 
 [tool.setuptools]
@@ -64,8 +66,16 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipelin
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 # `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
 # développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
-# hors du dépôt.
-extend_exclude = ["frontend", ".venv", "venv", "scripts", "data"]
+# hors du dépôt. L'estimation des poids du modèle des groupes d'auteurs tourne sur le poste de
+# développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement.
+extend_exclude = [
+    "frontend",
+    ".venv",
+    "venv",
+    "scripts",
+    "data",
+    "interfaces/cli/dev/estimate_residual_weights.py",
+]
 
 # ----------------------------------------------------------------------
 # import-linter : vérifie les règles de dépendance entre couches DDD.

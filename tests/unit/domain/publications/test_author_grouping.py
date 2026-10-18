@@ -83,6 +83,22 @@ class TestAlignPublication:
             align_publication(notices, ordered=False)
         )
 
+    def test_le_residu_de_la_regle_est_transmis_notice_par_notice(self):
+        reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
+        other = [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")]
+        received = []
+        align_publication(
+            {1: _notice(1, reference), 2: _notice(2, other)},
+            on_residual=lambda notice, sigs, groups: received.append((notice, sigs, groups)),
+        )
+        assert received == [
+            (
+                2,
+                [_author("navarro", "j e garcia", gap=1)],
+                [_author("garcia navarro", "j e", gap=1)],
+            )
+        ]
+
     def test_le_residu_lie_une_variante_avec_score_et_marge(self):
         model = ResidualModel(
             weights={

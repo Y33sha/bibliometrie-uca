@@ -193,11 +193,13 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "deptry" },
+    { name = "duckdb" },
     { name = "import-linter" },
     { name = "mypy" },
     { name = "pip-audit" },
     { name = "pre-commit" },
     { name = "pre-commit-hooks" },
+    { name = "pyarrow" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -231,11 +233,13 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "deptry", specifier = "==0.25.1" },
+    { name = "duckdb", specifier = "==1.5.6" },
     { name = "import-linter", specifier = "==2.15" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "pip-audit", specifier = "==2.10.1" },
     { name = "pre-commit", specifier = "==4.7.0" },
     { name = "pre-commit-hooks", specifier = "==6.0.0" },
+    { name = "pyarrow", specifier = "==26.0.0" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "pytest-asyncio", specifier = "==1.4.0" },
     { name = "pytest-cov", specifier = "==7.1.0" },
