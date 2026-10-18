@@ -235,6 +235,16 @@ class PublicationsReconciliationQueries:
         )
         record_redirect(conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id)
 
+    def mark_authorships_dirty(self, conn: Connection, publication_ids: list[int]) -> int:
+        """Pose `authorships_dirty` sur ces publications : leurs notices ou leurs signatures ont changé. Retourne le nombre de publications marquées."""
+        if not publication_ids:
+            return 0
+        stmt = text(
+            "UPDATE publications SET authorships_dirty = true"
+            " WHERE id = ANY(:ids) AND NOT authorships_dirty"
+        ).bindparams(bindparam("ids"))
+        return conn.execute(stmt, {"ids": publication_ids}).rowcount
+
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
         """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""
         if not source_publication_ids:

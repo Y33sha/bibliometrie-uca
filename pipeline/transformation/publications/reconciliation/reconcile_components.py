@@ -148,6 +148,7 @@ def reconcile(
         )
 
     survivors: set[int] = set()
+    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     created = 0
     splits = 0
 
@@ -201,6 +202,9 @@ def reconcile(
             with savepoint(conn):
                 refresh_from_sources(pub_id, repo=publication_repo)
 
+    # 5. Les publications touchées regroupent à nouveau leurs signatures : publications d'arrivée, et anciennes publications des SP déplacées ou détachées. Une SP dirty a pu changer ses signatures.
+    left = {row.publication_id for row in rows if row.publication_id is not None}
+    queries.mark_authorships_dirty(conn, sorted((survivors | left) - dissolved_ids))
     cleared = queries.clear_keys_dirty(conn, dirty_ids)
     return ReconcileStats(
         processed=len(dirty_ids),
