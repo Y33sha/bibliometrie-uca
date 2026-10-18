@@ -5,6 +5,7 @@ Les notices d'une publication se traitent de la plus longue liste d'auteurs à l
 
 import math
 from bisect import bisect_left
+from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -107,10 +108,12 @@ class Author:
     gap: int
 
 
+@lru_cache(maxsize=1_000_000)
 def _initials(first_name: str) -> str:
     return "".join(part[:1] for part in first_name.split())
 
 
+@lru_cache(maxsize=1_000_000)
 def _only_initials(first_name: str) -> bool:
     return all(len(part) <= 1 for part in first_name.split())
 
@@ -195,7 +198,10 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
 
 def position_only(x: Author, y: Author) -> bool:
     """Seule la position rapproche les deux auteurs : patronymes sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
-    levels = comparison_levels(x, y)
+    return _position_only(comparison_levels(x, y))
+
+
+def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
     return (
         levels[Comparison.LAST_NAME] == ComparisonLevel.ELSE
         and levels[Comparison.FIRST_NAME] in (ComparisonLevel.ELSE, None)
@@ -212,9 +218,13 @@ class ResidualModel:
 
     def score(self, x: Author, y: Author) -> float:
         """Somme des poids des comparaisons entre deux auteurs, sans a priori."""
+        return self.score_levels(comparison_levels(x, y))
+
+    def score_levels(self, levels: Mapping[Comparison, ComparisonLevel | None]) -> float:
+        """Somme des poids de niveaux de comparaison déjà calculés."""
         return sum(
             self.weights[name].get(level, 0.0)
-            for name, level in comparison_levels(x, y).items()
+            for name, level in levels.items()
             if level is not None
         )
 
@@ -434,26 +444,54 @@ def _residual_links(
     if not rest_sigs or not rest_groups:
         return {}
     threshold = link_threshold(len(rest_groups))
+    members = {
+        g.index: [_author(signatures[m.signature], group_gaps[g.index]) for m in g.members]
+        for g in rest_groups
+    }
+    # Index de blocage : groupes par trou, par deux premières lettres d'un patronyme de membre, par identifiant de membre.
+    by_gap: dict[int, set[int]] = defaultdict(set)
+    by_prefix: dict[str, set[int]] = defaultdict(set)
+    by_orcid: dict[str, set[int]] = defaultdict(set)
+    by_idref: dict[str, set[int]] = defaultdict(set)
+    for index, authors in members.items():
+        by_gap[group_gaps[index]].add(index)
+        for y in authors:
+            by_prefix[y.last_name[:2]].add(index)
+            if y.orcid:
+                by_orcid[y.orcid].add(index)
+            if y.idref:
+                by_idref[y.idref].add(index)
     gains: dict[tuple[int, int], float] = {}
     for s in rest_sigs:
         x = _author(s, sig_gaps[s.id])
-        for g in rest_groups:
-            members = [
-                y
-                for m in g.members
-                if not position_only(x, y := _author(signatures[m.signature], group_gaps[g.index]))
+        candidates = (
+            by_gap.get(x.gap - 1, set())
+            | by_gap.get(x.gap, set())
+            | by_gap.get(x.gap + 1, set())
+            | by_prefix.get(x.last_name[:2], set())
+            | (by_orcid.get(x.orcid, set()) if x.orcid else set())
+            | (by_idref.get(x.idref, set()) if x.idref else set())
+        )
+        for index in candidates:
+            kept = [
+                (y, levels)
+                for y in members[index]
+                if not _position_only(levels := comparison_levels(x, y))
             ]
-            if not any(
-                abs(x.gap - y.gap) <= 1
-                or x.last_name[:2] == y.last_name[:2]
-                or (x.orcid and x.orcid == y.orcid)
-                or (x.idref and x.idref == y.idref)
-                for y in members
+            # Le blocage ne retient que les membres que la position seule ne rapproche pas ; le trou est celui du groupe.
+            if not kept or not (
+                abs(x.gap - group_gaps[index]) <= 1
+                or any(
+                    x.last_name[:2] == y.last_name[:2]
+                    or (x.orcid and x.orcid == y.orcid)
+                    or (x.idref and x.idref == y.idref)
+                    for y, _ in kept
+                )
             ):
                 continue
-            gain = max(model.score(x, y) for y in members) - threshold
+            gain = max(model.score_levels(levels) for _, levels in kept) - threshold
             if gain > 0:
-                gains[(s.id, g.index)] = gain
+                gains[(s.id, index)] = gain
     if not gains:
         return {}
     rows = sorted({s for s, _ in gains})
