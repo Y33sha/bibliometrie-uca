@@ -217,6 +217,15 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Conséquence : seule la première occurrence de chaque nom s'aligne. Les répétitions restent hors des groupes, donc hors du rattachement aux personnes.
 - [ ] Liste doublée sur place (A A B B…) : décalage de 1 sur une grande part de la liste. Elle fait 2 des 4 copies que le signal précédent manque.
 - [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
+- [x] Décomptes d'auteurs de chaque notice : `source_publications.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
+- [x] Une signature dont le nom entier est « et al. » est collective. Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
+- [x] Classement des écarts de longueur entre les notices d'une publication, le 2026-10-18 (`measure_list_gaps.py`). La longueur de référence est la plus fréquente parmi les notices. Une notice scanR issue d'un dépôt HAL est ignorée quand la notice HAL de ce dépôt est présente. Sur 69 428 publications à plusieurs notices, 62 807 ont des listes de même longueur, 4 091 des écarts expliqués, 88 une fusion erronée probable et 2 441 un écart inexpliqué.
+  - Causes reconnues : notice à un auteur, scanR coupé à 51, homonymes fusionnés par WoS, excédent fait de noms complets répétés, liste tronquée, dépôt HAL in2p3, fusion erronée probable.
+  - Liste tronquée : 80 % de ses patronymes figurent parmi les premiers patronymes de la liste longue, et 80 % des patronymes de la suite de la liste longue lui sont absents. Elle se termine souvent par un collectif que l'autre source détaille. La source omet souvent ce collectif.
+  - Dépôt HAL `in2p3-*` plus court que la référence, dont 80 % des patronymes figurent dans la référence : il liste les auteurs locaux.
+  - Fusion erronée probable : 20 % au plus des patronymes de la liste courte figurent dans la liste longue. La fusion d'une pièce DataCite avec son ensemble échappe à ce critère : la liste de la pièce est contenue dans celle de l'ensemble.
+- [x] Relecture de 71 grands écarts (du simple au double au moins), le 2026-10-18 : 23 listes tronquées, 13 fusions erronées, 9 listes recopiées, 7 listes d'auteurs locaux, 4 références fausses, 15 cas indéterminables. Les écarts que les règles laissent sans cause sont des listes partielles (directeurs d'ouvrage, collectif omis) et des listes longues qui contiennent la référence. Ces dernières y ajoutent les membres d'un collectif ou une copie sous d'autres formes de noms ; les répétitions de patronyme et d'initiale ne séparent pas ces deux cas.
+- [ ] Fusions erronées probables dans l'onglet Fusions suspectes.
 
 ### Phase 5 — Fin de chantier
 
