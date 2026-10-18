@@ -5,9 +5,18 @@
   import HubTabs from "$lib/components/HubTabs.svelte";
   import PublicationsListView from "$lib/components/PublicationsListView.svelte";
   import PublicationDrawer from "./PublicationDrawer.svelte";
+  import SuspectMergesList from "./SuspectMergesList.svelte";
+  import { api } from "$lib/api";
 
   // Onglets du référentiel : la liste, puis les files de détection des fusions suspectes.
   let tab = $state("all");
+  let suspectMergeCount = $state(0);
+
+  $effect(() => {
+    void api<{ total: number }>("/api/publications/suspect-merges/count").then(
+      (data) => (suspectMergeCount = data.total),
+    );
+  });
 
   // Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL.
   const selectedPublicationId = $derived(
@@ -27,7 +36,10 @@
 </svelte:head>
 
 <HubTabs
-  tabs={[{ key: "all", label: "Toutes les publications" }]}
+  tabs={[
+    { key: "all", label: "Toutes les publications" },
+    { key: "suspect-merges", label: "Fusions suspectes", count: suspectMergeCount },
+  ]}
   active={tab}
   onselect={(key) => (tab = key)}
 />
@@ -36,6 +48,13 @@
   <PublicationsListView
     restrictToPublications
     basePath="/admin/publications"
+    activePublicationId={selectedPublicationId}
+    onopenPublication={selectPublication}
+  />
+{/if}
+
+{#if tab === "suspect-merges"}
+  <SuspectMergesList
     activePublicationId={selectedPublicationId}
     onopenPublication={selectPublication}
   />

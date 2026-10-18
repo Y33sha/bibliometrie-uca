@@ -6,6 +6,7 @@ Nœud `author_grouping.build`.
 """
 
 import logging
+import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
@@ -25,7 +26,7 @@ from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progression import attente, progression
 from pipeline.transformation.publications.author_grouping.queries import (
     AuthorGroupingQueries,
     GroupRow,
@@ -150,7 +151,7 @@ def regroup(
 def build_groups(
     conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
 ) -> PhaseMetrics:
-    """Supprime les groupes des publications supprimées, puis recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
+    """Supprime les groupes des publications supprimées, puis recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs."""
     orphans = queries.delete_orphan_groups(conn)
     conn.commit()
     if orphans:
@@ -162,6 +163,9 @@ def build_groups(
     publication_ids = queries.fetch_dirty_publication_ids(conn)
     etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
     if not publication_ids:
+        if orphans:
+            queries.refresh_alignment(conn)
+            conn.commit()
         rien_a_faire(logger)
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
@@ -172,6 +176,12 @@ def build_groups(
             batch = publication_ids[start : start + BATCH_SIZE]
             group_count += regroup(conn, queries, batch, methods, avancement.avance)
             conn.commit()
+    etape(logger, "Recouvrement des listes d'auteurs")
+    t0 = time.perf_counter()
+    with attente(DERNIERE_BRANCHE, logger) as ligne:
+        queries.refresh_alignment(conn)
+        conn.commit()
+        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),

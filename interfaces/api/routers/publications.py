@@ -23,6 +23,7 @@ from application.ports.read_models.publications_queries import (
     PublicationSort,
     PublicationSourcesResponse,
     PublicationsQueries,
+    SuspectMergesResponse,
 )
 from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPES
@@ -39,7 +40,7 @@ from interfaces.api.filters import (
     parse_str_csv,
     parse_vocabulary_csv,
 )
-from interfaces.api.models import EnumOption
+from interfaces.api.models import EnumOption, TotalCountResponse
 from interfaces.api.params import SearchTerm
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
 
@@ -233,6 +234,24 @@ def export_theses_csv(
     return _csv_stream(
         queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
     )
+
+
+@router.get("/suspect-merges/count", response_model=TotalCountResponse)
+def suspect_merges_count(
+    queries: PublicationsQueries = Depends(publications_queries),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Fusions suspectes » (badge)."""
+    return TotalCountResponse(total=queries.suspect_merges_count())
+
+
+@router.get("/suspect-merges", response_model=SuspectMergesResponse)
+def suspect_merges(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PublicationsQueries = Depends(publications_queries),
+) -> SuspectMergesResponse:
+    """Publications dont moins de la moitié des signatures d'auteur sont alignées par la règle, paginées."""
+    return queries.suspect_merges(page=page, per_page=per_page)
 
 
 @router.get("/{pub_id}", response_model=PublicationDetailResponse)

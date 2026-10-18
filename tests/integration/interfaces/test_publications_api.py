@@ -22,6 +22,20 @@ def test_licenses_follow_the_domain_enum(client):
     ]
 
 
+class TestSuspectMerges:
+    """File des fusions suspectes : la lecture de la vue matérialisée passe sous le rôle de l'API."""
+
+    def test_compteur(self, client):
+        r = client.get("/api/publications/suspect-merges/count")
+        assert r.status_code == 200
+        assert r.json() == {"total": 0}
+
+    def test_liste_vide(self, client):
+        r = client.get("/api/publications/suspect-merges", params={"page": 1, "per_page": 20})
+        assert r.status_code == 200
+        assert r.json()["publications"] == []
+
+
 class TestPublicationsList:
     """Exerce le SQL de GET /api/publications avec toutes les combinaisons
     de filtres actuellement supportés par le router."""

@@ -833,6 +833,7 @@ NODES: tuple[Node, ...] = (
             "source_authorship_groups.reference_position",
             "grouped_source_authorships.id",
             "publications.authorships_dirty",
+            "publication_author_alignment",
         ),
         # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que le nœud retire lui-même.
         previous_run=("publications.id", "publications.authorships_dirty"),

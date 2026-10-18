@@ -138,6 +138,10 @@ class AuthorGroupingQueries:
         ).scalar_one()
         return int(count)
 
+    def refresh_alignment(self, conn: Connection) -> None:
+        """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
+        conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment"))
+
     def fetch_dirty_publication_ids(self, conn: Connection) -> list[int]:
         """Publications marquées `authorships_dirty`."""
         rows = conn.execute(

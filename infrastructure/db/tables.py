@@ -6,7 +6,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 
 Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
-Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
+Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_author_alignment`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
 from sqlalchemy import (
@@ -797,6 +797,10 @@ grouped_source_authorships = Table(
     ),
     schema="publications",
 )
+
+# `publication_author_alignment` (MATERIALIZED VIEW, migration 5c1d8e3a7f20) : recouvrement des
+# listes d'auteurs de chaque publication à plusieurs notices, dérivé des groupes de signatures.
+# Sert la file des fusions suspectes. SQL brut + REFRESH en fin de phase `author_grouping`.
 
 
 # Identités d'auteur dédupliquées : la clé (nom et prénom normalisés,

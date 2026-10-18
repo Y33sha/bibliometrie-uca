@@ -387,6 +387,38 @@ class PublicationSourcesResponse(BaseModel):
     source_publications: list[SourcePublicationMetadataOut]
 
 
+class SuspectMergeNoticeOut(BaseModel):
+    """Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur."""
+
+    source: str
+    source_id: str
+    signatures: int
+    rule_aligned_signatures: int
+    lone_signatures: int
+
+
+class SuspectMergeOut(BaseModel):
+    """Publication dont moins de la moitié des signatures d'auteur sont alignées par la règle : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
+
+    `rule_aligned_signatures` : signatures d'auteur d'un groupe dont un membre est lié par la règle (nom, identifiant, ordre). `lone_signatures` : signatures d'auteur seules dans leur groupe. `model_signatures` : signatures d'auteur liées à leur groupe par le modèle ; `min_margin` : plus petite marge de ces liens, en bits.
+    """
+
+    publication_id: int
+    title: str
+    pub_year: int | None
+    doc_type: str
+    signatures: int
+    rule_aligned_signatures: int
+    lone_signatures: int
+    model_signatures: int
+    min_margin: float | None
+    notices: list[SuspectMergeNoticeOut]
+
+
+class SuspectMergesResponse(PaginatedResponse):
+    publications: list[SuspectMergeOut]
+
+
 class PublicationsQueries(Protocol):
     """Lectures sync pour /api/publications/*.
 
@@ -424,4 +456,10 @@ class PublicationsQueries(Protocol):
 
     def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
         """Métadonnées de chaque enregistrement source de la publication ; `None` si la publication n'existe pas."""
+        ...
+
+    def suspect_merges_count(self) -> int: ...
+
+    def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
+        """Fusions suspectes, la plus faible part de signatures d'auteur alignées par la règle d'abord."""
         ...

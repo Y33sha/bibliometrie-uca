@@ -286,6 +286,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/suspect-merges/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Merges Count
+         * @description Compteur de l'onglet « Fusions suspectes » (badge).
+         */
+        get: operations["suspect_merges_count_api_publications_suspect_merges_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/suspect-merges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suspect Merges
+         * @description Publications dont moins de la moitié des signatures d'auteur sont alignées par la règle, paginées.
+         */
+        get: operations["suspect_merges_api_publications_suspect_merges_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/{pub_id}": {
         parameters: {
             query?: never;
@@ -5401,6 +5441,63 @@ export interface components {
             /** Sources */
             sources: string[];
         };
+        /**
+         * SuspectMergeNoticeOut
+         * @description Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur.
+         */
+        SuspectMergeNoticeOut: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Signatures */
+            signatures: number;
+            /** Rule Aligned Signatures */
+            rule_aligned_signatures: number;
+            /** Lone Signatures */
+            lone_signatures: number;
+        };
+        /**
+         * SuspectMergeOut
+         * @description Publication dont moins de la moitié des signatures d'auteur sont alignées par la règle : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
+         *
+         *     `rule_aligned_signatures` : signatures d'auteur d'un groupe dont un membre est lié par la règle (nom, identifiant, ordre). `lone_signatures` : signatures d'auteur seules dans leur groupe. `model_signatures` : signatures d'auteur liées à leur groupe par le modèle ; `min_margin` : plus petite marge de ces liens, en bits.
+         */
+        SuspectMergeOut: {
+            /** Publication Id */
+            publication_id: number;
+            /** Title */
+            title: string;
+            /** Pub Year */
+            pub_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Signatures */
+            signatures: number;
+            /** Rule Aligned Signatures */
+            rule_aligned_signatures: number;
+            /** Lone Signatures */
+            lone_signatures: number;
+            /** Model Signatures */
+            model_signatures: number;
+            /** Min Margin */
+            min_margin: number | null;
+            /** Notices */
+            notices: components["schemas"]["SuspectMergeNoticeOut"][];
+        };
+        /** SuspectMergesResponse */
+        SuspectMergesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Publications */
+            publications: components["schemas"]["SuspectMergeOut"][];
+            /** Pages */
+            readonly pages: number;
+        };
         /** ThesesAuthorshipOut */
         ThesesAuthorshipOut: {
             /** Id */
@@ -6011,6 +6108,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suspect_merges_count_api_publications_suspect_merges_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    suspect_merges_api_publications_suspect_merges_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuspectMergesResponse"];
                 };
             };
             /** @description Validation Error */

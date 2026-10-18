@@ -5,6 +5,7 @@ Le package est organisé par thème :
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
 - `source_publications` : `get_publication_sources`
+- `suspect_merges` : `suspect_merges`, `suspect_merges_count`
 
 `PgPublicationsQueries` agrège ces lectures sous le port `application.ports.read_models.publications_queries.PublicationsQueries`.
 """
@@ -27,6 +28,7 @@ from application.ports.read_models.publications_queries import (
     PublicationsFacetsResponse,
     PublicationSourcesResponse,
     PublicationsQueries,
+    SuspectMergesResponse,
 )
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.read_models.publications.detail import (
@@ -43,6 +45,10 @@ from infrastructure.read_models.publications.list import (
 )
 from infrastructure.read_models.publications.source_publications import (
     get_publication_sources as _get_publication_sources,
+)
+from infrastructure.read_models.publications.suspect_merges import (
+    suspect_merges as _suspect_merges,
+    suspect_merges_count as _suspect_merges_count,
 )
 
 
@@ -127,6 +133,12 @@ class PgPublicationsQueries(PublicationsQueries):
 
     def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
         return _get_publication_sources(self._conn, pub_id)
+
+    def suspect_merges_count(self) -> int:
+        return _suspect_merges_count(self._conn)
+
+    def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
+        return _suspect_merges(self._conn, page=page, per_page=per_page)
 
 
 __all__ = ["PgPublicationsQueries"]
