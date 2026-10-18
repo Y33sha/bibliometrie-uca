@@ -23,30 +23,38 @@ log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 # Signature d'auteur individuelle, comme `is_individual_author`.
 _AUTHOR = f"NOT sa.collective AND '{AuthorshipRole.AUTHOR.value}' = ANY(sa.roles)"
 
-_COUNTS = f"""
-    SELECT sp.id,
-           count(sa.id) FILTER (WHERE {_AUTHOR}) AS n,
-           count(DISTINCT (k.last_name_normalized, coalesce(k.first_name_normalized, '')))
-               FILTER (WHERE {_AUTHOR}) AS d
-    FROM source_publications sp
-    LEFT JOIN source_authorships sa ON sa.source_publication_id = sp.id
-    LEFT JOIN author_identifying_keys k ON k.id = sa.identity_id
-    WHERE sp.id BETWEEN :lo AND :hi
-    GROUP BY sp.id
-"""  # noqa: S608
 
-
-def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
-    """Écrit les décomptes des notices `[lo, hi]` qui changent. Rend le nombre de notices modifiées."""
+def _update_counts(conn: Connection, notices: str, params: dict[str, object]) -> int:
+    """Écrit les décomptes des notices filtrées par la condition SQL `notices` (sur `sp`) qui changent. Rend le nombre de notices modifiées."""
     return conn.execute(
         text(f"""
             UPDATE source_publications sp
             SET author_count = c.n, distinct_author_count = c.d
-            FROM ({_COUNTS}) c
+            FROM (
+                SELECT sp.id,
+                       count(sa.id) FILTER (WHERE {_AUTHOR}) AS n,
+                       count(DISTINCT (k.last_name_normalized, coalesce(k.first_name_normalized, '')))
+                           FILTER (WHERE {_AUTHOR}) AS d
+                FROM source_publications sp
+                LEFT JOIN source_authorships sa ON sa.source_publication_id = sp.id
+                LEFT JOIN author_identifying_keys k ON k.id = sa.identity_id
+                WHERE {notices}
+                GROUP BY sp.id
+            ) c
             WHERE sp.id = c.id AND (sp.author_count, sp.distinct_author_count) IS DISTINCT FROM (c.n, c.d)
         """),  # noqa: S608
-        {"lo": lo, "hi": hi},
+        params,
     ).rowcount
+
+
+def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
+    """Écrit les décomptes des notices `[lo, hi]` qui changent. Rend le nombre de notices modifiées."""
+    return _update_counts(conn, "sp.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
+
+
+def backfill_notices(conn: Connection, notice_ids: list[int]) -> int:
+    """Écrit les décomptes des notices `notice_ids` qui changent. Rend le nombre de notices modifiées."""
+    return _update_counts(conn, "sp.id = ANY(:ids)", {"ids": notice_ids})
 
 
 def main() -> int:
