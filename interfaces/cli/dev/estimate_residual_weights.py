@@ -48,9 +48,9 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.transformation.publications.author_grouping import residual_weights
 from pipeline.transformation.publications.author_grouping.author_grouping import (
-    BATCH_SIZE,
     deferred_notices,
     notices_by_role,
+    publication_batches,
 )
 from pipeline.transformation.publications.author_grouping.queries import (
     AuthorGroupingQueries,
@@ -73,7 +73,7 @@ EM_MAX_PAIRS = 5_000_000
 U_MAX_PAIRS = 10_000_000
 
 _PUBLICATIONS_SQL = text("""
-    SELECT publication_id FROM source_publications
+    SELECT publication_id, sum(author_count)::integer FROM source_publications
     WHERE publication_id IS NOT NULL
     GROUP BY 1 HAVING count(*) > 1
     ORDER BY 1
@@ -144,14 +144,14 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
     """Écrit le résidu de la règle et les signatures du modèle complet à partir des signatures en base."""
     queries = AuthorGroupingQueries()
     t0 = time.perf_counter()
-    publication_ids = list(conn.execute(_PUBLICATIONS_SQL).scalars())
-    log.info("%d publications à plusieurs notices", len(publication_ids))
+    publications = [(r[0], r[1]) for r in conn.execute(_PUBLICATIONS_SQL)]
+    log.info("%d publications à plusieurs notices", len(publications))
     with (
         pq.ParquetWriter(residual_path, _RESIDUAL_SCHEMA) as residual_out,
         pq.ParquetWriter(signatures_path, _SIGNATURES_SCHEMA) as signatures_out,
     ):
-        for start in range(0, len(publication_ids), BATCH_SIZE):
-            batch = publication_ids[start : start + BATCH_SIZE]
+        done = 0
+        for batch in publication_batches(publications):
             rows_by_publication: dict[int, list[SignatureRow]] = {}
             for row in queries.fetch_signatures(conn, batch):
                 rows_by_publication.setdefault(row.publication_id, []).append(row)
@@ -184,9 +184,9 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
                     ]
             residual_out.write_table(pa.Table.from_pylist(residual, _RESIDUAL_SCHEMA))
             signatures_out.write_table(pa.Table.from_pylist(signatures, _SIGNATURES_SCHEMA))
-            done = start + len(batch)
+            done += len(batch)
             log.info(
-                "%d/%d publications (%.0f s)", done, len(publication_ids), time.perf_counter() - t0
+                "%d/%d publications (%.0f s)", done, len(publications), time.perf_counter() - t0
             )
 
 

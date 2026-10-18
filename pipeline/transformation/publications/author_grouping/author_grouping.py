@@ -38,10 +38,28 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
     RESIDUAL_WEIGHTS,
 )
 
+# Plafonds d'un lot de publications : nombre de publications, nombre de signatures d'auteur chargées en mémoire.
 BATCH_SIZE = 1000
+BATCH_SIGNATURES = 200_000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
 # Source dont la notice passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
 DEFERRED_SOURCE = "scanr"
+
+
+def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[int]]:
+    """Lots de publications, dans l'ordre : un lot se ferme à `BATCH_SIZE` publications ou dès qu'il atteint `BATCH_SIGNATURES` signatures. `publications` : (publication, nombre de signatures)."""
+    batches: list[list[int]] = []
+    batch: list[int] = []
+    signatures = 0
+    for publication_id, count in publications:
+        batch.append(publication_id)
+        signatures += count
+        if len(batch) >= BATCH_SIZE or signatures >= BATCH_SIGNATURES:
+            batches.append(batch)
+            batch, signatures = [], 0
+    if batch:
+        batches.append(batch)
+    return batches
 
 
 def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
@@ -167,7 +185,8 @@ def build_groups(
             "%s : leur publication n'existe plus",
             accord(orphans, "groupe supprimé", "groupes supprimés"),
         )
-    publication_ids = queries.fetch_dirty_publication_ids(conn)
+    dirty = queries.fetch_dirty_publications(conn)
+    publication_ids = [publication_id for publication_id, _ in dirty]
     etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
     if not publication_ids:
         if orphans:
@@ -179,8 +198,7 @@ def build_groups(
     methods: Counter[str] = Counter()
     group_count = 0
     with progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
-        for start in range(0, len(publication_ids), BATCH_SIZE):
-            batch = publication_ids[start : start + BATCH_SIZE]
+        for batch in publication_batches(dirty):
             group_count += regroup(conn, queries, batch, methods, avancement.avance)
             conn.commit()
     etape(logger, "Recouvrement des listes d'auteurs")

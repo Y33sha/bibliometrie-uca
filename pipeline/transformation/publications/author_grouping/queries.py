@@ -155,12 +155,19 @@ class AuthorGroupingQueries:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment"))
 
-    def fetch_dirty_publication_ids(self, conn: Connection) -> list[int]:
-        """Publications marquées `authorships_dirty`."""
+    def fetch_dirty_publications(self, conn: Connection) -> list[tuple[int, int]]:
+        """Publications marquées `authorships_dirty`, avec le nombre de signatures d'auteur de leurs notices (`author_count`)."""
         rows = conn.execute(
-            text("SELECT id FROM publications WHERE authorships_dirty ORDER BY id")
-        ).scalars()
-        return list(rows)
+            text("""
+                SELECT p.id, coalesce(sum(sp.author_count), 0)::integer AS signatures
+                FROM publications p
+                LEFT JOIN source_publications sp ON sp.publication_id = p.id
+                WHERE p.authorships_dirty
+                GROUP BY p.id
+                ORDER BY p.id
+            """)
+        ).all()
+        return [(r.id, r.signatures) for r in rows]
 
     def fetch_signatures(
         self, conn: Connection, publication_ids: Sequence[int]
