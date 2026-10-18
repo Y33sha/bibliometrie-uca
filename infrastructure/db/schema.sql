@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9gO2jx99LSTv5MGCzhSuKhS8Zfk0n0K0stWHRMgXlKOScpvwbcpYMY8grYTsmCX
+\restrict b3LeCSBfO3jpmB2c9oaAxvEZYWC53c2pivAubzo0UI67fB4Wv4jkk6IQtE3oCsz
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1379,8 +1379,16 @@ CREATE TABLE publications.publications (
     license public.license_type,
     deposit_license public.license_type,
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
-    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    authorships_dirty boolean DEFAULT true NOT NULL
 );
+
+
+--
+-- Name: COLUMN publications.authorships_dirty; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.authorships_dirty IS 'Groupes de signatures à recalculer : une notice a rejoint ou quitté la publication, ou ses signatures ont changé.';
 
 
 --
@@ -3554,6 +3562,13 @@ CREATE INDEX publication_subjects_subject_idx ON publications.publication_subjec
 
 
 --
+-- Name: publications_authorships_dirty_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX publications_authorships_dirty_idx ON publications.publications USING btree (id) WHERE authorships_dirty;
+
+
+--
 -- Name: publications_doi_lower_key; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -4683,5 +4698,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9gO2jx99LSTv5MGCzhSuKhS8Zfk0n0K0stWHRMgXlKOScpvwbcpYMY8grYTsmCX
+\unrestrict b3LeCSBfO3jpmB2c9oaAxvEZYWC53c2pivAubzo0UI67fB4Wv4jkk6IQtE3oCsz
 
