@@ -186,7 +186,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ### Phase 3 — Usages
 
-- [ ] Rattachement `cross_source` remplacé par la propagation de la personne dans le groupe, quand le groupe en a une seule.
+- [x] Rattachement `cross_source` remplacé par la propagation de la personne dans le groupe, quand le groupe en a une seule.
 - [ ] Identification des personnes par groupe, dans le chantier de déduplication des personnes. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
 - [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
