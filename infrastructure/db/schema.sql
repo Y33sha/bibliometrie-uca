@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fyGN6BZyHXmrfGEus9ZhutFMlsBv7ltk2pv3JhFqF5tyPub9yYsJFtCMeEumVam
+\restrict 9gO2jx99LSTv5MGCzhSuKhS8Zfk0n0K0stWHRMgXlKOScpvwbcpYMY8grYTsmCX
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -142,6 +142,19 @@ CREATE TYPE public.doc_type AS ENUM (
     'data_paper',
     'proceedings',
     'media'
+);
+
+
+--
+-- Name: grouping_method; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.grouping_method AS ENUM (
+    'reference',
+    'name',
+    'identifier',
+    'order',
+    'model'
 );
 
 
@@ -1263,6 +1276,28 @@ ALTER SEQUENCE publications.authorships_id_seq OWNED BY publications.authorships
 
 
 --
+-- Name: grouped_source_authorships; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.grouped_source_authorships (
+    source_authorship_id integer NOT NULL,
+    group_id integer NOT NULL,
+    source_publication_id integer NOT NULL,
+    method public.grouping_method NOT NULL,
+    score real,
+    margin real,
+    CONSTRAINT grouped_source_authorships_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
+);
+
+
+--
+-- Name: TABLE grouped_source_authorships; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.grouped_source_authorships IS 'Appartenance d''une signature à son groupe. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
+
+
+--
 -- Name: publication_relations; Type: TABLE; Schema: publications; Owner: -
 --
 
@@ -1379,6 +1414,46 @@ CREATE SEQUENCE publications.publications_id_seq
 --
 
 ALTER SEQUENCE publications.publications_id_seq OWNED BY publications.publications.id;
+
+
+--
+-- Name: source_authorship_groups; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.source_authorship_groups (
+    id integer NOT NULL,
+    publication_id integer NOT NULL,
+    person_id integer,
+    resolution_mode public.resolution_mode,
+    reference_position smallint
+);
+
+
+--
+-- Name: TABLE source_authorship_groups; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.source_authorship_groups IS 'Signatures d''un même auteur dans une publication, avec au maximum une signature par notice. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
+
+
+--
+-- Name: source_authorship_groups_id_seq; Type: SEQUENCE; Schema: publications; Owner: -
+--
+
+CREATE SEQUENCE publications.source_authorship_groups_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: source_authorship_groups_id_seq; Type: SEQUENCE OWNED BY; Schema: publications; Owner: -
+--
+
+ALTER SEQUENCE publications.source_authorship_groups_id_seq OWNED BY publications.source_authorship_groups.id;
 
 
 --
@@ -2395,6 +2470,13 @@ ALTER TABLE ONLY publications.publications ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
+-- Name: source_authorship_groups id; Type: DEFAULT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.source_authorship_groups ALTER COLUMN id SET DEFAULT nextval('publications.source_authorship_groups_id_seq'::regclass);
+
+
+--
 -- Name: subjects id; Type: DEFAULT; Schema: publications; Owner: -
 --
 
@@ -2671,6 +2753,22 @@ ALTER TABLE ONLY publications.authorships
 
 
 --
+-- Name: grouped_source_authorships grouped_source_authorships_group_notice_uq; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.grouped_source_authorships
+    ADD CONSTRAINT grouped_source_authorships_group_notice_uq UNIQUE (group_id, source_publication_id);
+
+
+--
+-- Name: grouped_source_authorships grouped_source_authorships_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.grouped_source_authorships
+    ADD CONSTRAINT grouped_source_authorships_pkey PRIMARY KEY (source_authorship_id);
+
+
+--
 -- Name: publication_relations publication_relations_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -2708,6 +2806,22 @@ ALTER TABLE ONLY publications.publications_detail
 
 ALTER TABLE ONLY publications.publications
     ADD CONSTRAINT publications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_authorship_groups source_authorship_groups_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.source_authorship_groups
+    ADD CONSTRAINT source_authorship_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_authorship_groups source_authorship_groups_publication_person_uq; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.source_authorship_groups
+    ADD CONSTRAINT source_authorship_groups_publication_person_uq UNIQUE (publication_id, person_id);
 
 
 --
@@ -3447,6 +3561,13 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON publications.publications USIN
 
 
 --
+-- Name: source_authorship_groups_person_id_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX source_authorship_groups_person_id_idx ON publications.source_authorship_groups USING btree (person_id);
+
+
+--
 -- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -4103,6 +4224,30 @@ ALTER TABLE ONLY publications.authorships
 
 
 --
+-- Name: grouped_source_authorships grouped_source_authorships_group_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.grouped_source_authorships
+    ADD CONSTRAINT grouped_source_authorships_group_id_fkey FOREIGN KEY (group_id) REFERENCES publications.source_authorship_groups(id) ON DELETE CASCADE;
+
+
+--
+-- Name: grouped_source_authorships grouped_source_authorships_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.grouped_source_authorships
+    ADD CONSTRAINT grouped_source_authorships_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES sources.source_authorships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: grouped_source_authorships grouped_source_authorships_source_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.grouped_source_authorships
+    ADD CONSTRAINT grouped_source_authorships_source_publication_id_fkey FOREIGN KEY (source_publication_id) REFERENCES sources.source_publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publication_relations publication_relations_from_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -4156,6 +4301,22 @@ ALTER TABLE ONLY publications.publications
 
 ALTER TABLE ONLY publications.publications
     ADD CONSTRAINT publications_monograph_id_fkey FOREIGN KEY (monograph_id) REFERENCES publishing.monographs(id);
+
+
+--
+-- Name: source_authorship_groups source_authorship_groups_person_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.source_authorship_groups
+    ADD CONSTRAINT source_authorship_groups_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_authorship_groups source_authorship_groups_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.source_authorship_groups
+    ADD CONSTRAINT source_authorship_groups_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES publications.publications(id) ON DELETE CASCADE;
 
 
 --
@@ -4522,5 +4683,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fyGN6BZyHXmrfGEus9ZhutFMlsBv7ltk2pv3JhFqF5tyPub9yYsJFtCMeEumVam
+\unrestrict 9gO2jx99LSTv5MGCzhSuKhS8Zfk0n0K0stWHRMgXlKOScpvwbcpYMY8grYTsmCX
 
