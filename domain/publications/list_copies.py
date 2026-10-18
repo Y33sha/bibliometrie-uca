@@ -1,4 +1,4 @@
-"""Copies dans la liste d'auteurs d'une notice : une source recopie la liste, ou une partie, à la suite d'elle-même, ou double chaque nom sur place (A A B B…)."""
+"""Doublons d'auteur dans la liste d'une notice : la source répète tout ou partie de la liste à sa suite (A B C A B C), ou chaque nom à sa place (A A B B…)."""
 
 from collections import defaultdict
 from collections.abc import Sequence
@@ -6,9 +6,9 @@ from itertools import pairwise
 
 from domain.publications.author_grouping import Signature
 
-# Nombre de noms complets répétés au même décalage qui signale une copie.
+# Nombre de noms complets répétés au même décalage qui signale la répétition d'un bloc de la liste.
 MIN_COPIED_NAMES = 2
-# Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste doublée sur place.
+# Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place.
 MIN_DOUBLED_PAIRS = 4
 
 type Name = tuple[str, str]
@@ -25,9 +25,9 @@ def copied_signatures(signatures: Sequence[Signature]) -> dict[int, int]:
 
 
 def _block_copies(by_name: dict[Name, list[Signature]]) -> set[int]:
-    """Occurrences qui suivent la précédente du même nom d'un décalage de copie.
+    """Occurrences qui suivent la précédente du même nom d'un décalage de répétition.
 
-    Le décalage de copie est supérieur à 1 et commun à au moins `MIN_COPIED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
+    Le décalage de répétition est supérieur à 1 et commun à au moins `MIN_COPIED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
     """
     names_by_offset: dict[int, set[Name]] = defaultdict(set)
     for name, occurrences in by_name.items():

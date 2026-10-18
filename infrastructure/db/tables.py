@@ -920,8 +920,8 @@ source_authorships = Table(
         "duplicate_of",
         Integer,
         comment=(
-            "Signature dont celle-ci est la copie, dans une liste d'auteurs recopiée par la"
-            " source. Écrite par la phase author_grouping."
+            "Doublon d'auteur : signature qui répète, dans la liste d'auteurs de sa notice, la"
+            " signature référencée. Écrite par la phase author_grouping."
         ),
     ),
     Column("person_id", Integer),
