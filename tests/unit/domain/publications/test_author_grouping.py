@@ -83,6 +83,23 @@ class TestAlignPublication:
             align_publication(notices, ordered=False)
         )
 
+    def test_une_notice_qui_intervertit_nom_et_prenom_s_aligne_dans_l_ordre(self):
+        """Les quatre autres sources donnent « Roger-Leroi Valerie » : le prénom tient la place du patronyme pour toute la notice."""
+        reference = [("piaton", "sophie"), ("roger leroi", "valerie"), ("vallet", "guillaume t")]
+        inverted = [("sophie", "piaton"), ("valerie", "roger leroi"), ("guillaume", "vallet")]
+        groups = align_publication({1: _notice(1, reference), 2: _notice(2, inverted)})
+        assert _grouped(groups) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
+            [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
+            [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
+        ]
+
+    def test_a_longueur_egale_une_notice_reportee_ne_fonde_pas_les_groupes(self):
+        first = _notice(1, [("hollandts", "xavier"), ("hollandts", "xavier")])
+        second = _notice(2, [("valiorgue", "bertrand"), ("hollandts", "xavier")])
+        groups = align_publication({1: first, 2: second}, deferred={1})
+        assert {g.reference.id for g in groups} >= {200, 201}
+
     def test_le_residu_de_la_regle_est_transmis_notice_par_notice(self):
         reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
         other = [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")]

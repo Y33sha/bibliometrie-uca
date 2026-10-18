@@ -139,6 +139,29 @@ def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
     assert orphans.scalar_one() == 0
 
 
+def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
+    pub = insert_publication(conn)
+    scanr = _notice(
+        conn, pub, "scanr", "doi10.1/x", [("hollandts", "xavier"), ("hollandts", "xavier")]
+    )
+    crossref = _notice(
+        conn, pub, "crossref", "10.1/x", [("valiorgue", "bertrand"), ("hollandts", "xavier")]
+    )
+    assert scanr[0] < crossref[0]
+
+    _run(conn)
+
+    references = conn.execute(
+        text("""
+            SELECT gs.source_authorship_id FROM grouped_source_authorships gs
+            JOIN source_authorship_groups g ON g.id = gs.group_id
+            WHERE g.publication_id = :p AND gs.method = 'reference'
+        """),
+        {"p": pub},
+    ).scalars()
+    assert set(crossref) <= set(references)
+
+
 def test_les_autres_roles_s_alignent_par_le_nom(conn):
     pub = insert_publication(conn)
     theses = _notice(

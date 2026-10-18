@@ -28,7 +28,7 @@ _SIGNATURES_SQL = text("""
           AND NOT (n.source = 'scanr' AND n.source_id LIKE 'hal%' AND EXISTS (
                 SELECT 1 FROM notices h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
     )
-    SELECT k.publication_id, k.id AS notice, sa.id, sa.author_position AS position, sa.roles,
+    SELECT k.publication_id, k.id AS notice, k.source, sa.id, sa.author_position AS position, sa.roles,
            aik.last_name_normalized AS last_name,
            coalesce(aik.first_name_normalized, '') AS first_name,
            coalesce(aik.person_identifiers ->> 'orcid', '') AS orcid,
@@ -86,6 +86,7 @@ class SignatureRow:
 
     publication_id: int
     notice: int
+    source: str
     id: int
     position: int | None
     roles: list[str] | None

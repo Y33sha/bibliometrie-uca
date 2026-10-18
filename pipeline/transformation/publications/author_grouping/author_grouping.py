@@ -38,6 +38,8 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
 BATCH_SIZE = 1000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
 AUTHOR = "author"
+# Source dont la notice passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
+DEFERRED_SOURCE = "scanr"
 
 
 def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
@@ -69,14 +71,20 @@ def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Si
     return by_class
 
 
+def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
+    """Notices de `DEFERRED_SOURCE` parmi les signatures d'une publication."""
+    return {row.notice for row in rows if row.source == DEFERRED_SOURCE}
+
+
 def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
     """Groupes des signatures d'une publication, classe de rôle par classe de rôle."""
+    deferred = deferred_notices(rows)
     groups: list[Group] = []
     for role_class, notices in sorted(notices_by_role(rows).items()):
         if role_class == AUTHOR:
-            groups += align_publication(notices, model=_MODEL, assign=assign)
+            groups += align_publication(notices, model=_MODEL, assign=assign, deferred=deferred)
         else:
-            groups += align_publication(notices, ordered=False)
+            groups += align_publication(notices, ordered=False, deferred=deferred)
     return groups
 
 

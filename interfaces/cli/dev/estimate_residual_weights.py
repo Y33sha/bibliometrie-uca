@@ -43,6 +43,7 @@ from pipeline.transformation.publications.author_grouping import residual_weight
 from pipeline.transformation.publications.author_grouping.author_grouping import (
     AUTHOR,
     BATCH_SIZE,
+    deferred_notices,
     notices_by_role,
 )
 from pipeline.transformation.publications.author_grouping.queries import (
@@ -154,7 +155,11 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
                 notices = notices_by_role(rows).get(AUTHOR, {})
                 if len(notices) < 2:
                     continue
-                align_publication(notices, on_residual=_collector(residual, publication_id))
+                align_publication(
+                    notices,
+                    on_residual=_collector(residual, publication_id),
+                    deferred=deferred_notices(rows),
+                )
                 if max(len(sigs) for sigs in notices.values()) <= FULL_MODEL_MAX_AUTHORS:
                     signatures += [
                         {

@@ -5,8 +5,8 @@ Les notices d'une publication se traitent de la plus longue liste d'auteurs à l
 
 import math
 from bisect import bisect_left
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import lru_cache
 
@@ -360,6 +360,18 @@ def _author(s: Signature, gap_index: int) -> Author:
     return Author(s.last_name, s.first_name, s.orcid, s.idref, gap_index)
 
 
+def _swapped(s: Signature) -> Signature:
+    return replace(s, last_name=s.first_name, first_name=s.last_name)
+
+
+def _inverted(sigs: Sequence[Signature], groups: Sequence[Group]) -> bool:
+    """La notice donne le prénom à la place du patronyme : plus de ses prénoms que de ses patronymes sont des patronymes de groupes."""
+    last_names = {g.reference.last_name for g in groups if g.reference.last_name}
+    direct = sum(s.last_name in last_names for s in sigs)
+    swapped = sum(bool(s.first_name) and s.first_name in last_names for s in sigs)
+    return swapped > direct
+
+
 def _residual_links(
     notice: _NoticeLinks, signatures: Mapping[int, Signature], model: ResidualModel, assign: Assign
 ) -> dict[int, tuple[int, float, float]]:
@@ -412,15 +424,20 @@ def align_publication(
     model: ResidualModel | None = None,
     assign: Assign | None = None,
     on_residual: ResidualSink | None = None,
+    deferred: Collection[int] = (),
 ) -> list[Group]:
     """Groupes de signatures d'une publication.
 
-    Les notices se traitent de la plus longue à la plus courte, puis par identifiant, chacune face aux groupes déjà formés. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
+    Les notices se traitent de la plus longue à la plus courte, chacune face aux groupes déjà formés. À longueur égale, les notices `deferred` passent après les autres, puis l'ordre suit l'identifiant de notice. Une notice qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
     signatures = {s.id: s for sigs in notices.values() for s in sigs}
     groups: list[Group] = []
-    for i, notice_id in enumerate(sorted(notices, key=lambda n: (-len(notices[n]), n))):
+    order = sorted(notices, key=lambda n: (-len(notices[n]), n in deferred, n))
+    for i, notice_id in enumerate(order):
         sigs = sorted(notices[notice_id], key=lambda s: (s.position, s.id))
+        if i and _inverted(sigs, groups):
+            sigs = [_swapped(s) for s in sigs]
+            signatures.update((s.id, s) for s in sigs)
         links: dict[int, int] = {}
         methods: dict[int, GroupingMethod] = {}
         scores: dict[int, tuple[float, float]] = {}
