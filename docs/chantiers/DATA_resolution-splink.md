@@ -25,7 +25,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ### Phase 1 — Cadrage
 
 - [ ] Trancher l'algorithme de résolution des personnes : cascade de règles ou modèle probabiliste, et avec lui le recalcul complet de la résolution.
-- [ ] Rattachements par identifiant sans appui. Au 2026-10-18, 2 232 signatures sont rattachées par identifiant à une personne qui ne détient aucun de leurs identifiants ; pour 885, l'identifiant est rejeté pour cette personne. La réattribution d'un identifiant par la phase `persons` détache les rattachements de l'ancien titulaire. Le rejet et la réattribution à l'administration les laissent en place.
+- [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. Ils sont à réexaminer sur les autres critères (nom, groupe), sans détachement systématique. L'identifiant de la signature est souvent faux alors que la personne est la bonne.
 
 ## Questions ouvertes
 
