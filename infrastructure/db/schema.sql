@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict uclnfKHkBCjLzeaLmvQcq0Q5PcZeBJAWDjpUCY2GtEGH7K9Idsxd6IugNCX6I3z
+\restrict gxgZM7SOQzVbAaPAhYNtRgchryYofpqMeoH2UrbrfTqdIVGYgDKgvwL3akEVipA
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1002,7 +1002,7 @@ COMMENT ON COLUMN sources.source_authorships.collective IS 'Signature collective
 -- Name: COLUMN source_authorships.duplicate_of; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON COLUMN sources.source_authorships.duplicate_of IS 'Signature dont celle-ci est la copie, dans une liste d''auteurs recopiée par la source. Écrite par la phase author_grouping.';
+COMMENT ON COLUMN sources.source_authorships.duplicate_of IS 'Doublon d''auteur : signature qui répète, dans la liste d''auteurs de sa notice, la signature référencée. Écrite par la phase author_grouping.';
 
 
 --
@@ -4776,5 +4776,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict uclnfKHkBCjLzeaLmvQcq0Q5PcZeBJAWDjpUCY2GtEGH7K9Idsxd6IugNCX6I3z
+\unrestrict gxgZM7SOQzVbAaPAhYNtRgchryYofpqMeoH2UrbrfTqdIVGYgDKgvwL3akEVipA
 
