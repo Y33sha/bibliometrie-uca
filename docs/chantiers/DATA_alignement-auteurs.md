@@ -148,26 +148,28 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ### Phase 2 — Méthode et modèle
 
-- [ ] Méthode d'alignement, choisie d'après la mesure. Essai du 2026-10-17, dans `data/experiments/alignement-auteurs/` (non versionné).
-  - Modèle de Fellegi-Sunter (Splink). Les poids s'estiment par EM sur les paires de signatures d'une même publication. Comparaisons : nom, prénom, ORCID, IdRef, `hal_person_id` (égalité seule), position selon l'écart et la longueur de liste.
-  - Affectation hongroise entre chaque paire de notices. Un lien est retenu quand les preuves dépassent log2 de la longueur de liste.
-  - Le dernier auteur restant de chaque liste est lié quand les auteurs liés qui le précèdent sont les mêmes des deux côtés.
-  - Une notice scanR recopiée d'un dépôt HAL est exclue quand la publication a ce dépôt.
-  - Au-delà de 100 auteurs, un modèle distinct compare les seules paires de même position, de même identifiant ou aux noms de mêmes trois premières lettres.
-  - Les notices s'affectent aux groupes déjà formés, de la plus longue liste à la plus courte : un groupe a au plus une signature par notice.
-  - Règle comparée, 2026-10-18 : même nom unique de part et d'autre ; sinon nom et initiale uniques ; sinon identifiant partagé, puis ordre des positions ; enfin, entre deux liens, les signatures restantes se lient dans l'ordre à effectifs égaux. Sur 1 000 publications tirées au hasard, 100 désaccords relus à l'aveugle :
+- [x] Méthode d'alignement, choisie d'après la mesure : une règle de noms, puis un modèle de Fellegi-Sunter sur le résidu. Essais des 17 et 18 octobre 2026, dans `data/experiments/alignement-auteurs/` (non versionné).
+  - Les notices se traitent de la plus longue liste à la plus courte, chacune face aux groupes déjà formés : un groupe a au plus une signature par notice. Une notice scanR recopiée d'un dépôt HAL est exclue quand la publication a ce dépôt.
+  - Règle, à l'intérieur de chaque patronyme :
+    1. patronyme unique des deux côtés ;
+    2. patronyme et prénom complet uniques ;
+    3. patronyme et initiale uniques ;
+    4. ORCID ou IdRef partagé, à patronyme égal ;
+    5. filtre d'ordre : seule la plus longue suite de liens rangés dans le même ordre des deux côtés est gardée, les autres liens passent au résidu ;
+    6. dans chaque trou entre deux liens, patronyme et initiale en nombre égal des deux côtés : lien dans l'ordre des positions.
+  - Résidu : modèle de Fellegi-Sunter (Splink), estimé par EM sur les seules signatures restantes. Comparaisons : patronyme, prénom, ORCID, IdRef, trou (même trou, trou voisin, ailleurs). Affectation hongroise : un lien est retenu quand les preuves dépassent log2 du nombre de groupes restants. Les poids d'ORCID et d'IdRef viennent d'un modèle estimé sur toutes les paires : sur le résidu, l'EM ne les identifie pas.
+  - Le résidu fait 1,9 % des liens jusqu'à 100 auteurs, 10,6 % au-delà.
+  - Évaluation sur trois relectures :
 
-    | Listes | Paires liées par les deux | Fellegi-Sunter seul (juste / faux) | Règle seule (juste / faux) |
+    | Méthode | 326 paires de la phase 1 | 97 désaccords entre Fellegi-Sunter et une règle sans filtre d'ordre | 47 écarts de l'hybride au consensus des deux autres |
     |---|---|---|---|
-    | 100 auteurs au plus | 35 585 | 43 (25 / 0 sur 25 relus) | 49 (19 / 6 sur 25 relus) |
-    | plus de 100 auteurs | 321 494 | 5 459 (11 / 12 sur 25 relus) | 38 106 (20 / 4 sur 25 relus) |
+    | Fellegi-Sunter seul, position absolue | 312 | 46 | 33 |
+    | Règle sans filtre d'ordre, trous comblés dans l'ordre | 314 | 51 | 33 |
+    | Règle, puis Fellegi-Sunter sur le résidu | 315 | 86 | 39 |
 
-    Jusqu'à 100 auteurs, les deux méthodes s'accordent à 99,7 % et Fellegi-Sunter se trompe un peu moins. Au-delà, la règle se trompe environ quatre fois moins : l'ordre des positions départage les homonymes.
-  - Résultat sur les 326 paires relues en phase 1 : 312 correctes pour Fellegi-Sunter, 314 pour la règle. La règle évite les erreurs de noms fréquents et rate davantage de prénoms divergents. Erreurs de Fellegi-Sunter :
-    - 4 noms fréquents (Kim, Zhang) liés à la même position malgré des prénoms différents, dans des listes de plus de 400 auteurs ;
-    - 3 paires d'un auteur en double dans une notice HAL ;
-    - 3 paires « autre personne » et 2 « HAL a raison » non liées ;
-    - 1 auteur déplacé et 1 variante de nom non liés.
+  - Fellegi-Sunter seul confond les homonymes des grandes listes (Kim, Zhang). Sans filtre d'ordre, l'étape du patronyme unique lie des auteurs éloignés quand les sources découpent autrement nom et prénom (« A. Ferrer » en position 757, « J. A. Valls Ferrer » en position 2579).
+  - Erreurs restantes sur les 326 paires : auteur en double dans une notice HAL, prénom faux dans HAL, noms différents à la même position, un auteur déplacé, une variante de nom.
+  - Limite : trois « Y. Zhang » consécutifs, dans l'ordre inverse chez Crossref et chez HAL. Seuls les noms déclarés dans le registre ORCID les départagent.
 - [ ] Modèle : table des auteurs alignés portant `person_id`, lien de chaque signature à son auteur, contraintes d'unicité.
 - [ ] Marquage à recalculer d'un auteur aligné dont une signature change d'identifiants.
 
@@ -186,8 +188,6 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ## Questions ouvertes
 
-- **Méthode.** Affectation par similarité de noms sous les contraintes des identifiants. Rôle de la position : indice faible, ou critère pour les seules listes courtes.
-- **Identifiants différents entre sources.** Deux valeurs différentes d'un même type, à des signatures de sources différentes, séparent-elles deux signatures ? Une personne peut avoir deux IdRef ou deux comptes ORCID.
 - **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
