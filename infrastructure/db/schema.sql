@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict grRk7TaPUeleQuEwL5RQZolgmK3EqxJss8otcu9UrWx43bUuLJFTzfHsL1Xvyez
+\restrict uclnfKHkBCjLzeaLmvQcq0Q5PcZeBJAWDjpUCY2GtEGH7K9Idsxd6IugNCX6I3z
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -964,6 +964,7 @@ CREATE TABLE sources.source_authorships (
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
     countries text[],
     collective boolean DEFAULT false NOT NULL,
+    duplicate_of integer,
     CONSTRAINT source_authorships_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
 );
 ALTER TABLE ONLY sources.source_authorships ALTER COLUMN source_publication_id SET (n_distinct=-0.0134);
@@ -995,6 +996,13 @@ COMMENT ON COLUMN sources.source_authorships.countries IS 'Pays de la signature 
 --
 
 COMMENT ON COLUMN sources.source_authorships.collective IS 'Signature collective (collaboration, consortium, groupe d''étude…), posée par la normalisation d''après le signal de la source ou d''après le nom.';
+
+
+--
+-- Name: COLUMN source_authorships.duplicate_of; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_authorships.duplicate_of IS 'Signature dont celle-ci est la copie, dans une liste d''auteurs recopiée par la source. Écrite par la phase author_grouping.';
 
 
 --
@@ -4086,6 +4094,13 @@ CREATE UNIQUE INDEX source_authorship_structures_pkey ON sources.source_authorsh
 
 
 --
+-- Name: source_authorships_duplicate_of_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX source_authorships_duplicate_of_idx ON sources.source_authorships USING btree (duplicate_of) WHERE (duplicate_of IS NOT NULL);
+
+
+--
 -- Name: addresses_normalized_text_key; Type: INDEX; Schema: structures; Owner: -
 --
 
@@ -4598,6 +4613,14 @@ ALTER TABLE ONLY sources.source_authorship_rors
 
 
 --
+-- Name: source_authorships source_authorships_duplicate_of_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_authorships
+    ADD CONSTRAINT source_authorships_duplicate_of_fkey FOREIGN KEY (duplicate_of) REFERENCES sources.source_authorships(id) ON DELETE SET NULL;
+
+
+--
 -- Name: source_authorships source_authorships_identity_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -4753,5 +4776,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict grRk7TaPUeleQuEwL5RQZolgmK3EqxJss8otcu9UrWx43bUuLJFTzfHsL1Xvyez
+\unrestrict uclnfKHkBCjLzeaLmvQcq0Q5PcZeBJAWDjpUCY2GtEGH7K9Idsxd6IugNCX6I3z
 
