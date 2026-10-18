@@ -82,7 +82,7 @@ TO bibliometrie_app;
 
 GRANT UPDATE ON
     structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_authorships,
-    sources.source_publications
+    sources.source_publications, publications.source_authorship_groups
 TO bibliometrie_app;
 
 -- Une table créée par une migration future est lisible, et rien de plus : sa nature se
