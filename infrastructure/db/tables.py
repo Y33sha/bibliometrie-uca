@@ -1121,6 +1121,8 @@ publications = Table(
     # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
+    # Groupes de signatures à recalculer : posé par `normalize` et `publications`, retiré par la phase des groupes.
+    Column("authorships_dirty", Boolean, nullable=False, server_default="true"),
     # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
     # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
