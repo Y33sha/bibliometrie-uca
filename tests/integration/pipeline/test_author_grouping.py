@@ -102,6 +102,20 @@ def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
     assert kept.scalar_one() == person
 
 
+def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
+    pub = insert_publication(conn)
+    _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+    _notice(conn, pub, "openalex", "W1", [("martin", "a"), ("petit", "b")])
+    _run(conn)
+    tuples = "SELECT source_authorship_id, ctid::text FROM grouped_source_authorships"
+    before = dict(conn.execute(text(tuples)).all())
+    conn.execute(text("UPDATE publications SET authorships_dirty = true WHERE id = :p"), {"p": pub})
+
+    _run(conn)
+
+    assert dict(conn.execute(text(tuples)).all()) == before
+
+
 def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
     """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la signature."""
     monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)

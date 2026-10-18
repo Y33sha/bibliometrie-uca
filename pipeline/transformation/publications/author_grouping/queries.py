@@ -40,17 +40,16 @@ _SIGNATURES_SQL = text("""
 """)
 
 _GROUPS_SQL = text("""
-    SELECT g.id, g.publication_id, gs.source_authorship_id
+    SELECT g.id, g.publication_id, gs.source_authorship_id, gs.source_publication_id,
+           gs.method::text AS method, gs.score, gs.margin
     FROM source_authorship_groups g
     LEFT JOIN grouped_source_authorships gs ON gs.group_id = g.id
     WHERE g.publication_id = ANY(:publications)
 """)
 
-_DELETE_MEMBERSHIPS_SQL = text("""
-    DELETE FROM grouped_source_authorships gs
-    USING source_authorship_groups g
-    WHERE gs.group_id = g.id AND g.publication_id = ANY(:publications)
-""")
+_DELETE_MEMBERSHIPS_SQL = text(
+    "DELETE FROM grouped_source_authorships WHERE source_authorship_id = ANY(:signatures)"
+)
 
 _DELETE_GROUPS_SQL = text("DELETE FROM source_authorship_groups WHERE id = ANY(:ids)")
 
@@ -181,14 +180,23 @@ class AuthorGroupingQueries:
 
     def fetch_groups(
         self, conn: Connection, publication_ids: Sequence[int]
-    ) -> dict[int, dict[int, set[int]]]:
-        """Signatures des groupes en base : publication → groupe → signatures."""
-        out: dict[int, dict[int, set[int]]] = {}
+    ) -> tuple[dict[int, dict[int, set[int]]], dict[int, MembershipRow]]:
+        """Groupes en base de ces publications : publication → groupe → signatures, et appartenance de chaque signature groupée."""
+        groups: dict[int, dict[int, set[int]]] = {}
+        memberships: dict[int, MembershipRow] = {}
         for row in conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
-            members = out.setdefault(row.publication_id, {}).setdefault(row.id, set())
+            members = groups.setdefault(row.publication_id, {}).setdefault(row.id, set())
             if row.source_authorship_id is not None:
                 members.add(row.source_authorship_id)
-        return out
+                memberships[row.source_authorship_id] = MembershipRow(
+                    row.source_authorship_id,
+                    row.id,
+                    row.source_publication_id,
+                    row.method,
+                    row.score,
+                    row.margin,
+                )
+        return groups, memberships
 
     def group_ids(self, conn: Connection, n: int) -> list[int]:
         """`n` identifiants tirés de la séquence des groupes."""
@@ -201,13 +209,14 @@ class AuthorGroupingQueries:
         conn: Connection,
         publication_ids: Sequence[int],
         groups: Sequence[GroupRow],
+        removed: Sequence[int],
         memberships: Sequence[MembershipRow],
         unmatched_ids: Sequence[int],
         copies: Mapping[int, int],
     ) -> None:
         """Écrit les groupes et les signatures copiées de ces publications, et retire leur drapeau `authorships_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les groupes `unmatched_ids` sont supprimés. `copies` : signature copiée → signature dont elle est la copie (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les appartenances des signatures `removed` sont supprimées, puis `memberships` est inséré. Les groupes `unmatched_ids` sont supprimés. `copies` : signature copiée → signature dont elle est la copie (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
         """
         conn.execute(
             _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
@@ -216,12 +225,8 @@ class AuthorGroupingQueries:
             conn.execute(
                 _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
             )
-        conn.execute(_DELETE_MEMBERSHIPS_SQL, {"publications": list(publication_ids)})
-        # Signature d'une notice venue d'une autre publication, encore rattachée à un groupe de celle-ci.
-        conn.execute(
-            text("DELETE FROM grouped_source_authorships WHERE source_authorship_id = ANY(:ids)"),
-            {"ids": [m.signature for m in memberships]},
-        )
+        if removed:
+            conn.execute(_DELETE_MEMBERSHIPS_SQL, {"signatures": list(removed)})
         if unmatched_ids:
             conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
         kept = [g for g in groups if g.existing]

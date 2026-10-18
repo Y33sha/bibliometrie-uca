@@ -6,9 +6,10 @@ Nœud `author_grouping.build`.
 """
 
 import logging
+import math
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from scipy.optimize import linear_sum_assignment
@@ -112,20 +113,46 @@ def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[i
     return groups, copies
 
 
+def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
+    """L'appartenance en base vaut l'appartenance calculée. Le score et la marge sont comparés à la précision de leur colonne (`real`)."""
+    if stored is None:
+        return False
+
+    def close(a: float | None, b: float | None) -> bool:
+        return a is None if b is None else a is not None and math.isclose(a, b, rel_tol=1e-6)
+
+    return (
+        (stored.group, stored.notice, stored.method)
+        == (planned.group, planned.notice, planned.method)
+        and close(stored.score, planned.score)
+        and close(stored.margin, planned.margin)
+    )
+
+
+def membership_changes(
+    stored: Mapping[int, MembershipRow], planned: Sequence[MembershipRow]
+) -> tuple[list[int], list[MembershipRow]]:
+    """Signatures dont l'appartenance en base disparaît ou change, et appartenances à insérer. Une appartenance inchangée reste en place."""
+    inserted = [m for m in planned if not _same_membership(stored.get(m.signature), m)]
+    kept = {m.signature for m in planned}
+    removed = [s for s in stored if s not in kept] + [m.signature for m in inserted]
+    return removed, inserted
+
+
 def _plan_batch(
     queries: AuthorGroupingQueries,
     conn: Connection,
     publication_ids: Sequence[int],
     methods: Counter[str],
     on_publication: Callable[[], None],
-) -> tuple[list[GroupRow], list[MembershipRow], list[int], dict[int, int]]:
-    """Groupes et appartenances à écrire pour un lot de publications, groupes en base sans correspondant, et signatures copiées. `on_publication` est appelé après chaque publication calculée."""
+) -> tuple[list[GroupRow], list[int], list[MembershipRow], list[int], dict[int, int]]:
+    """Plan d'écriture d'un lot de publications : groupes, signatures dont l'appartenance est à supprimer, appartenances à insérer, groupes en base sans correspondant, signatures copiées. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SignatureRow]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
         rows_by_publication.setdefault(row.publication_id, []).append(row)
         positions[row.id] = row.position
-    existing = queries.fetch_groups(conn, publication_ids)
+    existing, stored = queries.fetch_groups(conn, publication_ids)
     planned: list[tuple[int, Group, int | None]] = []
     unmatched: list[int] = []
     copies: dict[int, int] = {}
@@ -151,7 +178,8 @@ def _plan_batch(
             memberships.append(
                 MembershipRow(m.signature, group_id, m.notice, str(m.method), m.score, m.margin)
             )
-    return group_rows, memberships, unmatched, copies
+    removed, inserted = membership_changes(stored, memberships)
+    return group_rows, removed, inserted, unmatched, copies
 
 
 def regroup(
@@ -162,14 +190,14 @@ def regroup(
     on_publication: Callable[[], None] = lambda: None,
 ) -> int:
     """Recalcule et écrit les groupes et les signatures copiées de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
-    groups, memberships, unmatched, copies = _plan_batch(
+    groups, removed, inserted, unmatched, copies = _plan_batch(
         queries,
         conn,
         publication_ids,
         methods if methods is not None else Counter(),
         on_publication,
     )
-    queries.write(conn, publication_ids, groups, memberships, unmatched, copies)
+    queries.write(conn, publication_ids, groups, removed, inserted, unmatched, copies)
     return len(groups)
 
 
