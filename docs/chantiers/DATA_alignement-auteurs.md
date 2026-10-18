@@ -163,7 +163,11 @@ Les verdicts manuels sur les signatures ont deux ancrages :
     | plus de 100 auteurs | 321 494 | 5 459 (11 / 12 sur 25 relus) | 38 106 (20 / 4 sur 25 relus) |
 
     Jusqu'à 100 auteurs, les deux méthodes s'accordent à 99,7 % et Fellegi-Sunter se trompe un peu moins. Au-delà, la règle se trompe environ quatre fois moins : l'ordre des positions départage les homonymes.
-  - Résultat sur les 326 paires relues en phase 1 : 312 correctes pour Fellegi-Sunter, 314 pour la règle. Erreurs de Fellegi-Sunter : 4 noms fréquents (Kim, Zhang) liés à la même position malgré des prénoms différents, dans des listes de plus de 400 auteurs ; 3 paires d'un auteur en double dans une notice HAL ; 3 paires « autre personne » non liées ; 2 « HAL a raison » non liés ; 1 auteur déplacé non lié ; 1 variante de nom non liée. La règle évite les 4 erreurs de noms fréquents et rate davantage de prénoms divergents.
+  - Résultat sur les 326 paires relues en phase 1 : 312 correctes pour Fellegi-Sunter, 314 pour la règle. La règle évite les erreurs de noms fréquents et rate davantage de prénoms divergents. Erreurs de Fellegi-Sunter :
+    - 4 noms fréquents (Kim, Zhang) liés à la même position malgré des prénoms différents, dans des listes de plus de 400 auteurs ;
+    - 3 paires d'un auteur en double dans une notice HAL ;
+    - 3 paires « autre personne » et 2 « HAL a raison » non liées ;
+    - 1 auteur déplacé et 1 variante de nom non liés.
 - [ ] Modèle : table des auteurs alignés portant `person_id`, lien de chaque signature à son auteur, contraintes d'unicité.
 - [ ] Marquage à recalculer d'un auteur aligné dont une signature change d'identifiants.
 
