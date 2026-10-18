@@ -153,9 +153,14 @@ def build_groups(
     """Supprime les groupes des publications supprimées, puis recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
     orphans = queries.delete_orphan_groups(conn)
     conn.commit()
-    etape(logger, "%s de publications supprimées retirés", accord(orphans, "groupe"))
+    if orphans:
+        etape(
+            logger,
+            "%s : leur publication n'existe plus",
+            accord(orphans, "groupe supprimé", "groupes supprimés"),
+        )
     publication_ids = queries.fetch_dirty_publication_ids(conn)
-    etape(logger, "%s à regrouper", accord(len(publication_ids), "publication"))
+    etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
     if not publication_ids:
         rien_a_faire(logger)
         return PhaseMetrics()

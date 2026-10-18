@@ -1169,7 +1169,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
-    "author_grouping": "Groupes des signatures d'un même auteur dans chaque publication",
+    "author_grouping": "Alignement des auteurs liés aux notices de la même publication",
     "persons": "Résolution de l'identité des personnes",
     "authorships": "Rafraîchissement des liens entre publications, personnes et structures",
     "relations": "Relations entre publications apparentées",
