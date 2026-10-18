@@ -29,6 +29,7 @@ from pipeline.ingestion.http.dump_download import (
 )
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.http_status import raise_for_status
+from pipeline.ingestion.http.tls import tls_context
 
 ZENODO_HOST = "zenodo.org"
 
@@ -54,6 +55,7 @@ def published_ror_version(*, user_agent: str) -> str | None:
             f"{API_BASE_URLS['datacite']}/dois/{ROR_DATA_CONCEPT_DOI}",
             headers={"User-Agent": user_agent},
             timeout=15,
+            verify=tls_context(),
         )
         raise_for_status(response)
         attributes = as_mapping(as_mapping(response.json().get("data")).get("attributes"))
@@ -128,7 +130,7 @@ def download_ror_dump(
     """
     logger.info("Téléchargement du dump ROR %s …", dump.name)
     with (
-        httpx2.Client(timeout=timeout, follow_redirects=False) as client,
+        httpx2.Client(timeout=timeout, follow_redirects=False, verify=tls_context()) as client,
         client.stream("GET", dump.url, headers={"User-Agent": user_agent}) as resp,
     ):
         raise_for_status(resp)

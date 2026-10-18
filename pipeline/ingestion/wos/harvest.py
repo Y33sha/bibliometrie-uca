@@ -25,6 +25,7 @@ from pipeline.ingestion.http.api_params import WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
+from pipeline.ingestion.http.tls import tls_context
 from pipeline.ingestion.wos.fields import (
     build_query,
     extract_doi,
@@ -116,6 +117,7 @@ class WosClient:
             headers=self._headers,
             params={"databaseId": "WOS", "usrQuery": "OG=(test)", "count": "0", "firstRecord": "1"},
             timeout=30,
+            verify=tls_context(),
         )
         if resp.status_code in (401, 403):
             raise RuntimeError(

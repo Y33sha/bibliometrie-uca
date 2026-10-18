@@ -17,6 +17,7 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import decide_oa_status
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.http.tls import tls_context
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
@@ -157,7 +158,7 @@ async def _verifier(
     # La `Connection` SA sync n'est pas thread-safe ; les writes concurrents d'un paquet passent par `to_thread` sous ce lock (le commit, lui, se fait à la frontière de paquet, hors concurrence).
     db_lock = asyncio.Lock()
 
-    async with httpx2.AsyncClient() as client:
+    async with httpx2.AsyncClient(verify=tls_context()) as client:
 
         async def process_one(
             pub_id: int, doi: str, current_status: str | None, has_open_deposit: bool

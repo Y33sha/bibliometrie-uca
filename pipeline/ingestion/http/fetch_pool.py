@@ -18,6 +18,8 @@ from collections.abc import Awaitable, Callable, Sequence
 import httpx2
 from sqlalchemy import Connection
 
+from pipeline.ingestion.http.tls import tls_context
+
 
 class RequestPace:
     """Plafond de débit commun à des requêtes simultanées : les départs sont réservés l'un après l'autre, espacés de `1 / max_per_second` seconde.
@@ -59,7 +61,7 @@ async def run_fetch_pool[Item, Fetched](
     item_iter = iter(items)
     done = 0
 
-    async with httpx2.AsyncClient() as client:
+    async with httpx2.AsyncClient(verify=tls_context()) as client:
 
         async def worker() -> None:
             nonlocal done

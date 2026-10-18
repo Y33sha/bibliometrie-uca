@@ -32,6 +32,7 @@ from pipeline.ingestion.http.circuit_breaker import (
 )
 from pipeline.ingestion.http.http_status import raise_for_status
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
+from pipeline.ingestion.http.tls import tls_context
 
 logger = logging.getLogger(__name__)
 
@@ -119,9 +120,12 @@ def http_request_with_retry(
                 headers=headers,
                 auth=auth,
                 timeout=timeout,
+                verify=tls_context(),
             )
             if (target := _same_host_redirect(resp)) is not None:
-                resp = httpx2.request("GET", target, headers=headers, auth=auth, timeout=timeout)
+                resp = httpx2.request(
+                    "GET", target, headers=headers, auth=auth, timeout=timeout, verify=tls_context()
+                )
         except httpx2.RequestError as e:
             last_error = e
             if is_last:

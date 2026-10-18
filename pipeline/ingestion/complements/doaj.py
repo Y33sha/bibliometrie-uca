@@ -22,6 +22,7 @@ from pipeline.ingestion.http.dump_download import (
     write_capped,
 )
 from pipeline.ingestion.http.http_status import raise_for_status
+from pipeline.ingestion.http.tls import tls_context
 
 DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
 """Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
@@ -78,7 +79,7 @@ def fetch_doaj_dump(
     logger.info("Téléchargement du dump DOAJ depuis %s", url, extra={"detail": True})
     target = httpx2.URL(url)
     headers = {"User-Agent": user_agent}
-    with httpx2.Client(timeout=timeout, follow_redirects=False) as client:
+    with httpx2.Client(timeout=timeout, follow_redirects=False, verify=tls_context()) as client:
         for _ in range(_MAX_REDIRECTS + 1):
             with client.stream("GET", target, headers=headers) as resp:
                 if resp.is_redirect:
