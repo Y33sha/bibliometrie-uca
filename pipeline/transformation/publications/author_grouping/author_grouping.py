@@ -7,7 +7,7 @@ Nœud `author_grouping.build`.
 
 import logging
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 
 from scipy.optimize import linear_sum_assignment
@@ -80,8 +80,9 @@ def _plan_batch(
     conn: Connection,
     publication_ids: Sequence[int],
     methods: Counter[str],
+    on_publication: Callable[[], None],
 ) -> tuple[list[GroupRow], list[MembershipRow], list[int]]:
-    """Groupes et appartenances à écrire pour un lot de publications, et groupes en base sans correspondant."""
+    """Groupes et appartenances à écrire pour un lot de publications, et groupes en base sans correspondant. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SignatureRow]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
@@ -96,6 +97,7 @@ def _plan_batch(
         plan = plan_group_ids(old, [frozenset(m.signature for m in g.members) for g in groups])
         planned += [(publication_id, g, gid) for g, gid in zip(groups, plan, strict=True)]
         unmatched += sorted(set(old) - {gid for gid in plan if gid is not None})
+        on_publication()
     fresh = iter(queries.group_ids(conn, sum(1 for *_, gid in planned if gid is None)))
     group_rows: list[GroupRow] = []
     memberships: list[MembershipRow] = []
@@ -128,11 +130,12 @@ def build_groups(
     with progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
         for start in range(0, len(publication_ids), BATCH_SIZE):
             batch = publication_ids[start : start + BATCH_SIZE]
-            groups, memberships, unmatched = _plan_batch(queries, conn, batch, methods)
+            groups, memberships, unmatched = _plan_batch(
+                queries, conn, batch, methods, avancement.avance
+            )
             queries.write(conn, batch, groups, memberships, unmatched)
             conn.commit()
             group_count += len(groups)
-            avancement.avance(len(batch))
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),
