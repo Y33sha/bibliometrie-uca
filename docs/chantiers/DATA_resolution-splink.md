@@ -26,6 +26,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 - [ ] Trancher l'algorithme de résolution des personnes : cascade de règles ou modèle probabiliste, et avec lui le recalcul complet de la résolution.
 - [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. Ils sont à réexaminer sur les autres critères (nom, groupe), sans détachement systématique. L'identifiant de la signature est souvent faux alors que la personne est la bonne.
+- [ ] Doublons d'auteur des notices écartées de l'alignement (notice scanR issue d'un dépôt HAL présent, notice DataCite au DOI convergé) : `author_grouping` ne les détecte pas, donc la résolution les rattache à une personne. 358 notices au 2026-10-18.
 
 ## Questions ouvertes
 
