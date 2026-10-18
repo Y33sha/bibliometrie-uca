@@ -246,7 +246,7 @@ class CountryQueries:
         if not rows:
             return 0
         payload = json.dumps([{"id": addr_id, "c": codes} for addr_id, codes in rows])
-        return conn.execute(
+        marked = conn.execute(
             text(
                 """
                 WITH proposed AS (
@@ -265,6 +265,7 @@ class CountryQueries:
             ),
             {"payload": payload, "method": method.value},
         ).scalar_one()
+        return int(marked)
 
     def replace_candidates_of_dirty_addresses(
         self,
@@ -291,7 +292,7 @@ class CountryQueries:
 
     def insert_ror_candidates(self, conn: Connection) -> int:
         """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque `candidates_dirty` les adresses qui en reçoivent un. Retourne le nombre d'adresses qui reçoivent un candidat."""
-        return conn.execute(
+        marked = conn.execute(
             text(
                 """
                 WITH added AS (
@@ -307,6 +308,7 @@ class CountryQueries:
                 + _MARK_DIRTY
             )
         ).scalar_one()
+        return int(marked)
 
     def resolve_address_countries(
         self, conn: Connection, address_ids: list[int] | None = None
