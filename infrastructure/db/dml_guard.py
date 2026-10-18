@@ -34,6 +34,9 @@ def _mark_dml(
 
 
 def _clear_dml_flag(conn: Connection) -> None:
+    """Réarme le flag. Une connexion invalidée, après une interruption pendant une requête par exemple, est laissée telle quelle : lire son `info` tenterait de la reconnecter."""
+    if conn.invalidated:
+        return
     conn.info.pop(_DIRTY_KEY, None)
     conn.info.pop(_STACK_KEY, None)
 

@@ -13,6 +13,8 @@ Deux niveaux :
 """
 
 import os
+import signal
+import threading
 from collections.abc import Iterator
 from types import SimpleNamespace
 
@@ -143,6 +145,20 @@ class TestDmlFlag:
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (10)"))
         sp.commit()
         assert has_uncommitted_dml(probe_conn)
+
+
+def test_une_interruption_pendant_une_requete_remonte_telle_quelle():
+    """Un Ctrl+C pendant une requête invalide la connexion ; sa fermeture rollbacke, et le listener laisse remonter le `KeyboardInterrupt`."""
+    engine = create_engine(_test_url())
+    install_dml_guard(engine)
+    timer = threading.Timer(0.5, os.kill, (os.getpid(), signal.SIGINT))
+    try:
+        with pytest.raises(KeyboardInterrupt), engine.connect() as conn:
+            timer.start()
+            conn.execute(text("SELECT pg_sleep(10)"))
+    finally:
+        timer.cancel()
+        engine.dispose()
 
 
 # DML no-op (zéro ligne) : arme le flag sans modifier de donnée réelle.
