@@ -63,10 +63,11 @@ def test_les_signatures_d_un_meme_auteur_sont_groupees(conn):
     hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")])
     oa = _notice(conn, pub, "openalex", "W1", [("martin", "a"), ("durand", "c")])
 
-    _run(conn)
+    metrics = _run(conn)
 
     groups = sorted(_groups(conn, pub).values(), key=min)
     assert groups == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
+    assert metrics.details["summary"] == {"publications": 1, "groups": 3, "reference": 3, "name": 2}
     dirty = conn.execute(
         text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": pub}
     )

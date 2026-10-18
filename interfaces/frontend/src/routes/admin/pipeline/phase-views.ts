@@ -183,6 +183,17 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
+  author_grouping: {
+    summary: [
+      { key: "publications", label: "Publications regroupées" },
+      { key: "groups", label: "Groupes" },
+      { key: "reference", label: "Signatures fondatrices d'un groupe" },
+      { key: "name", label: "Liens par le nom" },
+      { key: "identifier", label: "Liens par l'identifiant" },
+      { key: "order", label: "Liens par l'ordre des homonymes" },
+      { key: "model", label: "Liens par le modèle probabiliste" },
+    ],
+  },
   persons: {
     summary: [
       { key: "created", label: "Personnes créées" },

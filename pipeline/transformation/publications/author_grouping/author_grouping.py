@@ -134,7 +134,11 @@ def build_groups(
             group_count += len(groups)
             avancement.avance(len(batch))
     metrics.add(updated=len(publication_ids))
-    metrics.extras.update(dict(methods))
+    metrics.details["summary"] = {
+        "publications": len(publication_ids),
+        "groups": group_count,
+        **{str(method): count for method, count in methods.items()},
+    }
     metrics.resume = (
         f"{accord(len(publication_ids), 'publication')}, {accord(group_count, 'groupe')}"
     )
