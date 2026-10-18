@@ -24,7 +24,7 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_signature(signature: str = "sa") -> str:
-    """Condition vraie quand la signature aliasée `signature` désigne une personne : elle n'est ni collective, ni copiée dans la liste d'auteurs de sa notice (`duplicate_of`)."""
+    """Condition vraie quand la signature aliasée `signature` désigne une personne : elle n'est ni collective, ni un doublon d'auteur (`duplicate_of`)."""
     return f"NOT {signature}.collective AND {signature}.duplicate_of IS NULL"
 
 

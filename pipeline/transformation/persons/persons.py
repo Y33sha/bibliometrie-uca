@@ -2,7 +2,7 @@
 
 Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve` et tournent sur **une seule** transaction : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de nœud laisserait sinon des signatures détachées jusqu'au run suivant. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation. Les signatures copiées dans la liste d'auteurs de leur notice (`duplicate_of`), non épinglées, perdent leur personne.
+1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'une notice (`duplicate_of`), non épinglés, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
@@ -90,11 +90,11 @@ class PersonsPhase:
 
             n_copies = persons_queries.detach_copies(conn)
             if n_copies:
-                etape(logger, "Signatures copiées dans la liste d'auteurs de leur notice")
+                etape(logger, "Auteurs en double dans la liste d'une notice")
                 logger.info(
-                    "%s%s",
+                    "%s%s de leur personne",
                     DERNIERE_BRANCHE,
-                    accord(n_copies, "signature détachée", "signatures détachées"),
+                    accord(n_copies, "doublon détaché", "doublons détachés"),
                 )
 
             arbitration = arbitrate_identifier_conflicts(

@@ -214,9 +214,9 @@ class AuthorGroupingQueries:
         unmatched_ids: Sequence[int],
         copies: Mapping[int, int],
     ) -> None:
-        """Écrit les groupes et les signatures copiées de ces publications, et retire leur drapeau `authorships_dirty`.
+        """Écrit les groupes et les doublons d'auteur de ces publications, et retire leur drapeau `authorships_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les appartenances des signatures `removed` sont supprimées, puis `memberships` est inséré. Les groupes `unmatched_ids` sont supprimés. `copies` : signature copiée → signature dont elle est la copie (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les appartenances des signatures `removed` sont supprimées, puis `memberships` est inséré. Les groupes `unmatched_ids` sont supprimés. `copies` : doublon → première occurrence de son nom (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
         """
         conn.execute(
             _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}

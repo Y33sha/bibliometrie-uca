@@ -215,7 +215,7 @@ class PersonsMatchingQueries:
         return [_to_bare(r) for r in rows]
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
-        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective ou copiée n'ancre rien."""
+        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective ou un doublon d'auteur n'ancre rien."""
         rows = conn.execute(
             text(f"""
                 SELECT sa_auth.person_id, gs.group_id,
@@ -361,7 +361,7 @@ class PersonsMatchingQueries:
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
         """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
 
-        Une signature collective ou copiée ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
+        Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
         source_filter = (
             "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
         )
@@ -620,7 +620,7 @@ class PersonsMatchingQueries:
         ).rowcount
 
     def detach_copies(self, conn: Connection) -> int:
-        """Détache de leur personne les signatures copiées dans la liste d'auteurs de leur notice (`duplicate_of`), sauf épinglage. Rend le nombre de signatures détachées."""
+        """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
         return conn.execute(
             text("""
                 UPDATE source_authorships sa

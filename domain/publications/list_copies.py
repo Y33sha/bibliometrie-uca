@@ -15,7 +15,7 @@ type Name = tuple[str, str]
 
 
 def copied_signatures(signatures: Sequence[Signature]) -> dict[int, int]:
-    """Signatures copiées d'une notice, chacune vers la première occurrence de son nom complet."""
+    """Doublons d'auteur d'une notice, chacun vers la première occurrence de son nom complet."""
     ordered = sorted((s for s in signatures if s.last_name), key=lambda s: (s.position, s.id))
     by_name: dict[Name, list[Signature]] = defaultdict(list)
     for s in ordered:

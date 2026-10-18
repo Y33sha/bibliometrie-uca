@@ -1,6 +1,6 @@
 """Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les signatures d'auteur copiées dans la liste de leur notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
 Nœud `author_grouping.build`.
 """
@@ -102,7 +102,7 @@ def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
 
 
 def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[int, int]]:
-    """Groupes des signatures d'une publication, classe de rôle par classe de rôle, et signatures d'auteur copiées (signature copiée → première occurrence de son nom). Les copies restent hors des groupes."""
+    """Groupes des signatures d'une publication, classe de rôle par classe de rôle, et doublons d'auteur (doublon → première occurrence de son nom). Les doublons restent hors des groupes."""
     deferred = deferred_notices(rows)
     groups: list[Group] = []
     copies: dict[int, int] = {}
@@ -191,7 +191,7 @@ def _plan_batch(
     on_publication: Callable[[], None],
     mapper: Mapper,
 ) -> tuple[list[GroupRow], list[int], list[MembershipRow], list[int], dict[int, int]]:
-    """Plan d'écriture d'un lot de publications : groupes, signatures dont l'appartenance est à supprimer, appartenances à insérer, groupes en base sans correspondant, signatures copiées. `on_publication` est appelé après chaque publication calculée."""
+    """Plan d'écriture d'un lot de publications : groupes, signatures dont l'appartenance est à supprimer, appartenances à insérer, groupes en base sans correspondant, doublons d'auteur. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SignatureTuple]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
@@ -231,7 +231,7 @@ def regroup(
     on_publication: Callable[[], None] = lambda: None,
     mapper: Mapper = map,
 ) -> int:
-    """Recalcule et écrit les groupes et les signatures copiées de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
+    """Recalcule et écrit les groupes et les doublons d'auteur de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
     groups, removed, inserted, unmatched, copies = _plan_batch(
         queries,
         conn,
