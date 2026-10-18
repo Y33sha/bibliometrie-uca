@@ -98,7 +98,8 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - `method` : `reference` (la signature fonde le groupe), `name`, `identifier`, `order`, `model`.
   - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
 - Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication. Les doubles rattachements relèvent de ce chantier.
-- Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices.
+- Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices. `publications.authorships_dirty` marque les publications à recalculer : `normalize` le pose quand les signatures d'une notice changent, `publications` quand les notices d'une publication changent, la phase des groupes le retire.
+- La phase des groupes, entre `publications` et `persons`, écrit seulement les deux tables des groupes. La phase `persons` garde sa cascade, à une exception : le rattachement `cross_source` devient une propagation dans le groupe. La déduplication des personnes sur les groupes, avec Splink, relève d'un chantier à part.
 - Après le recalcul, chaque groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de signatures, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `person_id` et `resolution_mode` suivent l'identifiant. Un ancien groupe sans correspondant est supprimé.
 - Les verdicts restent ancrés sur les données sources : une signature dont les identifiants changent est supprimée puis réinsérée.
 - Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships` en fin de chantier, matviews comprises.
@@ -182,7 +183,8 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 
 ### Phase 3 — Usages
 
-- [ ] Identification des personnes par groupe. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
+- [ ] Rattachement `cross_source` remplacé par la propagation de la personne dans le groupe, quand le groupe en a une seule.
+- [ ] Identification des personnes par groupe, dans le chantier de déduplication des personnes. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
 - [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
