@@ -15,6 +15,11 @@ PERSON_DATA: dict[str, MergedData] = {
         DataNature.DERIVED,
         "Authorships, une par publication.",
     ),
+    "signature_groups": MergedData(
+        MergeRule.COMBINE,
+        DataNature.DERIVED,
+        "Groupes de signatures, un par publication. Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne.",
+    ),
     "rejected_authorships": MergedData(
         MergeRule.TRANSFER_UNIQUE,
         DataNature.DECISION,

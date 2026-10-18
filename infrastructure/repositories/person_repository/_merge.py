@@ -67,6 +67,23 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
     _name_forms.refresh_name_forms(conn, target_id, forms)
 
 
+def _merge_signature_groups(conn: Connection, target_id: int, source_id: int) -> None:
+    conn.execute(
+        text("""
+            UPDATE source_authorship_groups s SET person_id = NULL, resolution_mode = NULL
+            WHERE s.person_id = :s AND EXISTS (
+                SELECT 1 FROM source_authorship_groups t
+                WHERE t.person_id = :t AND t.publication_id = s.publication_id
+            )
+        """),
+        {"t": target_id, "s": source_id},
+    )
+    conn.execute(
+        text("UPDATE source_authorship_groups SET person_id = :t WHERE person_id = :s"),
+        {"t": target_id, "s": source_id},
+    )
+
+
 def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
     rows: dict[int, str | None] = {
         r.id: r.exclusion
@@ -87,6 +104,9 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 MERGE_STEPS: dict[str, MergeStep] = {
     "signatures": transfer("source_authorships", "person_id"),
     "authorships": transfer_unique("authorships", "person_id", "publication_id"),
+    "signature_groups": MergeStep(
+        (("source_authorship_groups", "person_id"),), _merge_signature_groups
+    ),
     "rejected_authorships": transfer_unique(
         "rejected_authorships", "person_id", "source_publication_id"
     ),

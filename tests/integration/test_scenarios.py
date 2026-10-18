@@ -190,6 +190,35 @@ class TestMergePersons:
             is None
         )
 
+    def test_merge_transfers_signature_groups_one_per_publication(self, sa_sync_conn, person_repo):
+        """Régression : les groupes de signatures référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses signatures."""
+        conn = sa_sync_conn
+        target = _person(conn, "Dupont", first_name="Jean")
+        source = _person(conn, "Dupont", first_name="J.")
+        shared, alone = insert_publication(conn), insert_publication(conn)
+        groups = {}
+        for key, publication, person in (
+            ("target", shared, target),
+            ("source_shared", shared, source),
+            ("source_alone", alone, source),
+        ):
+            groups[key] = conn.execute(
+                text(
+                    "INSERT INTO source_authorship_groups (publication_id, person_id)"
+                    " VALUES (:p, :person) RETURNING id"
+                ),
+                {"p": publication, "person": person},
+            ).scalar_one()
+
+        merge_person(target, source, repo=person_repo)
+
+        persons = dict(
+            conn.execute(text("SELECT id, person_id FROM source_authorship_groups")).all()
+        )
+        assert persons[groups["target"]] == target
+        assert persons[groups["source_shared"]] is None
+        assert persons[groups["source_alone"]] == target
+
     def test_merge_blocked_if_both_rh(self, sa_sync_conn, person_repo):
         target = _person(sa_sync_conn, "Dupont", first_name="Jean")
         source = _person(sa_sync_conn, "Dupont", first_name="J.")
