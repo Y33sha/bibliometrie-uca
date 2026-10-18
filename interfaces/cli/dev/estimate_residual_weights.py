@@ -36,7 +36,13 @@ from splink.internals.blocking_rule_creator import BlockingRuleCreator
 from sqlalchemy import Connection, text
 
 from domain.dates import today
-from domain.publications.author_grouping import Author, ResidualSink, align_publication
+from domain.publications.author_grouping import (
+    Author,
+    Comparison,
+    ComparisonLevel,
+    ResidualSink,
+    align_publication,
+)
 from domain.publications.authorship_roles import AuthorshipRole
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -78,11 +84,11 @@ _RESIDUAL_SCHEMA = pa.schema(
         ("unique_id", pa.string()),
         ("side", pa.string()),
         ("slot", pa.string()),
-        ("gap", pa.int32()),
-        ("ln", pa.string()),
-        ("fn", pa.string()),
-        ("orcid", pa.string()),
-        ("idref", pa.string()),
+        (Comparison.GAP, pa.int32()),
+        (Comparison.LAST_NAME, pa.string()),
+        (Comparison.FIRST_NAME, pa.string()),
+        (Comparison.ORCID, pa.string()),
+        (Comparison.IDREF, pa.string()),
     ]
 )
 _SIGNATURES_SCHEMA = pa.schema(
@@ -92,10 +98,10 @@ _SIGNATURES_SCHEMA = pa.schema(
         ("notice_id", pa.int64()),
         ("pos", pa.int32()),
         ("n", pa.int32()),
-        ("ln", pa.string()),
-        ("fn", pa.string()),
-        ("orcid", pa.string()),
-        ("idref", pa.string()),
+        (Comparison.LAST_NAME, pa.string()),
+        (Comparison.FIRST_NAME, pa.string()),
+        (Comparison.ORCID, pa.string()),
+        (Comparison.IDREF, pa.string()),
     ]
 )
 
@@ -114,11 +120,11 @@ def _residual_records(
             "unique_id": f"{side[0]}{slot}:{rank}",
             "side": side,
             "slot": slot,
-            "gap": author.gap,
-            "ln": _blank(author.last_name),
-            "fn": _blank(author.first_name),
-            "orcid": _blank(author.orcid),
-            "idref": _blank(author.idref),
+            Comparison.GAP: author.gap,
+            Comparison.LAST_NAME: _blank(author.last_name),
+            Comparison.FIRST_NAME: _blank(author.first_name),
+            Comparison.ORCID: _blank(author.orcid),
+            Comparison.IDREF: _blank(author.idref),
         }
         for side, authors in (("signature", sigs), ("groupe", groups))
         for rank, author in enumerate(authors)
@@ -168,10 +174,10 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
                             "notice_id": notice_id,
                             "pos": s.position,
                             "n": len(sigs),
-                            "ln": _blank(s.last_name),
-                            "fn": _blank(s.first_name),
-                            "orcid": _blank(s.orcid),
-                            "idref": _blank(s.idref),
+                            Comparison.LAST_NAME: _blank(s.last_name),
+                            Comparison.FIRST_NAME: _blank(s.first_name),
+                            Comparison.ORCID: _blank(s.orcid),
+                            Comparison.IDREF: _blank(s.idref),
                         }
                         for notice_id, sigs in notices.items()
                         for s in sigs
@@ -195,40 +201,47 @@ def _only_initials(col: str) -> str:
 def _name_comparisons() -> list[cl.CustomComparison]:
     """Patronyme et prénom, niveaux de `comparison_levels`."""
     last_name = cl.CustomComparison(
-        output_column_name="ln",
+        output_column_name=Comparison.LAST_NAME,
         comparison_levels=[
-            cll.NullLevel("ln"),
-            cll.ExactMatchLevel("ln").configure(label_for_charts="Exact match on ln"),
-            cll.CustomLevel("ln_l = fn_r AND ln_r = fn_l", label_for_charts="reversed"),
+            cll.NullLevel(Comparison.LAST_NAME),
+            cll.ExactMatchLevel(Comparison.LAST_NAME).configure(
+                label_for_charts=ComparisonLevel.LAST_NAME_EXACT
+            ),
+            cll.CustomLevel(
+                "ln_l = fn_r AND ln_r = fn_l", label_for_charts=ComparisonLevel.REVERSED
+            ),
             cll.CustomLevel(
                 "list_has_all(string_split(ln_l, ' '), string_split(ln_r, ' '))"
                 " OR list_has_all(string_split(ln_r, ' '), string_split(ln_l, ' '))",
-                label_for_charts="mots inclus",
+                label_for_charts=ComparisonLevel.WORDS_INCLUDED,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.92", label_for_charts="jw 0.92"
+                "jaro_winkler_similarity(ln_l, ln_r) >= 0.92",
+                label_for_charts=ComparisonLevel.JW_092,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.8", label_for_charts="jw 0.8"
+                "jaro_winkler_similarity(ln_l, ln_r) >= 0.8", label_for_charts=ComparisonLevel.JW_08
             ),
-            cll.ElseLevel().configure(label_for_charts="else"),
+            cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
     )
     first_name = cl.CustomComparison(
-        output_column_name="fn",
+        output_column_name=Comparison.FIRST_NAME,
         comparison_levels=[
-            cll.NullLevel("fn"),
-            cll.ExactMatchLevel("fn").configure(label_for_charts="Exact match on fn"),
+            cll.NullLevel(Comparison.FIRST_NAME),
+            cll.ExactMatchLevel(Comparison.FIRST_NAME).configure(
+                label_for_charts=ComparisonLevel.FIRST_NAME_EXACT
+            ),
             cll.CustomLevel(
                 f"(({_only_initials('fn_l')}) OR ({_only_initials('fn_r')}))"
                 f" AND (starts_with({_initials('fn_l')}, {_initials('fn_r')})"
                 f" OR starts_with({_initials('fn_r')}, {_initials('fn_l')}))",
-                label_for_charts="initiales concordantes",
+                label_for_charts=ComparisonLevel.INITIALS_MATCH,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(fn_l, fn_r) >= 0.9", label_for_charts="jw 0.9"
+                "jaro_winkler_similarity(fn_l, fn_r) >= 0.9", label_for_charts=ComparisonLevel.JW_09
             ),
-            cll.ElseLevel().configure(label_for_charts="else"),
+            cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
     )
     return [last_name, first_name]
@@ -239,8 +252,10 @@ def _identifier(column: str) -> cl.CustomComparison:
         output_column_name=column,
         comparison_levels=[
             cll.NullLevel(column),
-            cll.ExactMatchLevel(column).configure(label_for_charts="exact"),
-            cll.ElseLevel().configure(label_for_charts="else"),
+            cll.ExactMatchLevel(column).configure(
+                label_for_charts=ComparisonLevel.IDENTIFIER_EXACT
+            ),
+            cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
     )
 
@@ -261,17 +276,22 @@ _RESIDUAL_EM_BLOCKS = [
 
 def _residual_settings() -> SettingsCreator:
     gap = cl.CustomComparison(
-        output_column_name="gap",
+        output_column_name=Comparison.GAP,
         comparison_levels=[
-            cll.CustomLevel("gap_l = gap_r", label_for_charts="même trou"),
-            cll.CustomLevel("abs(gap_l - gap_r) = 1", label_for_charts="trou voisin"),
-            cll.ElseLevel().configure(label_for_charts="ailleurs"),
+            cll.CustomLevel("gap_l = gap_r", label_for_charts=ComparisonLevel.SAME_GAP),
+            cll.CustomLevel("abs(gap_l - gap_r) = 1", label_for_charts=ComparisonLevel.NEXT_GAP),
+            cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSEWHERE),
         ],
     )
     return SettingsCreator(
         link_type="link_only",
         blocking_rules_to_generate_predictions=[*_RESIDUAL_BLOCKS],
-        comparisons=[*_name_comparisons(), _identifier("orcid"), _identifier("idref"), gap],
+        comparisons=[
+            *_name_comparisons(),
+            _identifier(Comparison.ORCID),
+            _identifier(Comparison.IDREF),
+            gap,
+        ],
         additional_columns_to_retain=["slot"],
         max_iterations=RESIDUAL_ITERATIONS,
     )
@@ -306,7 +326,12 @@ def _full_settings() -> SettingsCreator:
     return SettingsCreator(
         link_type="dedupe_only",
         blocking_rules_to_generate_predictions=[_SAME_PUBLICATION_RULE],
-        comparisons=[*_name_comparisons(), _identifier("orcid"), _identifier("idref"), position],
+        comparisons=[
+            *_name_comparisons(),
+            _identifier(Comparison.ORCID),
+            _identifier(Comparison.IDREF),
+            position,
+        ],
         additional_columns_to_retain=["publication_id", "notice_id", "n"],
         max_iterations=FULL_MODEL_ITERATIONS,
     )
@@ -381,7 +406,7 @@ def _estimate_identifiers() -> dict[str, dict[str, float]]:
         _SAME_PUBLICATION, max_pairs=EM_MAX_PAIRS
     )
     weights = _level_weights(linker)
-    return {column: weights[column] for column in ("orcid", "idref")}
+    return {column: weights[column] for column in (Comparison.ORCID, Comparison.IDREF)}
 
 
 def _render(weights: Mapping[str, Mapping[str, float]]) -> str:

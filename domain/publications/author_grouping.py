@@ -115,44 +115,93 @@ def _only_initials(first_name: str) -> bool:
     return all(len(part) <= 1 for part in first_name.split())
 
 
-def comparison_levels(x: Author, y: Author) -> dict[str, str | None]:
+class Comparison(StrEnum):
+    """Comparaison du modèle du résidu ; la valeur est le nom de colonne du modèle Splink."""
+
+    LAST_NAME = "ln"
+    FIRST_NAME = "fn"
+    ORCID = "orcid"
+    IDREF = "idref"
+    GAP = "gap"
+
+
+class ComparisonLevel(StrEnum):
+    """Niveau d'une comparaison du modèle du résidu ; la valeur est le libellé du niveau dans le modèle Splink."""
+
+    LAST_NAME_EXACT = "Exact match on ln"
+    REVERSED = "reversed"
+    WORDS_INCLUDED = "mots inclus"
+    JW_092 = "jw 0.92"
+    JW_08 = "jw 0.8"
+    FIRST_NAME_EXACT = "Exact match on fn"
+    INITIALS_MATCH = "initiales concordantes"
+    JW_09 = "jw 0.9"
+    IDENTIFIER_EXACT = "exact"
+    SAME_GAP = "même trou"
+    NEXT_GAP = "trou voisin"
+    ELSEWHERE = "ailleurs"
+    # Aucun des niveaux de ressemblance de la comparaison.
+    ELSE = "else"
+
+
+def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel | None]:
     """Niveau de chaque comparaison du modèle du résidu entre deux auteurs ; `None` quand une valeur manque."""
-    levels: dict[str, str | None] = {}
+    levels: dict[Comparison, ComparisonLevel | None] = {}
     lx, ly = x.last_name, y.last_name
     if not lx or not ly:
-        levels["ln"] = None
+        levels[Comparison.LAST_NAME] = None
     elif lx == ly:
-        levels["ln"] = "Exact match on ln"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.LAST_NAME_EXACT
     elif lx == y.first_name and ly == x.first_name:
-        levels["ln"] = "reversed"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.REVERSED
     elif set(lx.split()) <= set(ly.split()) or set(ly.split()) <= set(lx.split()):
-        levels["ln"] = "mots inclus"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.WORDS_INCLUDED
     elif jaro_winkler(lx, ly) >= 0.92:
-        levels["ln"] = "jw 0.92"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.JW_092
     elif jaro_winkler(lx, ly) >= 0.8:
-        levels["ln"] = "jw 0.8"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.JW_08
     else:
-        levels["ln"] = "else"
+        levels[Comparison.LAST_NAME] = ComparisonLevel.ELSE
     fx, fy = x.first_name, y.first_name
     if not fx or not fy:
-        levels["fn"] = None
+        levels[Comparison.FIRST_NAME] = None
     elif fx == fy:
-        levels["fn"] = "Exact match on fn"
+        levels[Comparison.FIRST_NAME] = ComparisonLevel.FIRST_NAME_EXACT
     elif (_only_initials(fx) or _only_initials(fy)) and (
         _initials(fx).startswith(_initials(fy)) or _initials(fy).startswith(_initials(fx))
     ):
-        levels["fn"] = "initiales concordantes"
+        levels[Comparison.FIRST_NAME] = ComparisonLevel.INITIALS_MATCH
     elif jaro_winkler(fx, fy) >= 0.9:
-        levels["fn"] = "jw 0.9"
+        levels[Comparison.FIRST_NAME] = ComparisonLevel.JW_09
     else:
-        levels["fn"] = "else"
-    for name, vx, vy in (("orcid", x.orcid, y.orcid), ("idref", x.idref, y.idref)):
-        levels[name] = None if not vx or not vy else ("exact" if vx == vy else "else")
+        levels[Comparison.FIRST_NAME] = ComparisonLevel.ELSE
+    for comparison, vx, vy in (
+        (Comparison.ORCID, x.orcid, y.orcid),
+        (Comparison.IDREF, x.idref, y.idref),
+    ):
+        levels[comparison] = (
+            None
+            if not vx or not vy
+            else (ComparisonLevel.IDENTIFIER_EXACT if vx == vy else ComparisonLevel.ELSE)
+        )
     distance = abs(x.gap - y.gap)
-    levels["gap"] = (
-        "même trou" if distance == 0 else ("trou voisin" if distance == 1 else "ailleurs")
+    levels[Comparison.GAP] = (
+        ComparisonLevel.SAME_GAP
+        if distance == 0
+        else (ComparisonLevel.NEXT_GAP if distance == 1 else ComparisonLevel.ELSEWHERE)
     )
     return levels
+
+
+def position_only(x: Author, y: Author) -> bool:
+    """Seule la position rapproche les deux auteurs : patronymes sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
+    levels = comparison_levels(x, y)
+    return (
+        levels[Comparison.LAST_NAME] == ComparisonLevel.ELSE
+        and levels[Comparison.FIRST_NAME] in (ComparisonLevel.ELSE, None)
+        and ComparisonLevel.IDENTIFIER_EXACT
+        not in (levels[Comparison.ORCID], levels[Comparison.IDREF])
+    )
 
 
 @dataclass(frozen=True)
@@ -377,7 +426,7 @@ def _residual_links(
 ) -> dict[int, tuple[int, float, float]]:
     """Liens du résidu : signature → (indice de groupe, score, marge).
 
-    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe. Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe que la position seule ne rapproche pas (`position_only`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
     """
     sig_gaps, group_gaps = notice.gaps()
     rest_sigs = [s for s in notice.sigs if s.id in sig_gaps]
@@ -389,7 +438,11 @@ def _residual_links(
     for s in rest_sigs:
         x = _author(s, sig_gaps[s.id])
         for g in rest_groups:
-            members = [_author(signatures[m.signature], group_gaps[g.index]) for m in g.members]
+            members = [
+                y
+                for m in g.members
+                if not position_only(x, y := _author(signatures[m.signature], group_gaps[g.index]))
+            ]
             if not any(
                 abs(x.gap - y.gap) <= 1
                 or x.last_name[:2] == y.last_name[:2]

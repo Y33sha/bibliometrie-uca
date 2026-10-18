@@ -167,7 +167,7 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
 
 
 def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
-    """Deux œuvres réunies à tort : aucune signature d'auteur n'est alignée par la règle, même si le modèle en lie par la position. La publication bien alignée reste hors de la file."""
+    """Deux œuvres réunies à tort : aucune signature d'auteur n'est alignée par la règle. La publication bien alignée reste hors de la file."""
     merged = insert_publication(conn)
     _notice(conn, merged, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
     _notice(conn, merged, "openalex", "W1", [("durand", "claire"), ("leroy", "denis")])

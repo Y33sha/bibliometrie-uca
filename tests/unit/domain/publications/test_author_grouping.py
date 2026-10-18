@@ -17,6 +17,10 @@ from domain.publications.author_grouping import (
     link_threshold,
     longest_ordered,
     plan_group_ids,
+    position_only,
+)
+from pipeline.transformation.publications.author_grouping.residual_weights import (
+    RESIDUAL_WEIGHTS,
 )
 
 
@@ -137,12 +141,54 @@ class TestAlignPublication:
         assert member.score == pytest.approx(18.0)
         assert member.margin is not None and member.margin > 0
 
+    def test_la_position_seule_ne_lie_pas(self):
+        """Deux listes sans aucun nom commun : le même trou ne suffit pas à lier deux auteurs."""
+        model = ResidualModel(RESIDUAL_WEIGHTS)
+        groups = align_publication(
+            {
+                1: _notice(1, [("martin", "anne"), ("petit", "bruno")]),
+                2: _notice(2, [("durand", "claire"), ("leroy", "denis")]),
+            },
+            model=model,
+            assign=_greedy,
+        )
+        assert _grouped(groups) == []
+
+    def test_un_identifiant_commun_lie_malgre_des_noms_sans_ressemblance(self):
+        model = ResidualModel(RESIDUAL_WEIGHTS)
+        orcid = "0000-0001-2345-6789"
+        groups = align_publication(
+            {
+                1: [Signature(100, 1, 0, "martin", "anne", orcid)],
+                2: [Signature(200, 2, 0, "dupont", "claire", orcid)],
+            },
+            model=model,
+            assign=_greedy,
+        )
+        assert _grouped(groups) == [[(100, GroupingMethod.REFERENCE), (200, GroupingMethod.MODEL)]]
+
     def test_au_maximum_une_signature_par_notice(self):
         names = [("zhang", "y"), ("zhang", "y"), ("zhang", "y")]
         notices = {1: _notice(1, names), 2: _notice(2, names[:2]), 3: _notice(3, names[:1])}
         for group in align_publication(notices):
             notices_of_group = [m.notice for m in group.members]
             assert len(notices_of_group) == len(set(notices_of_group))
+
+
+class TestPositionOnly:
+    def test_noms_sans_ressemblance(self):
+        assert position_only(_author("martin", "anne"), _author("durand", "claire"))
+
+    def test_prenom_absent(self):
+        assert position_only(_author("martin", ""), _author("durand", "claire"))
+
+    def test_patronyme_proche(self):
+        assert not position_only(_author("martin", "anne"), _author("martins", "claire"))
+
+    def test_identifiant_commun(self):
+        assert not position_only(
+            _author("martin", "anne", orcid="0000"), _author("durand", "claire", orcid="0000")
+        )
 
 
 class TestFullFirstName:
