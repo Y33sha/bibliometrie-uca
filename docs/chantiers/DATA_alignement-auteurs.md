@@ -238,4 +238,5 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
+- **Lecture anticipée des lots d'`author_grouping`.** Un thread lirait le lot suivant, sur sa propre connexion, pendant le calcul et l'écriture du lot en cours : environ 7 s gagnées par lot de grandes collaborations. Prérequis : supprimer une appartenance par couple (signature, groupe). Sinon, la publication de départ d'une notice déplacée, lue avant le commit du lot qui contient la publication d'arrivée, effacerait la nouvelle appartenance.
 - **Nom déclaré par IdRef et ORCID.** Les API d'IdRef et d'ORCID donnent le nom de la personne. Ce nom permettrait d'écarter les identifiants attribués à tort.
