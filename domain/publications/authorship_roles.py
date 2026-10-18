@@ -51,7 +51,10 @@ _HAL_MAP = {
         [AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER],
         False,
     ),  # orateur, auteur de la communication
-    "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
+    "ctb": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.CONTRIBUTOR],
+        False,
+    ),  # contributeur, cité dans la liste d'auteurs
     "sad": ([AuthorshipRole.CONTRIBUTOR], False),  # conseiller scientifique
     "csc": ([AuthorshipRole.CONTRIBUTOR], False),  # consultant
     "preface_writer": ([AuthorshipRole.CONTRIBUTOR], False),
@@ -113,7 +116,10 @@ _SCANR_MAP = {
     "scientific_editor": ([AuthorshipRole.SCIENTIFIC_EDITOR], False),
     "co_first_author": ([AuthorshipRole.AUTHOR], False),
     "co_last_author": ([AuthorshipRole.AUTHOR], False),
-    "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
+    "ctb": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.CONTRIBUTOR],
+        False,
+    ),  # contributeur, cité dans la liste d'auteurs
     "sad": ([AuthorshipRole.CONTRIBUTOR], False),
     "edt": ([AuthorshipRole.EDITOR], False),
     "spk": (

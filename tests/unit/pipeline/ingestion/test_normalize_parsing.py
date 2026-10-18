@@ -521,6 +521,12 @@ class TestMapRole:
         assert map_role("hal", "spk") == (["author", "speaker"], False)
         assert map_role("scanr", "presenter") == (["author", "speaker"], False)
 
+    def test_contributeur_est_aussi_auteur(self):
+        """Un contributeur HAL ou scanR figure dans la liste d'auteurs, à sa place."""
+        assert map_role("hal", "ctb") == (["author", "contributor"], False)
+        assert map_role("scanr", "ctb") == (["author", "contributor"], False)
+        assert map_role("hal", "sad") == (["contributor"], False)
+
     def test_empty_role_defaults_to_author(self):
         assert map_role("hal", None) == (["author"], False)
         assert map_role("hal", "") == (["author"], False)
