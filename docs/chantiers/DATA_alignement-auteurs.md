@@ -211,11 +211,12 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 ### Phase 4 — Diagnostic des listes d'auteurs
 
 - [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les signatures concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de la notice seule ; la comparaison avec les autres notices de la publication sert de confirmation. Le diagnostic se calcule sur les signatures que la phase `author_grouping` charge déjà.
-- [ ] Liste recopiée en tout ou en partie. Relecture de 64 notices où un nom complet revient, le 2026-10-18 : sous 10 % de répétitions, 5 vrais homonymes et 3 notices indéterminées ; au-delà, 51 listes recopiées et 5 indéterminées.
+- [x] Liste recopiée en tout ou en partie. Relecture de 64 notices où un nom complet revient, le 2026-10-18 : sous 10 % de répétitions, 5 vrais homonymes et 3 notices indéterminées ; au-delà, 51 listes recopiées et 5 indéterminées.
   - Signal : au moins deux noms répétés avec le même décalage de position, supérieur à 1. Il trouve 47 des 51 copies et aucun des 5 homonymes, qui sont tous côte à côte (décalage de 1).
   - La longueur ne détecte pas la copie, qui se retrouve dans d'autres sources. Une notice plus longue que la médiane des autres manque 15 copies sur 51 ; un écart avec une autre notice égal au nombre de répétitions confirme 26 copies sur 51.
   - Conséquence : seule la première occurrence de chaque nom s'aligne. Les répétitions restent hors des groupes, donc hors du rattachement aux personnes.
-- [ ] Liste doublée sur place (A A B B…) : décalage de 1 sur une grande part de la liste. Elle fait 2 des 4 copies que le signal précédent manque.
+- [x] Liste doublée sur place (A A B B…) : une suite d'au moins 4 paires côte à côte, de noms différents.
+- [x] Copies notées dans `source_authorships.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 1 246 notices, 39 295 signatures copiées.
 - [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
 - [x] Décomptes d'auteurs de chaque notice : `source_publications.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
 - [x] Une signature dont le nom entier est « et al. » est collective. Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
@@ -237,5 +238,4 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
-- **Diagnostic des listes.** Où le stocker : colonne de `source_publications`, table dédiée ? Quelle part de doublons côte à côte distingue une liste doublée sur place des homonymes consécutifs des listes alphabétiques ?
 - **Nom déclaré par IdRef et ORCID.** Les API d'IdRef et d'ORCID donnent le nom de la personne. Ce nom permettrait d'écarter les identifiants attribués à tort.
