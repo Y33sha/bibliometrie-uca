@@ -622,8 +622,13 @@ addresses = Table(
     # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
     # fin de cascade.
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
-    # Adresse à traiter par la phase `countries` : détection par le texte, puis résolution des candidats.
-    Column("candidates_dirty", Boolean, nullable=False, server_default="true"),
+    Column(
+        "candidates_dirty",
+        Boolean,
+        nullable=False,
+        server_default="true",
+        comment="Adresse à traiter : détection du pays par le texte, puis résolution des candidats.",
+    ),
     # Index UNIQUE sur expression md5(normalized_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
     schema="structures",
@@ -642,6 +647,10 @@ address_country_candidates = Table(
     Column("method", country_detection_method_enum, primary_key=True),
     Column("detected_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     schema="structures",
+    comment=(
+        "Pays proposé pour une adresse par un moyen de détection. addresses.countries en dérive"
+        " par la préséance du domaine."
+    ),
 )
 
 
@@ -889,10 +898,24 @@ source_authorships = Table(
     # Posé par normalize (nouveaux source_authorships) et la détection (adresse
     # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
-    # Pays de la signature : adresses, organisations ROR sans adresse, structures HAL.
-    Column("countries", ARRAY(Text)),
-    # Signature collective (collaboration, consortium…), d'après la source ou le nom.
-    Column("collective", Boolean, nullable=False, server_default="false"),
+    Column(
+        "countries",
+        ARRAY(Text),
+        comment=(
+            "Pays de la signature : pays retenus de ses adresses, de ses organisations ROR sans"
+            " adresse et de ses structures HAL."
+        ),
+    ),
+    Column(
+        "collective",
+        Boolean,
+        nullable=False,
+        server_default="false",
+        comment=(
+            "Signature collective (collaboration, consortium, groupe d'étude…), posée par la"
+            " normalisation d'après le signal de la source ou d'après le nom."
+        ),
+    ),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
     # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des
@@ -1125,8 +1148,16 @@ publications = Table(
     # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
-    # Groupes de signatures à recalculer : posé par `normalize` et `publications`, retiré par la phase des groupes.
-    Column("authorships_dirty", Boolean, nullable=False, server_default="true"),
+    Column(
+        "authorships_dirty",
+        Boolean,
+        nullable=False,
+        server_default="true",
+        comment=(
+            "Groupes de signatures à recalculer : une notice a rejoint ou quitté la publication,"
+            " ou ses signatures ont changé."
+        ),
+    ),
     # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
     # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
@@ -1413,7 +1444,12 @@ subjects = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("label", Text, nullable=False),
-    Column("label_normalized", Text, nullable=False),
+    Column(
+        "label_normalized",
+        Text,
+        nullable=False,
+        comment="Forme de recherche du libellé (normalize_text), servie par un index trigram.",
+    ),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("usage_count", Integer, nullable=False, server_default="0"),
