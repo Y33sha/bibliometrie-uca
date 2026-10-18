@@ -93,10 +93,13 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - L'alignement se fait par publication, avant la phase `persons`.
 - Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux signatures qui le partagent.
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
-- Une table des auteurs alignés relie les signatures d'un même auteur et porte `person_id`, retiré des `source_authorships`.
-- Un auteur aligné réunit au plus une signature par notice. Une personne correspond au plus à un auteur aligné par publication. Les doubles rattachements relèvent de ce chantier.
-- Les verdicts restent ancrés sur les données sources, pas sur les auteurs alignés : l'identifiant d'un auteur aligné change à chaque recalcul de l'alignement.
-- Une signature dont les identifiants changent marque son auteur aligné à recalculer, et la résolution des personnes le reprend.
+- `source_authorship_groups` réunit les signatures d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_authorships`.
+- `grouped_source_authorships` relie chaque signature à son groupe : `source_authorship_id` (clé primaire), `group_id`, `source_publication_id`, `method`, `score`, `margin`.
+  - `method` : `reference` (la signature fonde le groupe), `name`, `identifier`, `order`, `model`.
+  - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
+- Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication. Les doubles rattachements relèvent de ce chantier.
+- Les verdicts restent ancrés sur les données sources, pas sur les groupes : l'identifiant d'un groupe change à chaque recalcul.
+- Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships` en fin de chantier, matviews comprises.
 
 ## Phasage
 
@@ -170,20 +173,22 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Fellegi-Sunter seul confond les homonymes des grandes listes (Kim, Zhang). Sans filtre d'ordre, l'étape du patronyme unique lie des auteurs éloignés quand les sources découpent autrement nom et prénom (« A. Ferrer » en position 757, « J. A. Valls Ferrer » en position 2579).
   - Erreurs restantes sur les 326 paires : auteur en double dans une notice HAL, prénom faux dans HAL, noms différents à la même position, un auteur déplacé, une variante de nom.
   - Limite : trois « Y. Zhang » consécutifs, dans l'ordre inverse chez Crossref et chez HAL. Seuls les noms déclarés dans le registre ORCID les départagent.
-- [ ] Modèle : table des auteurs alignés portant `person_id`, lien de chaque signature à son auteur, contraintes d'unicité.
-- [ ] Marquage à recalculer d'un auteur aligné dont une signature change d'identifiants.
+- [ ] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
+- [ ] Recalcul : publication entière, ou groupes touchés seulement, selon le temps de calcul mesuré sur le stock.
+- [ ] Poids du modèle du résidu versionnés dans le dépôt ; script de maintenance qui les réestime avec Splink. Le pipeline calcule les poids des paires sans Splink.
 
 ### Phase 3 — Usages
 
-- [ ] Identification des personnes par auteur aligné. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
+- [ ] Identification des personnes par groupe. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
 - [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
-- [ ] Indices de périmètre par auteur aligné : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
+- [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
 - [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles. La comparaison des listes d'auteurs entre sources (`SourceComparison.svelte`) quitte la page publique d'une publication pour le volet publication de l'UI admin.
 
 ### Phase 4 — Fin de chantier
 
+- [ ] Remplacement de `authorships` par `source_authorship_groups`, matviews reportées.
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
@@ -191,5 +196,4 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la signature : notice et position, notice et nom ?
 - **Signature sans correspondant** dans les autres notices (liste partielle) : un auteur à une seule signature.
 - **ORCID d'OpenAlex sans DOI.** Sur des notices OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
-- **Rapport avec `authorships`** : l'auteur aligné remplace-t-il la consolidation par paire (publication, personne) ?
 - **Nom déclaré par IdRef et ORCID.** Les API d'IdRef et d'ORCID donnent le nom de la personne. Ce nom permettrait d'écarter les identifiants attribués à tort.
