@@ -120,6 +120,22 @@ class MembershipRow:
 class AuthorGroupingQueries:
     """Lectures et écritures des groupes de signatures."""
 
+    def delete_orphan_groups(self, conn: Connection) -> int:
+        """Supprime les groupes des publications supprimées, et leurs appartenances. Rend le nombre de groupes supprimés."""
+        return conn.execute(
+            text("""
+                WITH orphans AS (
+                    DELETE FROM source_authorship_groups g
+                    WHERE NOT EXISTS (SELECT 1 FROM publications p WHERE p.id = g.publication_id)
+                    RETURNING g.id
+                ), memberships AS (
+                    DELETE FROM grouped_source_authorships gs
+                    USING orphans o WHERE gs.group_id = o.id
+                )
+                SELECT count(*) FROM orphans
+            """)
+        ).scalar_one()
+
     def fetch_dirty_publication_ids(self, conn: Connection) -> list[int]:
         """Publications marquées `authorships_dirty`."""
         rows = conn.execute(

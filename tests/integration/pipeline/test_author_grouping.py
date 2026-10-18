@@ -119,6 +119,26 @@ def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypa
     assert all(moved[0] not in sigs for sigs in _groups(conn, departure).values())
 
 
+def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
+    pub = insert_publication(conn)
+    _notice(conn, pub, "hal", "hal-1", [("martin", "anne")])
+    _notice(conn, pub, "openalex", "W1", [("martin", "a")])
+    _run(conn)
+    conn.execute(text("DELETE FROM source_publications WHERE publication_id = :p"), {"p": pub})
+    conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": pub})
+
+    _run(conn)
+
+    assert _groups(conn, pub) == {}
+    orphans = conn.execute(
+        text("""
+            SELECT count(*) FROM grouped_source_authorships gs
+            WHERE NOT EXISTS (SELECT 1 FROM source_authorship_groups g WHERE g.id = gs.group_id)
+        """)
+    )
+    assert orphans.scalar_one() == 0
+
+
 def test_les_autres_roles_s_alignent_par_le_nom(conn):
     pub = insert_publication(conn)
     theses = _notice(

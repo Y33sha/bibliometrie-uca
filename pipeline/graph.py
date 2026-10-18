@@ -807,6 +807,7 @@ NODES: tuple[Node, ...] = (
         "author_grouping.build",
         "author_grouping",
         reads=(
+            "publications.id",
             "publications.authorships_dirty",
             "source_publications.publication_id",
             "source_publications.source_id",
@@ -827,8 +828,8 @@ NODES: tuple[Node, ...] = (
             "grouped_source_authorships.id",
             "publications.authorships_dirty",
         ),
-        # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
-        previous_run=("publications.authorships_dirty",),
+        # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que le nœud retire lui-même.
+        previous_run=("publications.id", "publications.authorships_dirty"),
     ),
     _node(
         "persons.resolve",

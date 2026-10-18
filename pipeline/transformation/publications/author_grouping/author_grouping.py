@@ -137,7 +137,10 @@ def regroup(
 def build_groups(
     conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
 ) -> PhaseMetrics:
-    """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
+    """Supprime les groupes des publications supprimées, puis recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
+    orphans = queries.delete_orphan_groups(conn)
+    conn.commit()
+    etape(logger, "%s de publications supprimées retirés", accord(orphans, "groupe"))
     publication_ids = queries.fetch_dirty_publication_ids(conn)
     etape(logger, "%s à regrouper", accord(len(publication_ids), "publication"))
     if not publication_ids:
