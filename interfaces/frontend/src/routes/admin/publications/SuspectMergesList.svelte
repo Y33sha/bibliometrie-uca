@@ -36,7 +36,7 @@
 
 <p class="intro">
   Publications dont <strong>moins de la moitié des auteurs</strong> se retrouvent d'une notice à
-  l'autre : leurs listes d'auteurs ne se recouvrent pas, signe probable de deux œuvres réunies à
+  l'autre&nbsp;: leurs listes d'auteurs ne se recouvrent pas, signe probable de deux œuvres réunies à
   tort. Pour chaque notice, le nombre de ses auteurs retrouvés dans une autre notice.
 </p>
 
@@ -61,7 +61,7 @@
         </div>
         <div class="stats">
           <span class="share">
-            {percent(item.matched_signatures, item.signatures)} % d'auteurs retrouvés
+            {percent(item.matched_signatures, item.signatures)}&nbsp;% d'auteurs retrouvés
           </span>
           <span>{item.matched_signatures} / {item.signatures} signatures</span>
         </div>

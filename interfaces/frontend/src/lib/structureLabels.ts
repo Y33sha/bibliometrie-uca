@@ -30,7 +30,7 @@ export function structsTooltip(a: Affiliation, structures: Record<string, Struct
 	}
 	if (a.structure_ids?.length) {
 		parts.push(
-			`Structures identifiées : ${a.structure_ids.map((sid) => structLabel(structures, sid)).join(', ')}`,
+			`Structures identifiées\u00a0: ${a.structure_ids.map((sid) => structLabel(structures, sid)).join(', ')}`,
 		);
 	}
 	return parts.join('\n');

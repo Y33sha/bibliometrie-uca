@@ -16,7 +16,7 @@ describe("structsTooltip", () => {
       authorship({ raw_affiliation: "Université Clermont Auvergne", structure_ids: [1] }),
       { "1": struct({ acronym: "LMBP" }) },
     );
-    expect(out).toBe("Université Clermont Auvergne\nStructures identifiées : LMBP");
+    expect(out).toBe("Université Clermont Auvergne\nStructures identifiées\u00a0: LMBP");
   });
 
   it("ne produit aucun balisage HTML autour d'une affiliation malveillante (non-régression XSS)", () => {
