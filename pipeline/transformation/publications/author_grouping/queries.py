@@ -1,6 +1,6 @@
 """Requêtes de la phase `author_grouping`."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
@@ -53,6 +53,19 @@ _DELETE_MEMBERSHIPS_SQL = text("""
 """)
 
 _DELETE_GROUPS_SQL = text("DELETE FROM source_authorship_groups WHERE id = ANY(:ids)")
+
+_CLEAR_COPIES_SQL = text("""
+    UPDATE source_authorships sa SET duplicate_of = NULL
+    FROM source_publications sp
+    WHERE sa.source_publication_id = sp.id AND sp.publication_id = ANY(:publications)
+      AND sa.duplicate_of IS NOT NULL AND sa.id <> ALL(CAST(:copies AS integer[]))
+""")
+
+_SET_COPIES_SQL = text("""
+    UPDATE source_authorships sa SET duplicate_of = u.original
+    FROM unnest(CAST(:copies AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
+    WHERE sa.id = u.id AND sa.duplicate_of IS DISTINCT FROM u.original
+""")
 
 _UPDATE_POSITIONS_SQL = text("""
     UPDATE source_authorship_groups g SET reference_position = u.position
@@ -183,11 +196,19 @@ class AuthorGroupingQueries:
         groups: Sequence[GroupRow],
         memberships: Sequence[MembershipRow],
         unmatched_ids: Sequence[int],
+        copies: Mapping[int, int],
     ) -> None:
-        """Écrit les groupes de ces publications et retire leur drapeau `authorships_dirty`.
+        """Écrit les groupes et les signatures copiées de ces publications, et retire leur drapeau `authorships_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les groupes `unmatched_ids` sont supprimés.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les groupes `unmatched_ids` sont supprimés. `copies` : signature copiée → signature dont elle est la copie (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
         """
+        conn.execute(
+            _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
+        )
+        if copies:
+            conn.execute(
+                _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
+            )
         conn.execute(_DELETE_MEMBERSHIPS_SQL, {"publications": list(publication_ids)})
         # Signature d'une notice venue d'une autre publication, encore rattachée à un groupe de celle-ci.
         conn.execute(

@@ -916,6 +916,14 @@ source_authorships = Table(
             " normalisation d'après le signal de la source ou d'après le nom."
         ),
     ),
+    Column(
+        "duplicate_of",
+        Integer,
+        comment=(
+            "Signature dont celle-ci est la copie, dans une liste d'auteurs recopiée par la"
+            " source. Écrite par la phase author_grouping."
+        ),
+    ),
     Column("person_id", Integer),
     # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
     # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des

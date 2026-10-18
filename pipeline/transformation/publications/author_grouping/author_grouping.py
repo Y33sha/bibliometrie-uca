@@ -1,6 +1,6 @@
 """Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les signatures d'auteur copiées dans la liste de leur notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
 Nœud `author_grouping.build`.
 """
@@ -22,6 +22,7 @@ from domain.publications.author_grouping import (
     plan_group_ids,
 )
 from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.list_copies import copied_signatures
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
@@ -77,16 +78,20 @@ def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
     return {row.notice for row in rows if row.source == DEFERRED_SOURCE}
 
 
-def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
-    """Groupes des signatures d'une publication, classe de rôle par classe de rôle."""
+def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[int, int]]:
+    """Groupes des signatures d'une publication, classe de rôle par classe de rôle, et signatures d'auteur copiées (signature copiée → première occurrence de son nom). Les copies restent hors des groupes."""
     deferred = deferred_notices(rows)
     groups: list[Group] = []
+    copies: dict[int, int] = {}
     for role_class, notices in sorted(notices_by_role(rows).items()):
         if role_class == AuthorshipRole.AUTHOR:
-            groups += align_publication(notices, model=_MODEL, assign=assign, deferred=deferred)
+            for signatures in notices.values():
+                copies |= copied_signatures(signatures)
+            kept = {n: [s for s in sigs if s.id not in copies] for n, sigs in notices.items()}
+            groups += align_publication(kept, model=_MODEL, assign=assign, deferred=deferred)
         else:
             groups += align_publication(notices, ordered=False, deferred=deferred)
-    return groups
+    return groups, copies
 
 
 def _plan_batch(
@@ -95,8 +100,8 @@ def _plan_batch(
     publication_ids: Sequence[int],
     methods: Counter[str],
     on_publication: Callable[[], None],
-) -> tuple[list[GroupRow], list[MembershipRow], list[int]]:
-    """Groupes et appartenances à écrire pour un lot de publications, et groupes en base sans correspondant. `on_publication` est appelé après chaque publication calculée."""
+) -> tuple[list[GroupRow], list[MembershipRow], list[int], dict[int, int]]:
+    """Groupes et appartenances à écrire pour un lot de publications, groupes en base sans correspondant, et signatures copiées. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SignatureRow]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
@@ -105,8 +110,10 @@ def _plan_batch(
     existing = queries.fetch_groups(conn, publication_ids)
     planned: list[tuple[int, Group, int | None]] = []
     unmatched: list[int] = []
+    copies: dict[int, int] = {}
     for publication_id in publication_ids:
-        groups = group_publication(rows_by_publication.get(publication_id, []))
+        groups, publication_copies = group_publication(rows_by_publication.get(publication_id, []))
+        copies |= publication_copies
         old = {gid: frozenset(sigs) for gid, sigs in existing.get(publication_id, {}).items()}
         plan = plan_group_ids(old, [frozenset(m.signature for m in g.members) for g in groups])
         planned += [(publication_id, g, gid) for g, gid in zip(groups, plan, strict=True)]
@@ -126,7 +133,7 @@ def _plan_batch(
             memberships.append(
                 MembershipRow(m.signature, group_id, m.notice, str(m.method), m.score, m.margin)
             )
-    return group_rows, memberships, unmatched
+    return group_rows, memberships, unmatched, copies
 
 
 def regroup(
@@ -136,15 +143,15 @@ def regroup(
     methods: Counter[str] | None = None,
     on_publication: Callable[[], None] = lambda: None,
 ) -> int:
-    """Recalcule et écrit les groupes de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
-    groups, memberships, unmatched = _plan_batch(
+    """Recalcule et écrit les groupes et les signatures copiées de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
+    groups, memberships, unmatched, copies = _plan_batch(
         queries,
         conn,
         publication_ids,
         methods if methods is not None else Counter(),
         on_publication,
     )
-    queries.write(conn, publication_ids, groups, memberships, unmatched)
+    queries.write(conn, publication_ids, groups, memberships, unmatched, copies)
     return len(groups)
 
 

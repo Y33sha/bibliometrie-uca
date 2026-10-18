@@ -23,6 +23,11 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
     return f"CASE {col} {whens} END"
 
 
+def person_signature(signature: str = "sa") -> str:
+    """Condition vraie quand la signature aliasée `signature` désigne une personne : elle n'est ni collective, ni copiée dans la liste d'auteurs de sa notice (`duplicate_of`)."""
+    return f"NOT {signature}.collective AND {signature}.duplicate_of IS NULL"
+
+
 def diamond_journal_sql(journal: str = "j") -> str:
     """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
     return (

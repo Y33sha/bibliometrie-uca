@@ -2,7 +2,7 @@
 
 Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve` et tournent sur **une seule** transaction : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de nœud laisserait sinon des signatures détachées jusqu'au run suivant. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation.
+1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation. Les signatures copiées dans la liste d'auteurs de leur notice (`duplicate_of`), non épinglées, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
@@ -74,7 +74,7 @@ class PersonsPhase:
         return metrics
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        """Épinglages, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
+        """Épinglages, détachement des copies, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         persons_queries, logger = self.persons_queries, ctx.logger
         with ctx.open_tx() as conn:
             writes = self.writes_factory(conn)
@@ -86,6 +86,15 @@ class PersonsPhase:
                     "%s%s",
                     DERNIERE_BRANCHE,
                     accord(n_enforced, "signature recalée", "signatures recalées"),
+                )
+
+            n_copies = persons_queries.detach_copies(conn)
+            if n_copies:
+                etape(logger, "Signatures copiées dans la liste d'auteurs de leur notice")
+                logger.info(
+                    "%s%s",
+                    DERNIERE_BRANCHE,
+                    accord(n_copies, "signature détachée", "signatures détachées"),
                 )
 
             arbitration = arbitrate_identifier_conflicts(

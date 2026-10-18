@@ -26,6 +26,7 @@ from infrastructure.repositories.person_repository import person_without_decisio
 from infrastructure.sql_fragments import (
     REJECTED_PAIRS,
     identifier_neutralized,
+    person_signature,
     publication_rejected_for,
     strong_identifier_signatures,
     usable_identifier,
@@ -133,12 +134,12 @@ _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     FALSE AS in_perimeter,
     NULL::integer AS current_person_id"""
 
-# Conditions communes à toutes les branches : SA orpheline hors-périmètre, individuelle,
+# Conditions communes à toutes les branches : SA orpheline hors-périmètre, d'une personne,
 # rattachée à une publication active (les hors périmètre ne sont pas matérialisées).
-_OOP_COMMON_WHERE = """
+_OOP_COMMON_WHERE = f"""
     sa_auth.person_id IS NULL
     AND sa_auth.in_perimeter = FALSE
-    AND NOT sa_auth.collective
+    AND {person_signature("sa_auth")}
     AND sd.publication_id IS NOT NULL
 """
 
@@ -169,7 +170,7 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
     JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
     JOIN publications pub ON pub.id = sd.publication_id
     WHERE linked.person_id IS NOT NULL
-      AND NOT linked.collective
+      AND {person_signature("linked")}
       AND {_OOP_COMMON_WHERE}
 """
 
@@ -198,7 +199,7 @@ class PersonsMatchingQueries:
                 JOIN publications pub ON pub.id = sd.publication_id
                 WHERE sa_auth.person_id IS NULL
                   AND sa_auth.in_perimeter = TRUE
-                  AND NOT sa_auth.collective
+                  AND {person_signature("sa_auth")}
                   AND sd.publication_id IS NOT NULL
                 ORDER BY sa_auth.id
             """)
@@ -214,7 +215,7 @@ class PersonsMatchingQueries:
         return [_to_bare(r) for r in rows]
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
-        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective n'ancre rien."""
+        """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective ou copiée n'ancre rien."""
         rows = conn.execute(
             text(f"""
                 SELECT sa_auth.person_id, gs.group_id,
@@ -224,7 +225,7 @@ class PersonsMatchingQueries:
                 JOIN grouped_source_authorships gs ON gs.source_authorship_id = sa_auth.id
                 WHERE sa_auth.person_id IS NOT NULL
                   AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
-                  AND NOT sa_auth.collective
+                  AND {person_signature("sa_auth")}
             """)
         ).all()
         return [
@@ -250,7 +251,7 @@ class PersonsMatchingQueries:
                 JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
                 JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
                 WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
-                  AND NOT sa_auth.collective
+                  AND {person_signature("sa_auth")}
                   AND sd.publication_id IS NOT NULL
                   AND NOT EXISTS (
                       SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa_auth.id
@@ -360,7 +361,7 @@ class PersonsMatchingQueries:
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
         """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
 
-        Une signature collective ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
+        Une signature collective ou copiée ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
         source_filter = (
             "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
         )
@@ -376,7 +377,7 @@ class PersonsMatchingQueries:
                 JOIN source_authorships sa ON sa.identity_id = aik.id
                 WHERE aik.person_identifiers ? :id_type
                   AND aik.author_name_normalized IS NOT NULL
-                  AND NOT sa.collective
+                  AND {person_signature("sa")}
                   AND NOT {_ID_TYPE_SHARED}
                   {source_filter}
                 GROUP BY 1, 2
@@ -616,6 +617,19 @@ class PersonsMatchingQueries:
                   )
             """),
             {"ids": source_authorship_ids},
+        ).rowcount
+
+    def detach_copies(self, conn: Connection) -> int:
+        """Détache de leur personne les signatures copiées dans la liste d'auteurs de leur notice (`duplicate_of`), sauf épinglage. Rend le nombre de signatures détachées."""
+        return conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET person_id = NULL, resolution_mode = NULL
+                WHERE sa.duplicate_of IS NOT NULL AND sa.person_id IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
+                  )
+            """)
         ).rowcount
 
     def delete_empty_persons(self, conn: Connection) -> int:

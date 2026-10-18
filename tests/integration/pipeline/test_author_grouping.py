@@ -190,6 +190,41 @@ def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
     ]
 
 
+def _duplicate_of(conn, signatures):
+    rows = conn.execute(
+        text("SELECT id, duplicate_of FROM source_authorships WHERE id = ANY(:ids)"),
+        {"ids": signatures},
+    )
+    return dict(rows.all())
+
+
+def test_les_copies_d_une_liste_restent_hors_des_groupes(conn):
+    pub = insert_publication(conn)
+    names = [("martin", "anne"), ("petit", "bruno"), ("durand", "claire")]
+    hal = _notice(conn, pub, "hal", "hal-1", names + names)
+    oa = _notice(conn, pub, "openalex", "W1", names)
+
+    _run(conn)
+
+    originals = dict.fromkeys(hal[:3])
+    copies = dict(zip(hal[3:], hal[:3], strict=True))
+    assert _duplicate_of(conn, hal) == originals | copies
+    assert sorted(_groups(conn, pub).values(), key=min) == [{hal[i], oa[i]} for i in range(3)]
+
+
+def test_une_signature_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
+    pub = insert_publication(conn)
+    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+    conn.execute(
+        text("UPDATE source_authorships SET duplicate_of = :a WHERE id = :b"),
+        {"a": hal[0], "b": hal[1]},
+    )
+
+    _run(conn)
+
+    assert _duplicate_of(conn, hal) == {hal[0]: None, hal[1]: None}
+
+
 def test_les_autres_roles_s_alignent_par_le_nom(conn):
     pub = insert_publication(conn)
     theses = _notice(
