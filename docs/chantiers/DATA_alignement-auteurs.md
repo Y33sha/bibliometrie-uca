@@ -181,7 +181,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [x] Réconciliation des identifiants de groupes après recalcul.
 - [x] Phase `author_grouping`, entre `publications` et `persons`. Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms.
 - [x] Poids du modèle du résidu versionnés dans le dépôt. Le pipeline calcule les poids des paires sans Splink.
-- [ ] Script de maintenance qui réestime les poids avec Splink.
+- [x] Script qui réestime les poids avec Splink (`interfaces/cli/dev/estimate_residual_weights.py`).
 - [x] Premier passage de la phase sur le stock, le 2026-10-18 : 76 511 publications en une heure environ, 6,3 millions de groupes, 19,9 millions de signatures groupées. Liens par le nom : 12,4 millions ; par le modèle : 858 000 ; par l'ordre : 285 000 ; par l'identifiant : 30 000. Évaluation identique à l'essai : 316 paires correctes sur 327, 86 désaccords sur 97 et 39 écarts sur 47 tranchés comme la relecture.
 
 ### Phase 3 — Usages
