@@ -179,7 +179,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [x] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
 - [x] Temps de calcul de l'essai, en Python sur un cœur : 36 minutes pour le stock (18,6 millions de signatures), de 0,4 à 2,2 secondes pour une collaboration d'environ 11 700 signatures en 5 notices.
 - [x] Réconciliation des identifiants de groupes après recalcul.
-- [x] Phase `source_authorship_groups`, entre `publications` et `persons`. Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms.
+- [x] Phase `author_grouping`, entre `publications` et `persons`. Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms.
 - [x] Poids du modèle du résidu versionnés dans le dépôt. Le pipeline calcule les poids des paires sans Splink.
 - [ ] Script de maintenance qui réestime les poids avec Splink.
 - [ ] Premier passage de la phase sur le stock, puis évaluation sur les trois relectures.

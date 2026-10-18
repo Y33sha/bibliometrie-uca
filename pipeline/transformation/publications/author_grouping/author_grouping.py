@@ -1,8 +1,8 @@
-"""Phase `source_authorship_groups` : groupes des signatures d'un même auteur dans chaque publication.
+"""Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.source_authorship_groups`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
-Nœud `source_authorship_groups.build`.
+Nœud `author_grouping.build`.
 """
 
 import logging
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
-from domain.publications.source_authorship_groups import (
+from domain.publications.author_grouping import (
     Group,
     ResidualModel,
     Signature,
@@ -25,13 +25,13 @@ from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.transformation.publications.source_authorship_groups.queries import (
+from pipeline.transformation.publications.author_grouping.queries import (
+    AuthorGroupingQueries,
     GroupRow,
     MembershipRow,
     SignatureRow,
-    SourceAuthorshipGroupsQueries,
 )
-from pipeline.transformation.publications.source_authorship_groups.residual_weights import (
+from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
 
@@ -76,7 +76,7 @@ def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
 
 
 def _plan_batch(
-    queries: SourceAuthorshipGroupsQueries,
+    queries: AuthorGroupingQueries,
     conn: Connection,
     publication_ids: Sequence[int],
     methods: Counter[str],
@@ -114,7 +114,7 @@ def _plan_batch(
 
 
 def build_groups(
-    conn: Connection, queries: SourceAuthorshipGroupsQueries, logger: logging.Logger
+    conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
 ) -> PhaseMetrics:
     """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
     publication_ids = queries.fetch_dirty_publication_ids(conn)
@@ -142,8 +142,8 @@ def build_groups(
 
 
 @dataclass(frozen=True)
-class SourceAuthorshipGroupsPhase:
-    queries: SourceAuthorshipGroupsQueries
+class AuthorGroupingPhase:
+    queries: AuthorGroupingQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
@@ -152,7 +152,4 @@ class SourceAuthorshipGroupsPhase:
 
 def build() -> Phase:
     """Groupe les signatures d'un même auteur dans les publications marquées."""
-    return NodePhase(
-        "source_authorship_groups.build",
-        SourceAuthorshipGroupsPhase(SourceAuthorshipGroupsQueries()),
-    )
+    return NodePhase("author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()))

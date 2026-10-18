@@ -804,8 +804,8 @@ NODES: tuple[Node, ...] = (
         previous_run=("publications.id",),
     ),
     _node(
-        "source_authorship_groups.build",
-        "source_authorship_groups",
+        "author_grouping.build",
+        "author_grouping",
         reads=(
             "publications.authorships_dirty",
             "source_publications.publication_id",
@@ -1161,7 +1161,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
-    "source_authorship_groups": "Groupes des signatures d'un même auteur dans chaque publication",
+    "author_grouping": "Groupes des signatures d'un même auteur dans chaque publication",
     "persons": "Résolution de l'identité des personnes",
     "authorships": "Rafraîchissement des liens entre publications, personnes et structures",
     "relations": "Relations entre publications apparentées",

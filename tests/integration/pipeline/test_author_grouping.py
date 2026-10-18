@@ -1,25 +1,19 @@
-"""Intégration : phase `source_authorship_groups`, sur vraie base (`conn.commit` neutralisé)."""
+"""Intégration : phase `author_grouping`, sur vraie base (`conn.commit` neutralisé)."""
 
 import logging
 
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.publications.source_authorship_groups import (
-    source_authorship_groups,
-)
-from pipeline.transformation.publications.source_authorship_groups.queries import (
-    SourceAuthorshipGroupsQueries,
-)
-from pipeline.transformation.publications.source_authorship_groups.source_authorship_groups import (
-    build_groups,
-)
+from pipeline.transformation.publications.author_grouping import author_grouping
+from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
+from pipeline.transformation.publications.author_grouping.queries import AuthorGroupingQueries
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
-logger = logging.getLogger("test_source_authorship_groups")
+logger = logging.getLogger("test_author_grouping")
 
 
 @pytest.fixture
@@ -61,7 +55,7 @@ def _groups(conn, publication_id):
 
 
 def _run(conn):
-    return build_groups(conn, SourceAuthorshipGroupsQueries(), logger)
+    return build_groups(conn, AuthorGroupingQueries(), logger)
 
 
 def test_les_signatures_d_un_meme_auteur_sont_groupees(conn):
@@ -105,7 +99,7 @@ def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
 
 def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
     """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la signature."""
-    monkeypatch.setattr(source_authorship_groups, "BATCH_SIZE", 1)
+    monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)
     arrival = insert_publication(conn)
     departure = insert_publication(conn)
     _notice(conn, arrival, "hal", "hal-1", [("martin", "anne")])

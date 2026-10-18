@@ -1,4 +1,4 @@
-"""Requêtes de la phase `source_authorship_groups`."""
+"""Requêtes de la phase `author_grouping`."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -117,7 +117,7 @@ class MembershipRow:
     margin: float | None
 
 
-class SourceAuthorshipGroupsQueries:
+class AuthorGroupingQueries:
     """Lectures et écritures des groupes de signatures."""
 
     def fetch_dirty_publication_ids(self, conn: Connection) -> list[int]:

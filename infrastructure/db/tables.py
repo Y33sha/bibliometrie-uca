@@ -42,11 +42,11 @@ from domain.merge import MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
+from domain.publications.author_grouping import GroupingMethod
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
-from domain.publications.source_authorship_groups import GroupingMethod
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode

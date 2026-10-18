@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from domain.publications.source_authorship_groups import (
+from domain.publications.author_grouping import (
     Author,
     GroupingMethod,
     ResidualModel,
