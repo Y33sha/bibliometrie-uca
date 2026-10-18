@@ -98,7 +98,9 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - `method` : `reference` (la signature fonde le groupe), `name`, `identifier`, `order`, `model`.
   - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
 - Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication. Les doubles rattachements relèvent de ce chantier.
-- Les verdicts restent ancrés sur les données sources, pas sur les groupes : l'identifiant d'un groupe change à chaque recalcul.
+- Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices.
+- Après le recalcul, chaque groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de signatures, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `person_id` et `resolution_mode` suivent l'identifiant. Un ancien groupe sans correspondant est supprimé.
+- Les verdicts restent ancrés sur les données sources : une signature dont les identifiants changent est supprimée puis réinsérée.
 - Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships` en fin de chantier, matviews comprises.
 
 ## Phasage
@@ -174,7 +176,8 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Erreurs restantes sur les 326 paires : auteur en double dans une notice HAL, prénom faux dans HAL, noms différents à la même position, un auteur déplacé, une variante de nom.
   - Limite : trois « Y. Zhang » consécutifs, dans l'ordre inverse chez Crossref et chez HAL. Seuls les noms déclarés dans le registre ORCID les départagent.
 - [ ] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
-- [ ] Recalcul : publication entière, ou groupes touchés seulement, selon le temps de calcul mesuré sur le stock.
+- [ ] Temps de calcul : recalcul complet du stock, et recalcul d'une publication de très grande collaboration.
+- [ ] Réconciliation des identifiants de groupes après recalcul.
 - [ ] Poids du modèle du résidu versionnés dans le dépôt ; script de maintenance qui les réestime avec Splink. Le pipeline calcule les poids des paires sans Splink.
 
 ### Phase 3 — Usages
