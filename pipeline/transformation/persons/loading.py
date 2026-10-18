@@ -1,6 +1,6 @@
 """Chargement et enrichissement des candidats de la cascade personnes.
 
-Deux populations de signatures non liées traversent la cascade (`match`/`create`) : in-périmètre (éligibles à tous les barreaux) et hors-périmètre ancrés (rattachables sans forme de nom). Ce module les charge via le port, enrichit chaque row (parsing du nom, normalisations, flag de création autorisée), et construit l'index des authorships déjà rattachées par (publication, position) qui alimente le signal cross-source.
+Deux populations de signatures non liées traversent la cascade (`match`/`create`) : in-périmètre (éligibles à tous les barreaux) et hors-périmètre ancrés (rattachables sans forme de nom). Ce module les charge via le port, enrichit chaque row (parsing du nom, normalisations, flag de création autorisée), et construit l'index des authorships déjà rattachées par groupe de signatures, qui alimente le signal cross-source.
 """
 
 from collections import defaultdict
@@ -37,6 +37,8 @@ class EnrichedAuthorship(NamedTuple):
     last_norm: str
     first_norm: str
     allow_create: bool
+    # Groupe des signatures du même auteur dans la publication : clé du matching cross-source.
+    group_id: int | None = None
 
 
 def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
@@ -62,6 +64,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         last_norm=last_norm,
         first_norm=first_norm or "",
         allow_create=allow_create,
+        group_id=row.group_id,
     )
 
 
@@ -90,14 +93,14 @@ def get_cross_source_candidates(
     return [_enrich(row) for row in queries.fetch_cross_source_linked(conn)]
 
 
-def load_linked_authorships_by_pub(
+def load_linked_authorships_by_group(
     conn: Connection, queries: PersonsMatchingQueries
-) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
-    """Index des authorships rattachées par (publication_id, author_position)."""
-    index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
+) -> dict[int, list[tuple[int, str, str, str]]]:
+    """Index des authorships rattachées, par groupe de signatures."""
+    index: dict[int, list[tuple[int, str, str, str]]] = defaultdict(list)
 
     for r in queries.fetch_linked_authorships(conn):
         ln, fn = r.name.normalized()
-        index[(r.publication_id, r.author_position)].append((r.person_id, ln, fn or "", r.source))
+        index[r.group_id].append((r.person_id, ln, fn or "", r.source))
 
     return index

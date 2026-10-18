@@ -844,6 +844,7 @@ NODES: tuple[Node, ...] = (
             "source_authorships.collective",
             "source_authorships.source_publication_id",
             "source_publications.publication_id",
+            "grouped_source_authorships",
             "person_identifiers",
             "person_name_forms",
             "persons",

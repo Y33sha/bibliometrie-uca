@@ -115,6 +115,25 @@ def _plan_batch(
     return group_rows, memberships, unmatched
 
 
+def regroup(
+    conn: Connection,
+    queries: AuthorGroupingQueries,
+    publication_ids: Sequence[int],
+    methods: Counter[str] | None = None,
+    on_publication: Callable[[], None] = lambda: None,
+) -> int:
+    """Recalcule et écrit les groupes de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
+    groups, memberships, unmatched = _plan_batch(
+        queries,
+        conn,
+        publication_ids,
+        methods if methods is not None else Counter(),
+        on_publication,
+    )
+    queries.write(conn, publication_ids, groups, memberships, unmatched)
+    return len(groups)
+
+
 def build_groups(
     conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
 ) -> PhaseMetrics:
@@ -130,12 +149,8 @@ def build_groups(
     with progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
         for start in range(0, len(publication_ids), BATCH_SIZE):
             batch = publication_ids[start : start + BATCH_SIZE]
-            groups, memberships, unmatched = _plan_batch(
-                queries, conn, batch, methods, avancement.avance
-            )
-            queries.write(conn, batch, groups, memberships, unmatched)
+            group_count += regroup(conn, queries, batch, methods, avancement.avance)
             conn.commit()
-            group_count += len(groups)
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),

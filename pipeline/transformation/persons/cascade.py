@@ -3,7 +3,7 @@
 Deux populations de candidats traversent la même cascade :
 
 - **In-périmètre** (`source_authorships.in_perimeter = TRUE`) : authorships dont la source a détecté une affiliation dans le périmètre. Éligibles à tous les barreaux.
-- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même publication × position qu'un authorship déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
+- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même groupe de signatures qu'un authorship déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
 
 `match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
 
@@ -11,7 +11,7 @@ Deux populations de candidats traversent la même cascade :
 2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
 3. **IdRef**.
 4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne, dans l'ordre « prénom nom » puis, pour une signature au nom et prénom inversés, « nom prénom » ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
-5. **Cross-source** — même publication × position, nom compatible ; inopérant au bootstrap.
+5. **Cross-source** — même groupe de signatures, nom compatible ; inopérant au bootstrap.
 
 Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une signature qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses signatures attestent seul.
 
@@ -55,7 +55,7 @@ from pipeline.transformation.persons.loading import (
     get_all_unlinked_authorships,
     get_cross_source_candidates,
     get_out_of_perimeter_candidates,
-    load_linked_authorships_by_pub,
+    load_linked_authorships_by_group,
 )
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.metrics import CascadeResult, log_matching_breakdown
@@ -95,7 +95,7 @@ class _Cascade:
         self.cross_source_candidate_ids = {a.source_authorship_id for a in cross_source}
         self.resolved_cross_source_ids: set[int] = set()
 
-        self._linked_index = load_linked_authorships_by_pub(conn, queries)
+        self._linked_index = load_linked_authorships_by_group(conn, queries)
         self._idref_map = queries.fetch_identifier_to_person_map(conn, "idref")
         self._orcid_map = queries.fetch_identifier_to_person_map(conn, "orcid")
         self._hal_account_map = queries.fetch_identifier_to_person_map(conn, "hal_person_id")
@@ -126,8 +126,8 @@ class _Cascade:
     ) -> tuple[int | None, NameFormDecision, frozenset[int]]:
         """Décision cross-source + forme de nom, contre les index vivants."""
         cross_source_match: int | None = None
-        if a.publication_id is not None:
-            candidates = self._linked_index.get((a.publication_id, a.author_position), [])
+        if a.group_id is not None:
+            candidates = self._linked_index.get(a.group_id, [])
             if candidates:
                 cross_source_match = decide_cross_source_match(
                     authorship_source=a.source,
@@ -136,7 +136,7 @@ class _Cascade:
                     candidates=candidates,
                 )
         rejected_for_pub = self._rejected_for(a)
-        # Barreau name_form réservé au périmètre : hors-périmètre, un nom seul ne peut ni attacher ni créer (on n'a que des candidats ancrés sur identifiant ou position).
+        # Barreau name_form réservé au périmètre : hors-périmètre, un nom seul ne peut ni attacher ni créer (les candidats sont ancrés sur un identifiant ou un groupe).
         if a.in_perimeter:
             name_form_outcome = self._name_form_outcome(a, rejected_for_pub)
         else:
@@ -271,11 +271,9 @@ class _Cascade:
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
-        # Un membre ferme (identifiant, nom, création) ancre le cross-source de sa position ; un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
-        if a.publication_id is not None and reason != "cross_source":
-            self._linked_index[(a.publication_id, a.author_position)].append(
-                (pid, a.last_norm, a.first_norm, a.source)
-            )
+        # Un membre ferme (identifiant, nom, création) ancre le cross-source de son groupe ; un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
+        if a.group_id is not None and reason != "cross_source":
+            self._linked_index[a.group_id].append((pid, a.last_norm, a.first_norm, a.source))
         return True
 
     def apply_create(self, a: EnrichedAuthorship) -> None:
@@ -292,11 +290,9 @@ class _Cascade:
         )
         add_identifiers(marker, [a.identifiers], writes=self._writes)
         self._index_namesake(Namesake(marker, last, first))
-        # La personne créée ancre aussi le cross-source de sa position, pour ses co-signatures.
-        if a.publication_id is not None:
-            self._linked_index[(a.publication_id, a.author_position)].append(
-                (marker, a.last_norm, a.first_norm, a.source)
-            )
+        # La personne créée ancre aussi le cross-source de son groupe, pour les autres signatures du même auteur.
+        if a.group_id is not None:
+            self._linked_index[a.group_id].append((marker, a.last_norm, a.first_norm, a.source))
         self.created += 1
 
     def _index_namesake(self, namesake: Namesake) -> None:

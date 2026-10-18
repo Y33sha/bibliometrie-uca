@@ -159,15 +159,15 @@ def decide_cross_source_match(
     first_norm: str,
     candidates: list[tuple[int, str, str, str]],
 ) -> int | None:
-    """Décide si une authorship peut être rattachée à une `person` déjà associée à la même publication × position auteur via une autre source.
+    """Décide si une authorship peut être rattachée à la `person` d'une autre signature de son groupe (signatures du même auteur dans la publication, `grouped_source_authorships`).
 
-    Le pipeline ingère chaque publi par 1+ sources. Quand par exemple HAL a déjà rattaché l'auteur en position 3 à person 42, et qu'on rencontre l'authorship OpenAlex en position 3 de la même publi non encore rattachée, on peut transmettre le rattachement — à condition que le nom soit compatible (garde-fou contre les désalignements de position entre sources).
+    Quand HAL a déjà rattaché un auteur à la personne 42, la signature OpenAlex du même groupe reçoit la même personne, à condition que son nom soit compatible.
 
     Paramètres :
 
     - `authorship_source` : source de l'authorship qu'on cherche à rattacher. Sert à exclure les candidats de la même source (qui ne porteraient aucun signal supplémentaire).
     - `last_norm`, `first_norm` : nom normalisé de l'authorship.
-    - `candidates` : liste de tuples `(person_id, last_norm, first_norm, source)` — les authorships déjà rattachées à la même `(publication_id, author_position)`, à fournir via prefetch (typiquement `linked_index[(pub_id, position)]`).
+    - `candidates` : liste de tuples `(person_id, last_norm, first_norm, source)` — les authorships déjà rattachées du même groupe.
 
     Cascade :
 
@@ -361,7 +361,7 @@ def decide_person_match(
     2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la signature dans le TEI HAL.
     3. **IdRef** (`idref_match`).
     4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne, ou, à forme inconnue, seule personne aux initiales compatibles (`reason="compatible_name"`). Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
-    5. **Cross-source** (`cross_source_match`) — match par `(publication_id, author_position)` avec une authorship d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
+    5. **Cross-source** (`cross_source_match`) — match par le groupe de signatures, avec une authorship d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
     6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship (store `rejected_authorships`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse l'authorship orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).

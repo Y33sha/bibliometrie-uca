@@ -52,14 +52,15 @@ class BareUnlinkedAuthorship(NamedTuple):
     in_perimeter: bool
     # `person_id` courant si la signature est déjà liée en cross-source et re-jugée ce run ; `None` pour une signature non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
     current_person_id: int | None
+    # Groupe des signatures du même auteur dans la publication (`grouped_source_authorships`) : clé du matching cross-source.
+    group_id: int | None = None
 
 
 class LinkedAuthorshipRow(NamedTuple):
-    """Projection SQL : `source_authorships` déjà rattaché à une personne, toutes sources confondues. Sert au matching cross-source par `(publication_id, author_position)`."""
+    """Projection SQL : `source_authorships` déjà rattaché à une personne, toutes sources confondues. Sert au matching cross-source par groupe de signatures."""
 
     person_id: int
-    author_position: int
-    publication_id: int
+    group_id: int
     name: SignatureName
     source: str
 
@@ -106,6 +107,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
         author_position=r.author_position,
         in_perimeter=r.in_perimeter,
         current_person_id=r.current_person_id,
+        group_id=r.group_id,
     )
 
 
@@ -123,7 +125,9 @@ _BARE_PROJECTION_HEAD = f"""
     jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
     sa_auth.roles,
     sd.publication_id,
-    sa_auth.author_position"""
+    sa_auth.author_position,
+    (SELECT gs.group_id FROM grouped_source_authorships gs
+     WHERE gs.source_authorship_id = sa_auth.id) AS group_id"""
 
 _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     FALSE AS in_perimeter,
@@ -153,22 +157,18 @@ def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
     )
 
 
-# Branche « cross-source-ancrée » : signature hors-périmètre à une (publication,
-# position) où une autre est déjà rattachée. Self-join sur `linked.author_position`
-# (position source, clé de `linked_index`) ; le matching nom-compatible est tranché
-# côté Python (`decide_cross_source_match`).
+# Branche « cross-source-ancrée » : signature hors-périmètre dont le groupe (`grouped_source_authorships`) compte une signature déjà rattachée. Le matching nom-compatible est tranché côté Python (`decide_cross_source_match`).
 _OOP_CROSS_SOURCE_BRANCH = f"""
     SELECT {_OOP_PROJECTION}
     FROM source_authorships linked
-    JOIN source_publications sd_linked ON sd_linked.id = linked.source_publication_id
-    JOIN source_publications sd ON sd.publication_id = sd_linked.publication_id
-    JOIN source_authorships sa_auth
-        ON sa_auth.source_publication_id = sd.id
-       AND sa_auth.author_position = linked.author_position
+    JOIN grouped_source_authorships gl ON gl.source_authorship_id = linked.id
+    JOIN grouped_source_authorships ga
+        ON ga.group_id = gl.group_id AND ga.source_authorship_id <> gl.source_authorship_id
+    JOIN source_authorships sa_auth ON sa_auth.id = ga.source_authorship_id
+    JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
     JOIN author_identifying_keys aik ON aik.id = sa_auth.identity_id
     JOIN publications pub ON pub.id = sd.publication_id
     WHERE linked.person_id IS NOT NULL
-      AND linked.author_position IS NOT NULL
       AND NOT linked.collective
       AND {_OOP_COMMON_WHERE}
 """
@@ -206,9 +206,9 @@ class PersonsMatchingQueries:
         return [_to_bare(r) for r in rows]
 
     def fetch_out_of_perimeter_candidates(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
-        """Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même signature peut être candidate par plusieurs chemins (identifiant fort partagé, ou ancrage cross-source sur une position déjà liée). La cascade côté orchestrateur arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces candidats hors-périmètre).
+        """Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même signature peut être candidate par plusieurs chemins (identifiant fort partagé, ou ancrage cross-source sur un groupe de signatures déjà lié). La cascade côté orchestrateur arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces candidats hors-périmètre).
 
-        Seules les signatures ancrées sur une personne existante (identifiant partagé) ou sur une position déjà rattachée (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source porte l'essentiel de son coût.
+        Seules les signatures ancrées sur une personne existante (identifiant partagé) ou sur un groupe de signatures déjà rattaché (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source porte l'essentiel de son coût.
         """
         rows = conn.execute(text(_OOP_CANDIDATES_SQL)).all()
         return [_to_bare(r) for r in rows]
@@ -217,23 +217,20 @@ class PersonsMatchingQueries:
         """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective n'ancre rien."""
         rows = conn.execute(
             text(f"""
-                SELECT sa_auth.person_id, sa_auth.author_position,
-                       sd.publication_id,
+                SELECT sa_auth.person_id, gs.group_id,
                        sa_auth.raw_author_name, sa_auth.raw_last_name, sa_auth.raw_first_name,
                        sa_auth.source::text AS source
                 FROM source_authorships sa_auth
-                JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
+                JOIN grouped_source_authorships gs ON gs.source_authorship_id = sa_auth.id
                 WHERE sa_auth.person_id IS NOT NULL
                   AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
                   AND NOT sa_auth.collective
-                  AND sd.publication_id IS NOT NULL
             """)
         ).all()
         return [
             LinkedAuthorshipRow(
                 person_id=r.person_id,
-                author_position=r.author_position,
-                publication_id=r.publication_id,
+                group_id=r.group_id,
                 name=SignatureName.from_columns(
                     r.raw_author_name, r.raw_last_name, r.raw_first_name
                 ),

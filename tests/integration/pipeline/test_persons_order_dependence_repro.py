@@ -19,6 +19,7 @@ from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.person_writes import PersonWrites
 from pipeline.transformation.persons.purge import purge
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -50,9 +51,8 @@ def _seed_signature(conn, *, pub_id, raw_name, name_norm):
     )
 
 
-def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2):
-    """Une publication vue par HAL et OpenAlex, même auteur en position 0 mais deux graphies.
-    Deux signatures non rattachées, à créer."""
+def _seed_two_notices(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2, grouped=True):
+    """Une publication vue par HAL (notice `sa1_id`) et OpenAlex (notice `sa2_id`), une signature non rattachée chacune, en position 0. `grouped` : les deux signatures forment un groupe, celui d'un même auteur."""
     insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
     for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
         insert_source_publication(
@@ -78,6 +78,8 @@ def _seed_cross_source_pair(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, 
             author_name_normalized=norm,
             in_perimeter=True,
         )
+    if grouped:
+        insert_group(conn, pub_id, [(sa1_id, sa1_id), (sa2_id, sa2_id)])
 
 
 def _run_create(conn):
@@ -298,15 +300,15 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
     assert "  └─ 1 personne créée" in caplog.messages
 
 
-def test_une_forme_ambigue_rejoint_la_creation_de_sa_co_signature(sa_sync_conn):
-    """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des signatures. Traitée après les créations, elle rejoint en cross-source la personne que crée sa co-signature."""
+def test_une_forme_ambigue_rejoint_la_personne_de_son_groupe(sa_sync_conn):
+    """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des signatures. Les deux forment un groupe. Traitée après les créations, « J Martin » rejoint en cross-source la personne que crée l'autre signature du groupe."""
     conn = sa_sync_conn
     _seed_signature(conn, pub_id=95050, raw_name="Julie Martin", name_norm="julie martin")
     _seed_signature(conn, pub_id=95051, raw_name="Joseph Martin", name_norm="joseph martin")
     _run_create(conn)
     _populate_canonical_forms(conn)  # « j martin » désigne les deux personnes
 
-    _seed_cross_source_pair(
+    _seed_two_notices(
         conn,
         pub_id=95060,
         sa1_id=95062,
@@ -322,14 +324,10 @@ def test_une_forme_ambigue_rejoint_la_creation_de_sa_co_signature(sa_sync_conn):
     assert _person_of(conn, 95061) == _person_of(conn, 95062)
 
 
-def test_cross_source_pair_merges_via_deferred_creation(sa_sync_conn):
-    """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex), même publication × position, sont le
-    même auteur pour le cross-source (`names_compatible`), mais leurs formes de nom sont
-    disjointes — le matching par nom ne les réunit pas. Traitée en premier, « Jean Martin » est
-    différée puis créée ; « J-P Martin » la rejoint par cross-source au lieu de créer un doublon.
-    Une seule personne."""
+def test_un_groupe_reunit_deux_formes_disjointes_sur_une_personne(sa_sync_conn):
+    """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex) forment un groupe, et leurs noms sont compatibles (`names_compatible`). Leurs formes de nom sont disjointes. Traitée en premier, « Jean Martin » est différée puis créée. « J-P Martin » rejoint sa personne par cross-source."""
     conn = sa_sync_conn
-    _seed_cross_source_pair(
+    _seed_two_notices(
         conn,
         pub_id=95020,
         sa1_id=95021,
@@ -342,11 +340,24 @@ def test_cross_source_pair_merges_via_deferred_creation(sa_sync_conn):
     _run_create(conn)
 
     assert _martin_count(conn) == 1
-    persons_on = (
-        conn.execute(
-            text("SELECT DISTINCT person_id FROM source_authorships WHERE id IN (95021, 95022)")
-        )
-        .scalars()
-        .all()
+    assert _person_of(conn, 95021) is not None
+    assert _person_of(conn, 95021) == _person_of(conn, 95022)
+
+
+def test_deux_signatures_hors_groupe_creent_deux_personnes(sa_sync_conn):
+    """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex) occupent la même position, hors de tout groupe. Chacune crée sa personne."""
+    conn = sa_sync_conn
+    _seed_two_notices(
+        conn,
+        pub_id=95030,
+        sa1_id=95031,
+        raw1="Jean Martin",
+        norm1="jean martin",
+        sa2_id=95032,
+        raw2="J-P Martin",
+        norm2="j p martin",
+        grouped=False,
     )
-    assert len(persons_on) == 1 and persons_on[0] is not None  # les deux sur la même personne
+    _run_create(conn)
+
+    assert _martin_count(conn) == 2
