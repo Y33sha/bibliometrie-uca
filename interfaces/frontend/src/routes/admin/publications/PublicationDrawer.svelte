@@ -39,13 +39,6 @@
   const records = $derived(data ? orderRecords(data.source_publications) : []);
   const rows = $derived(comparisonRows(records));
   const authors = $derived(data ? authorRows(records, data.signatures) : []);
-
-  // Méthode qui a fait entrer la signature dans son groupe, quand elle n'est pas le nom.
-  const METHOD_LABELS: Record<string, string> = {
-    identifier: "identifiant",
-    order: "ordre",
-    model: "modèle",
-  };
 </script>
 
 <Drawer width="1200px" {onclose}>
@@ -153,14 +146,6 @@
                         {#if s.countries?.length}
                           <span class="countries"
                             >{s.countries.map((c) => c.toUpperCase()).join(" ")}</span
-                          >
-                        {/if}
-                        {#if s.method && METHOD_LABELS[s.method]}
-                          <span
-                            class="method"
-                            title={s.method === "model"
-                              ? `Score ${s.score?.toFixed(1)} bits, marge ${s.margin?.toFixed(1)} bits`
-                              : undefined}>{METHOD_LABELS[s.method]}</span
                           >
                         {/if}
                       </span>
@@ -287,12 +272,5 @@
     font-size: 0.75rem;
     margin-left: 4px;
   }
-  .method {
-    font-size: 0.7rem;
-    color: #8a5a00;
-    background: #fff3d6;
-    border-radius: 3px;
-    padding: 0 4px;
-    margin-left: 4px;
-  }
+
 </style>
