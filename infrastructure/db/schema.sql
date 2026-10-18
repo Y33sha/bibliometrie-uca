@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict b3LeCSBfO3jpmB2c9oaAxvEZYWC53c2pivAubzo0UI67fB4Wv4jkk6IQtE3oCsz
+\restrict IkDncbgHzhtLj1K6RDF6k3EnbSdBvAlTdFILZC7hOqagtkLaJhrqfRPANpj9LEJ
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1298,6 +1298,65 @@ COMMENT ON TABLE publications.grouped_source_authorships IS 'Appartenance d''une
 
 
 --
+-- Name: source_authorship_groups; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.source_authorship_groups (
+    id integer NOT NULL,
+    publication_id integer NOT NULL,
+    person_id integer,
+    resolution_mode public.resolution_mode,
+    reference_position smallint
+);
+
+
+--
+-- Name: TABLE source_authorship_groups; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.source_authorship_groups IS 'Signatures d''un même auteur dans une publication, avec au maximum une signature par notice. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
+
+
+--
+-- Name: publication_author_alignment; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
+--
+
+CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
+ WITH author_members AS (
+         SELECT g.publication_id,
+            gs.group_id,
+            gs.source_publication_id,
+            gs.method,
+            gs.margin,
+            count(*) OVER (PARTITION BY gs.group_id) AS group_size,
+            bool_or((gs.method = ANY (ARRAY['name'::public.grouping_method, 'identifier'::public.grouping_method, 'order'::public.grouping_method]))) OVER (PARTITION BY gs.group_id) AS rule_linked
+           FROM ((publications.grouped_source_authorships gs
+             JOIN publications.source_authorship_groups g ON ((g.id = gs.group_id)))
+             JOIN sources.source_authorships sa ON ((sa.id = gs.source_authorship_id)))
+          WHERE ((sa.roles IS NULL) OR ('author'::text = ANY (sa.roles)))
+        )
+ SELECT publication_id,
+    count(DISTINCT source_publication_id) AS notices,
+    count(*) AS signatures,
+    count(DISTINCT group_id) AS groups,
+    count(*) FILTER (WHERE rule_linked) AS rule_aligned_signatures,
+    count(*) FILTER (WHERE (group_size = 1)) AS lone_signatures,
+    count(*) FILTER (WHERE (method = 'model'::public.grouping_method)) AS model_signatures,
+    min(margin) AS min_margin
+   FROM author_members
+  GROUP BY publication_id
+ HAVING (count(DISTINCT source_publication_id) >= 2)
+  WITH NO DATA;
+
+
+--
+-- Name: MATERIALIZED VIEW publication_author_alignment; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON MATERIALIZED VIEW publications.publication_author_alignment IS 'Recouvrement des listes d''auteurs des publications à plusieurs notices. rule_aligned_signatures : signatures d''auteur d''un groupe dont un membre est lié par la règle (nom, identifiant, ordre). lone_signatures : signatures d''auteur seules dans leur groupe. model_signatures : signatures d''auteur liées à leur groupe par le modèle ; min_margin : plus petite marge de ces liens, en bits.';
+
+
+--
 -- Name: publication_relations; Type: TABLE; Schema: publications; Owner: -
 --
 
@@ -1422,26 +1481,6 @@ CREATE SEQUENCE publications.publications_id_seq
 --
 
 ALTER SEQUENCE publications.publications_id_seq OWNED BY publications.publications.id;
-
-
---
--- Name: source_authorship_groups; Type: TABLE; Schema: publications; Owner: -
---
-
-CREATE TABLE publications.source_authorship_groups (
-    id integer NOT NULL,
-    publication_id integer NOT NULL,
-    person_id integer,
-    resolution_mode public.resolution_mode,
-    reference_position smallint
-);
-
-
---
--- Name: TABLE source_authorship_groups; Type: COMMENT; Schema: publications; Owner: -
---
-
-COMMENT ON TABLE publications.source_authorship_groups IS 'Signatures d''un même auteur dans une publication, avec au maximum une signature par notice. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
 
 
 --
@@ -3548,6 +3587,13 @@ CREATE INDEX idx_publications_year_type ON publications.publications USING btree
 
 
 --
+-- Name: publication_author_alignment_pkey; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE UNIQUE INDEX publication_author_alignment_pkey ON publications.publication_author_alignment USING btree (publication_id);
+
+
+--
 -- Name: publication_structures_pub_struct; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -4698,5 +4744,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict b3LeCSBfO3jpmB2c9oaAxvEZYWC53c2pivAubzo0UI67fB4Wv4jkk6IQtE3oCsz
+\unrestrict IkDncbgHzhtLj1K6RDF6k3EnbSdBvAlTdFILZC7hOqagtkLaJhrqfRPANpj9LEJ
 
