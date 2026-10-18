@@ -81,8 +81,11 @@ class FakeAuthorshipsBatchQueries:
                     v["person_identifiers"],
                     v["content_hash"],
                     v["collective"],
+                    v["roles"],
                 )
             )
+
+    def mark_authorships_dirty(self, conn, source_publication_id: int) -> None: ...
 
     def upsert_addresses_batch(self, conn, values) -> None: ...
 

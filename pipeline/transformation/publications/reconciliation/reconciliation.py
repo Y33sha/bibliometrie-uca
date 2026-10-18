@@ -236,7 +236,7 @@ class PublicationsReconciliationQueries:
         record_redirect(conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id)
 
     def mark_authorships_dirty(self, conn: Connection, publication_ids: list[int]) -> int:
-        """Pose `authorships_dirty` sur ces publications : leurs notices ou leurs signatures ont changé. Retourne le nombre de publications marquées."""
+        """Pose `authorships_dirty` sur ces publications. Retourne le nombre de publications marquées."""
         if not publication_ids:
             return 0
         stmt = text(

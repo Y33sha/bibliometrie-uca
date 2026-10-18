@@ -19,6 +19,7 @@ from tests.integration.helpers.journals import (
     insert_journal_doi_namespace,
     insert_publisher,
 )
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice de titre « T », OpenAlex par défaut.
@@ -614,6 +615,41 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
             "raw": "10.9002/file1",
             "corrected_by": "DATACITE_PACKAGE_PIECE",
         }
+
+
+def test_une_correction_de_doi_regroupe_les_signatures_de_la_publication(sa_sync_conn):
+    """La pièce converge sur le DOI du dépôt qui partage sa publication : le groupement l'écarte."""
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    other = insert_publication(conn)
+    insert_source_publication(
+        conn,
+        publication,
+        source="datacite",
+        source_id="d-parent",
+        title="Set",
+        doi="10.9001/set",
+        doc_type="dataset",
+    )
+    insert_source_publication(
+        conn,
+        publication,
+        source="datacite",
+        source_id="d-piece",
+        title="Piece",
+        title_normalized="piece",
+        doi="10.9002/file1",
+        doc_type="dataset",
+        meta={"related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]},
+    )
+    insert_source_publication(conn, other, source="openalex", source_id="W-other", title="Other")
+    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+
+    assert _apply_cluster(conn) == 1
+
+    dirty = dict(conn.execute(text("SELECT id, authorships_dirty FROM publications")).all())
+    assert dirty[publication] is True
+    assert dirty[other] is False
 
 
 def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):

@@ -256,8 +256,10 @@ NODES: tuple[Node, ...] = (
                 "staging",
                 "source_publications.id",
                 "source_publications.authors_hash",
+                "source_publications.publication_id",
                 "source_authorships.id",
                 "source_authorships.author_position",
+                "source_authorships.roles",
                 "source_authorships.identity_id",
                 "source_authorships.content_hash",
                 "author_identifying_keys",
@@ -277,6 +279,7 @@ NODES: tuple[Node, ...] = (
                 "addresses.id",
                 "addresses.candidates_dirty",
                 "address_country_candidates",
+                "publications.authorships_dirty",
                 *_containers(source),
             ),
             # Ses propres lignes de `staging`, notices et signatures, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
@@ -304,6 +307,7 @@ NODES: tuple[Node, ...] = (
         writes=(
             "source_publications.id",
             "source_publications.keys_dirty",
+            "publications.authorships_dirty",
             "source_authorships.id",
             "source_authorship_addresses",
             "source_authorship_rors",
@@ -748,6 +752,7 @@ NODES: tuple[Node, ...] = (
                 "meta",
                 "external_ids",
                 "source_id",
+                "publication_id",
             )
         )
         # DOI que doi.org ne connaît pas.
@@ -764,6 +769,7 @@ NODES: tuple[Node, ...] = (
             "source_publications.external_ids",
             "source_publications.raw_metadata",
             "source_publications.keys_dirty",
+            "publications.authorships_dirty",
         ),
         previous_run=("source_publications",),
     ),

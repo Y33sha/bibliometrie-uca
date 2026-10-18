@@ -148,6 +148,8 @@ def reconcile(
         )
 
     survivors: set[int] = set()
+    # Publications qui gagnent ou perdent une notice.
+    membership_changed: set[int] = set()
     dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     created = 0
     splits = 0
@@ -167,12 +169,18 @@ def reconcile(
                     splits += 1
             queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
             survivors.add(target)
+            for sp in group.source_publication_ids:
+                if (previous := rows_by_sp[sp].publication_id) != target:
+                    membership_changed.update(p for p in (previous, target) if p is not None)
 
         # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
         # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
         # n'a plus de source.
         if plan.detached:
             queries.detach_source_publications(conn, list(plan.detached))
+            membership_changed.update(
+                p for sp in plan.detached if (p := rows_by_sp[sp].publication_id) is not None
+            )
             for pub_id in sorted(
                 {p for sp in plan.detached if (p := rows_by_sp[sp].publication_id) is not None}
                 - survivors
@@ -202,9 +210,8 @@ def reconcile(
             with savepoint(conn):
                 refresh_from_sources(pub_id, repo=publication_repo)
 
-    # 5. Les publications touchées regroupent à nouveau leurs signatures : publications d'arrivée, et anciennes publications des SP déplacées ou détachées. Une SP dirty a pu changer ses signatures.
-    left = {row.publication_id for row in rows if row.publication_id is not None}
-    queries.mark_authorships_dirty(conn, sorted((survivors | left) - dissolved_ids))
+    # 5. Les publications qui gagnent ou perdent une notice regroupent leurs signatures.
+    queries.mark_authorships_dirty(conn, sorted(membership_changed - dissolved_ids))
     cleared = queries.clear_keys_dirty(conn, dirty_ids)
     return ReconcileStats(
         processed=len(dirty_ids),

@@ -451,7 +451,18 @@ class PgMetadataCorrectionQueries:
         ]
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes `doi`, `external_ids` et `raw_metadata`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes `doi`, `external_ids` et `raw_metadata`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
+
+        La publication de chaque notice reçoit `authorships_dirty` : le groupement des signatures écarte une notice dont le DOI converge sur celui d'une autre œuvre.
+        """
+        conn.execute(
+            text("""
+                UPDATE publications p SET authorships_dirty = true
+                FROM source_publications sp
+                WHERE sp.id = ANY(:ids) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+            """),
+            {"ids": [u.id for u in updates]},
+        )
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],

@@ -175,7 +175,7 @@ class TestEndToEnd:
         assert redirect_of(conn, MergedEntity.PUBLICATION, pub_b) is None
 
     def test_les_publications_touchees_regroupent_leurs_signatures(self, sa_sync_conn, monkeypatch):
-        """La publication qui reçoit une notice et celle qui en perd une sont à regrouper ; une publication sans notice réexaminée ne l'est pas."""
+        """La publication qui reçoit une notice et celle qui en perd une sont à regrouper. Une publication dont la notice réexaminée reste en place ne l'est pas."""
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
@@ -184,7 +184,7 @@ class TestEndToEnd:
         _notice(conn, pub_a, source_id="a", doi="10.1/x")
         _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
         _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
-        _notice(conn, untouched, source_id="d", doi="10.9/z", keys_dirty=False)
+        _notice(conn, untouched, source_id="d", doi="10.9/z")
         conn.execute(text("UPDATE publications SET authorships_dirty = false"))
 
         run(

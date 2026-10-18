@@ -109,6 +109,26 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
     assert _a_reconcilier(conn, orpheline) is False
 
 
+def test_la_publication_du_document_disparu_regroupe_ses_signatures(sa_sync_conn_owner):
+    conn = sa_sync_conn_owner
+    publication = _publication(conn)
+    autre = _publication(conn)
+    _notice(
+        conn,
+        publication,
+        source_id="hal-disparu",
+        staging_id=_staging(conn, source_id="hal-disparu", disappeared=True),
+    )
+    _notice(conn, autre, source_id="hal-autre", staging_id=_staging(conn, source_id="hal-autre"))
+    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+
+    delete_disappeared_source_publications(conn)
+
+    dirty = dict(conn.execute(text("SELECT id, authorships_dirty FROM publications")).all())
+    assert dirty[publication] is True
+    assert dirty[autre] is False
+
+
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-present")
     sp_id = _notice(sa_sync_conn_owner, source_id="hal-present", staging_id=staging_id)

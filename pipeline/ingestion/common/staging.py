@@ -329,8 +329,20 @@ def _delete_source_publications(
 ) -> int:
     """Supprime les `source_publications` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
 
-    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. Rend le nombre de `source_publications` supprimées.
+    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication reçoit `authorships_dirty`. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. Rend le nombre de `source_publications` supprimées.
     """
+    conn.execute(
+        text(f"""
+            UPDATE publications p
+            SET authorships_dirty = true
+            FROM source_publications sp
+            JOIN staging s ON s.id = sp.staging_id
+            WHERE {staging_filter}
+              AND p.id = sp.publication_id
+              AND NOT p.authorships_dirty
+        """),  # noqa: S608
+        params,
+    )
     # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.
     conn.execute(
         text(f"""

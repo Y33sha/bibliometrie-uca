@@ -17,6 +17,7 @@ from pipeline.ingestion.common.signatures import (
 )
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 
 # Notice Crossref « 10.9999/sync », de titre « t ».
@@ -172,6 +173,58 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
 
     assert _signatures(conn, sp)[0][0] == sa_id
     assert _addresses(conn, sa_id) == ["Labo B"]
+
+
+def _authorships_dirty(conn, publication_id: int) -> bool:
+    return conn.execute(
+        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication_id}
+    ).scalar_one()
+
+
+def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_roles(sa_sync_conn):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    sp = _notice(conn, publication)
+    _write(
+        conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")]), _rec(1, "Xu, Z.")]
+    )
+    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+
+    _write(
+        conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")]), _rec(1, "Xu, Z.")]
+    )
+    assert not _authorships_dirty(conn, publication)
+
+    _write(
+        conn, sp, [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean", addresses=[AddressRecord("Labo B")])]
+    )
+    assert _authorships_dirty(conn, publication)
+
+    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+    _write(
+        conn,
+        sp,
+        [
+            _rec(0, "Xu, Z."),
+            _rec(
+                1, "Dupont, Jean", roles=["author", "editor"], addresses=[AddressRecord("Labo B")]
+            ),
+        ],
+    )
+    assert _authorships_dirty(conn, publication)
+
+    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+    _write(
+        conn,
+        sp,
+        [
+            _rec(0, "Xu, Zhilu"),
+            _rec(
+                1, "Dupont, Jean", roles=["author", "editor"], addresses=[AddressRecord("Labo B")]
+            ),
+        ],
+    )
+    assert _authorships_dirty(conn, publication)
 
 
 def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):

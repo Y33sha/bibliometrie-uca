@@ -59,7 +59,7 @@ class SourceAuthorshipUpdate(SourceAuthorshipItem):
 
 
 class StoredSourceAuthorship(NamedTuple):
-    """Une signature en base d'une notice : identifiant, position, identité, empreinte et marque collective."""
+    """Une signature en base d'une notice : identifiant, position, identité, empreinte, marque collective et rôles."""
 
     id: int
     author_position: int | None
@@ -68,6 +68,7 @@ class StoredSourceAuthorship(NamedTuple):
     person_identifiers: JsonValue
     content_hash: str | None
     collective: bool
+    roles: list[str] | None
 
 
 class AddressBatchItem(TypedDict):
@@ -226,7 +227,7 @@ class AuthorshipsBatchQueries:
             text("""
                 SELECT sa.id, sa.author_position, aik.last_name_normalized,
                        aik.first_name_normalized, aik.person_identifiers, sa.content_hash,
-                       sa.collective
+                       sa.collective, sa.roles
                 FROM source_authorships sa
                 JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                 WHERE sa.source_publication_id = :spid
@@ -234,6 +235,17 @@ class AuthorshipsBatchQueries:
             {"spid": source_publication_id},
         ).all()
         return [StoredSourceAuthorship(*r) for r in rows]
+
+    def mark_authorships_dirty(self, conn: Connection, source_publication_id: int) -> None:
+        """Pose `authorships_dirty` sur la publication de la notice."""
+        conn.execute(
+            text("""
+                UPDATE publications p SET authorships_dirty = true
+                FROM source_publications sp
+                WHERE sp.id = :spid AND p.id = sp.publication_id AND NOT p.authorships_dirty
+            """),
+            {"spid": source_publication_id},
+        )
 
     def delete_source_authorships(self, conn: Connection, ids: list[int]) -> None:
         if ids:

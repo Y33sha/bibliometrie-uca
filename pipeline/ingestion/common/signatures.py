@@ -120,7 +120,7 @@ def write_source_authorships(
 ) -> None:
     """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
+    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `authorships_dirty` sur la publication de la notice.
 
     Une signature entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
@@ -161,16 +161,24 @@ def write_source_authorships(
     stored = queries.fetch_stored_source_authorships(conn, source_publication_id)
     plan = plan_signature_sync(
         [
-            StoredSignature(s.id, s.author_position, _stored_identity(s), s.content_hash)
+            StoredSignature(
+                s.id, s.author_position, _stored_identity(s), s.content_hash, _roles(s.roles)
+            )
             for s in stored
         ],
         [
             IncomingSignature(
-                key, item["author_position"], _item_identity(item), item["content_hash"] or ""
+                key,
+                item["author_position"],
+                _item_identity(item),
+                item["content_hash"] or "",
+                _roles(item["roles"]),
             )
             for key, item in enumerate(items)
         ],
     )
+    if plan.regroup:
+        queries.mark_authorships_dirty(conn, source_publication_id)
 
     queries.delete_source_authorships(conn, list(plan.deletes))
     queries.update_source_authorships_batch(
@@ -256,6 +264,10 @@ def _identity(
     """Clé d'appariement d'une signature : nom et prénom normalisés, identifiants, comme `author_identifying_keys`, et marque collective. Une signature qui devient collective est donc réinsérée sans personne."""
     ids = json.dumps(person_identifiers, sort_keys=True) if person_identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
+
+
+def _roles(roles: list[str] | None) -> tuple[str, ...] | None:
+    return tuple(roles) if roles is not None else None
 
 
 def _stored_identity(row: StoredSourceAuthorship) -> Hashable:

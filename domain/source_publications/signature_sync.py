@@ -12,34 +12,37 @@ from domain.types import JsonValue
 
 
 class StoredSignature(NamedTuple):
-    """Signature en base : identifiant, position, identité (nom normalisé et identifiants) et empreinte."""
+    """Signature en base : identifiant, position, identité (nom normalisé et identifiants), empreinte et rôles."""
 
     id: int
     position: int | None
     identity: Hashable
     content_hash: str | None
+    roles: tuple[str, ...] | None = None
 
 
 class IncomingSignature(NamedTuple):
-    """Signature issue de la notice renormalisée : clé (rang dans la notice), position d'auteur, identité et empreinte. Une signature sans rôle d'auteur n'a pas de position."""
+    """Signature issue de la notice renormalisée : clé (rang dans la notice), position d'auteur, identité, empreinte et rôles. Une signature sans rôle d'auteur n'a pas de position."""
 
     key: int
     position: int | None
     identity: Hashable
     content_hash: str
+    roles: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SignatureSyncPlan:
     """Ce que la renormalisation fait des signatures d'une notice.
 
-    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant.
+    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une signature est insérée ou supprimée, ou change de position ou de rôles. Les signatures de la publication sont alors à regrouper.
     """
 
     updates: tuple[tuple[int, int], ...]
     kept: tuple[int, ...]
     inserts: tuple[int, ...]
     deletes: tuple[int, ...]
+    regroup: bool
 
 
 def plan_signature_sync(
@@ -71,11 +74,15 @@ def plan_signature_sync(
 
     matched_stored = {s.id for s, _ in pairs}
     matched_incoming = {i.key for _, i in pairs}
+    inserts = tuple(sorted(i.key for i in incoming if i.key not in matched_incoming))
+    deletes = tuple(sorted(s.id for s in stored if s.id not in matched_stored))
     return SignatureSyncPlan(
         updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.content_hash != i.content_hash)),
         kept=tuple(sorted(s.id for s, i in pairs if s.content_hash == i.content_hash)),
-        inserts=tuple(sorted(i.key for i in incoming if i.key not in matched_incoming)),
-        deletes=tuple(sorted(s.id for s in stored if s.id not in matched_stored)),
+        inserts=inserts,
+        deletes=deletes,
+        regroup=bool(inserts or deletes)
+        or any((s.position, s.roles) != (i.position, i.roles) for s, i in pairs),
     )
 
 
