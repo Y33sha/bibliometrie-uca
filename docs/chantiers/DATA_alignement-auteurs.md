@@ -199,6 +199,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Modèle : 9 des 11 erreurs de groupement viennent de deux œuvres distinctes réunies dans une même publication. Une autre vient d'une notice scanR qui répète un auteur et sert de liste de référence. La dernière vient de noms inversés par quatre sources sur cinq : le niveau « noms inversés » du modèle n'a pas de poids, faute d'estimation par l'EM.
   - Ordre : 7 des 9 rattachements faux concernent un même ORCID, rattaché par identifiant à une autre personne que son titulaire. Les 3 erreurs de groupement sont des homonymes que l'ordre départage à tort, alors que l'ORCID les distingue.
   - Nom : les doublons de personnes viennent d'un prénom absent, réduit ou différent selon la source. Deux erreurs de source sont deux noms concaténés par Crossref.
+- [x] Notices aux noms inversés : une notice qui intervertit nom et prénom s'aligne avec ses noms remis dans l'ordre. À longueur égale, une notice scanR passe après les autres et ne fonde un groupe qu'à défaut d'une autre. Sur les jeux relus, 91 désaccords sur 97 sont tranchés comme la relecture, contre 86 ; le reste est inchangé.
 - [ ] Identification des personnes par groupe, dans le chantier de déduplication des personnes. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
 - [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
 - [ ] Fusions suspectes : listes d'auteurs qui ne s'alignent pas.
