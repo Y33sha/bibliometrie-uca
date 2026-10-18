@@ -22,6 +22,8 @@ from domain.persons.collective_names import is_collective_name
         "ENPEN Study Collaborators",
         "French Society of Bone Marrow Transplantation and Cellular Therapy",
         "In vitro tests for Drug Allergy Task Force of EAACI",
+        "Et Al.",
+        "et al",
     ],
 )
 def test_reconnait_un_collectif(name):
@@ -30,7 +32,7 @@ def test_reconnait_un_collectif(name):
 
 @pytest.mark.parametrize(
     "name",
-    ["Antonio Comite", "Tony Affolder", "A. Nedelcu plus co-authors", "", None],
+    ["Antonio Comite", "Tony Affolder", "A. Nedelcu plus co-authors", "R. Barate et al.", "", None],
 )
 def test_garde_les_personnes(name):
     """« Comite » est aussi un nom de famille. Une personne suivie de ses co-auteurs reste une personne."""

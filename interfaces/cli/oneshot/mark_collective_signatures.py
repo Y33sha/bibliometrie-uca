@@ -1,7 +1,7 @@
-# STATUS: oneshot (2026-10-17)
+# STATUS: oneshot (2026-10-18)
 """Marque `source_authorships.collective` sur le stock d'après la règle du nom (`is_collective_name`), par lots d'identifiants validés un à un.
 
-La phase `persons` suivante détache les signatures marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé.
+Les publications des signatures marquées sont à regrouper. La phase `persons` suivante détache les signatures marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. `backfill_author_counts` recalcule ensuite les décomptes d'auteurs des notices. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé.
 
 Usage :
     python -m interfaces.cli.oneshot.mark_collective_signatures [--dry-run] [--from-id N] [--batch 1000000]
@@ -44,6 +44,22 @@ def _collective_ids(conn: Connection, lo: int, hi: int) -> list[int]:
     ]
 
 
+def mark_collective(conn: Connection, ids: list[int]) -> None:
+    """Marque collectives les signatures `ids` et met leurs publications à regrouper."""
+    conn.execute(
+        text("UPDATE source_authorships SET collective = true WHERE id = ANY(:ids)"),
+        {"ids": ids},
+    )
+    conn.execute(
+        text("""
+            UPDATE publications p SET authorships_dirty = true
+            FROM source_publications sp JOIN source_authorships sa ON sa.source_publication_id = sp.id
+            WHERE sa.id = ANY(:ids) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+        """),
+        {"ids": ids},
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="compte sans écrire")
@@ -63,10 +79,7 @@ def main() -> int:
             hi = lo + args.batch - 1
             ids = _collective_ids(conn, lo, hi)
             if ids and not args.dry_run:
-                conn.execute(
-                    text("UPDATE source_authorships SET collective = true WHERE id = ANY(:ids)"),
-                    {"ids": ids},
-                )
+                mark_collective(conn, ids)
             conn.commit()
             marked += len(ids)
             log.info(
