@@ -11,6 +11,7 @@ Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, cl�
 
 from sqlalchemy import (
     CHAR,
+    REAL,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -45,6 +46,7 @@ from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
+from domain.publications.source_authorship_groups import GroupingMethod
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
@@ -747,6 +749,53 @@ rejected_authorships = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     PrimaryKeyConstraint("source_publication_id", "person_id", name="rejected_authorships_pkey"),
     schema="persons",
+)
+
+
+grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
+
+source_authorship_groups = Table(
+    "source_authorship_groups",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("publication_id", Integer, nullable=False),
+    Column("person_id", Integer),
+    Column("resolution_mode", resolution_mode_enum),
+    Column("reference_position", SmallInteger),
+    UniqueConstraint(
+        "publication_id", "person_id", name="source_authorship_groups_publication_person_uq"
+    ),
+    comment=(
+        "Signatures d'un même auteur dans une publication, avec au maximum une signature par "
+        "notice. reference_position : position dans la liste la plus longue. Une personne "
+        "correspond au maximum à un groupe par publication."
+    ),
+    schema="publications",
+)
+
+
+grouped_source_authorships = Table(
+    "grouped_source_authorships",
+    metadata,
+    Column("source_authorship_id", Integer, primary_key=True),
+    Column("group_id", Integer, nullable=False),
+    Column("source_publication_id", Integer, nullable=False),
+    Column("method", grouping_method_enum, nullable=False),
+    Column("score", REAL),
+    Column("margin", REAL),
+    UniqueConstraint(
+        "group_id", "source_publication_id", name="grouped_source_authorships_group_notice_uq"
+    ),
+    CheckConstraint(
+        "method = 'model' OR (score IS NULL AND margin IS NULL)",
+        name="grouped_source_authorships_score_check",
+    ),
+    comment=(
+        "Appartenance d'une signature à son groupe. method : origine du lien. score et margin, "
+        "en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure "
+        "autre possibilité de l'affectation."
+    ),
+    schema="publications",
 )
 
 
