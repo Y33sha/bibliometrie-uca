@@ -1,6 +1,6 @@
 """Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les signatures d'auteur copiées dans la liste de leur notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les signatures d'auteur copiées dans la liste de leur notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
 Nœud `author_grouping.build`.
 """
@@ -9,8 +9,11 @@ import logging
 import math
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
+from contextlib import nullcontext
+from dataclasses import dataclass, fields
+from operator import attrgetter
 
 from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
@@ -26,6 +29,7 @@ from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.list_copies import copied_signatures
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente, progression
@@ -139,45 +143,82 @@ def membership_changes(
     return removed, inserted
 
 
+# Signature (champs de `SignatureRow` dans l'ordre), appartenance (signature, notice, méthode, score, marge) et groupe (signature de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
+type SignatureTuple = tuple[int, int, str, int, int | None, list[str] | None, str, str, str, str]
+type MemberTuple = tuple[int, int, str, float | None, float | None]
+type GroupTuple = tuple[int, list[MemberTuple]]
+type Aligned = tuple[list[GroupTuple], dict[int, int]]
+
+_SIGNATURE_FIELDS = attrgetter(*(f.name for f in fields(SignatureRow)))
+
+
+def align_rows(rows: Sequence[SignatureTuple]) -> Aligned:
+    """`group_publication` sur les signatures d'une publication en tuples, résultat en tuples."""
+    groups, copies = group_publication([SignatureRow(*row) for row in rows])
+    return [
+        (
+            g.reference.id,
+            [(m.signature, m.notice, str(m.method), m.score, m.margin) for m in g.members],
+        )
+        for g in groups
+    ], copies
+
+
+type Mapper = Callable[
+    [Callable[[Sequence[SignatureTuple]], Aligned], Sequence[Sequence[SignatureTuple]]],
+    Iterator[Aligned],
+]
+"""Applique `align_rows` aux signatures de chaque publication et rend les résultats dans l'ordre : `map`, ou un pool de processus."""
+
+
+def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
+    """`Mapper` qui répartit les publications d'un lot entre les `workers` processus de `pool`, par paquets de taille adaptée au lot."""
+
+    def mapper(
+        fn: Callable[[Sequence[SignatureTuple]], Aligned],
+        items: Sequence[Sequence[SignatureTuple]],
+    ) -> Iterator[Aligned]:
+        return pool.map(fn, items, chunksize=max(1, len(items) // (4 * workers)))
+
+    return mapper
+
+
 def _plan_batch(
     queries: AuthorGroupingQueries,
     conn: Connection,
     publication_ids: Sequence[int],
     methods: Counter[str],
     on_publication: Callable[[], None],
+    mapper: Mapper,
 ) -> tuple[list[GroupRow], list[int], list[MembershipRow], list[int], dict[int, int]]:
     """Plan d'écriture d'un lot de publications : groupes, signatures dont l'appartenance est à supprimer, appartenances à insérer, groupes en base sans correspondant, signatures copiées. `on_publication` est appelé après chaque publication calculée."""
-    rows_by_publication: dict[int, list[SignatureRow]] = {}
+    rows_by_publication: dict[int, list[SignatureTuple]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
-        rows_by_publication.setdefault(row.publication_id, []).append(row)
+        rows_by_publication.setdefault(row.publication_id, []).append(_SIGNATURE_FIELDS(row))
         positions[row.id] = row.position
     existing, stored = queries.fetch_groups(conn, publication_ids)
-    planned: list[tuple[int, Group, int | None]] = []
+    planned: list[tuple[int, GroupTuple, int | None]] = []
     unmatched: list[int] = []
     copies: dict[int, int] = {}
-    for publication_id in publication_ids:
-        groups, publication_copies = group_publication(rows_by_publication.get(publication_id, []))
+    results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
+    for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
         copies |= publication_copies
         old = {gid: frozenset(sigs) for gid, sigs in existing.get(publication_id, {}).items()}
-        plan = plan_group_ids(old, [frozenset(m.signature for m in g.members) for g in groups])
+        plan = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
         planned += [(publication_id, g, gid) for g, gid in zip(groups, plan, strict=True)]
         unmatched += sorted(set(old) - {gid for gid in plan if gid is not None})
         on_publication()
     fresh = iter(queries.group_ids(conn, sum(1 for *_, gid in planned if gid is None)))
     group_rows: list[GroupRow] = []
     memberships: list[MembershipRow] = []
-    for publication_id, group, gid in planned:
+    for publication_id, (reference, members), gid in planned:
         existing_id = gid is not None
         group_id = gid if gid is not None else next(fresh)
-        group_rows.append(
-            GroupRow(group_id, publication_id, positions[group.reference.id], existing_id)
-        )
-        for m in group.members:
-            methods[m.method] += 1
-            memberships.append(
-                MembershipRow(m.signature, group_id, m.notice, str(m.method), m.score, m.margin)
-            )
+        group_rows.append(GroupRow(group_id, publication_id, positions[reference], existing_id))
+        for signature, notice, method, score, margin in members:
+            methods[method] += 1
+            memberships.append(MembershipRow(signature, group_id, notice, method, score, margin))
     removed, inserted = membership_changes(stored, memberships)
     return group_rows, removed, inserted, unmatched, copies
 
@@ -188,6 +229,7 @@ def regroup(
     publication_ids: Sequence[int],
     methods: Counter[str] | None = None,
     on_publication: Callable[[], None] = lambda: None,
+    mapper: Mapper = map,
 ) -> int:
     """Recalcule et écrit les groupes et les signatures copiées de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
     groups, removed, inserted, unmatched, copies = _plan_batch(
@@ -196,6 +238,7 @@ def regroup(
         publication_ids,
         methods if methods is not None else Counter(),
         on_publication,
+        mapper,
     )
     queries.write(conn, publication_ids, groups, removed, inserted, unmatched, copies)
     return len(groups)
@@ -225,9 +268,14 @@ def build_groups(
     metrics = PhaseMetrics(seen=len(publication_ids))
     methods: Counter[str] = Counter()
     group_count = 0
-    with progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
+    workers = min(available_cpus(), len(publication_ids))
+    with (
+        ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
+        progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement,
+    ):
+        mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
-            group_count += regroup(conn, queries, batch, methods, avancement.avance)
+            group_count += regroup(conn, queries, batch, methods, avancement.avance, mapper)
             conn.commit()
     etape(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()

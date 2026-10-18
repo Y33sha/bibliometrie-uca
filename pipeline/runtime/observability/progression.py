@@ -23,8 +23,8 @@ try:
     from tqdm.utils import disp_len
 
     # `tqdm` se verrouille par défaut sur un `multiprocessing.RLock`, soit un sémaphore du
-    # système, qu'un processus interrompu laisse derrière lui. Le pipeline répartit son travail
-    # entre threads, jamais entre processus : un verrou de threads suffit et ne laisse rien.
+    # système, qu'un processus interrompu laisse derrière lui. Seul le processus principal du
+    # pipeline affiche une barre : un verrou de threads suffit et ne laisse rien.
     tqdm.set_lock(threading.RLock())
 except ImportError:  # `tqdm` est une dépendance de développement.
     tqdm = None  # type: ignore[assignment,misc]
