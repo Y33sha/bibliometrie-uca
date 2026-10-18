@@ -6,9 +6,10 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_publications import get_publication_sources
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
 # Notice de titre « Titre ».
 _notice = partial(insert_source_publication, title="Titre")
@@ -125,3 +126,37 @@ class TestGetPublicationSources:
             "Anglais",
             "English",
         )
+
+
+class TestSignatures:
+    def test_signatures_de_chaque_notice_avec_leur_groupe(self, sa_sync_conn):
+        conn = sa_sync_conn
+        pub = insert_publication(conn)
+        hal = _notice(conn, pub, source="hal", source_id="hal-1")
+        openalex = _notice(conn, pub, source="openalex", source_id="W1")
+        hal_martin = insert_signature(
+            conn, hal, source="hal", raw_author_name="Anne Martin", author_position=0
+        )
+        openalex_martin = insert_signature(
+            conn, openalex, source="openalex", raw_author_name="A. Martin", author_position=0
+        )
+        collective = insert_signature(
+            conn,
+            openalex,
+            source="openalex",
+            raw_author_name="ATLAS Collaboration",
+            author_position=1,
+            collective=True,
+        )
+        group = insert_group(conn, pub, [(hal_martin, hal), (openalex_martin, openalex)])
+
+        result = get_publication_sources(conn, pub)
+
+        assert result is not None
+        by_id = {s.id: s for s in result.signatures}
+        assert set(by_id) == {hal_martin, openalex_martin, collective}
+        assert (by_id[hal_martin].group_id, by_id[hal_martin].method) == (group, "reference")
+        assert (by_id[openalex_martin].group_id, by_id[openalex_martin].method) == (group, "name")
+        assert by_id[openalex_martin].source_publication_id == openalex
+        assert by_id[collective].group_id is None
+        assert by_id[collective].collective is True

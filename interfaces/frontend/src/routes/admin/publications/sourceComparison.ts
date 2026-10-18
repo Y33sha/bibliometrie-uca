@@ -1,8 +1,9 @@
 import type { components } from '$lib/api/schema';
-import { docTypeSingular, oaLabelsMap } from '$lib/labels';
+import { AUTHORSHIP_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
 import { SOURCE_ORDER } from '$lib/sources';
 
 export type SourceRecord = components['schemas']['SourcePublicationMetadataOut'];
+export type SourceSignature = components['schemas']['SourceSignatureOut'];
 
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
 export type CellLink = { kind: 'doi'; doi: string } | { kind: 'journals' | 'publishers'; id: number };
@@ -173,4 +174,68 @@ export function comparisonRows(records: SourceRecord[]): ComparisonRow[] {
 			divergent: isDivergent(records.map((r) => f.compared(r))),
 		}))
 		.filter((row) => row.cells.some((c) => c.text !== null));
+}
+
+/** Ligne des listes d'auteurs : les signatures d'un groupe, ou une signature hors des groupes, une case par enregistrement (`null` quand l'enregistrement n'en donne pas). */
+export interface AuthorRow {
+	key: string;
+	/** Rôle des signatures de la ligne ; `null` pour les auteurs. */
+	role: string | null;
+	cells: (SourceSignature | null)[];
+	/** Un enregistrement qui donne des signatures de ce rôle n'en a aucune dans la ligne. */
+	divergent: boolean;
+}
+
+const AUTHOR = 'author';
+
+function roleRank(role: string): number {
+	const i = AUTHORSHIP_ROLE_ORDER.indexOf(role);
+	return i < 0 ? AUTHORSHIP_ROLE_ORDER.length : i;
+}
+
+/** Rôle sous lequel une signature s'affiche : auteur dès qu'elle a ce rôle, sinon son premier rôle dans l'ordre d'affichage. */
+function displayRole(s: SourceSignature): string {
+	const roles = s.roles?.length ? s.roles : [AUTHOR];
+	if (roles.includes(AUTHOR)) return AUTHOR;
+	return [...roles].sort((a, b) => roleRank(a) - roleRank(b))[0];
+}
+
+/** Lignes des listes d'auteurs, pour des enregistrements déjà ordonnés : une ligne par groupe de signatures, une par signature hors des groupes. Les auteurs d'abord, dans l'ordre de la liste de référence du groupe, puis les autres rôles dans leur ordre d'affichage. */
+export function authorRows(records: SourceRecord[], signatures: SourceSignature[]): AuthorRow[] {
+	const column = new Map(records.map((r, i) => [r.id, i]));
+	const members = new Map<string, SourceSignature[]>();
+	const present = new Map<string, Set<number>>();
+	for (const s of signatures) {
+		const col = column.get(s.source_publication_id);
+		if (col === undefined) continue;
+		const key = s.group_id != null ? `g${s.group_id}` : `s${s.id}`;
+		members.set(key, [...(members.get(key) ?? []), s]);
+		const role = displayRole(s);
+		present.set(role, (present.get(role) ?? new Set()).add(col));
+	}
+	const rows = [...members].map(([key, group]) => {
+		const role = displayRole(group[0]);
+		const cells: (SourceSignature | null)[] = records.map(() => null);
+		for (const s of group) cells[column.get(s.source_publication_id)!] = s;
+		const positions = group.map((s) => s.position).filter((p): p is number => p != null);
+		return {
+			row: {
+				key,
+				role: role === AUTHOR ? null : role,
+				cells,
+				divergent: group.length < (present.get(role)?.size ?? 0),
+			},
+			rank: roleRank(role),
+			position: group[0].group_position ?? (positions.length ? Math.min(...positions) : Infinity),
+			name: group[0].full_name ?? '',
+		};
+	});
+	rows.sort(
+		(a, b) =>
+			a.rank - b.rank ||
+			a.position - b.position ||
+			a.name.localeCompare(b.name) ||
+			a.row.key.localeCompare(b.row.key),
+	);
+	return rows.map((r) => r.row);
 }

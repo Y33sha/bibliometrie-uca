@@ -4592,14 +4592,6 @@ export interface components {
             sources: components["schemas"]["SourcePublicationOut"][];
             /** Authorships */
             authorships: components["schemas"]["ConsolidatedAuthorshipOut"][];
-            /** Hal Authorships */
-            hal_authorships: components["schemas"]["SourceAuthorshipOut"][];
-            /** Openalex Authorships */
-            openalex_authorships: components["schemas"]["SourceAuthorshipOut"][];
-            /** Wos Authorships */
-            wos_authorships: components["schemas"]["SourceAuthorshipOut"][];
-            /** Scanr Authorships */
-            scanr_authorships: components["schemas"]["SourceAuthorshipOut"][];
             /** Theses Authorships */
             theses_authorships: components["schemas"]["ThesesAuthorshipOut"][];
             thesis_meta: components["schemas"]["ThesisMeta"] | null;
@@ -4687,13 +4679,19 @@ export interface components {
         };
         /**
          * PublicationSourcesResponse
-         * @description Enregistrements sources d'une publication, toutes sources confondues.
+         * @description Enregistrements sources d'une publication, toutes sources confondues, leurs signatures, et les structures que ces signatures citent.
          */
         PublicationSourcesResponse: {
             /** Title */
             title: string;
             /** Source Publications */
             source_publications: components["schemas"]["SourcePublicationMetadataOut"][];
+            /** Signatures */
+            signatures: components["schemas"]["SourceSignatureOut"][];
+            /** Structures */
+            structures: {
+                [key: string]: components["schemas"]["StructureInfo"];
+            };
         };
         /**
          * PublicationsFacetsResponse
@@ -5029,31 +5027,6 @@ export interface components {
             /** Message */
             message: string;
         };
-        /**
-         * SourceAuthorshipOut
-         * @description Authorship source (HAL / OpenAlex / WoS / ScanR).
-         *
-         *     `raw_affiliation` agrège les adresses brutes liées à l'authorship via
-         *     `source_authorship_addresses` ; `None` s'il n'y en a pas.
-         */
-        SourceAuthorshipOut: {
-            /** Id */
-            id: number;
-            /** Author Position */
-            author_position: number | null;
-            /** Full Name */
-            full_name: string | null;
-            /** Person Id */
-            person_id: number | null;
-            /** In Perimeter */
-            in_perimeter: boolean;
-            /** Structure Ids */
-            structure_ids: number[] | null;
-            /** Raw Affiliation */
-            raw_affiliation?: string | null;
-            /** Countries */
-            countries: string[] | null;
-        };
         /** SourceAuthorshipRef */
         SourceAuthorshipRef: {
             /** Source */
@@ -5137,6 +5110,46 @@ export interface components {
             countries: string[] | null;
             /** Is Secondary */
             is_secondary: boolean;
+        };
+        /**
+         * SourceSignatureOut
+         * @description Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
+         *
+         *     `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
+         */
+        SourceSignatureOut: {
+            /** Id */
+            id: number;
+            /** Source Publication Id */
+            source_publication_id: number;
+            /** Position */
+            position: number | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Roles */
+            roles: string[] | null;
+            /** Person Id */
+            person_id: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Collective */
+            collective: boolean;
+            /** Structure Ids */
+            structure_ids: number[] | null;
+            /** Raw Affiliation */
+            raw_affiliation: string | null;
+            /** Countries */
+            countries: string[] | null;
+            /** Group Id */
+            group_id: number | null;
+            /** Group Position */
+            group_position: number | null;
+            /** Method */
+            method: string | null;
+            /** Score */
+            score: number | null;
+            /** Margin */
+            margin: number | null;
         };
         /** StatsFacetsResponse */
         StatsFacetsResponse: {

@@ -1,11 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { structsTooltip, type StructInfo, type SourceAuthorship } from "./types";
+import { structsTooltip, type Affiliation, type StructInfo } from "./structureLabels";
 
 const struct = (over: Partial<StructInfo>): StructInfo =>
   ({ id: 1, name: "Laboratoire", acronym: "LAB", type: "labo", ...over }) as StructInfo;
 
-const authorship = (over: Partial<SourceAuthorship>): SourceAuthorship =>
-  ({ raw_affiliation: null, structure_ids: [], ...over }) as SourceAuthorship;
+const authorship = (over: Partial<Affiliation>): Affiliation => ({
+  raw_affiliation: null,
+  structure_ids: [],
+  ...over,
+});
 
 describe("structsTooltip", () => {
   it("assemble l'affiliation brute et les structures identifiées", () => {

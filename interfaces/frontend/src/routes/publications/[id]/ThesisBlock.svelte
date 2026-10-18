@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { AUTHORSHIP_ROLE_ORDER, authorshipRoleLabels } from "$lib/labels";
   import StructureTag from "./StructureTag.svelte";
   import { type StructInfo, type ThesisAuthorship, type ThesisMeta } from "./types";
 
@@ -15,30 +16,15 @@
     structures: Record<string, StructInfo>;
   } = $props();
 
-  const ROLE_ORDER = [
-    "author",
-    "thesis_director",
-    "rapporteur",
-    "jury_president",
-    "jury_member",
-  ];
-
-  const ROLE_LABELS: Record<string, string> = {
-    author: "Auteur",
-    thesis_director: "Direction",
-    rapporteur: "Rapporteur",
-    jury_president: "Président du jury",
-    jury_member: "Examinateur",
-  };
 </script>
 
 <div class="section thesis-section">
   <h2 class="section-title">Thèse</h2>
   <dl class="thesis-dl">
-    {#each ROLE_ORDER as role}
+    {#each AUTHORSHIP_ROLE_ORDER as role}
       {@const people = thesesAuth.filter((a) => a.roles?.includes(role))}
       {#if people.length}
-        <dt>{ROLE_LABELS[role] || role}</dt>
+        <dt>{authorshipRoleLabels[role] || role}</dt>
         <dd>
           {#each people as p, i}
             {#if p.person_id}

@@ -1,0 +1,37 @@
+import type { components } from './api/schema';
+
+export type StructInfo = components['schemas']['StructureInfo'];
+
+/** Ce qu'une signature dit de son affiliation : adresses brutes et structures identifiées. */
+export interface Affiliation {
+	raw_affiliation?: string | null;
+	structure_ids?: number[] | null;
+}
+
+/** Nom d'une structure via son id (acronyme si dispo, sinon nom, sinon `#id`). */
+export function structLabel(structures: Record<string, StructInfo>, id: number): string {
+	const s = structures[String(id)];
+	return s ? s.acronym || s.name : `#${id}`;
+}
+
+export function structIsLabo(structures: Record<string, StructInfo>, id: number): boolean {
+	return structures[String(id)]?.type === 'labo';
+}
+
+/**
+ * Tooltip résumé des affiliations brutes + structures identifiées, en texte simple.
+ *
+ * L'affiliation brute et les libellés de structures proviennent des sources externes : le résultat est du texte rendu tel quel par `Tooltip` (jamais interprété comme HTML), les lignes séparées par des sauts de ligne.
+ */
+export function structsTooltip(a: Affiliation, structures: Record<string, StructInfo>): string {
+	const parts: string[] = [];
+	if (a.raw_affiliation) {
+		parts.push(a.raw_affiliation);
+	}
+	if (a.structure_ids?.length) {
+		parts.push(
+			`Structures identifiées : ${a.structure_ids.map((sid) => structLabel(structures, sid)).join(', ')}`,
+		);
+	}
+	return parts.join('\n');
+}

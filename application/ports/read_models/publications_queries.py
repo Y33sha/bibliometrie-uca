@@ -251,23 +251,6 @@ class ConsolidatedAuthorshipOut(BaseModel):
     has_rh: bool  # la personne est rattachée au référentiel RH (persons_rh)
 
 
-class SourceAuthorshipOut(BaseModel):
-    """Authorship source (HAL / OpenAlex / WoS / ScanR).
-
-    `raw_affiliation` agrège les adresses brutes liées à l'authorship via
-    `source_authorship_addresses` ; `None` s'il n'y en a pas.
-    """
-
-    id: int
-    author_position: int | None
-    full_name: str | None
-    person_id: int | None
-    in_perimeter: bool
-    structure_ids: list[int] | None
-    raw_affiliation: str | None = None
-    countries: list[str] | None
-
-
 class ThesesAuthorshipOut(BaseModel):
     id: int
     author_position: int | None
@@ -333,10 +316,6 @@ class PublicationDetailResponse(BaseModel):
     publication: PublicationDetailCore
     sources: list[SourcePublicationOut]
     authorships: list[ConsolidatedAuthorshipOut]
-    hal_authorships: list[SourceAuthorshipOut]
-    openalex_authorships: list[SourceAuthorshipOut]
-    wos_authorships: list[SourceAuthorshipOut]
-    scanr_authorships: list[SourceAuthorshipOut]
     theses_authorships: list[ThesesAuthorshipOut]
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
@@ -380,11 +359,37 @@ class SourcePublicationMetadataOut(BaseModel):
     article_number: str | None
 
 
+class SourceSignatureOut(BaseModel):
+    """Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
+
+    `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
+    """
+
+    id: int
+    source_publication_id: int
+    position: int | None
+    full_name: str | None
+    roles: list[str] | None
+    person_id: int | None
+    in_perimeter: bool
+    collective: bool
+    structure_ids: list[int] | None
+    raw_affiliation: str | None
+    countries: list[str] | None
+    group_id: int | None
+    group_position: int | None
+    method: str | None
+    score: float | None
+    margin: float | None
+
+
 class PublicationSourcesResponse(BaseModel):
-    """Enregistrements sources d'une publication, toutes sources confondues."""
+    """Enregistrements sources d'une publication, toutes sources confondues, leurs signatures, et les structures que ces signatures citent."""
 
     title: str
     source_publications: list[SourcePublicationMetadataOut]
+    signatures: list[SourceSignatureOut]
+    structures: dict[str, StructureInfo]
 
 
 class SuspectMergeNoticeOut(BaseModel):

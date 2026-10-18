@@ -1,4 +1,4 @@
-"""Enregistrements sources d'une publication, confrontés dans le volet de l'administration."""
+"""Enregistrements sources d'une publication et leurs signatures, confrontés dans le volet de l'administration."""
 
 from collections.abc import Mapping
 
@@ -7,7 +7,10 @@ from sqlalchemy import Connection, Row, text
 from application.ports.read_models.publications_queries import (
     PublicationSourcesResponse,
     SourcePublicationMetadataOut,
+    SourceSignatureOut,
 )
+from infrastructure.read_models.publications.detail import structures_by_id
+from infrastructure.read_models.sql_fragments import signature_display_name
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
@@ -70,8 +73,56 @@ def _record(r: Row[tuple[object, ...]]) -> SourcePublicationMetadataOut:
     )
 
 
+def _signatures(conn: Connection, pub_id: int) -> list[SourceSignatureOut]:
+    """Signatures des enregistrements de la publication, avec leur groupe et leur entrée dans le groupe."""
+    rows = conn.execute(
+        text(f"""
+            SELECT sa.id, sa.source_publication_id, sa.author_position AS position,
+                   {signature_display_name()} AS full_name, sa.roles, sa.person_id,
+                   sa.in_perimeter, sa.collective, sa.countries,
+                   (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
+                    FROM source_authorship_structures sas
+                    WHERE sas.source_authorship_id = sa.id) AS structure_ids,
+                   (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
+                    FROM source_authorship_addresses saa
+                    JOIN addresses addr ON addr.id = saa.address_id
+                    WHERE saa.source_authorship_id = sa.id) AS raw_affiliation,
+                   gs.group_id, g.reference_position AS group_position, gs.method::text AS method,
+                   gs.score, gs.margin
+            FROM source_publications sp
+            JOIN source_authorships sa ON sa.source_publication_id = sp.id
+            LEFT JOIN grouped_source_authorships gs ON gs.source_authorship_id = sa.id
+            LEFT JOIN source_authorship_groups g ON g.id = gs.group_id
+            WHERE sp.publication_id = :pid
+            ORDER BY sa.source_publication_id, sa.author_position NULLS LAST, sa.id
+        """),  # noqa: S608
+        {"pid": pub_id},
+    ).all()
+    return [
+        SourceSignatureOut(
+            id=r.id,
+            source_publication_id=r.source_publication_id,
+            position=r.position,
+            full_name=r.full_name,
+            roles=r.roles,
+            person_id=r.person_id,
+            in_perimeter=r.in_perimeter,
+            collective=r.collective,
+            structure_ids=r.structure_ids,
+            raw_affiliation=r.raw_affiliation,
+            countries=r.countries,
+            group_id=r.group_id,
+            group_position=r.group_position,
+            method=r.method,
+            score=r.score,
+            margin=r.margin,
+        )
+        for r in rows
+    ]
+
+
 def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSourcesResponse | None:
-    """Métadonnées de chaque enregistrement source de la publication `pub_id`, ou `None` si la publication n'existe pas."""
+    """Métadonnées et signatures de chaque enregistrement source de la publication `pub_id`, ou `None` si la publication n'existe pas."""
     title = conn.execute(
         text("SELECT title FROM publications WHERE id = :pid"), {"pid": pub_id}
     ).scalar_one_or_none()
@@ -95,4 +146,12 @@ def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSources
         """),
         {"pid": pub_id},
     ).all()
-    return PublicationSourcesResponse(title=title, source_publications=[_record(r) for r in rows])
+    signatures = _signatures(conn, pub_id)
+    return PublicationSourcesResponse(
+        title=title,
+        source_publications=[_record(r) for r in rows],
+        signatures=signatures,
+        structures=structures_by_id(
+            conn, {sid for s in signatures for sid in s.structure_ids or []}
+        ),
+    )

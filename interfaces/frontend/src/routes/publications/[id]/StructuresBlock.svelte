@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
-  import { structIsLabo, structLabel, type StructInfo } from "./types";
+  import { structIsLabo, structLabel, type StructInfo } from "$lib/structureLabels";
 
   let {
     structureIds,

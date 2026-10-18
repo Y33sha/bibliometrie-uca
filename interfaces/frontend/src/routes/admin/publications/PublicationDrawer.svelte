@@ -5,8 +5,11 @@
   import Drawer from "$lib/components/Drawer.svelte";
   import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import SourceTag from "$lib/components/SourceTag.svelte";
+  import Tooltip from "$lib/components/Tooltip.svelte";
+  import { authorshipRoleLabels } from "$lib/labels";
   import { sourceExternalUrl } from "$lib/sources";
-  import { comparisonRows, orderRecords } from "./sourceComparison";
+  import { structsTooltip } from "$lib/structureLabels";
+  import { authorRows, comparisonRows, orderRecords } from "./sourceComparison";
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
 
@@ -32,9 +35,17 @@
       });
   });
 
-  // Une colonne par enregistrement source, une ligne par champ.
+  // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de signatures d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_publications) : []);
   const rows = $derived(comparisonRows(records));
+  const authors = $derived(data ? authorRows(records, data.signatures) : []);
+
+  // Méthode qui a fait entrer la signature dans son groupe, quand elle n'est pas le nom.
+  const METHOD_LABELS: Record<string, string> = {
+    identifier: "identifiant",
+    order: "ordre",
+    model: "modèle",
+  };
 </script>
 
 <Drawer width="1200px" {onclose}>
@@ -99,6 +110,60 @@
                     {/if}
                     {#if cell.note}
                       <div class="note" title="Nom donné par la source">{cell.note}</div>
+                    {/if}
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+            {#if authors.length}
+              <tr class="section-row">
+                <th class="field" scope="row">Auteurs</th>
+                <td colspan={records.length}></td>
+              </tr>
+            {/if}
+            {#each authors as row (row.key)}
+              <tr class:divergent={row.divergent}>
+                <th
+                  class="field"
+                  scope="row"
+                  title={row.divergent ? "Signature absente d'un enregistrement" : undefined}
+                >
+                  {row.role ? (authorshipRoleLabels[row.role] ?? row.role) : ""}
+                </th>
+                {#each row.cells as s}
+                  <td class="author-cell">
+                    {#if s}
+                      <span class="position">{s.position != null ? s.position + 1 : ""}</span>
+                      <span class="author">
+                        {#if s.person_id}
+                          <a
+                            href="{base}/persons/{s.person_id}"
+                            target="_blank"
+                            rel="noopener"
+                            class:in-perimeter={s.in_perimeter}>{s.full_name}</a
+                          >
+                        {:else}
+                          <span class:in-perimeter={s.in_perimeter}>{s.full_name}</span>
+                        {/if}
+                        {#if structsTooltip(s, data.structures)}
+                          <Tooltip text={structsTooltip(s, data.structures)}
+                            ><span class="info">&#9432;</span></Tooltip
+                          >
+                        {/if}
+                        {#if s.countries?.length}
+                          <span class="countries"
+                            >{s.countries.map((c) => c.toUpperCase()).join(" ")}</span
+                          >
+                        {/if}
+                        {#if s.method && METHOD_LABELS[s.method]}
+                          <span
+                            class="method"
+                            title={s.method === "model"
+                              ? `Score ${s.score?.toFixed(1)} bits, marge ${s.margin?.toFixed(1)} bits`
+                              : undefined}>{METHOD_LABELS[s.method]}</span
+                          >
+                        {/if}
+                      </span>
                     {/if}
                   </td>
                 {/each}
@@ -188,5 +253,46 @@
   }
   .failure {
     color: #888;
+  }
+  .section-row th,
+  .section-row td {
+    border-bottom: 2px solid var(--border, #e0e0e0);
+    padding-top: 14px;
+    color: #444;
+  }
+  .author-cell {
+    white-space: nowrap;
+  }
+  .position {
+    display: inline-block;
+    min-width: 2.5em;
+    color: #999;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    margin-right: 6px;
+  }
+  .author {
+    white-space: normal;
+  }
+  .in-perimeter {
+    font-weight: 600;
+  }
+  .info {
+    color: #888;
+    cursor: help;
+    margin-left: 3px;
+  }
+  .countries {
+    color: #888;
+    font-size: 0.75rem;
+    margin-left: 4px;
+  }
+  .method {
+    font-size: 0.7rem;
+    color: #8a5a00;
+    background: #fff3d6;
+    border-radius: 3px;
+    padding: 0 4px;
+    margin-left: 4px;
   }
 </style>

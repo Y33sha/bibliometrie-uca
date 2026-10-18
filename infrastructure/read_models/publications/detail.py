@@ -8,7 +8,6 @@ from application.ports.read_models.publications_queries import (
     PublicationDetailCore,
     PublicationDetailResponse,
     RelatedPublicationOut,
-    SourceAuthorshipOut,
     SourcePublicationOut,
     StructureInfo,
     ThesesAuthorshipOut,
@@ -80,51 +79,18 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPubl
     return out
 
 
-def _fetch_biblio_source_authorships(
-    conn: Connection, source: str, pub_id: int
-) -> list[SourceAuthorshipOut]:
-    """Authorships HAL / OpenAlex / WoS / ScanR d'une publi, avec adresses agrégées.
-
-    Quand plusieurs `source_publications` de la même source pointent sur la même publi canonique (ex: deux Work IDs OpenAlex pour un même DOI), on affiche les auteurs de l'**import le plus récent** (`created_at DESC`). Les liens vers les sources, eux, sont multiples côté header — cf `PublicationHeader.svelte`.
-
-    `raw_affiliation` concatène les `addresses.raw_text` liées via `source_authorship_addresses`. `countries` est le pays de la signature (`source_authorships.countries`).
-    """
+def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo]:
+    """Acronyme, nom et type des structures `ids`, par identifiant en texte."""
+    if not ids:
+        return {}
     rows = conn.execute(
-        text(f"""
-            SELECT sa.id, sa.author_position, {signature_display_name()} AS full_name, sa.person_id,
-                   sa.in_perimeter,
-                   (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
-                    FROM source_authorship_structures sas
-                    WHERE sas.source_authorship_id = sa.id) AS structure_ids,
-                   (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
-                    FROM source_authorship_addresses saa2
-                    JOIN addresses addr ON addr.id = saa2.address_id
-                    WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
-                   sa.countries
-            FROM source_authorships sa
-            WHERE sa.source_publication_id = (
-                SELECT id FROM source_publications
-                WHERE source = :src AND publication_id = :pid
-                ORDER BY created_at DESC
-                LIMIT 1
-            )
-            ORDER BY sa.author_position
+        text("""
+            SELECT id, acronym, name, structure_type::text AS type FROM structures
+            WHERE id = ANY(:ids)
         """),
-        {"src": source, "pid": pub_id},
+        {"ids": list(ids)},
     ).all()
-    return [
-        SourceAuthorshipOut(
-            id=r.id,
-            author_position=r.author_position,
-            full_name=r.full_name,
-            person_id=r.person_id,
-            in_perimeter=r.in_perimeter,
-            structure_ids=r.structure_ids,
-            raw_affiliation=r.raw_affiliation,
-            countries=r.countries,
-        )
-        for r in rows
-    ]
+    return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
 
 
 def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailResponse | None:
@@ -220,11 +186,6 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
         for r in auth_rows
     ]
 
-    hal_authorships = _fetch_biblio_source_authorships(conn, "hal", pub_id)
-    oa_authorships = _fetch_biblio_source_authorships(conn, "openalex", pub_id)
-    wos_authorships = _fetch_biblio_source_authorships(conn, "wos", pub_id)
-    scanr_authorships = _fetch_biblio_source_authorships(conn, "scanr", pub_id)
-
     theses_rows = conn.execute(
         text(f"""
             SELECT sa.id, sa.author_position, {signature_display_name()} AS full_name, sa.person_id,
@@ -281,29 +242,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     relations = get_publication_relations(conn, pub_id)
     external_identifiers = get_publication_external_identifiers(conn, pub_id)
 
-    all_struct_ids: set[int] = set()
-    for auth_list in (
-        authorships,
-        hal_authorships,
-        oa_authorships,
-        wos_authorships,
-        scanr_authorships,
-    ):
-        for a in auth_list:
-            if a.structure_ids:
-                all_struct_ids.update(a.structure_ids)
-
-    structures: dict[str, StructureInfo] = {}
-    if all_struct_ids:
-        struct_rows = conn.execute(
-            text("""
-                SELECT id, acronym, name, structure_type::text AS type FROM structures
-                WHERE id = ANY(:ids)
-            """),
-            {"ids": list(all_struct_ids)},
-        ).all()
-        for s in struct_rows:
-            structures[str(s.id)] = StructureInfo(acronym=s.acronym, name=s.name, type=s.type)
+    structures = structures_by_id(conn, {sid for a in authorships for sid in a.structure_ids or []})
 
     return PublicationDetailResponse(
         publication=PublicationDetailCore(
@@ -332,10 +271,6 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
         ),
         sources=sources,
         authorships=authorships,
-        hal_authorships=hal_authorships,
-        openalex_authorships=oa_authorships,
-        wos_authorships=wos_authorships,
-        scanr_authorships=scanr_authorships,
         theses_authorships=theses_authorships,
         thesis_meta=thesis_meta,
         structures=structures,

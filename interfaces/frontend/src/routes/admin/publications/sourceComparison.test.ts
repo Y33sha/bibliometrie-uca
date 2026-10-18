@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	authorRows,
 	comparisonRows,
 	isDivergent,
 	orderRecords,
 	type ComparisonRow,
 	type SourceRecord,
+	type SourceSignature,
 } from './sourceComparison';
 
 function record(overrides: Partial<SourceRecord>): SourceRecord {
@@ -116,5 +118,57 @@ describe('comparisonRows', () => {
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {
 		const rows = comparisonRows([record({ source: 'wos', language_raw: 'English' })]);
 		expect(row(rows, 'language').cells).toEqual([{ text: 'Anglais', note: 'English' }]);
+	});
+});
+
+function signature(overrides: Partial<SourceSignature>): SourceSignature {
+	return {
+		id: 1,
+		source_publication_id: 1,
+		position: 0,
+		full_name: 'Anne Martin',
+		roles: ['author'],
+		person_id: null,
+		in_perimeter: false,
+		collective: false,
+		structure_ids: null,
+		raw_affiliation: null,
+		countries: null,
+		group_id: null,
+		group_position: null,
+		method: null,
+		score: null,
+		margin: null,
+		...overrides,
+	};
+}
+
+describe('authorRows', () => {
+	const records = [record({ id: 1, source: 'hal' }), record({ id: 2, source: 'openalex' })];
+
+	it("réunit les signatures d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
+		const rows = authorRows(records, [
+			signature({ id: 11, source_publication_id: 1, position: 1, group_id: 7, group_position: 1 }),
+			signature({ id: 21, source_publication_id: 2, position: 0, group_id: 7, group_position: 1 }),
+			signature({ id: 10, source_publication_id: 1, position: 0, group_id: 6, group_position: 0 }),
+		]);
+		expect(rows.map((r) => r.cells.map((c) => c?.id ?? null))).toEqual([
+			[10, null],
+			[11, 21],
+		]);
+		expect(rows.map((r) => r.divergent)).toEqual([true, false]);
+	});
+
+	it('place une signature hors des groupes à sa position, et les autres rôles après les auteurs', () => {
+		const rows = authorRows(records, [
+			signature({ id: 30, source_publication_id: 1, position: null, roles: ['jury_member'] }),
+			signature({ id: 12, source_publication_id: 1, position: 2, collective: true }),
+			signature({ id: 10, source_publication_id: 1, position: 0, group_id: 6, group_position: 0 }),
+		]);
+		expect(rows.map((r) => [r.cells[0]?.id, r.role])).toEqual([
+			[10, null],
+			[12, null],
+			[30, 'jury_member'],
+		]);
 	});
 });

@@ -2,21 +2,18 @@
   import { pageTitle } from "$lib/institution.svelte";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { apiDetail, auth } from "$lib/api";
+  import { apiDetail } from "$lib/api";
   import PublicationAbstract from "$lib/components/PublicationAbstract.svelte";
-  import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
+  import type { PubResponse } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
   import ThesisBlock from "./ThesisBlock.svelte";
   import StructuresBlock from "./StructuresBlock.svelte";
   import PersonsBlock from "./PersonsBlock.svelte";
-  import SourceComparison from "./SourceComparison.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
 
   const pubId = $derived($page.params.id);
   let canGoBack = $state(false);
-  // Comparaison des sources réservée à l'admin connecté.
-  let isAdmin = $state(false);
 
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
@@ -41,64 +38,7 @@
     data?.authorships.find((a) => a.in_perimeter)?.structure_ids ?? [],
   );
 
-  const halSource = $derived(data?.sources.find((s) => s.source === "hal"));
-  const oaSource = $derived(data?.sources.find((s) => s.source === "openalex"));
-  const scanrSource = $derived(data?.sources.find((s) => s.source === "scanr"));
-  const wosSource = $derived(data?.sources.find((s) => s.source === "wos"));
   const thesesSource = $derived(data?.sources.find((s) => s.source === "theses"));
-
-  const sourceRows = $derived.by(() => {
-    if (!data) return [];
-    const halMap = new Map<number, SourceAuthorship>();
-    const oaMap = new Map<number, SourceAuthorship>();
-    const wosMap = new Map<number, SourceAuthorship>();
-    const scanrMap = new Map<number, SourceAuthorship>();
-    for (const a of data.hal_authorships) if (a.author_position != null) halMap.set(a.author_position, a);
-    for (const a of data.openalex_authorships) if (a.author_position != null) oaMap.set(a.author_position, a);
-    for (const a of data.wos_authorships) if (a.author_position != null) wosMap.set(a.author_position, a);
-    for (const a of data.scanr_authorships) if (a.author_position != null) scanrMap.set(a.author_position, a);
-
-    const allPos = new Set([
-      ...halMap.keys(),
-      ...oaMap.keys(),
-      ...wosMap.keys(),
-      ...scanrMap.keys(),
-    ]);
-    const rows: SourceRow[] = [];
-    for (const pos of [...allPos].sort((a, b) => a - b)) {
-      const hal = halMap.get(pos) ?? null;
-      const oa = oaMap.get(pos) ?? null;
-      const wos = wosMap.get(pos) ?? null;
-      const scanr = scanrMap.get(pos) ?? null;
-      const entries = [hal, oa, wos, scanr].filter((x): x is SourceAuthorship => x !== null);
-
-      let conflict = false;
-      // Conflit : auteur du périmètre dans une source mais absent d'une autre source présente
-      const ucaEntries = entries.filter((e) => e.in_perimeter);
-      if (ucaEntries.length > 0) {
-        if (hal === null && data.hal_authorships.length > 0) conflict = true;
-        if (oa === null && data.openalex_authorships.length > 0) conflict = true;
-        if (wos === null && data.wos_authorships.length > 0) conflict = true;
-        if (scanr === null && data.scanr_authorships.length > 0) conflict = true;
-      }
-      // Conflit : deux personnes résolues différentes
-      const personIds = entries
-        .filter((e) => e.person_id !== null)
-        .map((e) => e.person_id!);
-      if (new Set(personIds).size > 1) conflict = true;
-      // Conflit : auteur du périmètre résolu aligné avec auteur non résolu
-      if (
-        ucaEntries.some((e) => e.person_id !== null) &&
-        entries.some((e) => e.person_id === null)
-      )
-        conflict = true;
-
-      rows.push({ position: pos, hal, oa, wos, scanr, conflict });
-    }
-    return rows;
-  });
-
-  const hasSourceConflict = $derived(sourceRows.some((r) => r.conflict));
 
   async function loadData(id: string) {
     data = await apiDetail<PubResponse>(`/api/publications/${id}`);
@@ -115,15 +55,10 @@
     });
   });
 
-  onMount(async () => {
+  onMount(() => {
     canGoBack =
       (window as any).navigation?.canGoBack ??
       document.referrer.startsWith(window.location.origin);
-    try {
-      isAdmin = (await auth.check()).authenticated;
-    } catch {
-      isAdmin = false;
-    }
   });
 </script>
 
@@ -181,19 +116,6 @@
 
     <PublicationSidebar {pub} sources={data!.sources} externalIds={data!.external_identifiers} />
   </div>
-
-  {#if isAdmin}
-    <SourceComparison
-      data={data!}
-      {sourceRows}
-      {hasSourceConflict}
-      {halSource}
-      {oaSource}
-      {wosSource}
-      {scanrSource}
-      structures={data!.structures}
-    />
-  {/if}
 {/if}
 
 <style>

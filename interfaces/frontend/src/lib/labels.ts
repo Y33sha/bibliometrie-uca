@@ -279,3 +279,33 @@ export function issnLabel(issn: { support: string | null; linking: boolean }): s
 	if (issn.linking) return support ? `${support} · ISSN-L` : 'ISSN-L';
 	return support ?? 'ISSN';
 }
+
+/** Rôles d'une signature dans leur ordre d'affichage. Valeurs de `AuthorshipRole` côté backend. */
+export const AUTHORSHIP_ROLE_ORDER = [
+	'author',
+	'speaker',
+	'editor',
+	'scientific_editor',
+	'translator',
+	'contributor',
+	'thesis_director',
+	'rapporteur',
+	'jury_president',
+	'jury_member',
+	'other',
+];
+
+/** Libellés FR des rôles d'une signature. */
+export const authorshipRoleLabels: Record<string, string> = {
+	author: 'Auteur',
+	speaker: 'Orateur',
+	editor: 'Éditeur',
+	scientific_editor: 'Éditeur scientifique',
+	translator: 'Traducteur',
+	contributor: 'Contributeur',
+	thesis_director: 'Direction',
+	rapporteur: 'Rapporteur',
+	jury_president: 'Président du jury',
+	jury_member: 'Examinateur',
+	other: 'Autre rôle',
+};

@@ -123,13 +123,7 @@ class TestGetPublicationDetail:
         assert detail.publication.doi_ra is None
 
     def test_multiple_source_publications_same_source(self, sa_sync_conn):
-        """Plusieurs `source_publications` d'une même source pour une publi
-        canonique (ex: deux Work IDs OpenAlex partageant un DOI) :
-
-        - `detail["sources"]` renvoie tous les rows, tri DESC par created_at.
-        - `detail["openalex_authorships"]` ne renvoie que les auteurs de la
-          row la plus récente (= rendu unique côté UI).
-        """
+        """Deux notices OpenAlex d'une même publication sont toutes deux dans `sources`, la plus récente d'abord."""
         pub = insert_publication(sa_sync_conn, title="Multi-OA")
         # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
         sd_old = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
@@ -154,11 +148,8 @@ class TestGetPublicationDetail:
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
-        # Header : les 2 source_publications sont remontées, plus récente en 1er.
         oa_sources = [s for s in detail.sources if s.source == "openalex"]
         assert [s.source_id for s in oa_sources] == ["W2-NEW", "W1-OLD"]
-        # Comparaison sources : seul l'auteur de la plus récente est exposé.
-        assert [a.full_name for a in detail.openalex_authorships] == ["Bob"]
 
     def test_aggregates_structures(self, sa_sync_conn):
         lab_id = insert_structure(sa_sync_conn, "LAB-X", name="Labo X")
