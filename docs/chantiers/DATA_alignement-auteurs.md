@@ -176,10 +176,13 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Fellegi-Sunter seul confond les homonymes des grandes listes (Kim, Zhang). Sans filtre d'ordre, l'étape du patronyme unique lie des auteurs éloignés quand les sources découpent autrement nom et prénom (« A. Ferrer » en position 757, « J. A. Valls Ferrer » en position 2579).
   - Erreurs restantes sur les 326 paires : auteur en double dans une notice HAL, prénom faux dans HAL, noms différents à la même position, un auteur déplacé, une variante de nom.
   - Limite : trois « Y. Zhang » consécutifs, dans l'ordre inverse chez Crossref et chez HAL. Seuls les noms déclarés dans le registre ORCID les départagent.
-- [ ] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
-- [ ] Temps de calcul : recalcul complet du stock, et recalcul d'une publication de très grande collaboration.
-- [ ] Réconciliation des identifiants de groupes après recalcul.
-- [ ] Poids du modèle du résidu versionnés dans le dépôt ; script de maintenance qui les réestime avec Splink. Le pipeline calcule les poids des paires sans Splink.
+- [x] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
+- [x] Temps de calcul de l'essai, en Python sur un cœur : 36 minutes pour le stock (18,6 millions de signatures), de 0,4 à 2,2 secondes pour une collaboration d'environ 11 700 signatures en 5 notices.
+- [x] Réconciliation des identifiants de groupes après recalcul.
+- [x] Phase `source_authorship_groups`, entre `publications` et `persons`. Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms.
+- [x] Poids du modèle du résidu versionnés dans le dépôt. Le pipeline calcule les poids des paires sans Splink.
+- [ ] Script de maintenance qui réestime les poids avec Splink.
+- [ ] Premier passage de la phase sur le stock, puis évaluation sur les trois relectures.
 
 ### Phase 3 — Usages
 
