@@ -42,8 +42,14 @@ _HAL_MAP = {
     "edt": ([AuthorshipRole.EDITOR], False),
     "dir": ([AuthorshipRole.EDITOR], False),  # directeur de publication
     "scientific_editor": ([AuthorshipRole.SCIENTIFIC_EDITOR], False),
-    "spk": ([AuthorshipRole.SPEAKER], False),
-    "presenter": ([AuthorshipRole.SPEAKER], False),
+    "spk": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER],
+        False,
+    ),  # orateur, auteur de la communication
+    "presenter": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER],
+        False,
+    ),  # orateur, auteur de la communication
     "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
     "sad": ([AuthorshipRole.CONTRIBUTOR], False),  # conseiller scientifique
     "csc": ([AuthorshipRole.CONTRIBUTOR], False),  # consultant
@@ -109,8 +115,14 @@ _SCANR_MAP = {
     "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
     "sad": ([AuthorshipRole.CONTRIBUTOR], False),
     "edt": ([AuthorshipRole.EDITOR], False),
-    "spk": ([AuthorshipRole.SPEAKER], False),
-    "presenter": ([AuthorshipRole.SPEAKER], False),
+    "spk": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER],
+        False,
+    ),  # orateur, auteur de la communication
+    "presenter": (
+        [AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER],
+        False,
+    ),  # orateur, auteur de la communication
     "trl": ([AuthorshipRole.TRANSLATOR], False),
     "csc": ([AuthorshipRole.CONTRIBUTOR], False),
     "preface_writer": ([AuthorshipRole.CONTRIBUTOR], False),

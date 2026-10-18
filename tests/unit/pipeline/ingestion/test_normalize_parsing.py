@@ -516,6 +516,11 @@ class TestMapRole:
     def test_scanr_thesis_director(self):
         assert map_role("scanr", "directeurthese") == (["thesis_director"], False)
 
+    def test_orateur_est_aussi_auteur(self):
+        """L'orateur d'une communication en est l'un des auteurs, à sa place dans la liste."""
+        assert map_role("hal", "spk") == (["author", "speaker"], False)
+        assert map_role("scanr", "presenter") == (["author", "speaker"], False)
+
     def test_empty_role_defaults_to_author(self):
         assert map_role("hal", None) == (["author"], False)
         assert map_role("hal", "") == (["author"], False)

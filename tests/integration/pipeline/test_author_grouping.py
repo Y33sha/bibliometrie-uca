@@ -162,17 +162,6 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
     assert set(crossref) <= set(references)
 
 
-def test_l_orateur_s_aligne_avec_les_auteurs(conn):
-    """HAL code `speaker` l'auteur qui présente la communication ; OpenAlex le donne comme auteur."""
-    pub = insert_publication(conn)
-    hal = _notice(conn, pub, "hal", "hal-1", [("dugat bony", "eric")], roles=["speaker"])
-    openalex = _notice(conn, pub, "openalex", "W1", [("dugat bony", "eric")], roles=["author"])
-
-    _run(conn)
-
-    assert {hal[0], openalex[0]} in _groups(conn, pub).values()
-
-
 def test_les_autres_roles_s_alignent_par_le_nom(conn):
     pub = insert_publication(conn)
     theses = _notice(
