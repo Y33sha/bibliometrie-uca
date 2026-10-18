@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Callable, Hashable, Mapping
+from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from sqlalchemy import Connection
@@ -19,6 +19,7 @@ from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
+from domain.publications.authorship_roles import AuthorshipRole
 from domain.source_publications.signature_sync import (
     IncomingSignature,
     StoredSignature,
@@ -66,7 +67,7 @@ class AuthorRecord:
     name: SignatureName
     is_corresponding: bool = False
     collective: bool = False
-    roles: list[str] | None = None
+    roles: list[AuthorshipRole] | None = None
     person_identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
     ror_ids: frozenset[RorId] = frozenset()
@@ -266,7 +267,7 @@ def _identity(
     return (last_name_normalized, first_name_normalized, ids, collective)
 
 
-def _roles(roles: list[str] | None) -> tuple[str, ...] | None:
+def _roles(roles: Sequence[str] | None) -> tuple[str, ...] | None:
     return tuple(roles) if roles is not None else None
 
 

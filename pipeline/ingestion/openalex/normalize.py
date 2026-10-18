@@ -15,6 +15,7 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
+from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
@@ -466,7 +467,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 position=position,
                 name=name,
                 is_corresponding=bool(authorship.get("is_corresponding")),
-                roles=["author"],
+                roles=[AuthorshipRole.AUTHOR],
                 person_identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(

@@ -1,5 +1,7 @@
 """Règles de politique de création de personnes."""
 
+from domain.publications.authorship_roles import AuthorshipRole
+
 
 def allow_person_creation(source: str, roles: list[str]) -> bool:
     """Indique si la cascade de matching peut créer une personne pour cette authorship, à défaut d'avoir trouvé un match.
@@ -10,4 +12,4 @@ def allow_person_creation(source: str, roles: list[str]) -> bool:
 
     Note : distincte de la règle `OUT_OF_SCOPE_DOC_TYPES` (cf. `domain.publications.scope`) qui exclut entièrement memoir et peer_review du pipeline persons (ni matching ni création).
     """
-    return not (source == "theses" and "author" not in roles)
+    return not (source == "theses" and AuthorshipRole.AUTHOR not in roles)

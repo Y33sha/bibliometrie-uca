@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import THESES_FIELD_ROLES, merge_roles
+from domain.publications.authorship_roles import THESES_FIELD_ROLES, AuthorshipRole, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -31,7 +31,7 @@ class ThesisAuthorship:
     """
 
     person: Mapping[str, JsonValue]
-    roles: list[str]
+    roles: list[AuthorshipRole]
     name: SignatureName
     author_position: int | None
     person_identifiers: dict[str, str] | None
@@ -49,7 +49,7 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAutho
     """
     # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
     personnes: dict[str, Mapping[str, JsonValue]] = {}
-    roles_par_personne: dict[str, list[str]] = {}
+    roles_par_personne: dict[str, list[AuthorshipRole]] = {}
 
     for field, roles in THESES_FIELD_ROLES.items():
         if field == "president":
@@ -74,7 +74,7 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAutho
         if name is None:
             continue
         merged = merge_roles([roles_par_personne[key]])
-        is_author = "author" in merged
+        is_author = AuthorshipRole.AUTHOR in merged
         ppn = as_str(person.get("ppn"))
         person_identifiers = {"idref": ppn} if ppn else None
 

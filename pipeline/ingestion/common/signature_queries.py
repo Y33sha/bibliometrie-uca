@@ -43,7 +43,7 @@ class SourceAuthorshipItem(SignatureNameFields):
     author_position: int | None
     is_corresponding: bool
     collective: bool
-    roles: list[str] | None
+    roles: Sequence[str] | None
     person_identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None

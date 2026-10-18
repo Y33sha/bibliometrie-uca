@@ -37,11 +37,11 @@ from sqlalchemy import Connection, text
 
 from domain.dates import today
 from domain.publications.author_grouping import Author, ResidualSink, align_publication
+from domain.publications.authorship_roles import AuthorshipRole
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.transformation.publications.author_grouping import residual_weights
 from pipeline.transformation.publications.author_grouping.author_grouping import (
-    AUTHOR,
     BATCH_SIZE,
     deferred_notices,
     notices_by_role,
@@ -152,7 +152,7 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
             residual: list[dict[str, object]] = []
             signatures: list[dict[str, object]] = []
             for publication_id, rows in rows_by_publication.items():
-                notices = notices_by_role(rows).get(AUTHOR, {})
+                notices = notices_by_role(rows).get(AuthorshipRole.AUTHOR, {})
                 if len(notices) < 2:
                     continue
                 align_publication(

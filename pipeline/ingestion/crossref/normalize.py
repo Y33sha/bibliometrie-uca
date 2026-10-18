@@ -20,6 +20,7 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
+from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
 from domain.source_publications.external_ids import ExternalIdType
@@ -323,7 +324,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
                 position=position,
                 name=name,
                 collective=collective,
-                roles=["author"],
+                roles=[AuthorshipRole.AUTHOR],
                 person_identifiers=ids if ids else None,
                 addresses=addresses,
                 ror_ids=signature_rors,

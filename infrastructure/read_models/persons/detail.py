@@ -21,6 +21,7 @@ from application.ports.read_models.persons_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.dates import today
+from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
@@ -77,12 +78,17 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
 # ── Thèses encadrées ─────────────────────────────────────────────
 
 
-_THESIS_ROLES = ("thesis_director", "rapporteur", "jury_president", "jury_member")
+_THESIS_ROLES = (
+    AuthorshipRole.THESIS_DIRECTOR,
+    AuthorshipRole.RAPPORTEUR,
+    AuthorshipRole.JURY_PRESIDENT,
+    AuthorshipRole.JURY_MEMBER,
+)
 _THESIS_ROLE_LABELS = {
-    "thesis_director": "Directeur/directrice de thèse",
-    "rapporteur": "Rapporteur",
-    "jury_president": "Président du jury",
-    "jury_member": "Membre du jury",
+    AuthorshipRole.THESIS_DIRECTOR: "Directeur/directrice de thèse",
+    AuthorshipRole.RAPPORTEUR: "Rapporteur",
+    AuthorshipRole.JURY_PRESIDENT: "Président du jury",
+    AuthorshipRole.JURY_MEMBER: "Membre du jury",
 }
 
 
@@ -140,7 +146,7 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     by_role: dict[str, list[PersonThesis]] = {}
     for row in rows:
         roles = row.roles or []
-        role = "jury_member"
+        role = AuthorshipRole.JURY_MEMBER
         for r in _THESIS_ROLES:
             if r in roles:
                 role = r

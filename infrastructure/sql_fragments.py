@@ -7,6 +7,7 @@ from application.ports.repositories.address_repository import AddressCountryFilt
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
+from domain.publications.authorship_roles import AuthorshipRole
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
@@ -33,7 +34,7 @@ def diamond_journal_sql(journal: str = "j") -> str:
 
 def has_author_role(signature: str = "sa") -> str:
     """Condition vraie quand la signature ou l'authorship aliasée `signature` tient le rôle d'auteur."""
-    return f"{signature}.roles && ARRAY['author']::text[]"
+    return f"{signature}.roles && ARRAY['{AuthorshipRole.AUTHOR.value}']::text[]"
 
 
 def identifier_neutralized(

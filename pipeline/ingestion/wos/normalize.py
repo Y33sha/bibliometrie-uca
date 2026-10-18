@@ -11,7 +11,7 @@ from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import map_role
+from domain.publications.authorship_roles import AuthorshipRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
@@ -610,7 +610,11 @@ def build_wos_author_records(
                 position=as_int(author.get("position")) or 0,
                 name=name,
                 is_corresponding=bool(author.get("is_corresponding")),
-                roles=[role for e in as_sequence(author.get("roles")) if (role := as_str(e))]
+                roles=[
+                    AuthorshipRole(role)
+                    for e in as_sequence(author.get("roles"))
+                    if (role := as_str(e))
+                ]
                 or None,
                 person_identifiers=ids if ids else None,
                 addresses=[

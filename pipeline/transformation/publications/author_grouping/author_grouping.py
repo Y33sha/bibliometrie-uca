@@ -20,6 +20,7 @@ from domain.publications.author_grouping import (
     align_publication,
     plan_group_ids,
 )
+from domain.publications.authorship_roles import AuthorshipRole
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
@@ -37,9 +38,8 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
 
 BATCH_SIZE = 1000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
-AUTHOR = "author"
-# Rôles alignés avec les auteurs : `speaker` désigne l'auteur qui présente une communication, à sa place dans la liste.
-_AUTHOR_ROLES = frozenset({AUTHOR, "speaker"})
+# Rôles alignés avec les auteurs : `SPEAKER` désigne l'auteur qui présente une communication, à sa place dans la liste.
+_AUTHOR_ROLES = frozenset({AuthorshipRole.AUTHOR, AuthorshipRole.SPEAKER})
 # Source dont la notice passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
 DEFERRED_SOURCE = "scanr"
 
@@ -52,8 +52,8 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
 
 def _role_class(roles: list[str] | None) -> str:
     """Classe d'alignement d'une signature : les auteurs et les orateurs ensemble, les autres rôles chacun à part."""
-    roles = roles or [AUTHOR]
-    return AUTHOR if _AUTHOR_ROLES.intersection(roles) else ",".join(sorted(roles))
+    roles = roles or [AuthorshipRole.AUTHOR]
+    return AuthorshipRole.AUTHOR if _AUTHOR_ROLES.intersection(roles) else ",".join(sorted(roles))
 
 
 def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Signature]]]:
@@ -83,7 +83,7 @@ def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
     deferred = deferred_notices(rows)
     groups: list[Group] = []
     for role_class, notices in sorted(notices_by_role(rows).items()):
-        if role_class == AUTHOR:
+        if role_class == AuthorshipRole.AUTHOR:
             groups += align_publication(notices, model=_MODEL, assign=assign, deferred=deferred)
         else:
             groups += align_publication(notices, ordered=False, deferred=deferred)

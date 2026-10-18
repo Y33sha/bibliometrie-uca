@@ -3,23 +3,27 @@
 Chaque authorship peut avoir un ou plusieurs rôles (text[]). Les normalizers appellent `map_role(source, raw_role)` pour obtenir la liste de rôles canoniques + un flag `is_corresponding`.
 """
 
+from enum import StrEnum
+
 # ═══════════════════════════════════════════════════════════════════
 # Enum canonique
 # ═══════════════════════════════════════════════════════════════════
 
-AUTHORSHIP_ROLES = {
-    "author",  # auteur
-    "translator",  # traducteur
-    "editor",  # directeur de publication / éditeur d'ouvrage
-    "scientific_editor",  # éditeur scientifique (revue)
-    "speaker",  # conférencier / orateur
-    "contributor",  # contributeur (autre contribution identifiée)
-    "thesis_director",  # directeur de thèse
-    "rapporteur",  # rapporteur de thèse
-    "jury_member",  # membre du jury (examinateur, sans rôle spécifique)
-    "jury_president",  # président du jury
-    "other",  # autre rôle non classifiable
-}
+
+class AuthorshipRole(StrEnum):
+    """Rôle canonique d'une signature, valeur de `source_authorships.roles`."""
+
+    AUTHOR = "author"  # auteur
+    TRANSLATOR = "translator"  # traducteur
+    EDITOR = "editor"  # directeur de publication / éditeur d'ouvrage
+    SCIENTIFIC_EDITOR = "scientific_editor"  # éditeur scientifique (revue)
+    SPEAKER = "speaker"  # conférencier / orateur
+    CONTRIBUTOR = "contributor"  # contributeur (autre contribution identifiée)
+    THESIS_DIRECTOR = "thesis_director"  # directeur de thèse
+    RAPPORTEUR = "rapporteur"  # rapporteur de thèse
+    JURY_MEMBER = "jury_member"  # membre du jury (examinateur, sans rôle spécifique)
+    JURY_PRESIDENT = "jury_president"  # président du jury
+    OTHER = "other"  # autre rôle non classifiable
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -30,139 +34,129 @@ AUTHORSHIP_ROLES = {
 # crp (correspondent) → author + is_corresponding=True
 # co_first_author / co_last_author → author (la position est déjà dans author_position)
 _HAL_MAP = {
-    "aut": (["author"], False),
-    "crp": (["author"], True),  # auteur correspondant
-    "co_first_author": (["author"], False),
-    "co_last_author": (["author"], False),
-    "trl": (["translator"], False),
-    "edt": (["editor"], False),
-    "dir": (["editor"], False),  # directeur de publication
-    "scientific_editor": (["scientific_editor"], False),
-    "spk": (["speaker"], False),
-    "presenter": (["speaker"], False),
-    "ctb": (["contributor"], False),
-    "sad": (["contributor"], False),  # conseiller scientifique
-    "csc": (["contributor"], False),  # consultant
-    "preface_writer": (["contributor"], False),
-    "int": (["contributor"], False),  # interviewer
-    "interviewee": (["contributor"], False),
-    "reporter": (["contributor"], False),
-    "enq": (["contributor"], False),  # enquêteur
-    "com": (["contributor"], False),  # compilateur
-    "ann": (["contributor"], False),  # annotateur
-    "cwt": (["contributor"], False),  # commentateur
-    "ill": (["contributor"], False),  # illustrateur
-    "pht": (["contributor"], False),  # photographe
-    "ctg": (["contributor"], False),  # cartographe
-    "wam": (["contributor"], False),  # rédacteur accompagnement
-    "win": (["contributor"], False),  # rédacteur introduction
-    "dis": (["author"], False),  # dissertant → auteur
-    "rsp": (["contributor"], False),  # répondant
+    "aut": ([AuthorshipRole.AUTHOR], False),
+    "crp": ([AuthorshipRole.AUTHOR], True),  # auteur correspondant
+    "co_first_author": ([AuthorshipRole.AUTHOR], False),
+    "co_last_author": ([AuthorshipRole.AUTHOR], False),
+    "trl": ([AuthorshipRole.TRANSLATOR], False),
+    "edt": ([AuthorshipRole.EDITOR], False),
+    "dir": ([AuthorshipRole.EDITOR], False),  # directeur de publication
+    "scientific_editor": ([AuthorshipRole.SCIENTIFIC_EDITOR], False),
+    "spk": ([AuthorshipRole.SPEAKER], False),
+    "presenter": ([AuthorshipRole.SPEAKER], False),
+    "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
+    "sad": ([AuthorshipRole.CONTRIBUTOR], False),  # conseiller scientifique
+    "csc": ([AuthorshipRole.CONTRIBUTOR], False),  # consultant
+    "preface_writer": ([AuthorshipRole.CONTRIBUTOR], False),
+    "int": ([AuthorshipRole.CONTRIBUTOR], False),  # interviewer
+    "interviewee": ([AuthorshipRole.CONTRIBUTOR], False),
+    "reporter": ([AuthorshipRole.CONTRIBUTOR], False),
+    "enq": ([AuthorshipRole.CONTRIBUTOR], False),  # enquêteur
+    "com": ([AuthorshipRole.CONTRIBUTOR], False),  # compilateur
+    "ann": ([AuthorshipRole.CONTRIBUTOR], False),  # annotateur
+    "cwt": ([AuthorshipRole.CONTRIBUTOR], False),  # commentateur
+    "ill": ([AuthorshipRole.CONTRIBUTOR], False),  # illustrateur
+    "pht": ([AuthorshipRole.CONTRIBUTOR], False),  # photographe
+    "ctg": ([AuthorshipRole.CONTRIBUTOR], False),  # cartographe
+    "wam": ([AuthorshipRole.CONTRIBUTOR], False),  # rédacteur accompagnement
+    "win": ([AuthorshipRole.CONTRIBUTOR], False),  # rédacteur introduction
+    "dis": ([AuthorshipRole.AUTHOR], False),  # dissertant → auteur
+    "rsp": ([AuthorshipRole.CONTRIBUTOR], False),  # répondant
     # Rôles techniques/rares → other
-    "pro": (["other"], False),
-    "ard": (["other"], False),
-    "prd": (["other"], False),
-    "stm": (["other"], False),
-    "med": (["other"], False),
-    "man": (["other"], False),
-    "sds": (["other"], False),
-    "compiler": (["other"], False),
-    "coding": (["other"], False),
-    "design": (["other"], False),
-    "testing": (["other"], False),
-    "architecture": (["other"], False),
-    "support": (["other"], False),
-    "maintenance": (["other"], False),
-    "documentation": (["other"], False),
-    "debugging": (["other"], False),
-    "management": (["other"], False),
-    "project_manager": (["other"], False),
-    "ctr": (["other"], False),
-    "dev": (["other"], False),
-    "first": (["author"], False),
-    "oth": (["other"], False),
+    "pro": ([AuthorshipRole.OTHER], False),
+    "ard": ([AuthorshipRole.OTHER], False),
+    "prd": ([AuthorshipRole.OTHER], False),
+    "stm": ([AuthorshipRole.OTHER], False),
+    "med": ([AuthorshipRole.OTHER], False),
+    "man": ([AuthorshipRole.OTHER], False),
+    "sds": ([AuthorshipRole.OTHER], False),
+    "compiler": ([AuthorshipRole.OTHER], False),
+    "coding": ([AuthorshipRole.OTHER], False),
+    "design": ([AuthorshipRole.OTHER], False),
+    "testing": ([AuthorshipRole.OTHER], False),
+    "architecture": ([AuthorshipRole.OTHER], False),
+    "support": ([AuthorshipRole.OTHER], False),
+    "maintenance": ([AuthorshipRole.OTHER], False),
+    "documentation": ([AuthorshipRole.OTHER], False),
+    "debugging": ([AuthorshipRole.OTHER], False),
+    "management": ([AuthorshipRole.OTHER], False),
+    "project_manager": ([AuthorshipRole.OTHER], False),
+    "ctr": ([AuthorshipRole.OTHER], False),
+    "dev": ([AuthorshipRole.OTHER], False),
+    "first": ([AuthorshipRole.AUTHOR], False),
+    "oth": ([AuthorshipRole.OTHER], False),
 }
 
 # WoS
 _WOS_MAP = {
-    "author": (["author"], False),
-    "book_editor": (["editor"], False),
-    "book": (["author"], False),  # auteur de livre
-    "corp": (["author"], False),  # auteur collectif
-    "anon": (["author"], False),  # auteur anonyme
+    "author": ([AuthorshipRole.AUTHOR], False),
+    "book_editor": ([AuthorshipRole.EDITOR], False),
+    "book": ([AuthorshipRole.AUTHOR], False),  # auteur de livre
+    "corp": ([AuthorshipRole.AUTHOR], False),  # auteur collectif
+    "anon": ([AuthorshipRole.AUTHOR], False),  # auteur anonyme
 }
 
 # ScanR : mix de codes MARC et de rôles thèses (français, sans accents)
 _SCANR_MAP = {
-    "author": (["author"], False),
-    "directeurthese": (["thesis_director"], False),
-    "rapporteur": (["rapporteur"], False),
-    "membrejury": (["jury_member"], False),
-    "presidentjury": (["jury_president"], False),
-    "scientific_editor": (["scientific_editor"], False),
-    "co_first_author": (["author"], False),
-    "co_last_author": (["author"], False),
-    "ctb": (["contributor"], False),
-    "sad": (["contributor"], False),
-    "edt": (["editor"], False),
-    "spk": (["speaker"], False),
-    "presenter": (["speaker"], False),
-    "trl": (["translator"], False),
-    "csc": (["contributor"], False),
-    "preface_writer": (["contributor"], False),
-    "interviewee": (["contributor"], False),
-    "int": (["contributor"], False),
-    "reporter": (["contributor"], False),
-    "enq": (["contributor"], False),
-    "ill": (["contributor"], False),
-    "pht": (["contributor"], False),
-    "cwt": (["contributor"], False),
-    "dir": (["editor"], False),
-    "com": (["contributor"], False),
-    "ann": (["contributor"], False),
-    "wam": (["contributor"], False),
-    "management": (["other"], False),
-    "project_manager": (["other"], False),
-    "coding": (["other"], False),
-    "design": (["other"], False),
-    "testing": (["other"], False),
-    "med": (["other"], False),
-    "oth": (["other"], False),
+    "author": ([AuthorshipRole.AUTHOR], False),
+    "directeurthese": ([AuthorshipRole.THESIS_DIRECTOR], False),
+    "rapporteur": ([AuthorshipRole.RAPPORTEUR], False),
+    "membrejury": ([AuthorshipRole.JURY_MEMBER], False),
+    "presidentjury": ([AuthorshipRole.JURY_PRESIDENT], False),
+    "scientific_editor": ([AuthorshipRole.SCIENTIFIC_EDITOR], False),
+    "co_first_author": ([AuthorshipRole.AUTHOR], False),
+    "co_last_author": ([AuthorshipRole.AUTHOR], False),
+    "ctb": ([AuthorshipRole.CONTRIBUTOR], False),
+    "sad": ([AuthorshipRole.CONTRIBUTOR], False),
+    "edt": ([AuthorshipRole.EDITOR], False),
+    "spk": ([AuthorshipRole.SPEAKER], False),
+    "presenter": ([AuthorshipRole.SPEAKER], False),
+    "trl": ([AuthorshipRole.TRANSLATOR], False),
+    "csc": ([AuthorshipRole.CONTRIBUTOR], False),
+    "preface_writer": ([AuthorshipRole.CONTRIBUTOR], False),
+    "interviewee": ([AuthorshipRole.CONTRIBUTOR], False),
+    "int": ([AuthorshipRole.CONTRIBUTOR], False),
+    "reporter": ([AuthorshipRole.CONTRIBUTOR], False),
+    "enq": ([AuthorshipRole.CONTRIBUTOR], False),
+    "ill": ([AuthorshipRole.CONTRIBUTOR], False),
+    "pht": ([AuthorshipRole.CONTRIBUTOR], False),
+    "cwt": ([AuthorshipRole.CONTRIBUTOR], False),
+    "dir": ([AuthorshipRole.EDITOR], False),
+    "com": ([AuthorshipRole.CONTRIBUTOR], False),
+    "ann": ([AuthorshipRole.CONTRIBUTOR], False),
+    "wam": ([AuthorshipRole.CONTRIBUTOR], False),
+    "management": ([AuthorshipRole.OTHER], False),
+    "project_manager": ([AuthorshipRole.OTHER], False),
+    "coding": ([AuthorshipRole.OTHER], False),
+    "design": ([AuthorshipRole.OTHER], False),
+    "testing": ([AuthorshipRole.OTHER], False),
+    "med": ([AuthorshipRole.OTHER], False),
+    "oth": ([AuthorshipRole.OTHER], False),
 }
 
 # theses.fr : les rôles sont structurels (champs séparés dans le JSON)
 # Le mapping est direct, pas besoin de table — voir THESES_FIELD_ROLES ci-dessous
 THESES_FIELD_ROLES = {
-    "auteurs": ["author"],
-    "directeurs": ["thesis_director"],
-    "rapporteurs": ["rapporteur"],
-    "examinateurs": ["jury_member"],
-    "president": ["jury_president"],
+    "auteurs": [AuthorshipRole.AUTHOR],
+    "directeurs": [AuthorshipRole.THESIS_DIRECTOR],
+    "rapporteurs": [AuthorshipRole.RAPPORTEUR],
+    "examinateurs": [AuthorshipRole.JURY_MEMBER],
+    "president": [AuthorshipRole.JURY_PRESIDENT],
 }
 
 # Rôles thèse qui impliquent l'appartenance au jury
 # → pas besoin d'ajouter jury_member si un de ceux-ci est déjà présent
-_THESIS_ROLES_IMPLYING_JURY = {"thesis_director", "rapporteur", "jury_president"}
+_THESIS_ROLES_IMPLYING_JURY = {
+    AuthorshipRole.THESIS_DIRECTOR,
+    AuthorshipRole.RAPPORTEUR,
+    AuthorshipRole.JURY_PRESIDENT,
+}
 
-_SOURCE_MAPS = {
+_SOURCE_MAPS: dict[str, dict[str, tuple[list[AuthorshipRole], bool]]] = {
     "hal": _HAL_MAP,
     "wos": _WOS_MAP,
     "scanr": _SCANR_MAP,
 }
-
-
-# Garde-fou : les mappings ne produisent que des rôles du vocabulaire canonique.
-# Sans cela, une faute de frappe dans un mapping écrirait un rôle hors-vocabulaire
-# dans `authorships.roles` sans rien pour l'arrêter.
-assert all(
-    role in AUTHORSHIP_ROLES
-    for mapping in _SOURCE_MAPS.values()
-    for roles, _ in mapping.values()
-    for role in roles
-), "un mapping source produit un rôle hors de AUTHORSHIP_ROLES"
-assert all(role in AUTHORSHIP_ROLES for roles in THESES_FIELD_ROLES.values() for role in roles), (
-    "THESES_FIELD_ROLES produit un rôle hors de AUTHORSHIP_ROLES"
-)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -170,18 +164,17 @@ assert all(role in AUTHORSHIP_ROLES for roles in THESES_FIELD_ROLES.values() for
 # ═══════════════════════════════════════════════════════════════════
 
 
-def map_role(source: str, raw_role: str | None) -> tuple[list[str], bool]:
+def map_role(source: str, raw_role: str | None) -> tuple[list[AuthorshipRole], bool]:
     """Mappe un rôle brut d'une source vers le(s) rôle(s) canonique(s).
 
-    Retourne (roles: list[str], is_corresponding: bool).
-    Si le rôle brut est inconnu, retourne (["author"], False) par défaut.
+    Retourne (roles, is_corresponding). Un rôle absent, ou une source sans table, donne `AUTHOR` ; un rôle inconnu de la table de la source donne `OTHER`.
     """
     if not raw_role:
-        return ["author"], False
+        return [AuthorshipRole.AUTHOR], False
 
     source_map = _SOURCE_MAPS.get(source)
     if not source_map:
-        return ["author"], False
+        return [AuthorshipRole.AUTHOR], False
 
     raw_role = raw_role.strip()
     if raw_role in source_map:
@@ -193,20 +186,20 @@ def map_role(source: str, raw_role: str | None) -> tuple[list[str], bool]:
         if key.lower() == raw_lower:
             return val
 
-    return ["other"], False
+    return [AuthorshipRole.OTHER], False
 
 
-def merge_roles(role_lists: list[list[str]]) -> list[str]:
+def merge_roles(role_lists: list[list[AuthorshipRole]]) -> list[AuthorshipRole]:
     """Fusionne plusieurs listes de rôles en supprimant les redondances.
 
-    Applique la règle : si un rôle thèse impliquant le jury est présent, `jury_member` est superflu.
+    Applique la règle : si un rôle thèse impliquant le jury est présent, `JURY_MEMBER` est superflu.
     """
-    all_roles = set()
+    all_roles: set[AuthorshipRole] = set()
     for roles in role_lists:
         all_roles.update(roles)
 
     # Si un rôle thèse spécifique est présent, retirer jury_member
     if all_roles & _THESIS_ROLES_IMPLYING_JURY:
-        all_roles.discard("jury_member")
+        all_roles.discard(AuthorshipRole.JURY_MEMBER)
 
     return sorted(all_roles)
