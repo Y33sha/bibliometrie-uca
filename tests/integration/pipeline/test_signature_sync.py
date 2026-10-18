@@ -227,6 +227,29 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
     assert _authorships_dirty(conn, publication)
 
 
+def test_decomptes_des_auteurs_de_la_notice(sa_sync_conn):
+    """Seules les signatures au rôle author, non collectives, comptent ; un nom répété compte une fois parmi les noms distincts."""
+    conn = sa_sync_conn
+    sp = _notice(conn)
+    author = ["author"]
+    _write(
+        conn,
+        sp,
+        [
+            _rec(0, "Dupont, Jean", roles=author),
+            _rec(1, "ATLAS Collaboration", roles=author),
+            _rec(2, "Dupont, Jean", roles=author),
+            AuthorRecord(None, SignatureName(raw="Martin, Paul"), roles=["jury_member"]),
+        ],
+    )
+
+    counts = conn.execute(
+        text("SELECT author_count, distinct_author_count FROM source_publications WHERE id = :sp"),
+        {"sp": sp},
+    ).one()
+    assert tuple(counts) == (2, 1)
+
+
 def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):
     conn = sa_sync_conn
     sp = _notice(conn)

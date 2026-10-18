@@ -19,7 +19,7 @@ from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.authorship_roles import AuthorshipRole, is_individual_author
 from domain.source_publications.signature_sync import (
     IncomingSignature,
     StoredSignature,
@@ -121,7 +121,7 @@ def write_source_authorships(
 ) -> None:
     """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `authorships_dirty` sur la publication de la notice.
+    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `authorships_dirty` sur la publication de la notice. La notice reçoit son nombre de signatures d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une signature entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
@@ -180,6 +180,12 @@ def write_source_authorships(
     )
     if plan.regroup:
         queries.mark_authorships_dirty(conn, source_publication_id)
+    authors = [
+        (item["last_name_normalized"], item["first_name_normalized"] or "")
+        for item in items
+        if is_individual_author(item["roles"], item["collective"])
+    ]
+    queries.set_author_counts(conn, source_publication_id, len(authors), len(set(authors)))
 
     queries.delete_source_authorships(conn, list(plan.deletes))
     queries.update_source_authorships_batch(

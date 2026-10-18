@@ -294,6 +294,19 @@ class AuthorshipsBatchQueries:
             {"payload": payload},
         )
 
+    def set_author_counts(
+        self, conn: Connection, source_publication_id: int, author_count: int, distinct: int
+    ) -> None:
+        """Écrit `author_count` et `distinct_author_count` de la notice."""
+        conn.execute(
+            text("""
+                UPDATE source_publications
+                SET author_count = :n, distinct_author_count = :d
+                WHERE id = :id AND (author_count, distinct_author_count) IS DISTINCT FROM (:n, :d)
+            """),
+            {"n": author_count, "d": distinct, "id": source_publication_id},
+        )
+
     def fetch_authors_hash(self, conn: Connection, source_publication_id: int) -> str | None:
         return conn.execute(
             text("SELECT authors_hash FROM source_publications WHERE id = :id"),

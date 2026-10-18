@@ -87,6 +87,10 @@ class FakeAuthorshipsBatchQueries:
 
     def mark_authorships_dirty(self, conn, source_publication_id: int) -> None: ...
 
+    def set_author_counts(
+        self, conn, source_publication_id: int, author_count: int, distinct: int
+    ) -> None: ...
+
     def upsert_addresses_batch(self, conn, values) -> None: ...
 
     def fetch_address_ids_by_normalized_text(self, conn, normalized_texts) -> dict[str, int]:

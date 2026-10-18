@@ -1210,6 +1210,20 @@ source_publications = Table(
         Text,
         comment="Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.",
     ),
+    Column(
+        "author_count",
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Signatures de la notice qui ont le rôle author et ne sont pas collectives, telles que la source les donne.",
+    ),
+    Column(
+        "distinct_author_count",
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Noms complets normalisés distincts parmi les signatures comptées par author_count.",
+    ),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",

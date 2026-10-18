@@ -3,6 +3,7 @@
 Chaque authorship peut avoir un ou plusieurs rôles (text[]). Les normalizers appellent `map_role(source, raw_role)` pour obtenir la liste de rôles canoniques + un flag `is_corresponding`.
 """
 
+from collections.abc import Sequence
 from enum import StrEnum
 
 # ═══════════════════════════════════════════════════════════════════
@@ -215,3 +216,8 @@ def merge_roles(role_lists: list[list[AuthorshipRole]]) -> list[AuthorshipRole]:
         all_roles.discard(AuthorshipRole.JURY_MEMBER)
 
     return sorted(all_roles)
+
+
+def is_individual_author(roles: Sequence[str] | None, collective: bool) -> bool:
+    """La signature compte dans la liste d'auteurs de sa notice : elle a le rôle `AUTHOR` et n'est pas collective."""
+    return not collective and AuthorshipRole.AUTHOR in (roles or ())
