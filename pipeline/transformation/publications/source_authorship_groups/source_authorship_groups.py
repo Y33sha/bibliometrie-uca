@@ -1,0 +1,158 @@
+"""Phase `source_authorship_groups` : groupes des signatures d'un même auteur dans chaque publication.
+
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots. Les auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.source_authorship_groups`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+
+Nœud `source_authorship_groups.build`.
+"""
+
+import logging
+from collections import Counter
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+
+from scipy.optimize import linear_sum_assignment
+from sqlalchemy import Connection
+
+from domain.publications.source_authorship_groups import (
+    Group,
+    ResidualModel,
+    Signature,
+    align_publication,
+    plan_group_ids,
+)
+from pipeline.node_runner import NodePhase
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
+from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.progression import progression
+from pipeline.transformation.publications.source_authorship_groups.queries import (
+    GroupRow,
+    MembershipRow,
+    SignatureRow,
+    SourceAuthorshipGroupsQueries,
+)
+from pipeline.transformation.publications.source_authorship_groups.residual_weights import (
+    RESIDUAL_WEIGHTS,
+)
+
+BATCH_SIZE = 2000
+_MODEL = ResidualModel(RESIDUAL_WEIGHTS)
+_AUTHOR = "author"
+
+
+def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
+    """Affectation de gain maximal (algorithme hongrois)."""
+    rows, cols = linear_sum_assignment([[-value for value in row] for row in matrix])
+    return zip(rows.tolist(), cols.tolist(), strict=True)
+
+
+def _role_class(roles: list[str] | None) -> str:
+    """Classe d'alignement d'une signature : les auteurs ensemble, les autres rôles chacun à part."""
+    roles = roles or [_AUTHOR]
+    return _AUTHOR if _AUTHOR in roles else ",".join(sorted(roles))
+
+
+def group_publication(rows: Sequence[SignatureRow]) -> list[Group]:
+    """Groupes des signatures d'une publication, classe de rôle par classe de rôle.
+
+    Une signature sans position prend la position 0 pour l'alignement, qui la range alors par identifiant.
+    """
+    by_class: dict[str, dict[int, list[Signature]]] = {}
+    for row in rows:
+        notices = by_class.setdefault(_role_class(row.roles), {})
+        position = row.position if row.position is not None else 0
+        notices.setdefault(row.notice, []).append(
+            Signature(
+                row.id, row.notice, position, row.last_name, row.first_name, row.orcid, row.idref
+            )
+        )
+    groups: list[Group] = []
+    for role_class, notices in sorted(by_class.items()):
+        if role_class == _AUTHOR:
+            groups += align_publication(notices, model=_MODEL, assign=assign)
+        else:
+            groups += align_publication(notices, ordered=False)
+    return groups
+
+
+def _plan_batch(
+    queries: SourceAuthorshipGroupsQueries,
+    conn: Connection,
+    publication_ids: Sequence[int],
+    methods: Counter[str],
+) -> tuple[list[GroupRow], list[MembershipRow], list[int]]:
+    """Groupes et appartenances à écrire pour un lot de publications, et groupes en base sans correspondant."""
+    rows_by_publication: dict[int, list[SignatureRow]] = {}
+    positions: dict[int, int | None] = {}
+    for row in queries.fetch_signatures(conn, publication_ids):
+        rows_by_publication.setdefault(row.publication_id, []).append(row)
+        positions[row.id] = row.position
+    existing = queries.fetch_groups(conn, publication_ids)
+    planned: list[tuple[int, Group, int | None]] = []
+    unmatched: list[int] = []
+    for publication_id in publication_ids:
+        groups = group_publication(rows_by_publication.get(publication_id, []))
+        old = {gid: frozenset(sigs) for gid, sigs in existing.get(publication_id, {}).items()}
+        plan = plan_group_ids(old, [frozenset(m.signature for m in g.members) for g in groups])
+        planned += [(publication_id, g, gid) for g, gid in zip(groups, plan, strict=True)]
+        unmatched += sorted(set(old) - {gid for gid in plan if gid is not None})
+    fresh = iter(queries.group_ids(conn, sum(1 for *_, gid in planned if gid is None)))
+    group_rows: list[GroupRow] = []
+    memberships: list[MembershipRow] = []
+    for publication_id, group, gid in planned:
+        existing_id = gid is not None
+        group_id = gid if gid is not None else next(fresh)
+        group_rows.append(
+            GroupRow(group_id, publication_id, positions[group.reference.id], existing_id)
+        )
+        for m in group.members:
+            methods[m.method] += 1
+            memberships.append(
+                MembershipRow(m.signature, group_id, m.notice, str(m.method), m.score, m.margin)
+            )
+    return group_rows, memberships, unmatched
+
+
+def build_groups(
+    conn: Connection, queries: SourceAuthorshipGroupsQueries, logger: logging.Logger
+) -> PhaseMetrics:
+    """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot."""
+    publication_ids = queries.fetch_dirty_publication_ids(conn)
+    etape(logger, "%s à regrouper", accord(len(publication_ids), "publication"))
+    if not publication_ids:
+        rien_a_faire(logger)
+        return PhaseMetrics()
+    metrics = PhaseMetrics(seen=len(publication_ids))
+    methods: Counter[str] = Counter()
+    group_count = 0
+    with progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
+        for start in range(0, len(publication_ids), BATCH_SIZE):
+            batch = publication_ids[start : start + BATCH_SIZE]
+            groups, memberships, unmatched = _plan_batch(queries, conn, batch, methods)
+            queries.write(conn, batch, groups, memberships, unmatched)
+            conn.commit()
+            group_count += len(groups)
+            avancement.avance(len(batch))
+    metrics.add(updated=len(publication_ids))
+    metrics.extras.update(dict(methods))
+    metrics.resume = (
+        f"{accord(len(publication_ids), 'publication')}, {accord(group_count, 'groupe')}"
+    )
+    return metrics
+
+
+@dataclass(frozen=True)
+class SourceAuthorshipGroupsPhase:
+    queries: SourceAuthorshipGroupsQueries
+
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        with ctx.open_tx() as conn:
+            return build_groups(conn, self.queries, ctx.logger)
+
+
+def build() -> Phase:
+    """Groupe les signatures d'un même auteur dans les publications marquées."""
+    return NodePhase(
+        "source_authorship_groups.build",
+        SourceAuthorshipGroupsPhase(SourceAuthorshipGroupsQueries()),
+    )

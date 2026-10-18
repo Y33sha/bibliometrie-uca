@@ -804,6 +804,33 @@ NODES: tuple[Node, ...] = (
         previous_run=("publications.id",),
     ),
     _node(
+        "source_authorship_groups.build",
+        "source_authorship_groups",
+        reads=(
+            "publications.authorships_dirty",
+            "source_publications.publication_id",
+            "source_publications.source_id",
+            "source_publications.raw_metadata",
+            "source_authorships.id",
+            "source_authorships.source_publication_id",
+            "source_authorships.author_position",
+            "source_authorships.roles",
+            "source_authorships.collective",
+            "source_authorships.identity_id",
+            "author_identifying_keys",
+            "source_authorship_groups",
+            "grouped_source_authorships",
+        ),
+        writes=(
+            "source_authorship_groups.id",
+            "source_authorship_groups.reference_position",
+            "grouped_source_authorships.id",
+            "publications.authorships_dirty",
+        ),
+        # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
+        previous_run=("publications.authorships_dirty",),
+    ),
+    _node(
         "persons.resolve",
         "persons",
         reads=(
@@ -1134,6 +1161,7 @@ PHASE_LIBELLES: dict[str, str] = {
     "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
+    "source_authorship_groups": "Groupes des signatures d'un même auteur dans chaque publication",
     "persons": "Résolution de l'identité des personnes",
     "authorships": "Rafraîchissement des liens entre publications, personnes et structures",
     "relations": "Relations entre publications apparentées",

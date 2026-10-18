@@ -1,0 +1,144 @@
+"""Intégration : phase `source_authorship_groups`, sur vraie base (`conn.commit` neutralisé)."""
+
+import logging
+
+import pytest
+from sqlalchemy import text
+
+from pipeline.transformation.publications.source_authorship_groups import (
+    source_authorship_groups,
+)
+from pipeline.transformation.publications.source_authorship_groups.queries import (
+    SourceAuthorshipGroupsQueries,
+)
+from pipeline.transformation.publications.source_authorship_groups.source_authorship_groups import (
+    build_groups,
+)
+from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_publication
+
+logger = logging.getLogger("test_source_authorship_groups")
+
+
+@pytest.fixture
+def conn(sa_sync_conn, monkeypatch):
+    monkeypatch.setattr(sa_sync_conn, "commit", lambda: None)
+    return sa_sync_conn
+
+
+def _notice(conn, publication_id, source, source_id, names, roles=None, positions=True):
+    """Notice et ses signatures, à partir de couples (patronyme, prénom). Rend les identifiants des signatures."""
+    notice = insert_source_publication(conn, publication_id, source=source, source_id=source_id)
+    return [
+        insert_signature(
+            conn,
+            notice,
+            source=source,
+            author_position=pos if positions else None,
+            identity_id=upsert_split_identity(conn, last, first),
+            roles=roles,
+        )
+        for pos, (last, first) in enumerate(names)
+    ]
+
+
+def _groups(conn, publication_id):
+    """Signatures de chaque groupe de la publication : identifiant de groupe → ensemble de signatures."""
+    rows = conn.execute(
+        text("""
+            SELECT g.id, gs.source_authorship_id FROM source_authorship_groups g
+            JOIN grouped_source_authorships gs ON gs.group_id = g.id
+            WHERE g.publication_id = :p
+        """),
+        {"p": publication_id},
+    ).all()
+    out: dict[int, set[int]] = {}
+    for gid, sig in rows:
+        out.setdefault(gid, set()).add(sig)
+    return out
+
+
+def _run(conn):
+    return build_groups(conn, SourceAuthorshipGroupsQueries(), logger)
+
+
+def test_les_signatures_d_un_meme_auteur_sont_groupees(conn):
+    pub = insert_publication(conn)
+    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")])
+    oa = _notice(conn, pub, "openalex", "W1", [("martin", "a"), ("durand", "c")])
+
+    _run(conn)
+
+    groups = sorted(_groups(conn, pub).values(), key=min)
+    assert groups == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
+    dirty = conn.execute(
+        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": pub}
+    )
+    assert dirty.scalar_one() is False
+
+
+def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
+    pub = insert_publication(conn)
+    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+    _notice(conn, pub, "openalex", "W1", [("martin", "a")])
+    _run(conn)
+    martin = next(gid for gid, sigs in _groups(conn, pub).items() if hal[0] in sigs)
+    person = insert_person(conn, "Martin", first_name="Anne")
+    conn.execute(
+        text("UPDATE source_authorship_groups SET person_id = :person WHERE id = :g"),
+        {"person": person, "g": martin},
+    )
+    _notice(conn, pub, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
+    conn.execute(text("UPDATE publications SET authorships_dirty = true WHERE id = :p"), {"p": pub})
+
+    _run(conn)
+
+    groups = _groups(conn, pub)
+    assert hal[0] in groups[martin] and len(groups[martin]) == 3
+    kept = conn.execute(
+        text("SELECT person_id FROM source_authorship_groups WHERE id = :g"), {"g": martin}
+    )
+    assert kept.scalar_one() == person
+
+
+def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
+    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la signature."""
+    monkeypatch.setattr(source_authorship_groups, "BATCH_SIZE", 1)
+    arrival = insert_publication(conn)
+    departure = insert_publication(conn)
+    _notice(conn, arrival, "hal", "hal-1", [("martin", "anne")])
+    moved = _notice(conn, departure, "openalex", "W1", [("martin", "a")])
+    _notice(conn, departure, "crossref", "10.1/x", [("martin", "a")])
+    _run(conn)
+    conn.execute(
+        text("UPDATE source_publications SET publication_id = :p WHERE source_id = 'W1'"),
+        {"p": arrival},
+    )
+    conn.execute(text("UPDATE publications SET authorships_dirty = true"))
+
+    _run(conn)
+
+    assert any(moved[0] in sigs for sigs in _groups(conn, arrival).values())
+    assert all(moved[0] not in sigs for sigs in _groups(conn, departure).values())
+
+
+def test_les_autres_roles_s_alignent_par_le_nom(conn):
+    pub = insert_publication(conn)
+    theses = _notice(
+        conn,
+        pub,
+        "theses",
+        "2020UCFA0001",
+        [("dupont", "jean")],
+        roles=["thesis_director"],
+        positions=False,
+    )
+    hal = _notice(
+        conn, pub, "hal", "tel-1", [("dupont", "j")], roles=["thesis_director"], positions=False
+    )
+
+    _run(conn)
+
+    assert {theses[0], hal[0]} in _groups(conn, pub).values()

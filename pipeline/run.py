@@ -58,6 +58,9 @@ from pipeline.transformation.publications import oa_status, relations
 from pipeline.transformation.publications.authorships import authorships
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.reconciliation import publications
+from pipeline.transformation.publications.source_authorship_groups import (
+    source_authorship_groups,
+)
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
@@ -88,6 +91,7 @@ _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "publishers_journals": publishers_journals.build,
     "metadata_correction": metadata_correction.build,
     "publications": publications.build,
+    "source_authorship_groups": source_authorship_groups.build,
     "relations": relations.build,
     "persons": persons.build,
     "authorships": authorships.build,
