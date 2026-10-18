@@ -35,7 +35,7 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
     RESIDUAL_WEIGHTS,
 )
 
-BATCH_SIZE = 2000
+BATCH_SIZE = 1000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
 _AUTHOR = "author"
 
