@@ -167,7 +167,7 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
 
 
 def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
-    """Deux œuvres réunies à tort : aucune signature d'auteur n'est alignée par la règle. La publication bien alignée reste hors de la file."""
+    """Deux œuvres réunies à tort : aucune signature d'auteur n'a de correspondant dans l'autre notice. La publication bien alignée reste hors de la file."""
     merged = insert_publication(conn)
     _notice(conn, merged, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
     _notice(conn, merged, "openalex", "W1", [("durand", "claire"), ("leroy", "denis")])
@@ -179,12 +179,12 @@ def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
 
     assert suspect_merges_count(conn) == 1
     [suspect] = suspect_merges(conn, page=1, per_page=10).publications
-    assert (suspect.publication_id, suspect.signatures, suspect.rule_aligned_signatures) == (
+    assert (suspect.publication_id, suspect.signatures, suspect.matched_signatures) == (
         merged,
         4,
         0,
     )
-    assert sorted((n.source, n.rule_aligned_signatures) for n in suspect.notices) == [
+    assert sorted((n.source, n.matched_signatures) for n in suspect.notices) == [
         ("hal", 0),
         ("openalex", 0),
     ]

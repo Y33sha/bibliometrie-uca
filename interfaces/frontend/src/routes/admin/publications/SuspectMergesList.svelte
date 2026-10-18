@@ -35,10 +35,9 @@
 </script>
 
 <p class="intro">
-  Publications dont <strong>moins de la moitié des signatures d'auteur</strong> sont alignées par
-  le nom, un identifiant ou l'ordre : leurs notices ont des listes d'auteurs qui ne se recouvrent
-  pas, signe probable de deux œuvres réunies à tort. Les liens du modèle seul ne comptent pas comme
-  alignés ; leur nombre et leur plus petite marge sont indiqués à part.
+  Publications dont <strong>moins de la moitié des auteurs</strong> se retrouvent d'une notice à
+  l'autre : leurs listes d'auteurs ne se recouvrent pas, signe probable de deux œuvres réunies à
+  tort. Pour chaque notice, le nombre de ses auteurs retrouvés dans une autre notice.
 </p>
 
 {#if !list.loaded}
@@ -61,22 +60,16 @@
           </span>
         </div>
         <div class="stats">
-          <span class="share" title="Signatures d'auteur alignées par le nom, un identifiant ou l'ordre">
-            {percent(item.rule_aligned_signatures, item.signatures)} % alignées
+          <span class="share">
+            {percent(item.matched_signatures, item.signatures)} % d'auteurs retrouvés
           </span>
-          <span>{item.rule_aligned_signatures} / {item.signatures} signatures</span>
-          <span>{item.lone_signatures} seules</span>
-          {#if item.model_signatures}
-            <span title="Liens du modèle seul ; plus petite marge en bits">
-              {item.model_signatures} par le modèle (marge min. {item.min_margin?.toFixed(1)})
-            </span>
-          {/if}
+          <span>{item.matched_signatures} / {item.signatures} signatures</span>
         </div>
         <div class="notices">
           {#each item.notices as n (n.source + n.source_id)}
             <span class="notice">
               <SourceTag source={n.source} id={n.source_id} href={sourceExternalUrl(n.source, n.source_id) ?? undefined} />
-              {n.rule_aligned_signatures} / {n.signatures}
+              {n.matched_signatures} / {n.signatures}
             </span>
           {/each}
         </div>

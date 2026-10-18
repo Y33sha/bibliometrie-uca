@@ -398,25 +398,18 @@ class SuspectMergeNoticeOut(BaseModel):
     source: str
     source_id: str
     signatures: int
-    rule_aligned_signatures: int
-    lone_signatures: int
+    matched_signatures: int
 
 
 class SuspectMergeOut(BaseModel):
-    """Publication dont moins de la moitié des signatures d'auteur sont alignées par la règle : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
-
-    `rule_aligned_signatures` : signatures d'auteur d'un groupe dont un membre est lié par la règle (nom, identifiant, ordre). `lone_signatures` : signatures d'auteur seules dans leur groupe. `model_signatures` : signatures d'auteur liées à leur groupe par le modèle ; `min_margin` : plus petite marge de ces liens, en bits.
-    """
+    """Publication dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice : ses notices ont des listes d'auteurs qui ne se recouvrent pas."""
 
     publication_id: int
     title: str
     pub_year: int | None
     doc_type: str
     signatures: int
-    rule_aligned_signatures: int
-    lone_signatures: int
-    model_signatures: int
-    min_margin: float | None
+    matched_signatures: int
     notices: list[SuspectMergeNoticeOut]
 
 
@@ -466,5 +459,5 @@ class PublicationsQueries(Protocol):
     def suspect_merges_count(self) -> int: ...
 
     def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
-        """Fusions suspectes, la plus faible part de signatures d'auteur alignées par la règle d'abord."""
+        """Fusions suspectes, la plus faible part de signatures d'auteur avec correspondant d'abord."""
         ...

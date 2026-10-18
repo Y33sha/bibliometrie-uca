@@ -315,7 +315,7 @@ export interface paths {
         };
         /**
          * Suspect Merges
-         * @description Publications dont moins de la moitié des signatures d'auteur sont alignées par la règle, paginées.
+         * @description Publications dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice, paginées.
          */
         get: operations["suspect_merges_api_publications_suspect_merges_get"];
         put?: never;
@@ -5465,16 +5465,12 @@ export interface components {
             source_id: string;
             /** Signatures */
             signatures: number;
-            /** Rule Aligned Signatures */
-            rule_aligned_signatures: number;
-            /** Lone Signatures */
-            lone_signatures: number;
+            /** Matched Signatures */
+            matched_signatures: number;
         };
         /**
          * SuspectMergeOut
-         * @description Publication dont moins de la moitié des signatures d'auteur sont alignées par la règle : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
-         *
-         *     `rule_aligned_signatures` : signatures d'auteur d'un groupe dont un membre est lié par la règle (nom, identifiant, ordre). `lone_signatures` : signatures d'auteur seules dans leur groupe. `model_signatures` : signatures d'auteur liées à leur groupe par le modèle ; `min_margin` : plus petite marge de ces liens, en bits.
+         * @description Publication dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
          */
         SuspectMergeOut: {
             /** Publication Id */
@@ -5487,14 +5483,8 @@ export interface components {
             doc_type: string;
             /** Signatures */
             signatures: number;
-            /** Rule Aligned Signatures */
-            rule_aligned_signatures: number;
-            /** Lone Signatures */
-            lone_signatures: number;
-            /** Model Signatures */
-            model_signatures: number;
-            /** Min Margin */
-            min_margin: number | null;
+            /** Matched Signatures */
+            matched_signatures: number;
             /** Notices */
             notices: components["schemas"]["SuspectMergeNoticeOut"][];
         };

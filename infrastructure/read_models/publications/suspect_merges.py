@@ -9,15 +9,13 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.publications.authorship_roles import AuthorshipRole
 
-# Moins de la moitié des signatures d'auteur sont dans un groupe dont un membre est lié par la règle (nom, identifiant, ordre).
-_SUSPECT = "2 * pa.rule_aligned_signatures < pa.signatures"
+# Moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice.
+_SUSPECT = "2 * pa.matched_signatures < pa.signatures"
 
 _NOTICES_SQL = text(f"""
     WITH members AS (
         SELECT g.publication_id, gs.source_publication_id,
-               count(*) OVER (PARTITION BY gs.group_id) AS group_size,
-               bool_or(gs.method IN ('name', 'identifier', 'order'))
-                   OVER (PARTITION BY gs.group_id) AS rule_linked
+               count(*) OVER (PARTITION BY gs.group_id) AS group_size
         FROM source_authorship_groups g
         JOIN grouped_source_authorships gs ON gs.group_id = g.id
         JOIN source_authorships sa ON sa.id = gs.source_authorship_id
@@ -25,8 +23,7 @@ _NOTICES_SQL = text(f"""
           AND (sa.roles IS NULL OR '{AuthorshipRole.AUTHOR.value}' = ANY(sa.roles))
     )
     SELECT m.publication_id, sp.source::text AS source, sp.source_id,
-           count(*) AS signatures, count(*) FILTER (WHERE m.rule_linked) AS rule_aligned_signatures,
-           count(*) FILTER (WHERE m.group_size = 1) AS lone_signatures
+           count(*) AS signatures, count(*) FILTER (WHERE m.group_size >= 2) AS matched_signatures
     FROM members m
     JOIN source_publications sp ON sp.id = m.source_publication_id
     GROUP BY m.publication_id, sp.source, sp.source_id
@@ -44,17 +41,16 @@ def suspect_merges_count(conn: Connection) -> int:
 
 
 def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMergesResponse:
-    """Publications de la file, la plus faible part de signatures d'auteur alignées par la règle d'abord, avec le décompte de chaque notice."""
+    """Publications de la file, la plus faible part de signatures d'auteur avec correspondant d'abord, avec le décompte de chaque notice."""
     total = suspect_merges_count(conn)
     rows = conn.execute(
         text(f"""
             SELECT pa.publication_id, p.title, p.pub_year, p.doc_type::text AS doc_type,
-                   pa.signatures, pa.rule_aligned_signatures, pa.lone_signatures,
-                   pa.model_signatures, pa.min_margin
+                   pa.signatures, pa.matched_signatures
             FROM publication_author_alignment pa
             JOIN publications p ON p.id = pa.publication_id
             WHERE {_SUSPECT}
-            ORDER BY pa.rule_aligned_signatures::float / pa.signatures, pa.signatures DESC, pa.publication_id
+            ORDER BY pa.matched_signatures::float / pa.signatures, pa.signatures DESC, pa.publication_id
             LIMIT :limit OFFSET :offset
         """),  # noqa: S608
         {"limit": per_page, "offset": (page - 1) * per_page},
@@ -66,8 +62,7 @@ def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMerg
                 source=n.source,
                 source_id=n.source_id,
                 signatures=n.signatures,
-                rule_aligned_signatures=n.rule_aligned_signatures,
-                lone_signatures=n.lone_signatures,
+                matched_signatures=n.matched_signatures,
             )
         )
     return SuspectMergesResponse(
@@ -81,10 +76,7 @@ def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMerg
                 pub_year=r.pub_year,
                 doc_type=r.doc_type,
                 signatures=r.signatures,
-                rule_aligned_signatures=r.rule_aligned_signatures,
-                lone_signatures=r.lone_signatures,
-                model_signatures=r.model_signatures,
-                min_margin=r.min_margin,
+                matched_signatures=r.matched_signatures,
                 notices=notices.get(r.publication_id, []),
             )
             for r in rows
