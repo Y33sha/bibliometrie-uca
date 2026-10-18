@@ -38,6 +38,8 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
 BATCH_SIZE = 1000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
 AUTHOR = "author"
+# Rôles alignés avec les auteurs : `speaker` désigne l'auteur qui présente une communication, à sa place dans la liste.
+_AUTHOR_ROLES = frozenset({AUTHOR, "speaker"})
 # Source dont la notice passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
 DEFERRED_SOURCE = "scanr"
 
@@ -49,9 +51,9 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
 
 
 def _role_class(roles: list[str] | None) -> str:
-    """Classe d'alignement d'une signature : les auteurs ensemble, les autres rôles chacun à part."""
+    """Classe d'alignement d'une signature : les auteurs et les orateurs ensemble, les autres rôles chacun à part."""
     roles = roles or [AUTHOR]
-    return AUTHOR if AUTHOR in roles else ",".join(sorted(roles))
+    return AUTHOR if _AUTHOR_ROLES.intersection(roles) else ",".join(sorted(roles))
 
 
 def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Signature]]]:
