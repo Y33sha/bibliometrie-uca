@@ -2,7 +2,7 @@
 
 Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/authorships/orphans/...`) — actions utilisateur, hors pipeline. À l'interface entre `persons`, `source_authorships` et `publications`, leur issue est la création ou la mise à jour de lignes dans `authorships`.
 
-Le helper privé `_refresh_authorship_from_sources` chaîne les cinq opérations atomiques du port qui recomposent une authorship pour une paire (publication, personne) depuis ses source_authorships.
+Les lignes consolidées se recomposent depuis les signatures par les requêtes de la phase `authorships`, restreintes à la personne et aux publications concernées.
 
 Les deux opérations vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
 """
@@ -21,7 +21,6 @@ from domain.errors import (
     NotFoundError,
     RejectedPairError,
 )
-from domain.sources.registry import SOURCE_PRIORITY
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +126,8 @@ def assign_orphan_authorship(
     if row["author_name_normalized"]:
         repo.add_name_form(person_id, row["author_name_normalized"], source=row["source"])
 
-    # Recomposer l'authorship canonique pour la paire (pub, person)
     if publication_id is not None:
-        _refresh_authorship_from_sources(person_id, publication_id, authorship_repo=authorship_repo)
+        authorship_repo.consolidate_authorships(person_id, [publication_id])
     # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
@@ -187,7 +185,7 @@ def batch_assign_orphan_authorships(
         )
     if assigned:
         authorship_repo.pin_authorships(assigned, person_id)
-        build_queries.create_authorships_from_sources(conn, person_id, assigned, SOURCE_PRIORITY)
+        authorship_repo.consolidate_authorships(person_id, publication_ids)
         for name_form in authorship_repo.get_distinct_name_forms_from_source_authorships(assigned):
             repo.add_name_form(person_id, name_form)
 
@@ -202,25 +200,3 @@ def batch_assign_orphan_authorships(
         {"source_authorship_ids": assigned, "skipped": skipped},
     )
     return len(assigned)
-
-
-def _refresh_authorship_from_sources(
-    person_id: int,
-    publication_id: int,
-    *,
-    authorship_repo: AuthorshipRepository,
-) -> None:
-    """Recompose une authorship pour la paire (publication, personne) depuis ses source_authorships actives.
-
-    Chaîne :
-    1. INSERT IF MISSING dans authorships
-    2. Recalcule author_position (par priorité de source) et is_corresponding (bool_or)
-    3. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par l'appelant)
-    """
-    authorship_repo.insert_authorship_if_missing(publication_id, person_id)
-    authorship_repo.recompute_authorship_author_position_and_corresponding(
-        publication_id,
-        person_id,
-        SOURCE_PRIORITY,
-    )
-    authorship_repo.recompute_authorship_perimeter(publication_id, person_id)

@@ -646,6 +646,45 @@ class TestBatchAssignOrphanAuthorships:
         ).all()
         assert all(r.person_id == person_id for r in rows)
 
+    def test_consolide_comme_la_phase_authorships(self, sa_sync_conn, repo, authorship_repo):
+        """Position de la source prioritaire, union des indices de périmètre et des rôles de toutes les signatures."""
+        insert_persons_perimeter(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
+        sa_hal = _jean_dupont_signature(
+            sa_sync_conn, _notice(sa_sync_conn, pub_id), author_position=3, roles=["author"]
+        )
+        sa_oa = _jean_dupont_signature(
+            sa_sync_conn,
+            _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1"),
+            source="openalex",
+            author_position=5,
+            in_perimeter=True,
+            roles=["editor"],
+        )
+
+        batch_assign_orphan_authorships(
+            person_id,
+            [sa_hal, sa_oa],
+            repo=repo,
+            authorship_repo=authorship_repo,
+            conn=sa_sync_conn,
+            build_queries=_BUILD_QUERIES,
+        )
+
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
+                "FROM authorships WHERE publication_id = :pub AND person_id = :pid"
+            ),
+            {"pub": pub_id, "pid": person_id},
+        ).one()
+        assert (row.author_position, row.evidence, row.roles) == (
+            3,
+            ["address"],
+            ["author", "editor"],
+        )
+
     def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Une signature déjà rattachée est écartée : ni confirmation, ni authorship, ni forme de nom pour la personne visée ; l'orpheline du lot est rattachée."""
         insert_persons_perimeter(sa_sync_conn)
@@ -1001,6 +1040,45 @@ class TestUpdateNameFormStatus:
 
 
 class TestAssignOrphanAuthorship:
+    def test_recompose_l_authorship_existante_depuis_toutes_ses_signatures(
+        self, sa_sync_conn, repo, authorship_repo
+    ):
+        """L'authorship déjà liée par une signature HAL reçoit les indices et les rôles de la signature rattachée."""
+        insert_persons_perimeter(sa_sync_conn)
+        person_id = _person(sa_sync_conn)
+        pub_id = insert_publication(sa_sync_conn)
+        _jean_dupont_signature(
+            sa_sync_conn,
+            _notice(sa_sync_conn, pub_id),
+            author_position=3,
+            person_id=person_id,
+            roles=["author"],
+        )
+        insert_authorship(sa_sync_conn, pub_id, person_id=person_id, author_position=3)
+        orphan = _jean_dupont_signature(
+            sa_sync_conn,
+            _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1"),
+            source="openalex",
+            author_position=5,
+            in_perimeter=True,
+            roles=["editor"],
+        )
+
+        assign_orphan_authorship(person_id, orphan, repo=repo, authorship_repo=authorship_repo)
+
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
+                "FROM authorships WHERE publication_id = :pub AND person_id = :pid"
+            ),
+            {"pub": pub_id, "pid": person_id},
+        ).one()
+        assert (row.author_position, row.evidence, row.roles) == (
+            3,
+            ["address"],
+            ["author", "editor"],
+        )
+
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Une signature déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
