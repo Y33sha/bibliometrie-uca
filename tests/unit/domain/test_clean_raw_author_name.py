@@ -59,6 +59,20 @@ class TestCleanRawAuthorName:
             ("Ho\\v s\\'ek", "Hošék"),
             ("Gon\\C Calo, Ricardo", "GonÇalo, Ricardo"),
             ("Ge\\ssner, Gregor", "Geßner, Gregor"),
+            # UTF-8 lu comme du Windows-1252 : réparé.
+            ("TÃ©lesphore Sime-Ngando", "Télesphore Sime-Ngando"),
+            ("NuÃ±ez LÃ³pez, Leslie", "Nuñez López, Leslie"),
+            ("DelanoÃ«, Julien", "Delanoë, Julien"),
+            ("Michel Peocâ€™h", "Michel Peoc’h"),
+            ("FranÃ§ois, Ã‰mile", "François, Émile"),
+            # Windows-1252 lu comme du GBK : réparé.
+            ("Fran鏾is Bouchon", "François Bouchon"),
+            ("M閘anie Brard", "Mélanie Brard"),
+            # Lettres accentuées légitimes et nom en idéogrammes : inchangés.
+            ("São João, Ângela", "São João, Ângela"),
+            ("Ãlvaro Ñúñez", "Ãlvaro Ñúñez"),
+            ("Wang王", "Wang王"),
+            ("王小明", "王小明"),
         ],
     )
     def test_clean(self, raw: str, expected: str) -> None:

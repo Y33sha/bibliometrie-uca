@@ -175,6 +175,56 @@ def decode_latex_accents(text: str) -> str:
     return unicodedata.normalize("NFC", text.replace("{", "").replace("}", ""))
 
 
+def _cp1252_char(byte: int) -> str:
+    """Caractère que Windows-1252 lit pour `byte`. Les cinq octets que Windows-1252 laisse indéfinis se lisent comme le caractère de contrôle de même code."""
+    try:
+        return bytes([byte]).decode("cp1252")
+    except UnicodeDecodeError:
+        return chr(byte)
+
+
+# Octets 0x80 à 0xFF, indexés par leur lecture Windows-1252.
+_CP1252_BYTES = {_cp1252_char(b): b for b in range(0x80, 0x100)}
+_CONTINUATION = "".join(_cp1252_char(b) for b in range(0x80, 0xC0))
+# Caractère UTF-8 lu comme du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce.
+_UTF8_AS_CP1252 = f"[Â-ß][{_CONTINUATION}]|[à-ï][{_CONTINUATION}]{{2}}|[ð-ô][{_CONTINUATION}]{{3}}"
+# Texte Windows-1252 lu comme du GBK : une lettre accentuée et la lettre ASCII qui la suit forment un idéogramme, collé à une lettre latine.
+_CP1252_AS_GBK = "(?<=[A-Za-z])[一-鿿]+"
+# Expression des deux défauts d'encodage que `repair_encoding` répare, valable aussi pour PostgreSQL.
+ENCODING_ERROR_PATTERN = f"{_UTF8_AS_CP1252}|{_CP1252_AS_GBK}"
+_UTF8_AS_CP1252_RE = re.compile(_UTF8_AS_CP1252)
+_CP1252_AS_GBK_RE = re.compile(_CP1252_AS_GBK)
+
+
+def _from_utf8(m: re.Match[str]) -> str:
+    try:
+        return bytes(_CP1252_BYTES[c] for c in m.group()).decode("utf-8")
+    except UnicodeDecodeError:
+        return m.group()
+
+
+def _from_gbk(m: re.Match[str]) -> str:
+    try:
+        pairs = [c.encode("gbk") for c in m.group()]
+    except UnicodeEncodeError:
+        return m.group()
+    if not all(
+        len(p) == 2 and p[0] >= 0x80 and chr(p[1]).isascii() and chr(p[1]).isalpha() for p in pairs
+    ):
+        return m.group()
+    try:
+        return b"".join(pairs).decode("cp1252")
+    except UnicodeDecodeError:
+        return m.group()
+
+
+def repair_encoding(text: str) -> str:
+    """Texte dont l'encodage erroné est réparé : UTF-8 lu comme du Windows-1252 (« TÃ©lesphore » → Télesphore), Windows-1252 lu comme du GBK (« Fran鏾is » → François)."""
+    if text.isascii():
+        return text
+    return _CP1252_AS_GBK_RE.sub(_from_gbk, _UTF8_AS_CP1252_RE.sub(_from_utf8, text))
+
+
 def sanitize_raw_text(text: str) -> str:
     """Assainit un texte brut de son bruit invisible, sans le dénaturer.
 
@@ -275,7 +325,7 @@ _TRAILING_SEPARATORS = ",;:-–—/"
 
 
 def clean_raw_author_name(raw: str) -> str:
-    """Nom d'auteur brut sans balisage, sans accents LaTeX, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
+    """Nom d'auteur brut sans balisage, à l'encodage réparé, sans accents LaTeX, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
 
     Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé d'identité, et les formes de nom dérivées.
 
@@ -283,7 +333,7 @@ def clean_raw_author_name(raw: str) -> str:
     """
     if not raw:
         return raw
-    text = decode_latex_accents(to_plain_text(raw))
+    text = decode_latex_accents(repair_encoding(to_plain_text(raw)))
     cleaned = " ".join(_EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text)).split())
     # Parenthèse que le retrait des chiffres a détachée de son contenu : « (EA 999) » → « (EA) ».
     cleaned = cleaned.replace(" )", ")").replace(" ]", "]")
