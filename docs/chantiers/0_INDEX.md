@@ -20,7 +20,6 @@
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
-- [Reconstruction après un changement de règle](CODE_reconstruction-apres-changement-de-regle.md)
 - [Résolution des personnes](DATA_resolution-personnes.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
@@ -29,6 +28,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-19 — [Reconstruction après un changement de règle](archived/2026-10-19_CODE_reconstruction-apres-changement-de-regle.md)
 - 2026-10-17 — [Signatures collectives](archived/2026-10-17_DATA_signatures-collectives.md)
 - 2026-10-16 — [Pays des signatures : candidats et résolution](archived/2026-10-16_DATA_pays-des-signatures.md)
 - 2026-10-16 — [Normalisation des textes : écritures non latines et unicité des adresses](archived/2026-10-16_DATA_normalisation-des-textes.md)

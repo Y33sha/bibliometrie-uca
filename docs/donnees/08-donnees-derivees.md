@@ -36,6 +36,15 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 
 ## Incrémental ou recalcul complet
 
-Les phases coûteuses ne retraitent que ce qui a changé depuis la dernière exécution, repéré par des **flags `dirty`** posés à l'écriture amont : `keys_dirty` sur `source_publications` (clés de résolution modifiées → regroupement des publications à refaire), `candidates_dirty` sur `addresses` (pays à détecter et à résoudre), `countries_dirty` sur `addresses` et `source_authorships` (pays à recalculer). Le traitement traite les lignes marquées puis efface le flag.
+Les phases coûteuses retraitent seulement ce qui a changé depuis la dernière exécution. Une **marque de recalcul** désigne les lignes à reprendre :
 
-Le mode incrémental fait l'hypothèse que l'état antérieur est correct. Une évolution des règles en amont peut donc laisser un **drift** : des dérivés figés sur l'ancienne logique, jamais re-marqués. Plusieurs traitements offrent pour cela une option qui marque tout le stock à recalculer, par exemple `run_pipeline --only publications --rebuild-publications`. À lancer après un changement de règles, pour matérialiser ce que le mode incrémental ne verrait pas.
+- `keys_dirty` sur `source_publications` : regroupement des publications à refaire (phase `publications`) ;
+- `authorships_dirty` sur `publications` : groupes d'auteurs à recalculer (phase `author_grouping`) ;
+- `authors_hash` vide sur `source_publications` : signatures à resynchroniser à la prochaine normalisation de la notice (phase `normalize`) ;
+- `subjects_ingested_at` vide sur `publications` : sujets à ingérer (phase `subjects`) ;
+- `candidates_dirty` sur `addresses` : pays à détecter et à résoudre ;
+- `countries_dirty` sur `addresses` et `source_authorships` : pays à recalculer.
+
+L'écriture amont pose la marque. Le traitement reprend les lignes marquées, puis efface la marque.
+
+Le mode incrémental suppose que l'état antérieur est correct. Une règle modifiée laisse donc des dérivés calculés selon l'ancienne règle, jamais marqués. Les [options de reconstruction](../exploitation/03-pipeline.md#reconstructions) posent la marque sur tout le stock. Le traitement ordinaire applique ensuite la règle modifiée.

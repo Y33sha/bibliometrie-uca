@@ -27,11 +27,7 @@ L'opérateur doit savoir qu'une règle a changé, et quelle option la propage. S
 - [x] `--normalize-full` marque toutes les notices à resynchroniser. 7ae2eab4e
 - [x] Retrait de `--rebuild-authorships` et de `purge_authorships`. 7ae2eab4e
 
-### Phase 2 — Propagation en production
+### Phase 2 — Documentation
 
-- [ ] Inventaire des règles dont le changement demande une reconstruction : clés de réconciliation, normalisation des auteurs, ingestion des sujets.
-- [ ] Marque posée par chaque reconstruction, documentée pour l'écriture des migrations de données.
-
-### Phase 3 — Documentation
-
-- [ ] Mise à jour de `docs/pipeline` et de `docs/exploitation`.
+- [x] Mise à jour de `docs/pipeline` et de `docs/exploitation`. 7ae2eab4e
+- [x] Marques de recalcul listées dans `docs/donnees`.
