@@ -175,18 +175,18 @@ def decode_latex_accents(text: str) -> str:
     return unicodedata.normalize("NFC", text.replace("{", "").replace("}", ""))
 
 
-def _cp1252_char(byte: int) -> str:
-    """Caractère que Windows-1252 lit pour `byte`. Les cinq octets que Windows-1252 laisse indéfinis se lisent comme le caractère de contrôle de même code."""
+def _byte_readings(byte: int) -> str:
+    """Caractères que Latin-1 et Windows-1252 lisent pour `byte`. Ils diffèrent seulement de 0x80 à 0x9F, où Latin-1 lit un caractère de contrôle."""
     try:
-        return bytes([byte]).decode("cp1252")
+        return chr(byte) + bytes([byte]).decode("cp1252")
     except UnicodeDecodeError:
         return chr(byte)
 
 
-# Octets 0x80 à 0xFF, indexés par leur lecture Windows-1252.
-_CP1252_BYTES = {_cp1252_char(b): b for b in range(0x80, 0x100)}
-_CONTINUATION = "".join(_cp1252_char(b) for b in range(0x80, 0xC0))
-# Caractère UTF-8 lu comme du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce.
+# Octets 0x80 à 0xFF, indexés par leurs lectures Latin-1 et Windows-1252.
+_BYTES = {c: b for b in range(0x80, 0x100) for c in _byte_readings(b)}
+_CONTINUATION = "".join(_byte_readings(b) for b in range(0x80, 0xC0))
+# Caractère UTF-8 lu comme du Latin-1 ou du Windows-1252 : un octet de tête, puis autant d'octets de continuation qu'il en annonce.
 _UTF8_AS_CP1252 = f"[Â-ß][{_CONTINUATION}]|[à-ï][{_CONTINUATION}]{{2}}|[ð-ô][{_CONTINUATION}]{{3}}"
 # Texte Windows-1252 lu comme du GBK : une lettre accentuée et la lettre ASCII qui la suit forment un idéogramme, collé à une lettre latine.
 _CP1252_AS_GBK = "(?<=[A-Za-z])[一-鿿]+"
@@ -198,7 +198,7 @@ _CP1252_AS_GBK_RE = re.compile(_CP1252_AS_GBK)
 
 def _from_utf8(m: re.Match[str]) -> str:
     try:
-        return bytes(_CP1252_BYTES[c] for c in m.group()).decode("utf-8")
+        return bytes(_BYTES[c] for c in m.group()).decode("utf-8")
     except UnicodeDecodeError:
         return m.group()
 
@@ -219,7 +219,7 @@ def _from_gbk(m: re.Match[str]) -> str:
 
 
 def repair_encoding(text: str) -> str:
-    """Texte dont l'encodage erroné est réparé : UTF-8 lu comme du Windows-1252 (« TÃ©lesphore » → Télesphore), Windows-1252 lu comme du GBK (« Fran鏾is » → François)."""
+    """Texte dont l'encodage erroné est réparé : UTF-8 lu comme du Latin-1 ou du Windows-1252 (« TÃ©lesphore » → Télesphore), Windows-1252 lu comme du GBK (« Fran鏾is » → François)."""
     if text.isascii():
         return text
     return _CP1252_AS_GBK_RE.sub(_from_gbk, _UTF8_AS_CP1252_RE.sub(_from_utf8, text))

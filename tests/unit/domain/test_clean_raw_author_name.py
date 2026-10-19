@@ -65,6 +65,10 @@ class TestCleanRawAuthorName:
             ("DelanoÃ«, Julien", "Delanoë, Julien"),
             ("Michel Peocâ€™h", "Michel Peoc’h"),
             ("FranÃ§ois, Ã‰mile", "François, Émile"),
+            # UTF-8 lu comme du Latin-1 : réparé.
+            ("GroÃ\x9f, Silke", "Groß, Silke"),
+            ("MandiÄ\x87, Igor", "Mandić, Igor"),
+            ("Posyniak, MichaÅ\x82", "Posyniak, Michał"),
             # Windows-1252 lu comme du GBK : réparé.
             ("Fran鏾is Bouchon", "François Bouchon"),
             ("M閘anie Brard", "Mélanie Brard"),
