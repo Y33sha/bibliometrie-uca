@@ -98,6 +98,28 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     assert _carte(sa_sync_conn, signature_id) is None
 
 
+def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
+    """Les groupes d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
+    signature_id, identity_id = _signature(sa_sync_conn, None, source_id="c-regroupe")
+    publication_id = sa_sync_conn.execute(
+        text(
+            "SELECT sp.publication_id FROM source_authorships sa "
+            "JOIN source_publications sp ON sp.id = sa.source_publication_id WHERE sa.id = :id"
+        ),
+        {"id": signature_id},
+    ).scalar_one()
+    sa_sync_conn.execute(
+        text("UPDATE publications SET authorships_dirty = false WHERE id = :id"),
+        {"id": publication_id},
+    )
+
+    PersonsMatchingQueries().write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
+
+    assert sa_sync_conn.execute(
+        text("SELECT authorships_dirty FROM publications WHERE id = :id"), {"id": publication_id}
+    ).scalar_one()
+
+
 def test_shared_prime_sur_misplaced(sa_sync_conn):
     signature_id, identity_id = _signature(
         sa_sync_conn, {"orcid": "shared"}, source_id="c-shared-prime"

@@ -406,7 +406,7 @@ class PersonsMatchingQueries:
     def write_misplaced_neutralizations(
         self, conn: Connection, misplaced: Mapping[int, Sequence[str]]
     ) -> MisplacedNeutralizations:
-        """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites."""
+        """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `authorships_dirty`."""
         payload = [
             {"identity_id": identity_id, "carte": dict.fromkeys(id_types, _MISPLACED)}
             for identity_id, id_types in misplaced.items()
@@ -443,7 +443,13 @@ class PersonsMatchingQueries:
                     SET neutralized_identifiers = c.apres
                     FROM cibles c
                     WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
-                    RETURNING sa.id, sa.resolution_mode, c.avant, c.apres
+                    RETURNING sa.id, sa.source_publication_id, sa.resolution_mode, c.avant, c.apres
+                ),
+                regroupees AS (
+                    UPDATE publications p SET authorships_dirty = true
+                    FROM source_publications sp
+                    WHERE sp.id IN (SELECT source_publication_id FROM modifiees)
+                      AND p.id = sp.publication_id AND NOT p.authorships_dirty
                 )
                 SELECT id,
                        coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
