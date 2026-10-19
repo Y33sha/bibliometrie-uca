@@ -14,6 +14,7 @@ Deux niveaux :
 
 import os
 import signal
+import sys
 import threading
 from collections.abc import Iterator
 from types import SimpleNamespace
@@ -147,11 +148,19 @@ class TestDmlFlag:
         assert has_uncommitted_dml(probe_conn)
 
 
+def _ctrl_c() -> None:
+    """Simule un Ctrl+C. Sous Windows, `os.kill` termine le processus : le signal est levé dans le processus, comme le fait la console."""
+    if sys.platform == "win32":
+        signal.raise_signal(signal.SIGINT)
+    else:
+        os.kill(os.getpid(), signal.SIGINT)
+
+
 def test_une_interruption_pendant_une_requete_remonte_telle_quelle():
     """Un Ctrl+C pendant une requête invalide la connexion ; sa fermeture rollbacke, et le listener laisse remonter le `KeyboardInterrupt`."""
     engine = create_engine(_test_url())
     install_dml_guard(engine)
-    timer = threading.Timer(0.5, os.kill, (os.getpid(), signal.SIGINT))
+    timer = threading.Timer(0.5, _ctrl_c)
     try:
         with pytest.raises(KeyboardInterrupt), engine.connect() as conn:
             timer.start()
