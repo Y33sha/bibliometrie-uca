@@ -57,6 +57,8 @@ class TestCleanRawAuthorName:
             ("{\\'E}mile Besan\\c{c}on", "Émile Besançon"),
             ("Mar\\'{\\i}a J{\\o}rgensen", "María Jørgensen"),
             ("Ho\\v s\\'ek", "Hošék"),
+            ("Gon\\C Calo, Ricardo", "GonÇalo, Ricardo"),
+            ("Ge\\ssner, Gregor", "Geßner, Gregor"),
         ],
     )
     def test_clean(self, raw: str, expected: str) -> None:

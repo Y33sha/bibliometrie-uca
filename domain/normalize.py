@@ -133,22 +133,24 @@ _GREEK_COMMANDS: dict[str, str] = {
 }
 
 # Accent LaTeX sur une lettre : `\'e`, `\'{e}`, `\c{c}`, `\v c`. Groupe 1 : la commande d'accent ; groupe 2 ou 3 : la lettre. Les commandes faites d'une lettre (`\c`, `\v`) sont suivies d'une accolade ou d'une espace.
+# Une source qui met un nom en majuscules met aussi la commande (`Gon\C Calo`).
 _LATEX_ACCENT_RE = re.compile(
-    r"\\([`'^\"~=.]|[cvuHkr](?=[\s{]))(?:\{\s*([A-Za-zı])\s*\}|\s*([A-Za-zı]))"
+    r"\\([`'^\"~=.]|[cvuHkrCVUKR](?=[\s{]))(?:\{\s*([A-Za-zı])\s*\}|\s*([A-Za-zı]))"
 )
 _LATEX_COMMAND_RE = re.compile(r"\\([A-Za-z]+)")
 # Diacritique combinant de chaque commande d'accent.
 _LATEX_ACCENTS = {
     "'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303", "=": "\u0304",
     ".": "\u0307", "u": "\u0306", "v": "\u030c", "H": "\u030b", "c": "\u0327", "k": "\u0328",
-    "r": "\u030a",
+    "r": "\u030a", "U": "\u0306", "V": "\u030c", "C": "\u0327", "K": "\u0328", "R": "\u030a",
 }  # fmt: skip
 # Lettres LaTeX sans équivalent ASCII : `\o` → ø, `\ss` → ß. `\i` est le i sans point, qui reçoit un accent (`\'{\i}`).
 _LATEX_LETTERS = {
-    "aa": "å", "AA": "Å", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "ss": "ß",
-    "o": "ø", "O": "Ø", "l": "ł", "L": "Ł", "i": "ı",
+    "aa": "å", "AA": "Å", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "ss": "ß", "Ss": "ß",
+    "SS": "ß", "o": "ø", "O": "Ø", "l": "ł", "L": "Ł", "i": "ı",
 }  # fmt: skip
-_LATEX_LETTER_RE = re.compile(r"\\(aa|AA|ae|AE|oe|OE|ss|[oOlLi])(?![A-Za-z])")
+# `\ss` se reconnaît même collé au reste du mot (`Ge\ssner`) : aucune autre commande ne commence par ss.
+_LATEX_LETTER_RE = re.compile(r"\\(ss|Ss|SS|(?:aa|AA|ae|AE|oe|OE|[oOlLi])(?![A-Za-z]))")
 
 
 def strip_latex(text: str) -> str:
