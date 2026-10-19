@@ -45,19 +45,22 @@ class OpenalexExtractConfig:
 def build_params(
     institution_ids: list[str],
     *,
-    year: int | None = None,
+    years: list[int],
     cursor: str = "*",
     since: str | None = None,
 ) -> QueryParams:
     """Paramètres d'une requête `/works`.
 
-    Si `since` est fourni (format `YYYY-MM-DD`), filtre sur `from_updated_date`. Sinon filtre sur `publication_year`. Le `lineage:` agrège les institutions par `|` (OR).
+    `years` borne `publication_year` (une année, ou la plage de la plus petite à la plus grande). `since` (`YYYY-MM-DD`) ajoute `from_updated_date`. Le `lineage:` agrège les institutions par `|` (OR).
     """
     lineage_filter = "|".join(institution_ids or [])
+    first, last = min(years), max(years)
+    year_filter = (
+        f"publication_year:{first}" if first == last else f"publication_year:{first}-{last}"
+    )
+    filter_str = f"authorships.institutions.lineage:{lineage_filter},{year_filter}"
     if since:
-        filter_str = f"authorships.institutions.lineage:{lineage_filter},from_updated_date:{since}"
-    else:
-        filter_str = f"authorships.institutions.lineage:{lineage_filter},publication_year:{year}"
+        filter_str += f",from_updated_date:{since}"
     return filter_params(filter_str, cursor=cursor)
 
 
@@ -86,28 +89,28 @@ class OpenalexClient:
             )
 
     def count(
-        self, institution_ids: list[str], *, year: int | None = None, since: str | None = None
+        self, institution_ids: list[str], *, years: list[int], since: str | None = None
     ) -> int:
-        """Nombre de works d'une année ou d'une période, lu sur une page d'un seul work réduit à son identifiant."""
+        """Nombre de works des années `years`, modifiés depuis `since` s'il est donné, lu sur une page d'un seul work réduit à son identifiant."""
         params = {
-            **build_params(institution_ids, year=year, since=since),
+            **build_params(institution_ids, years=years, since=since),
             "per_page": 1,
             "select": "id",
         }
-        data = self._get(params, f"OpenAlex comptage {since or year}")
+        data = self._get(params, f"OpenAlex comptage {since or years[0]}")
         return as_int(at_path(data, "meta").get("count")) or 0
 
     def fetch_page(
         self,
         institution_ids: list[str],
         *,
-        year: int | None = None,
+        years: list[int],
         cursor: str = "*",
         since: str | None = None,
     ) -> Mapping[str, JsonValue]:
         """Une page de works ; `cursor` vaut `"*"` au premier appel, puis le `next_cursor` de la page précédente."""
-        params = build_params(institution_ids, year=year, cursor=cursor, since=since)
-        return self._get(params, f"OpenAlex {since or year}")
+        params = build_params(institution_ids, years=years, cursor=cursor, since=since)
+        return self._get(params, f"OpenAlex {since or years[0]}")
 
     def fetch_filtered_page(
         self, filter_str: str, cursor: str, label: str
@@ -139,17 +142,17 @@ def extract_period(
     logger: ExtractLogger,
     avancement: Progression,
     *,
-    year: int | None = None,
+    years: list[int],
     since: str | None = None,
 ) -> PhaseMetrics:
-    """Moissonne les works d'une année, ou modifiés depuis une date, page après page."""
+    """Moissonne les works des années `years`, modifiés depuis `since` s'il est donné, page après page."""
     metrics = PhaseMetrics()
     cursor = "*"
     total_count: int | None = None
     fetched = 0
 
     while True:
-        data = client.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
+        data = client.fetch_page(institution_ids, years=years, cursor=cursor, since=since)
         if total_count is None:
             total_count = as_int(at_path(data, "meta").get("count")) or 0
 
@@ -191,32 +194,33 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexClient]):
             self.logger.info("Mode incrémental : documents modifiés depuis %s", args.since)
 
     def extract_all(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> PhaseMetrics:
+        """Moissonne les works du périmètre. En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année."""
         ids = config.institution_ids
         client = self._client
+        years = self._years(args)
 
         def extrait(
-            avancement: Progression, *, year: int | None = None, since: str | None = None
+            avancement: Progression, *, years: list[int], since: str | None = None
         ) -> PhaseMetrics:
-            portee = f"depuis {since}" if since else str(year)
+            portee = f"depuis {since}" if since else str(years[0])
             return extract_period(
                 client,
                 self.conn,
                 ids,
                 scoped_logger(self.logger, self.SOURCE, portee),
                 avancement,
-                year=year,
+                years=years,
                 since=since,
             )
 
         if args.since:
             return self._extrait_d_un_tenant(
-                client.count(ids, since=args.since),
-                lambda avancement: extrait(avancement, since=args.since),
+                client.count(ids, years=years, since=args.since),
+                lambda avancement: extrait(avancement, years=years, since=args.since),
             )
 
-        years = self._years(args)
         return self._extrait_par_annee(
             years,
-            lambda annee: client.count(ids, year=annee),
-            lambda annee, avancement: extrait(avancement, year=annee),
+            lambda annee: client.count(ids, years=[annee]),
+            lambda annee, avancement: extrait(avancement, years=[annee]),
         )

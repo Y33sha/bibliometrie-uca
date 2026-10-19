@@ -33,36 +33,41 @@ def _sans_auth(monkeypatch):
 
 class TestBuildParams:
     def test_year_filter(self):
-        params = build_params(["I1"], year=2024)
+        params = build_params(["I1"], years=[2024])
         assert params["filter"] == "authorships.institutions.lineage:I1,publication_year:2024"
 
-    def test_since_overrides_year(self):
-        params = build_params(["I1"], year=2024, since="2026-05-01")
+    def test_years_range_uses_min_and_max(self):
+        params = build_params(["I1"], years=[2023, 2026, 2024])
+        assert params["filter"] == "authorships.institutions.lineage:I1,publication_year:2023-2026"
+
+    def test_combines_years_and_since(self):
+        params = build_params(["I1"], years=[2024, 2026], since="2026-05-01")
         assert params["filter"] == (
-            "authorships.institutions.lineage:I1,from_updated_date:2026-05-01"
+            "authorships.institutions.lineage:I1,publication_year:2024-2026,"
+            "from_updated_date:2026-05-01"
         )
 
     def test_lineage_joins_multiple_institutions(self):
-        params = build_params(["I1", "I2", "I3"], year=2024)
+        params = build_params(["I1", "I2", "I3"], years=[2024])
         assert params["filter"] == (
             "authorships.institutions.lineage:I1|I2|I3,publication_year:2024"
         )
 
     def test_select_and_cursor(self):
-        params = build_params(["I1"], year=2024)
+        params = build_params(["I1"], years=[2024])
         assert params["select"]
         assert params["cursor"] == "*"
-        assert build_params(["I1"], year=2024, cursor="abc123")["cursor"] == "abc123"
+        assert build_params(["I1"], years=[2024], cursor="abc123")["cursor"] == "abc123"
 
     def test_auth_api_key_included(self, monkeypatch):
         _auth(monkeypatch, api_key="testkey", email="test@example.com")
-        params = build_params(["I1"], year=2024)
+        params = build_params(["I1"], years=[2024])
         assert params.get("api_key") == "testkey"
         assert "mailto" not in params
 
     def test_auth_email_fallback(self, monkeypatch):
         _auth(monkeypatch, email="test@example.com")
-        params = build_params(["I1"], year=2024)
+        params = build_params(["I1"], years=[2024])
         assert params.get("mailto") == "test@example.com"
         assert "api_key" not in params
 
@@ -95,15 +100,17 @@ def _client(pages: list[dict]) -> MagicMock:
     return client
 
 
-def _extraire(client: MagicMock, **kwargs):
-    return extract_period(client, MagicMock(), ["I1"], _LOGGER, _avancement(), **kwargs)
+def _extraire(client: MagicMock, years: list[int] | None = None):
+    return extract_period(
+        client, MagicMock(), ["I1"], _LOGGER, _avancement(), years=years or [2024]
+    )
 
 
 def test_pagination_jusqu_a_l_epuisement_du_curseur(ecritures):
     client = _client(
         [_page([_work("W1"), _work("W2")], next_cursor="c2", count=3), _page([_work("W3")])]
     )
-    assert _extraire(client, year=2024).new == 3
+    assert _extraire(client).new == 3
     assert [appel.kwargs["cursor"] for appel in client.fetch_page.call_args_list] == ["*", "c2"]
     assert [e.source_id for e in ecritures] == ["W1", "W2", "W3"]
 
@@ -141,14 +148,14 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
     client = _client([_page([_work("W1")]), _page([_work("W2")])])
     metrics = extracteur(OpenalexExtractor, client).run(arguments_du_run())
     assert metrics.new == 2
-    assert [appel.kwargs["year"] for appel in client.count.call_args_list] == [2023, 2024]
+    assert [appel.kwargs["years"] for appel in client.count.call_args_list] == [[2023], [2024]]
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021])
     client = _client([_page([_work("W1")])])
     extracteur(OpenalexExtractor, client).run(arguments_du_run(year=2024))
-    assert client.fetch_page.call_args.kwargs["year"] == 2024
+    assert client.fetch_page.call_args.kwargs["years"] == [2024]
 
 
 def test_run_incremental_fait_une_seule_passe_sur_la_date(configuration, ecritures):
@@ -158,6 +165,14 @@ def test_run_incremental_fait_une_seule_passe_sur_la_date(configuration, ecritur
     assert client.fetch_page.call_count == 1
     assert client.fetch_page.call_args.kwargs["since"] == "2026-01-01"
     assert client.count.call_args.kwargs["since"] == "2026-01-01"
+
+
+def test_run_incremental_garde_les_annees_du_mode_complet(configuration, ecritures):
+    configuration(harvest, annees=[2020, 2021, 2022])
+    client = _client([_page([_work("W1")])])
+    extracteur(OpenalexExtractor, client).run(arguments_du_run(since="2026-01-01"))
+    assert client.fetch_page.call_args.kwargs["years"] == [2020, 2021, 2022]
+    assert client.count.call_args.kwargs["years"] == [2020, 2021, 2022]
 
 
 def test_run_sans_institution_refuse(configuration):
