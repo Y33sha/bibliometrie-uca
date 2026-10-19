@@ -1,6 +1,6 @@
 """Orchestrateur unique de la phase personnes.
 
-Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve` et tournent sur **une seule** transaction : `reset` peut détacher des signatures (conflits d'identifiant), la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Ces mutations dérivées doivent committer ensemble — un crash en cours de nœud laisserait sinon des signatures détachées jusqu'au run suivant. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
+Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des signatures, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de nœud annule l'ensemble. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'une notice (`duplicate_of`), non épinglés, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
@@ -142,7 +142,7 @@ class PersonsPhase:
 def build() -> Phase:
     """Rattachement des signatures aux personnes, et création des personnes inconnues.
 
-    Une transaction enchaîne la réapplication des épinglages posés par l'administration, la réinitialisation des attributions dérivées, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
+    Une transaction enchaîne la réapplication des épinglages posés par l'administration, l'arbitrage des identifiants, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
     """
     from pipeline.transformation.persons.matching import PersonsMatchingQueries
     from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
