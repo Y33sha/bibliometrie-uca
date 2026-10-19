@@ -11,7 +11,7 @@ from collections import defaultdict
 from sqlalchemy import Connection
 
 from domain.persons.identifiers import IdentifierOrigin
-from domain.persons.matching import ORCID_MATCH_SOURCES, form_matches_person
+from domain.persons.matching import STRONG_PERSON_IDENTIFIER_TYPES, form_matches_person
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -23,9 +23,6 @@ from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.person_writes import IdentifierConflict, PersonWrites
 from pipeline.transformation.persons.requalify_identifiers import IdentifierConsensus
 
-# Types d'identifiant forts soumis à l'arbitrage de conflit.
-_CONFLICT_ID_TYPES = ("orcid", "idref", "hal_person_id")
-
 
 def detect_identifier_conflicts(
     conn: Connection, queries: PersonsMatchingQueries
@@ -35,14 +32,11 @@ def detect_identifier_conflicts(
     Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
     """
     conflicts: list[IdentifierConflict] = []
-    for id_type in _CONFLICT_ID_TYPES:
+    for id_type in STRONG_PERSON_IDENTIFIER_TYPES:
         owners = queries.fetch_identifier_owners(conn, id_type)
         if not owners:
             continue
-        sources = tuple(ORCID_MATCH_SOURCES) if id_type == "orcid" else None
-        for id_value, bearer_person_id in queries.fetch_identifier_bearer_persons(
-            conn, id_type, sources
-        ):
+        for id_value, bearer_person_id in queries.fetch_identifier_bearer_persons(conn, id_type):
             owner = owners.get(id_value)
             if owner is None or bearer_person_id == owner[0]:
                 continue

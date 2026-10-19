@@ -12,8 +12,7 @@ from domain.persons.identifiers import (
     PersonIdentifierType,
 )
 from domain.persons.matching import (
-    ORCID_MATCH_SOURCES,
-    STRONG_IDENTIFIER_TYPES,
+    STRONG_PERSON_IDENTIFIER_TYPES,
     IdentifiedPerson,
     Namesake,
     PersonNameForms,
@@ -29,6 +28,7 @@ from infrastructure.sql_fragments import (
     person_signature,
     publication_rejected_for,
     strong_identifier_signatures,
+    trusted_identifier_sql,
     usable_identifier,
 )
 
@@ -175,7 +175,7 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
 """
 
 _OOP_CANDIDATES_SQL = " UNION ".join(
-    [*(_oop_identifier_branch(t) for t in STRONG_IDENTIFIER_TYPES), _OOP_CROSS_SOURCE_BRANCH]
+    [*(_oop_identifier_branch(t) for t in STRONG_PERSON_IDENTIFIER_TYPES), _OOP_CROSS_SOURCE_BRANCH]
 )
 
 
@@ -185,7 +185,7 @@ class PersonsMatchingQueries:
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         """Colonnes de la projection des `source_authorships` in-perimeter, individuelles, non liées :
 
-        - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. `hal_person_id` et `idhal` ne sont portés que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
+        - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. Seules les signatures HAL contiennent `hal_person_id` et `idhal`. La cascade écarte les identifiants que leur source rend non fiables (`trusted_identifier`).
         - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
         """
         rows = conn.execute(
@@ -361,13 +361,7 @@ class PersonsMatchingQueries:
     def fetch_identifier_votes(self, conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
         """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
 
-        Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Pour l'ORCID, seules les sources à dépôt auteur comptent, comme au matching."""
-        source_filter = (
-            "AND sa.source = ANY(:orcid_sources)" if id_type == PersonIdentifierType.ORCID else ""
-        )
-        params: dict[str, object] = {"id_type": id_type}
-        if id_type == PersonIdentifierType.ORCID:
-            params["orcid_sources"] = list(ORCID_MATCH_SOURCES)
+        Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
         rows = conn.execute(
             text(f"""
                 SELECT aik.person_identifiers->>:id_type AS id_value,
@@ -379,10 +373,10 @@ class PersonsMatchingQueries:
                   AND aik.author_name_normalized IS NOT NULL
                   AND {person_signature("sa")}
                   AND NOT {_ID_TYPE_SHARED}
-                  {source_filter}
+                  AND {trusted_identifier_sql(id_type, "sa")}
                 GROUP BY 1, 2
             """),
-            params,
+            {"id_type": id_type},
         ).all()
         votes: dict[str, dict[str, int]] = {}
         for r in rows:
@@ -510,13 +504,9 @@ class PersonsMatchingQueries:
         return {r.id_value: (r.person_id, r.status) for r in rows}
 
     def fetch_identifier_bearer_persons(
-        self, conn: Connection, id_type: str, sources: tuple[str, ...] | None = None
+        self, conn: Connection, id_type: str
     ) -> list[tuple[str, int]]:
-        """Agrégat sur les signatures rattachées dont l'identité porte le type d'identifiant. `sources` restreint aux sources fiables (ORCID déposé par l'auteur, cf. `ORCID_MATCH_SOURCES`) ; absent, toutes sources."""
-        source_filter = "AND sa.source = ANY(:sources)" if sources else ""
-        params: dict[str, object] = {"id_type": id_type}
-        if sources:
-            params["sources"] = list(sources)
+        """Agrégat sur les signatures rattachées dont l'identité contient l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
         rows = conn.execute(
             text(f"""
                 SELECT aik.person_identifiers->>:id_type AS id_value, sa.person_id
@@ -525,10 +515,10 @@ class PersonsMatchingQueries:
                 WHERE aik.person_identifiers ? :id_type
                   AND NOT {_ID_TYPE_NEUTRALIZED}
                   AND sa.person_id IS NOT NULL
-                  {source_filter}
+                  AND {trusted_identifier_sql(id_type, "sa")}
                 GROUP BY 1, 2
             """),
-            params,
+            {"id_type": id_type},
         ).all()
         return [(r.id_value, r.person_id) for r in rows]
 

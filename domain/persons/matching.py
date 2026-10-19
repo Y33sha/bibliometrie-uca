@@ -48,12 +48,33 @@ ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
 
 `wos` et `scanr` sont exclus : leur ORCID est dérivé (matching algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas déposé par l'auteur. Il reste enregistré sur `person_identifiers` mais n'est pas utilisé comme signal de matching."""
 
-STRONG_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
+STRONG_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
     PersonIdentifierType.IDREF,
     PersonIdentifierType.HAL_PERSON_ID,
 )
 """Identifiants qui rattachent une signature à une personne sans forme de nom : hors périmètre, et pour l'entrée dans le périmètre d'une personne RH."""
+
+
+def trusted_identifier(id_type: str, source: str) -> bool:
+    """Vrai quand l'identifiant `id_type` d'une signature de `source` sert de signal de rattachement. Un ORCID compte seulement s'il vient de `ORCID_MATCH_SOURCES`."""
+    return id_type != PersonIdentifierType.ORCID or source in ORCID_MATCH_SOURCES
+
+
+class MatchReason(StrEnum):
+    """Motif d'une décision de la cascade de rattachement (`decide_person_match`, `decide_name_form_outcome`)."""
+
+    ORCID = "orcid"
+    HAL_PERSON_ID = "hal_person_id"
+    IDREF = "idref"
+    CROSS_SOURCE = "cross_source"
+    SINGLE_NAME = "single_name"
+    COMPATIBLE_NAME = "compatible_name"
+    NEW = "new"
+    AMBIGUOUS_NAME_FORM = "ambiguous_name_form"
+    ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
+    CREATION_NOT_ALLOWED = "creation_not_allowed"
+    OUT_OF_PERIMETER = "out_of_perimeter"
 
 
 class ResolutionMode(StrEnum):
@@ -64,13 +85,13 @@ class ResolutionMode(StrEnum):
     CROSS_SOURCE = "cross_source"
 
 
-RESOLUTION_MODE_BY_REASON: dict[str, ResolutionMode] = {
-    "orcid": ResolutionMode.IDENTIFIER,
-    "hal_person_id": ResolutionMode.IDENTIFIER,
-    "idref": ResolutionMode.IDENTIFIER,
-    "cross_source": ResolutionMode.CROSS_SOURCE,
-    "single_name": ResolutionMode.NAME,
-    "compatible_name": ResolutionMode.NAME,
+RESOLUTION_MODE_BY_REASON: dict[MatchReason, ResolutionMode] = {
+    MatchReason.ORCID: ResolutionMode.IDENTIFIER,
+    MatchReason.HAL_PERSON_ID: ResolutionMode.IDENTIFIER,
+    MatchReason.IDREF: ResolutionMode.IDENTIFIER,
+    MatchReason.CROSS_SOURCE: ResolutionMode.CROSS_SOURCE,
+    MatchReason.SINGLE_NAME: ResolutionMode.NAME,
+    MatchReason.COMPATIBLE_NAME: ResolutionMode.NAME,
 }
 
 
@@ -187,19 +208,21 @@ def decide_cross_source_match(
 
 
 # Motifs d'un `skip` par forme de nom connue : la signature ne peut ni se rattacher par son nom, ni créer de personne.
-UNDECIDABLE_NAME_FORM_REASONS = frozenset({"ambiguous_name_form", "all_candidates_rejected"})
+UNDECIDABLE_NAME_FORM_REASONS = frozenset(
+    {MatchReason.AMBIGUOUS_NAME_FORM, MatchReason.ALL_CANDIDATES_REJECTED}
+)
 
 
 @dataclass(frozen=True)
 class NameFormDecision:
     """Décision résultant du lookup d'une authorship dans `person_name_forms`.
 
-    Trois actions possibles : `match` (rattacher à une personne existante), `create` (créer une personne), `skip` (ne rien faire — soit ambiguïté de nom, soit création interdite par `allow_create`). Le `reason` dit pourquoi un `skip`, et distingue le `match` par initiales compatibles (`compatible_name`) du `match` par forme exacte.
+    Trois actions possibles : `match` (rattacher à une personne existante), `create` (créer une personne), `skip` (ne rien faire — soit ambiguïté de nom, soit création interdite par `allow_create`). Le `reason` dit pourquoi un `skip`, et distingue le `match` par initiales compatibles (`compatible_name`) du `match` par forme exacte, sans motif.
     """
 
     action: Literal["match", "create", "skip"]
     person_id: int | None = None
-    reason: str = ""
+    reason: MatchReason | None = None
 
 
 def decide_name_form_outcome(
@@ -223,20 +246,20 @@ def decide_name_form_outcome(
     - Forme inconnue, aucune personne compatible, `allow_create` → `create`.
     - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
     """
-    match_reason = ""
+    match_reason: MatchReason | None = None
     if person_ids is None:
         if not compatible_person_ids:
             if allow_create:
                 return NameFormDecision(action="create")
-            return NameFormDecision(action="skip", reason="creation_not_allowed")
+            return NameFormDecision(action="skip", reason=MatchReason.CREATION_NOT_ALLOWED)
         person_ids = list(compatible_person_ids)
-        match_reason = "compatible_name"
+        match_reason = MatchReason.COMPATIBLE_NAME
     candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
     if len(candidates) == 1:
         return NameFormDecision(action="match", person_id=candidates[0], reason=match_reason)
     if not candidates:
-        return NameFormDecision(action="skip", reason="all_candidates_rejected")
-    return NameFormDecision(action="skip", reason="ambiguous_name_form")
+        return NameFormDecision(action="skip", reason=MatchReason.ALL_CANDIDATES_REJECTED)
+    return NameFormDecision(action="skip", reason=MatchReason.AMBIGUOUS_NAME_FORM)
 
 
 @dataclass(frozen=True)
@@ -334,14 +357,11 @@ def identifier_misplaced(signature_form: str, consensus: str | None) -> bool:
 
 @dataclass(frozen=True)
 class PersonMatchDecision:
-    """Décision de la cascade de matching unifiée.
-
-    `reason` identifie le signal qui a tranché (`"orcid"` / `"hal_person_id"` / `"idref"` / `"cross_source"` / `"single_name"` / `"compatible_name"` pour les `match` ; `"new"` pour `create` ; `"ambiguous_name_form"` / `"all_candidates_rejected"` / `"creation_not_allowed"` pour `skip`). Utilisable côté logs et stats par le caller.
-    """
+    """Décision de la cascade de matching unifiée. `reason` identifie le signal qui a tranché."""
 
     action: Literal["match", "create", "skip"]
     person_id: int | None = None
-    reason: str = ""
+    reason: MatchReason | None = None
 
 
 def decide_person_match(
@@ -369,21 +389,19 @@ def decide_person_match(
     Pure, testable sans BDD : les paramètres sont précalculés par le caller via prefetch.
     """
     if orcid_match is not None and orcid_match not in rejected_person_ids:
-        return PersonMatchDecision(action="match", person_id=orcid_match, reason="orcid")
+        return PersonMatchDecision("match", orcid_match, MatchReason.ORCID)
     if hal_match is not None and hal_match not in rejected_person_ids:
-        return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
+        return PersonMatchDecision("match", hal_match, MatchReason.HAL_PERSON_ID)
     if idref_match is not None and idref_match not in rejected_person_ids:
-        return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
+        return PersonMatchDecision("match", idref_match, MatchReason.IDREF)
     if name_form_outcome.action == "match":
         return PersonMatchDecision(
-            action="match",
-            person_id=name_form_outcome.person_id,
-            reason=name_form_outcome.reason or "single_name",
+            "match",
+            name_form_outcome.person_id,
+            name_form_outcome.reason or MatchReason.SINGLE_NAME,
         )
     if cross_source_match is not None and cross_source_match not in rejected_person_ids:
-        return PersonMatchDecision(
-            action="match", person_id=cross_source_match, reason="cross_source"
-        )
+        return PersonMatchDecision("match", cross_source_match, MatchReason.CROSS_SOURCE)
     if name_form_outcome.action == "create":
-        return PersonMatchDecision(action="create", reason="new")
-    return PersonMatchDecision(action="skip", reason=name_form_outcome.reason)
+        return PersonMatchDecision("create", reason=MatchReason.NEW)
+    return PersonMatchDecision("skip", reason=name_form_outcome.reason)

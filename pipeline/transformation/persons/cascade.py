@@ -32,9 +32,9 @@ from sqlalchemy import Connection
 from domain.normalize import normalize_name
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import (
-    ORCID_MATCH_SOURCES,
     RESOLUTION_MODE_BY_REASON,
     UNDECIDABLE_NAME_FORM_REASONS,
+    MatchReason,
     NameFormDecision,
     Namesake,
     PersonMatchDecision,
@@ -43,6 +43,7 @@ from domain.persons.matching import (
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
+    trusted_identifier,
 )
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, initials_extend
@@ -140,7 +141,7 @@ class _Cascade:
         if a.in_perimeter:
             name_form_outcome = self._name_form_outcome(a, rejected_for_pub)
         else:
-            name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
+            name_form_outcome = NameFormDecision(action="skip", reason=MatchReason.OUT_OF_PERIMETER)
         return cross_source_match, name_form_outcome, rejected_for_pub
 
     def _rejected_for(self, a: EnrichedAuthorship) -> frozenset[int]:
@@ -182,10 +183,10 @@ class _Cascade:
         hal_decision = decide_match_by_identifier(
             hal_person_id, self._hal_account_map, a.name, a.name_forms, self._name_form_status
         )
-        # ORCID comme signal seulement depuis les sources à dépôt auteur (`ORCID_MATCH_SOURCES`) ; les autres restent enregistrés sur person_identifiers via add_identifiers.
+        # Un ORCID d'une source sans dépôt par l'auteur reste enregistré sur person_identifiers (add_identifiers), sans servir de signal.
         orcid_signal = (
             a.identifiers.get(PersonIdentifierType.ORCID)
-            if a.source in ORCID_MATCH_SOURCES
+            if trusted_identifier(PersonIdentifierType.ORCID, a.source)
             else None
         )
         orcid_decision = decide_match_by_identifier(
@@ -230,6 +231,7 @@ class _Cascade:
             self.apply_create(a)
             return True
         else:
+            assert decision.reason is not None  # garanti par decide_name_form_outcome action=skip
             self.skipped_counts[decision.reason] += 1
             self.orphans.append((a, decision.reason))
         return False
@@ -237,7 +239,7 @@ class _Cascade:
     def log_orphans(self, orphans_log: logging.Logger) -> None:
         """Écrit une ligne par signature restée sans personne : motif, personnes que désignent ses formes de nom, personnes aux initiales compatibles, personnes rejetées pour la publication. Les signatures dont la création est interdite (jurys de thèse) sont omises."""
         for a, reason in self.orphans:
-            if reason == "creation_not_allowed":
+            if reason == MatchReason.CREATION_NOT_ALLOWED:
                 continue
             forms = {f: self._name_form_map.get(f) for f in a.name_forms}
             orphans_log.info(
@@ -251,13 +253,17 @@ class _Cascade:
                 sorted(self._rejected_for(a)),
             )
 
-    def apply_match(self, a: EnrichedAuthorship, pid: int | None, reason: str) -> bool:
+    def apply_match(
+        self, a: EnrichedAuthorship, pid: int | None, reason: MatchReason | None
+    ) -> bool:
         """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
-        assert pid is not None  # garanti par decide_person_match action=match
+        assert (
+            pid is not None and reason is not None
+        )  # garantis par decide_person_match action=match
         if a.current_person_id is not None:
             # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
             self.resolved_cross_source_ids.add(a.source_authorship_id)
-            if reason == "cross_source" and pid == a.current_person_id:
+            if reason == MatchReason.CROSS_SOURCE and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
         self._writes.link_authorship(
             pid,
@@ -272,7 +278,7 @@ class _Cascade:
         if not a.in_perimeter:
             self.out_of_perimeter_matched += 1
         # Un membre ferme (identifiant, nom, création) ancre le cross-source de son groupe ; un résultat cross-source, jamais — il n'ancre pas un autre cross-source.
-        if a.group_id is not None and reason != "cross_source":
+        if a.group_id is not None and reason != MatchReason.CROSS_SOURCE:
             self._linked_index[a.group_id].append((pid, a.last_norm, a.first_norm, a.source))
         return True
 
