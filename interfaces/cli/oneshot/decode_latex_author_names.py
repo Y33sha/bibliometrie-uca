@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Mapping
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, TextClause, bindparam, text
 
 from domain.persons.signature_name import SignatureName
 from infrastructure.db.engine import get_sync_engine
@@ -28,12 +29,21 @@ from pipeline.ingestion.common.signatures import signature_name_fields
 
 log = setup_logger("decode_latex_author_names", os.path.dirname(__file__))
 
-_CANDIDATES_SQL = text(r"""
-    SELECT sa.id, sa.source_publication_id AS notice, sa.raw_author_name, sa.raw_last_name,
-           sa.raw_first_name, aik.person_identifiers
-    FROM source_authorships sa JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-    WHERE strpos(concat_ws(' ', sa.raw_author_name, sa.raw_last_name, sa.raw_first_name), chr(92)) > 0
-""")
+
+def candidates_sql(condition: str) -> TextClause:
+    """Signatures candidates : celles dont les noms réunis (`n.names`) vérifient `condition`."""
+    return text(f"""
+        SELECT sa.id, sa.source_publication_id AS notice, sa.raw_author_name, sa.raw_last_name,
+               sa.raw_first_name, aik.person_identifiers
+        FROM source_authorships sa JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+        CROSS JOIN LATERAL (
+            SELECT concat_ws(' ', sa.raw_author_name, sa.raw_last_name, sa.raw_first_name) AS names
+        ) n
+        WHERE {condition}
+    """)
+
+
+_LATEX_CANDIDATES_SQL = candidates_sql("strpos(n.names, chr(92)) > 0")
 
 _UPSERT_IDENTITIES_SQL = text(f"""
     INSERT INTO author_identifying_keys ({", ".join(IDENTITY_KEY_COLUMNS)})
@@ -68,11 +78,15 @@ _MARK_DIRTY_SQL = text("""
 """)
 
 
-def decoded_names(conn: Connection) -> tuple[list[dict[str, object]], list[int]]:
-    """Signatures dont le nom nettoyé diffère du nom stocké, avec leurs nouvelles colonnes de nom, et leurs notices."""
+def decoded_names(
+    conn: Connection,
+    candidates: TextClause = _LATEX_CANDIDATES_SQL,
+    params: Mapping[str, object] | None = None,
+) -> tuple[list[dict[str, object]], list[int]]:
+    """Signatures `candidates` dont le nom nettoyé diffère du nom stocké, avec leurs nouvelles colonnes de nom, et leurs notices."""
     rows: list[dict[str, object]] = []
     notices: set[int] = set()
-    for r in conn.execute(_CANDIDATES_SQL):
+    for r in conn.execute(candidates, params or {}):
         name = (
             SignatureName.from_parts(r.raw_last_name, r.raw_first_name)
             if r.raw_last_name is not None
