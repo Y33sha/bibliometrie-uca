@@ -1,6 +1,6 @@
 """Écritures de la phase `persons` sur une personne : création, nom, identifiants, rattachement d'une signature.
 
-L'API a ses propres écritures sur les mêmes tables. Les règles communes sont dans `domain.persons` : nom requis (`validated_name`), formes de nom (`compute_person_name_forms`), attribution d'un identifiant (`attribution_outcome`).
+Les requêtes sur les personnes, leurs formes de nom et leurs identifiants sont celles du repository des personnes, que l'API utilise aussi. Les règles communes sont dans `domain.persons` : nom requis (`validated_name`), formes de nom (`compute_person_name_forms`), attribution d'un identifiant (`attribution_outcome`).
 """
 
 import logging
@@ -17,7 +17,6 @@ from domain.persons.identifier_attribution import (
 )
 from domain.persons.identifiers import (
     PERSON_IDENTIFIER_TYPES,
-    AttributionStatus,
     IdentifierOrigin,
     normalized_identifier_value,
 )
@@ -25,32 +24,16 @@ from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import validated_name
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
-from infrastructure.db.scalars import row_int
 from infrastructure.repositories.person_repository import (
     create_person,
+    find_identifier,
+    insert_identifier,
     refresh_name_forms,
+    update_identifier,
     update_person_name,
 )
 
 logger = logging.getLogger(__name__)
-
-_FIND_IDENTIFIER = text("""
-    SELECT id, person_id, id_type, id_value, source, CAST(status AS text) AS status
-    FROM person_identifiers
-    WHERE id_type = :it AND id_value = :iv
-""")
-
-_INSERT_IDENTIFIER = text("""
-    INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-    VALUES (:pid, :it, :iv, :src, CAST(:st AS identifier_status))
-    RETURNING id
-""")
-
-_UPDATE_IDENTIFIER = text("""
-    UPDATE person_identifiers
-    SET person_id = :pid, status = CAST(:st AS identifier_status), source = :src
-    WHERE id = :id
-""")
 
 _LINK_AUTHORSHIP = text("""
     UPDATE source_authorships
@@ -92,45 +75,15 @@ class PersonWrites:
 
     def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
         """L'attribution de la paire `(id_type, id_value)`, ou `None`."""
-        row = self._conn.execute(_FIND_IDENTIFIER, {"it": id_type, "iv": id_value}).first()
-        if row is None:
-            return None
-        return IdentifierAttribution(
-            id=row.id,
-            person_id=row.person_id,
-            id_type=row.id_type,
-            id_value=row.id_value,
-            status=AttributionStatus(row.status),
-            source=IdentifierOrigin(row.source),
-        )
+        return find_identifier(self._conn, id_type, id_value)
 
     def insert_identifier(self, ident: IdentifierAttribution) -> None:
         """Insère l'attribution et pose son `id`."""
-        row = self._conn.execute(
-            _INSERT_IDENTIFIER,
-            {
-                "pid": ident.person_id,
-                "it": ident.id_type,
-                "iv": ident.id_value,
-                "src": ident.source,
-                "st": ident.status.value,
-            },
-        ).one()
-        ident.id = row_int(row.id)
+        insert_identifier(self._conn, ident)
 
     def update_identifier(self, ident: IdentifierAttribution) -> None:
         """Écrit la personne, le statut et l'origine d'une attribution existante."""
-        if ident.id is None:
-            raise ValueError("update_identifier : ident.id doit être posé")
-        self._conn.execute(
-            _UPDATE_IDENTIFIER,
-            {
-                "id": ident.id,
-                "pid": ident.person_id,
-                "st": ident.status.value,
-                "src": ident.source,
-            },
-        )
+        update_identifier(self._conn, ident)
 
     def link_authorship(
         self, person_id: int, source: str, source_authorship_id: int, resolution_mode: str

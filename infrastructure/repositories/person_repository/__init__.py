@@ -22,6 +22,11 @@ from infrastructure.repositories.person_repository._core import (
     create as create_person,
     update_name as update_person_name,
 )
+from infrastructure.repositories.person_repository._identifiers import (
+    find_identifier as find_identifier,
+    insert_identifier as insert_identifier,
+    update_identifier as update_identifier,
+)
 from infrastructure.repositories.person_repository._merge import (
     person_without_decision_sql as person_without_decision_sql,
 )
@@ -32,8 +37,11 @@ from infrastructure.repositories.person_repository._name_forms import (
 __all__ = [
     "PgPersonRepository",
     "create_person",
+    "find_identifier",
+    "insert_identifier",
     "person_without_decision_sql",
     "refresh_name_forms",
+    "update_identifier",
     "update_person_name",
 ]
 
