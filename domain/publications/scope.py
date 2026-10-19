@@ -1,14 +1,13 @@
-"""Doc_types hors périmètre métier : règle de scope explicite."""
+"""Types de document admissibles en publication."""
 
 OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "memoir"})
-"""Doc_types exclus de la logique métier : jamais matérialisés en publication.
+"""Types de document non admissibles : jamais matérialisés en publication.
 
 Une œuvre dont le `doc_type` canonique résolu appartient à cet ensemble n'a pas de ligne
-`publications` : `refresh_from_sources` la supprime après l'arbitrage du type
-(`pipeline/transformation/publications/reconciliation/refresh.py`), au même titre qu'une publication orpheline. Ses
-`source_publications` et `source_authorships` subsistent — trace de leur passage en
-source — mais détachées : sans publication, elles ne génèrent ni authorship canonique ni
-personne, les deux chemins exigeant une publication matérialisée.
+`publications` : le module du cycle de vie la supprime après l'arbitrage du type
+(`pipeline/transformation/publications/lifecycle.py`). Ses `source_publications` et
+`source_authorships` subsistent, détachées : sans publication, elles ne génèrent ni
+authorship canonique ni personne.
 
 Justifications :
 
@@ -18,7 +17,7 @@ Justifications :
   inclure polluerait `persons` de comptes éphémères.
 
 Deux points d'application : un enregistrement de l'un de ces types ne fonde pas de publication
-à la réconciliation (`domain/publications/reconciliation.py`), et `refresh_from_sources` supprime
-la publication dont le type résolu est de cet ensemble. Retirer un type de cet
+à la réconciliation (`domain/publications/reconciliation.py`), et le module du cycle de vie
+supprime la publication dont le type résolu est de cet ensemble. Retirer un type de cet
 ensemble suffit à le réintégrer à la matérialisation.
 """

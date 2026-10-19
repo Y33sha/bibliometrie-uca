@@ -17,8 +17,10 @@ import pytest
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
+from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.reconciliation.refresh import (
     PublicationStore,
+    RefreshVerdict,
     refresh_from_sources,
 )
 from tests.integration.helpers.authorships import insert_authorship
@@ -226,14 +228,14 @@ class TestRefreshFromSources:
 
     @pytest.mark.parametrize("out_of_scope_type", ["peer_review", "memoir"])
     def test_out_of_scope_doc_type_dematerializes(self, sa_sync_conn, out_of_scope_type):
-        """Un type résolu hors périmètre supprime la publication ; ses source_publications
+        """Un type résolu non admissible supprime la publication ; ses source_publications
         sont détachées (FK ON DELETE SET NULL), pas supprimées."""
         conn = sa_sync_conn
         pid = _insert_pub(conn, doc_type="article", pub_year=2024)
         _notice(
             conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type=out_of_scope_type
         )
-        refresh_from_sources(pid, repo=PublicationStore(conn))
+        assert refresh(PublicationStore(conn), pid) == RefreshVerdict.INADMISSIBLE_TYPE
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         sp_pub = _scalar(
@@ -244,14 +246,14 @@ class TestRefreshFromSources:
         assert sp_pub is None
 
     def test_out_of_scope_deletion_cascades_authorships(self, sa_sync_conn):
-        """La suppression hors périmètre emporte les authorships canoniques (FK ON DELETE
-        CASCADE) ; la personne, elle, survit."""
+        """La suppression d'un type non admissible emporte les authorships canoniques (FK ON
+        DELETE CASCADE) ; la personne, elle, survit."""
         conn = sa_sync_conn
         pid = _insert_pub(conn, doc_type="article", pub_year=2024)
         _notice(conn, pid, source="openalex", source_id=f"openalex-{pid}-", doc_type="peer_review")
         person_id = insert_person(conn, "Testauthor", first_name="A", normalizer="lower")
         insert_authorship(conn, pid, person_id=person_id, author_position=1)
-        refresh_from_sources(pid, repo=PublicationStore(conn))
+        refresh(PublicationStore(conn), pid)
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         assert (

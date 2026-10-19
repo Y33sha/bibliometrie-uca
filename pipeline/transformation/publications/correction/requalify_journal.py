@@ -9,10 +9,8 @@ from pipeline.transformation.publications.correction.correct_unary import (
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     PgMetadataCorrectionQueries,
 )
-from pipeline.transformation.publications.reconciliation.refresh import (
-    PublicationStore,
-    refresh_from_sources,
-)
+from pipeline.transformation.publications.lifecycle import refresh
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 
 
 def correct_journal_records(conn: Connection, journal_id: int) -> int:
@@ -39,6 +37,6 @@ def requalify_journal_publications(conn: Connection, journal_id: int) -> int:
     before = store.find_doc_types_by_ids(pub_ids)
     correct_journal_records(conn, journal_id)
     for pub_id in pub_ids:
-        refresh_from_sources(pub_id, repo=store)
+        refresh(store, pub_id)
     after = store.find_doc_types_by_ids(pub_ids)
     return sum(1 for pub_id, doc_type in before.items() if after.get(pub_id, doc_type) != doc_type)

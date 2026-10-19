@@ -2,10 +2,12 @@
 
 import json
 from collections.abc import Mapping, Sequence
+from enum import StrEnum
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.merge import MergedEntity
 from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
@@ -21,6 +23,7 @@ from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 from infrastructure.db.rows import rows_as
 from infrastructure.db.scalars import scalar_int
+from infrastructure.repositories.merge_steps import record_redirect
 from infrastructure.sql_fragments import corrected_by
 
 
@@ -333,8 +336,29 @@ class PublicationStore:
 
     # ── Suppression ────────────────────────────────────────────────
 
+    def has_source_publications(self, pub_id: int) -> bool:
+        """Vrai si au moins une `source_publication` est rattachée à la publication."""
+        return bool(
+            self._conn.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM source_publications WHERE publication_id = :id)"
+                ),
+                {"id": pub_id},
+            ).scalar_one()
+        )
+
+    def repoint_dependents(self, from_publication_id: int, to_publication_id: int) -> None:
+        """Re-pointe les paiements APC (`apc_payments`) de `from_publication_id` vers `to_publication_id`, et enregistre la redirection de son identifiant."""
+        self._conn.execute(
+            text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
+            {"s": from_publication_id, "t": to_publication_id},
+        )
+        record_redirect(
+            self._conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id
+        )
+
     def delete(self, pub_id: int) -> None:
-        """Supprime une publication. Le cascade DB nettoie `authorships` et `publication_subjects` ; `apc_payments` et `source_publications.publication_id` passent à NULL."""
+        """Supprime une publication. Le cascade DB nettoie `authorships` et `publication_subjects` ; `apc_payments` et `source_publications.publication_id` passent à NULL. Appelée par le module du cycle de vie (`pipeline.transformation.publications.lifecycle`)."""
         self._conn.execute(
             text("DELETE FROM publications WHERE id = :id"),
             {"id": pub_id},
@@ -376,27 +400,35 @@ def create_publication(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
+class RefreshVerdict(StrEnum):
+    """Issue du recalcul d'une publication depuis ses `source_publications`."""
+
+    SAVED = "saved"
+    ABSENT = "absent"
+    NO_SOURCE = "no_source"
+    INADMISSIBLE_TYPE = "inadmissible_type"
+
+
 def refresh_from_sources(
     pub_id: int,
     *,
     repo: PublicationStore,
-) -> None:
+) -> RefreshVerdict:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
     Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
-    Deux cas de suppression : la publication sans source rattachée, qu'aucune source n'atteste ; et celle dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (invariant « hors périmètre = jamais matérialisé »). Le `delete` détache les `source_publications` (FK ON DELETE SET NULL) et emporte les `authorships` canoniques en cascade.
+    Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
     Ne touche que la publication reçue et ses sources : quelles `source_publications` forment une même œuvre relève de la réconciliation (`pipeline/transformation/publications`). Laisse `notes` et `sources` inchangés (`update_sources` les pose).
     """
     pub = repo.find_by_id(pub_id)
     if pub is None:
-        return
+        return RefreshVerdict.ABSENT
 
     sources = repo.get_source_publications(pub_id)
     if not sources:
-        repo.delete(pub_id)
-        return
+        return RefreshVerdict.NO_SOURCE
 
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
@@ -413,11 +445,11 @@ def refresh_from_sources(
     _apply_canonical_doc_type_correction(pub, repo=repo)
 
     if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
-        repo.delete(pub_id)
-        return
+        return RefreshVerdict.INADMISSIBLE_TYPE
 
     repo.save(pub)
     repo.update_sources(pub_id)
+    return RefreshVerdict.SAVED
 
 
 def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationStore) -> None:

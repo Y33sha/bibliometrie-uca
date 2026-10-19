@@ -17,10 +17,8 @@ from pipeline.transformation.publications.correction.requalify_journal import (
     correct_journal_records,
     requalify_journal_publications,
 )
-from pipeline.transformation.publications.reconciliation.refresh import (
-    PublicationStore,
-    refresh_from_sources,
-)
+from pipeline.transformation.publications.lifecycle import refresh
+from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from pipeline.transformation.publishing.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
@@ -156,7 +154,7 @@ def merge_journals(conn: Connection, target_id: int, source_id: int) -> None:
     merge_journal_into(conn, target_id, source_id)
     correct_journal_records(conn, target_id)
     for pub_id in absorbed_pub_ids:
-        refresh_from_sources(pub_id, repo=store)
+        refresh(store, pub_id)
 
 
 class JournalRecompute:

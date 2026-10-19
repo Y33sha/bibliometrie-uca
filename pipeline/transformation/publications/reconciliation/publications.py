@@ -21,6 +21,7 @@ from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.transformation.publications.lifecycle import delete_publications_without_sources
 from pipeline.transformation.publications.reconciliation.reconcile_components import (
     run as reconcile_run,
 )
@@ -49,7 +50,7 @@ class PublicationsPhase:
             )
 
         def delete_without_sources(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            _delete_publications_without_sources(ctx.open_tx, reconciliation_queries, ctx.logger)
+            _delete_publications_without_sources(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 
         by_node = run_nodes(
@@ -70,14 +71,10 @@ class PublicationsPhase:
         return metrics
 
 
-def _delete_publications_without_sources(
-    open_tx: OpenTransaction,
-    reconciliation_queries: PublicationsReconciliationQueries,
-    logger: logging.Logger,
-) -> int:
+def _delete_publications_without_sources(open_tx: OpenTransaction, logger: logging.Logger) -> int:
     """Supprime les publications restées sans source. Retourne leur nombre."""
     with open_tx() as conn:
-        n = reconciliation_queries.delete_publications_without_sources(conn)
+        n = delete_publications_without_sources(conn)
     if n:
         etape(logger, "Publications sans source")
         logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))

@@ -224,7 +224,7 @@ class TestAssignmentOfOrphans:
         assert plan.groups == ()
 
     def test_no_member_able_to_found_a_publication_skipped(self):
-        """Aucun enregistrement ne fonde de publication : l'un est d'un type hors périmètre métier, l'autre est hors périmètre."""
+        """Aucun enregistrement ne fonde de publication : l'un est d'un type non admissible, l'autre est hors périmètre."""
         key = [("hal_id", "dumas-01234567")]
         plan = plan_reconciliation(
             [
