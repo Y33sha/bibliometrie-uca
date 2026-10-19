@@ -1,7 +1,4 @@
-"""Métriques de la phase personnes : résultat d'une passe et assemblage final.
-
-`CascadeResult` porte les compteurs d'une passe (`match` ou `create`) ; `build_metrics` fusionne ceux des deux passes avec les compteurs des étapes `reset`/`purge` en `PhaseMetrics`.
-"""
+"""Métriques de la phase personnes : compteurs de la cascade et métriques du nœud `persons.resolve`."""
 
 import logging
 from typing import NamedTuple
@@ -21,7 +18,7 @@ _MATCHING_METHODS: dict[str, str] = {
 
 
 class CascadeResult(NamedTuple):
-    """Compteurs d'une passe (`match` ou `create`), agrégés en métriques de phase."""
+    """Compteurs de la cascade, ses deux passes (`match` et `create`) réunies."""
 
     matched_counts: dict[str, int]
     skipped_counts: dict[str, int]

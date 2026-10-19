@@ -112,7 +112,7 @@ class SourceExtractor[ConfigT, ClientT](ABC):
 
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
-    - `load_config(conn) -> dict` : charge la config depuis la DB (URL, auth, affiliations, etc.)
+    - `load_config(conn) -> ConfigT` : charge la config depuis la DB (URL, auth, affiliations, etc.)
     - `extract_all(args, config) -> PhaseMetrics` : boucle d'extraction
 
     Points d'override optionnels :
