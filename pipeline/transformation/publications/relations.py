@@ -107,6 +107,21 @@ def _build_distinct_work_edges(
     return edges
 
 
+def _declared_pairs(
+    edges: list[RelationEdge], publications_by_doi: dict[str, DoiPublication]
+) -> set[frozenset[int]]:
+    """Paires de publications que relient les relations déclarées (signal #1), la cible résolue par son DOI."""
+    pairs: set[frozenset[int]] = set()
+    for edge in edges:
+        target = edge.target_publication_id
+        if target is None and edge.target_doi is not None:
+            resolved = publications_by_doi.get(edge.target_doi)
+            target = resolved.id if resolved else None
+        if target is not None:
+            pairs.add(frozenset((edge.from_publication_id, target)))
+    return pairs
+
+
 def _build_shared_key_edges(
     pairs: list[SharedKeyPair], declared_pairs: set[frozenset[int]]
 ) -> list[RelationEdge]:
@@ -171,13 +186,20 @@ class RelationsPhase:
             sources = queries.fetch_declared_relation_sources(conn)
             declared_edges = _build_declared_edges(sources)
             publications_by_doi = queries.fetch_publications_by_doi(
-                conn, _distinct_work_targets(sources)
+                conn,
+                sorted(
+                    {
+                        *_distinct_work_targets(sources),
+                        *(edge.target_doi for edge in declared_edges if edge.target_doi),
+                    }
+                ),
             )
             declared_edges += _build_distinct_work_edges(sources, publications_by_doi)
 
             pairs = queries.fetch_shared_key_pairs(conn)
-            declared_pairs = queries.fetch_declared_related_pairs(conn)
-            shared_edges = _build_shared_key_edges(pairs, declared_pairs)
+            shared_edges = _build_shared_key_edges(
+                pairs, _declared_pairs(declared_edges, publications_by_doi)
+            )
 
             erratum_matches = queries.fetch_erratum_title_matches(conn)
             preprint_matches = queries.fetch_preprint_title_matches(conn)
