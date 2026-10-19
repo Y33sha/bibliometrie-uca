@@ -119,7 +119,7 @@ class PublicationStore:
                        CAST(p.deposit_license AS text) AS deposit_license,
                        p.journal_id, p.monograph_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
-                       d.topics, d.biblio, p.meta, p.unpaywall_checked_at
+                       d.topics, d.biblio, p.meta
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = :id
@@ -150,7 +150,6 @@ class PublicationStore:
             topics=m["topics"],
             biblio=m["biblio"],
             meta=m["meta"],
-            unpaywall_checked_at=m["unpaywall_checked_at"],
         )
 
     def save(self, pub: Publication) -> None:
@@ -281,6 +280,17 @@ class PublicationStore:
         )
         return {r.id: r.journal_id for r in rows}
 
+    def get_unpaywall_verdicts(self, dois: Sequence[str]) -> dict[str, str]:
+        """Verdict d'Unpaywall de chaque DOI que connaît Unpaywall, pour l'agrégation dans `refresh_from_sources`."""
+        rows = self._conn.execute(
+            text(
+                "SELECT doi, oa_status::text AS oa_status FROM unpaywall"
+                " WHERE doi = ANY(:dois) AND oa_status IS NOT NULL"
+            ),
+            {"dois": list(dois)},
+        )
+        return {r.doi: r.oa_status for r in rows}
+
     def get_journal_type(self, journal_id: int) -> str | None:
         """`journal_type` d'un journal, pour la re-correction canonique journal-dépendante dans `refresh_from_sources`. None si le journal n'existe pas ou son type n'est pas posé."""
         return self._conn.execute(
@@ -391,12 +401,14 @@ def refresh_from_sources(
     secondary_ids = repo.get_converged_secondary_ids(pub_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
+    dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
     _refresh_aggregate(
         pub,
         sources,
         source_priority=SOURCE_PRIORITY,
         secondary_ids=secondary_ids,
         monograph_journals=repo.get_monograph_journal_ids(monograph_ids) if monograph_ids else {},
+        unpaywall=repo.get_unpaywall_verdicts(dois) if dois else {},
     )
     _apply_canonical_doc_type_correction(pub, repo=repo)
 

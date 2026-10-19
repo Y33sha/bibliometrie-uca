@@ -136,28 +136,35 @@ class TestRefreshFromSources:
         title = _scalar(conn, "SELECT title FROM publications WHERE id = :id", id=pub)
         assert title == "Jeu de données phénotypiques"
 
-    def test_unpaywall_verified_oa_status_preserved(self, sa_sync_conn):
-        """Une publi vérifiée par Unpaywall (`unpaywall_checked_at` posé) conserve son
-        `oa_status` à refresh — pas de ré-agrégation depuis les sources (Unpaywall fait
-        autorité). Sinon un réimport écraserait la correction Unpaywall."""
-        id1 = _insert_pub(sa_sync_conn, doi="10.1234/upw", oa_status="closed")
+    def test_le_verdict_d_unpaywall_sur_le_doi_l_emporte_sur_les_sources(self, sa_sync_conn):
+        id1 = _insert_pub(sa_sync_conn, doi="10.1234/upw", oa_status="unknown")
         sa_sync_conn.execute(
-            text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"), {"id": id1}
+            text(
+                "INSERT INTO unpaywall (doi, oa_status, checked_at) VALUES ('10.1234/upw', 'closed', now())"
+            )
         )
         _notice(
-            sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-gold", oa_status="gold"
-        )  # source dit gold
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id=f"openalex-{id1}-gold",
+            doi="10.1234/upw",
+            oa_status="gold",
+        )
         refresh_from_sources(id1, repo=PublicationStore(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
-        assert oa == "closed"  # préservé, pas écrasé par gold
+        assert oa == "closed"
 
-    def test_unverified_oa_status_still_aggregated(self, sa_sync_conn):
-        """Tant que pas vérifiée par Unpaywall (`unpaywall_checked_at` NULL), l'OA est
-        bien ré-agrégé depuis les sources (comportement nominal préservé)."""
+    def test_sans_verdict_l_oa_suit_les_sources(self, sa_sync_conn):
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/agg", oa_status="closed")
         _notice(
-            sa_sync_conn, id1, source="openalex", source_id=f"openalex-{id1}-gold", oa_status="gold"
+            sa_sync_conn,
+            id1,
+            source="openalex",
+            source_id=f"openalex-{id1}-gold",
+            doi="10.1234/agg",
+            oa_status="gold",
         )
         refresh_from_sources(id1, repo=PublicationStore(sa_sync_conn))
 

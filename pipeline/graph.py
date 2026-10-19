@@ -555,6 +555,8 @@ NODES: tuple[Node, ...] = (
             "source_publications.pub_year",
             "source_publications.doi",
             "source_publications.publication_id",
+            # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
+            "unpaywall",
         ),
         writes=(
             "journals",
@@ -579,6 +581,7 @@ NODES: tuple[Node, ...] = (
             "source_publications.publication_id",
             "source_publications.journal_id",
             "source_publications.doi",
+            "unpaywall",
         ),
     ),
     _node(
@@ -783,6 +786,7 @@ NODES: tuple[Node, ...] = (
             "apc_payments",
             "journals.journal_type",
             "monographs.journal_id",
+            "unpaywall",
         ),
         writes=(
             "publications",
@@ -791,12 +795,12 @@ NODES: tuple[Node, ...] = (
             "source_publications.keys_dirty",
             "apc_payments.publication_id",
         ),
-        # Statut confirmé par Unpaywall ; publications que `authorships.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `authorships.delete_empty_containers`.
+        # Verdicts d'Unpaywall ; publications que `authorships.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `authorships.delete_empty_containers`.
         previous_run=(
             "source_publications.countries",
             "publications.id",
             "publications.oa_status",
-            "publications.unpaywall_checked_at",
+            "unpaywall",
             "journals",
             "monographs",
         ),
@@ -1151,13 +1155,13 @@ NODES: tuple[Node, ...] = (
             "publications.id",
             "publications.doi",
             "publications.oa_status",
-            "publications.unpaywall_checked_at",
+            "unpaywall",
             "source_publications.publication_id",
             "source_publications.source",
             "source_publications.oa_status",
             "config",
         ),
-        writes=("publications.oa_status", "publications.unpaywall_checked_at"),
+        writes=("publications.oa_status", "unpaywall"),
         network="unpaywall",
     ),
 )

@@ -1,72 +1,105 @@
-"""File de vérification Unpaywall de la phase `oa_status` : sélection des publications à vérifier, écriture du statut reçu."""
+"""Requêtes de la phase `oa_status` : DOI à vérifier sur Unpaywall, verdicts reçus, statut des publications."""
 
+from collections.abc import Sequence
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.publications.metadata import OPEN_ARCHIVE_SOURCES, OaStatus
+from domain.publications.metadata import OaStatus
 from infrastructure.db.scalars import scalar_int
 
 
-class PublicationOaCheck(NamedTuple):
-    """Une publication à (re)vérifier sur Unpaywall : son `id`, son `doi`, son statut OA courant, et `has_open_deposit` — vrai si une archive ouverte en détient le fichier (HAL `green`). Ce dépôt interdit à Unpaywall de refermer le statut (garde-fou de la phase oa_status)."""
+class OaSignal(NamedTuple):
+    """Source et statut OA d'une notice d'une publication."""
+
+    source: str
+    oa_status: str | None
+
+
+class PublicationOaInputs(NamedTuple):
+    """Ce dont dépend le statut OA d'une publication : son DOI, son statut courant, les statuts de ses notices."""
 
     id: int
     doi: str
     oa_status: str | None
-    has_open_deposit: bool
+    signals: list[OaSignal]
 
 
-# Publications à (re)vérifier : à DOI, jamais vérifiées ou périmées (> `:stale` jours).
-_STALE_WHERE = """
-    doi IS NOT NULL
-    AND (
-        unpaywall_checked_at IS NULL
-        OR unpaywall_checked_at < now() - make_interval(days => :stale)
-    )
+# DOI des publications sans verdict d'Unpaywall, ou dont le verdict date de plus de `:stale` jours.
+_STALE_DOIS = """
+    SELECT d.doi, u.checked_at
+    FROM (SELECT DISTINCT lower(doi) AS doi FROM publications WHERE doi IS NOT NULL) d
+    LEFT JOIN unpaywall u ON u.doi = d.doi
+    WHERE u.doi IS NULL OR u.checked_at < now() - make_interval(days => :stale)
 """
 
 
 class OaStatusQueries:
     """Requêtes de la phase `oa_status`."""
 
-    def fetch_publications_with_doi(
+    def fetch_dois_to_check(
         self, conn: Connection, *, limit: int | None = None, staleness_days: int
-    ) -> list[PublicationOaCheck]:
-        """Publications à (re)vérifier sur Unpaywall : jamais vérifiées, ou vérifiées il y a plus de `staleness_days` jours. Triées jamais-vérifiées d'abord, puis les plus périmées ; `limit` cape le run, le reliquat s'écoulant sur les suivants."""
+    ) -> list[str]:
+        """DOI à vérifier sur Unpaywall : jamais vérifiés d'abord, puis les plus périmés. `limit` plafonne le run."""
         rows = conn.execute(
-            text(
-                f"""
-                SELECT id, doi, oa_status::text AS oa_status,
-                       EXISTS (
-                           SELECT 1 FROM source_publications s
-                           WHERE s.publication_id = publications.id
-                             AND s.source::text = ANY(:open_archive_sources)
-                             AND s.oa_status::text = '{OaStatus.GREEN.value}'
-                       ) AS has_open_deposit
-                FROM publications
-                WHERE """
-                + _STALE_WHERE
-                + """
-                ORDER BY unpaywall_checked_at ASC NULLS FIRST
-                LIMIT :lim
-                """
-            ),
-            {
-                "stale": staleness_days,
-                "lim": limit,
-                "open_archive_sources": list(OPEN_ARCHIVE_SOURCES),
-            },
-        ).all()
-        return [PublicationOaCheck(r.id, r.doi, r.oa_status, r.has_open_deposit) for r in rows]
+            text(f"{_STALE_DOIS} ORDER BY checked_at ASC NULLS FIRST, doi LIMIT :lim"),
+            {"stale": staleness_days, "lim": limit},
+        )
+        return [r.doi for r in rows]
 
-    def count_stale_publications(self, conn: Connection, *, staleness_days: int) -> int:
-        """Nombre de publications avec DOI à (re)vérifier (même prédicat que `fetch_publications_with_doi`, sans cap) — le backlog de staleness OA, avant plafonnement du run."""
+    def count_dois_to_check(self, conn: Connection, *, staleness_days: int) -> int:
+        """Nombre de DOI à vérifier, sans plafond."""
         return scalar_int(
-            conn.execute(
-                text("SELECT count(*) FROM publications WHERE " + _STALE_WHERE),
-                {"stale": staleness_days},
+            conn.execute(text(f"SELECT count(*) FROM ({_STALE_DOIS}) s"), {"stale": staleness_days})
+        )
+
+    def record_verdicts(self, conn: Connection, verdicts: Sequence[tuple[str, str | None]]) -> None:
+        """Écrit le verdict d'Unpaywall de chaque DOI, `None` pour un DOI absent d'Unpaywall, daté de l'instant."""
+        if not verdicts:
+            return
+        conn.execute(
+            text("""
+                INSERT INTO unpaywall (doi, oa_status, checked_at)
+                SELECT v.doi, CAST(v.oa_status AS oa_type), now()
+                FROM unnest(CAST(:dois AS text[]), CAST(:statuses AS text[])) AS v(doi, oa_status)
+                ON CONFLICT (doi) DO UPDATE
+                SET oa_status = EXCLUDED.oa_status, checked_at = EXCLUDED.checked_at
+            """),
+            {"dois": [d for d, _ in verdicts], "statuses": [s for _, s in verdicts]},
+        )
+
+    def fetch_oa_inputs(self, conn: Connection, dois: Sequence[str]) -> list[PublicationOaInputs]:
+        """Publications de ces DOI, avec les statuts OA de leurs notices."""
+        rows = conn.execute(
+            text("""
+                SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
+                       array_agg(sp.source::text ORDER BY sp.id) AS sources,
+                       array_agg(sp.oa_status::text ORDER BY sp.id) AS statuses
+                FROM publications p
+                JOIN source_publications sp ON sp.publication_id = p.id
+                WHERE lower(p.doi) = ANY(:dois)
+                GROUP BY p.id
+            """),
+            {"dois": list(dois)},
+        )
+        return [
+            PublicationOaInputs(
+                r.id,
+                r.doi,
+                r.oa_status,
+                [OaSignal(s, o) for s, o in zip(r.sources, r.statuses, strict=True)],
             )
+            for r in rows
+        ]
+
+    def update_oa_status(self, conn: Connection, pub_id: int, oa_status: str) -> None:
+        """Écrit le statut OA d'une publication."""
+        conn.execute(
+            text(
+                "UPDATE publications SET oa_status = CAST(:os AS oa_type), updated_at = now()"
+                " WHERE id = :id"
+            ),
+            {"os": oa_status, "id": pub_id},
         )
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
@@ -78,22 +111,3 @@ class OaStatusQueries:
             )
         ).all()
         return {r.status: int(r.n) for r in rows}
-
-    def update_oa_status(self, conn: Connection, pub_id: int, oa_status: str) -> None:
-        """Écrit le statut OA vérifié d'une publication et marque la vérification Unpaywall (`unpaywall_checked_at = now()`)."""
-        conn.execute(
-            text(
-                "UPDATE publications "
-                "SET oa_status = CAST(:os AS oa_type), unpaywall_checked_at = now(), "
-                "updated_at = now() "
-                "WHERE id = :id"
-            ),
-            {"os": oa_status, "id": pub_id},
-        )
-
-    def mark_unpaywall_checked(self, conn: Connection, pub_id: int) -> None:
-        """Marque la publication vérifiée sur Unpaywall (`unpaywall_checked_at = now()`) sans changer son statut — sortie de la file jusqu'à péremption."""
-        conn.execute(
-            text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
-            {"id": pub_id},
-        )

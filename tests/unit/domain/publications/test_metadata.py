@@ -1,4 +1,4 @@
-"""Tests des règles métier sur les métadonnées de publication (best_oa_status, decide_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
+"""Tests des règles métier sur les métadonnées de publication (best_oa_status, publication_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
 
 from types import SimpleNamespace
 
@@ -7,10 +7,10 @@ from domain.publications.metadata import (
     OA_RANK,
     best_oa_status,
     clean_publication_title,
-    decide_oa_status,
     has_minimal_publication_metadata,
     has_open_archive_deposit,
     normalized_title,
+    publication_oa_status,
 )
 
 
@@ -210,33 +210,38 @@ class TestCleanPublicationTitle:
         assert clean_publication_title("") == ""
 
 
-class TestDecideOaStatus:
-    def test_new_status_overwrites(self):
-        assert decide_oa_status("closed", "gold", False) == "gold"
+class TestPublicationOaStatus:
+    def test_sans_verdict_le_statut_le_plus_ouvert_des_sources(self):
+        sources = [_src("hal", "green"), _src("openalex", "gold")]
+        assert publication_oa_status(sources, None) == "gold"
 
-    def test_unchanged_returns_none(self):
-        assert decide_oa_status("gold", "gold", False) is None
+    def test_sources_muettes_sans_verdict_donnent_unknown(self):
+        assert publication_oa_status([_src("openalex", None)], None) == "unknown"
 
-    def test_diamond_preserved_against_gold(self):
-        assert decide_oa_status("diamond", "gold", False) is None
+    def test_le_verdict_l_emporte(self):
+        assert publication_oa_status([_src("openalex", "closed")], "gold") == "gold"
+        assert publication_oa_status([_src("openalex", "gold")], "closed") == "closed"
 
-    def test_diamond_not_preserved_against_more_open(self):
-        # Seul gold est confondu avec diamond par Unpaywall ; un autre statut écrase.
-        assert decide_oa_status("diamond", "green", False) == "green"
+    def test_diamond_tient_face_a_gold(self):
+        assert publication_oa_status([_src("openalex", "diamond")], "gold") == "diamond"
 
-    def test_embargoed_not_downgraded(self):
-        assert decide_oa_status("embargoed", "closed", False) is None
-        assert decide_oa_status("embargoed", "unknown", False) is None
+    def test_diamond_cede_a_un_autre_verdict(self):
+        # Seul gold est confondu avec diamond par Unpaywall.
+        assert publication_oa_status([_src("openalex", "diamond")], "green") == "green"
 
-    def test_embargoed_upgraded_to_open(self):
-        assert decide_oa_status("embargoed", "gold", False) == "gold"
+    def test_embargoed_tient_face_a_un_statut_ferme(self):
+        assert publication_oa_status([_src("hal", "embargoed")], "closed") == "embargoed"
+        assert publication_oa_status([_src("hal", "embargoed")], "unknown") == "embargoed"
 
-    def test_open_deposit_blocks_downgrade(self):
-        assert decide_oa_status("green", "closed", True) is None
-        assert decide_oa_status("green", "unknown", True) is None
+    def test_embargoed_cede_a_un_statut_ouvert(self):
+        assert publication_oa_status([_src("hal", "embargoed")], "gold") == "gold"
 
-    def test_open_deposit_allows_open_status(self):
-        assert decide_oa_status("closed", "gold", True) == "gold"
+    def test_un_depot_en_archive_ouverte_tient_face_a_un_statut_ferme(self):
+        assert publication_oa_status([_src("hal", "green")], "closed") == "green"
+        assert publication_oa_status([_src("hal", "green")], "unknown") == "green"
 
-    def test_no_deposit_writes_closed(self):
-        assert decide_oa_status("green", "closed", False) == "closed"
+    def test_un_verdict_ouvert_l_emporte_sur_un_depot(self):
+        assert publication_oa_status([_src("hal", "green")], "hybrid") == "hybrid"
+
+    def test_sans_depot_le_statut_ferme_tient(self):
+        assert publication_oa_status([_src("openalex", "green")], "closed") == "closed"

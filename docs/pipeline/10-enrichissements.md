@@ -44,8 +44,8 @@ Code : `pipeline/transformation/structures/countries/`.
 
 ## Statut open access (`oa_status`)
 
-Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publications.oa_status` — souvent plus à jour que le statut renseigné dans les sources.
+Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se calcule à partir de ses sources et de ce verdict, ici et à chaque recalcul de la publication.
 
-Incrémentale : pour lisser dans le temps les appels API, chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les publications jamais interrogées, ou dont le statut n'a pas été revu depuis le délai `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Une publication est marquée vérifiée quand Unpaywall a répondu, même sans la trouver. Quand Unpaywall est indisponible, elle est reprise au run suivant.
+Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou dont le verdict date de plus de `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Quand Unpaywall est indisponible, le DOI est repris au run suivant.
 
 Code : `pipeline/transformation/publications/oa_status.py`.

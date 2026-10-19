@@ -1148,10 +1148,6 @@ publications = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    # Staleness de l'enrichissement OA : date de la dernière interrogation d'Unpaywall
-    # (NULL = jamais), qu'elle ait trouvé la publication ou non. La phase `oa_status`
-    # re-vérifie les jamais-interrogées, puis les plus périmées.
-    Column("unpaywall_checked_at", DateTime(timezone=True)),
     # Date de la dernière ingestion des sujets (NULL = à ingérer), posée par la phase
     # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
     # publication recalculée depuis ses sources la remet à NULL.
@@ -1442,6 +1438,24 @@ failed_lookups = Table(
         "identifiant absent de son registre (hal-id dans HAL, NNT dans theses.fr, DOI auprès de "
         "doi.org). Les autres recherches reprennent quand not_found_at date de plus que le délai "
         "fetch_missing_retry_after_days."
+    ),
+    schema="sources",
+)
+
+
+unpaywall = Table(
+    "unpaywall",
+    metadata,
+    Column("doi", Text, primary_key=True),
+    Column(
+        "oa_status",
+        oa_type_enum,
+        comment="Statut open access donné par Unpaywall. NULL : DOI absent d'Unpaywall.",
+    ),
+    Column("checked_at", DateTime(timezone=True), nullable=False),
+    comment=(
+        "Verdict d'Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est "
+        "réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days."
     ),
     schema="sources",
 )

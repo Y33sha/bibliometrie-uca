@@ -67,15 +67,13 @@ ACCESS_LEVELS: dict[str, frozenset[str]] = {
 
 OA_OPEN_STATUSES: frozenset[str] = ACCESS_LEVELS["open"]
 
-# Statuts « non-ouverts » : aucun signal d'accès ouvert exploitable. Une archive
-# ouverte attestant un dépôt, ou un embargo connu, priment sur eux — d'où leur
-# usage dans `decide_oa_status` et le plancher archive-ouverte de l'agrégation.
+# Statuts « non-ouverts » : aucun signal d'open access exploitable. Une archive
+# ouverte attestant un dépôt, ou un embargo connu, priment sur eux (`publication_oa_status`).
 OA_CLOSED_STATUSES: frozenset[str] = ACCESS_LEVELS["closed"]
 
 # Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
 # déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,
-# qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (cf. `has_open_archive_deposit`,
-# le garde-fou de la phase oa_status et le plancher de `refresh_from_sources`). HAL pour l'instant ;
+# qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (`publication_oa_status`). HAL ;
 # le `green` HAL vient d'un dépôt effectif ou d'un lien arXiv/PMC (cf. `derive_hal_oa_status`).
 OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
 
@@ -112,26 +110,22 @@ def best_oa_status(statuses: Iterable[str | None]) -> str | None:
     return best
 
 
-def decide_oa_status(current: str | None, fetched: str, has_open_deposit: bool) -> str | None:
-    """Statut OA à écrire pour une publication après vérification Unpaywall, ou None si rien ne change (statut préservé).
+def publication_oa_status(sources: Iterable[_OaSignalSource], unpaywall: str | None) -> str:
+    """Statut OA d'une publication, à partir de ses sources et du verdict d'Unpaywall sur son DOI (`None` : DOI non vérifié ou absent d'Unpaywall).
 
-    Le statut remonté par Unpaywall (`fetched`) écrase le statut courant, sauf quatre préservations :
-    - statut inchangé (`fetched == current`) ;
-    - `current == 'diamond'` face à `gold` : Unpaywall ne connaît pas le diamond OA ;
-    - `current == 'embargoed'` face à `closed`/`unknown` : l'embargo est connu (HAL), pas de rétrogradation ;
-    - `has_open_deposit` face à `closed`/`unknown` : une archive ouverte détient le fichier, qu'Unpaywall ne voit pas sous le DOI.
-
-    Un statut plus ouvert (green+) écrase bien.
+    Sans verdict, le statut le plus ouvert des sources. Le verdict l'emporte, sauf dans trois cas où le statut des sources tient : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; un dépôt en archive ouverte face à closed ou unknown.
     """
-    if fetched == current:
-        return None
-    if current == OaStatus.DIAMOND and fetched == OaStatus.GOLD:
-        return None
-    if current == "embargoed" and fetched in OA_CLOSED_STATUSES:
-        return None
-    if has_open_deposit and fetched in OA_CLOSED_STATUSES:
-        return None
-    return fetched
+    sources = list(sources)
+    from_sources = best_oa_status(s.oa_status for s in sources) or OA_STATUS_UNKNOWN_DEFAULT
+    if unpaywall is None:
+        return from_sources
+    if from_sources == OaStatus.DIAMOND and unpaywall == OaStatus.GOLD:
+        return from_sources
+    if unpaywall in OA_CLOSED_STATUSES and (
+        from_sources == OaStatus.EMBARGOED or has_open_archive_deposit(sources)
+    ):
+        return from_sources
+    return unpaywall
 
 
 # ── Canonicalisation des titres double-encodés HTML ─────────────────
