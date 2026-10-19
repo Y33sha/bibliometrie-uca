@@ -23,9 +23,9 @@ L'opérateur doit savoir qu'une règle a changé, et quelle option la propage. S
 
 ### Phase 1 — Un seul mécanisme
 
-- [ ] `--rebuild-subjects` marque toutes les publications à ingérer.
-- [ ] `--normalize-full` marque toutes les notices à resynchroniser.
-- [ ] Retrait de `--rebuild-authorships` et de `purge_authorships`.
+- [x] `--rebuild-subjects` marque toutes les publications à ingérer. 7ae2eab4e
+- [x] `--normalize-full` marque toutes les notices à resynchroniser. 7ae2eab4e
+- [x] Retrait de `--rebuild-authorships` et de `purge_authorships`. 7ae2eab4e
 
 ### Phase 2 — Propagation en production
 
