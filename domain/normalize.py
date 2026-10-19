@@ -325,7 +325,7 @@ _TRAILING_SEPARATORS = ",;:-–—/"
 
 
 def clean_raw_author_name(raw: str) -> str:
-    """Nom d'auteur brut sans balisage, à l'encodage réparé, sans accents LaTeX, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
+    """Nom d'auteur brut sans balisage, à l'encodage réparé, sans accents LaTeX ni accolades, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
 
     Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé d'identité, et les formes de nom dérivées.
 
@@ -334,6 +334,8 @@ def clean_raw_author_name(raw: str) -> str:
     if not raw:
         return raw
     text = decode_latex_accents(repair_encoding(to_plain_text(raw)))
+    # Accolades de groupement LaTeX restées sans commande : « Geß{}ner ».
+    text = text.replace("{", "").replace("}", "")
     cleaned = " ".join(_EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text)).split())
     # Parenthèse que le retrait des chiffres a détachée de son contenu : « (EA 999) » → « (EA) ».
     cleaned = cleaned.replace(" )", ")").replace(" ]", "]")

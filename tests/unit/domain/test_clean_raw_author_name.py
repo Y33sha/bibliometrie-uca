@@ -59,6 +59,9 @@ class TestCleanRawAuthorName:
             ("Ho\\v s\\'ek", "Hošék"),
             ("Gon\\C Calo, Ricardo", "GonÇalo, Ricardo"),
             ("Ge\\ssner, Gregor", "Geßner, Gregor"),
+            # Accolades LaTeX sans commande : retirées.
+            ("Geß{}ner, Gregor", "Geßner, Gregor"),
+            ("{van der Berg}, Jan", "van der Berg, Jan"),
             # UTF-8 lu comme du Windows-1252 : réparé.
             ("TÃ©lesphore Sime-Ngando", "Télesphore Sime-Ngando"),
             ("NuÃ±ez LÃ³pez, Leslie", "Nuñez López, Leslie"),

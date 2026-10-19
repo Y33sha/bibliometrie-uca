@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
 """Répare l'encodage des noms d'auteur du stock (« TÃ©lesphore » → Télesphore, « Fran鏾is » → François), comme le fait la normalisation (`clean_raw_author_name`).
 
-Les signatures dont le nom présente un défaut d'encodage (`ENCODING_ERROR_PATTERN`) suivent le traitement de `decode_latex_author_names` : nom réparé, identité qui en découle, personne détachée sauf épinglage, décomptes d'auteurs recalculés, publications à regrouper, identités orphelines supprimées.
+Il retire aussi les accolades LaTeX restées sans commande (« Geß{}ner »). Les signatures dont le nom présente un défaut d'encodage (`ENCODING_ERROR_PATTERN`) ou des accolades suivent le traitement de `decode_latex_author_names` : nom réparé, identité qui en découle, personne détachée sauf épinglage, décomptes d'auteurs recalculés, publications à regrouper, identités orphelines supprimées.
 
 Usage :
     python -m interfaces.cli.oneshot.repair_author_name_encoding [--dry-run]
@@ -19,7 +19,7 @@ from interfaces.cli.oneshot.decode_latex_author_names import candidates_sql, dec
 
 log = setup_logger("repair_author_name_encoding", os.path.dirname(__file__))
 
-CANDIDATES_SQL = candidates_sql("n.names ~ :pattern")
+CANDIDATES_SQL = candidates_sql("n.names ~ :pattern OR n.names ~ '[{}]'")
 PARAMS = {"pattern": ENCODING_ERROR_PATTERN}
 
 

@@ -23,7 +23,13 @@ def test_seuls_les_noms_a_l_encodage_errone_sont_repares(sa_sync_conn):
             roles=["author"],
         )
         for position, raw in enumerate(
-            ("TÃ©lesphore Sime-Ngando", "Fran鏾is Bouchon", "São João, Ângela", "Wang王")
+            (
+                "TÃ©lesphore Sime-Ngando",
+                "Fran鏾is Bouchon",
+                "Lema{î}tre, A.",
+                "São João, Ângela",
+                "Wang王",
+            )
         )
     }
 
@@ -33,4 +39,5 @@ def test_seuls_les_noms_a_l_encodage_errone_sont_repares(sa_sync_conn):
     assert repaired == {
         signatures["TÃ©lesphore Sime-Ngando"]: "Télesphore Sime-Ngando",
         signatures["Fran鏾is Bouchon"]: "François Bouchon",
+        signatures["Lema{î}tre, A."]: "Lemaître, A.",
     }
