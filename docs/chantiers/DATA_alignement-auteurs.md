@@ -62,11 +62,11 @@ Mesure du 2026-10-16. Dans 2 931 notices, une même personne est rattachée à d
 | OpenAlex | `name` | 525 |
 | HAL | `name` | 464 |
 
-Un ORCID décalé dans Crossref rattache une signature à la personne d'un co-auteur, qui reçoit alors deux ORCID. Les signatures portant l'un ou l'autre s'y rattachent par identifiant, d'autres par forme de nom. OpenAlex reproduit Crossref. HAL est contaminé ensuite par le rattachement `cross_source`.
+Un ORCID décalé dans Crossref rattache une signature à la personne d'un co-auteur, qui reçoit alors deux ORCID. Les signatures qui contiennent l'un ou l'autre s'y rattachent par identifiant, d'autres par forme de nom. OpenAlex reproduit Crossref. HAL est contaminé ensuite par le rattachement `cross_source`.
 
 ### Identifiants contradictoires
 
-Mesure du 2026-10-16 : couples (publication, personne) dont les signatures portent deux valeurs d'un même identifiant fort non neutralisé, sur 398 405 couples.
+Mesure du 2026-10-16 : couples (publication, personne) dont les signatures contiennent deux valeurs d'un même identifiant fort non neutralisé, sur 398 405 couples.
 
 | Type | Dans une même notice | Cas | Personnes |
 |---|---|---|---|
@@ -160,9 +160,10 @@ Les verdicts manuels sur les signatures ont deux ancrages :
     1. patronyme unique des deux côtés ;
     2. patronyme et prénom complet uniques ;
     3. patronyme et initiale uniques ;
-    4. ORCID ou IdRef partagé, à patronyme égal ;
-    5. filtre d'ordre : seule la plus longue suite de liens rangés dans le même ordre des deux côtés est gardée, les autres liens passent au résidu ;
+    4. ORCID ou IdRef partagé avec un membre du groupe, à patronyme égal ; un identifiant présent dans deux groupes ne lie rien ;
+    5. filtre d'ordre : seule la plus longue suite de liens rangés dans le même ordre des deux côtés est gardée, les autres liens passent au résidu ; les liens par identifiant échappent au filtre ;
     6. dans chaque trou entre deux liens, patronyme et initiale en nombre égal des deux côtés : lien dans l'ordre des positions.
+  - Prénom connu : un prénom absent ou réduit à des initiales prend la valeur du prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la signature, si les initiales concordent. Une décision sur ce rattachement, ou un changement de ce prénom, marque à regrouper les publications des signatures qui contiennent l'identifiant.
   - Résidu : modèle de Fellegi-Sunter (Splink), estimé par EM sur les seules signatures restantes. Comparaisons : patronyme, prénom, ORCID, IdRef, trou (même trou, trou voisin, ailleurs). Affectation hongroise : un lien est retenu quand les preuves dépassent log2 du nombre de groupes restants. Les poids d'ORCID et d'IdRef viennent d'un modèle estimé sur toutes les paires : sur le résidu, l'EM ne les identifie pas.
   - Le résidu fait 1,9 % des liens jusqu'à 100 auteurs, 10,6 % au-delà.
   - Évaluation sur trois relectures :
@@ -182,6 +183,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - [x] Phase `author_grouping`, entre `publications` et `persons`. Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms.
 - [x] Poids du modèle du résidu versionnés dans le dépôt. Le pipeline calcule les poids des paires sans Splink.
 - [x] Script qui réestime les poids avec Splink (`interfaces/cli/dev/estimate_residual_weights.py`).
+- [x] Temps de calcul : lots bornés en nombre de signatures, écriture des seules appartenances modifiées, calcul réparti sur les cœurs disponibles (quota du conteneur compris). Un lot de grandes collaborations passe de 9,7 à 4,6 secondes sur deux cœurs.
 - [x] Premier passage de la phase sur le stock, le 2026-10-18 : 76 511 publications en une heure environ, 6,3 millions de groupes, 19,9 millions de signatures groupées. Liens par le nom : 12,4 millions ; par le modèle : 858 000 ; par l'ordre : 285 000 ; par l'identifiant : 30 000. Évaluation identique à l'essai : 316 paires correctes sur 327, 86 désaccords sur 97 et 39 écarts sur 47 tranchés comme la relecture.
 
 ### Phase 3 — Usages
@@ -199,9 +201,25 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Modèle : 9 des 11 erreurs de groupement viennent de deux œuvres distinctes réunies dans une même publication. Une autre vient d'une notice scanR qui répète un auteur et sert de liste de référence. La dernière vient de noms inversés par quatre sources sur cinq : le niveau « noms inversés » du modèle n'a pas de poids, faute d'estimation par l'EM.
   - Ordre : 7 des 9 rattachements faux concernent un même ORCID, rattaché par identifiant à une autre personne que son titulaire. Les 3 erreurs de groupement sont des homonymes que l'ordre départage à tort, alors que l'ORCID les distingue.
   - Nom : les doublons de personnes viennent d'un prénom absent, réduit ou différent selon la source. Deux erreurs de source sont deux noms concaténés par Crossref.
+- [x] Relecture des 346 groupes à plusieurs personnes après les corrections des listes d'auteurs, le 2026-10-19 : 335 jugés, dont 147 verdicts repris des relectures précédentes.
+
+  | Verdict | Groupes |
+  |---|---|
+  | Doublon de personnes | 202 |
+  | Erreur de groupement | 43 |
+  | Rattachement existant faux | 28 |
+  | Erreur de source | 27 |
+  | Fusion erronée de publications | 26 |
+  | Indéterminable | 9 |
+
+  - Les erreurs de groupement concernent presque toutes trois homonymes « Z. Xu » d'une collaboration de physique des particules. Les sources ne les rangent pas dans le même ordre, et leur ORCID figure sur une signature autre que la référence. La comparaison de l'identifiant à tous les membres du groupe ne suffit pas : la signature à initiale a l'ORCID, la signature au prénom complet n'en a pas. Le prénom connu sépare 10 des 21 erreurs de la strate ordre ; les autres groupes relus sont justes, ou l'ORCID est en attente de confirmation.
+  - 21 rattachements faux viennent d'un ORCID en attente, rattaché à une autre personne que son titulaire.
+  - Erreurs de source : noms concaténés par Crossref et WoS, accents LaTeX, rédactions et organismes non reconnus comme collectifs.
+  - Effet sur les jeux d'évaluation : 95 désaccords sur 97 et 41 écarts sur 47 tranchés comme la relecture.
+- [ ] Fusion des doublons de personnes relevés par les relectures : 167 personnes absorbées dans 159 (`data/experiments/alignement-auteurs/person_merges.csv`, non versionné).
 - [x] Notices aux noms inversés : une notice qui intervertit nom et prénom s'aligne avec ses noms remis dans l'ordre. À longueur égale, une notice scanR passe après les autres et ne fonde un groupe qu'à défaut d'une autre. Sur les jeux relus, 91 désaccords sur 97 sont tranchés comme la relecture, contre 86 ; le reste est inchangé.
 - [ ] Identification des personnes par groupe, dans le chantier de déduplication des personnes. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
-- [ ] Correction des doubles rattachements et des personnes portant deux identifiants de deux personnes.
+- [ ] Correction des doubles rattachements et des personnes qui ont deux identifiants de deux personnes.
 - [x] Fusions suspectes : onglet du référentiel des publications de l'UI admin. Il retient les publications dont moins de la moitié des auteurs se retrouvent d'une notice à l'autre (vue `publication_author_alignment`).
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
 - [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
@@ -216,10 +234,11 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - La longueur ne détecte pas la copie, qui se retrouve dans d'autres sources. Une notice plus longue que la médiane des autres manque 15 copies sur 51 ; un écart avec une autre notice égal au nombre de répétitions confirme 26 copies sur 51.
   - Conséquence : seule la première occurrence de chaque nom s'aligne. Les répétitions restent hors des groupes, donc hors du rattachement aux personnes.
 - [x] Liste doublée sur place (A A B B…) : une suite d'au moins 4 paires côte à côte, de noms différents.
-- [x] Copies notées dans `source_authorships.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 1 246 notices, 39 295 signatures copiées.
+- [x] Copies notées dans `source_authorships.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 578 notices, 21 971 doublons d'auteur.
 - [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
 - [x] Décomptes d'auteurs de chaque notice : `source_publications.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
-- [x] Une signature dont le nom entier est « et al. » est collective. Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
+- [x] Noms de collectifs : une signature dont le nom entier est « et al. » est collective, ainsi qu'un nom d'organisme ou de rédaction (« Die Redaktion », « Editorial Office »). Accents LaTeX décodés dans les noms d'auteur à la normalisation ; un oneshot corrige les 1 421 signatures du stock.
+- [x] Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
 - [x] Classement des écarts de longueur entre les notices d'une publication, le 2026-10-18 (`measure_list_gaps.py`). La longueur de référence est la plus fréquente parmi les notices. Une notice scanR issue d'un dépôt HAL est ignorée quand la notice HAL de ce dépôt est présente. Sur 69 428 publications à plusieurs notices, 62 807 ont des listes de même longueur, 4 091 des écarts expliqués, 88 une fusion erronée probable et 2 441 un écart inexpliqué.
   - Causes reconnues : notice à un auteur, scanR coupé à 51, homonymes fusionnés par WoS, excédent fait de noms complets répétés, liste tronquée, dépôt HAL in2p3, fusion erronée probable.
   - Liste tronquée : 80 % de ses patronymes figurent parmi les premiers patronymes de la liste longue, et 80 % des patronymes de la suite de la liste longue lui sont absents. Elle se termine souvent par un collectif que l'autre source détaille. La source omet souvent ce collectif.
