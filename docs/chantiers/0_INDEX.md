@@ -14,6 +14,7 @@
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
+- [Conception du pipeline](CODE_conception-du-pipeline.md)
 - [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Monographies](DATA_monographies.md)
