@@ -1,4 +1,4 @@
-"""Reconnaissance d'un nom de signature collective : collaboration, consortium, groupe d'étude, réseau, investigateurs…
+"""Reconnaissance d'un nom de signature collective : collaboration, consortium, groupe d'étude, réseau, investigateurs, rédaction, ou organisme déposé à la place d'un auteur (université, laboratoire, institut…).
 
 Sert aux sources qui ne distinguent pas un collectif d'une personne. La règle porte sur le nom normalisé (`normalize_text`) : un mot ou une locution de collectif suffit.
 """
@@ -7,29 +7,57 @@ from domain.normalize import normalize_text
 
 COLLECTIVE_WORDS: frozenset[str] = frozenset(
     {
+        "agence",
+        "agency",
         "alliance",
         "association",
+        "center",
+        "centre",
         "collaboration",
         "collaborations",
         "collaborative",
         "collaborators",
+        "commission",
         "committee",
         "consortium",
+        "council",
+        "department",
+        "departement",
+        "dept",
+        "ecole",
+        "editorial",
+        "editors",
         "equipe",
+        "federation",
+        "fondation",
+        "foundation",
         "group",
         "groupe",
         "groups",
         "initiative",
+        "institut",
+        "institute",
         "investigateurs",
         "investigators",
+        "laboratoire",
+        "laboratory",
         "members",
+        "ministere",
+        "ministry",
         "network",
+        "office",
+        "organisation",
+        "organization",
+        "redaktion",
         "registry",
         "reseau",
         "societe",
         "society",
         "study",
         "team",
+        "universitat",
+        "universite",
+        "university",
     }
 )
 
