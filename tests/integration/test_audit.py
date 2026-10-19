@@ -17,7 +17,7 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
-from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
 from tests.integration.helpers.persons import insert_person, insert_person_name_form

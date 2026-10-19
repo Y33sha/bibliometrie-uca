@@ -5,7 +5,7 @@ Elle exporte l'ordre des phases et les recalculs ciblés. `application/` déclar
 
 from pipeline.graph import PHASE_ORDER
 from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
-from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute

@@ -1,6 +1,6 @@
 """Intégration : l'agrégat Publication enregistre et relit sa licence et la licence de son dépôt."""
 
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.store import PublicationStore
 
 
 def test_licences_enregistrees_puis_relues(sa_sync_conn):

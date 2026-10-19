@@ -31,14 +31,10 @@ from pipeline.runtime.observability.libelles import (
 )
 from pipeline.runtime.observability.progression import attente, progression
 from pipeline.runtime.savepoint import savepoint
-from pipeline.transformation.publications.lifecycle import dissolve, refresh
+from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
-)
-from pipeline.transformation.publications.reconciliation.refresh import (
-    PublicationStore,
-    create_publication,
 )
 
 
@@ -60,7 +56,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 
 
 def _create_new_publication(
-    group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], publication_repo: PublicationStore
+    conn: Connection, group: WorkGroup, rows_by_sp: dict[int, ReconcileRow]
 ) -> int:
     """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `lifecycle.refresh`.
 
@@ -70,12 +66,12 @@ def _create_new_publication(
         key=lambda r: r.id,
     )
     assert seed.pub_year is not None
-    return create_publication(
+    return lifecycle.create(
+        conn,
         title_normalized=seed.title_normalized or "",
         doc_type=seed.doc_type,
         pub_year=seed.pub_year,
         doi=seed.doi,
-        repo=publication_repo,
     )
 
 
@@ -99,7 +95,6 @@ def reconcile(
     conn: Connection,
     queries: PublicationsReconciliationQueries,
     *,
-    publication_repo: PublicationStore,
     logger: logging.Logger | None = None,
     rebuild: bool = False,
 ) -> ReconcileStats | None:
@@ -163,7 +158,7 @@ def reconcile(
                 from_existing = any(
                     rows_by_sp[sp].publication_id is not None for sp in group.source_publication_ids
                 )
-                target = _create_new_publication(group, rows_by_sp, publication_repo)
+                target = _create_new_publication(conn, group, rows_by_sp)
                 created += 1
                 if from_existing:
                     splits += 1
@@ -186,12 +181,12 @@ def reconcile(
                 - survivors
             ):
                 with savepoint(conn):
-                    refresh(publication_repo, pub_id)
+                    lifecycle.refresh(conn, pub_id)
 
         # 3. Dissolutions, avant les survivants : la suppression libère le DOI qu'un survivant
         # reprend — la contrainte unique le refuserait autrement.
         for dissolved in plan.dissolved:
-            dissolve(publication_repo, dissolved.publication_id, dissolved.successor_publication_id)
+            lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
 
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
@@ -203,7 +198,7 @@ def reconcile(
         for pub_id in survivor_ids:
             avancement.avance()
             with savepoint(conn):
-                refresh(publication_repo, pub_id)
+                lifecycle.refresh(conn, pub_id)
 
     # 5. Les publications qui gagnent ou perdent une notice regroupent leurs signatures.
     queries.mark_authorships_dirty(conn, sorted(membership_changed - dissolved_ids))
@@ -225,13 +220,10 @@ def run(
     queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
     *,
-    publication_repo: PublicationStore,
     rebuild: bool = False,
 ) -> ReconcileStats | None:
     try:
-        stats = reconcile(
-            conn, queries, publication_repo=publication_repo, logger=logger, rebuild=rebuild
-        )
+        stats = reconcile(conn, queries, logger=logger, rebuild=rebuild)
         if stats is None:
             return None
         conn.commit()

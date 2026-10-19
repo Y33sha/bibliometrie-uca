@@ -20,7 +20,6 @@ from pipeline.transformation.publications.reconciliation.reconcile_components im
 from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,
 )
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
@@ -70,7 +69,7 @@ def create_all_publications(conn: Connection) -> None:
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PublicationsReconciliationQueries(), publication_repo=PublicationStore(conn))
+    reconcile(conn, PublicationsReconciliationQueries())
 
 
 __all__ = ["apply_metadata_corrections", "create_all_publications"]

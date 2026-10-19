@@ -6,14 +6,11 @@ import pytest
 from sqlalchemy import text
 
 from domain.merge import MergedEntity
+from pipeline.transformation.publications.consolidation import RefreshVerdict
 from pipeline.transformation.publications.lifecycle import (
     delete_publications_without_sources,
     dissolve,
     refresh,
-)
-from pipeline.transformation.publications.reconciliation.refresh import (
-    PublicationStore,
-    RefreshVerdict,
 )
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.redirects import redirect_of
@@ -35,14 +32,14 @@ class TestRefresh:
     def test_publication_sans_source_supprimee(self, sa_sync_conn):
         pid = insert_publication(sa_sync_conn)
 
-        assert refresh(PublicationStore(sa_sync_conn), pid) == RefreshVerdict.NO_SOURCE
+        assert refresh(sa_sync_conn, pid) == RefreshVerdict.NO_SOURCE
         assert not _pub_exists(sa_sync_conn, pid)
 
     def test_publication_avec_source_enregistree(self, sa_sync_conn):
         pid = insert_publication(sa_sync_conn)
         _notice(sa_sync_conn, pid, source_id="w1")
 
-        assert refresh(PublicationStore(sa_sync_conn), pid) == RefreshVerdict.SAVED
+        assert refresh(sa_sync_conn, pid) == RefreshVerdict.SAVED
         assert _pub_exists(sa_sync_conn, pid)
 
 
@@ -53,7 +50,7 @@ class TestDissolve:
         successeur = insert_publication(conn)
         paiement = insert_apc_payment(conn, publication_id=dissoute, open_access_fee=True)
 
-        dissolve(PublicationStore(conn), dissoute, successeur)
+        dissolve(conn, dissoute, successeur)
 
         assert not _pub_exists(conn, dissoute)
         assert redirect_of(conn, MergedEntity.PUBLICATION, dissoute) == successeur
@@ -71,7 +68,7 @@ class TestDissolve:
         _notice(conn, dissoute, source_id="w1")
 
         with pytest.raises(ValueError):
-            dissolve(PublicationStore(conn), dissoute, successeur)
+            dissolve(conn, dissoute, successeur)
         assert _pub_exists(conn, dissoute)
 
 
