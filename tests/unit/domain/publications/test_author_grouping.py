@@ -18,6 +18,7 @@ from domain.publications.author_grouping import (
     longest_ordered,
     plan_group_ids,
     position_only,
+    with_known_first_name,
 )
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
@@ -235,6 +236,32 @@ class TestFullFirstName:
 
     def test_un_prenom_complet_reste(self):
         assert full_first_name("jean a") == "jean a"
+
+
+class TestWithKnownFirstName:
+    @pytest.mark.parametrize(
+        "first_name, known, expected",
+        [
+            ("z", "zhihao", "zhihao"),
+            ("", "zhihao", "zhihao"),
+            ("j a", "jean andre", "jean andre"),
+            ("y", "zhihao", "y"),
+            ("zehua", "zhihao", "zehua"),
+            ("z", "", "z"),
+            ("z", "z", "z"),
+        ],
+        ids=[
+            "initiale",
+            "absent",
+            "initiales",
+            "incompatible",
+            "complet",
+            "inconnu",
+            "connu en initiale",
+        ],
+    )
+    def test_prenom_pour_l_alignement(self, first_name, known, expected):
+        assert with_known_first_name(first_name, known) == expected
 
 
 class TestLongestOrdered:

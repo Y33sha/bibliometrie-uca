@@ -24,6 +24,7 @@ from domain.publications.author_grouping import (
     Signature,
     align_publication,
     plan_group_ids,
+    with_known_first_name,
 )
 from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.list_copies import copied_signatures
@@ -82,16 +83,15 @@ def _role_class(roles: list[str] | None) -> str:
 def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Signature]]]:
     """Signatures d'une publication par classe de rôle, puis par notice.
 
-    Une signature sans position prend la position 0 pour l'alignement, qui la range alors par identifiant.
+    Une signature sans position prend la position 0 pour l'alignement, qui la range alors par identifiant. Une signature réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`).
     """
     by_class: dict[str, dict[int, list[Signature]]] = {}
     for row in rows:
         notices = by_class.setdefault(_role_class(row.roles), {})
         position = row.position if row.position is not None else 0
+        first_name = with_known_first_name(row.first_name, row.known_first_name)
         notices.setdefault(row.notice, []).append(
-            Signature(
-                row.id, row.notice, position, row.last_name, row.first_name, row.orcid, row.idref
-            )
+            Signature(row.id, row.notice, position, row.last_name, first_name, row.orcid, row.idref)
         )
     return by_class
 
@@ -144,7 +144,9 @@ def membership_changes(
 
 
 # Signature (champs de `SignatureRow` dans l'ordre), appartenance (signature, notice, méthode, score, marge) et groupe (signature de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
-type SignatureTuple = tuple[int, int, str, int, int | None, list[str] | None, str, str, str, str]
+type SignatureTuple = tuple[
+    int, int, str, int, int | None, list[str] | None, str, str, str, str, str
+]
 type MemberTuple = tuple[int, int, str, float | None, float | None]
 type GroupTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[GroupTuple], dict[int, int]]

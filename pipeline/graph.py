@@ -824,7 +824,11 @@ NODES: tuple[Node, ...] = (
             "source_authorships.roles",
             "source_authorships.collective",
             "source_authorships.identity_id",
+            "source_authorships.neutralized_identifiers",
             "author_identifying_keys",
+            # Prénom de la personne à laquelle un humain a rattaché l'identifiant d'une signature.
+            "person_identifiers",
+            "persons",
             "source_authorship_groups",
             "grouped_source_authorships",
         ),
@@ -836,8 +840,14 @@ NODES: tuple[Node, ...] = (
             "publications.authorships_dirty",
             "publication_author_alignment",
         ),
-        # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que le nœud retire lui-même.
-        previous_run=("publications.id", "publications.authorships_dirty"),
+        # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que le nœud retire lui-même ; personnes, identifiants et neutralisations qu'écrit la phase `persons`.
+        previous_run=(
+            "publications.id",
+            "publications.authorships_dirty",
+            "person_identifiers",
+            "persons",
+            "source_authorships.neutralized_identifiers",
+        ),
     ),
     _node(
         "persons.resolve",

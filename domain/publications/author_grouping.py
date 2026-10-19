@@ -32,6 +32,20 @@ def full_first_name(first_name: str) -> str:
     return first_name if any(len(part) > 1 for part in first_name.split()) else ""
 
 
+def with_known_first_name(first_name: str, known: str) -> str:
+    """Prénom d'une signature pour l'alignement : `known` quand le prénom de la signature est absent ou fait d'initiales que `known` prolonge (« z » et « zhihao »), sinon le prénom de la signature.
+
+    `known` : prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la signature.
+    """
+    if (
+        full_first_name(known)
+        and not full_first_name(first_name)
+        and _initials(known).startswith(_initials(first_name))
+    ):
+        return known
+    return first_name
+
+
 def longest_ordered(links: Iterable[tuple[int, int, int]]) -> set[int]:
     """Identifiants de la plus longue suite de liens (position dans la notice, rang du groupe, identifiant) dont les rangs croissent avec les positions."""
     items = sorted(links)

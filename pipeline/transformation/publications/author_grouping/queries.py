@@ -5,7 +5,9 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
+from domain.persons.identifiers import AttributionStatus
 from domain.source_publications.metadata_correction.shared_doi import DoiClusterCase
+from infrastructure.sql_fragments import in_clause, usable_identifier
 
 # Notice dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
 _CONVERGED = [
@@ -14,8 +16,21 @@ _CONVERGED = [
     DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
 ]
 
+# Statuts d'un rattachement d'identifiant posé par un humain.
+_HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
+
+
+def _known_first_name(id_type: str) -> str:
+    """Prénom normalisé de la personne à laquelle un humain a rattaché l'identifiant `id_type` de la signature `sa`, s'il n'est pas neutralisé."""
+    return f"""(
+        SELECT p.first_name_normalized FROM person_identifiers pi JOIN persons p ON p.id = pi.person_id
+        WHERE pi.id_type = '{id_type}' AND pi.id_value = {usable_identifier(f"'{id_type}'")}
+          AND pi.status::text IN {in_clause(_HUMAN_STATUSES)}
+    )"""
+
+
 # Signatures à grouper, hors collectifs, hors notices convergées ou recopiées d'un dépôt HAL présent.
-_SIGNATURES_SQL = text("""
+_SIGNATURES_SQL = text(f"""
     WITH notices AS (
         SELECT sp.id, sp.publication_id, sp.source::text AS source, sp.source_id,
                (sp.raw_metadata -> 'doi' ->> 'corrected_by') = ANY(:converged) IS TRUE AS converged
@@ -32,7 +47,8 @@ _SIGNATURES_SQL = text("""
            aik.last_name_normalized AS last_name,
            coalesce(aik.first_name_normalized, '') AS first_name,
            coalesce(aik.person_identifiers ->> 'orcid', '') AS orcid,
-           coalesce(aik.person_identifiers ->> 'idref', '') AS idref
+           coalesce(aik.person_identifiers ->> 'idref', '') AS idref,
+           coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
     FROM kept k
     JOIN source_authorships sa ON sa.source_publication_id = k.id
     JOIN author_identifying_keys aik ON aik.id = sa.identity_id
@@ -106,6 +122,7 @@ class SignatureRow:
     first_name: str
     orcid: str
     idref: str
+    known_first_name: str = ""
 
 
 @dataclass(frozen=True, slots=True)

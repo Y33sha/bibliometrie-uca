@@ -13,7 +13,7 @@ from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
 from pipeline.transformation.publications.author_grouping.queries import AuthorGroupingQueries
 from tests.integration.helpers.authorships import upsert_split_identity
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -257,3 +257,67 @@ def test_les_autres_roles_s_alignent_par_le_nom(conn):
     _run(conn)
 
     assert {theses[0], hal[0]} in _groups(conn, pub).values()
+
+
+_ORCID = "0000-0002-1825-0097"
+
+
+def _homonyms_with_orcid(conn, status):
+    """Deux homonymes de même initiale dans la notice HAL. La notice OpenAlex a une signature réduite à l'initiale, dont l'ORCID est rattaché avec `status` à une personne du prénom du second."""
+    pub = insert_publication(conn)
+    hal = _notice(conn, pub, "hal", "hal-1", [("xu", "zhihao"), ("xu", "zehua")])
+    notice = insert_source_publication(conn, pub, source="openalex", source_id="W1")
+    identity = upsert_split_identity(conn, "xu", "z", {"orcid": _ORCID})
+    oa = insert_signature(conn, notice, source="openalex", identity_id=identity)
+    person = insert_person(conn, "Xu", first_name="Zehua")
+    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status=status)
+    return pub, hal, oa
+
+
+def test_le_prenom_d_un_identifiant_confirme_aligne_les_initiales(conn):
+    pub, hal, oa = _homonyms_with_orcid(conn, "confirmed")
+
+    _run(conn)
+
+    assert {hal[1], oa} in _groups(conn, pub).values()
+
+
+def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
+    pub, hal, oa = _homonyms_with_orcid(conn, "pending")
+
+    _run(conn)
+
+    assert {hal[0], oa} in _groups(conn, pub).values()
+
+
+def _dirty(conn, publication_id):
+    return conn.execute(
+        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication_id}
+    ).scalar_one()
+
+
+def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):
+    pub, _, _ = _homonyms_with_orcid(conn, "pending")
+    _run(conn)
+
+    conn.execute(
+        text("UPDATE person_identifiers SET status = 'confirmed' WHERE id_value = :v"),
+        {"v": _ORCID},
+    )
+
+    assert _dirty(conn, pub) is True
+
+
+def test_un_changement_de_prenom_marque_la_publication_a_regrouper(conn):
+    pub, _, _ = _homonyms_with_orcid(conn, "confirmed")
+    _run(conn)
+
+    conn.execute(
+        text(
+            "UPDATE persons SET first_name_normalized = 'zhihao'"
+            " WHERE id = (SELECT person_id FROM person_identifiers WHERE id_value = :v)"
+        ),
+        {"v": _ORCID},
+    )
+
+    assert _dirty(conn, pub) is True
