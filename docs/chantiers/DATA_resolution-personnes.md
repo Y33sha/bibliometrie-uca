@@ -28,7 +28,11 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 ### Phase 1 — Mesure
 
-- [ ] Jeu d'évaluation tiré des verdicts humains : rattachements détachés (`rejected_authorships`), rattachements manuels (`confirmed_authorships`), relectures des groupes à plusieurs personnes, doublons de personnes fusionnés le 2026-10-19.
+- [x] Jeu d'évaluation tiré des verdicts humains, le 2026-10-19 (`build_evaluation_set.py`). Il compte 2 373 couples (signature, personne) justes, 523 couples (notice, personne) faux et 23 paires de personnes distinctes.
+  - Couples justes : 1 610 rattachements manuels (`confirmed_authorships`), et 763 signatures des groupes jugés « doublon de personnes », rattachées à la personne conservée par la fusion. 78 signatures sont hors groupe.
+  - Couples faux : rattachements détachés (`rejected_authorships`).
+  - Le jeu est concentré : trois personnes ont 80 % des détachements, cinq personnes 45 % des rattachements manuels.
+  - La cascade lit les rattachements manuels et les détachements. L'évaluation la fait tourner sans eux.
 - [ ] Précision et rappel de la cascade actuelle sur ce jeu. Ils servent de base de comparaison aux essais.
 - [ ] Signaux par groupe. Décompte des groupes dont les identifiants désignent plusieurs personnes, dont l'identifiant et le nom désignent deux personnes différentes, dont le nom désigne plusieurs personnes ou aucune.
 - [ ] Pouvoir de l'affiliation : parmi les groupes au nom ambigu, part de ceux dont les structures recoupent celles d'un seul candidat sur ses autres publications. Échantillon relu à la main.
