@@ -96,6 +96,18 @@ class TestSelectPhasesToRun:
         assert sortie.value.code == 2
         assert "persons" in capsys.readouterr().err
 
+    @pytest.mark.parametrize("valeur", ["", " , ", "hal,inexistante"])
+    def test_liste_de_sources_vide_ou_inconnue_arrete_le_run(self, valeur):
+        with pytest.raises(SystemExit) as sortie:
+            run_pipeline._build_arg_parser().parse_args(["--sources", valeur])
+
+        assert sortie.value.code == 2
+
+    def test_liste_de_sources_normalisee(self):
+        args = run_pipeline._build_arg_parser().parse_args(["--sources", " hal , wos "])
+
+        assert args.sources == "hal,wos"
+
 
 def _masquant(origine: BaseException) -> PendingRollbackError:
     """L'erreur que lève l'annulation d'une transaction sur une connexion perdue, `origine` étant l'exception en cours de traitement."""

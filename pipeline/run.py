@@ -131,6 +131,16 @@ def _catalogue_des_phases() -> str:
     return "\n".join(lignes)
 
 
+def _source_list(value: str) -> str:
+    """Valide `--sources` : au moins une source, toutes connues du registre."""
+    sources = [s.strip() for s in value.split(",") if s.strip()]
+    if not sources:
+        raise argparse.ArgumentTypeError("au moins une source attendue")
+    if unknown := [s for s in sources if s not in ALL_SOURCES]:
+        raise argparse.ArgumentTypeError(f"source(s) inconnue(s) : {', '.join(unknown)}")
+    return ",".join(sources)
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     """Parseur des arguments de la CLI pipeline.
 
@@ -164,6 +174,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--sources",
+        type=_source_list,
         default=",".join(ALL_SOURCES),
         help=f"Sources, séparées par des virgules (défaut : {','.join(ALL_SOURCES)})",
     )
