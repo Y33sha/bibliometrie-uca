@@ -4,7 +4,7 @@
 
 Trois modules, dans deux phases, suppriment des publications :
 
-- `refresh_from_sources` (`reconciliation/refresh.py`) supprime une publication sans notice, ou de type non admissible ;
+- `lifecycle.refresh` supprime, après recalcul, une publication sans notice ou de type non admissible ;
 - le nœud `publications.delete_without_sources` supprime les publications sans notice ;
 - le nœud `authorships.purge_orphan_publications` supprime les publications sans authorship.
 
@@ -41,11 +41,13 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 ### Phase 2 — Référentiels vides et compteurs
 
 - [ ] Suppression des référentiels vides et recalcul des `pub_count` sous `publishing/`, avec leurs nœuds.
+- [ ] Recalcul de `addresses.pub_count` sous `structures/`.
 
 ### Phase 3 — Drapeaux de recalcul
 
 - [ ] Fonction de marquage de `keys_dirty`.
 - [ ] Fonction de marquage de `authorships_dirty`.
+- [ ] Fonctions de marquage de `countries_dirty` et `candidates_dirty`, posés par `ror.py`, `hal_structures.py` et `signature_queries.py`.
 
 ### Phase 4 — Documentation
 

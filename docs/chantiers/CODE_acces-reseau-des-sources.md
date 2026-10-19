@@ -2,7 +2,7 @@
 
 ## Contexte
 
-La boucle « chercher un identifiant, écrire le résultat dans `staging` » existe en cinq copies : `common/fetch_missing.py`, `common/fetch_stale.py`, `hal/fetch_missing.py`, `theses/fetch_missing.py`, `openalex/fetch_truncated.py`. Chacune range elle-même les trois issues : trouvé, introuvable, indisponible.
+La boucle « chercher un identifiant, écrire le résultat dans `staging` » existe en cinq copies : `common/fetch_missing.py`, `common/fetch_stale.py`, `hal/fetch_missing.py`, `theses/fetch_missing.py`, `openalex/fetch_truncated.py`. Chacune range elle-même les trois issues : trouvé, introuvable, indisponible. `oa_status.py` (Unpaywall) et `enrich_journals_from_openalex.py` ont leur propre boucle réseau.
 
 Trois mécanismes règlent le débit d'une source :
 
