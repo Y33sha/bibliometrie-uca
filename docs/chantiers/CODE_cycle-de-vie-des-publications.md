@@ -34,8 +34,8 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 ### Phase 1 — Suppression d'une publication
 
 - [ ] Module du cycle de vie : seul module qui supprime une publication.
-- [ ] `dissolve(publication, successeur)` : report des paiements APC, redirection de l'identifiant, suppression. Appelée par `reconcile_components.py`.
-- [ ] Verdict rendu par `refresh_from_sources`, suppression par le module du cycle de vie.
+- [x] `dissolve(publication, successeur)` : report des paiements APC, redirection de l'identifiant, suppression. Appelée par `reconcile_components.py`. 2b6f11f1d
+- [x] Verdict rendu par `refresh_from_sources`, suppression par le module du cycle de vie. 2b6f11f1d
 - [ ] Nœud de suppression après `authorships`, à la place de `delete_without_sources` et de `purge_orphan_publications`, et lectures `previous_run` de `publications.id` qui en découlent.
 
 ### Phase 2 — Référentiels vides et compteurs
