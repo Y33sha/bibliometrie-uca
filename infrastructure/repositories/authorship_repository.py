@@ -11,6 +11,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipRepository,
 )
 from infrastructure.sql_fragments import (
+    PERSON_PUBLICATIONS_SCOPE,
     REJECTED_PAIRS,
     insert_missing_authorships_sql,
     propagate_authorship_attributes_sql,
@@ -78,9 +79,13 @@ class PgAuthorshipRepository(AuthorshipRepository):
         """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le pipeline."""
         if not publication_ids:
             return
-        scope = {"person_id": person_id, "publication_ids": publication_ids}
-        self._conn.execute(text(insert_missing_authorships_sql(scoped=True)), scope)
-        self._conn.execute(text(propagate_authorship_attributes_sql(scoped=True)), scope)
+        params = {"person_id": person_id, "publication_ids": publication_ids}
+        self._conn.execute(
+            text(insert_missing_authorships_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
+        )
+        self._conn.execute(
+            text(propagate_authorship_attributes_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
+        )
 
     # ── source_authorships : lien personne ↔ signature
 
