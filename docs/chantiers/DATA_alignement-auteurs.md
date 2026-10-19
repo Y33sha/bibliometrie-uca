@@ -248,8 +248,8 @@ Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de 
 - [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
 - [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
 - [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les signatures concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de la notice seule ; la comparaison avec les autres notices de la publication sert de confirmation. Le diagnostic se calcule sur les signatures que la phase `author_grouping` charge déjà.
-- [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
-- [ ] Fusions erronées probables dans l'onglet Fusions suspectes.
+- [x] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Les notices s'alignent de la plus longue à la plus courte, donc elle ne fonde pas les groupes.
+- [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des signatures ont un correspondant : une notice étrangère minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : une notice dont presque aucune signature n'a de correspondant.
 
 ### Phase 6 — Fin de chantier
 
