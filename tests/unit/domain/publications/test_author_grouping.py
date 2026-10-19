@@ -75,6 +75,44 @@ class TestAlignPublication:
         assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(groups)
         assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _grouped(groups)
 
+    def test_l_identifiant_d_un_membre_lie_au_groupe(self):
+        """La référence est sans ORCID ; un membre venu de la deuxième notice a l'ORCID, et la troisième notice rejoint son groupe, même dans l'ordre inverse."""
+        reference = _notice(1, [("martin", "anne"), ("martin", "bruno")])
+        with_orcid = [
+            Signature(200, 2, 0, "martin", "a", orcid="A"),
+            Signature(201, 2, 1, "martin", "b", orcid="B"),
+        ]
+        without_name = [
+            Signature(300, 3, 0, "martin", "", orcid="B"),
+            Signature(301, 3, 1, "martin", "", orcid="A"),
+        ]
+        groups = align_publication({1: reference, 2: with_orcid, 3: without_name})
+        assert _grouped(groups) == [
+            [
+                (100, GroupingMethod.REFERENCE),
+                (200, GroupingMethod.NAME),
+                (301, GroupingMethod.IDENTIFIER),
+            ],
+            [
+                (101, GroupingMethod.REFERENCE),
+                (201, GroupingMethod.NAME),
+                (300, GroupingMethod.IDENTIFIER),
+            ],
+        ]
+
+    def test_un_identifiant_present_dans_deux_groupes_ne_lie_rien(self):
+        reference = _notice(1, [("martin", "anne"), ("martin", "bruno")])
+        both = [
+            Signature(200, 2, 0, "martin", "a", orcid="A"),
+            Signature(201, 2, 1, "martin", "b", orcid="A"),
+        ]
+        groups = align_publication(
+            {1: reference, 2: both, 3: [Signature(300, 3, 0, "martin", "", orcid="A")]}
+        )
+        assert all(
+            300 not in {m.signature for m in g.members} or len(g.members) == 1 for g in groups
+        )
+
     def test_un_lien_qui_croise_l_ordre_est_ecarte(self):
         """Patronyme unique à l'autre bout de la liste : sans filtre d'ordre, « Ferrer » serait lié à « Ferrer » malgré les auteurs liés entre eux."""
         reference = [("martin", "a"), ("petit", "b"), ("durand", "c"), ("ferrer", "j")]

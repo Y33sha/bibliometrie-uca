@@ -314,9 +314,16 @@ def _initial_key(s: Signature) -> tuple[str, str] | None:
 class _NoticeLinks:
     """Liens de la règle entre une notice et les groupes déjà formés."""
 
-    def __init__(self, sigs: Sequence[Signature], groups: Sequence[Group]) -> None:
+    def __init__(
+        self,
+        sigs: Sequence[Signature],
+        groups: Sequence[Group],
+        signatures: Mapping[int, Signature] | None = None,
+    ) -> None:
         self.sigs = sigs
         self.groups = groups
+        # Signatures des membres des groupes, pour comparer les identifiants à tout le groupe.
+        self.signatures = signatures or {}
         self.rank = {g.index: r for r, g in enumerate(groups)}
         self.links: dict[int, int] = {}
         self.methods: dict[int, GroupingMethod] = {}
@@ -346,23 +353,32 @@ class _NoticeLinks:
             if len(ss) == 1 and len(gs) == 1:
                 self.link(ss[0], gs[0], method)
 
+    def _members(self, g: Group) -> list[Signature]:
+        return [self.signatures.get(m.signature, g.reference) for m in g.members]
+
     def shared_identifier(self) -> None:
-        """Lie une signature au groupe qui partage son ORCID ou son IdRef, à patronyme égal."""
-        by_name: dict[str, list[Group]] = {}
+        """Lie une signature au groupe dont un membre partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs groupes ne lie rien."""
+        by_identifier: dict[tuple[str, str, str], set[int]] = defaultdict(set)
         for g in self.groups:
-            by_name.setdefault(g.reference.last_name, []).append(g)
+            for m in self._members(g):
+                if m.last_name and m.orcid:
+                    by_identifier[("orcid", m.last_name, m.orcid)].add(g.index)
+                if m.last_name and m.idref:
+                    by_identifier[("idref", m.last_name, m.idref)].add(g.index)
+        by_index = {g.index: g for g in self.groups}
         for s in self.sigs:
             if s.id in self.links or not s.last_name:
                 continue
-            taken = self.linked_groups()
-            for g in by_name.get(s.last_name, ()):
-                ref = g.reference
-                if g.index not in taken and (
-                    (s.orcid and s.orcid == ref.orcid) or (s.idref and s.idref == ref.idref)
-                ):
-                    self.link(s, g, GroupingMethod.IDENTIFIER)
-                    if s.id in self.links:
-                        break
+            candidates = (
+                by_identifier.get(("orcid", s.last_name, s.orcid), set()) if s.orcid else set()
+            )
+            if not candidates and s.idref:
+                candidates = by_identifier.get(("idref", s.last_name, s.idref), set())
+            if (
+                len(candidates) == 1
+                and (index := next(iter(candidates))) not in self.linked_groups()
+            ):
+                self.link(s, by_index[index], GroupingMethod.IDENTIFIER)
 
     def name_steps(self) -> None:
         self.unique_pairs(_name_key, GroupingMethod.NAME)
@@ -371,12 +387,18 @@ class _NoticeLinks:
         self.shared_identifier()
 
     def order_filter(self) -> None:
-        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres."""
+        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant reste, quel que soit son rang."""
         kept = longest_ordered(
-            (s.position, self.rank[self.links[s.id]], s.id) for s in self.sigs if s.id in self.links
+            (s.position, self.rank[self.links[s.id]], s.id)
+            for s in self.sigs
+            if s.id in self.links and self.methods[s.id] != GroupingMethod.IDENTIFIER
         )
         for s in self.sigs:
-            if s.id in self.links and s.id not in kept:
+            if (
+                s.id in self.links
+                and s.id not in kept
+                and self.methods[s.id] != GroupingMethod.IDENTIFIER
+            ):
                 self.forbidden.add((s.id, self.links.pop(s.id)))
                 del self.methods[s.id]
 
@@ -533,7 +555,7 @@ def align_publication(
         methods: dict[int, GroupingMethod] = {}
         scores: dict[int, tuple[float, float]] = {}
         if i:
-            notice = _NoticeLinks(sigs, groups)
+            notice = _NoticeLinks(sigs, groups, signatures)
             notice.name_steps()
             if ordered:
                 notice.order_filter()
