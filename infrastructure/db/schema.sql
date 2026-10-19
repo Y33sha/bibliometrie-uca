@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gxgZM7SOQzVbAaPAhYNtRgchryYofpqMeoH2UrbrfTqdIVGYgDKgvwL3akEVipA
+\restrict SQmDWF9m6ImoZNCVhtVfGdhRGDaqY7geC0nOees0APnusU9HedrEr42MWd1O2J5
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -468,6 +468,62 @@ CREATE FUNCTION public.protect_authenticated_identifier() RETURNS trigger
             RETURN NEW;
         END;
         $$;
+
+
+--
+-- Name: regroup_identifier_publications(text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.regroup_identifier_publications(id_type text, id_value text) RETURNS void
+    LANGUAGE sql
+    AS $$
+                UPDATE publications.publications p SET authorships_dirty = true
+                FROM sources.source_publications sp
+                JOIN sources.source_authorships sa ON sa.source_publication_id = sp.id
+                JOIN sources.author_identifying_keys aik ON aik.id = sa.identity_id
+                WHERE p.id = sp.publication_id AND NOT p.authorships_dirty
+                  AND aik.person_identifiers ? id_type
+                  AND aik.person_identifiers ->> id_type = id_value
+            $$;
+
+
+--
+-- Name: regroup_on_first_name_change(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.regroup_on_first_name_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+                DECLARE
+                    ident record;
+                BEGIN
+                    FOR ident IN
+                        SELECT id_type, id_value FROM persons.person_identifiers
+                        WHERE person_id = NEW.id AND id_type IN ('orcid', 'idref') AND status IN ('confirmed', 'authenticated')
+                    LOOP
+                        PERFORM public.regroup_identifier_publications(ident.id_type, ident.id_value);
+                    END LOOP;
+                    RETURN NULL;
+                END;
+            $$;
+
+
+--
+-- Name: regroup_on_identifier_decision(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.regroup_on_identifier_decision() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+                BEGIN
+                    IF TG_OP = 'DELETE' THEN
+                        PERFORM public.regroup_identifier_publications(OLD.id_type, OLD.id_value);
+                    ELSE
+                        PERFORM public.regroup_identifier_publications(NEW.id_type, NEW.id_value);
+                    END IF;
+                    RETURN NULL;
+                END;
+            $$;
 
 
 SET default_tablespace = '';
@@ -3604,6 +3660,13 @@ CREATE INDEX idx_publications_year_type ON publications.publications USING btree
 
 
 --
+-- Name: ix_grouped_source_authorships_source_publication_id; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX ix_grouped_source_authorships_source_publication_id ON publications.grouped_source_authorships USING btree (source_publication_id);
+
+
+--
 -- Name: publication_author_alignment_pkey; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -3884,10 +3947,24 @@ CREATE INDEX author_identifying_keys_author_name_normalized_idx ON sources.autho
 
 
 --
+-- Name: author_identifying_keys_idref_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX author_identifying_keys_idref_idx ON sources.author_identifying_keys USING btree (((person_identifiers ->> 'idref'::text))) WHERE (person_identifiers ? 'idref'::text);
+
+
+--
 -- Name: author_identifying_keys_key_hash_idx; Type: INDEX; Schema: sources; Owner: -
 --
 
 CREATE INDEX author_identifying_keys_key_hash_idx ON sources.author_identifying_keys USING btree (key_hash);
+
+
+--
+-- Name: author_identifying_keys_orcid_idx; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX author_identifying_keys_orcid_idx ON sources.author_identifying_keys USING btree (((person_identifiers ->> 'orcid'::text))) WHERE (person_identifiers ? 'orcid'::text);
 
 
 --
@@ -4218,6 +4295,34 @@ ALTER STATISTICS sources.source_authorships_orphan_perimeter SET STATISTICS 1000
 --
 
 CREATE TRIGGER trg_protect_authenticated_identifier BEFORE INSERT OR UPDATE ON persons.person_identifiers FOR EACH ROW EXECUTE FUNCTION public.protect_authenticated_identifier();
+
+
+--
+-- Name: persons trg_regroup_on_first_name_change; Type: TRIGGER; Schema: persons; Owner: -
+--
+
+CREATE TRIGGER trg_regroup_on_first_name_change AFTER UPDATE OF first_name_normalized ON persons.persons FOR EACH ROW WHEN ((old.first_name_normalized IS DISTINCT FROM new.first_name_normalized)) EXECUTE FUNCTION public.regroup_on_first_name_change();
+
+
+--
+-- Name: person_identifiers trg_regroup_on_identifier_delete; Type: TRIGGER; Schema: persons; Owner: -
+--
+
+CREATE TRIGGER trg_regroup_on_identifier_delete AFTER DELETE ON persons.person_identifiers FOR EACH ROW WHEN (((old.id_type = ANY (ARRAY['orcid'::text, 'idref'::text])) AND (old.status = ANY (ARRAY['confirmed'::public.identifier_status, 'authenticated'::public.identifier_status])))) EXECUTE FUNCTION public.regroup_on_identifier_decision();
+
+
+--
+-- Name: person_identifiers trg_regroup_on_identifier_insert; Type: TRIGGER; Schema: persons; Owner: -
+--
+
+CREATE TRIGGER trg_regroup_on_identifier_insert AFTER INSERT ON persons.person_identifiers FOR EACH ROW WHEN (((new.id_type = ANY (ARRAY['orcid'::text, 'idref'::text])) AND (new.status = ANY (ARRAY['confirmed'::public.identifier_status, 'authenticated'::public.identifier_status])))) EXECUTE FUNCTION public.regroup_on_identifier_decision();
+
+
+--
+-- Name: person_identifiers trg_regroup_on_identifier_update; Type: TRIGGER; Schema: persons; Owner: -
+--
+
+CREATE TRIGGER trg_regroup_on_identifier_update AFTER UPDATE OF status, person_id ON persons.person_identifiers FOR EACH ROW WHEN (((new.id_type = ANY (ARRAY['orcid'::text, 'idref'::text])) AND ((old.status = ANY (ARRAY['confirmed'::public.identifier_status, 'authenticated'::public.identifier_status])) OR (new.status = ANY (ARRAY['confirmed'::public.identifier_status, 'authenticated'::public.identifier_status]))) AND ((old.status IS DISTINCT FROM new.status) OR (old.person_id IS DISTINCT FROM new.person_id)))) EXECUTE FUNCTION public.regroup_on_identifier_decision();
 
 
 --
@@ -4776,5 +4881,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gxgZM7SOQzVbAaPAhYNtRgchryYofpqMeoH2UrbrfTqdIVGYgDKgvwL3akEVipA
+\unrestrict SQmDWF9m6ImoZNCVhtVfGdhRGDaqY7geC0nOees0APnusU9HedrEr42MWd1O2J5
 
