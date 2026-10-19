@@ -33,13 +33,14 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
   - Couples faux : rattachements détachés (`rejected_authorships`).
   - Le jeu est concentré : trois personnes ont 80 % des détachements, cinq personnes 45 % des rattachements manuels.
   - La cascade lit les rattachements manuels et les détachements. L'évaluation la fait tourner sans eux.
-- [x] Précision et rappel de la cascade actuelle sur ce jeu, le 2026-10-19. La phase `persons` reconstruit les rattachements dans une copie de la base (`reset_eval.sql`). La copie garde les personnes, les notices RH et les décisions humaines sur les identifiants et les formes de nom. Elle perd les rattachements, les épinglages, les détachements et les attributions déduites des rattachements. La phase tourne trois fois. Les résultats sur le jeu d'évaluation varient peu après le deuxième passage (`evaluate.py`).
+- [x] Précision et rappel de la cascade actuelle sur ce jeu, le 2026-10-19. La phase `persons` reconstruit les rattachements dans une copie de la base (`reset_eval.sql`). La copie garde les personnes, les notices RH et les décisions humaines sur les identifiants et les formes de nom. Elle perd les rattachements, les épinglages, les détachements et les attributions déduites des rattachements. Les résultats sur le jeu d'évaluation varient peu après le deuxième passage (`evaluate.py`). Le tableau donne le troisième.
 
   | Lignes du jeu | Total | Juste | Sans personne | Autre personne | Personne créée |
   |---|---|---|---|---|---|
   | rattachements manuels | 1 610 | 464 | 755 | 363 | 28 |
   | signatures des doublons fusionnés | 763 | 592 | 29 | 0 | 142 |
 
+  - La reconstruction converge en cinq passages : 756 000, 1 307 000, 1 612 000, 1 732 000 puis 1 736 000 signatures rattachées, contre 1 833 000 en production. La phase charge les candidats hors périmètre en début de passage. Un lien entre sources attend donc le passage qui suit l'identification de son ancre.
   - 128 détachements sur 523 se reproduisent, dont 90 pour cinq personnes.
   - 345 rattachements faux viennent de deux personnes connues seulement par leurs épinglages, « A. Devaux » et « G. Roche ». La reconstruction les supprime, et leurs signatures rejoignent un homonyme par le nom.
   - Les doublons fusionnés se reforment : 142 signatures créent une autre personne.

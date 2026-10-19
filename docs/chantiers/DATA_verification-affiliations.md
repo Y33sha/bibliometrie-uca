@@ -18,8 +18,20 @@ Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les lien
   - Les notices de plus de 500 auteurs contiennent 1 780 des 2 774 signatures sans confirmation. 244 des 565 personnes signent ainsi dans une notice de 10 auteurs au plus.
   - Exemple g5296946 : une université chinoise et un laboratoire du périmètre. La signature HAL du dépôt in2p3, de 54 auteurs, donne aussi ce laboratoire.
   - Relecture de 65 de ces 565 personnes, le 2026-10-19 (`build_multicountry_review.py`) : 57 fausses personnes du périmètre, 3 doubles affiliations réelles, 5 cas indéterminables. Par plus petite notice concernée : 18 fausses sur 25 jusqu'à 10 auteurs, 19 sur 20 de 11 à 500 auteurs, 20 sur 20 au-delà. L'adresse française appartient à un autre auteur, ou l'adresse est fausse.
-- [ ] Personnes hors RH dont aucune signature du périmètre n'est confirmée par une autre source de son groupe, par source et type d'indice.
-- [ ] Échantillon de ces personnes relu à la main, par source et type d'indice.
+- [x] Personnes hors RH dont aucune signature du périmètre n'est confirmée par une autre source de son groupe, le 2026-10-19 (`measure_unconfirmed_perimeter.sql`) : 5 794 sur 15 024. Une signature est confirmée quand une signature d'une autre source du même groupe est aussi du périmètre.
+
+  | Source des indices | Personnes | Dont autre affiliation dans une autre source |
+  |---|---|---|
+  | OpenAlex | 3 429 | 1 636 |
+  | plusieurs sources | 649 | 413 |
+  | WoS | 639 | 523 |
+  | HAL | 539 | 304 |
+  | theses.fr | 348 | 1 |
+  | scanR | 182 | 135 |
+  | Crossref, DataCite | 8 | 5 |
+
+  - 991 de ces personnes ont une signature OpenAlex aux adresses de la France et d'un autre pays.
+- [ ] Échantillon de 70 de ces personnes relu à la main, hors adresses OpenAlex à plusieurs pays (`build_perimeter_review.py`).
 
 ### Phase 2 — INSPIRE-HEP
 
