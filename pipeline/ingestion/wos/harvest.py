@@ -35,7 +35,6 @@ from pipeline.ingestion.wos.fields import (
 )
 from pipeline.runtime.config import (
     get_extraction_api_ids,
-    get_years,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -225,7 +224,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
     def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
         affiliations = config.affiliations
         client = self._client
-        years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
+        years = self._years(args)
 
         def compte(annee: int) -> int:
             try:

@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.ingestion.common import harvest as common_harvest
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.hal import harvest
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
@@ -69,7 +70,7 @@ def configuration(monkeypatch):
 
     def _poser(collections: dict[str, str], annees: list[int]) -> None:
         monkeypatch.setattr(harvest, "get_hal_collections", lambda conn: collections)
-        monkeypatch.setattr(harvest, "get_years", lambda conn, start_year=None: annees)
+        monkeypatch.setattr(common_harvest, "get_years", lambda conn, start_year=None: annees)
 
     return _poser
 
@@ -110,7 +111,16 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date(configuration):
     client = _client()
     HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
     assert client.fetch_page_cursor.call_count == 1
-    assert client.count.call_args.args[0] == build_query(years=None, since="2026-01-01")
+
+
+def test_mode_incremental_garde_les_annees_du_mode_complet(configuration):
+    # Une notice ancienne modifiée depuis la date reste hors de la plage d'années.
+    configuration({"C": "Coll"}, [2020, 2021, 2022])
+    client = _client()
+    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
+    attendue = build_query(years=[2020, 2021, 2022], since="2026-01-01")
+    assert client.count.call_args.args[0] == attendue
+    assert client.fetch_page_cursor.call_args.args[0] == attendue
 
 
 def test_sans_collection_refuse(configuration):

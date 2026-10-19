@@ -25,7 +25,7 @@ from pipeline.ingestion.hal.fields import HAL_FIELDS, extract_doi, extract_id
 from pipeline.ingestion.http.api_params import HAL_DELAY, HAL_PER_PAGE
 from pipeline.ingestion.http.http_retry import http_request_with_retry
 from pipeline.ingestion.http.throttle import Throttle
-from pipeline.runtime.config import get_hal_collections, get_years
+from pipeline.runtime.config import get_hal_collections
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
@@ -165,20 +165,22 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les dépôts depuis la date. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
+        En mode incrémental, un seul périmètre : les notices modifiées depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))
+        years = self._years(args)
 
         if args.since:
             return self._extrait_d_un_tenant(
-                client.count(build_query(years=None, since=args.since), fq),
+                client.count(build_query(years=years, since=args.since), fq),
                 lambda avancement: extract_union(
                     client,
                     config,
                     self.conn,
                     scoped_logger(self.logger, self.SOURCE),
                     avancement,
+                    years=years,
                     since=args.since,
                     breaker_tripped=self._breaker_tripped,
                 ),
@@ -198,5 +200,4 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
                 breaker_tripped=self._breaker_tripped,
             )
 
-        years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
         return self._extrait_par_annee(years, compte, extrait)

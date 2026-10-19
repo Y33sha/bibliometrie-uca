@@ -33,9 +33,9 @@ class Ecriture:
 
 @pytest.fixture
 def configuration(monkeypatch):
-    """Remplace la lecture de la configuration d'un moissonneur : identifiants du périmètre, années.
+    """Pose la configuration lue par un moissonneur : identifiants du périmètre, années.
 
-    Seules les fonctions que le module importe sont remplacées.
+    Les identifiants sont posés dans le module du moissonneur s'il les lit, les années dans la classe commune des moissonneurs.
     """
 
     def _poser(
@@ -44,13 +44,15 @@ def configuration(monkeypatch):
         api_ids: list[str] | None = None,
         annees: list[int] | None = None,
     ) -> None:
-        lectures = {
-            "get_extraction_api_ids": lambda conn, source: ["X"] if api_ids is None else api_ids,
-            "get_years": lambda conn, start_year=None: [2024] if annees is None else annees,
-        }
-        for nom, lecture in lectures.items():
-            if hasattr(module, nom):
-                monkeypatch.setattr(module, nom, lecture)
+        if hasattr(module, "get_extraction_api_ids"):
+            monkeypatch.setattr(
+                module,
+                "get_extraction_api_ids",
+                lambda conn, source: ["X"] if api_ids is None else api_ids,
+            )
+        monkeypatch.setattr(
+            harvest, "get_years", lambda conn, start_year=None: [2024] if annees is None else annees
+        )
 
     return _poser
 

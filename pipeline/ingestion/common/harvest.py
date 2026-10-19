@@ -19,6 +19,7 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.runtime.config import get_years
 from pipeline.runtime.observability.libelles import (
     SUITE_DE_BRANCHE,
     accord,
@@ -135,6 +136,10 @@ class SourceExtractor[ConfigT, ClientT](ABC):
         self._client = client
         # Circuit-breaker de la source (posé par `run`) : les boucles `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
         self._breaker: SourceCircuitBreaker | None = None
+
+    def _years(self, args: argparse.Namespace) -> list[int]:
+        """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
+        return [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
 
     def _breaker_tripped(self) -> bool:
         """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`extract_all` pour stopper la source)."""

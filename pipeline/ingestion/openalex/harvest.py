@@ -27,7 +27,6 @@ from pipeline.ingestion.openalex.api import auth_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
 from pipeline.runtime.config import (
     get_extraction_api_ids,
-    get_years,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -215,7 +214,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexClient]):
                 lambda avancement: extrait(avancement, since=args.since),
             )
 
-        years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
+        years = self._years(args)
         return self._extrait_par_annee(
             years,
             lambda annee: client.count(ids, year=annee),

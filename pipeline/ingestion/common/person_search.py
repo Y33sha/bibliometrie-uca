@@ -25,7 +25,6 @@ from pipeline.ingestion.common.harvest import (
     stage_document,
 )
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.runtime.config import get_years
 from pipeline.runtime.observability.libelles import accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -119,7 +118,7 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
         return PersonSearchConfig(persons=persons)
 
     def extract_all(self, args: argparse.Namespace, config: PersonSearchConfig) -> PhaseMetrics:
-        all_years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
+        all_years = self._years(args)
         years = (min(all_years), max(all_years))
         persons = config.persons
         batches = [

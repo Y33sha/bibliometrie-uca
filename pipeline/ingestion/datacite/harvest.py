@@ -23,7 +23,7 @@ from pipeline.ingestion.common.harvest import (
 from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.runtime.config import get_extraction_api_ids, get_years
+from pipeline.runtime.config import get_extraction_api_ids
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
@@ -146,7 +146,7 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteClient]):
     def extract_all(self, args: argparse.Namespace, config: DataciteExtractConfig) -> PhaseMetrics:
         keywords = config.keywords
         client = self._client
-        years = [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
+        years = self._years(args)
 
         def compte(annee: int) -> int:
             try:
