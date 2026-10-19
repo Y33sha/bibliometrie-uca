@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.sql_fragments import AUTHORSHIP_PERIMETER_EVIDENCE_EXPR
+from infrastructure.sql_fragments import SIGNATURES_SCOPE, propagate_authorship_attributes_sql
 from pipeline.transformation.publications.reconciliation.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
@@ -26,19 +26,18 @@ class InPerimeterRecompute:
         sync_perimeter_evidence(
             conn, perimeter_ids=perimeter_structure_ids, signature_ids=source_authorship_ids
         )
-        publication_ids = list(
-            conn.execute(
-                text(f"""
-                    UPDATE authorships a
-                    SET perimeter_evidence = {AUTHORSHIP_PERIMETER_EVIDENCE_EXPR}
-                    FROM source_authorships changed
-                    JOIN source_publications changed_sp ON changed_sp.id = changed.source_publication_id
-                    WHERE changed.id = ANY(:ids)
-                      AND a.publication_id = changed_sp.publication_id
-                      AND a.person_id = changed.person_id
-                    RETURNING a.publication_id
-                """),
-                {"ids": source_authorship_ids},
-            ).scalars()
+        conn.execute(
+            text(propagate_authorship_attributes_sql(scope=SIGNATURES_SCOPE)),
+            {"signature_ids": source_authorship_ids},
         )
-        refresh_publications_perimeter_evidence(conn, publication_ids=sorted(set(publication_ids)))
+        publication_ids = conn.execute(
+            text("""
+                SELECT DISTINCT sp.publication_id
+                FROM source_authorships sa
+                JOIN source_publications sp ON sp.id = sa.source_publication_id
+                WHERE sa.id = ANY(:ids) AND sp.publication_id IS NOT NULL
+                ORDER BY 1
+            """),
+            {"ids": source_authorship_ids},
+        ).scalars()
+        refresh_publications_perimeter_evidence(conn, publication_ids=list(publication_ids))

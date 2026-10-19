@@ -177,19 +177,6 @@ def signature_perimeter_evidence(signature_ids: str | None = None) -> str:
     """
 
 
-# Indices de l'authorship aliasée `a` : union des indices de ses signatures.
-AUTHORSHIP_PERIMETER_EVIDENCE_EXPR = f"""
-    coalesce((
-        SELECT array_agg(DISTINCT e ORDER BY e)
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        CROSS JOIN LATERAL unnest(sa.perimeter_evidence) e
-        WHERE sd.publication_id = a.publication_id
-          AND sa.person_id = a.person_id
-    ), {NO_PERIMETER_EVIDENCE})
-"""
-
-
 def corrected(field: str, notice: str = "sp") -> str:
     """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de la notice aliasée `notice` (`domain.source_publications.raw_metadata`)."""
     return f"{notice}.raw_metadata ? '{field}'"
@@ -213,19 +200,24 @@ def raw_column(field: str, notice: str = "sp") -> str:
     )
 
 
-def _authorship_scope(scoped: bool) -> str:
-    """Restriction aux signatures de la personne `:person_id` sur les publications `:publication_ids`, quand `scoped`."""
-    return (
-        "AND sa.person_id = :person_id AND sp.publication_id = ANY(:publication_ids)"
-        if scoped
-        else ""
-    )
+# Restrictions de `insert_missing_authorships_sql` et `propagate_authorship_attributes_sql`, sur la signature `sa` et sa notice `sp`.
+PERSON_PUBLICATIONS_SCOPE = (
+    "AND sa.person_id = :person_id AND sp.publication_id = ANY(:publication_ids)"
+)
+"""Paires (publication, personne) de la personne `:person_id` sur les publications `:publication_ids`."""
+
+SIGNATURES_SCOPE = """AND (sp.publication_id, sa.person_id) IN (
+    SELECT s_sp.publication_id, s.person_id
+    FROM source_authorships s JOIN source_publications s_sp ON s_sp.id = s.source_publication_id
+    WHERE s.id = ANY(:signature_ids)
+)"""
+"""Paires (publication, personne) des signatures `:signature_ids`."""
 
 
-def insert_missing_authorships_sql(*, scoped: bool = False) -> str:
+def insert_missing_authorships_sql(*, scope: str = "") -> str:
     """Insère une authorship par paire (publication, personne) que lient des signatures, et absente de la table.
 
-    Une paire rejetée est écartée, sauf si une signature confirmée la relie : la confirmation vise la signature elle-même, le rejet la publication. `scoped` restreint aux paramètres `:person_id` et `:publication_ids`.
+    Une paire rejetée est écartée, sauf si une signature confirmée la relie : la confirmation vise la signature elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SIGNATURES_SCOPE`).
     """
     return f"""
         WITH all_pairs AS (
@@ -236,7 +228,7 @@ def insert_missing_authorships_sql(*, scoped: bool = False) -> str:
             JOIN publications pub ON pub.id = sp.publication_id
             LEFT JOIN confirmed_authorships ca
               ON ca.source_authorship_id = sa.id AND ca.person_id = sa.person_id
-            WHERE sa.person_id IS NOT NULL {_authorship_scope(scoped)}
+            WHERE sa.person_id IS NOT NULL {scope}
             GROUP BY sp.publication_id, sa.person_id
         )
         INSERT INTO authorships (publication_id, person_id)
@@ -252,10 +244,10 @@ def insert_missing_authorships_sql(*, scoped: bool = False) -> str:
     """
 
 
-def propagate_authorship_attributes_sql(*, scoped: bool = False) -> str:
+def propagate_authorship_attributes_sql(*, scope: str = "") -> str:
     """Recompose les attributs de chaque authorship depuis ses signatures.
 
-    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une signature le dit. Les indices de périmètre et les rôles sont l'union de ceux des signatures. `scoped` restreint aux paramètres `:person_id` et `:publication_ids`.
+    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une signature le dit. Les indices de périmètre et les rôles sont l'union de ceux des signatures. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SIGNATURES_SCOPE`).
     """
     return f"""
         WITH linked AS (
@@ -265,7 +257,7 @@ def propagate_authorship_attributes_sql(*, scoped: bool = False) -> str:
             JOIN source_publications sp ON sp.id = sa.source_publication_id
             JOIN authorships a ON a.publication_id = sp.publication_id
                               AND a.person_id = sa.person_id
-            WHERE TRUE {_authorship_scope(scoped)}
+            WHERE TRUE {scope}
         ),
         scal AS (
             SELECT l.aid,
