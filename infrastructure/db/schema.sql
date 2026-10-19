@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SQmDWF9m6ImoZNCVhtVfGdhRGDaqY7geC0nOees0APnusU9HedrEr42MWd1O2J5
+\restrict JhEuYnw8vFM5fJAN2DEosde44X91dlFCGhwEhLyPoPYc0zqqyGcdlpqML98SBm7
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1505,7 +1505,6 @@ CREATE TABLE publications.publications (
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
-    unpaywall_checked_at timestamp with time zone,
     subjects_ingested_at timestamp with time zone,
     monograph_id integer,
     license public.license_type,
@@ -2346,6 +2345,31 @@ CREATE SEQUENCE sources.staging_id_seq
 --
 
 ALTER SEQUENCE sources.staging_id_seq OWNED BY sources.staging.id;
+
+
+--
+-- Name: unpaywall; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.unpaywall (
+    doi text NOT NULL,
+    oa_status public.oa_type,
+    checked_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: TABLE unpaywall; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.unpaywall IS 'Verdict d''Unpaywall pour chaque DOI interrogé par la phase oa_status. Le DOI est réinterrogé quand checked_at date de plus que le délai unpaywall_recheck_after_days.';
+
+
+--
+-- Name: COLUMN unpaywall.oa_status; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.unpaywall.oa_status IS 'Statut open access donné par Unpaywall. NULL : DOI absent d''Unpaywall.';
 
 
 --
@@ -3281,6 +3305,14 @@ ALTER TABLE ONLY sources.staging
 
 
 --
+-- Name: unpaywall unpaywall_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.unpaywall
+    ADD CONSTRAINT unpaywall_pkey PRIMARY KEY (doi);
+
+
+--
 -- Name: address_country_candidates address_country_candidates_pkey; Type: CONSTRAINT; Schema: structures; Owner: -
 --
 
@@ -3566,13 +3598,6 @@ CREATE INDEX idx_pub_countries ON publications.publications USING gin (countries
 --
 
 CREATE INDEX idx_pub_title_trgm ON publications.publications USING gin (title_normalized public.gin_trgm_ops);
-
-
---
--- Name: idx_pub_unpaywall_checked; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_pub_unpaywall_checked ON publications.publications USING btree (unpaywall_checked_at NULLS FIRST) WHERE (doi IS NOT NULL);
 
 
 --
@@ -4881,5 +4906,5 @@ ALTER TABLE ONLY structures.structure_tutelles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SQmDWF9m6ImoZNCVhtVfGdhRGDaqY7geC0nOees0APnusU9HedrEr42MWd1O2J5
+\unrestrict JhEuYnw8vFM5fJAN2DEosde44X91dlFCGhwEhLyPoPYc0zqqyGcdlpqML98SBm7
 
