@@ -35,10 +35,12 @@ def extract_ut(rec: Mapping[str, JsonValue]) -> str:
 def get_records(data: Mapping[str, JsonValue]) -> list[Mapping[str, JsonValue]]:
     """Extrait la liste de records depuis la réponse API WoS.
 
-    Chemin profond `data.Data.Records.records.REC`. Retourne `[]` si n'importe quel niveau manque (réponse mal formée ou vide).
+    Chemin profond `data.Data.Records.records.REC`, liste ou objet unique. Retourne `[]` si n'importe quel niveau manque (réponse mal formée ou vide).
     """
     records = at_path(data, "Data", "Records", "records").get("REC")
-    return [as_mapping(r) for r in as_sequence(records)]
+    return [
+        as_mapping(r) for r in ([records] if isinstance(records, Mapping) else as_sequence(records))
+    ]
 
 
 def get_records_found(data: Mapping[str, JsonValue]) -> int:
