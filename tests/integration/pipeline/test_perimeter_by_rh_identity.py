@@ -55,7 +55,7 @@ def _in_perimeter(conn, signature: int) -> bool:
 
 
 def test_signature_pendant_le_contrat_entre_dans_le_perimetre(sa_sync_conn, rh_person):
-    debut, fin = _signature(sa_sync_conn, pub_year=2020), _signature(sa_sync_conn, pub_year=2023)
+    debut, fin = _signature(sa_sync_conn, pub_year=2021), _signature(sa_sync_conn, pub_year=2023)
 
     counts = sync_perimeter_evidence(sa_sync_conn, perimeter_ids=[])
 
@@ -75,6 +75,15 @@ def test_signature_hors_des_dates_du_contrat_reste_hors_perimetre(sa_sync_conn, 
 
     assert not _in_perimeter(sa_sync_conn, avant)
     assert not _in_perimeter(sa_sync_conn, apres)
+
+
+def test_signature_de_l_annee_d_arrivee_reste_hors_perimetre(sa_sync_conn, rh_person):
+    """Arrivée en septembre 2020 : une publication de 2020 a le plus souvent été écrite avant."""
+    arrivee = _signature(sa_sync_conn, pub_year=2020)
+
+    sync_perimeter_evidence(sa_sync_conn, perimeter_ids=[])
+
+    assert not _in_perimeter(sa_sync_conn, arrivee)
 
 
 def test_orcid_d_une_source_non_fiable_ou_neutralise_ignore(sa_sync_conn, rh_person):

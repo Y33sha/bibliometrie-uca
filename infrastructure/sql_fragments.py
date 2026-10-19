@@ -93,10 +93,10 @@ def strong_identifier_signatures(
     """
 
 
-# Identifiants des personnes RH, aux statuts qui les font interroger, avec les années de début et de fin de contrat. Une date inconnue ne borne pas : 0 sans début, 9999 sans fin.
+# Identifiants des personnes RH, aux statuts qui les font interroger, avec les années de présence : de l'année qui suit l'arrivée à l'année de fin de contrat. Sans date : 0, 9999.
 _RH_IDENTIFIERS = f"""(
     SELECT pi.person_id, pi.id_type::text AS id_type, pi.id_value,
-           coalesce(extract(year FROM r.start_date)::int, 0) AS first_year,
+           coalesce(extract(year FROM r.start_date)::int + 1, 0) AS first_year,
            coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
     FROM person_identifiers pi
     JOIN persons_rh r ON r.person_id = pi.person_id
@@ -105,7 +105,7 @@ _RH_IDENTIFIERS = f"""(
 
 
 def rh_identity_signatures(signature_filter: str = "") -> str:
-    """Requête des ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre les années de début et de fin de son contrat, sans rejet de la personne pour la notice.
+    """Requête des ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre l'année qui suit son arrivée et l'année de fin de son contrat, sans rejet de la personne pour la notice.
 
     `signature_filter` : condition supplémentaire sur la signature `sa_auth`.
     """
