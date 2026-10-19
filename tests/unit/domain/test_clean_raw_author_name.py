@@ -50,6 +50,13 @@ class TestCleanRawAuthorName:
             ("O'Neill, J.-P.", "O'Neill, J.-P."),
             # Nom fait seulement de chiffres (ORCID recopié) : inchangé.
             ("0000-0003-4887-7373", "0000-0003-4887-7373"),
+            # Accents et lettres LaTeX : remplacés par leur caractère.
+            ("Bayart, Fr\\'ed\\'eric", "Bayart, Frédéric"),
+            ("Lev\\^eque, Jessica", "Levêque, Jessica"),
+            ('Sch\\"afer, Uli', "Schäfer, Uli"),
+            ("{\\'E}mile Besan\\c{c}on", "Émile Besançon"),
+            ("Mar\\'{\\i}a J{\\o}rgensen", "María Jørgensen"),
+            ("Ho\\v s\\'ek", "Hošék"),
         ],
     )
     def test_clean(self, raw: str, expected: str) -> None:

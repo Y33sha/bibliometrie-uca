@@ -132,19 +132,45 @@ _GREEK_COMMANDS: dict[str, str] = {
     "ell": "ℓ",
 }
 
-# Accent LaTeX sur une lettre : `\'e`, `\'{e}`, `\c{c}`, `\v c`. La lettre seule reste, collée au mot.
+# Accent LaTeX sur une lettre : `\'e`, `\'{e}`, `\c{c}`, `\v c`. Groupe 1 : la commande d'accent ; groupe 2 ou 3 : la lettre. Les commandes faites d'une lettre (`\c`, `\v`) sont suivies d'une accolade ou d'une espace.
 _LATEX_ACCENT_RE = re.compile(
-    r"\\(?:[`'^\"~=.]|[cvuHkr](?=[\s{]))(?:\{\s*([A-Za-z])\s*\}|\s*([A-Za-z]))"
+    r"\\([`'^\"~=.]|[cvuHkr](?=[\s{]))(?:\{\s*([A-Za-zı])\s*\}|\s*([A-Za-zı]))"
 )
 _LATEX_COMMAND_RE = re.compile(r"\\([A-Za-z]+)")
+# Diacritique combinant de chaque commande d'accent.
+_LATEX_ACCENTS = {
+    "'": "\u0301", "`": "\u0300", "^": "\u0302", '"': "\u0308", "~": "\u0303", "=": "\u0304",
+    ".": "\u0307", "u": "\u0306", "v": "\u030c", "H": "\u030b", "c": "\u0327", "k": "\u0328",
+    "r": "\u030a",
+}  # fmt: skip
+# Lettres LaTeX sans équivalent ASCII : `\o` → ø, `\ss` → ß. `\i` est le i sans point, qui reçoit un accent (`\'{\i}`).
+_LATEX_LETTERS = {
+    "aa": "å", "AA": "Å", "ae": "æ", "AE": "Æ", "oe": "œ", "OE": "Œ", "ss": "ß",
+    "o": "ø", "O": "Ø", "l": "ł", "L": "Ł", "i": "ı",
+}  # fmt: skip
+_LATEX_LETTER_RE = re.compile(r"\\(aa|AA|ae|AE|oe|OE|ss|[oOlLi])(?![A-Za-z])")
 
 
 def strip_latex(text: str) -> str:
     """Retire les commandes LaTeX d'un texte. Une lettre accentuée (`\\'e`) garde sa lettre, une lettre grecque (`\\psi`) devient le caractère grec, toute autre commande (`\\rm`, `\\sqrt`, `\\bar`) disparaît. Les arguments restent ; les délimiteurs (`$ { } ^ _`) sont laissés à l'appelant."""
     if "\\" not in text:
         return text
-    text = _LATEX_ACCENT_RE.sub(lambda m: m.group(1) or m.group(2), text)
+    text = _LATEX_ACCENT_RE.sub(lambda m: m.group(2) or m.group(3), text)
     return _LATEX_COMMAND_RE.sub(lambda m: _GREEK_COMMANDS.get(m.group(1), " "), text)
+
+
+def decode_latex_accents(text: str) -> str:
+    """Texte dont les accents et les lettres LaTeX deviennent leur caractère, sans les accolades de groupement : `Fr\\'ed\\'eric` → Frédéric, `Besan\\c{c}on` → Besançon, `J{\\o}rgensen` → Jørgensen."""
+    if "\\" not in text:
+        return text
+    text = _LATEX_LETTER_RE.sub(lambda m: _LATEX_LETTERS[m.group(1)], text)
+
+    def accent(m: re.Match[str]) -> str:
+        letter = m.group(2) or m.group(3)
+        return ("i" if letter == "ı" else letter) + _LATEX_ACCENTS[m.group(1)]
+
+    text = _LATEX_ACCENT_RE.sub(accent, text)
+    return unicodedata.normalize("NFC", text.replace("{", "").replace("}", ""))
 
 
 def sanitize_raw_text(text: str) -> str:
@@ -247,7 +273,7 @@ _TRAILING_SEPARATORS = ",;:-–—/"
 
 
 def clean_raw_author_name(raw: str) -> str:
-    """Nom d'auteur brut sans balisage, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
+    """Nom d'auteur brut sans balisage, sans accents LaTeX, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
 
     Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé d'identité, et les formes de nom dérivées.
 
@@ -255,7 +281,7 @@ def clean_raw_author_name(raw: str) -> str:
     """
     if not raw:
         return raw
-    text = to_plain_text(raw)
+    text = decode_latex_accents(to_plain_text(raw))
     cleaned = " ".join(_EMPTY_BRACKETS_RE.sub(" ", _DIGITS_RE.sub("", text)).split())
     # Parenthèse que le retrait des chiffres a détachée de son contenu : « (EA 999) » → « (EA) ».
     cleaned = cleaned.replace(" )", ")").replace(" ]", "]")
