@@ -66,7 +66,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - Le SQL propre à un module vit dans ce module. Le SQL partagé par plusieurs modules est l'accès à une entité : il vit dans le *store* de l'entité, une classe qui reçoit la connexion à sa construction et rend un agrégat ou des lignes. *Repository* désigne seulement les adaptateurs d'`infrastructure/`. Pas de préfixe `Pg` ni de suffixe `Gateway` ou `Queries`.
 - `transformation/` est organisé par entité. Le graphe déclare des nœuds ; une phase regroupe des nœuds pour l'affichage dans les journaux et l'administration.
 - Les identifiants du code sont en anglais. Les textes affichés sont en français.
-- Une notion, un mot. `authorships` devient `contributions`.
+- Une notion, un mot. `authorships` devient `contributions`. La collecte des sources s'appelle *harvest* partout, phases comprises, et « moissonnage » dans les textes affichés.
 - L'outillage HTTP quitte `ingestion/` pour un paquet neutre `pipeline/http/`. `parallel.py` et `access_source.py` rejoignent `runtime/`. Des contrats import-linter fixent le sens des dépendances : le noyau (`runtime`, `graph`, `node_runner`) n'importe ni `ingestion` ni `transformation`.
 - Le contexte de phase est le seul canal des transactions et du journal.
 - Chaque phase par paquet applique les conventions SQL, de nommage et de langue aux modules qu'elle touche. Un module se modifie une seule fois.
@@ -132,6 +132,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 - [ ] Glossaire : un mot par notion, abréviations bannies.
 - [ ] `authorships` renommé `contributions`.
+- [ ] Collecte des sources renommée *harvest* : phases `extract` et `extract_by_person`, modules, identifiants.
 
 ### Phase 9 — Documentation
 
@@ -140,5 +141,4 @@ D'autres modules réunissent des connaissances sans rapport :
 ## Questions ouvertes
 
 - Nom du module qui expose `build()`, puisque la phase regroupe des nœuds pour l'affichage.
-- Moissonnage : `extract` ou `harvest`.
-- Périmètre de la phase 8 : le renommage d'`authorships` touche le schéma, l'API et le frontend.
+- Périmètre de la phase 8 : le renommage d'`authorships` touche le schéma, l'API et le frontend ; celui des phases touche la ligne de commande, les runs enregistrés et l'administration.
