@@ -35,6 +35,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente, progression
 from pipeline.transformation.publications.author_grouping.queries import (
     AuthorGroupingQueries,
+    BatchPlan,
     GroupRow,
     MembershipRow,
     SignatureRow,
@@ -175,8 +176,8 @@ def _plan_batch(
     methods: Counter[str],
     on_publication: Callable[[], None],
     mapper: Mapper,
-) -> tuple[list[GroupRow], list[int], list[MembershipRow], list[int], dict[int, int]]:
-    """Plan d'écriture d'un lot de publications : groupes, signatures dont l'appartenance est à supprimer, appartenances à insérer, groupes en base sans correspondant, doublons d'auteur. `on_publication` est appelé après chaque publication calculée."""
+) -> BatchPlan:
+    """Plan d'écriture d'un lot de publications. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SignatureTuple]] = {}
     positions: dict[int, int | None] = {}
     for row in queries.fetch_signatures(conn, publication_ids):
@@ -190,9 +191,9 @@ def _plan_batch(
     for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
         copies |= publication_copies
         old = {gid: frozenset(sigs) for gid, sigs in existing.get(publication_id, {}).items()}
-        plan = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
-        planned += [(publication_id, g, gid) for g, gid in zip(groups, plan, strict=True)]
-        unmatched += sorted(set(old) - {gid for gid in plan if gid is not None})
+        ids = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
+        planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
+        unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
     fresh = iter(queries.group_ids(conn, sum(1 for *_, gid in planned if gid is None)))
     group_rows: list[GroupRow] = []
@@ -205,7 +206,7 @@ def _plan_batch(
             methods[method] += 1
             memberships.append(MembershipRow(signature, group_id, notice, method, score, margin))
     removed, inserted = membership_changes(stored, memberships)
-    return group_rows, removed, inserted, unmatched, copies
+    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, copies)
 
 
 def regroup(
@@ -217,7 +218,7 @@ def regroup(
     mapper: Mapper = map,
 ) -> int:
     """Recalcule et écrit les groupes et les doublons d'auteur de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
-    groups, removed, inserted, unmatched, copies = _plan_batch(
+    plan = _plan_batch(
         queries,
         conn,
         publication_ids,
@@ -225,8 +226,8 @@ def regroup(
         on_publication,
         mapper,
     )
-    queries.write(conn, publication_ids, groups, removed, inserted, unmatched, copies)
-    return len(groups)
+    queries.write(conn, plan)
+    return len(plan.groups)
 
 
 def build_groups(
