@@ -51,7 +51,6 @@ from tests.helpers.normalize_doubles import (
     FakeStagingQueries,
     staging_row,
 )
-from tests.helpers.signature_sync import SYNC_SETTINGS
 
 
 class TestGetDoi:
@@ -576,7 +575,7 @@ class TestProcessAuthorships:
         monkeypatch.setattr(
             normalize_crossref,
             "sync_source_authorships",
-            lambda conn, queries, settings, source, spid, block, build: vus.update(
+            lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -586,7 +585,6 @@ class TestProcessAuthorships:
             MagicMock(),
             {"author": [{"family": "Dupont"}]},
             555,
-            sync_settings=SYNC_SETTINGS,
         )
 
         assert (vus["source"], vus["spid"]) == ("crossref", 555)
@@ -633,7 +631,6 @@ class TestProcessWork:
             publisher_repo=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
 
     def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
@@ -679,7 +676,6 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
-        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())
     row = staging_row()

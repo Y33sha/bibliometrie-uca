@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
@@ -15,7 +14,7 @@ from tests.helpers.normalize_doubles import FakeAuthorshipsBatchQueries
 
 def _items_written(records: list[AuthorRecord]) -> list[dict]:
     queries = FakeAuthorshipsBatchQueries()
-    write_source_authorships(MagicMock(), queries, fingerprint, "crossref", 1, records)
+    write_source_authorships(MagicMock(), queries, "crossref", 1, records)
     return queries.upserted_batches[0]
 
 

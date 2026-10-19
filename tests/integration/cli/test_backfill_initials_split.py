@@ -4,7 +4,6 @@ from sqlalchemy import text
 
 from domain.persons.signature_name import SignatureName
 from interfaces.cli.oneshot.backfill_initials_split import backfill
-from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import AuthorRecord, write_source_authorships
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -46,7 +45,6 @@ def test_synchronisation_apres_backfill_garde_la_signature(sa_sync_conn):
     write_source_authorships(
         sa_sync_conn,
         AuthorshipsBatchQueries(),
-        fingerprint,
         "openalex",
         sp,
         [AuthorRecord(0, SignatureName(raw="Del Buono L."))],

@@ -1,6 +1,5 @@
 """Idempotence : normalisation OpenAlex."""
 
-from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import create_all_publications
 from tests.integration.helpers.staging import insert_staging
 
@@ -142,7 +141,6 @@ def run_normalize_oa(conn):
             publisher_repo=publisher_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
-            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

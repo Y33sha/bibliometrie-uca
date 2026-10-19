@@ -1,6 +1,5 @@
 """Idempotence : normalisation Web of Science."""
 
-from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.staging import insert_staging
 
 WOS_STAGING_DOCS = [
@@ -94,7 +93,6 @@ def run_normalize_wos(conn):
             publisher_repo=publisher_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
-            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

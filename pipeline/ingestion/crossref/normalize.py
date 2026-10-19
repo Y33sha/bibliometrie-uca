@@ -42,7 +42,6 @@ from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
 )
 from pipeline.ingestion.common.source_publications import (
@@ -343,14 +342,11 @@ def process_authorships(
     authorship_queries: AuthorshipsBatchQueries,
     msg: Mapping[str, JsonValue],
     source_publication_id: int,
-    *,
-    sync_settings: SignatureSyncSettings,
 ) -> None:
     """Synchronise les signatures Crossref de la notice depuis son bloc auteurs."""
     sync_source_authorships(
         conn,
         authorship_queries,
-        sync_settings,
         "crossref",
         source_publication_id,
         extract_crossref_author_block(msg),
@@ -373,7 +369,6 @@ def process_work(
     publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -418,9 +413,7 @@ def process_work(
             meta=meta,
         ),
     )
-    process_authorships(
-        conn, authorship_queries, msg, source_publication_id, sync_settings=sync_settings
-    )
+    process_authorships(conn, authorship_queries, msg, source_publication_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -443,5 +436,4 @@ class CrossrefNormalizer(BibliographicNormalizer):
             publisher_repo=publisher_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
-            sync_settings=self._sync_settings,
         )

@@ -28,7 +28,7 @@ from domain.source_publications.signature_sync import (
 )
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue
-from pipeline.ingestion.common.fingerprint import Fingerprinter
+from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signature_queries import (
     AuthorshipAddressItem,
     AuthorshipRorItem,
@@ -78,17 +78,9 @@ AuthorBlock = Mapping[str, JsonValue]
 """Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'une notice."""
 
 
-@dataclass(frozen=True, slots=True)
-class SignatureSyncSettings:
-    """Réglages de la synchronisation des signatures : fonction d'empreinte."""
-
-    fingerprint: Fingerprinter
-
-
 def sync_source_authorships(
     conn: Connection,
     queries: AuthorshipsBatchQueries,
-    settings: SignatureSyncSettings,
     source: str,
     source_publication_id: int,
     block: AuthorBlock,
@@ -98,19 +90,16 @@ def sync_source_authorships(
 
     Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_signatures_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
-    block_hash = settings.fingerprint(dict(block))
+    block_hash = fingerprint(dict(block))
     if queries.fetch_authors_hash(conn, source_publication_id) == block_hash:
         return
-    write_source_authorships(
-        conn, queries, settings.fingerprint, source, source_publication_id, build(block)
-    )
+    write_source_authorships(conn, queries, source, source_publication_id, build(block))
     queries.set_authors_hash(conn, source_publication_id, block_hash)
 
 
 def write_source_authorships(
     conn: Connection,
     queries: AuthorshipsBatchQueries,
-    fingerprint: Fingerprinter,
     source: str,
     source_publication_id: int,
     records: list[AuthorRecord],

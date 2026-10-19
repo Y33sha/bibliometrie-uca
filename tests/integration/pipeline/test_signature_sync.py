@@ -14,7 +14,6 @@ from pipeline.ingestion.common.signature_queries import (
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
     write_source_authorships,
 )
@@ -34,7 +33,7 @@ def _rec(position: int, raw: str, **fields) -> AuthorRecord:
 
 
 def _write(conn, sp: int, records: list[AuthorRecord]) -> None:
-    write_source_authorships(conn, _Q, fingerprint, "crossref", sp, records)
+    write_source_authorships(conn, _Q, "crossref", sp, records)
 
 
 def _signatures(conn, sp: int) -> dict[int, tuple[int, str]]:
@@ -407,8 +406,7 @@ def _build_upper(block) -> list[AuthorRecord]:
 
 
 def _sync(conn, sp: int, names: list[str], build=_build) -> None:
-    settings = SignatureSyncSettings(fingerprint=fingerprint)
-    sync_source_authorships(conn, _Q, settings, "crossref", sp, {"names": names}, build)
+    sync_source_authorships(conn, _Q, "crossref", sp, {"names": names}, build)
 
 
 def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
@@ -465,14 +463,14 @@ def test_signature_sans_position_garde_sa_confirmation(sa_sync_conn):
             *extra,
         ]
 
-    write_source_authorships(conn, _Q, fingerprint, "theses", sp, thesis())
+    write_source_authorships(conn, _Q, "theses", sp, thesis())
     director_id = _signatures(conn, sp)[None][0]
     person = _pin(conn, director_id)
 
     reviewer = AuthorRecord(
         None, SignatureName(raw="Durand, Paul"), roles=["reviewer"], addresses=lab
     )
-    write_source_authorships(conn, _Q, fingerprint, "theses", sp, thesis(reviewer))
+    write_source_authorships(conn, _Q, "theses", sp, thesis(reviewer))
 
     rows = conn.execute(
         text(

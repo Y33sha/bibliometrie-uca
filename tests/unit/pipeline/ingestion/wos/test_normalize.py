@@ -46,7 +46,6 @@ from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     staging_row,
 )
-from tests.helpers.signature_sync import SYNC_SETTINGS
 
 # ── _safe_list ───────────────────────────────────────────────────
 
@@ -1080,7 +1079,6 @@ class TestProcessRecord:
             publisher_repo=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
-            sync_settings=SYNC_SETTINGS,
         )
 
         assert result is True
@@ -1133,7 +1131,6 @@ class TestProcessRecord:
             publisher_repo=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
 
         assert captured["ut"] == "WOS:fallback"
@@ -1157,7 +1154,6 @@ class TestProcessRecord:
                 publisher_repo=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
-                sync_settings=SYNC_SETTINGS,
             )
 
 
@@ -1176,7 +1172,6 @@ class TestWosNormalizer:
             container_repo_factory=journal_factory,
             publisher_repo_factory=publisher_factory,
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
 
         conn2 = MagicMock()
@@ -1196,7 +1191,6 @@ class TestWosNormalizer:
             container_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
         norm.preload_caches(MagicMock())
 
@@ -1220,5 +1214,4 @@ class TestWosNormalizer:
             "publisher_repo",
             "staging_queries",
             "authorship_queries",
-            "sync_settings",
         }

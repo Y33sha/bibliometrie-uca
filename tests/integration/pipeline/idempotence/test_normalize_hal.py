@@ -1,6 +1,5 @@
 """Idempotence : normalisation HAL."""
 
-from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.staging import insert_staging
 
 HAL_STAGING_DOCS = [
@@ -105,7 +104,6 @@ def run_normalize_hal(conn):
             publisher_repo=publisher_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
-            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

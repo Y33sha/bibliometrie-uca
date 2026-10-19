@@ -38,7 +38,6 @@ from tests.helpers.normalize_doubles import (
     FakeStagingQueries,
     staging_row,
 )
-from tests.helpers.signature_sync import SYNC_SETTINGS
 
 _EMPTY_PUB_META = PublicationMetadata(
     doi=None,
@@ -509,14 +508,12 @@ class TestProcessAuthorships:
         monkeypatch.setattr(
             normalize_scanr,
             "sync_source_authorships",
-            lambda conn, queries, settings, source, spid, block, build: vus.update(
+            lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
 
-        process_authorships(
-            MagicMock(), MagicMock(), {"authors": []}, 555, sync_settings=SYNC_SETTINGS
-        )
+        process_authorships(MagicMock(), MagicMock(), {"authors": []}, 555)
 
         assert (vus["source"], vus["spid"]) == ("scanr", 555)
 
@@ -542,7 +539,6 @@ class TestProcessWork:
             publisher_repo=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
         return rendu, queries, staging
 
@@ -571,7 +567,6 @@ class TestProcessWork:
             container_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
             authorship_queries=MagicMock(),
-            sync_settings=SYNC_SETTINGS,
         )
         assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
 
@@ -592,7 +587,6 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
-        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())
     row = staging_row()
