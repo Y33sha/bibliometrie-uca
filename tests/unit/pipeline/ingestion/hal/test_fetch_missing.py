@@ -4,11 +4,13 @@ Deux pistes, même forme : sélectionner les identifiants absents, puis les cher
 """
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
+from pipeline.ingestion.http.circuit_breaker import reset_current_breaker, set_current_breaker
 from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 
@@ -97,6 +99,26 @@ class TestParHalId:
 
         assert metrics.new == 60
         assert conn.commits == 2  # un au 50e document, un en sortie de pool
+
+    async def test_s_arrete_quand_le_circuit_breaker_coupe(self, monkeypatch):
+        """La recherche s'arrête à l'identifiant qui fait couper le circuit-breaker."""
+        hal_ids = [f"hal-{i}" for i in range(20)]
+        hal = _HalSimule(monkeypatch, ids=hal_ids)
+        breaker = SimpleNamespace(tripped=False)
+        recherche = fetch_missing.search_one
+
+        async def search_one_puis_coupure(client, query, *, label):
+            breaker.tripped = True
+            return await recherche(client, query, label=label)
+
+        monkeypatch.setattr(fetch_missing, "search_one", search_one_puis_coupure)
+        token = set_current_breaker(breaker)
+        try:
+            await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
+        finally:
+            reset_current_breaker(token)
+
+        assert hal.cherches == ["hal-0"]
 
     async def test_rien_a_faire(self, monkeypatch, caplog):
         """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""

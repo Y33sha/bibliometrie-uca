@@ -176,7 +176,6 @@ def _resolve(
                 commit_every=COMMIT_EVERY,
                 fetch=ask,
                 write=_write,
-                should_continue=lambda: breaker is None or not breaker.tripped,
                 prepare=prepare,
             )
         )

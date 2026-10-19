@@ -186,7 +186,6 @@ async def run_check_journals_in_sudoc(
             commit_every=COMMIT_EVERY,
             fetch=_fetch,
             write=_write,
-            should_continue=lambda: not breaker.tripped,
         )
 
     checked = metrics.updated + metrics.unchanged

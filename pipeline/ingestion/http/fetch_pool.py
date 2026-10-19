@@ -4,9 +4,7 @@ Motif partagé par les phases async du pipeline (`fetch_missing`, `fetch_stale`,
 
 `prepare`, facultatif, complète un item par une lecture en base avant son fetch, sous le même lock que les écritures.
 
-`write` ne commite pas : c'est cet helper qui porte le commit, par lot. `should_continue`
-permet un arrêt anticipé (coupe-circuit d'une source indisponible) : dès qu'il rend `False`,
-les workers cessent de tirer de nouveaux items.
+`write` ne commite pas : la boucle commite par lot. Dès que le circuit-breaker de la source coupe, les workers cessent de tirer de nouveaux items. C'est celui que l'accès à la source pose dans la ContextVar et que les clients HTTP alimentent.
 """
 
 from __future__ import annotations
@@ -18,6 +16,7 @@ from collections.abc import Awaitable, Callable, Sequence
 import httpx2
 from sqlalchemy import Connection
 
+from pipeline.ingestion.http.circuit_breaker import get_current_breaker
 from pipeline.ingestion.http.tls import tls_context
 
 
@@ -52,11 +51,10 @@ async def run_fetch_pool[Item, Fetched](
     commit_every: int,
     fetch: Callable[[httpx2.AsyncClient, Item], Awaitable[Fetched]],
     write: Callable[[Connection, Item, Fetched], None],
-    should_continue: Callable[[], bool] = lambda: True,
     prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
-    """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent
-    puis `write` sync sérialisé, commit tous les `commit_every` items."""
+    """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent puis `write` sync sérialisé, commit tous les `commit_every` items. S'arrête quand le circuit-breaker courant coupe."""
+    breaker = get_current_breaker()
     db_lock = asyncio.Lock()
     item_iter = iter(items)
     done = 0
@@ -66,7 +64,7 @@ async def run_fetch_pool[Item, Fetched](
         async def worker() -> None:
             nonlocal done
             for item in item_iter:
-                if not should_continue():
+                if breaker is not None and breaker.tripped:
                     return
                 if prepare is not None:
                     async with db_lock:
