@@ -62,6 +62,23 @@ def _run(conn):
     return build_groups(conn, AuthorGroupingQueries(), logger)
 
 
+def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
+    pub = insert_publication(conn)
+    notice = insert_source_publication(conn, pub, source="crossref", source_id="c-neutre")
+    signature = insert_signature(
+        conn,
+        notice,
+        source="crossref",
+        author_name_normalized="jean dupont",
+        person_identifiers={"orcid": "0000-0001-2345-6789", "idref": "123456789"},
+        neutralized_identifiers={"orcid": "shared", "idref": "misplaced"},
+    )
+
+    [row] = AuthorGroupingQueries().fetch_signatures(conn, [pub])
+
+    assert (row.id, row.orcid, row.idref) == (signature, "", "")
+
+
 def test_les_signatures_d_un_meme_auteur_sont_groupees(conn):
     pub = insert_publication(conn)
     hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")])

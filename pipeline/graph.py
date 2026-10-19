@@ -873,6 +873,8 @@ NODES: tuple[Node, ...] = (
             "source_authorships.person_id",
             "source_authorships.resolution_mode",
             "source_authorships.neutralized_identifiers",
+            # Publications dont une signature change de neutralisation : leurs groupes sont à recalculer.
+            "publications.authorships_dirty",
             "persons",
             "person_identifiers",
             "person_name_forms",

@@ -46,8 +46,8 @@ _SIGNATURES_SQL = text(f"""
     SELECT k.publication_id, k.id AS notice, k.source, sa.id, sa.author_position AS position,
            aik.last_name_normalized AS last_name,
            coalesce(aik.first_name_normalized, '') AS first_name,
-           coalesce(aik.person_identifiers ->> 'orcid', '') AS orcid,
-           coalesce(aik.person_identifiers ->> 'idref', '') AS idref,
+           coalesce({usable_identifier("'orcid'")}, '') AS orcid,
+           coalesce({usable_identifier("'idref'")}, '') AS idref,
            coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
     FROM kept k
     JOIN source_authorships sa ON sa.source_publication_id = k.id
