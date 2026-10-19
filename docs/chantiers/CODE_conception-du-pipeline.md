@@ -132,7 +132,6 @@ D'autres modules réunissent des connaissances sans rapport :
 
 - [ ] Glossaire : un mot par notion, abréviations bannies.
 - [ ] `authorships` renommé `contributions`.
-- [ ] Terme commun aux revues et aux monographies.
 
 ### Phase 9 — Documentation
 
@@ -142,5 +141,4 @@ D'autres modules réunissent des connaissances sans rapport :
 
 - Nom du module qui expose `build()`, puisque la phase regroupe des nœuds pour l'affichage.
 - Moissonnage : `extract` ou `harvest`.
-- Terme commun aux revues et aux monographies : `container`, `venue`.
 - Périmètre de la phase 8 : le renommage d'`authorships` touche le schéma, l'API et le frontend.
