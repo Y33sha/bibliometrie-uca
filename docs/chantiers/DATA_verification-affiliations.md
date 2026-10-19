@@ -31,7 +31,24 @@ Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les lien
   | Crossref, DataCite | 8 | 5 |
 
   - 991 de ces personnes ont une signature OpenAlex aux adresses de la France et d'un autre pays.
-- [ ] Échantillon de 70 de ces personnes relu à la main, hors adresses OpenAlex à plusieurs pays (`build_perimeter_review.py`).
+- [x] Échantillon de 70 de ces personnes relu à la main, hors adresses OpenAlex à plusieurs pays, le 2026-10-19 (`build_perimeter_review.py`).
+
+  | Source des indices | Autres sources | Relues | Fausses | Justes | Indéterminables |
+  |---|---|---|---|---|---|
+  | OpenAlex | autre affiliation | 12 | 12 | 0 | 0 |
+  | OpenAlex | aucune affiliation | 10 | 2 | 2 | 6 |
+  | HAL | autre affiliation | 8 | 6 | 2 | 0 |
+  | HAL | aucune affiliation | 8 | 0 | 0 | 8 |
+  | WoS | autre affiliation | 8 | 4 | 4 | 0 |
+  | scanR | toutes | 8 | 7 | 0 | 1 |
+  | plusieurs sources | autre affiliation | 6 | 4 | 2 | 0 |
+  | plusieurs sources | aucune affiliation | 4 | 0 | 4 | 0 |
+  | theses.fr | aucune affiliation | 6 | 0 | 6 | 0 |
+
+  - Une thèse en préparation a pour seule notice celle de theses.fr. Ses indices sont justes, mais aucune autre source ne peut les confirmer.
+  - HAL seul : surtout des publications antérieures à 2017, d'auteurs partis depuis longtemps.
+  - WoS se trompe sur la ville d'une adresse de l'université Côte d'Azur, dont le sigle est aussi UCA.
+  - Cas limites de périmètre : CHU, laboratoire homonyme d'une autre ville.
 
 ### Phase 2 — INSPIRE-HEP
 
