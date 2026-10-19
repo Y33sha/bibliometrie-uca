@@ -72,13 +72,18 @@ class _FakeQueries:
         *,
         stale_total: int | None = None,
         oa_distribution: dict[str, int] | None = None,
+        stored: dict[str, str | None] | None = None,
     ) -> None:
         self._pubs = pubs
         self._dois = list(dict.fromkeys(p.doi for p in pubs))
         self._stale_total = stale_total if stale_total is not None else len(self._dois)
         self._oa_distribution = oa_distribution or {}
+        self._stored = stored or {}
         self.verdicts: list[tuple[str, str | None]] = []
         self.updates: list[tuple[int, str]] = []
+
+    def fetch_verdicts(self, conn, dois) -> dict[str, str | None]:  # noqa: ARG002
+        return {d: s for d, s in self._stored.items() if d in set(dois)}
 
     def fetch_dois_to_check(self, conn, *, limit=None, staleness_days):  # noqa: ARG002
         return self._dois[:limit] if limit else self._dois
@@ -140,7 +145,12 @@ def test_happy_path_updates_each_pub(logger, http_mock):
     _route(http_mock, "10.1/b", status="green")
     _route(http_mock, "10.1/c", status="bronze")
 
-    queries = _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3})
+    queries = _FakeQueries(
+        pubs,
+        stale_total=42,
+        oa_distribution={"gold": 7, "closed": 3},
+        stored={"10.1/b": "closed", "10.1/c": "bronze"},
+    )
     metrics = _run(queries, _make_fetcher(), logger)
 
     assert sorted(queries.verdicts) == [
@@ -148,18 +158,15 @@ def test_happy_path_updates_each_pub(logger, http_mock):
         ("10.1/b", "green"),
         ("10.1/c", "bronze"),
     ]
-    # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
     assert sorted(queries.updates) == [(1, "gold"), (2, "green")]
-    # Indicateurs remontés : compteurs du run, backlog stale, ventilation + table OA.
-    assert metrics.total == 3
-    assert metrics.updated == 2
-    assert metrics.unchanged == 1
+    # Verdicts : 10.1/a nouveau, 10.1/b modifié, 10.1/c inchangé.
+    assert (metrics.total, metrics.new, metrics.updated, metrics.unchanged) == (3, 1, 1, 1)
     assert metrics.extras["not_found"] == 0
     assert "stale" not in metrics.extras
     summary = metrics.details["summary"]
     assert summary["stale"] == 42
     assert summary["checked"] == 3
-    assert summary["updated"] == 2
+    assert (summary["new"], summary["updated"], summary["unchanged"]) == (1, 1, 1)
     # before == after (fake renvoie la même distribution) → delta nul, trié par count.
     assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
@@ -168,11 +175,11 @@ def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_sources(logger, http_moc
     pubs = [_pub(1, "10.1/x", "closed", ("openalex", "gold"))]
     _route(http_mock, "10.1/x", http_status=404)
 
-    queries = _FakeQueries(pubs)
+    queries = _FakeQueries(pubs, stored={"10.1/x": "closed"})
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.verdicts == [("10.1/x", None)]
     assert queries.updates == [(1, "gold")]
-    assert metrics.extras["not_found"] == 1
+    assert (metrics.extras["not_found"], metrics.updated) == (1, 0)
 
 
 def test_unavailable_leaves_doi_unchecked(logger, http_mock):
@@ -199,15 +206,27 @@ def test_le_statut_suit_les_notices_de_la_publication(logger, http_mock):
     assert queries.updates == []
 
 
-def test_unchanged_status_skipped(logger, http_mock):
+def test_un_verdict_identique_compte_inchange(logger, http_mock):
     pubs = [_pub(1, "10.1/same", "gold")]
     _route(http_mock, "10.1/same", status="gold")
 
-    queries = _FakeQueries(pubs)
+    queries = _FakeQueries(pubs, stored={"10.1/same": "gold"})
     metrics = _run(queries, _make_fetcher(), logger)
     assert queries.verdicts == [("10.1/same", "gold")]
     assert queries.updates == []
-    assert metrics.unchanged == 1
+    assert (metrics.new, metrics.unchanged) == (0, 1)
+
+
+def test_le_bilan_du_journal_classe_les_verdicts(logger, http_mock, caplog):
+    pubs = [_pub(1, "10.1/n", "closed"), _pub(2, "10.1/m", "closed"), _pub(3, "10.1/x", "closed")]
+    _route(http_mock, "10.1/n", status="gold")
+    _route(http_mock, "10.1/m", status="green")
+    _route(http_mock, "10.1/x", http_status=404)
+
+    with caplog.at_level(logging.INFO):
+        _run(_FakeQueries(pubs, stored={"10.1/m": "closed"}), _make_fetcher(), logger)
+
+    assert "1 nouveau, 1 modifié, 0 inchangé, 1 non trouvé" in caplog.text
 
 
 def test_429_retries_transparently(logger, http_mock):

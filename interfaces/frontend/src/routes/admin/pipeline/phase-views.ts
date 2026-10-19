@@ -245,11 +245,12 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   oa_status: {
     summary: [
-      { key: "stale", label: "Publications à vérifier" },
-      { key: "checked", label: "Vérifiées (max 10 000)" },
-      { key: "updated", label: "Mises à jour" },
-      { key: "unchanged", label: "Inchangées" },
-      { key: "not_found", label: "Non trouvées" },
+      { key: "stale", label: "DOI à vérifier" },
+      { key: "checked", label: "Vérifiés" },
+      { key: "new", label: "Nouveaux" },
+      { key: "updated", label: "Modifiés" },
+      { key: "unchanged", label: "Inchangés" },
+      { key: "not_found", label: "Non trouvés" },
     ],
     tables: [
       {

@@ -53,6 +53,14 @@ class OaStatusQueries:
             conn.execute(text(f"SELECT count(*) FROM ({_STALE_DOIS}) s"), {"stale": staleness_days})
         )
 
+    def fetch_verdicts(self, conn: Connection, dois: Sequence[str]) -> dict[str, str | None]:
+        """Verdict en table de chacun de ces DOI, quand il en a un."""
+        rows = conn.execute(
+            text("SELECT doi, oa_status::text AS oa_status FROM unpaywall WHERE doi = ANY(:dois)"),
+            {"dois": list(dois)},
+        )
+        return {r.doi: r.oa_status for r in rows}
+
     def record_verdicts(self, conn: Connection, verdicts: Sequence[tuple[str, str | None]]) -> None:
         """Écrit le verdict d'Unpaywall de chaque DOI, `None` pour un DOI absent d'Unpaywall, daté de l'instant."""
         if not verdicts:

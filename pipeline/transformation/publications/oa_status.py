@@ -90,14 +90,15 @@ async def _verifier(
     stale_total = queries.count_dois_to_check(conn, staleness_days=staleness_days)
     before_dist = queries.count_publications_by_oa_status(conn)
 
-    progress = {"updated": 0, "skipped": 0, "not_found": 0, "unavailable": 0}
+    progress = {"new": 0, "updated": 0, "unchanged": 0, "not_found": 0, "unavailable": 0}
 
     def _result() -> PhaseMetrics:
-        # Indicateurs : synthèse du run (backlog, vérifiées, ventilation) puis répartition des publications par statut OA avec le delta du run (avant → après).
+        # Indicateurs : verdicts du run (nouveaux, modifiés, inchangés, non trouvés), puis répartition des publications par statut OA avec le delta du run (avant → après).
         metrics.add(
             total=total,
+            new=progress["new"],
             updated=progress["updated"],
-            unchanged=progress["skipped"],
+            unchanged=progress["unchanged"],
             not_found=progress["not_found"],
             errors=progress["unavailable"],
         )
@@ -110,8 +111,9 @@ async def _verifier(
         metrics.details["summary"] = {
             "stale": stale_total,
             "checked": total,
+            "new": progress["new"],
             "updated": progress["updated"],
-            "unchanged": progress["skipped"],
+            "unchanged": progress["unchanged"],
             "not_found": progress["not_found"],
             "unavailable": progress["unavailable"],
         }
@@ -170,7 +172,6 @@ async def _verifier(
                     if isinstance(outcome, Unavailable):
                         progress["unavailable"] += 1
                     elif isinstance(outcome, NotFound):
-                        progress["not_found"] += 1
                         verdicts.append((doi, None))
                     else:
                         verdicts.append((doi, outcome))
@@ -178,17 +179,15 @@ async def _verifier(
                 await asyncio.to_thread(conn.commit)
                 avancement.avance(len(chunk))
 
-    logger.info(
-        "%s%s, %s %s ; %s non %s, %s %s faute de réponse d'Unpaywall",
-        DERNIERE_BRANCHE,
-        accord(progress["updated"], "publication mise à jour", "publications mises à jour"),
-        progress["skipped"],
-        forme(progress["skipped"], "inchangée"),
-        accord(progress["not_found"], "DOI", "DOI"),
-        forme(progress["not_found"], "trouvé"),
-        progress["unavailable"],
-        forme(progress["unavailable"], "reporté"),
-    )
+    bilan = [
+        accord(progress["new"], "nouveau", "nouveaux"),
+        accord(progress["updated"], "modifié"),
+        accord(progress["unchanged"], "inchangé"),
+        accord(progress["not_found"], "non trouvé", "non trouvés"),
+    ]
+    if progress["unavailable"]:
+        bilan.append(accord(progress["unavailable"], "reporté"))
+    logger.info("%s%s", DERNIERE_BRANCHE, ", ".join(bilan))
 
     return _result()
 
@@ -199,16 +198,23 @@ def _apply_verdicts(
     verdicts: list[tuple[str, str | None]],
     progress: dict[str, int],
 ) -> None:
-    """Écrit les verdicts, puis recalcule le statut OA des publications de ces DOI (`publication_oa_status`)."""
-    queries.record_verdicts(conn, verdicts)
+    """Classe les verdicts face à ceux en table, les écrit, puis recalcule le statut OA des publications de ces DOI (`publication_oa_status`)."""
     by_doi = dict(verdicts)
+    stored = queries.fetch_verdicts(conn, list(by_doi))
+    for doi, status in verdicts:
+        if status is None:
+            progress["not_found"] += 1
+        elif doi not in stored:
+            progress["new"] += 1
+        elif stored[doi] != status:
+            progress["updated"] += 1
+        else:
+            progress["unchanged"] += 1
+    queries.record_verdicts(conn, verdicts)
     for pub in queries.fetch_oa_inputs(conn, list(by_doi)):
         status = publication_oa_status(pub.signals, by_doi.get(pub.doi))
-        if status == pub.oa_status:
-            progress["skipped"] += 1
-        else:
+        if status != pub.oa_status:
             queries.update_oa_status(conn, pub.id, status)
-            progress["updated"] += 1
 
 
 # ── Câblage ───────────────────────────────────────────────────

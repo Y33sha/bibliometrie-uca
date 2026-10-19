@@ -57,6 +57,14 @@ class TestDoisToCheck:
 
 
 class TestVerdicts:
+    def test_verdicts_en_table_nul_compris(self, sa_sync_conn):
+        _verdict(sa_sync_conn, "10.1/t", "gold", days_ago=1)
+        _verdict(sa_sync_conn, "10.1/u", None, days_ago=1)
+        assert _Q.fetch_verdicts(sa_sync_conn, ["10.1/t", "10.1/u", "10.1/z"]) == {
+            "10.1/t": "gold",
+            "10.1/u": None,
+        }
+
     def test_un_verdict_reecrit_le_precedent(self, sa_sync_conn):
         _verdict(sa_sync_conn, "10.1/v", "closed", days_ago=999)
         _Q.record_verdicts(sa_sync_conn, [("10.1/v", "gold"), ("10.1/w", None)])
