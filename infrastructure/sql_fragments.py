@@ -30,6 +30,15 @@ def person_signature(signature: str = "sa") -> str:
     return f"NOT {signature}.collective AND {signature}.duplicate_of IS NULL"
 
 
+def pinned(signature_id: str) -> str:
+    """Condition vraie quand l'administration a épinglé la signature d'identifiant `signature_id` à une personne (`confirmed_authorships`)."""
+    return f"EXISTS (SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = {signature_id})"
+
+
+DETACHED_SIGNATURE = "person_id = NULL, resolution_mode = NULL"
+"""Affectations d'un `UPDATE source_authorships` qui détache une signature de sa personne."""
+
+
 def diamond_journal_sql(journal: str = "j") -> str:
     """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
     return (

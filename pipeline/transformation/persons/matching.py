@@ -23,9 +23,11 @@ from domain.persons.signature_name import SignatureName
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories.person_repository import person_without_decision_sql
 from infrastructure.sql_fragments import (
+    DETACHED_SIGNATURE,
     REJECTED_PAIRS,
     identifier_neutralized,
     person_signature,
+    pinned,
     publication_rejected_for,
     strong_identifier_signatures,
     trusted_identifier_sql,
@@ -253,9 +255,7 @@ class PersonsMatchingQueries:
                 WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
                   AND {person_signature("sa_auth")}
                   AND sd.publication_id IS NOT NULL
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa_auth.id
-                  )
+                  AND NOT {pinned("sa_auth.id")}
                 ORDER BY sa_auth.id
             """)
         ).all()
@@ -447,10 +447,7 @@ class PersonsMatchingQueries:
                 )
                 SELECT id,
                        coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
-                       AND NOT EXISTS (
-                           SELECT 1 FROM confirmed_authorships ca
-                           WHERE ca.source_authorship_id = modifiees.id
-                       ) AS a_detacher
+                       AND NOT {pinned("modifiees.id")} AS a_detacher
                 FROM modifiees
                 WHERE EXISTS (
                     SELECT 1 FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
@@ -541,16 +538,14 @@ class PersonsMatchingQueries:
         return conn.execute(
             text(f"""
                 UPDATE source_authorships sa
-                SET person_id = NULL, resolution_mode = NULL
+                SET {DETACHED_SIGNATURE}
                 FROM author_identifying_keys aik
                 WHERE sa.identity_id = aik.id
                   AND sa.person_id = :old_owner
                   AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
                   AND aik.person_identifiers->>:id_type = :id_value
                   AND NOT {_ID_TYPE_NEUTRALIZED}
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
-                  )
+                  AND NOT {pinned("sa.id")}
             """),
             {"old_owner": old_owner_person_id, "id_type": id_type, "id_value": id_value},
         ).rowcount
@@ -570,10 +565,7 @@ class PersonsMatchingQueries:
                     FROM source_authorships sa
                     JOIN author_identifying_keys aik ON aik.id = sa.identity_id
                     WHERE sa.resolution_mode = '{ResolutionMode.NAME.value}'
-                      AND NOT EXISTS (
-                          SELECT 1 FROM confirmed_authorships ca
-                          WHERE ca.source_authorship_id = sa.id
-                      )
+                      AND NOT {pinned("sa.id")}
                       AND aik.author_name_normalized IN (
                           SELECT name_form
                           FROM person_name_forms
@@ -584,7 +576,7 @@ class PersonsMatchingQueries:
                       )
                 )
                 UPDATE source_authorships sa
-                SET person_id = NULL, resolution_mode = NULL
+                SET {DETACHED_SIGNATURE}
                 FROM candidates c
                 JOIN source_publications sp ON sp.id = c.source_publication_id
                 WHERE sa.id = c.id
@@ -604,13 +596,10 @@ class PersonsMatchingQueries:
         if not source_authorship_ids:
             return 0
         return conn.execute(
-            text("""
+            text(f"""
                 UPDATE source_authorships sa
-                SET person_id = NULL, resolution_mode = NULL
-                WHERE sa.id = ANY(:ids)
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
-                  )
+                SET {DETACHED_SIGNATURE}
+                WHERE sa.id = ANY(:ids) AND NOT {pinned("sa.id")}
             """),
             {"ids": source_authorship_ids},
         ).rowcount
@@ -618,13 +607,11 @@ class PersonsMatchingQueries:
     def detach_copies(self, conn: Connection) -> int:
         """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
         return conn.execute(
-            text("""
+            text(f"""
                 UPDATE source_authorships sa
-                SET person_id = NULL, resolution_mode = NULL
+                SET {DETACHED_SIGNATURE}
                 WHERE sa.duplicate_of IS NOT NULL AND sa.person_id IS NOT NULL
-                  AND NOT EXISTS (
-                      SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = sa.id
-                  )
+                  AND NOT {pinned("sa.id")}
             """)
         ).rowcount
 
