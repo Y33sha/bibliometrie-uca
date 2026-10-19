@@ -20,6 +20,7 @@ class AttributionOutcome(StrEnum):
     ADDED = "added"  # identifiant absent : inséré en `pending`
     ALREADY_EXISTS = "already_exists"  # déjà attribué à cette personne
     REASSIGNED = "reassigned"  # repris d'une autre personne, chez qui il était `rejected`
+    HELD_ELSEWHERE = "held_elsewhere"  # une autre personne le détient en `pending` ou `confirmed`
 
 
 @dataclass(slots=True)
@@ -75,7 +76,7 @@ def attribution_outcome(
 ) -> AttributionOutcome:
     """Issue de l'attribution à `person_id` d'un identifiant dont `existing` est l'attribution en base.
 
-    Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`. Pour le lui reprendre, son statut doit d'abord passer à `rejected`.
+    Une autre personne qui détient l'identifiant en `pending` ou `confirmed` le garde (`HELD_ELSEWHERE`). Pour le lui reprendre, son statut doit d'abord passer à `rejected`.
     """
     if existing is None:
         return AttributionOutcome.ADDED
@@ -83,7 +84,14 @@ def attribution_outcome(
         return AttributionOutcome.ALREADY_EXISTS
     if existing.status is AttributionStatus.REJECTED:
         return AttributionOutcome.REASSIGNED
-    raise CannotAttributeConflict(
+    return AttributionOutcome.HELD_ELSEWHERE
+
+
+def held_elsewhere_conflict(
+    existing: IdentifierAttribution, person_id: int
+) -> CannotAttributeConflict:
+    """Erreur qui refuse l'attribution à `person_id` d'un identifiant que détient l'attribution `existing` (`HELD_ELSEWHERE`)."""
+    return CannotAttributeConflict(
         f"Identifiant {existing.id_type}={existing.id_value!r} déjà attribué à "
         f"person_id={existing.person_id} avec statut {existing.status.value!r} ; impossible "
         f"d'attribuer à person_id={person_id}.",

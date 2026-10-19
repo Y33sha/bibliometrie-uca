@@ -23,6 +23,7 @@ from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
     attribution_outcome,
+    held_elsewhere_conflict,
 )
 from domain.persons.identifiers import (
     PUBLIC_PERSON_IDENTIFIER_TYPES,
@@ -156,7 +157,7 @@ def add_identifier(
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
-    L'issue suit la règle du domaine (`attribution_outcome`) : insertion en `pending`, rien à faire, ou reprise d'un identifiant rejeté chez une autre personne. Elle lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
+    L'issue suit la règle du domaine (`attribution_outcome`) : insertion en `pending`, rien à faire, ou reprise d'un identifiant rejeté chez une autre personne. Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
 
     La valeur est validée et normalisée via le value object du type
     (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
@@ -182,6 +183,8 @@ def add_identifier(
     existing = repo.find_identifier(id_type, id_value)
     outcome = attribution_outcome(existing, person_id)
 
+    if existing is not None and outcome is AttributionOutcome.HELD_ELSEWHERE:
+        raise held_elsewhere_conflict(existing, person_id)
     if outcome is AttributionOutcome.ALREADY_EXISTS:
         # Rien n'a changé : l'appel est idempotent, aucune décision n'a été prise.
         return AddIdentifierResult(outcome, id_value)

@@ -7,6 +7,7 @@ from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
     attribution_outcome,
+    held_elsewhere_conflict,
 )
 from domain.persons.identifiers import AttributionStatus
 
@@ -91,8 +92,10 @@ class TestAttributionOutcome:
         assert attribution_outcome(rejected, 99) is AttributionOutcome.REASSIGNED
 
     @pytest.mark.parametrize("status", [AttributionStatus.PENDING, AttributionStatus.CONFIRMED])
-    def test_identifier_held_elsewhere_is_a_conflict(self, status):
-        with pytest.raises(CannotAttributeConflict) as exc:
-            attribution_outcome(_make(status=status), 99)
-        assert exc.value.existing_person_id == 10
-        assert exc.value.existing_status == status.value
+    def test_identifier_held_elsewhere(self, status):
+        assert attribution_outcome(_make(status=status), 99) is AttributionOutcome.HELD_ELSEWHERE
+
+    def test_held_elsewhere_conflict_names_the_holder(self):
+        conflict = held_elsewhere_conflict(_make(status=AttributionStatus.CONFIRMED), 99)
+        assert isinstance(conflict, CannotAttributeConflict)
+        assert (conflict.existing_person_id, conflict.existing_status) == (10, "confirmed")
