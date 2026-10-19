@@ -9,7 +9,7 @@
   import { authorshipRoleLabels } from "$lib/labels";
   import { sourceExternalUrl } from "$lib/sources";
   import { structsTooltip } from "$lib/structureLabels";
-  import { authorRows, comparisonRows, orderRecords } from "./sourceComparison";
+  import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
 
@@ -121,8 +121,7 @@
                   scope="row"
                   title={row.divergent ? "Signature absente d'un enregistrement" : undefined}
                 >
-                  {row.role ? (authorshipRoleLabels[row.role] ?? row.role) : ""}
-                </th>
+</th>
                 {#each row.cells as s}
                   <td class="author-cell">
                     {#if s}
@@ -146,6 +145,13 @@
                         {#if s.countries?.length}
                           <span class="countries"
                             >{s.countries.map((c) => c.toUpperCase()).join(" ")}</span
+                          >
+                        {/if}
+                        {#if otherRoles(s).length}
+                          <span class="roles"
+                            >{otherRoles(s)
+                              .map((r) => (authorshipRoleLabels[r] ?? r).toLowerCase())
+                              .join(", ")}</span
                           >
                         {/if}
                       </span>
@@ -267,10 +273,15 @@
     cursor: help;
     margin-left: 3px;
   }
-  .countries {
+  .countries,
+  .roles {
     color: #888;
     font-size: 0.75rem;
     margin-left: 4px;
+  }
+
+  .roles {
+    font-style: italic;
   }
 
 </style>

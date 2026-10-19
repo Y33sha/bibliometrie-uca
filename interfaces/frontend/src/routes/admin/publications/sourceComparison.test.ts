@@ -4,6 +4,7 @@ import {
 	comparisonRows,
 	isDivergent,
 	orderRecords,
+	otherRoles,
 	type ComparisonRow,
 	type SourceRecord,
 	type SourceSignature,
@@ -159,16 +160,22 @@ describe('authorRows', () => {
 		expect(rows.map((r) => r.divergent)).toEqual([true, false]);
 	});
 
-	it('place une signature hors des groupes à sa position, et les autres rôles après les auteurs', () => {
+	it('place une signature hors des groupes à sa position, et les signatures sans position en dernier', () => {
 		const rows = authorRows(records, [
 			signature({ id: 30, source_publication_id: 1, position: null, roles: ['jury_member'] }),
 			signature({ id: 12, source_publication_id: 1, position: 2, collective: true }),
 			signature({ id: 10, source_publication_id: 1, position: 0, group_id: 6, group_position: 0 }),
 		]);
-		expect(rows.map((r) => [r.cells[0]?.id, r.role])).toEqual([
-			[10, null],
-			[12, null],
-			[30, 'jury_member'],
+		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);
+	});
+});
+
+describe('otherRoles', () => {
+	it("rend les rôles autres qu'auteur dans l'ordre d'affichage", () => {
+		expect(otherRoles(signature({ roles: ['contributor', 'author', 'editor'] }))).toEqual([
+			'editor',
+			'contributor',
 		]);
+		expect(otherRoles(signature({ roles: ['author'] }))).toEqual([]);
 	});
 });
