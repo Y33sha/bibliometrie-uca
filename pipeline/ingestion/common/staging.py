@@ -2,7 +2,7 @@
 
 - `upsert_staging` écrit un document, pour toutes les voies d'entrée (phases `extract`, `fetch_missing` et `fetch_stale`).
 - `StagingQueries` lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
-- `delete_disappeared_source_publications` retire les notices des documents disparus de leur source ; `rehydrate_*` réinjecte un payload archivé.
+- `delete_disappeared_source_publications` retire les notices des documents disparus de leur source, `delete_source_publications_before` celles parues avant une année ; `rehydrate_*` réinjecte un payload archivé.
 
 Le commit est à la charge de l'appelant.
 """
@@ -373,3 +373,29 @@ def delete_disappeared_source_publications(conn: Connection) -> int:
     Balayage ensembliste, idempotent.
     """
     return _delete_source_publications(conn, "s.disappeared_at IS NOT NULL", {})
+
+
+def delete_source_publications_before(
+    conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
+) -> tuple[int, int]:
+    """Supprime les notices parues avant `start_year` (cf. `_delete_source_publications`), puis leur ligne de `staging`. Les notices des sources `exempt_sources` restent.
+
+    Rend le nombre de `source_publications` et de lignes de `staging` supprimées.
+    """
+    staging_ids = list(
+        conn.execute(
+            text("""
+                SELECT sp.staging_id FROM source_publications sp
+                WHERE sp.pub_year < :start_year AND sp.staging_id IS NOT NULL
+                  AND sp.source::text <> ALL(:exempt)
+            """),
+            {"start_year": start_year, "exempt": list(exempt_sources)},
+        ).scalars()
+    )
+    if not staging_ids:
+        return 0, 0
+    deleted = _delete_source_publications(conn, "s.id = ANY(:ids)", {"ids": staging_ids})
+    staged = conn.execute(
+        text("DELETE FROM staging WHERE id = ANY(:ids)"), {"ids": staging_ids}
+    ).rowcount
+    return deleted, staged
