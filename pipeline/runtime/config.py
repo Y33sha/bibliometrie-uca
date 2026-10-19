@@ -6,7 +6,6 @@ Deux origines, selon la nature du réglage. Les paramètres d'exploitation — a
 import logging
 
 from sqlalchemy import Connection, text
-from sqlalchemy.exc import SQLAlchemyError
 
 from domain.dates import today
 from domain.types import JsonValue
@@ -23,13 +22,10 @@ def _get_from_db(conn: Connection, key: str) -> JsonValue:
 
     Le retour est typé `JsonValue` (frontière JSONB libre) — chaque caller fait son `isinstance(...)` pour contraindre le type (str, list, dict, …) avant usage.
     """
-    try:
-        row = conn.execute(
-            text("SELECT value FROM config WHERE key = :key"), {"key": key}
-        ).one_or_none()
-        return row.value if row else None
-    except SQLAlchemyError:
-        return None
+    row = conn.execute(
+        text("SELECT value FROM config WHERE key = :key"), {"key": key}
+    ).one_or_none()
+    return row.value if row else None
 
 
 def _config_int(conn: Connection, key: str) -> int | None:
