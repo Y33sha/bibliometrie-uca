@@ -4,6 +4,7 @@
 
 ### En pause
 
+- [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 - [Normalisation par lots de documents](CODE_batch-normalize.md)
 
@@ -14,7 +15,6 @@
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
-- [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
