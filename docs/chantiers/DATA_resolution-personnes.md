@@ -34,8 +34,26 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
   - Le jeu est concentré : trois personnes ont 80 % des détachements, cinq personnes 45 % des rattachements manuels.
   - La cascade lit les rattachements manuels et les détachements. L'évaluation la fait tourner sans eux.
 - [ ] Précision et rappel de la cascade actuelle sur ce jeu. Ils servent de base de comparaison aux essais.
-- [ ] Signaux par groupe. Décompte des groupes dont les identifiants désignent plusieurs personnes, dont l'identifiant et le nom désignent deux personnes différentes, dont le nom désigne plusieurs personnes ou aucune.
-- [ ] Pouvoir de l'affiliation : parmi les groupes au nom ambigu, part de ceux dont les structures recoupent celles d'un seul candidat sur ses autres publications. Échantillon relu à la main.
+- [x] Signaux par groupe, le 2026-10-19 (`measure_group_signals.sql`), sur les 503 276 groupes qui ont une signature du périmètre ou un identifiant connu. Identifiants : ORCID des sources à dépôt auteur, IdRef, compte HAL. Nom : forme exacte de la signature.
+
+  | Signal | Groupes | Sans personne |
+  |---|---|---|
+  | identifiants de plusieurs personnes | 26 | 0 |
+  | identifiant et nom de deux personnes différentes | 28 | 22 |
+  | identifiant d'une personne, nom concordant ou inconnu | 437 834 | 1 048 |
+  | nom d'une seule personne | 57 197 | 0 |
+  | nom de plusieurs personnes | 2 176 | 684 |
+  | aucun signal, périmètre | 6 015 | 6 014 |
+
+  - Les identifiants et les formes de nom en base viennent en partie des rattachements, donc la mesure sous-estime les conflits.
+- [ ] Pouvoir de l'affiliation, le 2026-10-19 (`measure_affiliation.sql`), sur les 2 176 groupes au nom ambigu. Une clé spécifique est un laboratoire ou une équipe du référentiel, ou un laboratoire, une équipe ou un département HAL. Le profil d'un candidat réunit les clés de ses autres publications.
+  - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 groupes. Avec les clés spécifiques, un seul candidat concorde dans 1 631 groupes, plusieurs dans 392.
+  - Sur ces 1 631 groupes, le candidat désigné est la personne rattachée dans 1 151 groupes, une autre personne dans 7. 463 groupes sont sans personne, 10 rattachés à plusieurs personnes.
+  - Échantillon de 97 groupes à relire (`build_affiliation_review.py`).
+- [x] Signatures OpenAlex du périmètre dont les adresses donnent la France et un autre pays, le 2026-10-19 (`measure_openalex_two_countries.sql`) : 11 624. OpenAlex réunit souvent dans une signature les affiliations de deux auteurs.
+  - Autres signatures du groupe : France ou indice de périmètre dans 8 850 cas, autres pays seulement dans 1 650, aucun pays dans 1 001. OpenAlex est seul dans le groupe dans 123 cas.
+  - 565 personnes hors RH ont pour seul appui au périmètre des signatures de ce type, sans confirmation. Le périmètre compte 15 024 personnes hors RH.
+  - Exemple g5296946 : X. Zhang, Central China Normal University et LPC Clermont. La signature HAL du dépôt in2p3, de 54 auteurs, donne aussi le LPC.
 - [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la signature est souvent faux et la personne souvent juste. Échantillon relu à la main.
 
 ### Phase 2 — Essais d'une cascade par groupe
