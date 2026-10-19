@@ -7,11 +7,15 @@ Le parent est désigné par son `publication_id` ; son DOI peut être absent (ci
 """
 
 import json
+import logging
+from contextlib import contextmanager
 from functools import partial
 
 from sqlalchemy import text
 
+from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.relations import RelationsPhase
 from pipeline.transformation.publications.relations_queries import (
     DoiPublication,
     PublicationRelationsQueries,
@@ -387,3 +391,43 @@ class TestFetchSharedKeyPairs:
         pairs = [p for p in _Q.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
 
         assert [(p.a_id, p.a_doi, p.b_id, p.b_doi) for p in pairs] == [(a, None, b, None)]
+
+
+class TestPhaseRelations:
+    def test_relation_declaree_ecarte_le_lien_vague_des_le_premier_run(self, sa_sync_conn):
+        """Sur une table vide, une relation déclarée écarte le `is_related_to` d'une clé partagée par la même paire."""
+        a = _pub(sa_sync_conn, doc_type="article", title_normalized="t-pr-a", doi="10.1/pr-a")
+        b = _pub(sa_sync_conn, doc_type="article", title_normalized="t-pr-b", doi="10.1/pr-b")
+        _notice(sa_sync_conn, a, source_id="hal-pr-1", external_ids={"hal_id": ["hal-pr-1"]})
+        _notice(sa_sync_conn, b, source_id="hal-pr-2", external_ids={"hal_id": ["hal-pr-1"]})
+        insert_source_publication(
+            sa_sync_conn,
+            a,
+            source="datacite",
+            source_id="10.1/pr-a",
+            title="t",
+            doi="10.1/pr-a",
+            meta={"related_identifiers": [{"relation_type": "IsSupplementTo", "doi": "10.1/pr-b"}]},
+        )
+
+        @contextmanager
+        def open_tx():
+            yield sa_sync_conn
+
+        RelationsPhase(_Q).run(
+            PhaseContext(
+                open_tx=open_tx,
+                logger=logging.getLogger("test"),
+                options=RunOptions(),
+                maintain=lambda operation: None,
+            )
+        )
+
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT relation_type::text, source FROM publication_relations "
+                "WHERE from_publication_id IN (:a, :b)"
+            ),
+            {"a": a, "b": b},
+        ).all()
+        assert [tuple(r) for r in rows] == [("is_supplement_to", "datacite")]

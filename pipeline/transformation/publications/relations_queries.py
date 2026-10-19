@@ -217,18 +217,6 @@ class PublicationRelationsQueries:
             for r in rows
         ]
 
-    def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
-        """Les paires déjà reliées par une relation déclarée (signal #1), pour écarter un `is_related_to` redondant."""
-        rows = conn.execute(
-            text(f"""
-                SELECT from_publication_id AS a, target_publication_id AS b
-                FROM publication_relations
-                WHERE source IN ('{Source.DATACITE.value}', '{Source.CROSSREF.value}')
-                  AND target_publication_id IS NOT NULL
-            """)
-        ).all()
-        return {frozenset((r.a, r.b)) for r in rows}
-
     def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
         """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
 

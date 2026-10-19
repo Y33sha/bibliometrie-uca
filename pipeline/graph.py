@@ -1054,6 +1054,8 @@ NODES: tuple[Node, ...] = (
             "publication_relations",
         ),
         writes=("publication_relations",),
+        # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
+        previous_run=("publication_relations",),
     ),
     _node(
         "subjects.ingest",

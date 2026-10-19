@@ -8,11 +8,13 @@ from pipeline.transformation.publications.relations import (
     _build_shared_key_edges,
     _build_title_match_edges,
     _count_by_pair_label,
+    _declared_pairs,
     _log_changes,
 )
 from pipeline.transformation.publications.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
+    RelationEdge,
     RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
@@ -68,6 +70,23 @@ class TestBuildSharedKeyEdges:
             [_pair(50, "peer_review", 60, "article")], declared_pairs=set()
         )
         assert edges == []
+
+
+class TestDeclaredPairs:
+    """Les paires déclarées se déduisent des arêtes du run, et non de la table du run précédent."""
+
+    def test_cible_resolue_par_son_doi(self):
+        edges = [RelationEdge(10, "is_supplement_to", "10.1/b", "datacite")]
+        pairs = _declared_pairs(edges, {"10.1/b": DoiPublication(20, "article")})
+        assert pairs == {frozenset((10, 20))}
+
+    def test_cible_designee_par_son_identifiant(self):
+        edges = [RelationEdge(20, "is_preprint_of", "10.1/a", "datacite", target_publication_id=10)]
+        assert _declared_pairs(edges, {}) == {frozenset((10, 20))}
+
+    def test_cible_hors_corpus_ignoree(self):
+        edges = [RelationEdge(10, "is_supplement_to", "10.9/ailleurs", "crossref")]
+        assert _declared_pairs(edges, {}) == set()
 
 
 def _notice(doc_type, relation_type, cible, doi):
