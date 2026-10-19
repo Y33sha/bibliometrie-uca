@@ -13,7 +13,7 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import map_role
+from domain.publications.authorship_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
@@ -341,7 +341,31 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 hal_structure_ids=hal_structure_ids,
             )
         )
-    return records
+    return merge_person_roles(records)
+
+
+def merge_person_roles(records: list[AuthorRecord]) -> list[AuthorRecord]:
+    """Une signature par personne, comme chez theses.fr. scanR liste une personne une fois par rôle (membre du jury et rapporteur). Une entrée de même nom et de mêmes identifiants qu'une précédente, avec un autre rôle, se fond dans celle-ci : rôles (`merge_roles`), adresses et structures réunis. Une entrée qui répète les mêmes rôles reste à part. Les positions se renumérotent dans l'ordre."""
+    kept: list[AuthorRecord] = []
+    by_person: dict[tuple[object, ...], AuthorRecord] = {}
+    for record in records:
+        key = (
+            record.name.normalized(),
+            tuple(sorted((k, str(v)) for k, v in (record.person_identifiers or {}).items())),
+        )
+        first = by_person.get(key)
+        if first is None or set(record.roles or ()) <= set(first.roles or ()):
+            by_person.setdefault(key, record)
+            kept.append(record)
+            continue
+        first.roles = merge_roles([first.roles or [], record.roles or []])
+        texts = {a.text for a in first.addresses}
+        first.addresses += [a for a in record.addresses if a.text not in texts]
+        first.ror_ids |= record.ror_ids
+        first.hal_structure_ids |= record.hal_structure_ids
+    for position, record in enumerate(kept):
+        record.position = position
+    return kept
 
 
 def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:

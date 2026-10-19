@@ -212,6 +212,41 @@ class TestBuildScanrAuthorRecords:
         doc = {"authors": [{"fullName": "Marie Dupont", "affiliations": [{"name": "Lab A"}]}]}
         assert build_scanr_author_records(doc)[0].name == SignatureName(raw="Marie Dupont")
 
+    def test_une_personne_listee_pour_plusieurs_roles_forme_une_signature(self):
+        doc = {
+            "authors": [
+                {"fullName": "Anis Limami", "role": "author"},
+                {
+                    "fullName": "Paul Durand",
+                    "role": "membrejury",
+                    "affiliations": [{"name": "Lab A"}],
+                },
+                {"fullName": "Jean Martin", "role": "directeurthese"},
+                {
+                    "fullName": "Paul Durand",
+                    "role": "rapporteur",
+                    "affiliations": [{"name": "Lab B"}],
+                },
+            ]
+        }
+        records = build_scanr_author_records(doc)
+        assert [(r.position, r.name.raw, r.roles) for r in records] == [
+            (0, "Anis Limami", ["author"]),
+            (1, "Paul Durand", ["rapporteur"]),
+            (2, "Jean Martin", ["thesis_director"]),
+        ]
+        assert [a.text for a in records[1].addresses] == ["Lab A", "Lab B"]
+
+    def test_un_nom_repete_avec_le_meme_role_ou_d_autres_identifiants_reste_a_part(self):
+        doc = {
+            "authors": [
+                {"fullName": "Paul Durand", "role": "author"},
+                {"fullName": "Paul Durand", "role": "author"},
+                {"fullName": "Paul Durand", "role": "rapporteur", "denormalized": {"idref": "1"}},
+            ]
+        }
+        assert len(build_scanr_author_records(doc)) == 3
+
     def test_affiliation_sans_nom_ne_donne_pas_son_pays_aux_autres(self):
         """Une affiliation sans nom n'écrit pas d'adresse, et son pays n'est posé sur aucune autre."""
         doc = {
