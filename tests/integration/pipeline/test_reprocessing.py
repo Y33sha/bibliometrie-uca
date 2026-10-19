@@ -12,7 +12,6 @@ import copy
 from sqlalchemy import text
 
 from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
-from tests.helpers.signature_sync import SYNC_SETTINGS
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
     create_all_publications,
@@ -90,7 +89,6 @@ def _run_normalize_hal(conn):
             publisher_repo=publisher_repo,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
-            sync_settings=SYNC_SETTINGS,
         ):
             processed += 1
     return processed

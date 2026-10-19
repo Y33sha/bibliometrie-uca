@@ -27,7 +27,6 @@ from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AuthorBlock,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
 )
 from pipeline.ingestion.common.source_publications import (
@@ -200,13 +199,11 @@ def process_authorships(
     source_publication_id: int,
     *,
     batch_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> None:
     """Synchronise les signatures de la thèse depuis son bloc auteurs."""
     sync_source_authorships(
         conn,
         batch_queries,
-        sync_settings,
         "theses",
         source_publication_id,
         extract_theses_author_block(these),
@@ -227,7 +224,6 @@ def process_work(
     *,
     staging_queries: StagingQueries,
     batch_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = staging_row.id
@@ -239,9 +235,7 @@ def process_work(
     source_publication_id = insert_source_document(
         conn, queries, these, staging_id, theses_id, pub_meta
     )
-    process_authorships(
-        conn, these, source_publication_id, batch_queries=batch_queries, sync_settings=sync_settings
-    )
+    process_authorships(conn, these, source_publication_id, batch_queries=batch_queries)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -258,12 +252,10 @@ class ThesesNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
         batch_queries: AuthorshipsBatchQueries,
-        sync_settings: SignatureSyncSettings,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._batch_queries = batch_queries
-        self._sync_settings = sync_settings
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         pub_meta = extract_pub_metadata(row.raw_data)
@@ -277,5 +269,4 @@ class ThesesNormalizer(SourceNormalizer):
             row,
             staging_queries=self._staging,
             batch_queries=self._batch_queries,
-            sync_settings=self._sync_settings,
         )

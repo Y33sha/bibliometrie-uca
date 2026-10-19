@@ -48,7 +48,6 @@ from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
 )
 from pipeline.ingestion.common.source_publications import (
@@ -495,14 +494,11 @@ def process_authorships(
     authorship_queries: AuthorshipsBatchQueries,
     work: Mapping[str, JsonValue],
     source_publication_id: int,
-    *,
-    sync_settings: SignatureSyncSettings,
 ) -> None:
     """Synchronise les signatures OpenAlex de la notice depuis son bloc auteurs."""
     sync_source_authorships(
         conn,
         authorship_queries,
-        sync_settings,
         "openalex",
         source_publication_id,
         extract_openalex_author_block(work),
@@ -525,7 +521,6 @@ def process_work(
     publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
@@ -545,9 +540,7 @@ def process_work(
     source_publication_id = insert_openalex_document(
         conn, queries, work, staging_id, pub_meta, primary
     )
-    process_authorships(
-        conn, authorship_queries, work, source_publication_id, sync_settings=sync_settings
-    )
+    process_authorships(conn, authorship_queries, work, source_publication_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -572,5 +565,4 @@ class OpenalexNormalizer(BibliographicNormalizer):
             publisher_repo=publisher_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
-            sync_settings=self._sync_settings,
         )

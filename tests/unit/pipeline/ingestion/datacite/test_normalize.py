@@ -28,7 +28,6 @@ from tests.helpers.normalize_doubles import (
     FakeStagingQueries,
     staging_row,
 )
-from tests.helpers.signature_sync import SYNC_SETTINGS
 
 
 class TestAuthorRecords:
@@ -285,7 +284,7 @@ class TestProcessAuthorships:
         monkeypatch.setattr(
             normalize_datacite,
             "sync_source_authorships",
-            lambda conn, queries, settings, source, spid, block, build: vus.update(
+            lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -296,7 +295,7 @@ class TestProcessAuthorships:
             ]
         }
 
-        process_authorships(MagicMock(), MagicMock(), attrs, 555, sync_settings=SYNC_SETTINGS)
+        process_authorships(MagicMock(), MagicMock(), attrs, 555)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
         assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
@@ -402,7 +401,6 @@ class TestProcessWork:
             "publisher_repo": MagicMock(),
             "staging_queries": staging_queries,
             "authorship_queries": MagicMock(),
-            "sync_settings": SYNC_SETTINGS,
         }
 
     @pytest.fixture(autouse=True)
@@ -496,7 +494,6 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
-        sync_settings=SYNC_SETTINGS,
     )
     normalizer.preload_caches(MagicMock())  # instancie les repositories sur la connexion
     row = staging_row()
@@ -514,7 +511,6 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         authorship_queries=MagicMock(),
-        sync_settings=SYNC_SETTINGS,
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,

@@ -32,7 +32,6 @@ from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
 )
 from pipeline.ingestion.common.source_publications import (
@@ -644,14 +643,11 @@ def process_authorships(
     logger: logging.Logger,
     rec: Mapping[str, JsonValue],
     source_publication_id: int,
-    *,
-    sync_settings: SignatureSyncSettings,
 ) -> None:
     """Synchronise les signatures WoS de la notice depuis son bloc auteurs."""
     sync_source_authorships(
         conn,
         authorship_queries,
-        sync_settings,
         "wos",
         source_publication_id,
         extract_wos_author_block(rec),
@@ -674,7 +670,6 @@ def process_record(
     publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     staging_id = staging_row.id
@@ -694,9 +689,7 @@ def process_record(
     pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
 
     source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
-    process_authorships(
-        conn, authorship_queries, logger, rec, source_publication_id, sync_settings=sync_settings
-    )
+    process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -720,5 +713,4 @@ class WosNormalizer(BibliographicNormalizer):
             publisher_repo=publisher_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
-            sync_settings=self._sync_settings,
         )

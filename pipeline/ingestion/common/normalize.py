@@ -23,7 +23,6 @@ from sqlalchemy import Connection
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.registry import SOURCE_PRIORITY
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
@@ -223,7 +222,6 @@ class BibliographicNormalizer(SourceNormalizer):
         container_repo_factory: Callable[[Connection], ContainerGatewayQueries],
         publisher_repo_factory: Callable[[Connection], PublisherGatewayQueries],
         authorship_queries: AuthorshipsBatchQueries,
-        sync_settings: SignatureSyncSettings,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -232,7 +230,6 @@ class BibliographicNormalizer(SourceNormalizer):
         self._publisher_repo_factory = publisher_repo_factory
         self._publisher_repo: PublisherGatewayQueries | None = None
         self._authorship_queries = authorship_queries
-        self._sync_settings = sync_settings
 
     def preload_caches(self, conn: Connection) -> None:
         """Instancie les repositories sur la connexion prête, une fois avant la boucle de traitement."""
@@ -416,9 +413,7 @@ def _run_cleanup_orphan_addresses() -> int:
 def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from infrastructure.raw_store import NullRawStore, get_raw_store
-    from pipeline.ingestion.common.fingerprint import fingerprint
     from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.common.signatures import SignatureSyncSettings
     from pipeline.ingestion.common.source_publications import (
         SourcePublicationQueries,
     )
@@ -434,7 +429,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
     raw_store = get_raw_store() if archive else NullRawStore()
-    sync_settings = SignatureSyncSettings(fingerprint=fingerprint)
 
     def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
         return lambda conn: cls(
@@ -445,7 +439,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             container_repo_factory=ContainerGatewayQueries,
             publisher_repo_factory=PublisherGatewayQueries,
             authorship_queries=AuthorshipsBatchQueries(),
-            sync_settings=sync_settings,
         )
 
     return {
@@ -455,7 +448,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             StagingQueries(raw_store),
             SourcePublicationQueries(),
             batch_queries=AuthorshipsBatchQueries(),
-            sync_settings=sync_settings,
         ),
         "crossref": _biblio(CrossrefNormalizer),
         "datacite": _biblio(DataciteNormalizer),

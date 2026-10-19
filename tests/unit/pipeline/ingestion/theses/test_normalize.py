@@ -7,7 +7,6 @@ Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 from unittest.mock import MagicMock
@@ -15,7 +14,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signatures import SignatureSyncSettings
 from pipeline.ingestion.theses import normalize as normalize_theses
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
@@ -232,9 +230,6 @@ class TestInsertSourceDocument:
 # ── process_authorships ──────────────────────────────────────────────
 
 
-_SYNC = SignatureSyncSettings(fingerprint=lambda content: json.dumps(content, sort_keys=True))
-
-
 def _these(**fields):
     """Thèse avec un auteur (IdRef connu) et un directeur."""
     return {
@@ -265,16 +260,16 @@ class TestBuildThesesAuthorRecords:
 class TestProcessAuthorships:
     def test_signatures_ecrites_par_le_writer_partage(self):
         batch = FakeAuthorshipsBatchQueries()
-        process_authorships(MagicMock(), _these(), 10, batch_queries=batch, sync_settings=_SYNC)
+        process_authorships(MagicMock(), _these(), 10, batch_queries=batch)
         assert batch.synced_for == [10]
         assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
 
     def test_renormalisation_garde_les_signatures(self):
         """Une thèse modifiée garde l'identifiant des signatures dont l'identité ne change pas, directeur compris."""
         batch = FakeAuthorshipsBatchQueries()
-        process_authorships(MagicMock(), _these(), 10, batch_queries=batch, sync_settings=_SYNC)
+        process_authorships(MagicMock(), _these(), 10, batch_queries=batch)
         modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
-        process_authorships(MagicMock(), modified, 10, batch_queries=batch, sync_settings=_SYNC)
+        process_authorships(MagicMock(), modified, 10, batch_queries=batch)
         assert [len(b) for b in batch.upserted_batches] == [2, 1]
         assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
 
@@ -289,7 +284,6 @@ class TestProcessWork:
             "logger": logging.getLogger("test"),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "batch_queries": MagicMock(),
-            "sync_settings": _SYNC,
         }
 
     def test_happy_path(self, monkeypatch):
@@ -322,7 +316,6 @@ def _make_normalizer():
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
         batch_queries=MagicMock(),
-        sync_settings=_SYNC,
     )
 
 

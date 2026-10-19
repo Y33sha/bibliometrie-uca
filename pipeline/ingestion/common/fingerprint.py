@@ -3,15 +3,10 @@
 La sérialisation trie les clés et s'encode en UTF-8 compact : deux valeurs égales ont la même sérialisation. L'empreinte est le XXH3 128 bits de cette sérialisation, sans usage cryptographique.
 """
 
-from collections.abc import Callable
-
 import orjson
 import xxhash
 
 from domain.types import JsonValue
-
-type Fingerprinter = Callable[[JsonValue], str]
-"""Empreinte d'une valeur JSON : deux valeurs égales ont la même empreinte."""
 
 
 def stable_json_bytes(value: JsonValue) -> bytes:
@@ -20,5 +15,5 @@ def stable_json_bytes(value: JsonValue) -> bytes:
 
 
 def fingerprint(value: JsonValue) -> str:
-    """Empreinte de la sérialisation stable d'une valeur. Implémente le port `Fingerprinter`."""
+    """Empreinte de la sérialisation stable d'une valeur : deux valeurs égales ont la même empreinte."""
     return xxhash.xxh3_128_hexdigest(stable_json_bytes(value))

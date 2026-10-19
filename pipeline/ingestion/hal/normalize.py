@@ -39,7 +39,6 @@ from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AuthorBlock,
     AuthorRecord,
-    SignatureSyncSettings,
     sync_source_authorships,
 )
 from pipeline.ingestion.common.source_publications import (
@@ -594,14 +593,11 @@ def process_authorships(
     authorship_queries: AuthorshipsBatchQueries,
     doc: Mapping[str, JsonValue],
     source_publication_id: int,
-    *,
-    sync_settings: SignatureSyncSettings,
 ) -> None:
     """Synchronise les signatures HAL de la notice depuis son bloc auteurs."""
     sync_source_authorships(
         conn,
         authorship_queries,
-        sync_settings,
         "hal",
         source_publication_id,
         extract_hal_author_block(doc),
@@ -624,7 +620,6 @@ def process_work(
     publisher_repo: PublisherGatewayQueries,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
-    sync_settings: SignatureSyncSettings,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     staging_id = staging_row.id
@@ -651,9 +646,7 @@ def process_work(
         hal_id,
         pub_meta,
     )
-    process_authorships(
-        conn, authorship_queries, doc, source_publication_id, sync_settings=sync_settings
-    )
+    process_authorships(conn, authorship_queries, doc, source_publication_id)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -677,5 +670,4 @@ class HalNormalizer(BibliographicNormalizer):
             publisher_repo=publisher_repo,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
-            sync_settings=self._sync_settings,
         )

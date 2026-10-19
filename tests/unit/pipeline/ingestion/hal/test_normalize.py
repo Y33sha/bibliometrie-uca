@@ -42,7 +42,6 @@ from tests.helpers.normalize_doubles import (
     FakeStagingQueries,
     staging_row,
 )
-from tests.helpers.signature_sync import SYNC_SETTINGS
 
 # ── Stubs ────────────────────────────────────────────────────────
 
@@ -582,9 +581,7 @@ class TestProcessAuthors:
     def test_synchronises_even_when_empty(self):
         """Sans auteur, le writer synchronise quand même : les signatures en base sont supprimées."""
         authorship_queries = FakeAuthorshipsBatchQueries()
-        normalize_hal.process_authorships(
-            MagicMock(), authorship_queries, {}, 10, sync_settings=SYNC_SETTINGS
-        )
+        normalize_hal.process_authorships(MagicMock(), authorship_queries, {}, 10)
         assert authorship_queries.synced_for == [10]
 
 
@@ -612,7 +609,6 @@ class TestProcessWork:
             "publisher_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": FakeAuthorshipsBatchQueries(),
-            "sync_settings": SYNC_SETTINGS,
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -698,7 +694,6 @@ def _make_normalizer():
         container_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
-        sync_settings=SYNC_SETTINGS,
     )
 
 
