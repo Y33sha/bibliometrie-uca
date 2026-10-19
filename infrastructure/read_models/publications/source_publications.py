@@ -11,6 +11,7 @@ from application.ports.read_models.publications_queries import (
 )
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.sql_fragments import stashed_raw
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
@@ -129,11 +130,11 @@ def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSources
     if title is None:
         return None
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sp.id, sp.source::text AS source, sp.source_id, sp.doi, sp.external_ids,
                    sp.title, sp.title_normalized, sp.doc_type, sp.pub_year, sp.language,
                    lang.name AS language_name,
-                   sp.raw_metadata->'language'->>'raw' AS language_raw,
+                   {stashed_raw("language")} AS language_raw,
                    sp.oa_status, sp.container_title, sp.biblio,
                    j.id AS journal_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name

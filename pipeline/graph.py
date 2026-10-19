@@ -598,7 +598,7 @@ NODES: tuple[Node, ...] = (
         previous_run=(
             "journals",
             "journal_issns",
-            # Type brut de la source, `coalesce(raw_metadata->'doc_type'->>'raw', doc_type)` : la correction ne le change pas.
+            # Type brut de la source (`raw_column`) : la correction ne le change pas.
             "source_publications.raw_metadata",
             "source_publications.doc_type",
             "source_publications.journal_id",
@@ -662,7 +662,7 @@ NODES: tuple[Node, ...] = (
         previous_run=(
             "monographs",
             "journals",
-            # Type brut de la source, `coalesce(raw_metadata->'doc_type'->>'raw', doc_type)` : la correction ne le change pas.
+            # Type brut de la source (`raw_column`) : la correction ne le change pas.
             "source_publications.raw_metadata",
             "source_publications.doc_type",
         ),

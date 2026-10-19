@@ -8,6 +8,7 @@ from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
 from domain.publications.authorship_roles import AuthorshipRole
+from domain.source_publications.raw_metadata import CORRECTED_BY, RAW
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -187,6 +188,29 @@ AUTHORSHIP_PERIMETER_EVIDENCE_EXPR = f"""
           AND sa.person_id = a.person_id
     ), {NO_PERIMETER_EVIDENCE})
 """
+
+
+def corrected(field: str, notice: str = "sp") -> str:
+    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de la notice aliasée `notice` (`domain.source_publications.raw_metadata`)."""
+    return f"{notice}.raw_metadata ? '{field}'"
+
+
+def corrected_by(field: str, notice: str = "sp") -> str:
+    """Règle qui a corrigé le champ `field` de la notice aliasée `notice`. NULL quand le champ est intact."""
+    return f"{notice}.raw_metadata -> '{field}' ->> '{CORRECTED_BY}'"
+
+
+def stashed_raw(field: str, notice: str = "sp") -> str:
+    """Valeur que la source donne pour le champ `field` de la notice aliasée `notice`, quand une correction l'a changée. NULL quand le champ est intact."""
+    return f"{notice}.raw_metadata -> '{field}' ->> '{RAW}'"
+
+
+def raw_column(field: str, notice: str = "sp") -> str:
+    """Valeur que la source donne pour la colonne texte `field` de la notice aliasée `notice` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
+    return (
+        f"CASE WHEN {notice}.raw_metadata -> '{field}' ? '{RAW}'"
+        f" THEN {stashed_raw(field, notice)} ELSE {notice}.{field} END"
+    )
 
 
 def _authorship_scope(scoped: bool) -> str:

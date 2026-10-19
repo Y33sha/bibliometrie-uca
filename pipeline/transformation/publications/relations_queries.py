@@ -14,6 +14,7 @@ from domain.sources.registry import Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
+from infrastructure.sql_fragments import raw_column
 
 
 class DeclaredRelationSource(NamedTuple):
@@ -179,7 +180,7 @@ class PublicationRelationsQueries:
         rows = conn.execute(
             text(f"""
                 SELECT sp.publication_id, sp.source::text AS source, sp.meta,
-                       lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS doi,
+                       lower({raw_column("doi")}) AS doi,
                        p.doc_type::text AS doc_type, sp.doc_type AS notice_doc_type
                 FROM source_publications sp
                 JOIN publications p ON p.id = sp.publication_id

@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.source_publications.metadata_correction.shared_doi import DoiClusterCase
-from infrastructure.sql_fragments import in_clause, usable_identifier
+from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
 
 # Notice dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
 _CONVERGED = [
@@ -33,7 +33,7 @@ def _known_first_name(id_type: str) -> str:
 _SIGNATURES_SQL = text(f"""
     WITH notices AS (
         SELECT sp.id, sp.publication_id, sp.source::text AS source, sp.source_id,
-               (sp.raw_metadata -> 'doi' ->> 'corrected_by') = ANY(:converged) IS TRUE AS converged
+               ({corrected_by("doi")}) = ANY(:converged) IS TRUE AS converged
         FROM source_publications sp
         WHERE sp.publication_id = ANY(:publications)
     ), kept AS (

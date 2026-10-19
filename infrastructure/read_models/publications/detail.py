@@ -23,7 +23,7 @@ from infrastructure.read_models.sql_fragments import (
     authorship_has_signature_from,
     signature_display_name,
 )
-from infrastructure.sql_fragments import active_issns
+from infrastructure.sql_fragments import active_issns, corrected_by
 
 
 def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
@@ -127,10 +127,10 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     keywords = pub_row.keywords or []
 
     sources_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries,
-                   COALESCE(sd.raw_metadata->'doi'->>'corrected_by' = ANY(:convergence_cases),
-                            false) AS is_secondary
+                   COALESCE({corrected_by("doi", "sd")} = ANY(:convergence_cases), false)
+                       AS is_secondary
             FROM source_publications sd
             WHERE sd.publication_id = :pid
             ORDER BY sd.created_at DESC
