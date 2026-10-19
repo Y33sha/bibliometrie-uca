@@ -11,20 +11,22 @@ L'orchestrateur produit les formes "persons" en Python via `compute_person_name_
 L'orchestrateur dépend du port `PersonNameFormsQueries` ; il est appelé par `run_pipeline`.
 """
 
-import logging
-
 from sqlalchemy import Connection
 
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
-from pipeline.transformation.persons.name_forms import PersonNameFormsQueries, RawFormBatchItem
+from pipeline.transformation.persons.name_forms import (
+    PersonNameFormsQueries,
+    RawFormBatchItem,
+    SyncCounts,
+)
 
 BATCH_SIZE = 5000
 
 
-def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.Logger) -> None:
+def populate(conn: Connection, queries: PersonNameFormsQueries) -> SyncCounts:
+    """Synchronise `person_name_forms` avec les formes attendues. Rend les formes insérées, modifiées et supprimées."""
     queries.create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []
-    n_persons_rows = 0
     for r in queries.fetch_persons_names(conn):
         fn = (r.first_name or "").strip()
         ln = r.last_name.strip()
@@ -32,12 +34,12 @@ def populate(conn: Connection, queries: PersonNameFormsQueries, logger: logging.
             batch.append(
                 {"name_form": form, "person_id": r.id, "source": CANONICAL_NAME_FORM_SOURCE}
             )
-            n_persons_rows += 1
             if len(batch) >= BATCH_SIZE:
                 queries.insert_raw_forms_batch(conn, batch)
                 batch = []
     if batch:
         queries.insert_raw_forms_batch(conn, batch)
 
-    queries.sync_from_raw_forms(conn)
+    counts = queries.sync_from_raw_forms(conn)
     queries.drop_temp_raw_forms_table(conn)
+    return counts

@@ -107,7 +107,7 @@ def _run_phase(conn):
     la purge appelée directement — l'ordre reproduit `PersonsPhase`."""
     _run_create(conn)
     _populate_canonical_forms(conn)
-    purge(conn, PersonsMatchingQueries(), _LOG)
+    purge(conn, PersonsMatchingQueries())
 
 
 def _martin_count(conn) -> int:

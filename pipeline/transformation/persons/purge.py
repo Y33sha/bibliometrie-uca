@@ -7,16 +7,12 @@ Placée après le peuplement, la purge voit l'ambiguïté née des créations du
 Elle supprime aussi les attributions d'identifiant d'origine automatique, en attente, qu'aucune signature de leur personne ne porte : celles d'un rattachement défait pendant le passage.
 """
 
-import logging
-
 from sqlalchemy import Connection
 
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 
 
-def purge(
-    conn: Connection, queries: PersonsMatchingQueries, logger: logging.Logger
-) -> dict[str, int]:
+def purge(conn: Connection, queries: PersonsMatchingQueries) -> dict[str, int]:
     """Re-orpheline les signatures nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes vidées.
 
     Retourne les compteurs `{reorphaned, deleted_attributions, deleted_persons}`. Le commit est laissé au caller.
