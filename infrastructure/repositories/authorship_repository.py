@@ -11,6 +11,7 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipRepository,
 )
 from infrastructure.sql_fragments import (
+    DETACHED_SIGNATURE,
     PERSON_PUBLICATIONS_SCOPE,
     REJECTED_PAIRS,
     insert_missing_authorships_sql,
@@ -41,7 +42,7 @@ def detach_rejected_signatures(
     return conn.execute(
         text(f"""
             UPDATE source_authorships sa
-            SET person_id = NULL
+            SET {DETACHED_SIGNATURE}
             FROM source_publications sp, ({REJECTED_PAIRS}) r
             WHERE sa.source_publication_id = sp.id
               AND r.publication_id = sp.publication_id
@@ -155,7 +156,7 @@ class PgAuthorshipRepository(AuthorshipRepository):
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
         return self._conn.execute(
             text(
-                "UPDATE source_authorships sa SET person_id = NULL "
+                f"UPDATE source_authorships sa SET {DETACHED_SIGNATURE} "
                 "FROM author_identifying_keys aik "
                 "WHERE sa.person_id = :pid AND aik.id = sa.identity_id "
                 "AND aik.author_name_normalized = :nf "
