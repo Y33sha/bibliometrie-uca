@@ -1,6 +1,6 @@
 """Tests unitaires de `populate_person_name_forms.populate`.
 
-Mocks : port `PersonNameFormsQueries`, `Connection`, logger. Pas de DB.
+Mocks : port `PersonNameFormsQueries`, `Connection`. Pas de DB.
 
 L'orchestrateur calcule les formes de noms en Python via `compute_person_name_forms` (déjà testé côté domain) puis insère par batches dans une table temp avant un sync SQL final.
 """
@@ -8,8 +8,6 @@ L'orchestrateur calcule les formes de noms en Python via `compute_person_name_fo
 from __future__ import annotations
 
 import logging
-
-import pytest
 
 from pipeline.transformation.persons import populate_person_name_forms
 from pipeline.transformation.persons.name_forms import (
@@ -51,17 +49,19 @@ class _FakeConn:
     """Connexion factice : `populate` ne fait que la passer aux queries (mockées), sans committer — le commit revient au caller."""
 
 
-@pytest.fixture
-def logger() -> logging.Logger:
-    return logging.getLogger("test_populate_person_name_forms")
+def test_rend_le_bilan_de_la_synchronisation():
+    queries = _FakeQueries(persons_rows=[])
+    queries.sync_return = SyncCounts(inserted=3, updated=1, deleted=2)
+
+    assert populate(_FakeConn(), queries) == SyncCounts(3, 1, 2)
 
 
-def test_empty_persons_still_creates_temp_and_syncs(logger):
+def test_empty_persons_still_creates_temp_and_syncs():
     """Pas de personnes : pas d'insert batch, mais le sync SQL est appelé (cas pertinent : il agrège aussi `source_authorships` en SQL, donc peut produire des lignes)."""
     queries = _FakeQueries(persons_rows=[])
     conn = _FakeConn()
 
-    populate(conn, queries, logger)
+    populate(conn, queries)
 
     assert queries.create_temp_called is True
     assert queries.batches == []
@@ -69,7 +69,7 @@ def test_empty_persons_still_creates_temp_and_syncs(logger):
     assert queries.drop_temp_called is True
 
 
-def test_single_person_single_batch(logger):
+def test_single_person_single_batch():
     """Quelques personnes : tout passe dans un seul `insert_raw_forms_batch` final."""
     queries = _FakeQueries(
         persons_rows=[
@@ -79,7 +79,7 @@ def test_single_person_single_batch(logger):
     )
     conn = _FakeConn()
 
-    populate(conn, queries, logger)
+    populate(conn, queries)
 
     # Un seul batch (sous le seuil BATCH_SIZE).
     assert len(queries.batches) == 1
@@ -91,14 +91,14 @@ def test_single_person_single_batch(logger):
     assert {r["person_id"] for r in rows} == {1, 2}
 
 
-def test_strips_whitespace_in_names(logger):
+def test_strips_whitespace_in_names():
     """Les noms / prénoms reçus de la DB sont strippés avant `compute_person_name_forms`."""
     queries = _FakeQueries(
         persons_rows=[PersonNameRow(id=1, last_name="  Dupont  ", first_name="  Marie  ")]
     )
     conn = _FakeConn()
 
-    populate(conn, queries, logger)
+    populate(conn, queries)
 
     rows = queries.batches[0]
     # Les formes générées s'appuient sur le strip ; aucune ne contient le whitespace de bord.
@@ -107,21 +107,21 @@ def test_strips_whitespace_in_names(logger):
         assert not r["name_form"].endswith(" ")
 
 
-def test_handles_null_first_name(logger):
+def test_handles_null_first_name():
     """`first_name = None` est converti en chaîne vide avant strip — pas d'AttributeError."""
     queries = _FakeQueries(
         persons_rows=[PersonNameRow(id=1, last_name="Sansprenom", first_name=None)]
     )
     conn = _FakeConn()
 
-    populate(conn, queries, logger)
+    populate(conn, queries)
 
     assert queries.sync_called is True
     rows = queries.batches[0]
     assert all(r["person_id"] == 1 for r in rows)
 
 
-def test_batches_flush_at_batch_size(monkeypatch, logger):
+def test_batches_flush_at_batch_size(monkeypatch):
     """Au-delà de BATCH_SIZE lignes, le batch est flushé et un nouveau démarre.
 
     On baisse `BATCH_SIZE` à 3 pour ne pas avoir à générer 5000+ formes.
@@ -136,7 +136,7 @@ def test_batches_flush_at_batch_size(monkeypatch, logger):
     )
     conn = _FakeConn()
 
-    populate(conn, queries, logger)
+    populate(conn, queries)
 
     # Plusieurs flushes : au moins 2 batches.
     assert len(queries.batches) >= 2
@@ -146,14 +146,14 @@ def test_batches_flush_at_batch_size(monkeypatch, logger):
     assert all(len(b) <= 3 for b in queries.batches[:-1])
 
 
-def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(logger, caplog):
+def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(caplog):
     """Les formes calculées transitent par une table que la synchronisation consomme."""
     queries = _FakeQueries(persons_rows=[])
     queries.sync_return = SyncCounts(42, 7, 3)
     conn = _FakeConn()
 
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        populate(conn, queries, logger)
+    with caplog.at_level(logging.INFO):
+        populate(conn, queries)
 
     assert queries.sync_called is True
     assert queries.drop_temp_called is True

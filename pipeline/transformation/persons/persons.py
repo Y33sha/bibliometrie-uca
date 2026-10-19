@@ -66,10 +66,13 @@ class PersonsPhase:
         )
         metrics = by_node["persons.resolve"]
         purge_counts = by_node["persons.purge"].extras
+        name_form_counts = by_node["persons.populate_person_name_forms"].extras
         summary = metrics.details["summary"]
         assert isinstance(summary, dict)
         summary["reorphaned_nominal"] = purge_counts.get("reorphaned", 0)
         summary["deleted_empty_persons"] = purge_counts.get("deleted_persons", 0)
+        for key, count in name_form_counts.items():
+            summary[f"name_forms_{key}"] = count
         metrics.resume = ""
         return metrics
 
@@ -126,13 +129,13 @@ class PersonsPhase:
             ctx.open_tx() as conn,
             attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", ctx.logger) as ligne,
         ):
-            populate(conn, self.name_forms_queries, ctx.logger)
+            counts = populate(conn, self.name_forms_queries)
             ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
-        return PhaseMetrics()
+        return PhaseMetrics(extras=counts._asdict())
 
     def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            counts = purge(conn, self.persons_queries, ctx.logger)
+            counts = purge(conn, self.persons_queries)
         return PhaseMetrics(extras=dict(counts))
 
 

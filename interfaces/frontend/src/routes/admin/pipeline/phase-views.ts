@@ -203,6 +203,9 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
       { key: "corroboration_rejected_distinct", label: "dont identifiants distincts" },
       { key: "cross_source_detached", label: "Cross-source détachés (sans appui)" },
+      { key: "name_forms_inserted", label: "Formes de nom ajoutées" },
+      { key: "name_forms_updated", label: "Formes de nom modifiées" },
+      { key: "name_forms_deleted", label: "Formes de nom supprimées" },
     ],
     tables: [
       {
