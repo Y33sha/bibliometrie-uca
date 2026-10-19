@@ -125,6 +125,10 @@ class TestGetRecords:
         data = {"Data": {"Records": {"records": {"REC": [{"UID": "X"}, {"UID": "Y"}]}}}}
         assert get_records(data) == [{"UID": "X"}, {"UID": "Y"}]
 
+    def test_un_objet_unique_compte_pour_un_enregistrement(self):
+        data = {"Data": {"Records": {"records": {"REC": {"UID": "X"}}}}}
+        assert get_records(data) == [{"UID": "X"}]
+
     def test_returns_empty_on_missing_path(self):
         assert get_records({}) == []
         assert get_records({"Data": {}}) == []

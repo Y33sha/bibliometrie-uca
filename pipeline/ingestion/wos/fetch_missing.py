@@ -15,14 +15,20 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
+from domain.types import JsonValue, as_mapping
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.http.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.http.http_retry import lookup_json_async
 from pipeline.ingestion.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.wos.fields import extract_doi, extract_ut, filter_doi_for_wos
+from pipeline.ingestion.wos.fields import (
+    extract_doi,
+    extract_ut,
+    filter_doi_for_wos,
+    get_records,
+    get_records_found,
+)
 from pipeline.runtime.config import get_wos_api_key
 
 log = logging.getLogger(__name__)
@@ -84,13 +90,12 @@ class WosDoiSearch:
             if not data:
                 complete = False
                 break
-            brut = at_path(data, "Data", "Records", "records").get("REC")
-            recs = [brut] if isinstance(brut, Mapping) else as_sequence(brut)
+            recs = get_records(data)
             if not recs:
                 break
-            records.extend(as_mapping(r) for r in recs)
+            records.extend(recs)
 
-            total = as_int(at_path(data, "QueryResult").get("RecordsFound")) or 0
+            total = get_records_found(data)
             if first_record + WOS_PER_PAGE - 1 >= total:
                 break
             first_record += WOS_PER_PAGE
