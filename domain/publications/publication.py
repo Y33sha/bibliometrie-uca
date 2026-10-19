@@ -8,7 +8,6 @@ L'entité porte la forme et l'identité de la référence canonique. Les règles
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
 
 from domain.publications.identifiers import DOI
 from domain.types import JsonValue
@@ -42,7 +41,3 @@ class Publication:
     topics: dict[str, JsonValue] | None = None
     biblio: dict[str, JsonValue] | None = None
     meta: dict[str, JsonValue] | None = None
-    # Date de la dernière vérification Unpaywall (None = jamais). Quand posée,
-    # Unpaywall fait autorité sur `oa_status` : l'agrégation cross-sources ne le
-    # ré-écrit pas (cf. `aggregation.refresh_from_sources`).
-    unpaywall_checked_at: datetime | None = None

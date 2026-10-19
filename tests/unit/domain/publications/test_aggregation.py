@@ -5,8 +5,6 @@ Cible la priorité donnée aux enregistrements canoniques sur les formes seconda
 listes restent unionnées.
 """
 
-from datetime import UTC, datetime
-
 import pytest
 
 from domain.publications.aggregation import refresh_from_sources
@@ -187,9 +185,7 @@ class TestChampsAgreges:
 
 
 class TestStatutOa:
-    """Le statut le plus ouvert des sources, tant qu'Unpaywall n'a pas été interrogé."""
-
-    _VERIFIE = datetime(2026, 1, 1, tzinfo=UTC)
+    """Le statut OA tiré des sources et du verdict d'Unpaywall sur le DOI de la publication."""
 
     def test_le_statut_le_plus_ouvert_l_emporte(self):
         verte = _sp(id=1, source="hal", oa_status="green")
@@ -204,25 +200,35 @@ class TestStatutOa:
         refresh_from_sources(pub, [_sp(oa_status=None)], source_priority=_PRIORITY)
         assert pub.oa_status == OA_STATUS_UNKNOWN_DEFAULT
 
-    def test_un_depot_en_archive_ouverte_rouvre_un_statut_ferme_par_unpaywall(self):
+    def test_un_depot_en_archive_ouverte_tient_face_a_un_verdict_ferme(self):
         pub = _pub()
-        pub.oa_status, pub.unpaywall_checked_at = "closed", self._VERIFIE
-        refresh_from_sources(pub, [_sp(source="hal", oa_status="green")], source_priority=("hal",))
+        refresh_from_sources(
+            pub,
+            [_sp(source="hal", oa_status="green")],
+            source_priority=("hal",),
+            unpaywall={"10.9001/set": "closed"},
+        )
         assert pub.oa_status == "green"
 
-    def test_sans_depot_le_statut_ferme_par_unpaywall_tient(self):
+    def test_sans_depot_le_verdict_ferme_tient(self):
         pub = _pub()
-        pub.oa_status, pub.unpaywall_checked_at = "closed", self._VERIFIE
         refresh_from_sources(
-            pub, [_sp(source="openalex", oa_status="gold")], source_priority=_PRIORITY
+            pub,
+            [_sp(source="openalex", oa_status="gold")],
+            source_priority=_PRIORITY,
+            unpaywall={"10.9001/set": "closed"},
         )
         assert pub.oa_status == "closed"
 
-    def test_un_statut_ouvert_d_unpaywall_tient_malgre_un_depot(self):
+    def test_le_verdict_vise_le_doi_de_la_publication(self):
         pub = _pub()
-        pub.oa_status, pub.unpaywall_checked_at = "hybrid", self._VERIFIE
-        refresh_from_sources(pub, [_sp(source="hal", oa_status="green")], source_priority=("hal",))
-        assert pub.oa_status == "hybrid"
+        refresh_from_sources(
+            pub,
+            [_sp(source="openalex", oa_status="gold")],
+            source_priority=_PRIORITY,
+            unpaywall={"10.9001/autre": "closed"},
+        )
+        assert pub.oa_status == "gold"
 
 
 class TestLicences:

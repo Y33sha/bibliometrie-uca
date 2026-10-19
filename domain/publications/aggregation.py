@@ -4,7 +4,7 @@ Encapsule les règles d'agrégation : à partir des `source_publications` attach
 
 Règles d'agrégation par type de champ :
 - **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
-- **`oa_status`** : le statut le plus ouvert toutes sources confondues (cf. `best_oa_status` dans `metadata`). Fallback à `OA_STATUS_UNKNOWN_DEFAULT` si toutes les sources sont silencieuses (la colonne canonique est NOT NULL).
+- **`oa_status`** : le statut le plus ouvert des sources, ou le verdict d'Unpaywall sur le DOI de la publication (`publication_oa_status` dans `metadata`).
 - **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
@@ -25,12 +25,7 @@ from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
-from domain.publications.metadata import (
-    OA_CLOSED_STATUSES,
-    OA_STATUS_UNKNOWN_DEFAULT,
-    best_oa_status,
-    has_open_archive_deposit,
-)
+from domain.publications.metadata import publication_oa_status
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
 from domain.sources.registry import Source
@@ -44,14 +39,17 @@ def refresh_from_sources(
     source_priority: tuple[str, ...],
     secondary_ids: frozenset[int] = frozenset(),
     monograph_journals: Mapping[int, int | None] | None = None,
+    unpaywall: Mapping[str, str] | None = None,
 ) -> None:
     """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
-    Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
+    Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA tiré des sources et du verdict d'Unpaywall (`publication_oa_status`), union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
-    `secondary_ids` liste les `source_publications` qui décrivent une **forme secondaire** de l'œuvre — une pièce, une version ou une variante dont le DOI a été substitué par le DOI de l'œuvre canonique (correction de convergence). Elles sont reléguées en fin de priorité, sous les enregistrements canoniques, pour que les scalaires descriptifs (titre en tête) proviennent de l'enregistrement qui porte nativement le DOI, et non d'une pièce prise au hasard (un `README.txt`, un fichier de données). Les listes restent unionnées toutes sources confondues : une pièce peut porter un mot-clé légitime.
+    `secondary_ids` liste les `source_publications` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
 
     `monograph_journals` donne l'entrée de `journals` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `journal_id` prend celle de sa monographie.
+
+    `unpaywall` donne le verdict d'Unpaywall des DOI des sources que connaît Unpaywall.
 
     Précondition : `sources` non vide. Le cas orphelin (aucune source) est une décision métier qui doit être traitée par le caller avant d'appeler cette fonction (suppression de la publication via `repo.delete`).
     """
@@ -78,23 +76,9 @@ def refresh_from_sources(
     pub.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
     if pub.journal_id is None and pub.monograph_id is not None and monograph_journals:
         pub.journal_id = monograph_journals.get(pub.monograph_id)
-    # Unpaywall fait autorité sur l'OA une fois qu'il a été interrogé (cf.
-    # `publications.unpaywall_checked_at`) : on ne ré-agrège `oa_status` depuis les
-    # sources que tant que la publication ne l'a pas été. Sinon un réimport
-    # écraserait le verdict d'Unpaywall par une valeur de source, jusqu'à la
-    # prochaine péremption.
-    if pub.unpaywall_checked_at is None:
-        pub.oa_status = (
-            best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
-        )
-    elif pub.oa_status in OA_CLOSED_STATUSES and has_open_archive_deposit(sorted_sources):
-        # Plancher dépôt-archive : Unpaywall a refermé (`closed`/`unknown`) une publication dont
-        # une archive ouverte détient le fichier (HAL `green`). Le fichier est un fait qu'Unpaywall
-        # ne voit pas sous le DOI — on rouvre depuis les sources. Hors ce cas, Unpaywall garde son
-        # autorité (il arbitre les prétentions d'ouverture sans dépôt).
-        pub.oa_status = (
-            best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
-        )
+    pub.oa_status = publication_oa_status(
+        sorted_sources, unpaywall.get(pub.doi.value) if pub.doi and unpaywall else None
+    )
     pub.license = license_by_source(sorted_sources, publisher_license_sources(pub.doc_type))
     pub.deposit_license = license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
     pub.container_title = as_str(first_non_null(sorted_sources, "container_title"))

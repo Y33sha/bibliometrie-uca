@@ -1,14 +1,6 @@
-"""Tests pour `pipeline.transformation.publications.oa_status.OaStatusPhase` (async).
+"""Tests pour `pipeline.transformation.publications.oa_status.OaStatusPhase` (async), avec le `fetcher` concret de `pipeline.ingestion.complements.unpaywall`.
 
-Couvre la version async via `httpx2.AsyncClient` + `asyncio.Semaphore`,
-end-to-end avec le `fetcher` concret depuis `pipeline.ingestion.complements.unpaywall` :
-- happy path (3 publis, statuts mappés, update DB)
-- 404 Unpaywall → `not_found`
-- Unpaywall indisponible → publication laissée dans la file
-- préservation `diamond` quand Unpaywall renvoie `gold`
-- statut inchangé → `skipped`, pas d'update
-- 429 retry transparent (géré par `http_request_with_retry_async`)
-- semaphore plafonne les fetches concurrents
+Les règles du statut sont testées dans `tests/unit/domain/publications/test_metadata.py` (`publication_oa_status`). Ici : verdicts écrits par DOI, recalcul des publications de ces DOI, DOI absent ou Unpaywall indisponible, 429, plafond de concurrence.
 
 Mocks : port `OaStatusQueries` (lectures + écritures capturées) ; requêtes HTTP via la fixture `http_mock`.
 """
@@ -33,6 +25,7 @@ from pipeline.transformation.publications.oa_status import (
     OaStatusFetcher,
     OaStatusPhase,
 )
+from pipeline.transformation.publications.oa_status_queries import OaSignal, PublicationOaInputs
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
 TEST_EMAIL = "test@example.com"
@@ -60,36 +53,50 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
     )
 
 
+def _pub(pub_id: int, doi: str, current: str | None, *signals: tuple[str, str | None]):
+    """Publication d'un DOI, de statut `current`, dont les notices donnent `signals` (par défaut, une notice OpenAlex au statut `current`)."""
+    return PublicationOaInputs(
+        pub_id,
+        doi,
+        current,
+        [OaSignal(s, o) for s, o in signals] or [OaSignal("openalex", current)],
+    )
+
+
 class _FakeQueries:
-    """Lectures de la file OA et capture des écritures (`update_oa_status`, `mark_unpaywall_checked`)."""
+    """DOI à vérifier, publications de ces DOI, et capture des écritures (`record_verdicts`, `update_oa_status`)."""
 
     def __init__(
         self,
-        pubs: list[tuple[int, str, str | None, bool]],
+        pubs: list[PublicationOaInputs],
         *,
         stale_total: int | None = None,
         oa_distribution: dict[str, int] | None = None,
     ) -> None:
         self._pubs = pubs
-        self._stale_total = stale_total if stale_total is not None else len(pubs)
+        self._dois = list(dict.fromkeys(p.doi for p in pubs))
+        self._stale_total = stale_total if stale_total is not None else len(self._dois)
         self._oa_distribution = oa_distribution or {}
+        self.verdicts: list[tuple[str, str | None]] = []
         self.updates: list[tuple[int, str]] = []
-        self.checked: list[int] = []
 
-    def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days):  # noqa: ARG002
-        return self._pubs[:limit] if limit else self._pubs
+    def fetch_dois_to_check(self, conn, *, limit=None, staleness_days):  # noqa: ARG002
+        return self._dois[:limit] if limit else self._dois
 
-    def count_stale_publications(self, conn, *, staleness_days) -> int:  # noqa: ARG002
+    def count_dois_to_check(self, conn, *, staleness_days) -> int:  # noqa: ARG002
         return self._stale_total
 
     def count_publications_by_oa_status(self, conn) -> dict[str, int]:  # noqa: ARG002
         return dict(self._oa_distribution)
 
+    def record_verdicts(self, conn, verdicts) -> None:  # noqa: ARG002
+        self.verdicts.extend(verdicts)
+
+    def fetch_oa_inputs(self, conn, dois) -> list[PublicationOaInputs]:  # noqa: ARG002
+        return [p for p in self._pubs if p.doi in set(dois)]
+
     def update_oa_status(self, conn, pub_id: int, status: str) -> None:  # noqa: ARG002
         self.updates.append((pub_id, status))
-
-    def mark_unpaywall_checked(self, conn, pub_id: int) -> None:  # noqa: ARG002
-        self.checked.append(pub_id)
 
 
 @pytest.fixture
@@ -125,9 +132,9 @@ def _run(
 
 def test_happy_path_updates_each_pub(logger, http_mock):
     pubs = [
-        (1, "10.1/a", "closed", False),
-        (2, "10.1/b", None, False),
-        (3, "10.1/c", "bronze", False),
+        _pub(1, "10.1/a", "closed"),
+        _pub(2, "10.1/b", None),
+        _pub(3, "10.1/c", "bronze"),
     ]
     _route(http_mock, "10.1/a", status="gold")
     _route(http_mock, "10.1/b", status="green")
@@ -136,6 +143,11 @@ def test_happy_path_updates_each_pub(logger, http_mock):
     queries = _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3})
     metrics = _run(queries, _make_fetcher(), logger)
 
+    assert sorted(queries.verdicts) == [
+        ("10.1/a", "gold"),
+        ("10.1/b", "green"),
+        ("10.1/c", "bronze"),
+    ]
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
     assert sorted(queries.updates) == [(1, "gold"), (2, "green")]
     # Indicateurs remontés : compteurs du run, backlog stale, ventilation + table OA.
@@ -152,101 +164,50 @@ def test_happy_path_updates_each_pub(logger, http_mock):
     assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
 
-def test_404_marks_as_not_found(logger, http_mock):
-    pubs = [(1, "10.1/x", "closed", False)]
+def test_404_ecrit_un_verdict_nul_et_le_statut_suit_les_sources(logger, http_mock):
+    pubs = [_pub(1, "10.1/x", "closed", ("openalex", "gold"))]
     _route(http_mock, "10.1/x", http_status=404)
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == []
-    assert queries.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
+    metrics = _run(queries, _make_fetcher(), logger)
+    assert queries.verdicts == [("10.1/x", None)]
+    assert queries.updates == [(1, "gold")]
+    assert metrics.extras["not_found"] == 1
 
 
-def test_unavailable_leaves_publication_unchecked(logger, http_mock):
-    """Unpaywall indisponible : ni statut ni date de vérification, la publication reste dans la file."""
-    pubs = [(1, "10.1/x", "closed", False)]
+def test_unavailable_leaves_doi_unchecked(logger, http_mock):
+    """Unpaywall indisponible : aucun verdict, le DOI reste dans la file."""
+    pubs = [_pub(1, "10.1/x", "closed")]
     _route(http_mock, "10.1/x", http_status=403)
 
     queries = _FakeQueries(pubs)
     metrics = _run(queries, _make_fetcher(), logger)
+    assert queries.verdicts == []
     assert queries.updates == []
-    assert queries.checked == []
     assert metrics.errors == 1
     assert metrics.extras["not_found"] == 0
 
 
-def test_diamond_not_replaced_by_gold(logger, http_mock):
-    """Diamond OA n'est pas connu d'Unpaywall : ne pas écraser par 'gold'."""
-    pubs = [(1, "10.1/diamond", "diamond", False)]
-    _route(http_mock, "10.1/diamond", status="gold")
-
-    queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == []
-
-
-def test_diamond_replaced_by_other_status(logger, http_mock):
-    """Diamond → bronze/green/closed : on accepte l'update (seul gold est filtré)."""
-    pubs = [(1, "10.1/diamond", "diamond", False)]
-    _route(http_mock, "10.1/diamond", status="bronze")
-
-    queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == [(1, "bronze")]
-
-
-def test_embargoed_not_downgraded_to_closed(logger, http_mock):
-    """Embargo connu (HAL) : Unpaywall voit le fichier non encore accessible et
-    renvoie 'closed' — on ne rétrograde pas vers closed/unknown."""
-    pubs = [(1, "10.1/emb", "embargoed", False)]
-    _route(http_mock, "10.1/emb", status="closed")
-
-    queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == []
-
-
-def test_embargoed_replaced_by_open_status(logger, http_mock):
-    """Embargo → green/gold : un statut réellement plus ouvert (trouvé ailleurs) écrase bien."""
-    pubs = [(1, "10.1/emb", "embargoed", False)]
-    _route(http_mock, "10.1/emb", status="green")
-
-    queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == [(1, "green")]
-
-
-def test_open_archive_deposit_not_downgraded_to_closed(logger, http_mock):
-    """Une archive ouverte détient le fichier (HAL green, `has_open_deposit=True`) : Unpaywall ne le
-    voit pas sous le DOI et renvoie 'closed' — on ne referme pas le dépôt, mais on marque vérifié."""
-    pubs = [(1, "10.1/deposit", "green", True)]
+def test_le_statut_suit_les_notices_de_la_publication(logger, http_mock):
+    """Le dépôt HAL d'une notice tient face au closed d'Unpaywall (`publication_oa_status`)."""
+    pubs = [_pub(1, "10.1/deposit", "green", ("hal", "green"), ("openalex", "closed"))]
     _route(http_mock, "10.1/deposit", status="closed")
 
     queries = _FakeQueries(pubs)
     _run(queries, _make_fetcher(), logger)
+    assert queries.verdicts == [("10.1/deposit", "closed")]
     assert queries.updates == []
-    assert queries.checked == [1]
-
-
-def test_open_archive_deposit_upgraded_by_unpaywall(logger, http_mock):
-    """Le garde-fou ne bloque que les rétrogradations : un statut plus ouvert (gold) écrase bien,
-    même avec un dépôt-archive."""
-    pubs = [(1, "10.1/deposit", "green", True)]
-    _route(http_mock, "10.1/deposit", status="gold")
-
-    queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
-    assert queries.updates == [(1, "gold")]
 
 
 def test_unchanged_status_skipped(logger, http_mock):
-    pubs = [(1, "10.1/same", "gold", False)]
+    pubs = [_pub(1, "10.1/same", "gold")]
     _route(http_mock, "10.1/same", status="gold")
 
     queries = _FakeQueries(pubs)
-    _run(queries, _make_fetcher(), logger)
+    metrics = _run(queries, _make_fetcher(), logger)
+    assert queries.verdicts == [("10.1/same", "gold")]
     assert queries.updates == []
-    assert queries.checked == [1]  # statut inchangé mais marqué vérifié
+    assert metrics.unchanged == 1
 
 
 def test_429_retries_transparently(logger, http_mock):
@@ -258,7 +219,7 @@ def test_429_retries_transparently(logger, http_mock):
         ]
     )
 
-    queries = _FakeQueries([(1, "10.1/r", "closed", False)])
+    queries = _FakeQueries([_pub(1, "10.1/r", "closed")])
     _run(queries, _make_fetcher(), logger)
     assert queries.updates == [(1, "green")]
 
@@ -281,14 +242,14 @@ def test_semaphore_caps_concurrent_fetches(logger):
         finally:
             in_flight -= 1
 
-    pubs = [(i, f"10.1/{i}", "closed", False) for i in range(10)]
+    pubs = [_pub(i, f"10.1/{i}", "closed") for i in range(10)]
     _run(_FakeQueries(pubs), tracked_fetcher, logger, max_concurrent=3)
     assert peak[0] == 3
 
 
 def test_skips_without_unpaywall_configuration(logger):
     """Sans configuration Unpaywall, l'accès à la source signale son absence et la phase s'arrête avant toute transaction."""
-    queries = _FakeQueries([(1, "10.1/a", "closed", False)])
+    queries = _FakeQueries([_pub(1, "10.1/a", "closed")])
     open_tx = MagicMock()
     phase = NodePhase(
         "oa_status.verify_unpaywall",
@@ -312,4 +273,4 @@ def test_skips_without_unpaywall_configuration(logger):
 
     open_tx.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
-    assert queries.checked == []
+    assert queries.verdicts == []

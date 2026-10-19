@@ -1,6 +1,6 @@
-"""Phase `oa_status` : statut d'accès ouvert des publications (`publications.oa_status`), lu dans Unpaywall.
+"""Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access qui en découle (`publications.oa_status`).
 
-Pour les publications ayant un DOI, interroge Unpaywall et met à jour le statut OA. Une publication est marquée vérifiée seulement si Unpaywall a répondu ; quand Unpaywall est indisponible, elle attend le run suivant. Le statut reçu écrase l'existant, à deux exceptions près : 'diamond' n'est pas remplacé par 'gold' ; 'embargoed' n'est pas remplacé par 'closed' ou 'unknown', l'embargo étant connu côté HAL quand Unpaywall voit seulement un fichier inaccessible. Un statut plus ouvert (green+) l'emporte dans les deux cas.
+La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs notices et du verdict.
 
 Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
-from domain.publications.metadata import decide_oa_status
+from domain.publications.metadata import publication_oa_status
 from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.http.tls import tls_context
 from pipeline.node_runner import NodePhase
@@ -44,7 +44,7 @@ MAX_CONCURRENT = 5
 class OaStatusPhase:
     """Vérifie sur Unpaywall le statut OA des publications à DOI.
 
-    `staleness_days` lit le délai, en jours, au-delà duquel une publication vérifiée l'est de nouveau. `max_per_run` lit le plafond de DOI vérifiés par run, `None` valant illimité.
+    `staleness_days` lit le délai, en jours, au-delà duquel un DOI vérifié l'est de nouveau. `max_per_run` lit le plafond de DOI vérifiés par run, `None` valant illimité.
     """
 
     queries: OaStatusQueries
@@ -54,7 +54,7 @@ class OaStatusPhase:
     max_concurrent: int = MAX_CONCURRENT
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Vérifie les publications dans une seule transaction."""
+        """Vérifie les DOI dans une seule transaction, avec un commit par paquet."""
         metrics = PhaseMetrics()
         with ctx.open_tx() as conn:
             metrics.merge(
@@ -83,13 +83,11 @@ async def _verifier(
     max_per_run: int | None,
     max_concurrent: int,
 ) -> PhaseMetrics:
-    """Interroge Unpaywall pour les publications à DOI (re)vérifier et met à jour leur `oa_status`, puis rend les métriques du run."""
+    """Interroge Unpaywall pour les DOI à vérifier, écrit les verdicts, recalcule le statut OA des publications de ces DOI, puis rend les métriques du run."""
     metrics = PhaseMetrics()
-    pubs = queries.fetch_publications_with_doi(
-        conn, limit=max_per_run, staleness_days=staleness_days
-    )
-    total = len(pubs)
-    stale_total = queries.count_stale_publications(conn, staleness_days=staleness_days)
+    dois = queries.fetch_dois_to_check(conn, limit=max_per_run, staleness_days=staleness_days)
+    total = len(dois)
+    stale_total = queries.count_dois_to_check(conn, staleness_days=staleness_days)
     before_dist = queries.count_publications_by_oa_status(conn)
 
     progress = {"updated": 0, "skipped": 0, "not_found": 0, "unavailable": 0}
@@ -139,87 +137,87 @@ async def _verifier(
     logger.info(
         "%s%s %s ou %s depuis plus de %s",
         BRANCHE,
-        accord(stale_total, "publication"),
-        forme(stale_total, "jamais vérifiée"),
-        forme(stale_total, "vérifiée"),
+        accord(stale_total, "DOI", "DOI"),
+        forme(stale_total, "jamais vérifié"),
+        forme(stale_total, "vérifié"),
         accord(staleness_days, "jour"),
     )
     if max_per_run and max_per_run < stale_total:
-        reportees = stale_total - total
+        reportes = stale_total - total
         logger.info(
             "%splafond de %s par run ⇒ %s %s au prochain",
             BRANCHE,
             max_per_run,
-            reportees,
-            forme(reportees, "reportée"),
+            reportes,
+            forme(reportes, "reporté"),
         )
 
     sem = asyncio.Semaphore(max_concurrent)
-    # La `Connection` SA sync n'est pas thread-safe ; les writes concurrents d'un paquet passent par `to_thread` sous ce lock (le commit, lui, se fait à la frontière de paquet, hors concurrence).
-    db_lock = asyncio.Lock()
 
     async with httpx2.AsyncClient(verify=tls_context()) as client:
 
-        async def process_one(
-            pub_id: int, doi: str, current_status: str | None, has_open_deposit: bool
-        ) -> None:
+        async def fetch(doi: str) -> tuple[str, LookupOutcome[str]]:
             async with sem:
-                status = await fetcher(client, doi)
+                return doi, await fetcher(client, doi)
 
-            # Unpaywall indisponible : rien n'est écrit, la publication reste dans la file.
-            if isinstance(status, Unavailable):
-                progress["unavailable"] += 1
-                return
-            # `new_status` non None = on écrit un nouveau statut ; sinon on pose seulement
-            # `unpaywall_checked_at`, que la publication soit absente d'Unpaywall ou que son
-            # statut y soit inchangé — dans les deux cas elle sort de la file jusqu'à péremption.
-            new_status: str | None = None
-            if isinstance(status, NotFound):
-                progress["not_found"] += 1
-            else:
-                new_status = decide_oa_status(current_status, status, has_open_deposit)
-                if new_status is None:
-                    progress["skipped"] += 1
-                else:
-                    progress["updated"] += 1
-
-            async with db_lock:
-                if new_status is not None:
-                    await asyncio.to_thread(queries.update_oa_status, conn, pub_id, new_status)
-                else:
-                    await asyncio.to_thread(queries.mark_unpaywall_checked, conn, pub_id)
-
-        # Traitement par paquets : chaque paquet part en concurrence (débit borné par `sem`) puis est committé.
+        # Par paquets : les requêtes d'un paquet partent en concurrence (débit borné par `sem`), puis ses écritures sont committées.
         with progression(total, BRANCHE.rstrip(), logger) as avancement:
             for start in range(0, total, BATCH_SIZE):
-                chunk = pubs[start : start + BATCH_SIZE]
-                await asyncio.gather(*(process_one(*pub) for pub in chunk))
+                chunk = dois[start : start + BATCH_SIZE]
+                verdicts: list[tuple[str, str | None]] = []
+                for doi, outcome in await asyncio.gather(*(fetch(doi) for doi in chunk)):
+                    # Unpaywall indisponible : rien n'est écrit, le DOI reste dans la file.
+                    if isinstance(outcome, Unavailable):
+                        progress["unavailable"] += 1
+                    elif isinstance(outcome, NotFound):
+                        progress["not_found"] += 1
+                        verdicts.append((doi, None))
+                    else:
+                        verdicts.append((doi, outcome))
+                await asyncio.to_thread(_apply_verdicts, conn, queries, verdicts, progress)
                 await asyncio.to_thread(conn.commit)
                 avancement.avance(len(chunk))
 
     logger.info(
-        "%s%s %s, %s %s, %s non %s, %s %s faute de réponse d'Unpaywall",
+        "%s%s, %s %s ; %s non %s, %s %s faute de réponse d'Unpaywall",
         DERNIERE_BRANCHE,
-        progress["updated"],
-        forme(progress["updated"], "mise à jour", "mises à jour"),
+        accord(progress["updated"], "publication mise à jour", "publications mises à jour"),
         progress["skipped"],
         forme(progress["skipped"], "inchangée"),
-        progress["not_found"],
-        forme(progress["not_found"], "trouvée"),
+        accord(progress["not_found"], "DOI", "DOI"),
+        forme(progress["not_found"], "trouvé"),
         progress["unavailable"],
-        forme(progress["unavailable"], "reportée"),
+        forme(progress["unavailable"], "reporté"),
     )
 
     return _result()
+
+
+def _apply_verdicts(
+    conn: Connection,
+    queries: OaStatusQueries,
+    verdicts: list[tuple[str, str | None]],
+    progress: dict[str, int],
+) -> None:
+    """Écrit les verdicts, puis recalcule le statut OA des publications de ces DOI (`publication_oa_status`)."""
+    queries.record_verdicts(conn, verdicts)
+    by_doi = dict(verdicts)
+    for pub in queries.fetch_oa_inputs(conn, list(by_doi)):
+        status = publication_oa_status(pub.signals, by_doi.get(pub.doi))
+        if status == pub.oa_status:
+            progress["skipped"] += 1
+        else:
+            queries.update_oa_status(conn, pub.id, status)
+            progress["updated"] += 1
 
 
 # ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:
-    """Enrichissement de `publications.oa_status`, une publication à la fois, via Unpaywall.
+    """Statut open access des publications, d'après le verdict d'Unpaywall sur leur DOI.
 
-    Le délai de péremption et le plafond par run bornent la phase : le retard des publications jamais vérifiées s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
+    Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
     """
 
     from pipeline.ingestion.complements.unpaywall import fetch_oa_status

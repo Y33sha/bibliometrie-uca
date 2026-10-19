@@ -1,103 +1,91 @@
-"""Tests d'intégration pour `pipeline.transformation.publications.oa_status_queries` : la file de vérification Unpaywall et les compteurs du bilan de phase."""
+"""Tests d'intégration pour `pipeline.transformation.publications.oa_status_queries` : DOI à vérifier sur Unpaywall, verdicts, publications de ces DOI."""
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
+from pipeline.transformation.publications.oa_status_queries import OaSignal, OaStatusQueries
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_publication
 
 _Q = OaStatusQueries()
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests
 
 
-def _set_checked(conn, pub_id, days_ago):
+def _verdict(conn, doi, oa_status, *, days_ago):
     conn.execute(
         text(
-            "UPDATE publications SET unpaywall_checked_at = now() - make_interval(days => :d) "
-            "WHERE id = :id"
+            "INSERT INTO unpaywall (doi, oa_status, checked_at)"
+            " VALUES (:doi, CAST(:os AS oa_type), now() - make_interval(days => :d))"
         ),
-        {"d": days_ago, "id": pub_id},
+        {"doi": doi, "os": oa_status, "d": days_ago},
     )
 
 
-class TestFetchPublicationsWithDoi:
-    def test_returns_tuples(self, sa_sync_conn):
-        """La fonction retourne des `PublicationOaCheck`, pour que les callers puissent unpacker
-        `(pub_id, doi, oa_status, has_open_deposit)`."""
-        insert_publication(sa_sync_conn, doi="10.1/a", oa_status="gold")
-        rows = _Q.fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
-        assert rows
-        assert all(isinstance(r, tuple) for r in rows)
-        # Forme du tuple : (id, doi, oa_status, has_open_deposit)
-        for pub_id, doi, oa_status, has_open_deposit in rows:
-            assert isinstance(pub_id, int)
-            assert isinstance(doi, str)
-            assert oa_status is None or isinstance(oa_status, str)
-            assert isinstance(has_open_deposit, bool)
-
-    def test_returns_only_pubs_with_doi(self, sa_sync_conn):
-        with_doi = insert_publication(sa_sync_conn, doi="10.1/a")
+class TestDoisToCheck:
+    def test_seuls_les_doi_sans_verdict_ou_perimes(self, sa_sync_conn):
+        """La péremption regarde seulement la date du verdict, nul compris."""
+        for doi in ("10.1/n", "10.1/s", "10.1/f", "10.1/absent"):
+            insert_publication(sa_sync_conn, doi=doi)
         insert_publication(sa_sync_conn, doi=None)
+        _verdict(sa_sync_conn, "10.1/s", "gold", days_ago=999)
+        _verdict(sa_sync_conn, "10.1/f", "gold", days_ago=1)
+        _verdict(sa_sync_conn, "10.1/absent", None, days_ago=1)
 
-        rows = _Q.fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
-        ids = [r.id for r in rows]
-        assert with_doi in ids
-        # Pas de pub sans DOI
-        assert all(r.doi is not None for r in rows)
+        dois = _Q.fetch_dois_to_check(sa_sync_conn, staleness_days=STALENESS)
 
-    def test_sorts_never_checked_first(self, sa_sync_conn):
-        # Tri `unpaywall_checked_at NULLS FIRST` : les jamais-vérifiés d'abord.
-        checked = insert_publication(sa_sync_conn, doi="10.1/a", oa_status="closed")
-        _set_checked(sa_sync_conn, checked, days_ago=1)
-        never = insert_publication(sa_sync_conn, doi="10.1/b", oa_status="closed")
-        rows = _Q.fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
-        ordered = [r.id for r in rows if r.id in (checked, never)]
-        assert ordered[0] == never
+        assert {"10.1/n", "10.1/s"} <= set(dois)
+        assert not {"10.1/f", "10.1/absent"} & set(dois)
+        assert _Q.count_dois_to_check(sa_sync_conn, staleness_days=STALENESS) == len(dois)
 
-    def test_staleness_excludes_only_the_fresh(self, sa_sync_conn):
-        """La péremption ne regarde que la date : le statut courant n'exempte personne."""
-        # jamais interrogé → inclus
-        never_gold = insert_publication(sa_sync_conn, doi="10.1/n", oa_status="gold")
-        # gold périmé → inclus : son statut peut venir d'une source, sans qu'Unpaywall
-        # ait jamais confirmé (publication absente de son index à l'interrogation)
-        gold_stale = insert_publication(sa_sync_conn, doi="10.1/g", oa_status="gold")
-        _set_checked(sa_sync_conn, gold_stale, days_ago=999)
-        # gold interrogé récemment → exclu (frais)
-        gold_fresh = insert_publication(sa_sync_conn, doi="10.1/gf", oa_status="gold")
-        _set_checked(sa_sync_conn, gold_fresh, days_ago=1)
-        # closed interrogé récemment → exclu (frais)
-        closed_fresh = insert_publication(sa_sync_conn, doi="10.1/cf", oa_status="closed")
-        _set_checked(sa_sync_conn, closed_fresh, days_ago=1)
-        # closed périmé → inclus
-        closed_stale = insert_publication(sa_sync_conn, doi="10.1/cs", oa_status="closed")
-        _set_checked(sa_sync_conn, closed_stale, days_ago=999)
+    def test_jamais_verifies_d_abord(self, sa_sync_conn):
+        insert_publication(sa_sync_conn, doi="10.1/a")
+        insert_publication(sa_sync_conn, doi="10.1/b")
+        _verdict(sa_sync_conn, "10.1/a", "closed", days_ago=999)
 
-        ids = {r.id for r in _Q.fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)}
-        assert never_gold in ids
-        assert gold_stale in ids
-        assert gold_fresh not in ids
-        assert closed_fresh not in ids
-        assert closed_stale in ids
+        dois = [
+            d
+            for d in _Q.fetch_dois_to_check(sa_sync_conn, staleness_days=STALENESS)
+            if d in ("10.1/a", "10.1/b")
+        ]
 
-    def test_respects_limit(self, sa_sync_conn):
+        assert dois == ["10.1/b", "10.1/a"]
+
+    def test_respecte_le_plafond(self, sa_sync_conn):
         for i in range(3):
             insert_publication(sa_sync_conn, doi=f"10.1/{i}")
-        rows = _Q.fetch_publications_with_doi(sa_sync_conn, limit=2, staleness_days=STALENESS)
-        assert len(rows) == 2
+        assert len(_Q.fetch_dois_to_check(sa_sync_conn, limit=2, staleness_days=STALENESS)) == 2
 
-    def test_returns_oa_status(self, sa_sync_conn):
-        insert_publication(sa_sync_conn, doi="10.1/a", oa_status="gold")
-        rows = _Q.fetch_publications_with_doi(sa_sync_conn, staleness_days=STALENESS)
-        assert any(r.oa_status == "gold" for r in rows)
+
+class TestVerdicts:
+    def test_un_verdict_reecrit_le_precedent(self, sa_sync_conn):
+        _verdict(sa_sync_conn, "10.1/v", "closed", days_ago=999)
+        _Q.record_verdicts(sa_sync_conn, [("10.1/v", "gold"), ("10.1/w", None)])
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT doi, oa_status::text, checked_at > now() - interval '1 minute'"
+                " FROM unpaywall WHERE doi IN ('10.1/v', '10.1/w') ORDER BY doi"
+            )
+        ).all()
+        assert [tuple(r) for r in rows] == [("10.1/v", "gold", True), ("10.1/w", None, True)]
+
+
+class TestPublicationsOfDois:
+    def test_statuts_des_notices(self, sa_sync_conn):
+        pub = insert_publication(sa_sync_conn, doi="10.1/p", oa_status="closed")
+        insert_source_publication(
+            sa_sync_conn, pub, source="hal", source_id="hal-oa", oa_status="green"
+        )
+        insert_source_publication(
+            sa_sync_conn, pub, source="openalex", source_id="W-oa", oa_status=None
+        )
+
+        [inputs] = _Q.fetch_oa_inputs(sa_sync_conn, ["10.1/p"])
+
+        assert (inputs.id, inputs.doi, inputs.oa_status) == (pub, "10.1/p", "closed")
+        assert inputs.signals == [OaSignal("hal", "green"), OaSignal("openalex", None)]
 
 
 class TestCounters:
-    def test_count_stale_publications_matches_the_queue(self, sa_sync_conn):
-        """Même prédicat que `fetch_publications_with_doi`, sans cap : le backlog avant plafonnement."""
-        insert_publication(sa_sync_conn, doi="10.1/a", oa_status="closed")
-        insert_publication(sa_sync_conn, doi=None)  # sans DOI → hors file
-        assert _Q.count_stale_publications(sa_sync_conn, staleness_days=STALENESS) == 1
-
     def test_count_publications_by_oa_status_groups_the_stock(self, sa_sync_conn):
         insert_publication(sa_sync_conn, doi="10.1/a", oa_status="gold")
         insert_publication(sa_sync_conn, doi="10.1/b", oa_status="gold")

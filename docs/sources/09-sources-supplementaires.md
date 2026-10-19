@@ -10,7 +10,7 @@ https://unpaywall.org/
 
 Documentation API : https://unpaywall.org/products/api
 
-Source d'enrichissement consultée par DOI pour obtenir une valeur à jour de `publications.oa_status`.
+Source d'enrichissement consultée par DOI pour le statut open access des publications.
 
 ### API utilisée
 
@@ -22,13 +22,11 @@ Source d'enrichissement consultée par DOI pour obtenir une valeur à jour de `p
 
 ### Données récupérées
 
-Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`.
-
-Consommée par la phase pipeline [`oa_status`](../pipeline/10-enrichissements.md#statut-open-access-oa_status).
+Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/10-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.unpaywall`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
 
 ### Particularités
 
-**Préservation du `diamond`** — Unpaywall ne distingue pas le diamond OA du gold. L'enrichissement ne remplace **jamais** un statut `diamond` par un `gold` retourné par Unpaywall.
+**Préservation du `diamond`** — Unpaywall ne distingue pas le diamond OA du gold. Une publication diamond selon ses sources le reste face au gold d'Unpaywall.
 
 <!--TODO: récupérer un lien OA pour chaque publi?-->
 
