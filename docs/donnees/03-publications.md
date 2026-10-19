@@ -66,8 +66,8 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `publications` | pipeline | `pipeline/transformation/publications/reconciliation/refresh.py` (`refresh_from_sources` recalcule depuis les sources) |
-| `publications_detail` | pipeline | `pipeline/transformation/publications/reconciliation/refresh.py` |
+| `publications` | pipeline | `pipeline/transformation/publications/consolidation.py` (`refresh_from_sources` recalcule depuis les sources) |
+| `publications_detail` | pipeline | `pipeline/transformation/publications/store.py` |
 | `publication_relations` | pipeline | phase `relations` |
 | `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
 | `subjects`, `publication_subjects` | pipeline | `pipeline/transformation/publications/subjects/subject_ingestion.py` |

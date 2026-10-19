@@ -12,10 +12,7 @@ Les deux nœuds (`pipeline.graph`) — réconciliation, suppression — sont ide
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
-
-from sqlalchemy import Connection
 
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
@@ -28,13 +25,11 @@ from pipeline.transformation.publications.reconciliation.reconcile_components im
 from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,
 )
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 
 
 @dataclass(frozen=True)
 class PublicationsPhase:
     reconciliation_queries: PublicationsReconciliationQueries
-    publication_repo_factory: Callable[[Connection], PublicationStore]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Réconciliation, puis suppression des publications restées sans source."""
@@ -45,7 +40,6 @@ class PublicationsPhase:
                 ctx.open_tx,
                 reconciliation_queries,
                 ctx.logger,
-                self.publication_repo_factory,
                 rebuild=ctx.options.rebuild_publications,
             )
 
@@ -85,7 +79,6 @@ def _reconcile(
     open_tx: OpenTransaction,
     reconciliation_queries: PublicationsReconciliationQueries,
     logger: logging.Logger,
-    publication_repo_factory: Callable[[Connection], PublicationStore],
     *,
     rebuild: bool,
 ) -> PhaseMetrics:
@@ -94,7 +87,6 @@ def _reconcile(
             conn,
             reconciliation_queries,
             logger,
-            publication_repo=publication_repo_factory(conn),
             rebuild=rebuild,
         )
 
@@ -128,9 +120,5 @@ def build() -> Phase:
     from pipeline.transformation.publications.reconciliation.reconciliation import (
         PublicationsReconciliationQueries,
     )
-    from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 
-    return PublicationsPhase(
-        PublicationsReconciliationQueries(),
-        publication_repo_factory=PublicationStore,
-    )
+    return PublicationsPhase(PublicationsReconciliationQueries())

@@ -11,7 +11,6 @@ import copy
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.publications_phase import (
     apply_metadata_corrections,
     create_all_publications,
@@ -121,7 +120,7 @@ def _fetch_stale_publications(conn):
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PublicationsReconciliationQueries(), publication_repo=PublicationStore(conn))
+    reconcile(conn, PublicationsReconciliationQueries())
 
 
 # ── Tests ───────────────────────────────────────────────────────

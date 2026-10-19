@@ -2,6 +2,7 @@
 
 from sqlalchemy import Connection
 
+from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_updates,
     hal_origin_ids,
@@ -9,8 +10,7 @@ from pipeline.transformation.publications.correction.correct_unary import (
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     PgMetadataCorrectionQueries,
 )
-from pipeline.transformation.publications.lifecycle import refresh
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.store import PublicationStore
 
 
 def correct_journal_records(conn: Connection, journal_id: int) -> int:
@@ -37,6 +37,6 @@ def requalify_journal_publications(conn: Connection, journal_id: int) -> int:
     before = store.find_doc_types_by_ids(pub_ids)
     correct_journal_records(conn, journal_id)
     for pub_id in pub_ids:
-        refresh(store, pub_id)
+        lifecycle.refresh(conn, pub_id)
     after = store.find_doc_types_by_ids(pub_ids)
     return sum(1 for pub_id, doc_type in before.items() if after.get(pub_id, doc_type) != doc_type)

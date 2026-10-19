@@ -17,7 +17,7 @@ from pipeline.transformation.publications.reconciliation.reconciliation import (
 )
 
 _Q = PublicationsReconciliationQueries()
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -138,7 +138,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_publication_id.
@@ -165,7 +164,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         assert _sp_state(conn, sp_a)[0] == pub_a
@@ -191,7 +189,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         dirty = dict(conn.execute(text("SELECT id, authorships_dirty FROM publications")).all())
@@ -209,7 +206,6 @@ class TestEndToEnd:
                 conn,
                 PublicationsReconciliationQueries(),
                 logger,
-                publication_repo=PublicationStore(conn),
             )
 
         assert "Aucun document nouveau ou mis à jour" in caplog.text
@@ -229,7 +225,6 @@ class TestEndToEnd:
                 conn,
                 PublicationsReconciliationQueries(),
                 logger,
-                publication_repo=PublicationStore(conn),
             )
 
         assert "résolus en 1 publication (1 déjà existante, 0 nouvelle ; 1 doublon" in caplog.text
@@ -245,7 +240,6 @@ class TestEndToEnd:
                 conn,
                 PublicationsReconciliationQueries(),
                 logger,
-                publication_repo=PublicationStore(conn),
                 rebuild=True,
             )
 
@@ -265,7 +259,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
@@ -301,7 +294,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
@@ -323,7 +315,6 @@ class TestEndToEnd:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -353,7 +344,6 @@ class TestMetadataBlock:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
@@ -379,7 +369,6 @@ class TestMetadataBlock:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -404,7 +393,6 @@ class TestMetadataBlock:
             conn,
             PublicationsReconciliationQueries(),
             logger,
-            publication_repo=PublicationStore(conn),
         )
 
         assert _pub_exists(conn, pub_a)
@@ -557,7 +545,6 @@ class TestExternalDoiCarrier:
         reconcile(
             conn,
             PublicationsReconciliationQueries(),
-            publication_repo=PublicationStore(conn),
         )
 
         assert _pub_exists(conn, orphan_pub)
@@ -627,7 +614,7 @@ class TestStaleMembership:
         conn = sa_sync_conn
         pub, preprint, published = self._seed_drifted_pair(conn)
 
-        reconcile(conn, _Q, publication_repo=PublicationStore(conn))
+        reconcile(conn, _Q)
 
         preprint_pub, preprint_dirty = _sp_state(conn, preprint)
         published_pub, published_dirty = _sp_state(conn, published)
@@ -663,7 +650,7 @@ class TestFirstHalIdKey:
             conn, pub, source_id="W1", external_ids={"hal_id": ["hal-01234567", "hal-07654321"]}
         )
 
-        reconcile(conn, _Q, publication_repo=PublicationStore(conn))
+        reconcile(conn, _Q)
 
         assert _sp_state(conn, bridge)[0] == _sp_state(conn, first)[0]
         assert _sp_state(conn, second)[0] != _sp_state(conn, first)[0]

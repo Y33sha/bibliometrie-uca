@@ -37,9 +37,7 @@ def _run(contexte, *, supprimees: int, total: int = 40):
         ),
         patch.object(phase, "delete_publications_without_sources", side_effect=supprimer),
     ):
-        rendu = phase.PublicationsPhase(
-            queries, publication_repo_factory=lambda conn: object()
-        ).run(contexte())
+        rendu = phase.PublicationsPhase(queries).run(contexte())
     return rendu, appels
 
 

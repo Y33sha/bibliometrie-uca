@@ -10,7 +10,7 @@ from infrastructure.sql_fragments import (
     insert_missing_authorships_sql,
     propagate_authorship_attributes_sql,
 )
-from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
 

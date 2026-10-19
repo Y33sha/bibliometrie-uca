@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures

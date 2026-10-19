@@ -10,7 +10,7 @@ from interfaces.cli.maintenance.delete_notices_out_of_window import (
     fetch_cutoff,
 )
 from pipeline.ingestion.common.staging import delete_source_publications_before
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.staging import insert_staging

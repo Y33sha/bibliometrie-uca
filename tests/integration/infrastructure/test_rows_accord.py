@@ -17,10 +17,10 @@ from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
+from pipeline.transformation.publications.consolidation import source_publications_of
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     PgMetadataCorrectionQueries,
 )
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.structures import (
     insert_perimeter,
@@ -54,8 +54,7 @@ class TestRelevesRendantUneListe:
         assert queries.fetch_journal_by_doi_candidates(sa_sync_conn_owner) == []
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
-        repo = PublicationStore(sa_sync_conn_owner)
-        assert repo.get_source_publications(1) == []
+        assert source_publications_of(sa_sync_conn_owner, 1) == []
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
         """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""

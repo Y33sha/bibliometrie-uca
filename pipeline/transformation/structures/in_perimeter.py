@@ -3,7 +3,7 @@
 from sqlalchemy import Connection, text
 
 from infrastructure.sql_fragments import SIGNATURES_SCOPE, propagate_authorship_attributes_sql
-from pipeline.transformation.publications.reconciliation.publication_perimeter import (
+from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
 from pipeline.transformation.structures.perimeter_evidence import (

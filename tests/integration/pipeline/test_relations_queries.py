@@ -14,13 +14,13 @@ from functools import partial
 from sqlalchemy import text
 
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
 from pipeline.transformation.publications.relations import RelationsPhase
 from pipeline.transformation.publications.relations_queries import (
     DoiPublication,
     PublicationRelationsQueries,
     RelationEdge,
 )
+from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_publication
 

@@ -7,7 +7,7 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.publications.reconciliation.refresh import PublicationStore
+from pipeline.transformation.publications.store import PublicationStore
 from pipeline.transformation.publications.subjects.subject_extractors import (
     hal_labels,
     openalex_labels,
