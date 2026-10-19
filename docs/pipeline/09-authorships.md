@@ -15,7 +15,7 @@ flowchart LR
     class B new;
 ```
 
-La phase `authorships` consolide en une table les signatures que rapportent toutes les sources : une ligne par couple publication-personne, dont les attributs résument ce que ces sources en disent. La construction est incrémentale et convergente — les attributs divergents sont réécrits, les paires que plus aucune source n'atteste sont supprimées — si bien qu'une relance aboutit au même état. `run_pipeline --rebuild-authorships` reconstruit la table entière.
+La phase `authorships` consolide en une table les signatures que rapportent toutes les sources : une ligne par couple publication-personne, dont les attributs résument ce que ces sources en disent. La construction est incrémentale et convergente — les attributs divergents sont réécrits, les paires que plus aucune source n'atteste sont supprimées — si bien qu'une relance aboutit au même état.
 
 1. **Insertion** des paires (publication, personne) manquantes, **sauf** les paires rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est (`rejected_authorships`). Une signature confirmée à la personne l'emporte sur le rejet.
 2. **Élagage** des authorships orphelines : les paires que plus aucune `source_authorship` n'atteste sont supprimées.

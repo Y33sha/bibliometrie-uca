@@ -30,8 +30,6 @@ La construction (`build_authorships.py`) se rejoue sans dommage et converge vers
 3. **Report sur la publication.** `publications.in_perimeter` devient vrai si la publication porte au moins une authorship d'auteur dans le périmètre, rattachée à une personne non écartée, ou si c'est une thèse soutenue dans un établissement du périmètre. C'est exactement le prédicat qu'emploie le filtre de périmètre.
 4. **Rafraîchissement** des deux vues matérialisées, sans bloquer les lectures.
 
-`run_pipeline --rebuild-authorships` vide d'abord la table : c'est la reconstruction de récupération, pas le mode courant.
-
 ## Écriture par l'API — édition manuelle
 
 L'API n'écrit jamais `authorships`. L'édition manuelle agit sur les tables en amont, décrites côté [personnes](persons.md), et la construction suivante en tire les conséquences.

@@ -7,7 +7,10 @@ from sqlalchemy import text
 from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import (
+    AuthorshipsBatchQueries,
+    mark_signatures_to_resync,
+)
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
@@ -403,8 +406,8 @@ def _build_upper(block) -> list[AuthorRecord]:
     return [_rec(i, name.upper()) for i, name in enumerate(block["names"])]
 
 
-def _sync(conn, sp: int, names: list[str], build=_build, *, normalize_full: bool = False) -> None:
-    settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=normalize_full)
+def _sync(conn, sp: int, names: list[str], build=_build) -> None:
+    settings = SignatureSyncSettings(fingerprint=fingerprint)
     sync_source_authorships(conn, _Q, settings, "crossref", sp, {"names": names}, build)
 
 
@@ -419,13 +422,14 @@ def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
     assert _signatures(conn, sp)[0][1] == "Dupont, Jean"
 
 
-def test_normalize_full_applique_une_regle_modifiee(sa_sync_conn):
+def test_notice_marquee_applique_une_regle_modifiee(sa_sync_conn):
     conn = sa_sync_conn
     sp = _notice(conn)
     _sync(conn, sp, ["Dupont, Jean"])
     sa_id = _signatures(conn, sp)[0][0]
 
-    _sync(conn, sp, ["Dupont, Jean"], _build_upper, normalize_full=True)
+    assert mark_signatures_to_resync(conn, "crossref") == 1
+    _sync(conn, sp, ["Dupont, Jean"], _build_upper)
 
     assert _signatures(conn, sp)[0] == (sa_id, "DUPONT, JEAN")
 

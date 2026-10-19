@@ -362,14 +362,19 @@ def build() -> Phase:
 
 
 class _NormalizeSelonOptions:
-    """Construit les normaliseurs selon les options du run (`--raw-store`, `--normalize-full`), puis exécute `NormalizePhase`."""
+    """Construit les normaliseurs selon les options du run (`--raw-store`), puis exécute `NormalizePhase`.
+
+    Avec `--normalize-full`, chaque source marque d'abord toutes ses notices à resynchroniser.
+    """
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
 
         options = ctx.options
-        registry = _normalize_builders(archive=options.raw_store, full=options.normalize_full)
+        registry = _normalize_builders(archive=options.raw_store)
 
         def normalize_one(source: str) -> NormalizeStats:
+            if options.normalize_full:
+                _run_mark_signatures_to_resync(source)
             return _run_normalize(registry[source])
 
         return NormalizePhase(
@@ -378,6 +383,13 @@ class _NormalizeSelonOptions:
             cleanup_orphan_identities=_run_cleanup_orphan_identities,
             cleanup_orphan_addresses=_run_cleanup_orphan_addresses,
         ).run(ctx)
+
+
+def _run_mark_signatures_to_resync(source: str) -> None:
+    from pipeline.ingestion.common.signature_queries import mark_signatures_to_resync
+
+    with open_tx() as conn:
+        mark_signatures_to_resync(conn, source)
 
 
 def _run_prune_disappeared() -> int:
@@ -401,9 +413,7 @@ def _run_cleanup_orphan_addresses() -> int:
         return delete_orphan_addresses(conn)
 
 
-def _normalize_builders(
-    *, archive: bool = True, full: bool = False
-) -> dict[str, ConstructeurNormalizer]:
+def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
     from infrastructure.raw_store import NullRawStore, get_raw_store
     from pipeline.ingestion.common.fingerprint import fingerprint
@@ -424,7 +434,7 @@ def _normalize_builders(
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
     raw_store = get_raw_store() if archive else NullRawStore()
-    sync_settings = SignatureSyncSettings(fingerprint=fingerprint, normalize_full=full)
+    sync_settings = SignatureSyncSettings(fingerprint=fingerprint)
 
     def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
         return lambda conn: cls(

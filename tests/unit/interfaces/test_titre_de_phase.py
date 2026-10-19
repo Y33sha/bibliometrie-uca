@@ -104,7 +104,6 @@ def _args(**modifications) -> argparse.Namespace:
         "from_phase": None,
         "no_extras": False,
         "rebuild_publications": False,
-        "rebuild_authorships": False,
         "rebuild_subjects": False,
         "raw_store": False,
         "normalize_full": False,
@@ -135,5 +134,5 @@ class TestTitreDuRun:
         assert "phases" not in _texte(_titre_du_run(_args(), [("extract", None)]))
 
     def test_les_reconstructions_demandees_paraissent(self, terminal) -> None:
-        texte = _texte(_titre_du_run(_args(rebuild_authorships=True), []))
-        assert "options ·· signatures reconstruites" in texte
+        texte = _texte(_titre_du_run(_args(rebuild_subjects=True), []))
+        assert "options ·· sujets reconstruits" in texte

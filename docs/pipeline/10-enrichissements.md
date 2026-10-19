@@ -19,7 +19,7 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 **Étape 1 — Ingestion.**
 Les sujets que les sources déclarent sur chaque `source_publication` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les concepts issus des ontologies des sources entrent dans `subjects` ; les mots-clés libres restent portés par les `source_publications`.
 
-Les publications traitées sont celles dont `publications.subjects_ingested_at` est vide : jamais ingérées, ou recalculées depuis leurs sources après la dernière ingestion de leurs sujets. L'ingestion pose cette date, y compris pour une publication sans sujet. Leurs liens existants sont supprimés — sauf ceux marqués `rejected` — puis reconstruits depuis les sources. L'option `--rebuild-subjects` re-traite le stock entier.
+Les publications traitées sont celles dont `publications.subjects_ingested_at` est vide : jamais ingérées, ou recalculées depuis leurs sources après la dernière ingestion de leurs sujets. L'ingestion pose cette date, y compris pour une publication sans sujet. Leurs liens existants sont supprimés — sauf ceux marqués `rejected` — puis reconstruits depuis les sources. L'option `--rebuild-subjects` vide cette date sur toutes les publications : la phase re-traite alors le stock entier.
 
 Les sujets qu'aucun lien ne référence plus sont supprimés.
 

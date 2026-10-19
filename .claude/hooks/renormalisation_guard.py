@@ -19,7 +19,7 @@ CYCLE = """Rappel du cycle :
 - `extract` upsert les payloads des sources dans `staging`. Une ligne repasse à `processed = FALSE` seulement si son payload a changé (`raw_hash` distinct), ou quand `fetch_truncated` la complète.
 - `normalize` traite seulement les lignes `processed = FALSE`. Avec `--raw-store`, `mark_done` archive le payload dans le raw store, puis vide `raw_data`.
 - Une notice déjà normalisée ne repasse donc pas par `normalize` d'elle-même. Rejouer la normalisation d'un stock passe par `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py`.
-- `--normalize-full` ne remet aucune notice en file : il force la synchronisation des signatures des seules notices traitées pendant ce passage, même à bloc auteurs inchangé."""
+- `--normalize-full` ne remet aucune notice en file : il vide l'empreinte du bloc auteurs des notices des sources normalisées, qui resynchronisent leurs signatures à leur prochaine normalisation, même à bloc auteurs inchangé."""
 
 RAPPEL_REPONSE = f"""Ta réponse précédente emploie « renormaliser ». {CYCLE}
 

@@ -189,12 +189,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
     )
     parser.add_argument(
-        "--rebuild-authorships",
-        action="store_true",
-        help="Avant la phase authorships, purge complète de la table puis reconstruction "
-        "depuis zéro (filet anti-divergence, en récupération).",
-    )
-    parser.add_argument(
         "--raw-store",
         action="store_true",
         help="Archive les réponses brutes des sources sur disque, sous "
@@ -204,14 +198,15 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--normalize-full",
         action="store_true",
-        help="À la phase normalize, synchronise les signatures de chaque notice même si son bloc "
-        "auteurs est inchangé, pour appliquer une règle de normalisation des auteurs modifiée.",
+        help="À la phase normalize, marque toutes les notices des sources normalisées : chacune "
+        "resynchronise ses signatures à sa prochaine normalisation, même si son bloc auteurs est "
+        "inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
     )
     parser.add_argument(
         "--rebuild-subjects",
         action="store_true",
-        help="À la phase subjects, ré-ingère toutes les publications (pas seulement les "
-        "modifiées) pour propager une évolution des règles d'ingestion sur tout le stock.",
+        help="À la phase subjects, marque toutes les publications à ingérer, pour propager "
+        "une évolution des règles d'ingestion sur tout le stock.",
     )
     return parser
 
@@ -344,7 +339,6 @@ def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder
         texte
         for drapeau, texte in (
             (args.rebuild_publications, "publications reconstruites"),
-            (args.rebuild_authorships, "signatures reconstruites"),
             (args.rebuild_subjects, "sujets reconstruits"),
             (args.raw_store, "archivage des données brutes"),
             (args.normalize_full, "signatures resynchronisées"),
@@ -388,7 +382,6 @@ def _run_one_phase(
                         start_year=args.start_year,
                         include_wos=args.include_wos,
                         rebuild_publications=args.rebuild_publications,
-                        rebuild_authorships=args.rebuild_authorships,
                         rebuild_subjects=args.rebuild_subjects,
                         raw_store=args.raw_store,
                         normalize_full=args.normalize_full,

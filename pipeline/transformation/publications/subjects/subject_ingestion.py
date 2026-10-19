@@ -41,19 +41,18 @@ def run(
     *,
     rebuild: bool = False,
 ) -> PhaseMetrics:
-    """Ré-ingère les sujets des publications à ingérer (ou de toutes si `rebuild`).
+    """Ré-ingère les sujets des publications à ingérer.
 
     `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
 
-    `rebuild` repasse toutes les publications, indépendamment du signal incrémental : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
+    `rebuild` marque d'abord toutes les publications à ingérer : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
     """
     subjects_before = queries.count_all_subjects(conn)
     etape(logger, "Liens publications-sujets")
 
     if rebuild:
-        pub_ids = queries.select_all_publication_ids(conn)
-    else:
-        pub_ids = queries.select_publications_to_reingest(conn)
+        queries.mark_all_publications_to_reingest(conn)
+    pub_ids = queries.select_publications_to_reingest(conn)
     if not pub_ids:
         queries.purge_orphan_subjects(conn)
         rien_a_faire(logger)

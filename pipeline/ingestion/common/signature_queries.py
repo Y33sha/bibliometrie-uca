@@ -115,6 +115,17 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 _KEY_COLUMNS_SQL = ", ".join(IDENTITY_KEY_COLUMNS)
 
 
+def mark_signatures_to_resync(conn: Connection, source: str) -> int:
+    """Vide l'empreinte du bloc auteurs des notices de `source` : leur prochaine normalisation synchronise leurs signatures. Rend le nombre de notices marquées."""
+    return conn.execute(
+        text("""
+            UPDATE source_publications SET authors_hash = NULL
+            WHERE source = :source AND authors_hash IS NOT NULL
+        """),
+        {"source": source},
+    ).rowcount
+
+
 def delete_orphan_identities(conn: Connection) -> int:
     """Supprime les identités de `author_identifying_keys` que plus aucune signature ne référence.
 
