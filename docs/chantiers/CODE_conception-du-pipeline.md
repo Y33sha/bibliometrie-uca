@@ -63,7 +63,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ## Décisions
 
-- Le SQL d'un module de logique vit dans un module voisin `<module>_queries.py`, sous forme d'une classe `<Module>Queries` sans état, qui reçoit la connexion à chaque appel. La persistance d'une entité (`PublicationStore`, et les classes `*GatewayQueries` des revues, monographies et éditeurs) passe par une classe qui reçoit la connexion à sa construction. Pas de préfixe `Pg` ni de suffixe `Gateway` hors des adaptateurs d'`infrastructure/`.
+- Le SQL propre à un module vit dans ce module. Le SQL partagé par plusieurs modules est l'accès à une entité : il vit dans le *store* de l'entité, une classe qui reçoit la connexion à sa construction et rend un agrégat ou des lignes. *Repository* désigne seulement les adaptateurs d'`infrastructure/`. Pas de préfixe `Pg` ni de suffixe `Gateway` ou `Queries`.
 - `transformation/` est organisé par entité. Le graphe déclare des nœuds ; une phase regroupe des nœuds pour l'affichage dans les journaux et l'administration.
 - Les identifiants du code sont en anglais. Les textes affichés sont en français.
 - Une notion, un mot. `authorships` devient `contributions`.
@@ -104,7 +104,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 - [ ] `PersonWrites` remplacé par `PgPersonRepository`.
 - [ ] Arbitrage des identifiants en un module.
-- [ ] `matching.py` et `name_forms.py` renommés en modules de requêtes.
+- [ ] SQL de `matching.py` et `name_forms.py` : store des personnes pour l'accès partagé, le reste dans les modules qui l'utilisent.
 - [ ] `loading.py` : champs projetés jamais lus.
 
 ### Phase 5 — `structures`
@@ -123,10 +123,10 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 7 — `publishing`
 
-- [ ] SQL de `journals/journals.py` réparti par étape.
+- [ ] SQL de `journals/journals.py` réparti par étape ; stores des revues, monographies et éditeurs.
 - [ ] Requalification par revue dans `journals/`, fusion des monographies sur le modèle des revues.
 - [ ] Liste des DOI connus tirée d'une vue commune avec `candidate_dois`.
-- [ ] Noms : passerelles, `SubjectsIngestionQueries`, étape DOAJ, `pub_id` d'éditeur.
+- [ ] Noms : étape DOAJ, `pub_id` d'éditeur.
 
 ### Phase 8 — Vocabulaire
 
