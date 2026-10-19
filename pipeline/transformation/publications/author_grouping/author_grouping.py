@@ -1,6 +1,6 @@
 """Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres auteurs s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Les signatures d'un autre rôle (jury, direction de thèse, édition) s'alignent rôle par rôle, par la seule règle de noms. Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres signatures, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
 Nœud `author_grouping.build`.
 """
@@ -26,7 +26,6 @@ from domain.publications.author_grouping import (
     plan_group_ids,
     with_known_first_name,
 )
-from domain.publications.authorship_roles import AuthorshipRole
 from domain.publications.list_copies import copied_signatures
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
@@ -74,26 +73,17 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
     return zip(rows.tolist(), cols.tolist(), strict=True)
 
 
-def _role_class(roles: list[str] | None) -> str:
-    """Classe d'alignement d'une signature : les auteurs ensemble, les autres rôles chacun à part."""
-    roles = roles or [AuthorshipRole.AUTHOR]
-    return AuthorshipRole.AUTHOR if AuthorshipRole.AUTHOR in roles else ",".join(sorted(roles))
-
-
-def notices_by_role(rows: Sequence[SignatureRow]) -> dict[str, dict[int, list[Signature]]]:
-    """Signatures d'une publication par classe de rôle, puis par notice.
-
-    Une signature sans position prend la position 0 pour l'alignement, qui la range alors par identifiant. Une signature réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`).
-    """
-    by_class: dict[str, dict[int, list[Signature]]] = {}
+def notices_of(rows: Sequence[SignatureRow]) -> dict[int, list[Signature]]:
+    """Signatures d'une publication par notice, tous rôles réunis. Une signature réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`)."""
+    notices: dict[int, list[Signature]] = {}
     for row in rows:
-        notices = by_class.setdefault(_role_class(row.roles), {})
-        position = row.position if row.position is not None else 0
         first_name = with_known_first_name(row.first_name, row.known_first_name)
         notices.setdefault(row.notice, []).append(
-            Signature(row.id, row.notice, position, row.last_name, first_name, row.orcid, row.idref)
+            Signature(
+                row.id, row.notice, row.position, row.last_name, first_name, row.orcid, row.idref
+            )
         )
-    return by_class
+    return notices
 
 
 def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
@@ -102,18 +92,13 @@ def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
 
 
 def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[int, int]]:
-    """Groupes des signatures d'une publication, classe de rôle par classe de rôle, et doublons d'auteur (doublon → première occurrence de son nom). Les doublons restent hors des groupes."""
-    deferred = deferred_notices(rows)
-    groups: list[Group] = []
+    """Groupes des signatures d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les signatures qui ont une position. Les doublons restent hors des groupes."""
+    notices = notices_of(rows)
     copies: dict[int, int] = {}
-    for role_class, notices in sorted(notices_by_role(rows).items()):
-        if role_class == AuthorshipRole.AUTHOR:
-            for signatures in notices.values():
-                copies |= copied_signatures(signatures)
-            kept = {n: [s for s in sigs if s.id not in copies] for n, sigs in notices.items()}
-            groups += align_publication(kept, model=_MODEL, assign=assign, deferred=deferred)
-        else:
-            groups += align_publication(notices, ordered=False, deferred=deferred)
+    for signatures in notices.values():
+        copies |= copied_signatures([s for s in signatures if s.position is not None])
+    kept = {n: [s for s in sigs if s.id not in copies] for n, sigs in notices.items()}
+    groups = align_publication(kept, model=_MODEL, assign=assign, deferred=deferred_notices(rows))
     return groups, copies
 
 
@@ -144,9 +129,7 @@ def membership_changes(
 
 
 # Signature (champs de `SignatureRow` dans l'ordre), appartenance (signature, notice, méthode, score, marge) et groupe (signature de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
-type SignatureTuple = tuple[
-    int, int, str, int, int | None, list[str] | None, str, str, str, str, str
-]
+type SignatureTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
 type MemberTuple = tuple[int, int, str, float | None, float | None]
 type GroupTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[GroupTuple], dict[int, int]]

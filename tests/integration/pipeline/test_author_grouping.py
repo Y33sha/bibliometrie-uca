@@ -239,24 +239,35 @@ def test_une_signature_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
     assert _duplicate_of(conn, hal) == {hal[0]: None, hal[1]: None}
 
 
-def test_les_autres_roles_s_alignent_par_le_nom(conn):
+def test_les_roles_s_alignent_ensemble(conn):
+    """Régression : un conseiller scientifique HAL (`sad`) reste à part de la même personne, auteur chez OpenAlex."""
+    pub = insert_publication(conn)
+    names = [("bahier porte", "christelle"), ("schweitzer", "zoe")]
+    hal = _notice(conn, pub, "hal", "ujm-1", names, roles=["contributor"])
+    oa = _notice(conn, pub, "openalex", "W1", [("ferrier", "beatrice"), *names])
+
+    _run(conn)
+
+    groups = _groups(conn, pub).values()
+    assert {hal[0], oa[1]} in groups and {hal[1], oa[2]} in groups
+
+
+def test_le_jury_sans_position_s_aligne_par_le_nom(conn):
     pub = insert_publication(conn)
     theses = _notice(
         conn,
         pub,
         "theses",
         "2020UCFA0001",
-        [("dupont", "jean")],
+        [("durand", "paul"), ("dupont", "jean")],
         roles=["thesis_director"],
         positions=False,
     )
-    hal = _notice(
-        conn, pub, "hal", "tel-1", [("dupont", "j")], roles=["thesis_director"], positions=False
-    )
+    hal = _notice(conn, pub, "hal", "tel-1", [("dupont", "j")], roles=["thesis_director"])
 
     _run(conn)
 
-    assert {theses[0], hal[0]} in _groups(conn, pub).values()
+    assert {theses[1], hal[0]} in _groups(conn, pub).values()
 
 
 _ORCID = "0000-0002-1825-0097"

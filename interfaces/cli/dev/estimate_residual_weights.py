@@ -43,13 +43,12 @@ from domain.publications.author_grouping import (
     ResidualSink,
     align_publication,
 )
-from domain.publications.authorship_roles import AuthorshipRole
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.transformation.publications.author_grouping import residual_weights
 from pipeline.transformation.publications.author_grouping.author_grouping import (
     deferred_notices,
-    notices_by_role,
+    notices_of,
     publication_batches,
 )
 from pipeline.transformation.publications.author_grouping.queries import (
@@ -158,7 +157,7 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
             residual: list[dict[str, object]] = []
             signatures: list[dict[str, object]] = []
             for publication_id, rows in rows_by_publication.items():
-                notices = notices_by_role(rows).get(AuthorshipRole.AUTHOR, {})
+                notices = notices_of(rows)
                 if len(notices) < 2:
                     continue
                 align_publication(
@@ -181,6 +180,7 @@ def export(conn: Connection, residual_path: Path, signatures_path: Path) -> None
                         }
                         for notice_id, sigs in notices.items()
                         for s in sigs
+                        if s.position is not None
                     ]
             residual_out.write_table(pa.Table.from_pylist(residual, _RESIDUAL_SCHEMA))
             signatures_out.write_table(pa.Table.from_pylist(signatures, _SIGNATURES_SCHEMA))

@@ -122,9 +122,21 @@ class TestAlignPublication:
         assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] not in _grouped(
             align_publication(notices)
         )
-        assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] in _grouped(
-            align_publication(notices, ordered=False)
-        )
+
+    def test_une_signature_sans_position_se_lie_par_le_nom_hors_de_l_ordre(self):
+        """Jury d'une thèse chez theses.fr, sans position : il se lie par le nom au jury positionné d'une autre notice, quel que soit son rang."""
+        reference = _notice(1, [("martin", "a"), ("petit", "b"), ("durand", "c")])
+        unordered = [
+            Signature(200, 2, 0, "martin", "anne"),
+            Signature(201, 2, None, "durand", "claire"),
+            Signature(202, 2, None, "petit", "bruno"),
+        ]
+        groups = align_publication({1: reference, 2: unordered})
+        assert sorted(_grouped(groups)) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
+            [(101, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
+            [(102, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
+        ]
 
     def test_une_notice_qui_intervertit_nom_et_prenom_s_aligne_dans_l_ordre(self):
         """Les quatre autres sources donnent « Roger-Leroi Valerie » : le prénom tient la place du patronyme pour toute la notice."""

@@ -274,11 +274,11 @@ def plan_group_ids(
 
 @dataclass(frozen=True)
 class Signature:
-    """Signature à grouper : notice, position dans la liste, noms normalisés, identifiants."""
+    """Signature à grouper : notice, position dans la liste, noms normalisés, identifiants. Une signature hors de la liste ordonnée (jury de thèse chez theses.fr) n'a pas de position."""
 
     id: int
     notice: int
-    position: int
+    position: int | None
     last_name: str
     first_name: str
     orcid: str = ""
@@ -312,6 +312,11 @@ type ResidualSink = Callable[[int, Sequence[Author], Sequence[Author]], None]
 """Reçoit le résidu de la règle pour une notice : son identifiant, ses signatures sans lien, puis les signatures de référence des groupes sans lien, chacune avec son trou."""
 
 
+def _list_order(s: Signature) -> tuple[bool, int, int]:
+    """Clé de tri dans la liste : les signatures sans position à la fin."""
+    return (s.position is None, s.position or 0, s.id)
+
+
 def _name_key(s: Signature) -> str:
     return s.last_name
 
@@ -326,7 +331,10 @@ def _initial_key(s: Signature) -> tuple[str, str] | None:
 
 
 class _NoticeLinks:
-    """Liens de la règle entre une notice et les groupes déjà formés."""
+    """Liens de la règle entre une notice et les groupes déjà formés.
+
+    Seules les signatures et les groupes qui ont une position entrent dans le filtre d'ordre, les trous et le résidu. Les autres se lient par le nom et l'identifiant.
+    """
 
     def __init__(
         self,
@@ -339,6 +347,7 @@ class _NoticeLinks:
         # Signatures des membres des groupes, pour comparer les identifiants à tout le groupe.
         self.signatures = signatures or {}
         self.rank = {g.index: r for r, g in enumerate(groups)}
+        self.ranked = {g.index for g in groups if g.reference.position is not None}
         self.links: dict[int, int] = {}
         self.methods: dict[int, GroupingMethod] = {}
         self.forbidden: set[tuple[int, int]] = set()
@@ -400,34 +409,39 @@ class _NoticeLinks:
         self.unique_pairs(_initial_key, GroupingMethod.NAME)
         self.shared_identifier()
 
-    def order_filter(self) -> None:
-        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant reste, quel que soit son rang."""
-        kept = longest_ordered(
-            (s.position, self.rank[self.links[s.id]], s.id)
-            for s in self.sigs
-            if s.id in self.links and self.methods[s.id] != GroupingMethod.IDENTIFIER
+    def _in_order(self, s: Signature) -> bool:
+        """Le lien de `s` entre dans le filtre d'ordre : signature et groupe ont une position, et le lien ne vient pas d'un identifiant."""
+        return (
+            s.position is not None
+            and self.links[s.id] in self.ranked
+            and self.methods[s.id] != GroupingMethod.IDENTIFIER
         )
-        for s in self.sigs:
-            if (
-                s.id in self.links
-                and s.id not in kept
-                and self.methods[s.id] != GroupingMethod.IDENTIFIER
-            ):
+
+    def order_filter(self) -> None:
+        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant, ou d'une signature ou d'un groupe sans position, reste."""
+        ordered = [s for s in self.sigs if s.id in self.links and self._in_order(s)]
+        kept = longest_ordered((s.position, self.rank[self.links[s.id]], s.id) for s in ordered)
+        for s in ordered:
+            if s.id not in kept:
                 self.forbidden.add((s.id, self.links.pop(s.id)))
                 del self.methods[s.id]
 
     def gaps(self) -> tuple[dict[int, int], dict[int, int]]:
-        """Trou de chaque signature et de chaque groupe restés sans lien."""
+        """Trou de chaque signature et de chaque groupe restés sans lien, parmi ceux qui ont une position."""
         taken = self.linked_groups()
-        anchor_positions = sorted(s.position for s in self.sigs if s.id in self.links)
-        anchor_ranks = sorted(self.rank[g] for g in taken)
+        anchor_positions = sorted(
+            s.position for s in self.sigs if s.id in self.links and s.position is not None
+        )
+        anchor_ranks = sorted(self.rank[g] for g in taken if g in self.ranked)
         sig_gaps = {
-            s.id: gap(anchor_positions, s.position) for s in self.sigs if s.id not in self.links
+            s.id: gap(anchor_positions, s.position)
+            for s in self.sigs
+            if s.id not in self.links and s.position is not None
         }
         group_gaps = {
             g.index: gap(anchor_ranks, self.rank[g.index])
             for g in self.groups
-            if g.index not in taken
+            if g.index not in taken and g.index in self.ranked
         }
         return sig_gaps, group_gaps
 
@@ -547,7 +561,6 @@ def _residual_links(
 def align_publication(
     notices: Mapping[int, Sequence[Signature]],
     *,
-    ordered: bool = True,
     model: ResidualModel | None = None,
     assign: Assign | None = None,
     on_residual: ResidualSink | None = None,
@@ -555,13 +568,13 @@ def align_publication(
 ) -> list[Group]:
     """Groupes de signatures d'une publication.
 
-    Les notices se traitent de la plus longue à la plus courte, chacune face aux groupes déjà formés. À longueur égale, les notices `deferred` passent après les autres, puis l'ordre suit l'identifiant de notice. Une notice qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `ordered` applique le filtre d'ordre et l'ordre dans les trous, pour des signatures aux positions significatives. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
+    Les notices se traitent de la plus longue à la plus courte, chacune face aux groupes déjà formés. À longueur égale, les notices `deferred` passent après les autres, puis l'ordre suit l'identifiant de notice. Une notice qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
     signatures = {s.id: s for sigs in notices.values() for s in sigs}
     groups: list[Group] = []
     order = sorted(notices, key=lambda n: (-len(notices[n]), n in deferred, n))
     for i, notice_id in enumerate(order):
-        sigs = sorted(notices[notice_id], key=lambda s: (s.position, s.id))
+        sigs = sorted(notices[notice_id], key=_list_order)
         if i and _inverted(sigs, groups):
             sigs = [_swapped(s) for s in sigs]
             signatures.update((s.id, s) for s in sigs)
@@ -571,28 +584,27 @@ def align_publication(
         if i:
             notice = _NoticeLinks(sigs, groups, signatures)
             notice.name_steps()
-            if ordered:
-                notice.order_filter()
-                notice.name_steps()
-                notice.order_filter()
-                notice.order_in_gaps()
-                if on_residual is not None:
-                    sig_gaps, group_gaps = notice.gaps()
-                    on_residual(
-                        notice_id,
-                        [_author(s, sig_gaps[s.id]) for s in sigs if s.id in sig_gaps],
-                        [
-                            _author(g.reference, group_gaps[g.index])
-                            for g in groups
-                            if g.index in group_gaps
-                        ],
-                    )
-                if model is not None and assign is not None:
-                    residual = _residual_links(notice, signatures, model, assign)
-                    for sig, (g, link_score, link_margin) in residual.items():
-                        notice.links[sig] = g
-                        notice.methods[sig] = GroupingMethod.MODEL
-                        scores[sig] = (link_score, link_margin)
+            notice.order_filter()
+            notice.name_steps()
+            notice.order_filter()
+            notice.order_in_gaps()
+            if on_residual is not None:
+                sig_gaps, group_gaps = notice.gaps()
+                on_residual(
+                    notice_id,
+                    [_author(s, sig_gaps[s.id]) for s in sigs if s.id in sig_gaps],
+                    [
+                        _author(g.reference, group_gaps[g.index])
+                        for g in groups
+                        if g.index in group_gaps
+                    ],
+                )
+            if model is not None and assign is not None:
+                residual = _residual_links(notice, signatures, model, assign)
+                for sig, (g, link_score, link_margin) in residual.items():
+                    notice.links[sig] = g
+                    notice.methods[sig] = GroupingMethod.MODEL
+                    scores[sig] = (link_score, link_margin)
             links, methods = notice.links, notice.methods
         by_index = {g.index: g for g in groups}
         for s in sigs:
@@ -603,5 +615,5 @@ def align_publication(
             else:
                 member = Member(s.id, notice_id, GroupingMethod.REFERENCE)
                 groups.append(Group(len(groups), s, [member]))
-        groups.sort(key=lambda g: (g.reference.position, g.index))
+        groups.sort(key=lambda g: (*_list_order(g.reference)[:2], g.index))
     return groups

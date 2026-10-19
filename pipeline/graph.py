@@ -821,7 +821,6 @@ NODES: tuple[Node, ...] = (
             "source_authorships.id",
             "source_authorships.source_publication_id",
             "source_authorships.author_position",
-            "source_authorships.roles",
             "source_authorships.collective",
             "source_authorships.identity_id",
             "source_authorships.neutralized_identifiers",
