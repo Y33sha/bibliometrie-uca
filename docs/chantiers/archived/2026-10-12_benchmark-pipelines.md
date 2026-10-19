@@ -138,7 +138,7 @@ Les liens vers les dépôts sont en fin de document.
 - Étape distincte et antérieure au dédoublonnage : regroupement par égalité stricte de l'identifiant, fusion des propriétés et des provenances.
 - En cas de types contradictoires, un ordre fixe : publication, jeu de données, logiciel, autre.
 - Le dédoublonnage par similarité ne traite ensuite que ce qui reste.
-- **Verdict : équivalent en place.** La réconciliation regroupe les notices par égalité de leurs identifiants, ou du triplet type, titre normalisé et année, sans comparaison de similarité. Le dédoublonnage par similarité qui la suivrait est à l'étude dans le chantier de résolution avec Splink.
+- **Verdict : équivalent en place.** La réconciliation regroupe les notices par égalité de leurs identifiants, ou du triplet type, titre normalisé et année, sans comparaison de similarité. Le dédoublonnage par similarité qui la suivrait est à l'étude dans le chantier de résolution des personnes.
 
 ### Des identifiants de confiance et d'autres non (OpenAIRE)
 
@@ -165,7 +165,7 @@ Les liens vers les dépôts sont en fin de document.
   3. **relations de fusion** : composantes connexes sur les relations de similarité, puis choix de l'identifiant du groupe ;
   4. **enregistrement représentant** : construit à partir des membres du groupe.
 - Chaque étape lit ce que la précédente a écrit. Rien ne passe en mémoire de l'une à l'autre.
-- **Verdict : à l'étude**, dans le chantier de résolution avec Splink : le découpage de `publications.reconcile` suivrait ces étapes.
+- **Verdict : à l'étude**, dans le chantier de résolution des personnes : le découpage de `publications.reconcile` suivrait ces étapes.
 
 ### Un identifiant de groupe qui survit aux runs (dnet-dedup)
 
@@ -213,14 +213,14 @@ Les liens vers les dépôts sont en fin de document.
 - Où : [`algorithm/evidence/targetauthor/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/java/reciter/algorithm/evidence/targetauthor) : `name/`, `email/`, `affiliation/`, `department/`, `grant/`, `knownrelationship/`, `journalcategory/`, `degree/`…
 - Chaque indice est une classe qui reçoit les articles et la personne, et rend un score.
 - Les indices ne se lisent pas entre eux. Le moteur les lance en parallèle : l'ordre n'a pas d'effet sur le résultat.
-- **Verdict : à l'étude**, dans le chantier de résolution avec Splink : chaque comparaison de Splink joue le rôle d'un indice.
+- **Verdict : à l'étude**, dans le chantier de résolution des personnes : chaque comparaison de Splink joue le rôle d'un indice.
 
 ### Chaque indice laisse une trace lisible (ReCiter)
 
 - Où : [`ReCiterFeatureGenerator.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/ReCiterFeatureGenerator.java).
 - Un indice n'écrit pas seulement un score. Il enregistre ce qui a concordé : l'adresse électronique trouvée, la forme du nom, l'affiliation.
 - La sortie, pour chaque article, réunit le score total, la décision humaine éventuelle et la liste de ces traces. L'interface de validation les affiche.
-- **Verdict : à l'étude**, dans le chantier de résolution avec Splink.
+- **Verdict : à l'étude**, dans le chantier de résolution des personnes.
 
 ### Les indices activés et pondérés en configuration (ReCiter)
 
@@ -267,7 +267,7 @@ Les liens vers les dépôts sont en fin de document.
 - Où : dans le code actuel, les jobs `SparkCopyOpenorgsSimRels`, `SparkCopyOpenorgsMergeRels` et `SparkWhitelistSimRels` ([dossier](https://code-repo.d4science.org/D-Net/dnet-hadoop/src/branch/master/dhp-workflows/dhp-dedup-openaire/src/main/java/eu/dnetlib/dhp/oa/dedup)). Le dernier n'a pas pu être lu.
 - Pour les organisations, l'algorithme produit des suggestions. Des curateurs les approuvent, les écartent, ou créent une relation que l'algorithme n'a pas vue ([documentation](https://graph.openaire.eu/docs/data-provision/deduplication/organizations)).
 - Ces décisions sont des relations ajoutées ou retirées avant le calcul des composantes.
-- **Verdict : à l'étude**, dans le chantier de résolution avec Splink.
+- **Verdict : à l'étude**, dans le chantier de résolution des personnes.
 
 ### Les décisions humaines servent trois fois (ReCiter)
 
@@ -276,7 +276,7 @@ Les liens vers les dépôts sont en fin de document.
 - **Elles servent à entraîner et à mesurer.** Où : [`resources/scripts/`](https://github.com/wcmc-its/ReCiter/tree/master/src/main/resources/scripts) et [`Analysis.java`](https://github.com/wcmc-its/ReCiter/blob/master/src/main/java/reciter/engine/erroranalysis/Analysis.java). Les scores des indices sont combinés par un petit réseau de neurones entraîné sur les acceptations et les rejets. La précision et le rappel sont calculés contre ces mêmes décisions.
 
 - Pour l'entraînement, le score d'un article est calculé sans sa propre décision, pour qu'elle ne s'explique pas par elle-même.
-- **Verdict : en place** pour la première : les confirmations et les rejets sont des entrées de la résolution. Les deux autres sont à l'étude dans le chantier de résolution avec Splink.
+- **Verdict : en place** pour la première : les confirmations et les rejets sont des entrées de la résolution. Les deux autres sont à l'étude dans le chantier de résolution des personnes.
 
 ### Les corrections de champs stockées à part (CRISalid)
 

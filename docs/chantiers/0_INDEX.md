@@ -17,7 +17,7 @@
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
-- [Résolution des entités avec Splink](DATA_resolution-splink.md)
+- [Résolution des personnes](DATA_resolution-personnes.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 

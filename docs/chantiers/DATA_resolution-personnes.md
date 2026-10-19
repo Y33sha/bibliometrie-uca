@@ -1,4 +1,4 @@
-# Chantier — Résolution des entités avec Splink
+# Chantier — Résolution des personnes
 
 ## Contexte
 
