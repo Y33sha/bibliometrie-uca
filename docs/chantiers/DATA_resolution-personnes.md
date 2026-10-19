@@ -64,6 +64,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
   - Autres signatures du groupe : France ou indice de périmètre dans 8 850 cas, autres pays seulement dans 1 650, aucun pays dans 1 001. OpenAlex est seul dans le groupe dans 123 cas.
   - 565 personnes hors RH ont pour seul appui au périmètre des signatures de ce type, sans confirmation. Le périmètre compte 15 024 personnes hors RH.
   - Exemple g5296946 : X. Zhang, Central China Normal University et LPC Clermont. La signature HAL du dépôt in2p3, de 54 auteurs, donne aussi le LPC.
+  - Relecture de 65 de ces 565 personnes, le 2026-10-19 (`build_multicountry_review.py`) : 57 fausses personnes du périmètre, 3 doubles affiliations réelles, 5 cas indéterminables. Par plus petite notice concernée : 18 fausses sur 25 jusqu'à 10 auteurs, 19 sur 20 de 11 à 500 auteurs, 20 sur 20 au-delà. L'adresse française appartient à un autre auteur, ou l'adresse est fausse.
 - [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la signature est souvent faux et la personne souvent juste. Échantillon relu à la main.
 
 ### Phase 2 — Essais d'une cascade par groupe
