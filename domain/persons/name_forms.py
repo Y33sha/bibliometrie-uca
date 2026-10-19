@@ -4,7 +4,7 @@ Une forme de nom est une chaîne « prénom nom » normalisée, destinée au mat
 
 Du point de vue domain, une forme de nom est entièrement définie par sa string normalisée — VO immuable, égalité par valeur.
 
-Note storage : la table `person_name_forms (name_form, person_id, sources[])` est un **index inverse** dénormalisé pour le matching nom → personnes. Les opérations d'écriture / interrogation sur ce mapping vivent côté repo (`infrastructure/repositories/person_repository/_name_forms.py`) : avec une PK composite `(name_form, person_id)` la sémantique "ajouter une source", "retirer une source", "forme ambiguë" devient SQL direct, sans représentation in-memory.
+Note storage : la table `person_name_forms (name_form, person_id, sources[])` est un **index inverse** dénormalisé pour le matching nom → personnes. Avec une PK composite `(name_form, person_id)`, « ajouter une source », « retirer une source » et « forme ambiguë » s'écrivent en SQL direct : écritures dans `infrastructure/repositories/person_repository/_name_forms.py`, lectures du matching dans la phase `persons`.
 """
 
 from dataclasses import dataclass

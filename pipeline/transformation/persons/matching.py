@@ -25,6 +25,7 @@ from infrastructure.repositories.person_repository import person_without_decisio
 from infrastructure.sql_fragments import (
     DETACHED_SIGNATURE,
     REJECTED_PAIRS,
+    active_name_form,
     identifier_neutralized,
     person_signature,
     pinned,
@@ -285,8 +286,7 @@ class PersonsMatchingQueries:
                 SELECT name_form,
                        array_agg(person_id ORDER BY person_id) AS person_ids
                 FROM person_name_forms
-                WHERE status <> '{AttributionStatus.REJECTED.value}'
-                   OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
+                WHERE {active_name_form("person_name_forms")}
                 GROUP BY name_form
             """)
         ).all()
@@ -569,8 +569,7 @@ class PersonsMatchingQueries:
                       AND aik.author_name_normalized IN (
                           SELECT name_form
                           FROM person_name_forms
-                          WHERE status <> '{AttributionStatus.REJECTED.value}'
-                             OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
+                          WHERE {active_name_form("person_name_forms")}
                           GROUP BY name_form
                           HAVING count(DISTINCT person_id) >= 2
                       )
@@ -584,8 +583,7 @@ class PersonsMatchingQueries:
                       SELECT count(DISTINCT pnf.person_id)
                       FROM person_name_forms pnf
                       WHERE pnf.name_form = c.name_form
-                        AND (pnf.status <> '{AttributionStatus.REJECTED.value}'
-                             OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
+                        AND {active_name_form("pnf")}
                         AND NOT {publication_rejected_for("sp.publication_id", "pnf.person_id")}
                   ) >= 2
             """)

@@ -18,9 +18,24 @@ from infrastructure.repositories.person_repository import (
     _merge,
     _name_forms,
 )
+from infrastructure.repositories.person_repository._core import (
+    create as create_person,
+    update_name as update_person_name,
+)
 from infrastructure.repositories.person_repository._merge import (
     person_without_decision_sql as person_without_decision_sql,
 )
+from infrastructure.repositories.person_repository._name_forms import (
+    refresh_name_forms as refresh_name_forms,
+)
+
+__all__ = [
+    "PgPersonRepository",
+    "create_person",
+    "person_without_decision_sql",
+    "refresh_name_forms",
+    "update_person_name",
+]
 
 if TYPE_CHECKING:
     from application.ports.repositories.person_repository import (
