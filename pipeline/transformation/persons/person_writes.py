@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.errors import CannotAttributeConflict, ValidationError
+from domain.errors import ValidationError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
@@ -126,14 +126,12 @@ def add_identifiers_from_authorships(
             seen.add((id_type, value))
             try:
                 _add_identifier(person_id, id_type, value, writes=writes)
-            except CannotAttributeConflict as exc:
-                logger.debug("%s", exc)
             except ValidationError:
                 logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
 
 
 def _add_identifier(person_id: int, id_type: str, id_value: str, *, writes: PersonWrites) -> None:
-    """Attribue un identifiant à la personne selon `attribution_outcome`."""
+    """Attribue un identifiant à la personne selon `attribution_outcome`. Un identifiant détenu par une autre personne reste à elle."""
     id_value = normalized_identifier_value(id_type, id_value)
     existing = writes.find_identifier(id_type, id_value)
     outcome = attribution_outcome(existing, person_id)
