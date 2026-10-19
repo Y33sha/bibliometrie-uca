@@ -4,7 +4,6 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.merge import MergedEntity
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -12,7 +11,6 @@ from domain.source_publications.keys import (
 )
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_int
-from infrastructure.repositories.merge_steps import record_redirect
 
 
 class ReconcileRow(NamedTuple):
@@ -225,16 +223,6 @@ class PublicationsReconciliationQueries:
         ).bindparams(bindparam("ids"))
         conn.execute(stmt, {"ids": source_publication_ids})
 
-    def repoint_dependents(
-        self, conn: Connection, from_publication_id: int, to_publication_id: int
-    ) -> None:
-        """Re-pointe les paiements APC (`apc_payments`) d'une publication **dissoute** vers son successeur, et enregistre la redirection de son identifiant. À appeler avant la suppression de la publication dissoute, qui détacherait ses paiements (SET NULL)."""
-        conn.execute(
-            text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
-            {"s": from_publication_id, "t": to_publication_id},
-        )
-        record_redirect(conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id)
-
     def mark_authorships_dirty(self, conn: Connection, publication_ids: list[int]) -> int:
         """Pose `authorships_dirty` sur ces publications. Retourne le nombre de publications marquées."""
         if not publication_ids:
@@ -253,17 +241,6 @@ class PublicationsReconciliationQueries:
             "UPDATE source_publications SET keys_dirty = false WHERE id = ANY(:ids)"
         ).bindparams(bindparam("ids"))
         return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
-
-    def delete_publications_without_sources(self, conn: Connection) -> int:
-        """Supprime les publications auxquelles plus aucune `source_publication` n'est rattachée. Retourne le nombre de publications supprimées."""
-        return conn.execute(
-            text("""
-                DELETE FROM publications p
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM source_publications sp WHERE sp.publication_id = p.id
-                )
-            """)
-        ).rowcount
 
     def count_publications(self, conn: Connection) -> int:
         """Total des publications (toutes in-périmètre : la réconciliation gate leur création sur le périmètre)."""

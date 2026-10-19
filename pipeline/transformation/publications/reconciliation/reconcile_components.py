@@ -3,8 +3,8 @@
 Recalcule les composantes connexes du voisinage 1-hop des `source_publications` marquées `keys_dirty` et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision est portée par `domain.publications.reconciliation.plan_reconciliation` (pure) ; ici on applique :
 
 - **groupes** : on rattache les SP de chaque groupe à son ancre (pub existant conservé), ou à un **nouveau** pub créé quand la partition n'a pas d'ancre existante (split) ;
-- **publications dissoutes** (vidées de toutes leurs SP par un merge) : leurs paiements APC (`apc_payments`) et leur identifiant sont redirigés vers le successeur, puis `refresh_from_sources` les supprime (orphelines) ;
-- **rafraîchissement** : `refresh_from_sources` recompute les métadonnées canoniques de chaque pub touché (et supprime les orphelines).
+- **publications dissoutes** (vidées de toutes leurs SP par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
+- **rafraîchissement** : `lifecycle.refresh` recalcule les métadonnées canoniques de chaque publication touchée, et supprime celles qui n'ont plus de source.
 
 Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des SP et les métadonnées des publications, pas la projection authorships.
 
@@ -31,6 +31,7 @@ from pipeline.runtime.observability.libelles import (
 )
 from pipeline.runtime.observability.progression import attente, progression
 from pipeline.runtime.savepoint import savepoint
+from pipeline.transformation.publications.lifecycle import dissolve, refresh
 from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,
     ReconcileRow,
@@ -38,7 +39,6 @@ from pipeline.transformation.publications.reconciliation.reconciliation import (
 from pipeline.transformation.publications.reconciliation.refresh import (
     PublicationStore,
     create_publication,
-    refresh_from_sources,
 )
 
 
@@ -62,7 +62,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 def _create_new_publication(
     group: WorkGroup, rows_by_sp: dict[int, ReconcileRow], publication_repo: PublicationStore
 ) -> int:
-    """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `refresh_from_sources`.
+    """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP portant une année. Les métadonnées définitives sont posées juste après par `lifecycle.refresh`.
 
     Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split perdante (membres matérialisés, qui portaient déjà une année) — dans les deux cas ≥1 membre a une année."""
     seed = min(
@@ -186,17 +186,12 @@ def reconcile(
                 - survivors
             ):
                 with savepoint(conn):
-                    refresh_from_sources(pub_id, repo=publication_repo)
+                    refresh(publication_repo, pub_id)
 
-        # 3. Dissolutions : les paiements APC et l'identifiant passent au successeur, puis
-        # `refresh_from_sources` supprime la publication vidée. Avant les survivants, pour libérer
-        # le DOI qu'un survivant reprend — la contrainte unique le refuserait autrement.
+        # 3. Dissolutions, avant les survivants : la suppression libère le DOI qu'un survivant
+        # reprend — la contrainte unique le refuserait autrement.
         for dissolved in plan.dissolved:
-            queries.repoint_dependents(
-                conn, dissolved.publication_id, dissolved.successor_publication_id
-            )
-            with savepoint(conn):
-                refresh_from_sources(dissolved.publication_id, repo=publication_repo)
+            dissolve(publication_repo, dissolved.publication_id, dissolved.successor_publication_id)
 
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 
@@ -208,7 +203,7 @@ def reconcile(
         for pub_id in survivor_ids:
             avancement.avance()
             with savepoint(conn):
-                refresh_from_sources(pub_id, repo=publication_repo)
+                refresh(publication_repo, pub_id)
 
     # 5. Les publications qui gagnent ou perdent une notice regroupent leurs signatures.
     queries.mark_authorships_dirty(conn, sorted(membership_changed - dissolved_ids))

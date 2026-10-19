@@ -12,14 +12,9 @@ from pipeline.transformation.publications.reconciliation import publications as 
 class _FakeQueries:
     """Enregistre l'ordre des appels ; rend les volumes fixés à la construction."""
 
-    def __init__(self, appels: list[str], *, supprimees: int, total: int) -> None:
+    def __init__(self, appels: list[str], *, total: int) -> None:
         self._appels = appels
-        self._supprimees = supprimees
         self._total = total
-
-    def delete_publications_without_sources(self, conn) -> int:
-        self._appels.append("suppression")
-        return self._supprimees
 
     def count_publications(self, conn) -> int:
         self._appels.append("décompte")
@@ -28,11 +23,19 @@ class _FakeQueries:
 
 def _run(contexte, *, supprimees: int, total: int = 40):
     appels: list[str] = []
-    queries = _FakeQueries(appels, supprimees=supprimees, total=total)
-    with patch.object(
-        phase,
-        "reconcile_run",
-        side_effect=lambda *args, **kwargs: appels.append("réconciliation"),
+    queries = _FakeQueries(appels, total=total)
+
+    def supprimer(conn) -> int:
+        appels.append("suppression")
+        return supprimees
+
+    with (
+        patch.object(
+            phase,
+            "reconcile_run",
+            side_effect=lambda *args, **kwargs: appels.append("réconciliation"),
+        ),
+        patch.object(phase, "delete_publications_without_sources", side_effect=supprimer),
     ):
         rendu = phase.PublicationsPhase(
             queries, publication_repo_factory=lambda conn: object()

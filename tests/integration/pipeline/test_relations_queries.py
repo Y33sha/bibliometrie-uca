@@ -205,7 +205,7 @@ class TestRelationTargetDeletionCascades:
             target_publication_id=parent,
         )
 
-        # Le chemin qui plantait : refresh_from_sources → repo.delete sur la cible orpheline.
+        # Le chemin qui plantait : lifecycle.refresh → store.delete sur la cible orpheline.
         PublicationStore(sa_sync_conn).delete(parent)
 
         remaining = sa_sync_conn.execute(
