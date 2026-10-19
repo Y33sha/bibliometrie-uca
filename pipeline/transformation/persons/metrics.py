@@ -3,17 +3,18 @@
 import logging
 from typing import NamedTuple
 
+from domain.persons.matching import MatchReason
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Méthodes de rattachement, par fiabilité décroissante de la cascade, et ce qu'elles disent.
-_MATCHING_METHODS: dict[str, str] = {
-    "orcid": "par ORCID",
-    "hal_person_id": "par compte HAL",
-    "idref": "par IdRef",
-    "cross_source": "par comparaison entre sources",
-    "single_name": "par nom sans homonymie",
-    "compatible_name": "par initiales compatibles",
+_MATCHING_METHODS: dict[MatchReason, str] = {
+    MatchReason.ORCID: "par ORCID",
+    MatchReason.HAL_PERSON_ID: "par compte HAL",
+    MatchReason.IDREF: "par IdRef",
+    MatchReason.CROSS_SOURCE: "par comparaison entre sources",
+    MatchReason.SINGLE_NAME: "par nom sans homonymie",
+    MatchReason.COMPATIBLE_NAME: "par initiales compatibles",
 }
 
 

@@ -5,7 +5,7 @@ Pour chaque publication dont les notices viennent d'au moins deux sources, et po
 
 - longueur des deux listes d'auteurs ;
 - accord de la position : une signature de la première notice trouve-t-elle, dans la seconde, un nom compatible (`names_compatible`) à la même position, à une autre position, ou nulle part ;
-- accord des identifiants forts (`STRONG_IDENTIFIER_TYPES`, hors identifiants neutralisés) : deux signatures qui partagent un identifiant sont-elles à la même position, et leurs noms sont-ils compatibles ; deux signatures à la même position ont-elles deux valeurs différentes du même type ;
+- accord des identifiants forts (`STRONG_PERSON_IDENTIFIER_TYPES`, hors identifiants neutralisés) : deux signatures qui partagent un identifiant sont-elles à la même position, et leurs noms sont-ils compatibles ; deux signatures à la même position ont-elles deux valeurs différentes du même type ;
 - ambiguïté : nombre de noms compatibles trouvés pour une signature décalée.
 
 L'accord se mesure aussi sans les paires dépendantes, où une notice recopie un dépôt HAL. Sur les publications à trois sources indépendantes ou plus, un vote désigne la source dont le prénom s'écarte à une position donnée.
@@ -32,7 +32,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from domain.persons.matching import STRONG_IDENTIFIER_TYPES
+from domain.persons.matching import STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -50,7 +50,7 @@ _BUCKETS = (
 )
 _LARGE = ">500"
 _BATCH = 500
-_STRONG = tuple(str(t) for t in STRONG_IDENTIFIER_TYPES)
+_STRONG = tuple(str(t) for t in STRONG_PERSON_IDENTIFIER_TYPES)
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,6 +16,7 @@ from domain.persons.matching import (
     form_matches_person,
     full_namesakes,
     identifier_misplaced,
+    trusted_identifier,
 )
 from domain.persons.signature_name import SignatureName
 
@@ -26,6 +27,17 @@ def _sig(raw: str) -> SignatureName:
 
 def _sigs(*raws: str) -> list[SignatureName]:
     return [_sig(raw) for raw in raws]
+
+
+class TestTrustedIdentifier:
+    def test_un_orcid_vaut_signal_selon_sa_source(self):
+        assert trusted_identifier("orcid", "crossref")
+        assert not trusted_identifier("orcid", "wos")
+        assert not trusted_identifier("orcid", "scanr")
+
+    def test_les_autres_identifiants_valent_signal_quelle_que_soit_la_source(self):
+        assert trusted_identifier("idref", "scanr")
+        assert trusted_identifier("hal_person_id", "hal")
 
 
 class TestConsensusName:

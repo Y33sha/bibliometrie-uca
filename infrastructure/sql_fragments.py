@@ -6,7 +6,7 @@ Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.journals.journal import OaModel
 from domain.persons.identifiers import PersonIdentifierType
-from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
+from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.publications.authorship_roles import AuthorshipRole
 from domain.source_publications.raw_metadata import CORRECTED_BY, RAW
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
@@ -64,6 +64,13 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
     )
 
 
+def trusted_identifier_sql(id_type: str, signature: str = "sa") -> str:
+    """Condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la signature aliasée `signature`."""
+    if id_type != PersonIdentifierType.ORCID:
+        return "TRUE"
+    return f"{signature}.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
+
+
 def strong_identifier_signatures(
     id_type: PersonIdentifierType,
     *,
@@ -74,13 +81,8 @@ def strong_identifier_signatures(
 ) -> str:
     """Requête des signatures `sa_auth` dont l'identité contient l'identifiant `id_type` d'une ligne de `identifiers`.
 
-    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et l'ORCID des sources hors `ORCID_MATCH_SOURCES`. La requête rejoint les signatures par `identity_id` après un rapprochement sur `author_identifying_keys`.
+    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les signatures par `identity_id` après un rapprochement sur `author_identifying_keys`.
     """
-    orcid_sources = (
-        f"AND sa_auth.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
-        if id_type == PersonIdentifierType.ORCID
-        else ""
-    )
     return f"""
         SELECT {select}
         FROM {identifiers} pi
@@ -90,7 +92,7 @@ def strong_identifier_signatures(
         WHERE pi.id_type = '{id_type}'
           AND aik.person_identifiers ? '{id_type}'
           AND NOT {identifier_neutralized(f"'{id_type}'", "sa_auth")}
-          {orcid_sources}
+          AND {trusted_identifier_sql(id_type, "sa_auth")}
           {f"AND {where}" if where else ""}
     """
 
@@ -129,7 +131,7 @@ def rh_identity_signatures(signature_filter: str = "") -> str:
             joins="JOIN source_publications sp_rh ON sp_rh.id = sa_auth.source_publication_id",
             where=" AND ".join(conditions),
         )
-        for id_type in STRONG_IDENTIFIER_TYPES
+        for id_type in STRONG_PERSON_IDENTIFIER_TYPES
     )
 
 
