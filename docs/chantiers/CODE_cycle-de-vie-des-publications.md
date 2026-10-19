@@ -26,15 +26,16 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 - Un module détient le cycle de vie d'une publication. `refresh_from_sources` rend un verdict, et ce module supprime.
 - La suppression des référentiels vides et le recalcul des `pub_count` relèvent de `publishing/`.
 - Chaque drapeau de recalcul a une fonction de marquage, détenue par la phase qui le lit.
-- Une opération `dissolve(publication, successeur)` du store fait le report des dépendances, la redirection et la suppression.
+- Une opération `dissolve(publication, successeur)` du module du cycle de vie fait le report des dépendances, la redirection et la suppression.
 
 ## Phasage
 
-### Phase 1 — Existence d'une publication
+### Phase 1 — Suppression d'une publication
 
-- [ ] Prédicat unique de suppression : sans notice, type hors du périmètre, sans authorship.
+- [ ] Module du cycle de vie : seul module qui supprime une publication.
+- [ ] `dissolve(publication, successeur)` : report des paiements APC, redirection de l'identifiant, suppression. Appelée par `reconcile_components.py`.
 - [ ] Verdict rendu par `refresh_from_sources`, suppression par le module du cycle de vie.
-- [ ] Place du nœud de suppression dans le graphe, et lectures `previous_run` de `publications.id` qui en découlent.
+- [ ] Prédicats de suppression, place du nœud dans le graphe, et lectures `previous_run` de `publications.id` qui en découlent.
 
 ### Phase 2 — Référentiels vides et compteurs
 
@@ -42,17 +43,15 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 
 ### Phase 3 — Drapeaux de recalcul
 
-- [ ] Fonction de marquage de `authorships_dirty`.
 - [ ] Fonction de marquage de `keys_dirty`.
+- [ ] Fonction de marquage de `authorships_dirty`.
 
-### Phase 4 — Dissolution
-
-- [ ] `dissolve` dans le store des publications, appelée par `reconcile_components.py`.
-
-### Phase 5 — Documentation
+### Phase 4 — Documentation
 
 - [ ] Mise à jour de `docs/pipeline`.
 
 ## Questions ouvertes
 
+- Prédicats de suppression : un seul (sans notice, type hors du périmètre, sans authorship), ou deux notions distinctes, existence (sans notice) et périmètre (type, authorship), connues à des moments différents du graphe.
+- Détenteur de `authorships_dirty` : la phase `author_grouping` le lit et l'efface. Le chantier d'alignement des auteurs redéfinit son rôle.
 - Scripts de `interfaces/cli/oneshot/` qui posent `authorships_dirty` : appel de la fonction de marquage, ou laissés en l'état.
