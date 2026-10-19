@@ -17,6 +17,7 @@ L'opérateur doit savoir qu'une règle a changé, et quelle option la propage. S
 
 - Une reconstruction marque à recalculer, puis suit le chemin ordinaire, comme `--rebuild-publications`.
 - `--rebuild-authorships` est retirée.
+- Les règles ne portent pas de version. En production, le commit qui modifie une règle contient une migration de données qui pose les marques de recalcul.
 
 ## Phasage
 
@@ -26,15 +27,11 @@ L'opérateur doit savoir qu'une règle a changé, et quelle option la propage. S
 - [ ] `--normalize-full` marque toutes les notices à resynchroniser.
 - [ ] Retrait de `--rebuild-authorships` et de `purge_authorships`.
 
-### Phase 2 — Version des règles
+### Phase 2 — Propagation en production
 
 - [ ] Inventaire des règles dont le changement demande une reconstruction : clés de réconciliation, normalisation des auteurs, ingestion des sujets.
-- [ ] Mécanisme retenu, selon la question ouverte.
+- [ ] Marque posée par chaque reconstruction, documentée pour l'écriture des migrations de données.
 
 ### Phase 3 — Documentation
 
 - [ ] Mise à jour de `docs/pipeline` et de `docs/exploitation`.
-
-## Questions ouvertes
-
-- Une version de chaque règle, stockée avec les données qu'elle produit, marquerait à recalculer les lignes d'une version antérieure, et rendrait les options inutiles. Changement de schéma : stockage par ligne, ou par table dans la configuration.

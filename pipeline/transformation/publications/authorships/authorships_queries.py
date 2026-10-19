@@ -18,13 +18,6 @@ from pipeline.transformation.publications.reconciliation.publication_perimeter i
 class AuthorshipsBuild:
     """Requêtes de construction des authorships."""
 
-    def purge_authorships(self, conn: Connection) -> int:
-        n = scalar_int(conn.execute(text("SELECT COUNT(*) FROM authorships")))
-        # La séquence des ids continue : un rollback restaure les lignes supprimées, pas une
-        # séquence remise à zéro.
-        conn.execute(text("DELETE FROM authorships"))
-        return n
-
     def insert_missing_authorships(self, conn: Connection) -> int:
         return conn.execute(text(insert_missing_authorships_sql())).rowcount
 

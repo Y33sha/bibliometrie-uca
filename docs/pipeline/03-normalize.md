@@ -33,7 +33,7 @@ Conservés en base, les payloads bruts la font grossir hors de proportion avec l
 
 Chaque signature entrante est rapprochée d'une signature en base de même identité (nom, prénom et identifiants normalisés, marque collective), puis de même position si l'identité est répétée. Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
 
-Une notice dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses signatures en l'état, sauf avec `--normalize-full`.
+Une notice dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses signatures en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour toutes les notices des sources normalisées : leurs signatures se resynchronisent à leur prochaine normalisation.
 
 Les signatures des thèses sont supprimées puis recréées à chaque normalisation.
 

@@ -115,9 +115,14 @@ class SubjectsIngestionQueries:
             {"ids": publication_ids},
         )
 
-    def select_all_publication_ids(self, conn: Connection) -> list[int]:
-        """Ids de toutes les publications — pour une ré-ingestion complète (`rebuild`), indépendante du signal incrémental."""
-        return [r.id for r in conn.execute(text("SELECT id FROM publications")).all()]
+    def mark_all_publications_to_reingest(self, conn: Connection) -> int:
+        """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Rend le nombre de publications marquées."""
+        return conn.execute(
+            text(
+                "UPDATE publications SET subjects_ingested_at = NULL "
+                "WHERE subjects_ingested_at IS NOT NULL"
+            )
+        ).rowcount
 
     def select_source_publications_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]

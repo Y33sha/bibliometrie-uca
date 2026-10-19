@@ -67,28 +67,25 @@ class _FakeAddressPubCountQueries:
         return 7
 
 
-def _run(contexte, lots, *, rebuild_authorships=False, build_metrics=None):
+def _run(contexte, lots, *, build_metrics=None):
     purge = _FakePurgeQueries(lots)
     pub_counts = _FakePubCountsQueries()
     adresses = _FakeAddressPubCountQueries()
-    vus: dict[str, object] = {}
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
     with patch.object(
         phase,
         "build_authorships",
-        side_effect=lambda conn, queries, logger, *, rebuild_full: (
-            vus.__setitem__("rebuild_full", rebuild_full) or metrics
-        ),
+        return_value=metrics,
     ):
         rendu = phase.AuthorshipsPhase(_FakeBuildQueries(), purge, pub_counts, adresses).run(
-            contexte(rebuild_authorships=rebuild_authorships)
+            contexte()
         )
-    return rendu, purge, pub_counts, vus
+    return rendu, purge, pub_counts
 
 
 def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
-    rendu, purge, pub_counts, _ = _run(contexte, [5000, 5000, 120])
+    rendu, purge, pub_counts = _run(contexte, [5000, 5000, 120])
 
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
@@ -97,22 +94,16 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
 
 
 def test_rien_a_purger(open_tx, contexte):
-    rendu, purge, _, _ = _run(contexte, [])
+    rendu, purge, _ = _run(contexte, [])
 
     assert rendu.details["summary"]["publications_purged"] == 0
     assert open_tx.conn.commits == 0
 
 
 def test_metriques_du_build_rendues_telles_quelles(contexte):
-    rendu, _, _, _ = _run(contexte, [], build_metrics=PhaseMetrics(new=42))
+    rendu, _, _ = _run(contexte, [], build_metrics=PhaseMetrics(new=42))
 
     assert rendu.new == 42
-
-
-def test_rebuild_transmis_au_build(contexte):
-    _, _, _, vus = _run(contexte, [], rebuild_authorships=True)
-
-    assert vus["rebuild_full"] is True
 
 
 def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
@@ -120,7 +111,7 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
     metrics = PhaseMetrics()
     metrics.details["summary"] = "rien à dire"
 
-    rendu, purge, _, _ = _run(contexte, [7], build_metrics=metrics)
+    rendu, purge, _ = _run(contexte, [7], build_metrics=metrics)
 
     assert rendu.details["summary"] == "rien à dire"
     assert purge.limites  # la purge a bien tourné
@@ -135,7 +126,7 @@ def test_chaque_noeud_dans_sa_transaction(open_tx, contexte):
 
 def test_la_synchronisation_suit_le_build(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
-        rendu, _, _, _ = _run(contexte, [])
+        rendu, _, _ = _run(contexte, [])
     assert rendu.details["summary"]["total_in_perimeter"] == 9
     lignes = [m for m in caplog.messages if m]
     debut = lignes.index("▶ Synchronisation des tables")

@@ -17,20 +17,8 @@ def build(
     conn: Connection,
     queries: AuthorshipsBuild,
     logger: logging.Logger,
-    *,
-    rebuild_full: bool = False,
 ) -> PhaseMetrics:
-    """Ajoute les liens attestés et retire ceux que plus aucune source n'atteste.
-
-    Idempotent. `rebuild_full=True` purge d'abord la table puis la reconstruit depuis zéro — reconstruction complète de récupération, exposée par `run_pipeline --rebuild-authorships`.
-    """
-    # Reset optionnel : repart d'une table vide.
-    if rebuild_full:
-        etape(logger, "Reconstruction complète")
-        with attente(DERNIERE_BRANCHE, logger) as ligne:
-            purged = queries.purge_authorships(conn)
-            ligne.conclut(f"{DERNIERE_BRANCHE}{accord(purged, 'lien')} {forme(purged, 'supprimé')}")
-
+    """Ajoute les liens attestés et retire ceux que plus aucune source n'atteste. Idempotent."""
     etape(logger, "Liens publication-personne")
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.

@@ -34,7 +34,6 @@ class RunOptions:
     start_year: int | None = None
     include_wos: bool = False
     rebuild_publications: bool = False
-    rebuild_authorships: bool = False
     rebuild_subjects: bool = False
     raw_store: bool = False
     normalize_full: bool = False

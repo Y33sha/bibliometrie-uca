@@ -8,7 +8,7 @@ Nœuds (`pipeline.graph`), chacun dans sa transaction :
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 5. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
 
-Le build est incrémental et convergent (add + prune + recompute en une passe) ; le recalcul complet de la table est possible via `run_pipeline --rebuild-authorships`.
+Le build est incrémental et convergent (add + prune + recompute en une passe).
 """
 
 from __future__ import annotations
@@ -54,9 +54,7 @@ class AuthorshipsPhase:
 
         def build(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                return build_authorships(
-                    conn, queries, ctx.logger, rebuild_full=ctx.options.rebuild_authorships
-                )
+                return build_authorships(conn, queries, ctx.logger)
 
         def propagate(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
@@ -217,7 +215,7 @@ def build() -> Phase:
 
     La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une signature se trouve modifiée par d'autres voies que sa propre normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
 
-    Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée. `run_pipeline --rebuild-authorships` la purge et la reconstruit depuis zéro, en récupération.
+    Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée.
     """
     from pipeline.transformation.publications.authorships.address_pub_count import (
         AddressPubCountQueries,

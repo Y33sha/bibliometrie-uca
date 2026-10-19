@@ -80,10 +80,9 @@ AuthorBlock = Mapping[str, JsonValue]
 
 @dataclass(frozen=True, slots=True)
 class SignatureSyncSettings:
-    """Réglages de la synchronisation des signatures : fonction d'empreinte, et `normalize_full`, qui synchronise même un bloc auteurs inchangé pour appliquer une règle de normalisation modifiée."""
+    """Réglages de la synchronisation des signatures : fonction d'empreinte."""
 
     fingerprint: Fingerprinter
-    normalize_full: bool = False
 
 
 def sync_source_authorships(
@@ -97,13 +96,10 @@ def sync_source_authorships(
 ) -> None:
     """Synchronise les signatures d'une notice depuis le bloc auteurs de son payload.
 
-    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état, sauf avec `normalize_full`.
+    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_signatures_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
     block_hash = settings.fingerprint(dict(block))
-    if (
-        not settings.normalize_full
-        and queries.fetch_authors_hash(conn, source_publication_id) == block_hash
-    ):
+    if queries.fetch_authors_hash(conn, source_publication_id) == block_hash:
         return
     write_source_authorships(
         conn, queries, settings.fingerprint, source, source_publication_id, build(block)

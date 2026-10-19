@@ -61,98 +61,8 @@ class TestBuildAuthorshipsIdempotence:
         )
 
 
-class TestBuildAuthorshipsRebuildFull:
-    """`rebuild_full=True` purge la table, la reconstruit, et converge vers l'état du build incrémental."""
-
-    def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
-        import logging
-
-        from pipeline.transformation.publications.authorships.authorships_queries import (
-            AuthorshipsBuild,
-        )
-        from pipeline.transformation.publications.authorships.build_authorships import build
-
-        setup_persons_test_data(sa_sync_conn)
-        run_create_persons(sa_sync_conn)
-        _run_build_authorships(sa_sync_conn)
-        counts_before = _count_authorships_tables(sa_sync_conn)
-        assert counts_before["total"] >= 3
-
-        build(
-            sa_sync_conn,
-            AuthorshipsBuild(),
-            logging.getLogger("test"),
-            rebuild_full=True,
-        )
-        counts_after = _count_authorships_tables(sa_sync_conn)
-
-        assert counts_after == counts_before, (
-            f"rebuild_full doit converger vers le même état !\n"
-            f"  avant : {counts_before}\n  après : {counts_after}"
-        )
-
-    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, caplog):
-        """Le journal annonce la purge, sans quoi tous les liens paraîtraient nouveaux."""
-        import logging
-
-        from sqlalchemy import text
-
-        from pipeline.transformation.publications.authorships.authorships_queries import (
-            AuthorshipsBuild,
-        )
-        from pipeline.transformation.publications.authorships.build_authorships import build
-
-        setup_persons_test_data(sa_sync_conn)
-        run_create_persons(sa_sync_conn)
-        _run_build_authorships(sa_sync_conn)
-        liens = sa_sync_conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
-
-        with caplog.at_level(logging.INFO, logger="test"):
-            build(
-                sa_sync_conn,
-                AuthorshipsBuild(),
-                logging.getLogger("test"),
-                rebuild_full=True,
-            )
-
-        assert "▶ Reconstruction complète" in caplog.messages
-        assert f"  └─ {liens} liens supprimés" in caplog.messages
-
-
-class TestBuildAuthorshipsRebuildRollback:
-    """Un rebuild annulé par rollback laisse la séquence des ids devant les lignes restaurées."""
-
-    def test_insert_after_rolled_back_rebuild(self, sa_sync_conn):
-        import logging
-
-        from sqlalchemy import text
-
-        from pipeline.transformation.publications.authorships.authorships_queries import (
-            AuthorshipsBuild,
-        )
-        from pipeline.transformation.publications.authorships.build_authorships import build
-
-        setup_persons_test_data(sa_sync_conn)
-        run_create_persons(sa_sync_conn)
-        _run_build_authorships(sa_sync_conn)
-        # Des ids au-delà du nombre de lignes, comme après des suppressions de liens.
-        sa_sync_conn.execute(text("DELETE FROM authorships"))
-        _run_build_authorships(sa_sync_conn)
-
-        savepoint = sa_sync_conn.begin_nested()
-        build(sa_sync_conn, AuthorshipsBuild(), logging.getLogger("test"), rebuild_full=True)
-        savepoint.rollback()
-
-        # Le lien d'id maximal, supprimé puis recréé, reçoit un id libre.
-        sa_sync_conn.execute(
-            text("DELETE FROM authorships WHERE id = (SELECT max(id) FROM authorships)")
-        )
-        _run_build_authorships(sa_sync_conn)
-
-
 def _snapshot_authorships_content(conn) -> list[tuple]:
-    """Contenu d'`authorships` hors identité (id) : ce qui doit être identique
-    entre un build incrémental et un rebuild full."""
+    """Contenu d'`authorships` hors identifiant : ce qui doit être identique entre un build incrémental et un build sur table vide."""
     from sqlalchemy import text
 
     return [
@@ -168,13 +78,10 @@ def _snapshot_authorships_content(conn) -> list[tuple]:
     ]
 
 
-class TestIncrementalEqualsFull:
-    """Après une mutation des sources, le build incrémental (add + prune +
-    recompute convergent) produit le même contenu que le rebuild full — seuls
-    les `id` diffèrent (le full les renumérote). Garde-fou : c'est ce qui permet
-    de retirer la purge du pipeline routinier."""
+class TestIncrementalEqualsFromScratch:
+    """Après une mutation des sources, le build incrémental (ajout, retrait et recalcul en une passe) produit le même contenu qu'un build sur table vide. Seuls les identifiants diffèrent."""
 
-    def test_incremental_matches_full_after_mutation(self, sa_sync_conn):
+    def test_incremental_matches_from_scratch_after_mutation(self, sa_sync_conn):
         from sqlalchemy import text
 
         setup_persons_test_data(sa_sync_conn)
@@ -202,23 +109,12 @@ class TestIncrementalEqualsFull:
         _run_build_authorships(sa_sync_conn)
         incremental = _snapshot_authorships_content(sa_sync_conn)
 
-        # Rebuild full (purge + reconstruction) sur le même état source → snapshot.
-        import logging
+        # Build sur table vide, sur le même état des sources → snapshot.
+        sa_sync_conn.execute(text("DELETE FROM authorships"))
+        _run_build_authorships(sa_sync_conn)
+        from_scratch = _snapshot_authorships_content(sa_sync_conn)
 
-        from pipeline.transformation.publications.authorships.authorships_queries import (
-            AuthorshipsBuild,
-        )
-        from pipeline.transformation.publications.authorships.build_authorships import build
-
-        build(
-            sa_sync_conn,
-            AuthorshipsBuild(),
-            logging.getLogger("test"),
-            rebuild_full=True,
-        )
-        full = _snapshot_authorships_content(sa_sync_conn)
-
-        assert incremental == full, (
-            "Le build incrémental doit produire le même contenu que le full.\n"
-            f"  incrémental : {incremental}\n  full : {full}"
+        assert incremental == from_scratch, (
+            "Le build incrémental doit produire le même contenu qu'un build sur table vide.\n"
+            f"  incrémental : {incremental}\n  table vide : {from_scratch}"
         )
