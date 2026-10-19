@@ -233,22 +233,11 @@ def regroup(
 def build_groups(
     conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
 ) -> PhaseMetrics:
-    """Supprime les groupes des publications supprimées, puis recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs."""
-    orphans = queries.delete_orphan_groups(conn)
-    conn.commit()
-    if orphans:
-        etape(
-            logger,
-            "%s : leur publication n'existe plus",
-            accord(orphans, "groupe supprimé", "groupes supprimés"),
-        )
+    """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`)."""
     dirty = queries.fetch_dirty_publications(conn)
     publication_ids = [publication_id for publication_id, _ in dirty]
     etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
     if not publication_ids:
-        if orphans:
-            queries.refresh_alignment(conn)
-            conn.commit()
         rien_a_faire(logger)
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
