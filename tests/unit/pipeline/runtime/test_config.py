@@ -77,7 +77,7 @@ class _ConnEnPanne:
 
 
 class TestPanneDeLecture:
-    """Une panne de lecture du périmètre d'extraction remonte à l'appelant."""
+    """Une panne de lecture de la configuration remonte à l'appelant."""
 
     def test_collections_hal(self):
         with pytest.raises(SQLAlchemyError):
@@ -86,3 +86,7 @@ class TestPanneDeLecture:
     def test_identifiants_d_api(self):
         with pytest.raises(SQLAlchemyError):
             get_extraction_api_ids(_ConnEnPanne(), "openalex")
+
+    def test_reglage_du_pipeline(self):
+        with pytest.raises(SQLAlchemyError):
+            module.get_fetch_stale_after_days(_ConnEnPanne())
