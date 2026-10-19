@@ -16,21 +16,24 @@ from infrastructure.sql_fragments import in_clause
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
-    """Retire `'persons'` des sources de toutes les rows de la personne, supprime celles dont la liste de sources devient vide, puis pose les formes calculées (source `'persons'`) via un UPSERT qui fusionne avec les sources existantes."""
+    """Pose `forms` comme formes du nom de la personne (`CANONICAL_NAME_FORM_SOURCE`). Les formes du nom précédent perdent cette source, et une forme sans autre source est supprimée."""
+    params = {"pid": person_id, "src": CANONICAL_NAME_FORM_SOURCE}
     conn.execute(
         text("""
             UPDATE person_name_forms
-            SET sources = array_remove(sources, 'persons')
-            WHERE person_id = :pid AND 'persons' = ANY(sources)
+            SET sources = array_remove(sources, :src)
+            WHERE person_id = :pid AND :src = ANY(sources)
         """),
-        {"pid": person_id},
+        params,
     )
     conn.execute(
         text("DELETE FROM person_name_forms WHERE person_id = :pid AND sources = '{}'"),
         {"pid": person_id},
     )
     for form in forms:
-        add_person_source(conn, name_form=form, person_id=person_id, source="persons")
+        add_person_source(
+            conn, name_form=form, person_id=person_id, source=CANONICAL_NAME_FORM_SOURCE
+        )
 
 
 def add_name_form(
@@ -78,7 +81,7 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
             DELETE FROM person_name_forms pnf
             WHERE pnf.person_id = :pid
               AND pnf.status = 'pending'
-              AND NOT ('persons' = ANY(pnf.sources))
+              AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
               AND NOT EXISTS (
                   SELECT 1 FROM source_authorships sa
                   JOIN author_identifying_keys aik ON aik.id = sa.identity_id

@@ -10,7 +10,6 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.errors import CannotAttributeConflict, ValidationError
-from domain.normalize import normalize_name
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
@@ -22,43 +21,18 @@ from domain.persons.identifiers import (
     IdentifierOrigin,
     normalized_identifier_value,
 )
-from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
+from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import validated_name
 from domain.sources.registry import require_known_source
 from domain.types import JsonValue
-from infrastructure.db.scalars import row_int, scalar_int
+from infrastructure.db.scalars import row_int
+from infrastructure.repositories.person_repository import (
+    create_person,
+    refresh_name_forms,
+    update_person_name,
+)
 
 logger = logging.getLogger(__name__)
-
-_INSERT_PERSON = text("""
-    INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized)
-    VALUES (:ln, :fn, :lnn, :fnn) RETURNING id
-""")
-
-_UPDATE_NAME = text("""
-    UPDATE persons SET last_name = :ln, first_name = :fn,
-                       last_name_normalized = :lnn, first_name_normalized = :fnn
-    WHERE id = :id
-""")
-
-# Les formes du nom de la personne (source `persons`) sont retirées, puis posées de nouveau. Une
-# forme attestée par une autre source reste.
-_REMOVE_CANONICAL_FORMS = text("""
-    UPDATE person_name_forms SET sources = array_remove(sources, :src)
-    WHERE person_id = :pid AND :src = ANY(sources)
-""")
-_DELETE_EMPTY_FORMS = text(
-    "DELETE FROM person_name_forms WHERE person_id = :pid AND sources = '{}'"
-)
-_ADD_CANONICAL_FORM = text("""
-    INSERT INTO person_name_forms (name_form, person_id, sources, status)
-    VALUES (:nf, :pid, ARRAY[:src], 'pending'::identifier_status)
-    ON CONFLICT (name_form, person_id) DO UPDATE SET
-        sources = (
-            SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
-            FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
-        )
-""")
 
 _FIND_IDENTIFIER = text("""
     SELECT id, person_id, id_type, id_value, source, CAST(status AS text) AS status
@@ -106,38 +80,15 @@ class PersonWrites:
 
     def create(self, last_name: str, first_name: str = "") -> int:
         """Crée une personne et retourne son `id`. Ses formes de nom sont posées par la synchronisation de fin de phase."""
-        return scalar_int(
-            self._conn.execute(
-                _INSERT_PERSON,
-                {
-                    "ln": last_name,
-                    "fn": first_name,
-                    "lnn": normalize_name(last_name),
-                    "fnn": normalize_name(first_name),
-                },
-            )
-        )
+        return create_person(self._conn, last_name, first_name)
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         """Change le nom d'une personne, sans toucher à ses formes de nom."""
-        self._conn.execute(
-            _UPDATE_NAME,
-            {
-                "ln": last_name,
-                "fn": first_name,
-                "lnn": normalize_name(last_name),
-                "fnn": normalize_name(first_name),
-                "id": person_id,
-            },
-        )
+        update_person_name(self._conn, person_id, last_name, first_name)
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
         """Pose `forms` comme formes du nom de la personne (source `persons`)."""
-        params = {"pid": person_id, "src": CANONICAL_NAME_FORM_SOURCE}
-        self._conn.execute(_REMOVE_CANONICAL_FORMS, params)
-        self._conn.execute(_DELETE_EMPTY_FORMS, {"pid": person_id})
-        for form in forms:
-            self._conn.execute(_ADD_CANONICAL_FORM, {**params, "nf": form})
+        refresh_name_forms(self._conn, person_id, forms)
 
     def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
         """L'attribution de la paire `(id_type, id_value)`, ou `None`."""

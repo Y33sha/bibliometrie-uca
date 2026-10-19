@@ -5,8 +5,9 @@ Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.journals.journal import OaModel
-from domain.persons.identifiers import PersonIdentifierType
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.authorship_roles import AuthorshipRole
 from domain.source_publications.raw_metadata import CORRECTED_BY, RAW
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
@@ -33,6 +34,14 @@ def person_signature(signature: str = "sa") -> str:
 def pinned(signature_id: str) -> str:
     """Condition vraie quand l'administration a épinglé la signature d'identifiant `signature_id` à une personne (`confirmed_authorships`)."""
     return f"EXISTS (SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = {signature_id})"
+
+
+def active_name_form(form: str) -> str:
+    """Condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) désigne sa personne au matching : une forme dérivée du nom de la personne, ou une forme non rejetée."""
+    return (
+        f"({form}.status <> '{AttributionStatus.REJECTED.value}'"
+        f" OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY({form}.sources))"
+    )
 
 
 DETACHED_SIGNATURE = "person_id = NULL, resolution_mode = NULL"
