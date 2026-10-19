@@ -33,7 +33,17 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
   - Couples faux : rattachements détachés (`rejected_authorships`).
   - Le jeu est concentré : trois personnes ont 80 % des détachements, cinq personnes 45 % des rattachements manuels.
   - La cascade lit les rattachements manuels et les détachements. L'évaluation la fait tourner sans eux.
-- [ ] Précision et rappel de la cascade actuelle sur ce jeu. Ils servent de base de comparaison aux essais.
+- [x] Précision et rappel de la cascade actuelle sur ce jeu, le 2026-10-19. La phase `persons` reconstruit les rattachements dans une copie de la base (`reset_eval.sql`). La copie garde les personnes, les notices RH et les décisions humaines sur les identifiants et les formes de nom. Elle perd les rattachements, les épinglages, les détachements et les attributions déduites des rattachements. La phase tourne trois fois. Les résultats sur le jeu d'évaluation varient peu après le deuxième passage (`evaluate.py`).
+
+  | Lignes du jeu | Total | Juste | Sans personne | Autre personne | Personne créée |
+  |---|---|---|---|---|---|
+  | rattachements manuels | 1 610 | 464 | 755 | 363 | 28 |
+  | signatures des doublons fusionnés | 763 | 592 | 29 | 0 | 142 |
+
+  - 128 détachements sur 523 se reproduisent, dont 90 pour cinq personnes.
+  - 345 rattachements faux viennent de deux personnes connues seulement par leurs épinglages, « A. Devaux » et « G. Roche ». La reconstruction les supprime, et leurs signatures rejoignent un homonyme par le nom.
+  - Les doublons fusionnés se reforment : 142 signatures créent une autre personne.
+  - 704 des 755 rattachements manuels restés sans personne sont groupés et du périmètre, et leur forme de nom désigne plusieurs personnes. L'affiliation spécifique, sur les profils de la reconstruction, désigne la personne épinglée dans 340 cas (59 personnes), une autre personne dans 5 cas (2 personnes), plusieurs candidats dans 317 cas (24 personnes). Elle ne tranche pas 42 cas (`affiliation_on_pins.sql`).
 - [x] Signaux par groupe, le 2026-10-19 (`measure_group_signals.sql`), sur les 503 276 groupes qui ont une signature du périmètre ou un identifiant connu. Identifiants : ORCID des sources à dépôt auteur, IdRef, compte HAL. Nom : forme exacte de la signature.
 
   | Signal | Groupes | Sans personne |
