@@ -1,6 +1,6 @@
 """Requêtes de la phase `author_grouping`."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
@@ -146,6 +146,22 @@ class MembershipRow:
     margin: float | None
 
 
+@dataclass(frozen=True, slots=True)
+class BatchPlan:
+    """Écritures d'un lot de publications."""
+
+    publication_ids: Sequence[int]
+    groups: list[GroupRow]
+    removed: list[int]
+    """Signatures dont l'appartenance en base est supprimée."""
+    memberships: list[MembershipRow]
+    """Appartenances à insérer."""
+    unmatched: list[int]
+    """Groupes en base sans correspondant, supprimés."""
+    copies: dict[int, int]
+    """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
+
+
 class AuthorGroupingQueries:
     """Lectures et écritures des groupes de signatures."""
 
@@ -220,20 +236,13 @@ class AuthorGroupingQueries:
             return []
         return list(conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
 
-    def write(
-        self,
-        conn: Connection,
-        publication_ids: Sequence[int],
-        groups: Sequence[GroupRow],
-        removed: Sequence[int],
-        memberships: Sequence[MembershipRow],
-        unmatched_ids: Sequence[int],
-        copies: Mapping[int, int],
-    ) -> None:
-        """Écrit les groupes et les doublons d'auteur de ces publications, et retire leur drapeau `authorships_dirty`.
+    def write(self, conn: Connection, plan: BatchPlan) -> None:
+        """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `authorships_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les appartenances des signatures `removed` sont supprimées, puis `memberships` est inséré. Les groupes `unmatched_ids` sont supprimés. `copies` : doublon → première occurrence de son nom (`duplicate_of`) ; les autres signatures de ces publications perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres signatures des publications du lot perdent leur `duplicate_of`.
         """
+        publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
+        memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
         conn.execute(
             _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
         )
