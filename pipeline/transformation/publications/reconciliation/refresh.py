@@ -21,6 +21,7 @@ from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 from infrastructure.db.rows import rows_as
 from infrastructure.db.scalars import scalar_int
+from infrastructure.sql_fragments import corrected_by
 
 
 class _SourcePublicationRow(NamedTuple):
@@ -263,10 +264,10 @@ class PublicationStore:
     def get_converged_secondary_ids(self, pub_id: int) -> frozenset[int]:
         """Ids des `source_publications` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
         result = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT id FROM source_publications
                 WHERE publication_id = :id
-                  AND raw_metadata->'doi'->>'corrected_by' = ANY(:cases)
+                  AND {corrected_by("doi", "source_publications")} = ANY(:cases)
             """),
             {"id": pub_id, "cases": list(CONVERGENCE_CASES)},
         )

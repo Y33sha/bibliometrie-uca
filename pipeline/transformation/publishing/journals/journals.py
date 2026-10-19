@@ -36,7 +36,7 @@ from infrastructure.db.tables import (
     journals,
 )
 from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
-from infrastructure.sql_fragments import active_issns, has_active_issn
+from infrastructure.sql_fragments import active_issns, corrected, has_active_issn, raw_column
 
 
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
@@ -308,11 +308,10 @@ _DELETE_JOURNALS = text("DELETE FROM journals WHERE id = ANY(:ids)")
 
 
 # Type brut de chaque document des revues de type inconnu : celui de la source, avant correction.
-_RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
+_RECORD_TYPES_OF_UNKNOWN_JOURNALS = text(f"""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
-           array_agg(coalesce(s.raw_metadata->'doc_type'->>'raw', s.doc_type) ORDER BY s.id)
-               AS raw_types
+           array_agg({raw_column("doc_type", "s")} ORDER BY s.id) AS raw_types
     FROM journals j
     JOIN source_publications s ON s.journal_id = j.id
     WHERE j.journal_type = 'unknown' AND NOT 'journal_type' = ANY(j.manual_fields)
@@ -322,11 +321,11 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
 
 
 # Une revue posée par son espace de noms laisse sa trace dans `raw_metadata.journal_id`.
-_DOI_JOURNAL_PAIRS = text("""
+_DOI_JOURNAL_PAIRS = text(f"""
     SELECT s.doi, s.journal_id, j.journal_type
     FROM source_publications s
     JOIN journals j ON j.id = s.journal_id
-    WHERE s.doi IS NOT NULL AND NOT s.raw_metadata ? 'journal_id'
+    WHERE s.doi IS NOT NULL AND NOT {corrected("journal_id", "s")}
 """)
 
 

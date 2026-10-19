@@ -48,7 +48,7 @@ from domain.publications.identifiers import issn_search_prefix
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
-from infrastructure.sql_fragments import active_issns, has_active_issn
+from infrastructure.sql_fragments import active_issns, corrected, has_active_issn, raw_column
 
 # Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
 _JOURNAL_LIST_COLUMNS = f"""
@@ -158,11 +158,10 @@ _SAME_TITLE_GROUPS = f"""
 """
 
 # Type brut de chaque document des revues typées `journal`, celui de la source avant correction.
-_JOURNAL_RECORD_TYPES = """
+_JOURNAL_RECORD_TYPES = f"""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
-           array_agg(coalesce(s.raw_metadata->'doc_type'->>'raw', s.doc_type) ORDER BY s.id)
-               AS raw_types
+           array_agg({raw_column("doc_type", "s")} ORDER BY s.id) AS raw_types
     FROM journals j
     JOIN source_publications s ON s.journal_id = j.id
     WHERE j.journal_type = 'journal'
@@ -170,10 +169,11 @@ _JOURNAL_RECORD_TYPES = """
 """
 
 # Enregistrements à DOI et à revue. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
-_RECORDS_WITH_DOI_AND_JOURNAL = """
+_RECORDS_WITH_DOI_AND_JOURNAL = f"""
     SELECT doi, journal_id, source::text AS source
     FROM source_publications
-    WHERE doi IS NOT NULL AND journal_id IS NOT NULL AND NOT raw_metadata ? 'journal_id'
+    WHERE doi IS NOT NULL AND journal_id IS NOT NULL
+      AND NOT {corrected("journal_id", "source_publications")}
 """
 
 # Revues où le même ISSN est actif.

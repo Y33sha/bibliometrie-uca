@@ -9,7 +9,7 @@ from domain.monographs.matching import MonographCandidate
 from domain.monographs.proceedings import MonographRecord
 from infrastructure.db.scalars import scalar_int
 from infrastructure.repositories.merge_steps import record_redirect
-from infrastructure.sql_fragments import has_active_issn
+from infrastructure.sql_fragments import has_active_issn, raw_column
 
 
 class MonographTitleGroup(NamedTuple):
@@ -129,20 +129,20 @@ _JOURNAL_CANDIDATES = text(f"""
 
 _SET_JOURNAL = text("UPDATE monographs SET journal_id = :journal_id WHERE id = :id")
 
-_PROCEEDINGS_FACTS = text("""
+_PROCEEDINGS_FACTS = text(f"""
     SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
            coalesce(
-               array_agg(sp.source::text ORDER BY sp.id) FILTER (WHERE sp.id IS NOT NULL), '{}'
+               array_agg(sp.source::text ORDER BY sp.id) FILTER (WHERE sp.id IS NOT NULL), '{{}}'
            ) AS sources,
            coalesce(
-               array_agg(coalesce(sp.raw_metadata->'doc_type'->>'raw', sp.doc_type) ORDER BY sp.id)
+               array_agg({raw_column("doc_type")} ORDER BY sp.id)
                    FILTER (WHERE sp.id IS NOT NULL),
-               '{}'
+               '{{}}'
            ) AS raw_doc_types,
            coalesce(
                array_agg(coalesce(sp.meta ? 'conference', false) ORDER BY sp.id)
                    FILTER (WHERE sp.id IS NOT NULL),
-               '{}'
+               '{{}}'
            ) AS declares
     FROM monographs m
     LEFT JOIN journals j ON j.id = m.journal_id

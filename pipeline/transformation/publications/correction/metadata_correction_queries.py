@@ -21,7 +21,7 @@ from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
 from infrastructure.db.tables import source_publications
-from infrastructure.sql_fragments import diamond_journal_sql
+from infrastructure.sql_fragments import corrected, diamond_journal_sql, raw_column
 
 
 class UnaryCorrectionRow(NamedTuple):
@@ -292,13 +292,13 @@ class PgMetadataCorrectionQueries:
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
         """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         rows = conn.execute(
-            text("""
+            text(f"""
                 SELECT id, source::text AS source,
-                       coalesce(raw_metadata->'doc_type'->>'raw', doc_type) AS raw_doc_type,
+                       {raw_column("doc_type", "source_publications")} AS raw_doc_type,
                        doi, journal_id, raw_metadata
                 FROM source_publications
                 WHERE (journal_id IS NULL AND doi IS NOT NULL)
-                   OR raw_metadata ? 'journal_id'
+                   OR {corrected("journal_id", "source_publications")}
             """)
         )
         return rows_as(JournalCorrectionRow, rows)
@@ -321,7 +321,7 @@ class PgMetadataCorrectionQueries:
                 WITH sp_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, raw_metadata,
                            meta, external_ids,
-                           lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS eff_doi
+                           lower({raw_column("doi", "source_publications")}) AS eff_doi
                     FROM source_publications
                 ),
                 dataset_dois AS (
@@ -408,7 +408,8 @@ class PgMetadataCorrectionQueries:
                       AND eff_doi IS NOT NULL
                     UNION
                     SELECT eff_doi AS d FROM sp_eff
-                    WHERE raw_metadata ?| ARRAY['doi', '{REMOVED_EXTERNAL_IDS}']
+                    WHERE {corrected("doi", "sp_eff")}
+                       OR {corrected(REMOVED_EXTERNAL_IDS, "sp_eff")}
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
