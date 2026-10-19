@@ -28,6 +28,13 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 - [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. Ils sont à réexaminer sur les autres critères (nom, groupe), sans détachement systématique. L'identifiant de la signature est souvent faux alors que la personne est la bonne.
 - [ ] Doublons d'auteur des notices écartées de l'alignement (notice scanR issue d'un dépôt HAL présent, notice DataCite au DOI convergé) : `author_grouping` ne les détecte pas, donc la résolution les rattache à une personne. 358 notices au 2026-10-18.
 
+### Phase 2 — Résolution par groupe
+
+- [ ] Identification des personnes par groupe de signatures (`source_authorship_groups`) au lieu de chaque signature. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
+- [ ] Correction des doubles rattachements (une personne rattachée à deux signatures d'une même notice) et des personnes qui ont les identifiants de deux personnes.
+- [ ] ORCID en attente rattachés à une autre personne que leur titulaire : 21 groupes dans la relecture du 2026-10-19.
+- [ ] `person_id` et `resolution_mode` passent de `source_authorships` à `source_authorship_groups`. `source_authorship_groups` remplace `authorships`, matviews reportées.
+
 ## Questions ouvertes
 
 - Pour le modèle probabiliste, Splink plutôt qu'un modèle maison.

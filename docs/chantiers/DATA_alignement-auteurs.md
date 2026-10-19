@@ -93,16 +93,16 @@ Les verdicts manuels sur les signatures ont deux ancrages :
 - L'alignement se fait par publication, avant la phase `persons`.
 - Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux signatures qui le partagent.
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
-- `source_authorship_groups` réunit les signatures d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_authorships`.
+- `source_authorship_groups` réunit les signatures d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_authorships` dans le chantier de [résolution des personnes](DATA_resolution-splink.md).
 - `grouped_source_authorships` relie chaque signature à son groupe : `source_authorship_id` (clé primaire), `group_id`, `source_publication_id`, `method`, `score`, `margin`.
   - `method` : `reference` (la signature fonde le groupe), `name`, `identifier`, `order`, `model`.
   - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
-- Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication. Les doubles rattachements relèvent de ce chantier.
+- Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication.
 - Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices. `publications.authorships_dirty` marque les publications à recalculer. La réconciliation de `publications` le pose sur les publications touchées : celles qui reçoivent une notice réexaminée, et celles qu'une notice quitte. Une notice réécrite par `normalize`, signatures comprises, est réexaminée. La phase des groupes retire le drapeau.
 - La phase des groupes, entre `publications` et `persons`, écrit seulement les deux tables des groupes. La phase `persons` garde sa cascade, à une exception : le rattachement `cross_source` devient une propagation dans le groupe. La déduplication des personnes sur les groupes, avec Splink, relève d'un chantier à part.
 - Après le recalcul, chaque groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de signatures, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `person_id` et `resolution_mode` suivent l'identifiant. Un ancien groupe sans correspondant est supprimé.
 - Les verdicts restent ancrés sur les données sources : une signature dont les identifiants changent est supprimée puis réinsérée.
-- Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships` en fin de chantier, matviews comprises.
+- Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships`, matviews comprises, dans le chantier de résolution des personnes.
 
 ## Phasage
 
@@ -166,6 +166,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Prénom connu : un prénom absent ou réduit à des initiales prend la valeur du prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la signature, si les initiales concordent. Une décision sur ce rattachement, ou un changement de ce prénom, marque à regrouper les publications des signatures qui contiennent l'identifiant.
   - Résidu : modèle de Fellegi-Sunter (Splink), estimé par EM sur les seules signatures restantes. Comparaisons : patronyme, prénom, ORCID, IdRef, trou (même trou, trou voisin, ailleurs). Affectation hongroise : un lien est retenu quand les preuves dépassent log2 du nombre de groupes restants. Les poids d'ORCID et d'IdRef viennent d'un modèle estimé sur toutes les paires : sur le résidu, l'EM ne les identifie pas.
   - Le résidu fait 1,9 % des liens jusqu'à 100 auteurs, 10,6 % au-delà.
+  - Deux variantes essayées le 2026-10-19, sans gain net sur le stock, donc écartées. Ordre des notices par source (theses.fr, Crossref, DataCite, HAL, OpenAlex, WoS, scanR) au lieu de la longueur : 2 paires de plus tranchées comme chacune des deux relectures, effet sur le stock impossible à juger sans relecture. Redécoupage d'un patronyme composé (« c adam / bourdarios » face à « adam bourdarios ») : autant de liens perdus que gagnés.
   - Évaluation sur trois relectures :
 
     | Méthode | 326 paires de la phase 1 | 97 désaccords entre Fellegi-Sunter et une règle sans filtre d'ordre | 47 écarts de l'hybride au consensus des deux autres |
@@ -216,27 +217,20 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Les erreurs de groupement concernent presque toutes trois homonymes « Z. Xu » d'une collaboration de physique des particules. Les sources ne les rangent pas dans le même ordre, et leur ORCID figure sur une signature autre que la référence. La comparaison de l'identifiant à tous les membres du groupe ne suffit pas : la signature à initiale a l'ORCID, la signature au prénom complet n'en a pas. Le prénom connu sépare 10 des 21 erreurs de la strate ordre ; les autres groupes relus sont justes, ou l'ORCID est en attente de confirmation.
   - 21 rattachements faux viennent d'un ORCID en attente, rattaché à une autre personne que son titulaire.
   - Erreurs de source : noms concaténés par Crossref et WoS, accents LaTeX, rédactions et organismes non reconnus comme collectifs.
-  - Effet sur les jeux d'évaluation : 95 désaccords sur 97 et 41 écarts sur 47 tranchés comme la relecture.
-- [ ] Fusion des doublons de personnes relevés par les relectures : 165 personnes absorbées dans 157 (`data/experiments/alignement-auteurs/person_merges.csv`, non versionné), par `interfaces/cli/oneshot/merge_reviewed_person_duplicates.py`. Deux paires restent hors de la liste. « Blandine Tauleigne Adib Essid » vient d'un nom concaténé par WoS : ses signatures désignent deux auteurs. Rosana Lopez et Rosa Ana Lopez Rodriguez sont deux personnes, que HAL confond.
+  - Accord avec les deux relectures de la phase 2, le 2026-10-19 : 93 paires sur 97 et 40 sur 47. Dans une publication ATLAS, une copie OpenAlex sans DOI d'un dépôt d'archives, plus longue de 38 auteurs, est devenue la liste de référence. Elle écrit autrement les patronymes composés et range les auteurs dans un autre ordre.
+- [x] Fusion des doublons de personnes relevés par les relectures : 165 personnes absorbées dans 157 (`data/experiments/alignement-auteurs/person_merges.csv`, non versionné), par `interfaces/cli/oneshot/merge_reviewed_person_duplicates.py`. Deux paires restent hors de la liste. « Blandine Tauleigne Adib Essid » vient d'un nom concaténé par WoS : ses signatures désignent deux auteurs. Rosana Lopez et Rosa Ana Lopez Rodriguez sont deux personnes, que HAL confond.
 - [x] Notices aux noms inversés : une notice qui intervertit nom et prénom s'aligne avec ses noms remis dans l'ordre. À longueur égale, une notice scanR passe après les autres et ne fonde un groupe qu'à défaut d'une autre. Sur les jeux relus, 91 désaccords sur 97 sont tranchés comme la relecture, contre 86 ; le reste est inchangé.
-- [ ] Identification des personnes par groupe, dans le chantier de déduplication des personnes. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
-- [ ] Correction des doubles rattachements et des personnes qui ont deux identifiants de deux personnes.
 - [x] Fusions suspectes : onglet du référentiel des publications de l'UI admin. Il retient les publications dont moins de la moitié des auteurs se retrouvent d'une notice à l'autre (vue `publication_author_alignment`).
-- [ ] Désaccords d'affiliation entre sources pour un même auteur.
-- [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
 - [x] Comparaison des listes d'auteurs entre sources : elle quitte la page publique d'une publication pour le volet publication de l'UI admin, une ligne par groupe.
-- [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
 
 ### Phase 4 — Diagnostic des listes d'auteurs
 
-- [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les signatures concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de la notice seule ; la comparaison avec les autres notices de la publication sert de confirmation. Le diagnostic se calcule sur les signatures que la phase `author_grouping` charge déjà.
 - [x] Liste recopiée en tout ou en partie. Relecture de 64 notices où un nom complet revient, le 2026-10-18 : sous 10 % de répétitions, 5 vrais homonymes et 3 notices indéterminées ; au-delà, 51 listes recopiées et 5 indéterminées.
   - Signal : au moins deux noms répétés avec le même décalage de position, supérieur à 1. Il trouve 47 des 51 copies et aucun des 5 homonymes, qui sont tous côte à côte (décalage de 1).
   - La longueur ne détecte pas la copie, qui se retrouve dans d'autres sources. Une notice plus longue que la médiane des autres manque 15 copies sur 51 ; un écart avec une autre notice égal au nombre de répétitions confirme 26 copies sur 51.
   - Conséquence : seule la première occurrence de chaque nom s'aligne. Les répétitions restent hors des groupes, donc hors du rattachement aux personnes.
 - [x] Liste doublée sur place (A A B B…) : une suite d'au moins 4 paires côte à côte, de noms différents.
 - [x] Copies notées dans `source_authorships.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 578 notices, 21 971 doublons d'auteur.
-- [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
 - [x] Décomptes d'auteurs de chaque notice : `source_publications.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
 - [x] Noms de collectifs : une signature dont le nom entier est « et al. » est collective, ainsi qu'un nom d'organisme ou de rédaction (« Die Redaktion », « Editorial Office »). Accents LaTeX décodés dans les noms d'auteur à la normalisation ; un oneshot corrige les 1 421 signatures du stock. Encodage réparé de la même façon (UTF-8 lu comme du Latin-1 ou du Windows-1252, Windows-1252 lu comme du GBK) : 2 487 signatures du stock, surtout chez OpenAlex.
 - [x] Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
@@ -246,11 +240,19 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Dépôt HAL `in2p3-*` plus court que la référence, dont 80 % des patronymes figurent dans la référence : il liste les auteurs locaux.
   - Fusion erronée probable : 20 % au plus des patronymes de la liste courte figurent dans la liste longue. La fusion d'une pièce DataCite avec son ensemble échappe à ce critère : la liste de la pièce est contenue dans celle de l'ensemble.
 - [x] Relecture de 71 grands écarts (du simple au double au moins), le 2026-10-18 : 23 listes tronquées, 13 fusions erronées, 9 listes recopiées, 7 listes d'auteurs locaux, 4 références fausses, 15 cas indéterminables. Les écarts que les règles laissent sans cause sont des listes partielles (directeurs d'ouvrage, collectif omis) et des listes longues qui contiennent la référence. Ces dernières y ajoutent les membres d'un collectif ou une copie sous d'autres formes de noms ; les répétitions de patronyme et d'initiale ne séparent pas ces deux cas.
+### Phase 5 — Suites
+
+Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de la résolution des personnes.
+
+- [ ] Désaccords d'affiliation entre sources pour un même auteur.
+- [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
+- [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
+- [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les signatures concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de la notice seule ; la comparaison avec les autres notices de la publication sert de confirmation. Le diagnostic se calcule sur les signatures que la phase `author_grouping` charge déjà.
+- [ ] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Conséquence : elle ne sert pas de liste de référence.
 - [ ] Fusions erronées probables dans l'onglet Fusions suspectes.
 
-### Phase 5 — Fin de chantier
+### Phase 6 — Fin de chantier
 
-- [ ] Remplacement de `authorships` par `source_authorship_groups`, matviews reportées.
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
