@@ -4,7 +4,7 @@
 
 Une signature appartient au périmètre par ses indices (`perimeter_evidence`) : adresse, structure HAL, ROR, identité RH, établissement de thèse. Chaque source donne ses indices pour sa propre signature. Une source attribue parfois à un auteur l'affiliation d'un autre auteur, ou une affiliation fausse. Une personne hors RH entrée dans le périmètre par une telle affiliation est une fausse personne du périmètre.
 
-Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les liens au périmètre établis par la seule signature scanR. Les structures que scanR donne aux auteurs des grandes collaborations sont souvent fausses, ses adresses aussi.
+Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les liens au périmètre établis par la seule signature scanR. Le lien était faux dans 12 cas sur 25 pour une structure, dans 10 cas sur 15 pour une adresse.
 
 ## Décisions
 
