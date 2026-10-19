@@ -77,7 +77,7 @@ class HalStructuresQueries:
 
     def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
         """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté. Marque `countries_dirty` les signatures qui citent une structure dont le pays change, ou un alias qui change de structure."""
-        previous_countries = dict(
+        previous_countries: dict[int, str | None] = dict(
             self._conn.execute(
                 text(
                     "SELECT hal_structure_id, country_code FROM hal_structures"
@@ -86,7 +86,7 @@ class HalStructuresQueries:
                 {"ids": [s.hal_structure_id for s in structures]},
             ).all()
         )
-        previous_aliases = dict(
+        previous_aliases: dict[int, int] = dict(
             self._conn.execute(
                 text(
                     "SELECT alias_id, hal_structure_id FROM hal_structure_aliases"

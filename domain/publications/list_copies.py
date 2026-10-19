@@ -12,52 +12,57 @@ MIN_COPIED_NAMES = 2
 MIN_DOUBLED_PAIRS = 4
 
 type Name = tuple[str, str]
+# Rang d'une signature dans la liste des auteurs, et la signature.
+type Placed = tuple[int, Signature]
 
 
 def copied_signatures(signatures: Sequence[Signature]) -> dict[int, int]:
-    """Doublons d'auteur d'une notice, chacun vers la première occurrence de son nom complet."""
-    ordered = sorted((s for s in signatures if s.last_name), key=lambda s: (s.position, s.id))
-    by_name: dict[Name, list[Signature]] = defaultdict(list)
-    for s in ordered:
-        by_name[_name(s)].append(s)
+    """Doublons d'auteur d'une notice, chacun vers la première occurrence de son nom complet. Seules les signatures qui ont une position et un nom de famille comptent."""
+    ordered = sorted(
+        ((s.position, s) for s in signatures if s.last_name and s.position is not None),
+        key=lambda p: (p[0], p[1].id),
+    )
+    by_name: dict[Name, list[Placed]] = defaultdict(list)
+    for p in ordered:
+        by_name[_name(p)].append(p)
     copies = _block_copies(by_name) | _doubled_in_place(ordered)
-    return {s.id: by_name[_name(s)][0].id for s in ordered if s.id in copies}
+    return {s.id: by_name[_name(p)][0][1].id for p in ordered if (s := p[1]).id in copies}
 
 
-def _block_copies(by_name: dict[Name, list[Signature]]) -> set[int]:
+def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
     """Occurrences qui suivent la précédente du même nom d'un décalage de répétition.
 
     Le décalage de répétition est supérieur à 1 et commun à au moins `MIN_COPIED_NAMES` noms. Les homonymes d'une liste alphabétique sont côte à côte, au décalage 1.
     """
     names_by_offset: dict[int, set[Name]] = defaultdict(set)
     for name, occurrences in by_name.items():
-        for a, b in pairwise(occurrences):
-            if b.position - a.position > 1:
-                names_by_offset[b.position - a.position].add(name)
+        for (pa, _), (pb, _) in pairwise(occurrences):
+            if pb - pa > 1:
+                names_by_offset[pb - pa].add(name)
     offsets = {d for d, names in names_by_offset.items() if len(names) >= MIN_COPIED_NAMES}
     return {
         b.id
         for occurrences in by_name.values()
-        for a, b in pairwise(occurrences)
-        if b.position - a.position in offsets
+        for (pa, _), (pb, b) in pairwise(occurrences)
+        if pb - pa in offsets
     }
 
 
-def _doubled_in_place(ordered: Sequence[Signature]) -> set[int]:
+def _doubled_in_place(ordered: Sequence[Placed]) -> set[int]:
     """Secondes occurrences des suites d'au moins `MIN_DOUBLED_PAIRS` paires côte à côte (A A B B…), de noms différents."""
     copies: set[int] = set()
-    run: list[Signature] = []
+    run: list[Placed] = []
 
     def close() -> None:
         if len(run) >= MIN_DOUBLED_PAIRS:
-            copies.update(s.id for s in run)
+            copies.update(s.id for _, s in run)
         run.clear()
 
     i = 0
     while i + 1 < len(ordered):
         a, b = ordered[i], ordered[i + 1]
-        if b.position == a.position + 1 and _name(a) == _name(b):
-            if run and (run[-1].position != a.position - 1 or _name(run[-1]) == _name(a)):
+        if b[0] == a[0] + 1 and _name(a) == _name(b):
+            if run and (run[-1][0] != a[0] - 1 or _name(run[-1]) == _name(a)):
                 close()
             run.append(b)
             i += 2
@@ -68,5 +73,5 @@ def _doubled_in_place(ordered: Sequence[Signature]) -> set[int]:
     return copies
 
 
-def _name(s: Signature) -> Name:
-    return (s.last_name, s.first_name)
+def _name(p: Placed) -> Name:
+    return (p[1].last_name, p[1].first_name)

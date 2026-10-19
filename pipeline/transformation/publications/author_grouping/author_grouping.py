@@ -96,7 +96,7 @@ def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[i
     notices = notices_of(rows)
     copies: dict[int, int] = {}
     for signatures in notices.values():
-        copies |= copied_signatures([s for s in signatures if s.position is not None])
+        copies |= copied_signatures(signatures)
     kept = {n: [s for s in sigs if s.id not in copies] for n, sigs in notices.items()}
     groups = align_publication(kept, model=_MODEL, assign=assign, deferred=deferred_notices(rows))
     return groups, copies

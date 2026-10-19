@@ -410,21 +410,21 @@ class _NoticeLinks:
         self.shared_identifier()
 
     def _in_order(self, s: Signature) -> bool:
-        """Le lien de `s` entre dans le filtre d'ordre : signature et groupe ont une position, et le lien ne vient pas d'un identifiant."""
-        return (
-            s.position is not None
-            and self.links[s.id] in self.ranked
-            and self.methods[s.id] != GroupingMethod.IDENTIFIER
-        )
+        """Le lien de `s` entre dans le filtre d'ordre : le groupe a une position, et le lien ne vient pas d'un identifiant."""
+        return self.links[s.id] in self.ranked and self.methods[s.id] != GroupingMethod.IDENTIFIER
 
     def order_filter(self) -> None:
         """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant, ou d'une signature ou d'un groupe sans position, reste."""
-        ordered = [s for s in self.sigs if s.id in self.links and self._in_order(s)]
-        kept = longest_ordered((s.position, self.rank[self.links[s.id]], s.id) for s in ordered)
-        for s in ordered:
-            if s.id not in kept:
-                self.forbidden.add((s.id, self.links.pop(s.id)))
-                del self.methods[s.id]
+        ordered = [
+            (s.position, self.rank[self.links[s.id]], s.id)
+            for s in self.sigs
+            if s.id in self.links and s.position is not None and self._in_order(s)
+        ]
+        kept = longest_ordered(ordered)
+        for _, _, signature_id in ordered:
+            if signature_id not in kept:
+                self.forbidden.add((signature_id, self.links.pop(signature_id)))
+                del self.methods[signature_id]
 
     def gaps(self) -> tuple[dict[int, int], dict[int, int]]:
         """Trou de chaque signature et de chaque groupe restés sans lien, parmi ceux qui ont une position."""
