@@ -11,10 +11,9 @@ from application.ports.repositories.authorship_repository import (
     AuthorshipRepository,
 )
 from infrastructure.sql_fragments import (
-    AUTHORSHIP_PERIMETER_EVIDENCE_EXPR,
     REJECTED_PAIRS,
-    case_priority,
-    publication_rejected_for,
+    insert_missing_authorships_sql,
+    propagate_authorship_attributes_sql,
 )
 
 
@@ -75,50 +74,13 @@ class PgAuthorshipRepository(AuthorshipRepository):
 
     # ── Recomposition d'une authorship depuis ses signatures ───────
 
-    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
-        self._conn.execute(
-            text(f"""
-                INSERT INTO authorships (publication_id, person_id)
-                SELECT :pub, :pid
-                WHERE NOT {publication_rejected_for(":pub", ":pid")}
-                ON CONFLICT (publication_id, person_id) DO NOTHING
-            """),
-            {"pub": publication_id, "pid": person_id},
-        )
-
-    def recompute_authorship_author_position_and_corresponding(
-        self, publication_id: int, person_id: int, source_priority: tuple[str, ...]
-    ) -> None:
-        """Aligné sur le build (`propagate_authorship_attributes`) : `author_position` par priorité de source, `is_corresponding` en `bool_or`."""
-        self._conn.execute(
-            text(f"""
-                UPDATE authorships a
-                SET author_position = sub.pos,
-                    is_corresponding = sub.is_corr
-                FROM (
-                    SELECT (array_agg(sa.author_position ORDER BY
-                               {case_priority(source_priority, "sa.source")})
-                               FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
-                           bool_or(sa.is_corresponding) AS is_corr
-                    FROM source_authorships sa
-                    JOIN source_publications sp ON sp.id = sa.source_publication_id
-                    WHERE sp.publication_id = :pub AND sa.person_id = :pid
-                ) sub
-                WHERE a.publication_id = :pub AND a.person_id = :pid
-            """),
-            {"pub": publication_id, "pid": person_id},
-        )
-
-    def recompute_authorship_perimeter(self, publication_id: int, person_id: int) -> None:
-        """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le caller."""
-        self._conn.execute(
-            text(f"""
-                UPDATE authorships a
-                SET perimeter_evidence = {AUTHORSHIP_PERIMETER_EVIDENCE_EXPR}
-                WHERE a.publication_id = :pub AND a.person_id = :pid
-            """),
-            {"pub": publication_id, "pid": person_id},
-        )
+    def consolidate_authorships(self, person_id: int, publication_ids: list[int]) -> None:
+        """Les structures dérivées vivent dans la matview `authorship_structures`, rafraîchie par le pipeline."""
+        if not publication_ids:
+            return
+        scope = {"person_id": person_id, "publication_ids": publication_ids}
+        self._conn.execute(text(insert_missing_authorships_sql(scoped=True)), scope)
+        self._conn.execute(text(propagate_authorship_attributes_sql(scoped=True)), scope)
 
     # ── source_authorships : lien personne ↔ signature
 

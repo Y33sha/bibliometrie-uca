@@ -9,6 +9,7 @@ from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_IDENTIFIER_TYPES
 from domain.publications.authorship_roles import AuthorshipRole
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
+from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -186,6 +187,92 @@ AUTHORSHIP_PERIMETER_EVIDENCE_EXPR = f"""
           AND sa.person_id = a.person_id
     ), {NO_PERIMETER_EVIDENCE})
 """
+
+
+def _authorship_scope(scoped: bool) -> str:
+    """Restriction aux signatures de la personne `:person_id` sur les publications `:publication_ids`, quand `scoped`."""
+    return (
+        "AND sa.person_id = :person_id AND sp.publication_id = ANY(:publication_ids)"
+        if scoped
+        else ""
+    )
+
+
+def insert_missing_authorships_sql(*, scoped: bool = False) -> str:
+    """Insère une authorship par paire (publication, personne) que lient des signatures, et absente de la table.
+
+    Une paire rejetée est écartée, sauf si une signature confirmée la relie : la confirmation vise la signature elle-même, le rejet la publication. `scoped` restreint aux paramètres `:person_id` et `:publication_ids`.
+    """
+    return f"""
+        WITH all_pairs AS (
+            SELECT sp.publication_id, sa.person_id,
+                   bool_or(ca.source_authorship_id IS NOT NULL) AS confirmed
+            FROM source_authorships sa
+            JOIN source_publications sp ON sp.id = sa.source_publication_id
+            JOIN publications pub ON pub.id = sp.publication_id
+            LEFT JOIN confirmed_authorships ca
+              ON ca.source_authorship_id = sa.id AND ca.person_id = sa.person_id
+            WHERE sa.person_id IS NOT NULL {_authorship_scope(scoped)}
+            GROUP BY sp.publication_id, sa.person_id
+        )
+        INSERT INTO authorships (publication_id, person_id)
+        SELECT ap.publication_id, ap.person_id
+        FROM all_pairs ap
+        WHERE NOT EXISTS (
+            SELECT 1 FROM authorships a
+            WHERE a.publication_id = ap.publication_id
+              AND a.person_id = ap.person_id
+        )
+          AND (ap.confirmed
+               OR NOT {publication_rejected_for("ap.publication_id", "ap.person_id")})
+    """
+
+
+def propagate_authorship_attributes_sql(*, scoped: bool = False) -> str:
+    """Recompose les attributs de chaque authorship depuis ses signatures.
+
+    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une signature le dit. Les indices de périmètre et les rôles sont l'union de ceux des signatures. `scoped` restreint aux paramètres `:person_id` et `:publication_ids`.
+    """
+    return f"""
+        WITH linked AS (
+            SELECT a.id AS aid, sa.source, sa.author_position, sa.is_corresponding,
+                   sa.perimeter_evidence, sa.roles
+            FROM source_authorships sa
+            JOIN source_publications sp ON sp.id = sa.source_publication_id
+            JOIN authorships a ON a.publication_id = sp.publication_id
+                              AND a.person_id = sa.person_id
+            WHERE TRUE {_authorship_scope(scoped)}
+        ),
+        scal AS (
+            SELECT l.aid,
+                   (array_agg(l.author_position ORDER BY
+                       {case_priority(SOURCE_PRIORITY, "l.source")})
+                       FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
+                   bool_or(l.is_corresponding) AS is_corr
+            FROM linked l
+            GROUP BY l.aid
+        ),
+        ev AS (
+            SELECT l.aid, array_agg(DISTINCT e ORDER BY e) AS evidence
+            FROM linked l, LATERAL unnest(l.perimeter_evidence) AS e
+            GROUP BY l.aid
+        ),
+        rol AS (
+            SELECT l.aid, array_agg(DISTINCT r ORDER BY r) AS roles
+            FROM linked l, LATERAL unnest(l.roles) AS r
+            GROUP BY l.aid
+        )
+        UPDATE authorships a
+        SET author_position = scal.pos,
+            is_corresponding = scal.is_corr,
+            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
+            roles            = rol.roles
+        FROM scal LEFT JOIN rol ON rol.aid = scal.aid LEFT JOIN ev ON ev.aid = scal.aid
+        WHERE a.id = scal.aid
+          AND (a.author_position, a.is_corresponding, a.perimeter_evidence, a.roles)
+              IS DISTINCT FROM (scal.pos, scal.is_corr,
+                                coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+    """
 
 
 def active_issns(journal: str) -> str:

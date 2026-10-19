@@ -5,12 +5,10 @@ Regroupe les étapes SQL pures (INSERT, UPDATE FROM CTE) qui promeuvent les `sou
 
 from sqlalchemy import Connection, text
 
-from domain.sources.registry import SOURCE_PRIORITY
 from infrastructure.db.scalars import scalar_int
 from infrastructure.sql_fragments import (
-    NO_PERIMETER_EVIDENCE,
-    case_priority,
-    publication_rejected_for,
+    insert_missing_authorships_sql,
+    propagate_authorship_attributes_sql,
 )
 from pipeline.transformation.publications.reconciliation.publication_perimeter import (
     refresh_publications_perimeter_evidence,
@@ -28,32 +26,7 @@ class AuthorshipsBuild:
         return n
 
     def insert_missing_authorships(self, conn: Connection) -> int:
-        # Une paire rejetée n'est pas recréée, sauf si une signature confirmée l'atteste : la confirmation vise la signature elle-même, le rejet la publication.
-        return conn.execute(
-            text(f"""
-                WITH all_pairs AS (
-                    SELECT sd.publication_id, sa.person_id,
-                           bool_or(ca.source_authorship_id IS NOT NULL) AS confirmed
-                    FROM source_authorships sa
-                    JOIN source_publications sd ON sd.id = sa.source_publication_id
-                    JOIN publications pub ON pub.id = sd.publication_id
-                    LEFT JOIN confirmed_authorships ca
-                      ON ca.source_authorship_id = sa.id AND ca.person_id = sa.person_id
-                    WHERE sa.person_id IS NOT NULL
-                    GROUP BY sd.publication_id, sa.person_id
-                )
-                INSERT INTO authorships (publication_id, person_id)
-                SELECT ap.publication_id, ap.person_id
-                FROM all_pairs ap
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM authorships a
-                    WHERE a.publication_id = ap.publication_id
-                      AND a.person_id = ap.person_id
-                )
-                  AND (ap.confirmed
-                       OR NOT {publication_rejected_for("ap.publication_id", "ap.person_id")})
-            """)
-        ).rowcount
+        return conn.execute(text(insert_missing_authorships_sql())).rowcount
 
     def prune_orphan_authorships(self, conn: Connection) -> int:
         return conn.execute(
@@ -70,47 +43,7 @@ class AuthorshipsBuild:
         ).rowcount
 
     def propagate_authorship_attributes(self, conn: Connection) -> int:
-        return conn.execute(
-            text(f"""
-                WITH linked AS (
-                    SELECT a.id AS aid, sa.source, sa.author_position, sa.is_corresponding,
-                           sa.perimeter_evidence, sa.roles
-                    FROM source_authorships sa
-                    JOIN source_publications sp ON sp.id = sa.source_publication_id
-                    JOIN authorships a ON a.publication_id = sp.publication_id
-                                      AND a.person_id = sa.person_id
-                ),
-                scal AS (
-                    SELECT l.aid,
-                           (array_agg(l.author_position ORDER BY
-                               {case_priority(SOURCE_PRIORITY, "l.source")})
-                               FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
-                           bool_or(l.is_corresponding) AS is_corr
-                    FROM linked l
-                    GROUP BY l.aid
-                ),
-                ev AS (
-                    SELECT l.aid, array_agg(DISTINCT e ORDER BY e) AS evidence
-                    FROM linked l, LATERAL unnest(l.perimeter_evidence) AS e
-                    GROUP BY l.aid
-                ),
-                rol AS (
-                    SELECT l.aid, array_agg(DISTINCT r ORDER BY r) AS roles
-                    FROM linked l, LATERAL unnest(l.roles) AS r
-                    GROUP BY l.aid
-                )
-                UPDATE authorships a
-                SET author_position = scal.pos,
-                    is_corresponding = scal.is_corr,
-                    perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
-                    roles            = rol.roles
-                FROM scal LEFT JOIN rol ON rol.aid = scal.aid LEFT JOIN ev ON ev.aid = scal.aid
-                WHERE a.id = scal.aid
-                  AND (a.author_position, a.is_corresponding, a.perimeter_evidence, a.roles)
-                      IS DISTINCT FROM (scal.pos, scal.is_corr,
-                                        coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
-            """)
-        ).rowcount
+        return conn.execute(text(propagate_authorship_attributes_sql())).rowcount
 
     def refresh_authorship_structures(self, conn: Connection) -> None:
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
@@ -143,40 +76,3 @@ class AuthorshipsBuild:
                 {"pid": person_id, "ids": source_authorship_ids},
             ).scalars()
         )
-
-    def create_authorships_from_sources(
-        self,
-        conn: Connection,
-        person_id: int,
-        source_authorship_ids: list[int],
-        source_priority: tuple[str, ...],
-    ) -> None:
-        # Une authorship par publication du lot, depuis la signature la plus prioritaire ; les structures dérivées (matview) restent au caller.
-        if not source_authorship_ids:
-            return
-        conn.execute(
-            text(f"""
-                CREATE TEMP TABLE _chosen_sa AS
-                SELECT DISTINCT ON (sd.publication_id)
-                    sd.publication_id, sa.id AS sa_id,
-                    sa.author_position, sa.perimeter_evidence, sa.is_corresponding
-                FROM source_authorships sa
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
-                WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
-                ORDER BY sd.publication_id, {case_priority(source_priority, "sa.source")}
-            """),
-            {"ids": source_authorship_ids},
-        )
-        conn.execute(
-            text(f"""
-                INSERT INTO authorships (publication_id, person_id,
-                    author_position, perimeter_evidence, is_corresponding)
-                SELECT cs.publication_id, :pid, cs.author_position, cs.perimeter_evidence,
-                       cs.is_corresponding
-                FROM _chosen_sa cs
-                WHERE NOT {publication_rejected_for("cs.publication_id", ":pid")}
-                ON CONFLICT (publication_id, person_id) DO NOTHING
-            """),
-            {"pid": person_id},
-        )
-        conn.execute(text("DROP TABLE _chosen_sa"))

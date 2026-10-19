@@ -107,19 +107,6 @@ class AuthorshipRepository(Protocol):
 
     # ── Recomposition d'une authorship depuis ses signatures ───────
 
-    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
-        """Crée la ligne consolidée de la paire si elle manque. Écarte les paires figurant dans `rejected_authorships`."""
-        ...
-
-    def recompute_authorship_author_position_and_corresponding(
-        self,
-        publication_id: int,
-        person_id: int,
-        source_priority: tuple[str, ...],
-    ) -> None:
-        """Réagrège `author_position` (par priorité de source) et `is_corresponding` (OR des signatures) sur la ligne consolidée."""
-        ...
-
-    def recompute_authorship_perimeter(self, publication_id: int, person_id: int) -> None:
-        """Réagrège `perimeter_evidence` (union des indices des signatures) sur la ligne consolidée d'une paire."""
+    def consolidate_authorships(self, person_id: int, publication_ids: list[int]) -> None:
+        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses signatures, par les requêtes de la phase `authorships`."""
         ...
