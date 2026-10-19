@@ -1,5 +1,6 @@
 """Nom d'un auteur tel qu'une source le donne sur une signature."""
 
+import re
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
@@ -10,6 +11,17 @@ from domain.persons.name_matching import (
     orient_initials,
     parse_raw_author_name,
 )
+
+# Mot qu'une source écrit à la place d'un nom absent : code DataCite de valeur inconnue (« (:unap) », « :unkn »), « None », « null ».
+_PLACEHOLDER_RE = re.compile(
+    r"\(?:(?:unac|unal|unap|unas|unav|unkn|none|null|tba)\)?|none|null", re.I
+)
+
+
+def is_placeholder_name(name: str) -> bool:
+    """Le nom est fait seulement de mots qui tiennent lieu de nom absent (« (:Unap) », « None, None »). Un nom réel qui contient l'un de ces mots (« Paolo None ») n'en est pas un."""
+    words = [w for w in re.split(r"[\s,]+", name) if w]
+    return bool(words) and all(_PLACEHOLDER_RE.fullmatch(w) for w in words)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,18 +48,20 @@ class SignatureName:
 
     @classmethod
     def from_parts(cls, last_name: str | None, first_name: str | None) -> "SignatureName | None":
-        """Nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. `None` sans aucun nom."""
+        """Nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. `None` sans aucun nom, ou pour un nom absent (`is_placeholder_name`)."""
         last = clean_raw_author_name(last_name or "").strip()
         first = clean_raw_author_name(first_name or "").strip()
+        if is_placeholder_name(f"{last} {first}"):
+            return None
         if not last:
             return cls.from_raw(first)
         return cls(last_name=last, first_name=first or None)
 
     @classmethod
     def from_raw(cls, raw: str | None) -> "SignatureName | None":
-        """Chaîne brute. `None` pour une chaîne vide."""
+        """Chaîne brute. `None` pour une chaîne vide ou un nom absent (`is_placeholder_name`)."""
         cleaned = clean_raw_author_name(raw or "").strip()
-        return cls(raw=cleaned) if cleaned else None
+        return cls(raw=cleaned) if cleaned and not is_placeholder_name(cleaned) else None
 
     @classmethod
     def from_columns(

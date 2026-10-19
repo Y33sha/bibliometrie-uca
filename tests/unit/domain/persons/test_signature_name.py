@@ -29,6 +29,24 @@ class TestFromRaw:
         assert SignatureName.from_raw("") is None
 
 
+class TestNomAbsent:
+    @pytest.mark.parametrize("raw", ["(:Unap)", ":unkn", ":none", "None, None", "null, null"])
+    def test_chaine_qui_tient_lieu_de_nom_absent(self, raw):
+        assert SignatureName.from_raw(raw) is None
+
+    def test_nom_et_prenom_qui_tiennent_lieu_de_nom_absent(self):
+        assert SignatureName.from_parts("None", "None") is None
+
+    @pytest.mark.parametrize("raw", ["Paolo None", "Unal, Guillaume", "Ines Adouani null"])
+    def test_nom_reel_qui_contient_un_de_ces_mots(self, raw):
+        assert SignatureName.from_raw(raw) == SignatureName(raw=raw)
+
+    def test_patronyme_none_avec_prenom(self):
+        assert SignatureName.from_parts("None", "Paolo") == SignatureName(
+            last_name="None", first_name="Paolo"
+        )
+
+
 class TestInvariants:
     def test_nom_et_chaine_brute_exclusifs(self):
         with pytest.raises(ValidationError):
