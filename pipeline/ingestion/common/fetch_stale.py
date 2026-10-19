@@ -250,7 +250,6 @@ async def refresh(
             commit_every=COMMIT_EVERY,
             fetch=_fetch,
             write=_write,
-            should_continue=lambda: breaker is None or not breaker.tripped,
         )
 
     if breaker is not None and breaker.tripped:

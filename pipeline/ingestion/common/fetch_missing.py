@@ -362,7 +362,6 @@ async def fetch_missing_doi(
             commit_every=1,
             fetch=_fetch,
             write=_write,
-            should_continue=lambda: breaker is None or not breaker.tripped,
         )
 
     if breaker is not None and breaker.tripped:

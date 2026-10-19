@@ -9,6 +9,7 @@ import pytest
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord
+from pipeline.ingestion.http.circuit_breaker import reset_current_breaker, set_current_breaker
 from pipeline.transformation.publishing.journals import check_journals_in_sudoc as mod
 from pipeline.transformation.publishing.journals.journals import (
     JournalSudocRow,
@@ -78,16 +79,22 @@ async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1, titl
         calls["records"].append(ppn)
         return _RECORDS.get(ppn)
 
-    metrics = await mod.run_check_journals_in_sudoc(
-        conn,
-        MagicMock(),
-        journal_repo=repo,
-        fetch_ppns=fetch_ppns,
-        fetch_record=fetch_record,
-        breaker=breaker or SimpleNamespace(tripped=False),
-        max_concurrent=max_concurrent,
-        max_per_second=1000,
-    )
+    breaker = breaker or SimpleNamespace(tripped=False)
+    # L'accès à la source pose le breaker dans la ContextVar, que lit la boucle de téléchargement.
+    token = set_current_breaker(breaker)
+    try:
+        metrics = await mod.run_check_journals_in_sudoc(
+            conn,
+            MagicMock(),
+            journal_repo=repo,
+            fetch_ppns=fetch_ppns,
+            fetch_record=fetch_record,
+            breaker=breaker,
+            max_concurrent=max_concurrent,
+            max_per_second=1000,
+        )
+    finally:
+        reset_current_breaker(token)
     return repo, conn, metrics, calls
 
 
