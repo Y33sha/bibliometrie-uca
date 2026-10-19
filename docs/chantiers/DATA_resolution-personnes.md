@@ -6,7 +6,7 @@ La résolution des personnes est une cascade de règles. Elle rattache chaque si
 
 La phase `author_grouping` réunit en amont les signatures d'un même auteur d'une publication (`source_authorship_groups`). La cascade se sert des groupes seulement pour propager une personne d'une signature aux autres signatures du groupe. Une décision par groupe réunit les identifiants, les noms et les affiliations de toutes les sources avant de trancher.
 
-L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la signature sans personne.
+L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la signature sans personne. Les affiliations fausses des sources, qui créent de fausses personnes du périmètre, relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
 
 **Contrat de la résolution** : en entrée, les notices et les signatures sources, plus les décisions humaines ; en sortie, une table de correspondance entre chaque notice ou signature et son entité. Le contrat tient quel que soit l'algorithme.
 
@@ -60,11 +60,6 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
   - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 groupes. Avec les clés spécifiques, un seul candidat concorde dans 1 631 groupes, plusieurs dans 392.
   - Sur ces 1 631 groupes, le candidat désigné est la personne rattachée dans 1 151 groupes, une autre personne dans 7. 463 groupes sont sans personne, 10 rattachés à plusieurs personnes.
   - Échantillon de 97 groupes à relire (`build_affiliation_review.py`).
-- [x] Signatures OpenAlex du périmètre dont les adresses donnent la France et un autre pays, le 2026-10-19 (`measure_openalex_two_countries.sql`) : 11 624. OpenAlex réunit souvent dans une signature les affiliations de deux auteurs.
-  - Autres signatures du groupe : France ou indice de périmètre dans 8 850 cas, autres pays seulement dans 1 650, aucun pays dans 1 001. OpenAlex est seul dans le groupe dans 123 cas.
-  - 565 personnes hors RH ont pour seul appui au périmètre des signatures de ce type, sans confirmation. Le périmètre compte 15 024 personnes hors RH.
-  - Exemple g5296946 : X. Zhang, Central China Normal University et LPC Clermont. La signature HAL du dépôt in2p3, de 54 auteurs, donne aussi le LPC.
-  - Relecture de 65 de ces 565 personnes, le 2026-10-19 (`build_multicountry_review.py`) : 57 fausses personnes du périmètre, 3 doubles affiliations réelles, 5 cas indéterminables. Par plus petite notice concernée : 18 fausses sur 25 jusqu'à 10 auteurs, 19 sur 20 de 11 à 500 auteurs, 20 sur 20 au-delà. L'adresse française appartient à un autre auteur, ou l'adresse est fausse.
 - [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la signature est souvent faux et la personne souvent juste. Échantillon relu à la main.
 
 ### Phase 2 — Essais d'une cascade par groupe

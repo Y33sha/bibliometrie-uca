@@ -20,6 +20,7 @@
 - [Résolution des personnes](DATA_resolution-personnes.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
+- [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
