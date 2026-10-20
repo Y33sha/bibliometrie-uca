@@ -1,10 +1,10 @@
-"""SQL de la fusion de deux personnes : une étape par donnée de `domain.persons.merge.PERSON_DATA`."""
+"""SQL de la fusion de deux personnes : une étape par donnée de la personne (`MERGE_STEPS`)."""
 
 from sqlalchemy import Connection, text
 
-from domain.merge import MergedEntity
+from domain.merge import DataNature, MergedEntity
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.merge import PERSON_DATA, merged_exclusion
+from domain.persons.merge import merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories.authorship_repository import (
@@ -41,6 +41,7 @@ def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) ->
 
 
 def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
+    """Sur une forme de nom commune, le statut de la conservée l'emporte, sauf s'il est en attente."""
     conn.execute(
         text(f"""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
@@ -68,6 +69,7 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def _merge_signature_groups(conn: Connection, target_id: int, source_id: int) -> None:
+    """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text("""
             UPDATE source_authorship_groups s SET person_id = NULL, resolution_mode = NULL
@@ -85,6 +87,7 @@ def _merge_signature_groups(conn: Connection, target_id: int, source_id: int) ->
 
 
 def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
+    """La plus forte des deux exclusions l'emporte (`merged_exclusion`)."""
     rows: dict[int, str | None] = {
         r.id: r.exclusion
         for r in conn.execute(
@@ -109,20 +112,27 @@ MERGE_STEPS: dict[str, MergeStep] = {
     ),
     "rejected_authorships": transfer_unique(
         "rejected_authorships", "person_id", "source_publication_id"
+    ).of_nature(DataNature.DECISION),
+    "confirmed_signatures": transfer("confirmed_authorships", "person_id").of_nature(
+        DataNature.DECISION
     ),
-    "confirmed_signatures": transfer("confirmed_authorships", "person_id"),
     "distinct_persons": MergeStep(
         (("distinct_persons", "person_id_a"), ("distinct_persons", "person_id_b")),
         _merge_distinct_persons,
+        DataNature.DECISION,
     ),
-    "identifiers": transfer("person_identifiers", "person_id"),
-    "name_forms": MergeStep((("person_name_forms", "person_id"),), _merge_name_forms),
+    "identifiers": transfer("person_identifiers", "person_id").of_nature(DataNature.MIXED),
+    "name_forms": MergeStep(
+        (("person_name_forms", "person_id"),), _merge_name_forms, DataNature.MIXED
+    ),
+    # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_roles`).
     "rh_record": untouched("persons_rh", "person_id"),
+    # Les formes de nom de l'absorbée restent (`name_forms`).
     "name": untouched(
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
-    ),
+    ).of_nature(DataNature.MIXED),
     "created_at": untouched("persons", "created_at"),
-    "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion),
+    "exclusion": MergeStep((("persons", "exclusion"),), _merge_exclusion, DataNature.DECISION),
 }
 
 
@@ -140,5 +150,5 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def person_without_decision_sql(alias: str) -> str:
-    """Condition SQL vraie quand la personne `alias` n'a aucune décision humaine : rejet, confirmation, non-doublon, exclusion (données de nature décision de `PERSON_DATA`)."""
-    return without_decision_sql("persons", alias, PERSON_DATA, MERGE_STEPS)
+    """Condition SQL vraie quand la personne `alias` n'a aucune décision humaine : rejet, confirmation, non-doublon, exclusion (étapes de nature décision de `MERGE_STEPS`)."""
+    return without_decision_sql("persons", alias, MERGE_STEPS)

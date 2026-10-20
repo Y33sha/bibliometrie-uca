@@ -16,8 +16,8 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
 )
 from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
     find_monographs_sharing_a_title,
-    merge_monograph_into,
 )
+from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,

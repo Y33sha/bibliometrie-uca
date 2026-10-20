@@ -8,12 +8,10 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.merge import MergedEntity
 from domain.monographs.matching import MonographCandidate, duplicate_monographs
-from infrastructure.repositories.merge_steps import record_redirect
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.monographs.store import MonographStore
+from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 
 LIBELLE = "Fusion des monographies en double"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -38,14 +36,6 @@ _TITLE_GROUPS = text("""
     ORDER BY min(id)
 """)
 
-_MOVE_RECORDS = text("UPDATE source_publications SET monograph_id = :t WHERE monograph_id = :s")
-_MOVE_PUBLICATIONS = text("UPDATE publications SET monograph_id = :t WHERE monograph_id = :s")
-_SOURCE_FIELDS = text("""
-    SELECT proceedings, year, isbn, eisbn, publisher_id, journal_id FROM monographs WHERE id = :s
-""")
-_RELEASE_SOURCE_ISBNS = text("UPDATE monographs SET isbn = NULL, eisbn = NULL WHERE id = :s")
-_DELETE_SOURCE = text("DELETE FROM monographs WHERE id = :s")
-
 
 def find_monographs_sharing_a_title(conn: Connection) -> list[MonographTitleGroup]:
     """Groupes d'au moins deux monographies de même titre normalisé."""
@@ -59,27 +49,6 @@ def find_monographs_sharing_a_title(conn: Connection) -> list[MonographTitleGrou
         )
         for r in conn.execute(_TITLE_GROUPS)
     ]
-
-
-def merge_monograph_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Reporte sur `target_id` les enregistrements et les publications de `source_id`, complète les champs vides de la cible, supprime la source et enregistre sa redirection."""
-    params = {"t": target_id, "s": source_id}
-    conn.execute(_MOVE_RECORDS, params)
-    conn.execute(_MOVE_PUBLICATIONS, params)
-    source = conn.execute(_SOURCE_FIELDS, params).one()
-    # La source libère ses ISBN avant que la cible les reçoive : la contrainte d'unicité le demande.
-    conn.execute(_RELEASE_SOURCE_ISBNS, params)
-    MonographStore(conn).enrich_monograph(
-        target_id,
-        proceedings=source.proceedings,
-        year=source.year,
-        isbn=source.isbn,
-        eisbn=source.eisbn,
-        publisher_id=source.publisher_id,
-        journal_id=source.journal_id,
-    )
-    conn.execute(_DELETE_SOURCE, params)
-    record_redirect(conn, MergedEntity.MONOGRAPH, target_id, source_id)
 
 
 def run_merge_duplicate_monographs(conn: Connection, logger: logging.Logger) -> PhaseMetrics:

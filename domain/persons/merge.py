@@ -1,67 +1,9 @@
-"""Fusion de deux personnes : rôles, et données d'une personne avec leur règle de fusion (`PERSON_DATA`)."""
+"""Fusion de deux personnes : rôles des deux personnes, exclusion de la personne fusionnée."""
 
 from collections.abc import Collection
 
 from domain.errors import ConflictError
-from domain.merge import DataNature, MergedData, MergeRule
 from domain.persons.person import PersonExclusion
-
-PERSON_DATA: dict[str, MergedData] = {
-    "signatures": MergedData(
-        MergeRule.TRANSFER, DataNature.DERIVED, "Signatures rattachées à la personne."
-    ),
-    "authorships": MergedData(
-        MergeRule.TRANSFER_UNIQUE,
-        DataNature.DERIVED,
-        "Authorships, une par publication.",
-    ),
-    "signature_groups": MergedData(
-        MergeRule.COMBINE,
-        DataNature.DERIVED,
-        "Groupes de signatures, un par publication. Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne.",
-    ),
-    "rejected_authorships": MergedData(
-        MergeRule.TRANSFER_UNIQUE,
-        DataNature.DECISION,
-        "Rejets d'une paire publication-personne, un par notice de la publication.",
-    ),
-    "confirmed_signatures": MergedData(
-        MergeRule.TRANSFER,
-        DataNature.DECISION,
-        "Confirmations d'une signature.",
-    ),
-    "distinct_persons": MergedData(
-        MergeRule.COMBINE,
-        DataNature.DECISION,
-        "Non-doublons. Ceux de l'absorbée passent à la conservée ; celui qui oppose les deux personnes fusionnées est supprimé.",
-    ),
-    "identifiers": MergedData(
-        MergeRule.TRANSFER,
-        DataNature.MIXED,
-        "Identifiants et leur statut.",
-    ),
-    "name_forms": MergedData(
-        MergeRule.COMBINE,
-        DataNature.MIXED,
-        "Formes de nom et leur statut. Sur une forme commune, le statut de la conservée l'emporte, sauf s'il est en attente.",
-    ),
-    "rh_record": MergedData(
-        MergeRule.ABSENT_FROM_SOURCE,
-        DataNature.DERIVED,
-        "Fiche de l'annuaire RH.",
-    ),
-    "name": MergedData(
-        MergeRule.KEEP_TARGET,
-        DataNature.MIXED,
-        "Nom et prénom. Les formes de nom de l'absorbée restent.",
-    ),
-    "created_at": MergedData(MergeRule.KEEP_TARGET, DataNature.DERIVED, "Date de création."),
-    "exclusion": MergedData(
-        MergeRule.COMBINE,
-        DataNature.DECISION,
-        "Exclusion. La plus forte des deux l'emporte (`merged_exclusion`).",
-    ),
-}
 
 
 def merge_roles(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
