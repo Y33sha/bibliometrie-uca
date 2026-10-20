@@ -29,6 +29,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 - **Citations d'une publication.** Le maximum des `cited_by_count` de ses notices. Un écart suspect entre sources donne lieu à une vérification ciblée sur d'autres sources en ligne. 40 publications ont au moins 10 citations et un maximum supérieur au double du compte OpenAlex.
 - **Calcul à la requête**, dans le script de rapport. La consolidation des indicateurs dans `publications.publications`, nécessaire aux filtres de l'interface, relève d'un chantier ultérieur.
+- **FWCI et top 10 % d'OpenAlex conservés quand le compte OpenAlex est aberrant.** OpenAlex sous-compte les citations de certaines publications : 0 citation pour un article de la collaboration ATLAS cité 59 fois dans le WoS, avec la même valeur dans l'API. 68 publications ont un compte OpenAlex inférieur à la moitié du maximum des autres sources, ce maximum étant d'au moins 5 (0,38 %). Les écarter fait passer le FWCI moyen de 1,652 à 1,656 et la part dans le top 10 % de 16,48 % à 16,51 %. Le laboratoire le plus touché, de physique des particules, en compte 45 : son FWCI moyen passe de 2,16 à 2,21.
 - **Rôles clés.** Ceux du rapport, choisis par unité. Le tableau InCites vient de l'Inserm : ses rôles PDC conviennent à la médecine.
 - **Présentation.** Lignes par année. La mise en forme PDF décide des agrégations éventuelles.
 
@@ -44,7 +45,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 - [x] Section « Impact » du rapport : un tableau par groupe de publications, en lignes par année
 - [ ] Comparaison du rapport d'un laboratoire avec son tableau InCites
-- [ ] Vérification ciblée des écarts suspects entre sources
+- [x] Vérification ciblée des écarts suspects entre sources
 
 ### Phase 3 — Fin de chantier
 
