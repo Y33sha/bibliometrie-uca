@@ -16,8 +16,8 @@ from pipeline.ingestion.common.person_search import (
     PersonSearchExtractor,
     PersonSearchPage,
 )
+from pipeline.ingestion.openalex.api import OpenalexClient
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
-from pipeline.ingestion.openalex.harvest import OpenalexClient
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:

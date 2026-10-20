@@ -12,15 +12,13 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_mapping, as_sequence
-from pipeline.http.http_retry import lookup_json_async
+from domain.types import JsonValue
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.openalex.api import auth_params
-from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
+from pipeline.ingestion.openalex.api import search_doi
+from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
 
 
 class OpenalexDoiSearch:
@@ -33,32 +31,15 @@ class OpenalexDoiSearch:
     max_concurrent = 3
     request_delay_s = 0.1
 
-    def __init__(self) -> None:
-        self.base_url = API_BASE_URLS["openalex"]
-
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         doi = dois[0]
-        params: dict[str, str | int | float] = {
-            "filter": f"doi:{doi}",
-            "select": SELECT_FIELDS,
-            **auth_params(),
-        }
-        outcome = await lookup_json_async(
-            client,
-            "GET",
-            self.base_url,
-            params=params,
-            timeout=30,
-            not_found_statuses=frozenset(),
-            label=f"DOI {doi}",
-        )
-        if isinstance(outcome, NotFound | Unavailable):
-            return DoiBatchResult()
-        results = [as_mapping(r) for r in as_sequence(as_mapping(outcome).get("results"))]
-        if not results:
+        work = await search_doi(client, doi)
+        if isinstance(work, NotFound):
             # Réponse OpenAlex valide, zéro résultat : DOI confirmé absent.
             return DoiBatchResult(not_found=[doi])
-        return DoiBatchResult(records=results[:1])
+        if isinstance(work, Unavailable):
+            return DoiBatchResult()
+        return DoiBatchResult(records=[work])
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
         doi = extract_doi(record)

@@ -28,9 +28,8 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
-from pipeline.ingestion.openalex.api import auth_params
+from pipeline.ingestion.openalex.api import auth_params, build_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_openalex_id
-from pipeline.ingestion.openalex.harvest import build_params
 
 log = setup_logger("audit_openalex_inline_truncation", os.path.dirname(__file__))
 

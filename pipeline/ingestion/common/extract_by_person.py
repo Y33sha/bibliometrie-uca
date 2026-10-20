@@ -128,7 +128,7 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
 
     def openalex(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.openalex.harvest import OpenalexClient
+        from pipeline.ingestion.openalex.api import OpenalexClient
         from pipeline.ingestion.openalex.person_search import OpenalexPersonExtractor
 
         return OpenalexPersonExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
