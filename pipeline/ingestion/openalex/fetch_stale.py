@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un work OpenAlex par son identifiant : nœud `fetch_stale.openalex`.
+"""Nouvelle lecture d'un work OpenAlex par son identifiant : tâche `fetch_stale.openalex`.
 
 `GET /works/{id}` rend le work complet, avec tous ses auteurs. Un 404 = work confirmé absent (supprimé ou fusionné dans OpenAlex).
 """

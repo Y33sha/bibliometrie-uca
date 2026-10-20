@@ -1,4 +1,4 @@
-"""Moissonnage de HAL par identifiant de personne : nœud `extract_by_person.hal`.
+"""Moissonnage de HAL par identifiant de personne : tâche `extract_by_person.hal`.
 
 Interroge l'API de recherche avec un filtre Solr qui réunit les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) des personnes du lot, borné par l'année de production. La pagination suit `cursorMark`.
 """

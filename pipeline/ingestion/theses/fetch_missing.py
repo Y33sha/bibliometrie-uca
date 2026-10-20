@@ -1,4 +1,4 @@
-"""Recherche dans theses.fr de la phase `fetch_missing` : nœud `fetch_missing.theses_by_nnt`.
+"""Recherche dans theses.fr de la phase `fetch_missing` : tâche `fetch_missing.theses_by_nnt`.
 
 NNT de thèses soutenues que d'autres sources contiennent (scanR, OpenAlex, HAL) et que le staging theses.fr n'a pas : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Un seul worker, cadencé à `THESES_DELAY`, comme le moissonnage.
 """

@@ -1,4 +1,4 @@
-"""Moissonnage theses.fr : nœud `extract.theses`.
+"""Moissonnage theses.fr : tâche `extract.theses`.
 
 Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. Sans année demandée, ramène tout l'historique theses.fr de ces établissements : la plage d'années de la configuration ne s'applique pas.
 """

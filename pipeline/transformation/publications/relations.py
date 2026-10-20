@@ -28,10 +28,10 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
@@ -174,8 +174,8 @@ class RelationsPhase:
     queries: PublicationRelationsQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute le nœud `relations.rebuild`."""
-        return run_nodes("relations", {"relations.rebuild": NodeStep(self._rebuild)}, ctx)[
+        """Exécute la tâche `relations.rebuild`."""
+        return run_tasks("relations", {"relations.rebuild": TaskStep(self._rebuild)}, ctx)[
             "relations.rebuild"
         ]
 

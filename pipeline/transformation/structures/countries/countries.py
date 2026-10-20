@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `countries` : pays candidats des adresses, résolution, et recalcul en cascade.
 
-Quatre nœuds (`pipeline.graph`), chacun dans sa propre transaction :
+Quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
 
 1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
 2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
@@ -14,10 +14,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.structures.countries import (
     detect_by_country_name,
     detect_by_place_name,
@@ -40,7 +40,7 @@ class CountriesPhase:
     queries: CountryQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les nœuds, borne l'entonnoir par les deux relevés et assemble les métriques."""
+        """Exécute les tâches, borne l'entonnoir par les deux relevés et assemble les métriques."""
         open_tx, queries = ctx.open_tx, self.queries
         initial = _etat_des_adresses(open_tx, queries)
 
@@ -75,18 +75,18 @@ class CountriesPhase:
                 refresh_publication_countries.refresh(conn, queries, ctx.logger)
             return PhaseMetrics()
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "countries",
             {
-                "countries.ror": NodeStep(ror),
-                "countries.detect": NodeStep(detect),
-                "countries.resolve": NodeStep(resolve),
-                "countries.refresh_publication_countries": NodeStep(refresh),
+                "countries.ror": TaskStep(ror),
+                "countries.detect": TaskStep(detect),
+                "countries.resolve": TaskStep(resolve),
+                "countries.refresh_publication_countries": TaskStep(refresh),
             },
             ctx,
         )
         metrics = PhaseMetrics()
-        for node_metrics in by_node.values():
+        for node_metrics in by_task.values():
             metrics.merge(node_metrics)
 
         final = _etat_des_adresses(open_tx, queries)

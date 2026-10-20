@@ -10,7 +10,7 @@ Les `authorships` canoniques sont laissées à la phase `authorships` (`insert_m
 
 Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux source_publications co-rattachées à une publication avec une SP dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
-Nœud `publications.reconcile` ; le SQL est dans `pipeline/transformation/publications/reconciliation/reconciliation.py`.
+Tâche `publications.reconcile` ; le SQL est dans `pipeline/transformation/publications/reconciliation/reconciliation.py`.
 """
 
 import logging

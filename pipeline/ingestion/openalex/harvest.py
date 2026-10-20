@@ -1,4 +1,4 @@
-"""Moissonnage OpenAlex : nœud `extract.openalex`.
+"""Moissonnage OpenAlex : tâche `extract.openalex`.
 
 Interroge `/works` sur la lignée des institutions du périmètre (`authorships.institutions.lineage`), année par année ou depuis une date de modification, avec une pagination par curseur.
 """

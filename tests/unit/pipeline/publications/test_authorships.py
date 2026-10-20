@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `authorships` : build, synchronisation, purge des orphelines, référentiels vides, refresh des compteurs.
 
-Le propos testé ici est l'enchaînement des nœuds et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
+Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
 """
 
 import logging
@@ -11,7 +11,7 @@ from pipeline.transformation.publications.authorships import authorships as phas
 
 
 class _FakeBuildQueries:
-    """Requêtes des trois nœuds de synchronisation."""
+    """Requêtes des trois tâches de synchronisation."""
 
     def __init__(self) -> None:
         self.appels: list[str] = []
@@ -117,7 +117,7 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
     assert purge.limites  # la purge a bien tourné
 
 
-def test_chaque_noeud_dans_sa_transaction(open_tx, contexte):
+def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
     # build, propagation, périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs

@@ -13,7 +13,7 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
-Chaque sous-étape est un nœud du graphe (`pipeline.graph`), exécuté par `pipeline.node_runner` dans l'ordre du graphe : une ligne du journal par nœud, sous le titre de sa section. Un nœud qui interroge une source passe par l'accès à cette source : sans identifiants, il est sauté avec un signal `source_unconfigured`. Ici, les étapes de chaque nœud et l'assemblage des métriques.
+Chaque sous-étape est une tâche du graphe (`pipeline.graph`), exécutée par `pipeline.task_runner` dans l'ordre du graphe : une ligne du journal par tâche, sous le titre de sa section. Une tâche qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Ici, les étapes de chaque tâche et l'assemblage des métriques.
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
     enrich_journals_from_openalex,
@@ -46,15 +46,15 @@ _PHASE = "publishers_journals"
 
 @dataclass(frozen=True)
 class PublishersJournalsPhase:
-    """`steps` associe à chaque nœud de la phase son étape (`NodeStep`)."""
+    """`steps` associe à chaque tâche de la phase son étape (`TaskStep`)."""
 
-    steps: Mapping[str, NodeStep]
+    steps: Mapping[str, TaskStep]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les nœuds de la phase et assemble ses métriques."""
-        by_node = run_nodes(_PHASE, self.steps, ctx)
+        """Exécute les tâches de la phase et assemble ses métriques."""
+        by_task = run_tasks(_PHASE, self.steps, ctx)
         metrics = PhaseMetrics()
-        _assemble(metrics, {name.removeprefix(f"{_PHASE}."): m for name, m in by_node.items()})
+        _assemble(metrics, {name.removeprefix(f"{_PHASE}."): m for name, m in by_task.items()})
         return metrics
 
 
@@ -147,56 +147,56 @@ def build() -> Phase:
         {
             f"{_PHASE}.{name}": step
             for name, step in {
-                "resolve_crossref_publishers": NodeStep(
+                "resolve_crossref_publishers": TaskStep(
                     _run_resolve_crossref_publishers,
                     "Éditeurs",
                     resolve_publishers.LIBELLES["Crossref"],
                 ),
-                "resolve_datacite_publishers": NodeStep(
+                "resolve_datacite_publishers": TaskStep(
                     _run_resolve_datacite_publishers,
                     "Éditeurs",
                     resolve_publishers.LIBELLES["DataCite"],
                 ),
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
-                "enrich_journals_from_openalex": NodeStep(
+                "enrich_journals_from_openalex": TaskStep(
                     _run_enrich_journals_from_openalex,
                     "Revues",
                     enrich_journals_from_openalex.LIBELLE,
                     threshold=3,
                 ),
-                "check_journals_in_sudoc": NodeStep(
+                "check_journals_in_sudoc": TaskStep(
                     _run_check_journals_in_sudoc,
                     "Revues",
                     check_journals_in_sudoc.LIBELLE,
                     threshold=3,
                 ),
-                "merge_duplicate_journals": NodeStep(
+                "merge_duplicate_journals": TaskStep(
                     _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LIBELLE
                 ),
-                "type_proceedings_journals": NodeStep(
+                "type_proceedings_journals": TaskStep(
                     _run_type_proceedings_journals, "Revues", type_proceedings_journals.LIBELLE
                 ),
-                "learn_journal_doi_namespaces": NodeStep(
+                "learn_journal_doi_namespaces": TaskStep(
                     _run_learn_journal_doi_namespaces,
                     "Revues",
                     learn_journal_doi_namespaces.LIBELLE,
                 ),
-                "enrich_journals_from_doaj": NodeStep(
+                "enrich_journals_from_doaj": TaskStep(
                     _run_enrich_journals_from_doaj,
                     "Revues",
                     import_journals_from_doaj_dump.LIBELLE,
                 ),
-                "merge_duplicate_monographs": NodeStep(
+                "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,
                     "Monographies",
                     merge_duplicate_monographs.LIBELLE,
                 ),
-                "link_monographs_to_collections": NodeStep(
+                "link_monographs_to_collections": TaskStep(
                     _run_link_monographs_to_collections,
                     "Monographies",
                     link_monographs_to_collections.LIBELLE,
                 ),
-                "type_proceedings_volumes": NodeStep(
+                "type_proceedings_volumes": TaskStep(
                     _run_type_proceedings_volumes,
                     "Monographies",
                     type_proceedings_volumes.LIBELLE,
@@ -263,7 +263,7 @@ def _prefixes_user_agent() -> str:
 def _run_enrich_journals_from_openalex(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
+    assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
     from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
     from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
     from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
@@ -288,7 +288,7 @@ def _run_enrich_journals_from_openalex(
 def _run_check_journals_in_sudoc(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
+    assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
     from pipeline.ingestion.api_params import (
         API_BASE_URLS,
         SUDOC_MAX_CONCURRENT,

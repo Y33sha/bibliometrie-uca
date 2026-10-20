@@ -1,15 +1,15 @@
-"""Tests de l'enchaînement de la phase `publishers_journals`, exécutée nœud par nœud dans l'ordre du graphe."""
+"""Tests de l'enchaînement de la phase `publishers_journals`, exécutée tâche par tâche dans l'ordre du graphe."""
 
 import dataclasses
 import logging
 
-from pipeline.graph import NODES
+from pipeline.graph import TASKS
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing import publishers_journals
 from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
 
 _CHAMPS = tuple(
-    n.name.removeprefix("publishers_journals.") for n in NODES if n.phase == "publishers_journals"
+    n.name.removeprefix("publishers_journals.") for n in TASKS if n.phase == "publishers_journals"
 )
 
 
@@ -39,13 +39,13 @@ def _run(
     )
 
 
-def test_les_noeuds_s_enchainent_dans_l_ordre_du_graphe(contexte):
+def test_les_taches_s_enchainent_dans_l_ordre_du_graphe(contexte):
     appels: list[str] = []
     _run(contexte, appels)
     assert appels == list(_CHAMPS)
 
 
-def test_chaque_noeud_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
+def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     fusion = PhaseMetrics()
     fusion.add(seen=2, journals_merged=2)
     fusion.report = "2 revues fusionnées"
@@ -62,19 +62,19 @@ def test_chaque_noeud_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     assert lignes[-1] == "  └─ Nature des monographies : rien à faire"
 
 
-def test_les_compteurs_des_noeuds_remontent_a_la_phase(contexte):
+def test_les_compteurs_des_taches_remontent_a_la_phase(contexte):
     worked = PhaseMetrics()
     worked.add(seen=3)
     metrics = _run(contexte, resolve_crossref_publishers=worked)
     assert metrics.total == 3
 
 
-def test_acces_non_configure_saute_les_noeuds_a_source(contexte, caplog):
-    """Sans identifiants, l'accès à la source saute le nœud avant sa fonction, et sa ligne le dit."""
+def test_acces_non_configure_saute_les_taches_a_source(contexte, caplog):
+    """Sans identifiants, l'accès à la source saute la tâche avant sa fonction, et sa ligne le dit."""
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
         metrics = _run(contexte, appels, credentials_missing="clé absente")
     assert "enrich_journals_from_openalex" not in appels
-    assert "merge_duplicate_journals" in appels  # nœud sans source
+    assert "merge_duplicate_journals" in appels  # tâche sans source
     assert "Type des revues sur OpenAlex : sautée, accès non configuré" in caplog.text
     assert {s["code"] for s in metrics.signals} == {"source_unconfigured"}

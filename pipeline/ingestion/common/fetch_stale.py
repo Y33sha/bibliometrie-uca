@@ -1,4 +1,4 @@
-"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` que le moissonnage n'a pas revus depuis `fetch_stale_after_days` jours. Nœuds `fetch_stale.<source>`.
+"""Phase `fetch_stale` : nouvelle lecture des documents de `staging` que le moissonnage n'a pas revus depuis `fetch_stale_after_days` jours. Tâches `fetch_stale.<source>`.
 
 Chaque document est relu **par son identifiant natif** (`staging.source_id`), avec ou sans DOI. Trois issues :
 
@@ -26,13 +26,13 @@ from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source, etape
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 COMMIT_EVERY = 50
 
@@ -67,9 +67,9 @@ class FetchStalePhase:
         years_default = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
         years_theses = [int(year)] if year else None
 
-        def node(source: str) -> NodeRun:
+        def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
+                assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
                 row_years = years_theses if source == "theses" else years_default
                 return self.refresh_one(ctx, source, row_years, breaker)
 
@@ -78,11 +78,11 @@ class FetchStalePhase:
         def retenue(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "fetch_stale",
             {
-                f"fetch_stale.{source}": NodeStep(
-                    node(source),
+                f"fetch_stale.{source}": TaskStep(
+                    task(source),
                     section=_SECTION,
                     label=source_label(source),
                     progress_bar=True,
@@ -95,7 +95,7 @@ class FetchStalePhase:
 
         by_source: dict[str, dict[str, float | None]] = {}
         for source in ALL_SOURCES:
-            source_metrics = by_node[f"fetch_stale.{source}"]
+            source_metrics = by_task[f"fetch_stale.{source}"]
             metrics.merge(source_metrics)
             if source not in targets or skipped(source_metrics):
                 continue

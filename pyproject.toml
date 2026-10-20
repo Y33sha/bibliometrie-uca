@@ -124,9 +124,9 @@ forbidden_modules = ["pipeline"]
 [[tool.importlinter.contracts]]
 name = "Pipeline : le noyau d'exécution ignore les phases"
 type = "forbidden"
-source_modules = ["pipeline.runtime", "pipeline.graph", "pipeline.node_runner", "pipeline.http"]
+source_modules = ["pipeline.runtime", "pipeline.graph", "pipeline.task_runner", "pipeline.http"]
 forbidden_modules = ["pipeline.ingestion", "pipeline.transformation"]
-# Les phases dépendent du noyau (`runtime`, `graph`, `node_runner`) et de l'outillage HTTP (`http`).
+# Les phases dépendent du noyau (`runtime`, `graph`, `task_runner`) et de l'outillage HTTP (`http`).
 # Seul l'orchestrateur `pipeline/run.py` assemble les phases.
 
 [[tool.importlinter.contracts]]

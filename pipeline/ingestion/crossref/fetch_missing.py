@@ -1,4 +1,4 @@
-"""Recherche par DOI dans Crossref : nœud `fetch_missing.doi.crossref`.
+"""Recherche par DOI dans Crossref : tâche `fetch_missing.doi.crossref`.
 
 CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre source mais absent du staging CrossRef, on interroge l'endpoint `GET /works/{doi}` et on insère le `message` dans `staging` avec `source='crossref'`.
 

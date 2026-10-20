@@ -2,7 +2,7 @@
 
 Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres signatures, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
-Nœud `author_grouping.build`.
+Tâche `author_grouping.build`.
 """
 
 import logging
@@ -27,12 +27,12 @@ from domain.publications.author_grouping import (
     with_known_first_name,
 )
 from domain.publications.list_copies import copied_signatures
-from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente, progression
+from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.author_grouping.queries import (
     AuthorGroupingQueries,
     BatchPlan,
@@ -281,6 +281,6 @@ class AuthorGroupingPhase:
 
 def build() -> Phase:
     """Groupe les signatures d'un même auteur dans les publications marquées."""
-    return NodePhase(
+    return SingleTaskPhase(
         "author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()), label="Bilan"
     )

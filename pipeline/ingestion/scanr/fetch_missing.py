@@ -1,4 +1,4 @@
-"""Recherche par DOI dans ScanR : nœud `fetch_missing.doi.scanr`.
+"""Recherche par DOI dans ScanR : tâche `fetch_missing.doi.scanr`.
 
 API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un lot de 50 DOI en un seul appel. Authentification basic.
 

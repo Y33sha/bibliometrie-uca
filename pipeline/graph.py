@@ -1,10 +1,10 @@
-"""Graphe de dépendances du pipeline : les nœuds, ce qu'ils lisent et écrivent, dans l'ordre d'exécution actuel. Chaque nœud appartient à une phase, et l'ordre des phases est celui de leurs nœuds.
+"""Graphe de dépendances du pipeline : les tâches, ce qu'elles lisent et écrivent, dans l'ordre d'exécution actuel. Chaque tâche appartient à une phase, et l'ordre des phases est celui de leurs tâches.
 
 Une donnée se désigne par sa table (`"journals"`) ou par une colonne (`"journals.journal_type"`) ; `"journals.id"` désigne l'existence des lignes, que créent et suppriment les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
-Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une lecture déclarée `previous_run` lit aussi ce qu'un nœud placé après lui, ou lui-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucun nœud une donnée écrite après lui, sauf lecture du run précédent déclarée.
+Une tâche dépend des tâches placées avant elle qui écrivent ce qu'elle lit. Une lecture déclarée `previous_run` lit aussi ce qu'une tâche placée après elle, ou elle-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des nœuds consécutifs du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucun ne dépend d'un autre nœud du groupe.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
 """
 
 from collections.abc import Iterable, Sequence
@@ -20,25 +20,25 @@ from domain.sources.registry import (
 
 
 @dataclass(frozen=True, slots=True)
-class Node:
+class Task:
     name: str
-    # Phase qui exécute le nœud : regroupement d'affichage et de sélection.
+    # Phase qui exécute la tâche : regroupement d'affichage et de sélection.
     phase: str
     reads: frozenset[str] = frozenset()
     writes: frozenset[str] = frozenset()
-    # Lectures de données écrites au run précédent, par un nœud plus loin dans l'ordre ou par le nœud lui-même.
+    # Lectures de données écrites au run précédent, par une tâche plus loin dans l'ordre ou par la tâche elle-même.
     previous_run: frozenset[str] = frozenset()
-    # API interrogée, si le nœud sort sur le réseau.
+    # API interrogée, si la tâche sort sur le réseau.
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE authorships`.
     maintenance: tuple[str, ...] = ()
-    # Groupe de nœuds consécutifs exécutés en parallèle.
+    # Groupe de tâches consécutives exécutées en parallèle.
     parallel_group: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class _PhaseIo:
-    """Lectures et écritures communes à tous les nœuds d'une phase."""
+    """Lectures et écritures communes à toutes les tâches d'une phase."""
 
     reads: tuple[str, ...] = ()
     writes: tuple[str, ...] = ()
@@ -68,7 +68,7 @@ _PHASE_IO: dict[str, _PhaseIo] = {
 }
 
 
-def _node(
+def _task(
     name: str,
     phase: str,
     *,
@@ -78,10 +78,10 @@ def _node(
     network: str | None = None,
     maintenance: tuple[str, ...] = (),
     parallel_group: str | None = None,
-) -> Node:
-    """Nœud de `phase`, avec les lectures et écritures communes à la phase (`_PHASE_IO`)."""
+) -> Task:
+    """Tâche de `phase`, avec les lectures et écritures communes à la phase (`_PHASE_IO`)."""
     shared = _PHASE_IO.get(phase, _PhaseIo())
-    return Node(
+    return Task(
         name,
         phase,
         frozenset((*shared.reads, *reads)),
@@ -111,29 +111,29 @@ def _affected_by(read: str, write: str) -> bool:
     )
 
 
-def _writes_read(reader: Node, writer: Node) -> list[str]:
+def _writes_read(reader: Task, writer: Task) -> list[str]:
     return [r for r in reader.reads if any(_affected_by(r, w) for w in writer.writes)]
 
 
-def dependencies(nodes: Sequence[Node]) -> dict[str, set[str]]:
-    """Pour chaque nœud, les nœuds placés avant lui, hors de son groupe parallèle, qui écrivent ce qu'il lit."""
+def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
+    """Pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, qui écrivent ce qu'elle lit."""
     return {
         reader.name: {
             writer.name
-            for writer in nodes[:i]
+            for writer in tasks[:i]
             if (reader.parallel_group is None or writer.parallel_group != reader.parallel_group)
             and _writes_read(reader, writer)
         }
-        for i, reader in enumerate(nodes)
+        for i, reader in enumerate(tasks)
     }
 
 
-def order_violations(nodes: Sequence[Node]) -> list[tuple[str, str, str]]:
+def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
     """Triplets (lecteur, donnée, écrivain) où l'écrivain, placé après le lecteur, écrit une donnée que le lecteur lit sans la déclarer lue au run précédent."""
     return sorted(
         (reader.name, item, writer.name)
-        for i, reader in enumerate(nodes)
-        for writer in nodes[i + 1 :]
+        for i, reader in enumerate(tasks)
+        for writer in tasks[i + 1 :]
         for item in _writes_read(reader, writer)
         if not _overlaps_any(item, reader.previous_run)
     )
@@ -165,8 +165,8 @@ def _containers(source: Source) -> tuple[str, ...]:
     return () if source == Source.THESES else _CONTAINERS
 
 
-NODES: tuple[Node, ...] = (
-    _node(
+TASKS: tuple[Task, ...] = (
+    _task(
         "perimeter_structures",
         "run",
         reads=("perimeters", "structure_tutelles", "structures"),
@@ -174,7 +174,7 @@ NODES: tuple[Node, ...] = (
     ),
     # Acquisition : les canaux écrivent la dernière observation d'un document dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
     *(
-        _node(
+        _task(
             f"extract.{source}",
             "extract",
             reads=(
@@ -194,7 +194,7 @@ NODES: tuple[Node, ...] = (
     ),
     # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
     *(
-        _node(
+        _task(
             f"extract_by_person.{source}",
             "extract_by_person",
             reads=("config", "persons_rh", "person_identifiers", "staging"),
@@ -205,17 +205,17 @@ NODES: tuple[Node, ...] = (
         )
         for source in PERSON_SEARCHED_SOURCES
     ),
-    _node("fetch_missing.hal_by_id", "fetch_missing", network="hal"),
-    _node(
+    _task("fetch_missing.hal_by_id", "fetch_missing", network="hal"),
+    _task(
         "fetch_missing.hal_by_nnt",
         "fetch_missing",
         reads=("publications.doc_type",),
         previous_run=("publications.doc_type",),
         network="hal",
     ),
-    _node("fetch_missing.theses_by_nnt", "fetch_missing", network="theses"),
+    _task("fetch_missing.theses_by_nnt", "fetch_missing", network="theses"),
     *(
-        _node(
+        _task(
             f"fetch_missing.doi.{source}",
             "fetch_missing",
             # DOI candidats de la vue `candidate_dois`, et agence d'enregistrement pour Crossref et DataCite.
@@ -231,7 +231,7 @@ NODES: tuple[Node, ...] = (
         for source in DOI_SEARCHABLE_SOURCES
     ),
     *(
-        _node(
+        _task(
             f"fetch_stale.{source}",
             "fetch_stale",
             reads=("config", "staging", "source_publications.pub_year"),
@@ -241,7 +241,7 @@ NODES: tuple[Node, ...] = (
         )
         for source in ALL_SOURCES
     ),
-    _node(
+    _task(
         "fetch_truncated.refetch_openalex",
         "fetch_truncated",
         reads=("staging",),
@@ -250,7 +250,7 @@ NODES: tuple[Node, ...] = (
         network="openalex",
     ),
     *(
-        _node(
+        _task(
             f"normalize.{source}",
             "normalize",
             reads=(
@@ -295,7 +295,7 @@ NODES: tuple[Node, ...] = (
         )
         for source in SOURCE_PRIORITY
     ),
-    _node(
+    _task(
         "normalize.prune_disappeared",
         "normalize",
         reads=(
@@ -318,14 +318,14 @@ NODES: tuple[Node, ...] = (
         ),
         previous_run=("source_publications",),
     ),
-    _node(
+    _task(
         "normalize.cleanup_orphan_identities",
         "normalize",
         reads=("source_authorships.identity_id", "author_identifying_keys.id"),
         writes=("author_identifying_keys.id",),
         previous_run=("source_authorships",),
     ),
-    _node(
+    _task(
         "normalize.cleanup_orphan_addresses",
         "normalize",
         reads=("source_authorship_addresses", "addresses.id"),
@@ -334,7 +334,7 @@ NODES: tuple[Node, ...] = (
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
     ),
-    _node(
+    _task(
         "affiliations.refresh_ror",
         "affiliations",
         reads=("ror_dump_imports", "source_authorship_rors"),
@@ -350,7 +350,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("ror_dump_imports",),
         network="zenodo",
     ),
-    _node(
+    _task(
         "affiliations.refresh_hal_structures",
         "affiliations",
         reads=("source_authorship_hal_structures",),
@@ -364,7 +364,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("hal_structures", "hal_structure_aliases"),
         network="hal",
     ),
-    _node(
+    _task(
         "affiliations.resolve_addresses",
         "affiliations",
         reads=(
@@ -377,7 +377,7 @@ NODES: tuple[Node, ...] = (
         writes=("address_structures.id", "address_structures.matched_form_id"),
         previous_run=("addresses",),
     ),
-    _node(
+    _task(
         "affiliations.resolve_thesis_partners",
         "affiliations",
         reads=(
@@ -389,7 +389,7 @@ NODES: tuple[Node, ...] = (
         writes=("idref_structures",),
         previous_run=("idref_structures",),
     ),
-    _node(
+    _task(
         "affiliations.populate",
         "affiliations",
         reads=(
@@ -431,7 +431,7 @@ NODES: tuple[Node, ...] = (
             "source_authorships.neutralized_identifiers",
         ),
     ),
-    _node(
+    _task(
         "resolve_ra.resolve_prefixes",
         "resolve_ra",
         reads=(
@@ -444,7 +444,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("source_publications", "publication_relations"),
         network="doi.org",
     ),
-    _node(
+    _task(
         "publishers_journals.resolve_crossref_publishers",
         "publishers_journals",
         reads=(
@@ -476,7 +476,7 @@ NODES: tuple[Node, ...] = (
         ),
         network="crossref",
     ),
-    _node(
+    _task(
         "publishers_journals.resolve_datacite_publishers",
         "publishers_journals",
         reads=(
@@ -504,7 +504,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("publishers", "publisher_name_forms"),
         network="datacite",
     ),
-    _node(
+    _task(
         "publishers_journals.enrich_journals_from_openalex",
         "publishers_journals",
         reads=(
@@ -517,7 +517,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("journals",),
         network="openalex",
     ),
-    _node(
+    _task(
         "publishers_journals.check_journals_in_sudoc",
         "publishers_journals",
         reads=(
@@ -538,7 +538,7 @@ NODES: tuple[Node, ...] = (
         previous_run=("journals", "journal_issns", "source_publications.journal_id"),
         network="sudoc",
     ),
-    _node(
+    _task(
         "publishers_journals.merge_duplicate_journals",
         "publishers_journals",
         reads=(
@@ -585,7 +585,7 @@ NODES: tuple[Node, ...] = (
             "unpaywall",
         ),
     ),
-    _node(
+    _task(
         "publishers_journals.type_proceedings_journals",
         "publishers_journals",
         reads=(
@@ -608,7 +608,7 @@ NODES: tuple[Node, ...] = (
             "source_publications.journal_id",
         ),
     ),
-    _node(
+    _task(
         "publishers_journals.learn_journal_doi_namespaces",
         "publishers_journals",
         reads=(
@@ -620,7 +620,7 @@ NODES: tuple[Node, ...] = (
         writes=("journal_doi_namespaces",),
         previous_run=("source_publications", "journals"),
     ),
-    _node(
+    _task(
         "publishers_journals.enrich_journals_from_doaj",
         "publishers_journals",
         reads=("journal_issns", "journals.doaj_imported_at", "config"),
@@ -628,14 +628,14 @@ NODES: tuple[Node, ...] = (
         previous_run=("journal_issns", "journals"),
         network="doaj",
     ),
-    _node(
+    _task(
         "publishers_journals.merge_duplicate_monographs",
         "publishers_journals",
         reads=("monographs.id", "monographs.title_normalized"),
         writes=("monographs.id", "source_publications.monograph_id", "publications.monograph_id"),
         previous_run=("monographs",),
     ),
-    _node(
+    _task(
         "publishers_journals.link_monographs_to_collections",
         "publishers_journals",
         reads=(
@@ -652,7 +652,7 @@ NODES: tuple[Node, ...] = (
         ),
         previous_run=("monographs", "source_publications.journal_id", "journal_issns"),
     ),
-    _node(
+    _task(
         "publishers_journals.type_proceedings_volumes",
         "publishers_journals",
         reads=(
@@ -671,7 +671,7 @@ NODES: tuple[Node, ...] = (
             "source_publications.doc_type",
         ),
     ),
-    _node(
+    _task(
         "metadata_correction.journal_by_doi",
         "metadata_correction",
         reads=(
@@ -688,7 +688,7 @@ NODES: tuple[Node, ...] = (
         ),
         previous_run=("source_publications",),
     ),
-    _node(
+    _task(
         "metadata_correction.unary",
         "metadata_correction",
         reads=(
@@ -741,7 +741,7 @@ NODES: tuple[Node, ...] = (
             "publishers.publisher_type",
         ),
     ),
-    _node(
+    _task(
         "metadata_correction.cluster",
         "metadata_correction",
         reads=tuple(
@@ -777,7 +777,7 @@ NODES: tuple[Node, ...] = (
         ),
         previous_run=("source_publications",),
     ),
-    _node(
+    _task(
         "publications.reconcile",
         "publications",
         reads=(
@@ -806,7 +806,7 @@ NODES: tuple[Node, ...] = (
             "monographs",
         ),
     ),
-    _node(
+    _task(
         "publications.delete_without_sources",
         "publications",
         reads=("publications.id", "source_publications.publication_id"),
@@ -814,7 +814,7 @@ NODES: tuple[Node, ...] = (
         # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
-    _node(
+    _task(
         "author_grouping.build",
         "author_grouping",
         reads=(
@@ -844,7 +844,7 @@ NODES: tuple[Node, ...] = (
             "publications.authorships_dirty",
             "publication_author_alignment",
         ),
-        # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que le nœud retire lui-même ; personnes, identifiants et neutralisations qu'écrit la phase `persons`.
+        # Publications que `authorships.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants et neutralisations qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publications.authorships_dirty",
@@ -853,7 +853,7 @@ NODES: tuple[Node, ...] = (
             "source_authorships.neutralized_identifiers",
         ),
     ),
-    _node(
+    _task(
         "persons.resolve",
         "persons",
         reads=(
@@ -893,7 +893,7 @@ NODES: tuple[Node, ...] = (
             "source_authorships.resolution_mode",
         ),
     ),
-    _node(
+    _task(
         "persons.populate_person_name_forms",
         "persons",
         reads=(
@@ -907,7 +907,7 @@ NODES: tuple[Node, ...] = (
         # Signatures détachées et personnes supprimées par `purge`.
         previous_run=("persons", "person_name_forms", "source_authorships.person_id"),
     ),
-    _node(
+    _task(
         "persons.purge",
         "persons",
         reads=(
@@ -937,7 +937,7 @@ NODES: tuple[Node, ...] = (
         # `normalize` et `persons` réécrivent en masse `source_authorships.person_id`.
         maintenance=("ANALYZE source_authorships",),
     ),
-    _node(
+    _task(
         "authorships.build",
         "authorships",
         reads=(
@@ -955,7 +955,7 @@ NODES: tuple[Node, ...] = (
         # Le planificateur estime la propagation des attributs sur les liens qui viennent d'être créés.
         maintenance=("ANALYZE authorships",),
     ),
-    _node(
+    _task(
         "authorships.propagate",
         "authorships",
         reads=(
@@ -975,7 +975,7 @@ NODES: tuple[Node, ...] = (
             "authorships.roles",
         ),
     ),
-    _node(
+    _task(
         "authorships.publications_in_perimeter",
         "authorships",
         reads=("authorships", "persons.exclusion", "publications.id"),
@@ -983,7 +983,7 @@ NODES: tuple[Node, ...] = (
         # Lignes que `authorships.purge_orphan_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
-    _node(
+    _task(
         "authorships.structures",
         "authorships",
         reads=(
@@ -995,13 +995,13 @@ NODES: tuple[Node, ...] = (
         ),
         writes=("authorship_structures", "publication_structures"),
     ),
-    _node(
+    _task(
         "authorships.purge_orphan_publications",
         "authorships",
         reads=("publications.id", "authorships"),
         writes=("publications.id",),
     ),
-    _node(
+    _task(
         "authorships.delete_empty_containers",
         "authorships",
         reads=(
@@ -1019,7 +1019,7 @@ NODES: tuple[Node, ...] = (
         ),
         writes=("monographs.id", "journals.id", "publishers.id", "journal_issns"),
     ),
-    _node(
+    _task(
         "authorships.pub_counts",
         "authorships",
         reads=(
@@ -1038,7 +1038,7 @@ NODES: tuple[Node, ...] = (
         writes=("addresses.pub_count", "journals.pub_count", "publishers.pub_count"),
         previous_run=("addresses",),
     ),
-    _node(
+    _task(
         "relations.rebuild",
         "relations",
         reads=(
@@ -1064,7 +1064,7 @@ NODES: tuple[Node, ...] = (
         # Lecture de la table avant sa reconstruction, pour compter les arêtes ajoutées et disparues.
         previous_run=("publication_relations",),
     ),
-    _node(
+    _task(
         "subjects.ingest",
         "subjects",
         reads=(
@@ -1077,7 +1077,7 @@ NODES: tuple[Node, ...] = (
         writes=("publication_subjects", "subjects.id", "publications.subjects_ingested_at"),
         previous_run=("publications.subjects_ingested_at", "subjects"),
     ),
-    _node(
+    _task(
         "subjects.usage",
         "subjects",
         reads=(
@@ -1087,13 +1087,13 @@ NODES: tuple[Node, ...] = (
         writes=("subjects.usage_count", "subject_cooccurrences"),
         previous_run=("subjects",),
     ),
-    _node(
+    _task(
         "countries.ror",
         "countries",
         reads=("source_authorship_rors", "ror_organizations", "countries", "addresses.id"),
         writes=("address_country_candidates", "addresses.candidates_dirty"),
     ),
-    _node(
+    _task(
         "countries.detect",
         "countries",
         reads=(
@@ -1107,7 +1107,7 @@ NODES: tuple[Node, ...] = (
         # Adresses marquées depuis la dernière résolution, que `countries.resolve` efface.
         previous_run=("addresses.candidates_dirty",),
     ),
-    _node(
+    _task(
         "countries.resolve",
         "countries",
         reads=(
@@ -1122,7 +1122,7 @@ NODES: tuple[Node, ...] = (
             "addresses.candidates_dirty",
         ),
     ),
-    _node(
+    _task(
         "countries.refresh_publication_countries",
         "countries",
         reads=(
@@ -1149,7 +1149,7 @@ NODES: tuple[Node, ...] = (
             "addresses.countries_dirty",
         ),
     ),
-    _node(
+    _task(
         "oa_status.verify_unpaywall",
         "oa_status",
         reads=(
@@ -1171,12 +1171,12 @@ NODES: tuple[Node, ...] = (
 # ── Phases ────────────────────────────────────────────────────
 
 _RUN_PHASE = "run"
-"""Groupe des nœuds que l'orchestrateur exécute avant toute phase."""
+"""Groupe des tâches que l'orchestrateur exécute avant toute phase."""
 
 PHASE_ORDER: tuple[str, ...] = tuple(
-    dict.fromkeys(node.phase for node in NODES if node.phase != _RUN_PHASE)
+    dict.fromkeys(task.phase for task in TASKS if task.phase != _RUN_PHASE)
 )
-"""Ordre d'exécution des phases : celui de leurs nœuds dans `NODES`."""
+"""Ordre d'exécution des phases : celui de leurs tâches dans `TASKS`."""
 
 PHASE_LIBELLES: dict[str, str] = {
     "extract": "Moissonnage par affiliation",
