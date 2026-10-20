@@ -92,4 +92,3 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 - [`interfaces/`](05-interfaces.md) — adaptateurs entrants
 - [Composition roots](06-composition-roots.md) — instanciation et câblage des adaptateurs
 - [Tests](07-tests.md) — tests unitaires, tests d'intégration, couverture
-- [Vocabulaire du code](08-vocabulaire.md) — un mot par notion, dans les textes et dans le code

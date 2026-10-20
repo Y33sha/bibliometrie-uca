@@ -4,6 +4,13 @@
 
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/03-pipeline.md).
 
+| Notion | Code | Ce que c'est |
+|---|---|---|
+| moissonnage | *harvest* : phases `harvest` et `harvest_by_person`, protocole `Harvester` | La collecte des sources. |
+| phase | `Phase` | Une unité du run dans les journaux et l'administration. |
+| tâche | `Task` | Une étape du graphe du run (`pipeline/graph.py`), avec ses lectures et ses écritures. |
+| store | `*Store` | L'accès SQL à une entité dans le pipeline. |
+
 ## Moissonnage
 
 - [Moissonnage par affiliation](02-extract.md#moissonnage-par-affiliation-extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
@@ -18,7 +25,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des structures
 
-- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [contributions](../glossaire.md#contribution) sources, par les structures qu'elles atteignent (adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse) ou par l'identité d'une personne RH.
+- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [contributions](../glossaire.md#contribution) sources. Une contribution source entre dans le périmètre par les structures qu'elle atteint : adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse. Elle y entre aussi par les identifiants d'une personne qui a une fiche RH.
 
 ## Résolution des publications
 
