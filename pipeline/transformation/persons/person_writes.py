@@ -1,11 +1,10 @@
-"""Règles de la phase `persons` sur une personne : changement de nom, identifiants observés dans ses signatures, conflits d'attribution.
+"""Règles de la phase `persons` sur une personne : changement de nom, identifiants observés dans ses signatures.
 
 Les écritures passent par le repository des personnes (`PgPersonRepository`), que l'API utilise aussi. Les règles communes sont dans `domain.persons` : nom requis (`validated_name`), formes de nom (`compute_person_name_forms`), attribution d'un identifiant (`attribution_outcome`).
 """
 
 import logging
 from collections.abc import Mapping, Sequence
-from typing import NamedTuple
 
 from domain.errors import ValidationError
 from domain.persons.identifier_attribution import (
@@ -24,19 +23,6 @@ from domain.types import JsonValue
 from infrastructure.repositories.person_repository import PgPersonRepository
 
 logger = logging.getLogger(__name__)
-
-
-class IdentifierConflict(NamedTuple):
-    """Une valeur d'identifiant qu'une signature du candidat contient est déjà attribuée à une autre personne.
-
-    L'arbitrage par consensus des porteurs la transfère au candidat si le consensus le désigne. Une attribution `confirmed` n'est jamais transférée.
-    """
-
-    id_type: str
-    id_value: str
-    candidate_person_id: int
-    owner_person_id: int
-    owner_status: str
 
 
 def rename_person(

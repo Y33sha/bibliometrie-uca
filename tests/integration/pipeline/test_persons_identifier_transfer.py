@@ -15,8 +15,8 @@ import logging
 from sqlalchemy import text
 
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
