@@ -696,7 +696,11 @@ class TestTitleRetractionPrefixRule:
         assert effective_metadata(view).doc_type is None
 
     def test_match_is_case_insensitive(self):
-        for raw in ("RETRACTION NOTICE TO X", "retraction notice to x", "Retraction Notice: x"):
+        for raw in (
+            "RETRACTION NOTICE TO X",
+            "retraction notice to x",
+            "Retraction Notice: x",
+        ):
             view = _view(doc_type="article", title=raw)
             corrected = effective_metadata(view).doc_type
             assert corrected is not None and corrected.value == "retraction"

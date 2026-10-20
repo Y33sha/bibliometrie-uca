@@ -28,7 +28,7 @@ SAME = [
     (("lavrentiev", "alexey"), ("lavrentiev", "alexei")),
     # Typo du patronyme (transposition), prénom identique.
     (("blanquet doit", "stephanie"), ("blanquet diot", "stephanie")),
-    # Année de naissance d'une signature SUDOC, retirée.
+    # Année de naissance d'une contribution source SUDOC, retirée.
     (("chiari 1977", "sophie"), ("chiari", "sophie")),
     # Graphie proche du patronyme et initiale du prénom, cumulées.
     (("mueller", "roman"), ("muller", "r")),

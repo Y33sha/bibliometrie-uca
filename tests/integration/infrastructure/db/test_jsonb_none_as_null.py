@@ -18,7 +18,7 @@ def test_parametre_lie_none_donne_null_sql(sa_sync_conn):
 
 
 def test_colonne_de_table_none_donne_null_sql(sa_sync_conn):
-    """Une identité d'auteur sans identifiant s'écrit avec un `identifiers` NULL."""
+    """Des informations du contributeur sans identifiant s'écrivent avec un `identifiers` NULL."""
     sa_sync_conn.execute(
         text(
             "INSERT INTO contributor_information (last_name_normalized, identifiers) "
@@ -36,7 +36,7 @@ def test_colonne_de_table_none_donne_null_sql(sa_sync_conn):
 
 
 def test_identite_sans_identifiant_ne_se_dedouble_pas(sa_sync_conn):
-    """Une signature sans identifiant rejoint l'identité NULL de même nom, au lieu d'en créer une.
+    """Une contribution source sans identifiant rejoint les informations du contributeur NULL de même nom, au lieu d'en créer d'autres.
 
     C'est ce que porte l'unique `NULLS NOT DISTINCT` de la table, et ce qu'un JSON `null` mettait
     en défaut : il n'est pas NULL, l'unique le laissait passer, et le `key_hash` de la ligne en

@@ -1,4 +1,4 @@
-"""Suppression des notices parues avant l'année de début du pipeline (`delete_source_records_out_of_window`)."""
+"""Suppression des enregistrements sources parues avant l'année de début du pipeline (`delete_source_records_out_of_window`)."""
 
 from functools import partial
 

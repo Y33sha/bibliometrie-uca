@@ -1,6 +1,6 @@
 """Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution source de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
 """
 
 from sqlalchemy import text
@@ -59,7 +59,7 @@ class TestListLabScope:
         assert {p_in, p_out} <= ids
 
     def test_source_contribution_counts_scoped_to_lab(self, sa_sync_conn):
-        """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
+        """Sous scope labo, les dénombrements ne comptent que les contributions sources du labo."""
         lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
         _contribution_in_lab(sa_sync_conn, person, lab_id=lab)
@@ -76,7 +76,7 @@ class TestListLabScope:
         assert next(p for p in unscoped.persons if p.id == person).source_contribution_count == 2
 
     def test_source_contribution_counts_author_role_only(self, sa_sync_conn):
-        """Les dénombrements comptent seulement les signatures en tant qu'auteur, dans la liste comme dans la fiche de curation."""
+        """Les dénombrements comptent seulement les contributions sources en tant qu'auteur, dans la liste comme dans la fiche d'édition."""
         person = insert_person(sa_sync_conn, "Juror")
         _contribution_in_lab(sa_sync_conn, person, in_perimeter=True)
         _contribution_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)

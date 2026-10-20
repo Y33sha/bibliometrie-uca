@@ -1,8 +1,8 @@
-"""Semis des contributions et des identités d'auteur, sur la connexion SQLAlchemy ou un curseur psycopg.
+"""Semis des contributions et des informations du contributeur, sur la connexion SQLAlchemy ou un curseur psycopg.
 
-Le nom normalisé et les identifiants d'une signature vivent dans la table
-d'identités dédupliquée `contributor_information` ; `source_contributions` ne
-porte qu'une FK `contributor_information_id`. Les tests qui sèment des signatures passent par
+Le nom normalisé et les identifiants d'une contribution source vivent dans la table
+dédupliquée `contributor_information` ; `source_contributions` ne
+a seulement une FK `contributor_information_id`. Les tests qui sèment des contributions sources passent par
 `upsert_contributor_information` (connexion SQLAlchemy) ou `upsert_contributor_information_on_cursor` (curseur
 psycopg) pour obtenir l'`contributor_information_id` correspondant.
 """
@@ -44,7 +44,7 @@ def _upsert(conn, params: dict) -> int:
 
 
 def upsert_contributor_information(conn, author_name_normalized=None, identifiers=None) -> int:
-    """Upsert l'identité de forme normalisée `author_name_normalized` (« prénom nom ») et d'identifiants `identifiers` (dict ou `None`), sur une connexion SQLAlchemy, et renvoie son `id`."""
+    """Upsert les informations du contributeur de forme normalisée `author_name_normalized` (« prénom nom ») et d'identifiants `identifiers` (dict ou `None`), sur une connexion SQLAlchemy, et renvoie son `id`."""
     return _upsert(conn, _form_params(author_name_normalized, identifiers))
 
 
@@ -92,7 +92,7 @@ def insert_contribution(
 def insert_confirmed_source_contribution(
     conn: Connection, source_contribution_id: int, *, person_id: int
 ) -> None:
-    """Épingle la signature `source_contribution_id` à la personne `person_id`."""
+    """Épingle la contribution source `source_contribution_id` à la personne `person_id`."""
     insert_row(
         conn,
         "confirmed_source_contributions",

@@ -456,7 +456,7 @@ class TestDecideMatchByIdentifier:
         )
 
     def test_surname_only_source_contribution_not_rejected(self):
-        """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
+        """Contribution source trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
         donc pas de refus — on s'abstient plutôt que de rejeter."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
@@ -494,7 +494,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection == (42, "helene chanal")
 
     def test_verdict_on_inverted_form(self):
-        """Signature au nom et prénom inversés : le verdict porté par sa forme « nom prénom » tranche."""
+        """Contribution source au nom et prénom inversés : le verdict de sa forme « nom prénom » tranche."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier(
@@ -580,7 +580,7 @@ class TestDecidePersonMatch:
         )
 
     def test_cross_source_wins_over_name_creation(self):
-        # Le cross-source passe avant la création : une signature à créer préfère rejoindre
+        # Le cross-source passe avant la création : une contribution source à créer préfère rejoindre
         # une ancre de même publication × position.
         decision = decide_person_match(
             orcid_match=None,

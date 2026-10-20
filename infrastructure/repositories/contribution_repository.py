@@ -26,8 +26,8 @@ def detach_rejected_source_contributions(
 
     Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
     """
-    scope = "AND r.publication_id = :pub" if publication_id is not None else ""
-    params = {"pid": person_id, "pub": publication_id}
+    scope = "AND r.publication_id = :publication" if publication_id is not None else ""
+    params = {"pid": person_id, "publication": publication_id}
     conn.execute(
         text(f"""
             DELETE FROM confirmed_source_contributions ca
@@ -198,10 +198,10 @@ class PgContributionRepository(ContributionRepository):
         self._conn.execute(
             text("""
                 INSERT INTO rejected_contributions (source_record_id, person_id)
-                SELECT id, :pid FROM source_records WHERE publication_id = :pub
+                SELECT id, :pid FROM source_records WHERE publication_id = :publication
                 ON CONFLICT DO NOTHING
             """),
-            {"pub": publication_id, "pid": person_id},
+            {"publication": publication_id, "pid": person_id},
         )
 
     def find_rejected_contribution(self, publication_id: int, person_id: int) -> datetime | None:
@@ -209,9 +209,9 @@ class PgContributionRepository(ContributionRepository):
             text("""
                 SELECT min(r.created_at) FROM rejected_contributions r
                 JOIN source_records sr ON sr.id = r.source_record_id
-                WHERE sr.publication_id = :pub AND r.person_id = :pid
+                WHERE sr.publication_id = :publication AND r.person_id = :pid
             """),
-            {"pub": publication_id, "pid": person_id},
+            {"publication": publication_id, "pid": person_id},
         ).scalar_one_or_none()
 
     def delete_rejected_contribution(self, publication_id: int, person_id: int) -> None:
@@ -220,9 +220,9 @@ class PgContributionRepository(ContributionRepository):
                 DELETE FROM rejected_contributions r
                 USING source_records sr
                 WHERE sr.id = r.source_record_id
-                  AND sr.publication_id = :pub AND r.person_id = :pid
+                  AND sr.publication_id = :publication AND r.person_id = :pid
             """),
-            {"pub": publication_id, "pid": person_id},
+            {"publication": publication_id, "pid": person_id},
         )
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:

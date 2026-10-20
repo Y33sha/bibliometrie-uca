@@ -125,7 +125,7 @@ class TestGetPublicationDetail:
         assert detail.publication.doi_ra is None
 
     def test_multiple_source_records_same_source(self, sa_sync_conn):
-        """Deux notices OpenAlex d'une même publication sont toutes deux dans `sources`, la plus récente d'abord."""
+        """Deux enregistrements sources OpenAlex d'une même publication sont tous deux dans `sources`, le plus récent d'abord."""
         publication = insert_publication(sa_sync_conn, title="Multi-OA")
         # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
         source_record_old = insert_source_record(

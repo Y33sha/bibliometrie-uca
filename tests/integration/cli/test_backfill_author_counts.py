@@ -1,4 +1,4 @@
-"""Oneshot `backfill_author_counts` : décomptes des auteurs des notices du stock."""
+"""Oneshot `backfill_author_counts` : décomptes des auteurs des enregistrements sources du stock."""
 
 from sqlalchemy import text
 

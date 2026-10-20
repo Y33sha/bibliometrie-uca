@@ -1,4 +1,4 @@
-"""Tests du writer partagé des signatures : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
+"""Tests du writer partagé des contributions sources : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
 
 from unittest.mock import MagicMock
 

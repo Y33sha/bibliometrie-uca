@@ -48,7 +48,7 @@ _publication = partial(
     insert_publication, title="Test Article", normalize_title=False, doc_type=None
 )
 
-# Notice de titre « Test », d'identifiant « hal-1 » par défaut.
+# Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 _PERIMETER_RECOMPUTE = SourceContributionPerimeterRecompute()
@@ -99,9 +99,9 @@ class TestExcludeContribution:
             sa_sync_conn.execute(
                 text(
                     f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
-                    "WHERE publication_id = :pub AND person_id = :pid"
+                    "WHERE publication_id = :publication AND person_id = :pid"
                 ),
-                {"pub": publication_id, "pid": person_id},
+                {"publication": publication_id, "pid": person_id},
             ).first()
             is not None
         )
@@ -198,9 +198,9 @@ class TestRejectPair:
             sa_sync_conn.execute(
                 text(
                     f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
-                    "WHERE publication_id = :pub AND person_id = :pid"
+                    "WHERE publication_id = :publication AND person_id = :pid"
                 ),
-                {"pub": publication_id, "pid": person_id},
+                {"publication": publication_id, "pid": person_id},
             ).first()
             is not None
         )
@@ -366,7 +366,7 @@ class TestPruneOrphanContributions:
 
     def test_global_scope_across_persons(self, sa_sync_conn):
         """Prune toutes les orphelines, pas seulement celles d'une personne ;
-        une contribution attestée (autre personne, même pub) est préservée."""
+        une contribution attestée (autre personne, même publication) est préservée."""
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         p_attested = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
@@ -471,7 +471,7 @@ class TestPropagateContributionAttributes:
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des signatures, de leurs contributions et de leurs publications, après une modification de address_structures.
+    """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs contributions et de leurs publications, après une modification de address_structures.
 
     `contribution_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
@@ -608,16 +608,16 @@ class TestPropagateUcaForAddresses:
 
 
 class TestRejectionAnchoredOnSourceRecords:
-    """Un rejet vise les notices : il suit leurs regroupements, et une publication est rejetée dès qu'une de ses notices l'est."""
+    """Un rejet vise les enregistrements sources : il suit leurs regroupements, et une publication est rejetée dès qu'une de ses enregistrements sources l'est."""
 
     def _rejected(self, conn, publication_id, person_id) -> bool:
         return (
             conn.execute(
                 text(
                     f"SELECT 1 FROM ({REJECTED_PAIRS}) rp "
-                    "WHERE publication_id = :pub AND person_id = :pid LIMIT 1"
+                    "WHERE publication_id = :publication AND person_id = :pid LIMIT 1"
                 ),
-                {"pub": publication_id, "pid": person_id},
+                {"publication": publication_id, "pid": person_id},
             ).first()
             is not None
         )
@@ -626,15 +626,15 @@ class TestRejectionAnchoredOnSourceRecords:
         return (
             conn.execute(
                 text(
-                    "SELECT 1 FROM contributions WHERE publication_id = :pub AND person_id = :pid"
+                    "SELECT 1 FROM contributions WHERE publication_id = :publication AND person_id = :pid"
                 ),
-                {"pub": publication_id, "pid": person_id},
+                {"publication": publication_id, "pid": person_id},
             ).first()
             is not None
         )
 
     def test_rejection_follows_its_source_record_into_another_publication(self, sa_sync_conn, repo):
-        """La notice rejetée rejoint une autre publication, qui devient rejetée ; l'ancienne publication peut disparaître sans emporter le rejet."""
+        """L'enregistrement source rejeté rejoint une autre publication, qui devient rejetée ; l'ancienne publication peut disparaître sans emporter le rejet."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_a = _publication(sa_sync_conn)
         publication_b = _publication(sa_sync_conn)
@@ -652,7 +652,7 @@ class TestRejectionAnchoredOnSourceRecords:
     def test_confirmed_source_contribution_prevails_over_rejection_of_another_source_record(
         self, sa_sync_conn
     ):
-        """Une notice rejetée pour P, une autre dont la signature est confirmée à P, dans la même publication : la contribution existe."""
+        """Un enregistrement source rejeté pour P, un autre dont la contribution source est confirmée à P, dans la même publication : la contribution existe."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         rejected_source_record = _source_record(sa_sync_conn, publication_id, source_id="hal-rejet")
@@ -677,7 +677,7 @@ class TestRejectionAnchoredOnSourceRecords:
     def test_unconfirmed_source_contribution_blocked_by_rejection_of_another_source_record(
         self, sa_sync_conn
     ):
-        """Une notice qui rejoint une publication rejetée pour P ne la rattache pas à P."""
+        """Un enregistrement source qui rejoint une publication rejetée pour P ne la rattache pas à P."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         rejected_source_record = _source_record(sa_sync_conn, publication_id, source_id="hal-rejet")

@@ -107,9 +107,9 @@ def _get_publication_oa_status(conn, hal_id):
 def _fetch_stale_publications(conn):
     """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
 
-    Le re-normalize a re-marqué les SP touchées `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées canoniques de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute SP modifiée est dirty, donc reprise).
+    Le re-normalize a re-marqué les enregistrements sources touchés `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute enregistrement source modifié est dirty, donc reprise).
 
-    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
+    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes enregistrement source avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit la valeur corrigée en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
     from pipeline.transformation.publications.reconciliation import reconcile
 
@@ -199,7 +199,7 @@ class TestHalReprocessingUpdatesOaStatus:
             {"hid": hal_id},
         )
 
-        # Re-dirty la SP et rejouer la seule phase publications : le dépôt tient.
+        # Re-dirty l'enregistrement source et rejouer la seule phase publications : le dépôt tient.
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)

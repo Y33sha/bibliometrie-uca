@@ -26,7 +26,7 @@ from tests.integration.helpers.journals import insert_journal, insert_journal_is
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_record
 
-# Notice de titre « Chapitre ».
+# Enregistrement source de titre « Chapitre ».
 _chapter = partial(insert_source_record, title="Chapitre")
 
 _PAPER = "9783030580803"

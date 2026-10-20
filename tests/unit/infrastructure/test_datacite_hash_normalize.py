@@ -1,4 +1,4 @@
-"""Empreinte de changement d'un nœud DataCite : indifférente à la route de lecture et aux compteurs, sensible à la notice."""
+"""Empreinte de changement d'un nœud DataCite : indifférente à la route de lecture et aux compteurs, sensible à l'enregistrement source."""
 
 import copy
 

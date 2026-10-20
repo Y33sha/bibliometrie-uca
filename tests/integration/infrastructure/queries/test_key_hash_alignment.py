@@ -1,6 +1,6 @@
 """Le lookup `key_hash` (Python) doit rester aligné sur la colonne générée `contributor_information.key_hash`.
 
-Un désalignement ferait échouer silencieusement la résolution d'identité par `key_hash`.
+Un désalignement ferait échouer silencieusement la résolution des informations du contributeur par `key_hash`.
 """
 
 from sqlalchemy import text

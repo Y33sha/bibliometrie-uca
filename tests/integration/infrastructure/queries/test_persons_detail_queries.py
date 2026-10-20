@@ -37,7 +37,7 @@ class TestPersonTheses:
         assert thesis.author_name == expected[thesis.author_person_id]
 
     def test_these_soutenue_ailleurs_et_ouvrage_dirige(self, sa_sync_conn):
-        """Une thèse sans notice theses.fr figure parmi les thèses de son rapporteur ; un ouvrage dont la personne est éditrice n'y figure pas."""
+        """Une thèse sans enregistrement source theses.fr figure parmi les thèses de son rapporteur ; un ouvrage dont la personne est éditrice n'y figure pas."""
         person = insert_person(sa_sync_conn, "Rapporteur")
         these = insert_publication(sa_sync_conn, "Thèse soutenue ailleurs", doc_type="thesis")
         ouvrage = insert_publication(sa_sync_conn, "Ouvrage dirigé", doc_type="book")

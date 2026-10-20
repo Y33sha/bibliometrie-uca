@@ -1,4 +1,4 @@
-"""Intégration : l'upsert de la normalisation écrit la licence de la notice dans la colonne `license_type`."""
+"""Intégration : l'upsert de la normalisation écrit la licence de l'enregistrement source dans la colonne `license_type`."""
 
 from sqlalchemy import text
 

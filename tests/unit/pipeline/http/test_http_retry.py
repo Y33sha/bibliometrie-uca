@@ -111,23 +111,26 @@ def test_success_returns_json():
 class TestAsyncText:
     @pytest.mark.asyncio
     async def test_returns_body_as_text(self, http_mock):
-        http_mock.get("https://api.example/notice.xml").mock(
+        http_mock.get("https://api.example/enregistrement source.xml").mock(
             return_value=httpx2.Response(200, text="<record/>")
         )
         async with httpx2.AsyncClient() as client:
             body = await http_get_text_with_retry_async(
-                client, "https://api.example/notice.xml", label="test"
+                client, "https://api.example/enregistrement source.xml", label="test"
             )
         assert body == "<record/>"
 
     @pytest.mark.asyncio
     async def test_retries_empty_body(self, http_mock):
-        route = http_mock.get("https://api.example/notice.xml").mock(
+        route = http_mock.get("https://api.example/enregistrement source.xml").mock(
             side_effect=[httpx2.Response(200, text=""), httpx2.Response(200, text="<record/>")]
         )
         async with httpx2.AsyncClient() as client:
             body = await http_get_text_with_retry_async(
-                client, "https://api.example/notice.xml", initial_backoff=0.01, label="test"
+                client,
+                "https://api.example/enregistrement source.xml",
+                initial_backoff=0.01,
+                label="test",
             )
         assert body == "<record/>"
         assert route.call_count == 2

@@ -154,10 +154,10 @@ def refresh_structure_matviews(conn) -> None:
 
 def add_contribution_structure(conn, contribution_id: int, structure_id: int) -> None:
     """Lie `contribution_id` à `structure_id` dans la matview `contribution_structures`
-    (via une signature qui atteste la contribution + appartenance au périmètre d'affiliation),
+    (via une contribution source qui atteste la contribution + appartenance au périmètre d'affiliation),
     puis rafraîchit `source_contribution_structures` et `contribution_structures`.
 
-    La signature atteste la contribution par sa publication et sa personne."""
+    La contribution source atteste la contribution par sa publication et sa personne."""
     publication_id, person_id = conn.execute(
         text("SELECT publication_id, person_id FROM contributions WHERE id = :id"),
         {"id": contribution_id},
@@ -173,7 +173,7 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
 
 
 def add_source_contribution_structure(conn, source_contribution_id: int, structure_id: int) -> None:
-    """Lie la signature `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
+    """Lie la contribution source `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
     raw_text = f"as-test-addr-{next(_seq)}"
     addr_id = insert_address(conn, raw_text, normalized_text=raw_text)
     insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)

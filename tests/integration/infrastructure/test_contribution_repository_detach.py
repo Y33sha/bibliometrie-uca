@@ -1,4 +1,4 @@
-"""Les détachements du repository des contributions retirent la personne et le mode de résolution de la signature."""
+"""Les détachements du repository des contributions retirent la personne et le mode de résolution de la contribution source."""
 
 from sqlalchemy import text
 

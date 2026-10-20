@@ -473,7 +473,7 @@ class TestISBN:
 
 
 class TestFindIsbns:
-    """Zones de notice telles que HAL, DataCite et WoS les portent."""
+    """Zones de enregistrement source telles que HAL, DataCite et WoS les donnent."""
 
     @pytest.mark.parametrize(
         ("raw", "expected"),

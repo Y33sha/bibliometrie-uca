@@ -2,7 +2,7 @@
 
 Deux angles :
 1. **Boucle** : via une fausse recherche, vérifie le pool de workers, l'inscription des DOI absents et les métriques.
-2. **Recherches par source** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (notice trouvée, absence, erreurs réseau et HTTP).
+2. **Recherches par source** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (enregistrement source trouvé, absence, erreurs réseau et HTTP).
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def _sans_config[S](cls: type[S], **attributs: object) -> S:
 
 
 class _FakeAdapter:
-    """Recherche de test : rend une notice par DOI, sauf les DOI de `absents` ; insert qui compte."""
+    """Recherche de test : rend un enregistrement source par DOI, sauf les DOI de `absents` ; insert qui compte."""
 
     source_key = "fake"
     batch_size = 1
@@ -210,7 +210,7 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_network_error_concludes_nothing(self, http_mock):
-        """Erreur réseau persistante → ni notice ni absence : le DOI attend le run suivant."""
+        """Erreur réseau persistante → ni enregistrement source ni absence : le DOI attend le run suivant."""
         http_mock.get("https://api.openalex.org/works").mock(
             side_effect=httpx2.ConnectError("refused")
         )
@@ -220,7 +220,7 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_http_error_concludes_nothing(self, http_mock):
-        """Erreur HTTP (401/4xx/5xx), y compris 404 de l'endpoint de recherche → ni notice ni absence."""
+        """Erreur HTTP (401/4xx/5xx), y compris 404 de l'endpoint de recherche → ni enregistrement source ni absence."""
         http_mock.get("https://api.openalex.org/works").mock(return_value=httpx2.Response(404))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
@@ -339,7 +339,7 @@ class TestScanrFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_auth_failure_concludes_nothing(self, http_mock):
-        """Erreur HTTP (401/403/500...) → ni notice ni absence, sans propager l'exception."""
+        """Erreur HTTP (401/403/500...) → ni enregistrement source ni absence, sans propager l'exception."""
         http_mock.post(API_BASE_URLS["scanr"]).mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])

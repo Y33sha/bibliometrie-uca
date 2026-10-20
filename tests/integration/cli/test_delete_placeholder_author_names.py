@@ -1,4 +1,4 @@
-"""Oneshot `delete_placeholder_author_names` : signatures du stock dont le nom tient lieu de nom absent."""
+"""Oneshot `delete_placeholder_author_names` : contributions sources du stock dont le nom tient lieu de nom absent."""
 
 from sqlalchemy import text
 

@@ -116,7 +116,7 @@ class _Conn:
 
 
 def test_le_bilan_compte_les_revues_distinctes(caplog):
-    """Régression : le bilan annonçait autant de revues que de notices rattachées."""
+    """Régression : le bilan annonçait autant de revues que d'enregistrements sources rattachés."""
     rows = [
         _row(id=1, doi="10.64628/aak.1"),
         _row(id=2, doi="10.64628/aak.2"),

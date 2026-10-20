@@ -26,7 +26,7 @@ from tests.integration.helpers.sources import insert_source_record
 
 _Q = PublicationRelationsQueries()
 
-# Notice de titre « t ».
+# Enregistrement source de titre « t ».
 _source_record = partial(insert_source_record, title="t")
 
 # Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
@@ -228,7 +228,7 @@ class TestRelationTargetDeletionCascades:
 
 
 def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
-    """Notice DataCite dont l'étape de correction a substitué le DOI."""
+    """Enregistrement source DataCite dont l'étape de correction a substitué le DOI."""
     insert_source_record(
         conn,
         publication_id,
@@ -246,7 +246,7 @@ class TestRelationsDeMemeOeuvre:
     def test_l_enregistrement_source_expose_son_doi_d_origine_et_le_type_de_sa_publication(
         self, sa_sync_conn
     ):
-        """Le préfixe se juge sur le DOI que la notice déclare, pas sur le DOI substitué."""
+        """Le préfixe se juge sur le DOI que l'enregistrement source déclare, pas sur le DOI substitué."""
         publication = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized="preprint", doi="10.48550/arxiv.1"
         )

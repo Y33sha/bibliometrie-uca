@@ -1,4 +1,4 @@
-"""Semis des tables sources pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`) : notices (`source_records`), signatures (`source_contributions`) et liens signature ↔ adresse (`source_contribution_addresses`)."""
+"""Semis des tables sources pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`) : enregistrements sources (`source_records`), contributions sources (`source_contributions`) et liens contribution source ↔ adresse (`source_contribution_addresses`)."""
 
 import datetime
 import json
@@ -44,7 +44,7 @@ def insert_source_record(
     topics: object = None,
     raw_metadata: dict[str, object] | None = None,
 ) -> int:
-    """Insère une notice et renvoie son `id`. `row_id` fixe l'`id`."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`."""
     return insert_row(
         conn,
         "source_records",
@@ -101,9 +101,9 @@ def insert_source_contribution(
     neutralized_identifiers: dict[str, object] | None = None,
     collective: bool = False,
 ) -> int:
-    """Insère une signature et renvoie son `id`. `row_id` fixe l'`id`.
+    """Insère une contribution source et renvoie son `id`. `row_id` fixe l'`id`.
 
-    L'identité est `contributor_information_id`, sinon celle de forme `author_name_normalized` et d'identifiants `identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
+    Les informations du contributeur sont `contributor_information_id`, sinon celles de forme `author_name_normalized` et d'identifiants `identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
     """
     if raw_author_name is None and raw_last_name is None:
         raw_author_name = "X"
@@ -143,7 +143,7 @@ def insert_source_contribution(
 def insert_source_contribution_address(
     conn: Connection, source_contribution_id: int, *, address_id: int
 ) -> int:
-    """Lie la signature `source_contribution_id` à l'adresse `address_id` et renvoie l'`id` du lien."""
+    """Lie la contribution source `source_contribution_id` à l'adresse `address_id` et renvoie l'`id` du lien."""
     return insert_row(
         conn,
         "source_contribution_addresses",

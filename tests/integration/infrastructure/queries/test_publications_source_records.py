@@ -11,7 +11,7 @@ from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
-# Notice de titre « Titre ».
+# Enregistrement source de titre « Titre ».
 _source_record = partial(insert_source_record, title="Titre")
 
 

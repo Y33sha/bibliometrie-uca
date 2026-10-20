@@ -22,12 +22,12 @@ from tests.integration.helpers.journals import (
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record
 
-# Notice de titre « T », OpenAlex par défaut.
+# Enregistrement source de titre « T », OpenAlex par défaut.
 _typed_source_record = partial(
     insert_source_record, source="openalex", title="T", title_normalized="t"
 )
 
-# Notice de titre « Un titre », OpenAlex par défaut.
+# Enregistrement source de titre « Un titre », OpenAlex par défaut.
 _source_record = partial(insert_source_record, source="openalex", title="Un titre")
 
 _Q = PgMetadataCorrectionQueries()
@@ -473,7 +473,7 @@ def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
 
 
 def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
-    """Régression : un DOI factice (`10.1364/ao.xx.xxxxxx`) réunissait des notices sans rapport."""
+    """Régression : un DOI factice (`10.1364/ao.xx.xxxxxx`) réunissait des enregistrements sources sans rapport."""
     conn = sa_sync_conn
     first = _typed_source_record(
         conn, source_id="h1", doi="10.1364/ao.xx.xxxxxx", doc_type="article"
@@ -497,7 +497,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
         "doi": {"raw": "10.1364/ao.xx.xxxxxx", "corrected_by": "UNRESOLVED_DOI_TO_NULL"}
     }
 
-    # doi.org connaît le DOI au run suivant : les notices le retrouvent.
+    # doi.org connaît le DOI au run suivant : les enregistrements sources le retrouvent.
     conn.execute(text("DELETE FROM failed_lookups"))
     assert _apply_cluster(conn) == 2
     dois = conn.execute(
@@ -511,7 +511,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 
 
 def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=None):
-    """Notice DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
+    """Enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
     meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
     return _typed_source_record(
         conn,
@@ -525,9 +525,9 @@ def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=No
 
 
 def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(sa_sync_conn):
-    """Une notice OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
+    """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
 
-    Régression : la cible était attachée à toutes les notices du DOI, et le type de la notice OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
+    Régression : la cible était attachée à toutes les enregistrements sources du DOI, et le type de l'enregistrement source OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
     """
     conn = sa_sync_conn
     wp = _seed_datacite(
@@ -578,7 +578,7 @@ def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
 
 
 def test_la_version_prime_sur_la_variante(sa_sync_conn):
-    """Une notice qui mentionne un concept et une variante converge sur le concept."""
+    """Un enregistrement source qui mentionne un concept et une variante converge sur le concept."""
     conn = sa_sync_conn
     version = _seed_datacite(
         conn,
@@ -595,7 +595,7 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
-    """SP DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `meta`."""
+    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `meta`."""
     return insert_source_record(
         conn,
         source="datacite",

@@ -1,4 +1,4 @@
-"""Entrée dans le périmètre par l'identité d'une personne RH : identifiant fort, dates du contrat, filtres de confiance, recalcul après édition d'une adresse."""
+"""Entrée dans le périmètre par les identifiants d'une personne qui a une fiche RH : identifiant fort, dates du contrat, filtres de confiance, recalcul après édition d'une adresse."""
 
 import datetime
 

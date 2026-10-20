@@ -1,4 +1,4 @@
-"""Groupes de signatures (`source_contribution_groups`, `source_contribution_group_members`) pour les tests d'intégration."""
+"""Groupes de contributions sources (`source_contribution_groups`, `source_contribution_group_members`) pour les tests d'intégration."""
 
 from sqlalchemy import Connection, text
 
@@ -10,7 +10,7 @@ def insert_group(
     *,
     method: str = "name",
 ) -> int:
-    """Groupe les signatures `(signature, notice)` d'une publication et renvoie l'`id` du groupe. La première fonde le groupe ; les autres le rejoignent par `method`."""
+    """Groupe les contributions sources `(contribution source, enregistrement source)` d'une publication et renvoie l'`id` du groupe. La première fonde le groupe ; les autres le rejoignent par `method`."""
     group_id = conn.execute(
         text("INSERT INTO source_contribution_groups (publication_id) VALUES (:p) RETURNING id"),
         {"p": publication_id},

@@ -127,20 +127,20 @@ def insert_hr_record(
 def insert_rejected_contribution(
     conn: Connection, publication_id: int, *, person_id: int, ignore_conflict: bool = False
 ) -> None:
-    """Rejette la paire publication ↔ personne, comme l'administration : un rejet par notice de la publication. Une publication sans notice en reçoit une. `ignore_conflict` ignore un rejet déjà présent."""
+    """Rejette la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit une. `ignore_conflict` ignore un rejet déjà présent."""
     conn.execute(
         text(
             "INSERT INTO source_records (source, source_id, title, publication_id) "
-            "SELECT 'hal', 'rejet-' || :pub, 'X', :pub "
-            "WHERE NOT EXISTS (SELECT 1 FROM source_records WHERE publication_id = :pub)"
+            "SELECT 'hal', 'rejet-' || :publication, 'X', :publication "
+            "WHERE NOT EXISTS (SELECT 1 FROM source_records WHERE publication_id = :publication)"
         ),
-        {"pub": publication_id},
+        {"publication": publication_id},
     )
     conflict = " ON CONFLICT DO NOTHING" if ignore_conflict else ""
     conn.execute(
         text(
             "INSERT INTO rejected_contributions (source_record_id, person_id) "
-            f"SELECT id, :pid FROM source_records WHERE publication_id = :pub{conflict}"
+            f"SELECT id, :pid FROM source_records WHERE publication_id = :publication{conflict}"
         ),
-        {"pub": publication_id, "pid": person_id},
+        {"publication": publication_id, "pid": person_id},
     )

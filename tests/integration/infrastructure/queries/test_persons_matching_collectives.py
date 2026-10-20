@@ -1,4 +1,4 @@
-"""La cascade personnes ignore les signatures collectives."""
+"""La cascade personnes ignore les contributions sources collectives."""
 
 from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
 from pipeline.transformation.persons.loading import fetch_unlinked_contributions
@@ -9,7 +9,7 @@ _ORCID = "0000-0002-9876-5432"
 
 
 def _source_contribution(conn, raw_name, *, collective, source_id, orcid=None):
-    """Signature crossref du périmètre, seule dans sa notice. Retourne son identifiant."""
+    """Contribution source crossref du périmètre, seule dans son enregistrement source. Retourne son identifiant."""
     source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )

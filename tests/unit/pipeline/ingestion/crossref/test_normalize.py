@@ -1,4 +1,4 @@
-"""Tests unitaires des extracteurs purs de `normalize_crossref`.
+"""Tests unitaires des fonctions de lecture pures de `normalize_crossref`.
 
 Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`,
@@ -404,7 +404,7 @@ class TestBuildCrossrefAuthorRecords:
         assert rec.identifiers is None
 
     def test_name_seul_est_collectif(self):
-        """Une entrée à `name` seul est une signature collective, à sa position dans la source."""
+        """Une entrée à `name` seul est une contribution source collective, à sa position dans la source."""
         msg = {
             "author": [
                 {"family": "Dupont", "given": "Jean"},
@@ -418,7 +418,7 @@ class TestBuildCrossrefAuthorRecords:
         ]
 
     def test_shared_orcid_kept_on_each_record(self):
-        """L'extracteur rend l'ORCID de chaque auteur tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
+        """La lecture rend l'ORCID de chaque auteur tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
         msg = {
             "author": [
                 {"family": "Acharya", "ORCID": "https://orcid.org/0000-0001-2345-6789"},
@@ -592,7 +592,7 @@ class TestProcessContributions:
 
 
 def _message(**surcharges) -> dict:
-    """Notice Crossref minimale et acceptable, que chaque test dégrade à sa guise."""
+    """Enregistrement source Crossref minimale et acceptable, que chaque test dégrade à sa guise."""
     return {
         "DOI": "10.1000/abc",
         "title": ["Un article"],

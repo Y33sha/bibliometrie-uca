@@ -1,6 +1,6 @@
 """Moissonnage HAL (`pipeline.ingestion.hal.harvest`).
 
-Requêtes Solr et champs des notices : fonctions pures. Pilotage par `HalHarvester` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
+Requêtes Solr et champs des enregistrements sources : fonctions pures. Pilotage par `HalHarvester` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date(configuration):
 
 
 def test_mode_incremental_garde_les_annees_du_mode_complet(configuration):
-    # Une notice ancienne modifiée depuis la date reste hors de la plage d'années.
+    # Un enregistrement source ancienne modifiée depuis la date reste hors de la plage d'années.
     configuration({"C": "Coll"}, [2020, 2021, 2022])
     client = _client()
     HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))

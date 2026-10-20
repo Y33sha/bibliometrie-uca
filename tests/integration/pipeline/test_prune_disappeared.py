@@ -17,7 +17,7 @@ from tests.integration.helpers.staging import insert_staging
 # Ligne de staging HAL traitée.
 _staging = partial(insert_staging, processed=True)
 
-# Notice de titre « Titre », aux clés à jour.
+# Enregistrement source de titre « Titre », aux clés à jour.
 _source_record = partial(insert_source_record, title="Titre", keys_dirty=False)
 
 
@@ -63,9 +63,11 @@ def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
 
 
 def test_les_contributions_sources_suivent_par_cascade(sa_sync_conn_owner):
-    staging_id = _staging(sa_sync_conn_owner, source_id="hal-avec-signature", disappeared=True)
+    staging_id = _staging(
+        sa_sync_conn_owner, source_id="hal-avec-contribution source", disappeared=True
+    )
     source_record_id = _source_record(
-        sa_sync_conn_owner, source_id="hal-avec-signature", staging_id=staging_id
+        sa_sync_conn_owner, source_id="hal-avec-contribution source", staging_id=staging_id
     )
     _source_contribution(sa_sync_conn_owner, source_record_id)
 
@@ -171,7 +173,7 @@ def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
 
 
 def test_un_enregistrement_source_sans_metadonnees_minimales_est_supprime(sa_sync_conn_owner):
-    """Une notice renormalisée sans année supprime l'enregistrement qu'elle avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
+    """Un enregistrement moissonné, renormalisé sans année, supprime l'enregistrement source qu'il avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
     publication = _publication(sa_sync_conn_owner)
     staging_id = _staging(sa_sync_conn_owner, source_id="W3131333980")
     source_record_id = _source_record(

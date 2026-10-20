@@ -22,13 +22,13 @@ from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
-    """Joue `metadata_correction` (unaire puis cluster) sur toutes les SP, en place.
+    """Joue `metadata_correction` (unaire puis cluster) sur toutes les enregistrements sources, en place.
 
     Compose fetch→compute→persist sans le `run()` applicatif : ce dernier batche et
     `conn.commit()` entre lots, ce qui casserait l'isolation transactionnelle du
     fixture `sa_sync_conn` (un `begin()` rollbacké en fin de test).
 
-    À rejouer après chaque (re-)normalize qui réécrit les colonnes SP avec le brut
+    À rejouer après chaque (re-)normalize qui réécrit les colonnes enregistrement source avec le brut
     source, avant tout `refresh_from_sources` / matching : c'est l'ordre du pipeline
     (phase `metadata_correction` avant phase `publications`).
     """
@@ -53,7 +53,7 @@ def create_all_publications(conn: Connection) -> None:
     Joue d'abord `metadata_correction` (unaire puis cluster), comme l'ordre réel
     du pipeline : l'assignation lit le `doc_type`/`journal_id`/`oa_status` canonique
     corrigé écrit en place sur la `source_record`, elle ne re-mappe ni ne
-    re-corrige. Sans cette passe, une SP porterait sa nomenclature source brute
+    re-corrige. Sans cette passe, un enregistrement source porterait sa nomenclature source brute
     (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.
 
     Ces tests ne jouent pas la phase affiliations : aucun `source_contribution`

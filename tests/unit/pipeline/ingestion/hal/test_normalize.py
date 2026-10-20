@@ -229,7 +229,7 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
 
 
 class TestParseTeiIsbns:
-    """HAL ne donne l'ISBN que dans la notice TEI, et la zone porte parfois autre chose."""
+    """HAL ne donne l'ISBN que dans le TEI, et la zone contient parfois autre chose."""
 
     def test_reads_the_isbn_zone(self):
         xml = _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>')
@@ -534,7 +534,7 @@ class TestBuildHalAuthorRecords:
         assert build_hal_author_records(doc)[0].identifiers is None
 
     def test_duplicate_hal_person_id_kept_on_each_record(self):
-        """L'extracteur rend les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position ; le writer neutralise ceux que partagent plusieurs signatures."""
+        """La lecture rend les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position ; le writer neutralise ceux que partagent plusieurs contributions sources."""
         label_xml = (
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
             '<author><idno type="IDREF">111111111</idno></author>'
@@ -556,7 +556,7 @@ class TestBuildHalAuthorRecords:
         assert records[2].identifiers == {"hal_person_id": 555}
 
     def test_structures_from_tei_without_address(self):
-        """Les structures HAL et leurs ROR, lus dans le TEI, vont sur la signature ; la signature est sans adresse."""
+        """Les structures HAL et leurs ROR, lus dans le TEI, vont sur la contribution source ; la contribution source est sans adresse."""
         block = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],
             "tei_author_rors": [["https://ror.org/03vgfxd91"]],
@@ -581,7 +581,7 @@ class TestBuildHalAuthorRecords:
 
 class TestProcessAuthors:
     def test_synchronises_even_when_empty(self):
-        """Sans auteur, le writer synchronise quand même : les signatures en base sont supprimées."""
+        """Sans auteur, le writer synchronise quand même : les contributions sources en base sont supprimées."""
         contribution_queries = FakeContributionsBatchQueries()
         normalize_hal.process_contributions(MagicMock(), contribution_queries, {}, 10)
         assert contribution_queries.synced_for == [10]
@@ -625,7 +625,7 @@ class TestProcessWork:
         assert sq.marked_done == [1]
 
     def test_missing_author_field_is_refused(self, stub_orchestration_deps):
-        """Métadonnées minimales présentes, champ auteurs absent : notice refusée, sans rien écrire (la boucle la marque)."""
+        """Métadonnées minimales présentes, champ auteurs absent : enregistrement source refusé, sans rien écrire (la boucle la marque)."""
         sq = FakeStagingQueries()
         row = staging_row(
             staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}

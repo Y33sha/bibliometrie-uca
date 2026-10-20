@@ -17,7 +17,7 @@ class TestConnectedComponents:
         assert connected_components([]) == []
 
     def test_singletons_without_tokens(self):
-        """Des SP sans clé ne s'apparentent à rien : une composante chacune."""
+        """Des enregistrement source sans clé ne s'apparentent à rien : une composante chacune."""
         assert connected_components([(3, _tok()), (1, _tok()), (2, _tok())]) == [[1], [2], [3]]
 
     def test_shared_doi_groups(self):
@@ -75,7 +75,7 @@ class TestConnectedComponents:
         assert result == [[1, 2, 3]]
 
     def test_multivalued_hal_ids_bridge_two_records(self):
-        """Une SP portant deux HAL ids ponte deux SP qui n'en partagent qu'un chacune."""
+        """Un enregistrement source qui a deux HAL ids ponte deux enregistrements sources qui n'en partagent qu'un chacune."""
         result = connected_components(
             [
                 (1, _tok(("hal_id", "hal-1"))),

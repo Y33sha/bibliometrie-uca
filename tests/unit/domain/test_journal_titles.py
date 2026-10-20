@@ -91,7 +91,10 @@ def test_missing_title():
         ("The European Physical Journal C", "Eur.Phys.J.C"),
         ("Physics Reports", "Phys.Rept."),
         ("Critical Care Medicine", "Crit Care Med"),
-        ("Monthly Notices of the Royal Astronomical Society", "Mon.Not.Roy.Astron.Soc."),
+        (
+            "Monthly Notices of the Royal Astronomical Society",
+            "Mon.Not.Roy.Astron.Soc.",
+        ),
         ("Journal of Instrumentation", "JINST"),
         ("Journal of Cosmology and Astroparticle Physics", "JCAP"),
         ("Highlights in High-Energy Physics", "HiHEP"),

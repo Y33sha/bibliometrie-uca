@@ -1,4 +1,4 @@
-"""Réinitialisation nominale de la phase personnes : re-orphelinage des signatures à
+"""Réinitialisation nominale de la phase personnes : re-orphelinage des contributions sources à
 forme de nom devenue ambiguë, puis GC des personnes vidées.
 """
 
@@ -85,9 +85,9 @@ def _publication_of(conn, source_contribution_id):
 
 
 def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
-    """Comme la cascade, la purge écarte la personne rejetée pour la publication de la signature.
+    """Comme la cascade, la purge écarte la personne rejetée pour la publication de la contribution source.
 
-    Régression : la purge comptait toutes les personnes de la forme, et remettait à NULL à chaque run une signature que la cascade rattachait de nouveau.
+    Régression : la purge comptait toutes les personnes de la forme, et remettait à NULL à chaque run une contribution source que la cascade rattachait de nouveau.
     """
     conn = sa_sync_conn
     rejetee = insert_person(conn, "Tixier", first_name="Laurent")

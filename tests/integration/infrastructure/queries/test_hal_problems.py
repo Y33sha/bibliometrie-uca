@@ -20,7 +20,7 @@ from tests.integration.helpers.structures import (
     insert_structure,
 )
 
-# Notice de 2024, de titre « T ».
+# Enregistrement source de 2024, de titre « T ».
 _source_record = partial(insert_source_record, title="T", publication_year=2024)
 
 
@@ -40,7 +40,7 @@ def _create_lab(conn, code="LAB", hal_collection=None):
 def _create_hal_source_contribution_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
-    """Crée un sa HAL portant `hal_person_id` sur son identité."""
+    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur."""
     publication = insert_publication(
         conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}"
     )
@@ -161,7 +161,7 @@ class TestHalMissingCollections:
 
 
 def _create_contribution_uca(conn, publication_id, lab_id, position=0):
-    """Contribution du périmètre rattachée à `lab_id`. Retourne sa personne, que portent les signatures qui l'attestent."""
+    """Contribution du périmètre rattachée à `lab_id`. Retourne sa personne, rattachée aux contributions sources qui l'attestent."""
     person_id = insert_person(conn)
     contribution_id = insert_contribution(
         conn,
@@ -186,8 +186,8 @@ def _create_address_for_source_contribution(conn, source_contribution_id):
 
 
 class TestHalAffiliationConflicts:
-    """Logique : publi avec ≥1 SP HAL ayant ≥1 contribution in_perimeter,
-    ≥1 SP WoS/OpenAlex, et aucune SP WoS/OA n'ayant de contribution in_perimeter."""
+    """Logique : publi avec ≥1 enregistrement source HAL ayant ≥1 contribution in_perimeter,
+    ≥1 enregistrement source WoS/OpenAlex, et aucun enregistrement source WoS/OA n'ayant de contribution in_perimeter."""
 
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
@@ -315,7 +315,7 @@ class TestHalAffiliationConflicts:
 
     def test_ignores_when_one_of_wos_oa_confirms(self, sa_sync_conn):
         # OA contredit mais WoS confirme → pas de conflit (la condition NOT EXISTS
-        # cherche n'importe quelle SP WoS/OA avec in_perimeter).
+        # cherche n'importe quelle enregistrement source WoS/OA avec in_perimeter).
         publication = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-mixed-1")

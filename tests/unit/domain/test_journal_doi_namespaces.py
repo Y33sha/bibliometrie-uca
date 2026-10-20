@@ -44,7 +44,7 @@ def _evidence(prefix: str, journal_id: int, n: int) -> list[tuple[str, int]]:
 
 
 def test_espace_retenu_malgre_une_erreur_isolee():
-    """Une notice HAL qui rattache à tort un article à une revue voisine ne défait pas l'espace."""
+    """Un enregistrement source HAL qui rattache à tort un article à une revue voisine ne défait pas l'espace."""
     evidence = _evidence("10.1016/j.physletb.", 1, 20) + [("10.1016/j.physletb.00003", 2)]
     evidence += _evidence("10.1016/j.epsl.", 4, 20)
     namespaces = learn_namespaces(evidence)

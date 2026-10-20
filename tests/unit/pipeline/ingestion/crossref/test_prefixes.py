@@ -35,7 +35,7 @@ def test_parse_member_id_from_url():
 
 
 def test_parse_member_id_from_plain_string():
-    """Une notice rend le membre en chaîne numérique, là où un préfixe le rend en URL."""
+    """Un enregistrement source rend le membre en chaîne numérique, là où un préfixe le rend en URL."""
     assert parse_member_id("54812") == 54812
 
 
@@ -72,7 +72,7 @@ async def test_fetch_crossref_prefix_no_member(http_mock):
 async def test_fetch_crossref_prefix_takes_depositing_member_when_registered_one_is_idle(
     http_mock,
 ):
-    """Le préfixe reste enregistré au nom d'un compte sans dépôt : la notice donne le compte vivant, dont le nom déclaré l'emporte sur l'imprint de la notice."""
+    """Le préfixe reste enregistré au nom d'un compte sans dépôt : l'enregistrement source donne le compte vivant, dont le nom déclaré l'emporte sur l'imprint de l'enregistrement source."""
     _message(
         http_mock,
         "/prefixes/10.70898",

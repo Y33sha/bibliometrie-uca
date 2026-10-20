@@ -129,7 +129,7 @@ class TestIdentifierConflicts:
         ]
 
     def test_neutralized_identifier_excluded(self, sa_sync_conn):
-        """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
+        """Une valeur que chaque contribution source neutralise ne fait pas de conflit, même en attente de validation."""
         p1 = insert_person(sa_sync_conn, "Brown", first_name="Anne")
         p2 = insert_person(sa_sync_conn, "Brown", first_name="A")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
@@ -148,7 +148,7 @@ class TestIdentifierConflicts:
 
     @pytest.mark.parametrize("status", ["confirmed", "rejected", "authenticated"])
     def test_settled_attribution_excluded(self, sa_sync_conn, status):
-        """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
+        """Une attribution tranchée clôt le conflit, même si des contributions sources d'une autre personne contiennent la valeur."""
         p1 = insert_person(sa_sync_conn, "Veyssiere", first_name="Hugo")
         p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))

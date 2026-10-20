@@ -24,7 +24,7 @@ from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.sources import insert_source_record
 
-# Notice de 2024, de titre « Test ».
+# Enregistrement source de 2024, de titre « Test ».
 _source_record = partial(insert_source_record, title="Test", publication_year=2024)
 
 # ── Helpers ──────────────────────────────────────────────────────

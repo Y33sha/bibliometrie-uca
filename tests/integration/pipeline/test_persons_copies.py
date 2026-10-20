@@ -1,4 +1,4 @@
-"""Phase personnes : une signature copiée dans la liste d'auteurs de sa notice (`duplicate_of`) n'est rattachée à personne."""
+"""Phase personnes : une contribution source copiée dans la liste d'auteurs de son enregistrement source (`duplicate_of`) n'est rattachée à personne."""
 
 from sqlalchemy import text
 
@@ -11,7 +11,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _original_and_copy(conn, source_id, *, person_id=None):
-    """Signature d'origine et sa copie dans la même notice, du périmètre."""
+    """Contribution source d'origine et sa copie dans la même notice, du périmètre."""
     source_record = insert_source_record(conn, insert_publication(conn), source_id=source_id)
     original, copy = (
         insert_source_contribution(

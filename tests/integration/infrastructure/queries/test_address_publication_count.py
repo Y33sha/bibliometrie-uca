@@ -25,7 +25,7 @@ def _source_contribution_for_publication(conn, publication_id, source_id):
 
 
 def _link_address(conn, source_contribution_id, raw_text):
-    """Rattache une adresse (créée à la volée, dédupliquée par md5) à une signature via `source_contribution_addresses`."""
+    """Rattache une adresse (créée à la volée, dédupliquée par md5) à une contribution source via `source_contribution_addresses`."""
     addr_id = insert_address(conn, raw_text, reuse=True)
     insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     return addr_id
@@ -33,10 +33,10 @@ def _link_address(conn, source_contribution_id, raw_text):
 
 class TestRecomputePublicationCount:
     def test_counts_distinct_publications(self, sa_sync_conn):
-        """publication_count = nb de publications canoniques distinctes, pas de signatures."""
+        """publication_count = nb de publications distinctes, pas de contributions sources."""
         p1 = insert_publication(sa_sync_conn, "P1")
         p2 = insert_publication(sa_sync_conn, "P2")
-        # 3 signatures sur la même adresse : 2 sur p1 (1 distinct), 1 sur p2.
+        # 3 contributions sources sur la même adresse : 2 sur p1 (1 distinct), 1 sur p2.
         for sid, publication in (("h1", p1), ("h2", p1), ("h3", p2)):
             _link_address(
                 sa_sync_conn,

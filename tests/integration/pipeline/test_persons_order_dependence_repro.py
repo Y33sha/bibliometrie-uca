@@ -1,8 +1,8 @@
 """Ordre-dépendance de la phase persons — canal nominal.
 
-Deux signatures d'une **même personne** sans identifiant partagé, l'une en forme pleine (« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit `sa.id` (ORDER BY déterministe de `fetch_unlinked_contributions`).
+Deux contributions sources d'une **même personne** sans identifiant partagé, l'une en forme pleine (« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit `sa.id` (ORDER BY déterministe de `fetch_unlinked_contributions`).
 
-La création live sème la map en mémoire via `compute_person_name_forms` (ordres + initiales) : une signature initiale rattrape une personne créée en forme pleine. Dans l'ordre inverse, la signature pleine rejoint la personne réduite par ses initiales compatibles, et la personne prend le prénom plein. Les deux ordres donnent une seule personne dès le premier run.
+La création live sème la map en mémoire via `compute_person_name_forms` (ordres + initiales) : une contribution source initiale rattrape une personne créée en forme pleine. Dans l'ordre inverse, la contribution source pleine rejoint la personne réduite par ses initiales compatibles, et la personne prend le prénom plein. Les deux ordres donnent une seule personne dès le premier run.
 
 Les tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback de la fixture) ; `_populate_canonical_forms` simule le peuplement des formes de nom.
 """
@@ -27,15 +27,15 @@ _LOG = logging.getLogger("test")
 
 
 def _seed_source_contribution(conn, *, publication_id, raw_name, name_norm):
-    """Publication + source_record + signature in-périmètre non rattachée, portant
-    l'identité `name_norm` (sans identifiant). L'id de la signature = `publication_id`, ce qui
+    """Publication + source_record + contribution source in-périmètre non rattachée, avec
+    les informations du contributeur `name_norm` (sans identifiant). L'id de la contribution source = `publication_id`, ce qui
     fixe l'ordre de traitement."""
-    insert_publication(conn, f"pub {publication_id}", row_id=publication_id)
+    insert_publication(conn, f"publication {publication_id}", row_id=publication_id)
     insert_source_record(
         conn,
         publication_id,
         source_id=f"hal-{publication_id}",
-        title=f"pub {publication_id}",
+        title=f"publication {publication_id}",
         row_id=publication_id,
         publication_year=2024,
         doc_type="ART",
@@ -53,15 +53,15 @@ def _seed_source_contribution(conn, *, publication_id, raw_name, name_norm):
 def _seed_two_source_records(
     conn, *, publication_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2, grouped=True
 ):
-    """Une publication vue par HAL (notice `sa1_id`) et OpenAlex (notice `sa2_id`), une signature non rattachée chacune, en position 0. `grouped` : les deux signatures forment un groupe, celui d'un même auteur."""
-    insert_publication(conn, f"pub {publication_id}", row_id=publication_id)
+    """Une publication vue par HAL (enregistrement source `sa1_id`) et OpenAlex (enregistrement source `sa2_id`), une contribution source non rattachée chacune, en position 0. `grouped` : les deux contributions sources forment un groupe, celui d'un même auteur."""
+    insert_publication(conn, f"publication {publication_id}", row_id=publication_id)
     for source_record_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
         insert_source_record(
             conn,
             publication_id,
             source=source,
             source_id=f"{source}-{source_record_id}",
-            title=f"pub {publication_id}",
+            title=f"publication {publication_id}",
             row_id=source_record_id,
             publication_year=2024,
             doc_type="ART",
@@ -125,7 +125,7 @@ def _person_of(conn, source_contribution_id):
 
 def test_full_then_initial_merges(sa_sync_conn):
     """Forme pleine (id bas, traitée d'abord) puis initiale dans le même run : la personne
-    créée en « Jean Martin » sème « j martin », la signature « J Martin » s'y rattache —
+    créée en « Jean Martin » sème « j martin », la contribution source « J Martin » s'y rattache —
     une seule personne."""
     _seed_source_contribution(
         sa_sync_conn, publication_id=95001, raw_name="Jean Martin", name_norm="jean martin"
@@ -151,7 +151,7 @@ def _martin_first_names(conn) -> list[str]:
 
 
 def _seed_person(conn, last_name, first_name, *, source_contributions=()):
-    """Personne existante, rattachée par son nom aux signatures `signatures` (ids)."""
+    """Personne existante, rattachée par son nom aux contributions sources `contributions sources` (ids)."""
     pid = create_person(last_name, first_name, repo=person_repository(conn))
     for source_contribution_id in source_contributions:
         conn.execute(
@@ -231,7 +231,7 @@ def test_a_completed_first_name_turns_away_another_first_name(sa_sync_conn):
 
 
 def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
-    """Une personne « Tnourji A. » que ses signatures nomment « Abdellah » prend ce prénom avant la cascade ; « Abdelkader Tnourji » crée alors sa propre personne."""
+    """Une personne « Tnourji A. » que ses contributions sources nomment « Abdellah » prend ce prénom avant la cascade ; « Abdelkader Tnourji » crée alors sa propre personne."""
     conn = sa_sync_conn
     _seed_source_contribution(
         conn, publication_id=95090, raw_name="Tnourji, A.", name_norm="tnourji a"
@@ -275,7 +275,7 @@ def test_full_name_with_a_double_family_name_joins_the_reduced_person(sa_sync_co
 
 
 def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_conn):
-    """Les signatures de « Martin J » la nomment « Jean » et « Julien » : elle garde ses initiales, et « Jacques Martin » ne s'y rattache pas."""
+    """Les contributions sources de « Martin J » la nomment « Jean » et « Julien » : elle garde ses initiales, et « Jacques Martin » ne s'y rattache pas."""
     conn = sa_sync_conn
     _seed_source_contribution(
         conn, publication_id=95100, raw_name="Jean Martin", name_norm="jean martin"
@@ -298,7 +298,7 @@ def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_co
 
 def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     """Sur-regroupement : « H Chanal » se colle d'abord à l'unique « Hervé Chanal » présent ;
-    dès que « Hélène Chanal » coexiste et rend « h chanal » ambiguë, la signature réduite est
+    dès que « Hélène Chanal » coexiste et rend « h chanal » ambiguë, la contribution source réduite est
     re-orphelinée — elle ne reste pas collée au premier arrivé, quel que soit l'ordre."""
     conn = sa_sync_conn
     _seed_source_contribution(
@@ -317,7 +317,7 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
 
 
 def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
-    """« H Chanal » désigne Hervé et Hélène : sa signature est comptée parmi celles qui peuvent créer une personne, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
+    """« H Chanal » désigne Hervé et Hélène : sa contribution source est comptée parmi celles qui peuvent créer une personne, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
     conn = sa_sync_conn
     _seed_source_contribution(
         conn, publication_id=95040, raw_name="Hervé Chanal", name_norm="herve chanal"
@@ -341,7 +341,7 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
 
 
 def test_une_forme_ambigue_rejoint_la_personne_de_son_groupe(sa_sync_conn):
-    """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des signatures. Les deux forment un groupe. Traitée après les créations, « J Martin » rejoint en cross-source la personne que crée l'autre signature du groupe."""
+    """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des contributions sources. Les deux forment un groupe. Traitée après les créations, « J Martin » rejoint en cross-source la personne que crée l'autre contribution source du groupe."""
     conn = sa_sync_conn
     _seed_source_contribution(
         conn, publication_id=95050, raw_name="Julie Martin", name_norm="julie martin"

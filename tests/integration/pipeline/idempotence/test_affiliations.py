@@ -146,7 +146,7 @@ class TestPopulateAffiliationsIdempotence:
 
         Une weekly avec --sources=hal ne doit plus laisser les SAs OpenAlex
         bloquées sans structure_ids quand leur adresse a été résolue entre
-        deux runs (cas observé sur pub 21743 : adresse UCA résolue mais
+        deux runs (cas observé sur publication 21743 : adresse UCA résolue mais
         Marc Ruivard / Olivier Aumaître côté OA restés sans structure_ids
         car la weekly run ne ciblait que hal+scanr).
         """

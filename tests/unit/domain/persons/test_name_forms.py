@@ -50,7 +50,7 @@ class TestComputePersonNameForms:
         }
 
     def test_prenom_en_initiales_collees(self) -> None:
-        """Prénom normalisé comme celui des signatures : « JP » donne « j p »."""
+        """Prénom normalisé comme celui des contributions sources : « JP » donne « j p »."""
         assert compute_person_name_forms("Dupont", "JP") == {"j p dupont"}
 
     def test_accents(self) -> None:

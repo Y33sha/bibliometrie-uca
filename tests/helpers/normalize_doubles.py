@@ -1,6 +1,6 @@
 """Doublures des requêtes d'écriture, communes aux tests des normaliseurs.
 
-Un normalizer verse ses documents dans `source_records`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
+Un normalizer verse ses documents dans `source_records`, écrit leurs contributions sources, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
 from pipeline.ingestion.common.source_contribution_queries import StoredSourceContributionRow
@@ -40,9 +40,9 @@ class FakeStagingQueries:
 
 
 class FakeContributionsBatchQueries:
-    """`ContributionsBatchQueries` : retient les signatures insérées, et les restitue comme signatures en base.
+    """`ContributionsBatchQueries` : retient les contributions sources insérées, et les restitue comme contributions sources en base.
 
-    `synced_for` retient les documents dont les signatures sont synchronisées. Les adresses ne sont pas retenues : leurs lectures rendent des tables vides.
+    `synced_for` retient les documents dont les contributions sources sont synchronisées. Les adresses ne sont pas retenues : leurs lectures rendent des tables vides.
     """
 
     def __init__(self) -> None:

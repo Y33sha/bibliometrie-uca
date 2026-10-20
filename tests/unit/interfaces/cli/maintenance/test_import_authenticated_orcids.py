@@ -2,7 +2,7 @@
 
 Le fichier associe un email à un ORCID que le chercheur a lui-même authentifié en se connectant à son compte. L'import confronte ces lignes aux personnes connues et n'authentifie que celles dont l'identité est certaine : un email inconnu ou porté par plusieurs personnes laisse la ligne de côté.
 
-L'authentification faisant autorité sur l'identité, un ORCID déjà rattaché à quelqu'un d'autre est déplacé vers le titulaire — chaque déplacement est signalé, car il révèle en général un doublon de personne à fusionner.
+L'authentification faisant autorité sur l'attribution, un ORCID déjà rattaché à quelqu'un d'autre est déplacé vers le titulaire — chaque déplacement est signalé, car il révèle en général un doublon de personne à fusionner.
 """
 
 import sys
@@ -77,7 +77,7 @@ class TestPlanAuthentications:
         assert plan.unmatched == ["inconnu@uca.fr"]
 
     def test_email_partage_par_plusieurs_personnes_ecarte(self):
-        """L'identité visée est indécidable : mieux vaut ne rien authentifier que se tromper de personne."""
+        """La personne visée est indécidable : mieux vaut ne rien authentifier que se tromper de personne."""
         plan = plan_authentications([("marie@uca.fr", _ORCID)], {"marie@uca.fr": [7, 9]})
 
         assert plan.entries == []

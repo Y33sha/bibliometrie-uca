@@ -1,4 +1,4 @@
-"""Tests de caractérisation du service des personnes et de l'attribution des signatures orphelines : identifiants, formes de nom, détachement, fusion."""
+"""Tests de caractérisation du service des personnes et de l'attribution des contributions sources orphelines : identifiants, formes de nom, détachement, fusion."""
 
 from functools import partial
 
@@ -60,12 +60,12 @@ _hal_name_form = partial(insert_person_name_form, sources=["hal"])
 # Personne « Dupont Jean » par défaut, normalisée par `lower`.
 _person = partial(insert_person, last_name="Dupont", first_name="Jean", normalizer="lower")
 
-# Signature de forme « jean dupont » par défaut.
+# Contribution source de forme « jean dupont » par défaut.
 _jean_dupont_source_contribution = partial(
     insert_source_contribution, author_name_normalized="jean dupont"
 )
 
-# Notice de titre « Test », d'identifiant « hal-1 » par défaut.
+# Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 _PERIMETER = PublicationPerimeterRecompute()
@@ -99,7 +99,7 @@ class TestAddIdentifier:
             add_identifier(person_id, "hal_person_id", "12345", source="manual", repo=repo)
 
     def test_auto_source_accepts_hal_person_id(self, sa_sync_conn, repo):
-        """La promotion depuis les signatures reste libre de le poser."""
+        """La promotion depuis les contributions sources reste libre de le poser."""
         person_id = _person(sa_sync_conn)
         result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
         assert result.outcome is AttributionOutcome.ADDED
@@ -651,8 +651,10 @@ class TestBatchAssignOrphanContributions:
 
         assert assigned == 2
         row = sa_sync_conn.execute(
-            text("SELECT id FROM contributions WHERE publication_id = :pub AND person_id = :pid"),
-            {"pub": publication_id, "pid": person_id},
+            text(
+                "SELECT id FROM contributions WHERE publication_id = :publication AND person_id = :pid"
+            ),
+            {"publication": publication_id, "pid": person_id},
         ).first()
         assert row is not None
         rows = sa_sync_conn.execute(
@@ -662,7 +664,7 @@ class TestBatchAssignOrphanContributions:
         assert all(r.person_id == person_id for r in rows)
 
     def test_consolide_comme_la_phase_contributions(self, sa_sync_conn, repo, contribution_repo):
-        """Position de la source prioritaire, union des indices de périmètre et des rôles de toutes les signatures."""
+        """Position de la source prioritaire, union des indices de périmètre et des rôles de toutes les contributions sources."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
@@ -692,9 +694,9 @@ class TestBatchAssignOrphanContributions:
         row = sa_sync_conn.execute(
             text(
                 "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
-                "FROM contributions WHERE publication_id = :pub AND person_id = :pid"
+                "FROM contributions WHERE publication_id = :publication AND person_id = :pid"
             ),
-            {"pub": publication_id, "pid": person_id},
+            {"publication": publication_id, "pid": person_id},
         ).one()
         assert (row.author_position, row.evidence, row.roles) == (
             3,
@@ -703,7 +705,7 @@ class TestBatchAssignOrphanContributions:
         )
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, contribution_repo):
-        """Une signature déjà rattachée est écartée : ni confirmation, ni contribution, ni forme de nom pour la personne visée ; l'orpheline du lot est rattachée."""
+        """Une contribution source déjà rattachée est écartée : ni confirmation, ni contribution, ni forme de nom pour la personne visée ; l'orpheline du lot est rattachée."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
@@ -1044,7 +1046,7 @@ class TestUpdateNameFormStatus:
             )
 
     def test_reject_detaches_contributions(self, sa_sync_conn, repo, contribution_repo):
-        """Rejeter une forme détache ses signatures (source_contributions → NULL) et
+        """Rejeter une forme détache ses contributions sources (source_contributions → NULL) et
         supprime les contributions canoniques devenues sans source ; le verrou reste posé."""
         pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
         _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
@@ -1092,7 +1094,7 @@ class TestAssignOrphanContribution:
     def test_recompose_la_contribution_existante_depuis_toutes_ses_contributions_sources(
         self, sa_sync_conn, repo, contribution_repo
     ):
-        """La contribution déjà liée par une signature HAL reçoit les indices et les rôles de la signature rattachée."""
+        """La contribution déjà liée par une contribution source HAL reçoit les indices et les rôles de la contribution source rattachée."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
@@ -1120,9 +1122,9 @@ class TestAssignOrphanContribution:
         row = sa_sync_conn.execute(
             text(
                 "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
-                "FROM contributions WHERE publication_id = :pub AND person_id = :pid"
+                "FROM contributions WHERE publication_id = :publication AND person_id = :pid"
             ),
-            {"pub": publication_id, "pid": person_id},
+            {"publication": publication_id, "pid": person_id},
         ).one()
         assert (row.author_position, row.evidence, row.roles) == (
             3,
@@ -1131,7 +1133,7 @@ class TestAssignOrphanContribution:
         )
 
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, contribution_repo):
-        """Une signature déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
+        """Une contribution source déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
@@ -1180,8 +1182,10 @@ class TestAssignOrphanContribution:
         assert row.person_id == person_id
 
         row = sa_sync_conn.execute(
-            text("SELECT id FROM contributions WHERE publication_id = :pub AND person_id = :pid"),
-            {"pub": publication_id, "pid": person_id},
+            text(
+                "SELECT id FROM contributions WHERE publication_id = :publication AND person_id = :pid"
+            ),
+            {"publication": publication_id, "pid": person_id},
         ).first()
         assert row is not None
 
@@ -1332,7 +1336,7 @@ class TestReassignRejectedPairUnit:
 
 
 class TestMergePersonRejectedContributions:
-    """La fusion transfère les rejets de l'absorbée vers l'absorbante (identité
+    """La fusion transfère les rejets de l'absorbée vers l'absorbante (clé
     identique), avec dédoublonnage sur conflit de PK."""
 
     def test_transfers_and_dedups(self, sa_sync_conn, repo):
@@ -1377,8 +1381,8 @@ class TestMergePersonRejectedContributions:
             text("SELECT person_id FROM source_contributions WHERE id = :id"), {"id": sa}
         ).scalar_one()
         contributions = sa_sync_conn.execute(
-            text("SELECT count(*) FROM contributions WHERE publication_id = :pub"),
-            {"pub": publication},
+            text("SELECT count(*) FROM contributions WHERE publication_id = :publication"),
+            {"publication": publication},
         ).scalar_one()
         assert person is None
         assert contributions == 0

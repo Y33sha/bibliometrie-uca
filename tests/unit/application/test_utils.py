@@ -176,8 +176,8 @@ class TestNamesCompatible:
         assert names_compatible("bailly", "j l", "bailly", "jean luc") is True
 
     def test_surname_only_is_compatible(self):
-        # Signature réduite au nom de famille : compatible avec un nom complet — le
-        # sous-ensemble de tokens matche. Évite de rejeter une signature trop pauvre
+        # Contribution source réduite au nom de famille : compatible avec un nom complet — le
+        # sous-ensemble de tokens matche. Évite de rejeter une contribution source trop pauvre
         # pour être comparée sur le prénom.
         assert names_compatible("dupont", "", "dupont", "jean") is True
 
