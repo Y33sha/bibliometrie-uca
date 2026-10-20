@@ -76,10 +76,10 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 1 — Dépendances et noyau d'exécution
 
-- [ ] `pipeline/http/` ; `parallel.py` et `access_source.py` sous `runtime/`.
-- [ ] Contrats import-linter du sens des dépendances.
-- [ ] Contexte de phase seul canal des transactions et du journal.
-- [ ] `RunOptions` résolues une fois : ensemble de sources explicite, politique du mode.
+- [x] `pipeline/http/` ; `parallel.py` et `access_source.py` sous `runtime/`. `api_params.py`, propre aux sources, sous `ingestion/`. addd583b6
+- [x] Contrats import-linter du sens des dépendances. daf45dab6
+- [x] Contexte de phase seul canal des transactions et du journal. 08a950ab6
+- [x] `RunOptions` résolues une fois : ensemble de sources explicite, politique du mode. fd7d41c5d
 - [ ] `runtime/config.py` : identifiants d'accès vers `ingestion/`, collections HAL et identifiants d'API vers `infrastructure/read_models/perimeters.py`. `savepoint.py` vers `infrastructure/db/`.
 - [ ] Interface de `run_nodes` et de `PhaseMetrics` : ligne de clôture optionnelle, `resume`, `add(total=…)`, `Node.group`, `Node.lot`.
 - [ ] Description d'une phase en un seul endroit.
