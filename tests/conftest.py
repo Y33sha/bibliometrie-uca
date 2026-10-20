@@ -4,6 +4,7 @@
   écrivent dans les fichiers log de production.
 - Fixture `_clear_caches` (autouse) qui vide les caches module-level
   entre chaque test.
+- Fixture `_adresse_polite_pool` (autouse) qui pose une adresse de test au polite pool, quel que soit l'environnement du poste.
 - Fixture `http_mock` qui sert les requêtes HTTP sortantes depuis des
   routes déclarées, sans laisser un appel réel partir.
 - Sur Windows, impose la WindowsSelectorEventLoopPolicy : psycopg3
@@ -60,6 +61,14 @@ def _isolate_raw_store(tmp_path_factory):
 
     settings.biblio_raw_store_dir = str(tmp_path_factory.mktemp("raw_store"))
     yield
+
+
+@pytest.fixture(autouse=True)
+def _adresse_polite_pool(monkeypatch):
+    """Les clients des sources annoncent une adresse de test au polite pool."""
+    from infrastructure.settings import settings
+
+    monkeypatch.setattr(settings, "polite_pool_email", "test@example.org")
 
 
 @pytest.fixture
