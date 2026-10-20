@@ -5,7 +5,6 @@ Interroge `/works` sur la lignée des institutions du périmètre (`authorships.
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -16,6 +15,7 @@ from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -104,15 +104,15 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
             )
         return OpenalexHarvestConfig(institution_ids=institution_ids)
 
-    def setup_logging(self, args: argparse.Namespace, config: OpenalexHarvestConfig) -> None:
-        if args.since:
-            self.logger.info("Mode incrémental : documents modifiés depuis %s", args.since)
+    def setup_logging(self, window: HarvestWindow, config: OpenalexHarvestConfig) -> None:
+        if window.since:
+            self.logger.info("Mode incrémental : documents modifiés depuis %s", window.since)
 
-    def harvest_all(self, args: argparse.Namespace, config: OpenalexHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: OpenalexHarvestConfig) -> PhaseMetrics:
         """Moissonne les works du périmètre. En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année."""
         ids = config.institution_ids
         client = self._client
-        years = self._years(args)
+        years = self._years(window)
 
         def extrait(
             avancement: Progression, *, years: list[int], since: str | None = None
@@ -128,10 +128,10 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
                 since=since,
             )
 
-        if args.since:
+        if window.since:
             return self._extrait_d_un_tenant(
-                client.count(ids, years=years, since=args.since),
-                lambda avancement: extrait(avancement, years=years, since=args.since),
+                client.count(ids, years=years, since=window.since),
+                lambda avancement: extrait(avancement, years=years, since=window.since),
             )
 
         return self._extrait_par_annee(

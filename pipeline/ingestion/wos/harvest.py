@@ -5,7 +5,6 @@ Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année
 
 from __future__ import annotations
 
-import argparse
 import time
 from dataclasses import dataclass
 
@@ -15,6 +14,7 @@ from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -129,7 +129,7 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
             )
         return WosHarvestConfig(affiliations=affiliations)
 
-    def setup_logging(self, args: argparse.Namespace, config: WosHarvestConfig) -> None:
+    def setup_logging(self, window: HarvestWindow, config: WosHarvestConfig) -> None:
         try:
             remaining = self._client.check_quota()
         except Exception as e:
@@ -138,10 +138,10 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
         if remaining:
             self.logger.info("Quota annuel restant : %s records", remaining)
 
-    def harvest_all(self, args: argparse.Namespace, config: WosHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: WosHarvestConfig) -> PhaseMetrics:
         affiliations = config.affiliations
         client = self._client
-        years = self._years(args)
+        years = self._years(window)
 
         def compte(annee: int) -> int:
             try:

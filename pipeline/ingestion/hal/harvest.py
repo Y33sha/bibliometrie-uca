@@ -7,7 +7,6 @@ Le routage new/updated/unchanged vient de l'écriture dans `staging`, pilotée p
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -17,6 +16,7 @@ from domain.types import as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_hal_collections
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -122,18 +122,18 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
             )
         return HalHarvestConfig(all_collections=dict(collections))
 
-    def harvest_all(self, args: argparse.Namespace, config: HalHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
         En mode incrémental, un seul périmètre : les notices modifiées depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))
-        years = self._years(args)
+        years = self._years(window)
 
-        if args.since:
+        if window.since:
             return self._extrait_d_un_tenant(
-                client.count(build_query(years=years, since=args.since), fq),
+                client.count(build_query(years=years, since=window.since), fq),
                 lambda avancement: harvest_union(
                     client,
                     config,
@@ -141,7 +141,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
                     scoped_logger(self.logger, self.SOURCE),
                     avancement,
                     years=years,
-                    since=args.since,
+                    since=window.since,
                     breaker_tripped=self._breaker_tripped,
                 ),
             )

@@ -7,10 +7,10 @@ Point d'entrée unique `run()` : invoqué par `run_pipeline`, il laisse remonter
 
 from __future__ import annotations
 
-import argparse
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import ClassVar, Protocol
 
 from sqlalchemy import Connection
@@ -32,6 +32,7 @@ from pipeline.runtime.observability.progression import Progression, progression
 __all__ = [
     "HarvestConfigError",
     "Harvester",
+    "HarvestWindow",
     "HarvesterFactory",
     "SourceHarvester",
     "stage_document",
@@ -98,6 +99,18 @@ class HarvestConfigError(Exception):
     """
 
 
+@dataclass(frozen=True, slots=True)
+class HarvestWindow:
+    """Bornes d'un moissonnage : année de départ, année unique (`--year`), date de modification minimale (mode quotidien).
+
+    `year` prime sur `start_year`. `since`, au format `YYYY-MM-DD`, sert au moissonnage incrémental de HAL et d'OpenAlex.
+    """
+
+    start_year: int | None = None
+    year: int | None = None
+    since: str | None = None
+
+
 class SourceHarvester[ConfigT, ClientT](ABC):
     """Template pour l'extraction API → staging.
 
@@ -108,10 +121,10 @@ class SourceHarvester[ConfigT, ClientT](ABC):
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
     - `load_config(conn) -> ConfigT` : charge la config depuis la DB (URL, auth, affiliations, etc.)
-    - `harvest_all(args, config) -> PhaseMetrics` : boucle d'extraction
+    - `harvest_all(window, config) -> PhaseMetrics` : boucle d'extraction
 
     Points d'override optionnels :
-    - `setup_logging(args, config)` : logs de header personnalisés
+    - `setup_logging(window, config)` : logs de header personnalisés
     """
 
     SOURCE: ClassVar[str] = ""
@@ -132,9 +145,9 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         # Circuit-breaker de la source (posé par `run`) : les boucles `harvest_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
         self._breaker: SourceCircuitBreaker | None = None
 
-    def _years(self, args: argparse.Namespace) -> list[int]:
+    def _years(self, window: HarvestWindow) -> list[int]:
         """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
-        return [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
+        return [window.year] if window.year else get_years(self.conn, start_year=window.start_year)
 
     def _breaker_tripped(self) -> bool:
         """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`harvest_all` pour stopper la source)."""
@@ -239,11 +252,11 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         """Charge la config DB (URL, auth, affiliations, années, etc.)."""
 
     @abstractmethod
-    def harvest_all(self, args: argparse.Namespace, config: ConfigT) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: ConfigT) -> PhaseMetrics:
         """Pilote l'extraction complète. Retourne les métriques finales."""
 
     def setup_logging(  # noqa: B027
-        self, args: argparse.Namespace, config: ConfigT
+        self, window: HarvestWindow, config: ConfigT
     ) -> None:
         """Logs de header personnalisés (ex: affiliations, collections, années)."""
 
@@ -251,7 +264,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
     def run(
         self,
-        args: argparse.Namespace,
+        window: HarvestWindow,
         *,
         breaker: SourceCircuitBreaker | None = None,
     ) -> PhaseMetrics:
@@ -263,8 +276,8 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         """
         self._breaker = breaker
         config = self.load_config(self.conn)
-        self.setup_logging(args, config)
-        return self.harvest_all(args, config)
+        self.setup_logging(window, config)
+        return self.harvest_all(window, config)
 
 
 class Harvester(Protocol):
@@ -275,7 +288,7 @@ class Harvester(Protocol):
 
     def run(
         self,
-        args: argparse.Namespace,
+        window: HarvestWindow,
         *,
         breaker: SourceCircuitBreaker | None = None,
     ) -> PhaseMetrics: ...

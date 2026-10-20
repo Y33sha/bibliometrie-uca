@@ -1,9 +1,11 @@
-"""Moissonneur sur un client simulé, et arguments de son run, pour les tests des moissonneurs."""
+"""Moissonneur sur un client simulé, et fenêtre de son run, pour les tests des moissonneurs."""
 
-import argparse
 import logging
 from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock
+
+from pipeline.ingestion.common.harvester import HarvestWindow
 
 
 def moissonneur[E](cls: Callable[..., E], client: MagicMock) -> E:
@@ -16,6 +18,6 @@ def source_a_bout() -> MagicMock:
     return MagicMock(tripped=True)
 
 
-def arguments_du_run(**surcharges: object) -> argparse.Namespace:
-    """Arguments du run lus par les moissonneurs : année, année de début, date de dernière extraction, `None` par défaut."""
-    return argparse.Namespace(**({"year": None, "start_year": None, "since": None} | surcharges))
+def arguments_du_run(**surcharges: Any) -> HarvestWindow:
+    """Fenêtre du moissonnage : année, année de début, date de modification minimale, `None` par défaut."""
+    return HarvestWindow(**surcharges)
