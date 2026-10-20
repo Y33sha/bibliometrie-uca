@@ -128,7 +128,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Requalification par revue dans `journals/`, fusion des monographies sur le modèle des revues. dc0ad9d0f, a4d612b73
 - [x] Un inventaire de fusion par entité, celui des étapes (`MergeStep`, avec la nature de sa donnée) ; les inventaires du domaine disparaissent. a4d612b73
 - [x] Liste des DOI connus tirée d'une vue commune avec `candidate_dois`. 4e6fb8c35
-- [ ] Noms : étape DOAJ, `pub_id` d'éditeur.
+- [x] Noms : étape DOAJ, `pub_id` d'éditeur. a80930582
 
 ### Phase 8 — Vocabulaire
 
