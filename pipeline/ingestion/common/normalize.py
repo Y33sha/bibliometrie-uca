@@ -22,6 +22,7 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.registry import SOURCE_PRIORITY
+from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
@@ -36,7 +37,6 @@ from pipeline.runtime.observability.libelles import (
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.runtime.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 

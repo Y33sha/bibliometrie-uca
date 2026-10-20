@@ -28,8 +28,9 @@ from interfaces.cli.dev.generate_seed import (
     write_seed,
 )
 from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
-from pipeline.runtime.config import get_openalex_api_key, get_polite_pool_email_optional
+from pipeline.ingestion.credentials import get_openalex_api_key
 
 ROR_API = "https://api.ror.org/v2/organizations"
 

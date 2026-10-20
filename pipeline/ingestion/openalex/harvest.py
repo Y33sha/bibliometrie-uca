@@ -13,6 +13,7 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.throttle import Throttle
 from pipeline.ingestion.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
@@ -25,9 +26,6 @@ from pipeline.ingestion.common.harvest import (
 )
 from pipeline.ingestion.openalex.api import auth_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
-from pipeline.runtime.config import (
-    get_extraction_api_ids,
-)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 

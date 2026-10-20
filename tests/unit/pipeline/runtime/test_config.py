@@ -1,72 +1,9 @@
-"""Configuration des sources : secrets d'accès, et robustesse aux pannes de lecture.
-
-Les identifiants d'accès aux API viennent de l'environnement, non de la base : ce sont des secrets. Leur absence se traduit différemment selon la source — une valeur vide, un couple vide, ou un refus net pour l'adresse annoncée en polite pool, qu'aucune valeur inventée ne doit remplacer.
-
-Une panne de lecture en base ne fait pas échouer le pipeline : le réglage retombe sur son défaut, et l'incident est signalé.
-"""
+"""Une panne de lecture de la configuration du pipeline remonte à l'appelant."""
 
 import pytest
-from pydantic import SecretStr
 from sqlalchemy.exc import SQLAlchemyError
 
-from pipeline.runtime import config as module
-from pipeline.runtime.config import (
-    get_extraction_api_ids,
-    get_hal_collections,
-    get_openalex_api_key,
-    get_polite_pool_email,
-    get_polite_pool_email_optional,
-    get_scanr_credentials,
-    get_wos_api_key,
-)
-
-
-class TestSecretsDAcces:
-    def test_cle_openalex_absente(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "openalex_api_key", SecretStr(""))
-        assert get_openalex_api_key() is None
-
-    def test_cle_openalex_presente(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "openalex_api_key", SecretStr("clé"))
-        assert get_openalex_api_key() == "clé"
-
-    def test_cle_wos(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "wos_api_key", SecretStr("clé-wos"))
-        assert get_wos_api_key() == "clé-wos"
-
-    def test_identifiants_scanr_complets(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "scanr_username", "utilisateur")
-        monkeypatch.setattr(module.settings, "scanr_password", SecretStr("secret"))
-        assert get_scanr_credentials() == ("utilisateur", "secret")
-
-    @pytest.mark.parametrize(
-        ("utilisateur", "secret"), [("utilisateur", ""), ("", "secret"), ("", "")]
-    )
-    def test_identifiants_scanr_incomplets(self, monkeypatch, utilisateur, secret):
-        """Un identifiant sans son mot de passe ne vaut rien : le couple entier est tenu pour absent."""
-        monkeypatch.setattr(module.settings, "scanr_username", utilisateur)
-        monkeypatch.setattr(module.settings, "scanr_password", SecretStr(secret))
-        assert get_scanr_credentials() == ("", "")
-
-
-class TestAdressePolitePool:
-    def test_adresse_configuree(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "polite_pool_email", "contact@uca.fr")
-
-        assert get_polite_pool_email_optional() == "contact@uca.fr"
-        assert get_polite_pool_email() == "contact@uca.fr"
-
-    def test_absence_toleree_par_les_appelants_qui_s_en_passent(self, monkeypatch):
-        monkeypatch.setattr(module.settings, "polite_pool_email", "")
-
-        assert get_polite_pool_email_optional() is None
-
-    def test_absence_refusee_par_ceux_qui_l_exigent(self, monkeypatch):
-        """Aucune adresse de repli : une adresse inventée expose à un blocage côté serveur."""
-        monkeypatch.setattr(module.settings, "polite_pool_email", "")
-
-        with pytest.raises(RuntimeError, match="POLITE_POOL_EMAIL"):
-            get_polite_pool_email()
+from pipeline.runtime.config import get_fetch_stale_after_days
 
 
 class _ConnEnPanne:
@@ -79,14 +16,6 @@ class _ConnEnPanne:
 class TestPanneDeLecture:
     """Une panne de lecture de la configuration remonte à l'appelant."""
 
-    def test_collections_hal(self):
-        with pytest.raises(SQLAlchemyError):
-            get_hal_collections(_ConnEnPanne())
-
-    def test_identifiants_d_api(self):
-        with pytest.raises(SQLAlchemyError):
-            get_extraction_api_ids(_ConnEnPanne(), "openalex")
-
     def test_reglage_du_pipeline(self):
         with pytest.raises(SQLAlchemyError):
-            module.get_fetch_stale_after_days(_ConnEnPanne())
+            get_fetch_stale_after_days(_ConnEnPanne())

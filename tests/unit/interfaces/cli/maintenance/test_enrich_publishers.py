@@ -34,7 +34,7 @@ def lancer(monkeypatch):
             module, "get_sync_engine", lambda: SimpleNamespace(connect=lambda: conn)
         )
         monkeypatch.setattr(module, "run_enrich_publishers_from_openalex", _enrichir)
-        monkeypatch.setattr("pipeline.runtime.config.source_credentials_missing", lambda s: None)
+        monkeypatch.setattr(module, "source_credentials_missing", lambda s: None)
         monkeypatch.setattr(sys, "argv", ["enrich_publishers", *arguments])
 
         code = main()

@@ -21,12 +21,11 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_str
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.http.polite_pool import build_user_agent
+from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.runtime.config import get_polite_pool_email
 
 
 class CrossrefDoiSearch:

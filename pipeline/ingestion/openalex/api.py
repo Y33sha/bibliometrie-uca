@@ -9,9 +9,10 @@ import httpx2
 from domain.types import JsonValue, as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.credentials import get_openalex_api_key
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS
-from pipeline.runtime.config import get_openalex_api_key, get_polite_pool_email_optional
 
 
 def credential_params() -> dict[str, str]:

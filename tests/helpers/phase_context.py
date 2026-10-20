@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from pipeline.runtime.context import PhaseContext, RunOptions
+from pipeline.runtime.context import CredentialsMissing, PhaseContext, RunOptions
 
 
 class FakeConnection:
@@ -46,14 +46,20 @@ def open_tx() -> FakeOpenTransaction:
 
 @pytest.fixture
 def contexte(open_tx: FakeOpenTransaction) -> Callable[..., PhaseContext]:
-    """Fabrique le contexte d'une phase sur `open_tx`, avec les options du run passées en arguments."""
+    """Fabrique le contexte d'une phase sur `open_tx`, avec les options du run passées en arguments.
 
-    def fabriquer(**options: Any) -> PhaseContext:
+    Toutes les sources ont leurs identifiants, sauf contrôle `credentials_missing` fourni.
+    """
+
+    def fabriquer(
+        *, credentials_missing: CredentialsMissing = lambda _source: None, **options: Any
+    ) -> PhaseContext:
         return PhaseContext(
             open_tx=open_tx,
             logger=logging.getLogger("test"),
             options=RunOptions(**options),
             maintain=lambda operation: None,
+            credentials_missing=credentials_missing,
         )
 
     return fabriquer

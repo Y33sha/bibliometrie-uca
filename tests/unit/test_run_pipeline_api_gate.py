@@ -14,13 +14,13 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications import oa_status
 
 _RUN_ENRICH = "pipeline.transformation.publications.oa_status._verifier"
-_CREDENTIALS = "pipeline.runtime.config.source_credentials_missing"
 _LOG = logging.getLogger("test")
 
 
 def _access(execute, *, missing=None):
-    with patch(_CREDENTIALS, return_value=missing):
-        return access_source("crossref", execute, phase="test", logger=_LOG)
+    return access_source(
+        "crossref", execute, phase="test", logger=_LOG, credentials_missing=lambda _source: missing
+    )
 
 
 def test_sans_identifiants_l_etape_est_sautee():
@@ -62,10 +62,11 @@ def test_circuit_coupe_signale():
 def test_phase_oa_status_skips_without_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch(_CREDENTIALS, return_value="email polite pool absent (config.polite_pool_email)"),
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
     ):
-        metrics = oa_status.build().run(phase_context(RunOptions()))
+        metrics = oa_status.build().run(
+            phase_context(RunOptions(), credentials_missing=lambda _source: "adresse absente")
+        )
 
     run_step.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
@@ -74,11 +75,12 @@ def test_phase_oa_status_skips_without_email():
 def test_phase_oa_status_runs_with_email():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch(_CREDENTIALS, return_value=None),
-        patch("pipeline.runtime.config.get_polite_pool_email_optional", return_value="e@x"),
+        patch("pipeline.http.polite_pool.get_polite_pool_email_optional", return_value="e@x"),
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
-        metrics = oa_status.build().run(phase_context(RunOptions()))
+        metrics = oa_status.build().run(
+            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+        )
 
     run_step.assert_called_once()
     assert metrics.new == 4

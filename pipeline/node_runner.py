@@ -129,6 +129,7 @@ def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> Phase
             lambda breaker: step.run(ctx, breaker),
             phase=group,
             logger=ctx.logger,
+            credentials_missing=ctx.credentials_missing,
             threshold=step.threshold,
         )
     metrics.duration_s = round(time.perf_counter() - t0, 1)

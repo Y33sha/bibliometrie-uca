@@ -116,9 +116,8 @@ def build() -> Phase:
 
     La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals`, qui suit, rattache les préfixes à leur éditeur via les API `/prefixes` ; `fetch_missing`, au run suivant, adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe n'est pas encore résolu.
     """
-    from pipeline.http.polite_pool import build_user_agent
+    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
     from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
-    from pipeline.runtime.config import get_polite_pool_email_optional
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.

@@ -16,7 +16,7 @@ from pipeline.http.circuit_breaker import (
     reset_current_breaker,
     set_current_breaker,
 )
-from pipeline.runtime import config
+from pipeline.runtime.context import CredentialsMissing
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
     signal_source_unavailable,
@@ -30,13 +30,14 @@ def access_source(
     *,
     phase: str,
     logger: logging.Logger,
+    credentials_missing: CredentialsMissing,
     threshold: int | None = None,
 ) -> PhaseMetrics:
     """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée.
 
-    `execute` reçoit le circuit-breaker, que ses boucles consultent pour s'arrêter quand il coupe. `phase` situe les avertissements dans le journal.
+    `execute` reçoit le circuit-breaker, que ses boucles consultent pour s'arrêter quand il coupe. `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source.
     """
-    if reason := config.source_credentials_missing(source):
+    if reason := credentials_missing(source):
         metrics = PhaseMetrics()
         signal_source_unconfigured(metrics, source, reason, logger=logger, phase=phase)
         return metrics

@@ -22,6 +22,7 @@ from pipeline.ingestion.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.credentials import get_wos_api_key
 from pipeline.ingestion.wos.fields import (
     extract_doi,
     extract_ut,
@@ -29,7 +30,6 @@ from pipeline.ingestion.wos.fields import (
     get_records,
     get_records_found,
 )
-from pipeline.runtime.config import get_wos_api_key
 
 log = logging.getLogger(__name__)
 

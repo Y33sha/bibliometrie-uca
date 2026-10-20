@@ -20,6 +20,9 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 # Ouvreur de transaction : un appelable qui rend une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
 OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 
+# Contrôle des identifiants d'accès : motif d'absence des identifiants d'une source, ou `None` s'ils sont utilisables.
+CredentialsMissing = Callable[[str], str | None]
+
 
 @dataclass(frozen=True, slots=True)
 class RunOptions:
@@ -46,12 +49,13 @@ class RunOptions:
 
 @dataclass(frozen=True, slots=True)
 class PhaseContext:
-    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, et l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`), hors transaction."""
+    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, et le contrôle des identifiants d'accès aux sources."""
 
     open_tx: OpenTransaction
     logger: logging.Logger
     options: RunOptions
     maintain: Callable[[str], None]
+    credentials_missing: CredentialsMissing
 
 
 class Phase(Protocol):

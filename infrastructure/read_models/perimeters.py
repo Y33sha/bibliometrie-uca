@@ -60,6 +60,43 @@ def get_extraction_structure_ids(conn: Connection) -> set[int]:
     return get_perimeter_structure_ids(conn, code) if code else set()
 
 
+def get_hal_collections(conn: Connection) -> dict[str, str]:
+    """Collections HAL {code_hal: label} des structures du périmètre d'extraction qui ont une collection HAL."""
+    structure_ids = get_extraction_structure_ids(conn)
+    if not structure_ids:
+        return {}
+    rows = conn.execute(
+        text(
+            "SELECT hal_collection, COALESCE(acronym, name) AS label "
+            "FROM structures "
+            "WHERE id = ANY(:ids) "
+            "AND hal_collection IS NOT NULL AND hal_collection != ''"
+        ),
+        {"ids": list(structure_ids)},
+    ).all()
+    return {r.hal_collection: r.label for r in rows}
+
+
+def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
+    """Identifiants d'API d'une source pour les structures du périmètre d'extraction (`structures.api_ids[source]`), sans doublon, dans l'ordre."""
+    struct_ids = get_extraction_structure_ids(conn)
+    if not struct_ids:
+        return []
+    rows = conn.execute(
+        text("SELECT api_ids->:src AS ids FROM structures WHERE id = ANY(:ids) AND api_ids ? :src"),
+        {"src": source, "ids": list(struct_ids)},
+    ).all()
+    result: list[str] = []
+    for row in rows:
+        ids = row.ids
+        if isinstance(ids, list):
+            result.extend(ids)
+        elif isinstance(ids, str):
+            # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
+            result.append(ids)
+    return list(dict.fromkeys(result))
+
+
 def get_persons_structure_ids(conn: Connection) -> set[int]:
     """Périmètre pour la création des personnes (`in_perimeter`), vide s'il n'est pas configuré."""
     code = persons_perimeter_code(conn)

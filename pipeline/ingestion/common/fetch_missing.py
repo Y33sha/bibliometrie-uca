@@ -382,7 +382,7 @@ async def fetch_missing_doi(
 
 def _doi_org_user_agent() -> str:
     """User-Agent du polite pool pour doi.org."""
-    from pipeline.runtime.config import get_polite_pool_email
+    from pipeline.http.polite_pool import get_polite_pool_email
 
     return build_user_agent(get_polite_pool_email())
 

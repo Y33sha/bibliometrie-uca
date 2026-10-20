@@ -1,6 +1,4 @@
-"""Lecture de la configuration du pipeline, depuis la table `config` et le périmètre.
-
-Trois réglages en dépendent : les années à couvrir, les collections HAL à moissonner et les identifiants de structure à interroger par source. Les deux derniers se dérivent du périmètre d'extraction : les structures qui le composent portent la collection et les identifiants.
+"""Lecture de la configuration du pipeline depuis la table `config`.
 
 Les clés dont la forme est imposée — plafonds d'interrogation, délais de réinterrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
 """
@@ -14,17 +12,14 @@ from pipeline.runtime.config import (
     FETCH_STALE_AFTER_DAYS_DEFAULT,
     UNPAYWALL_MAX_PER_RUN_DEFAULT,
     get_doaj_refresh_after_days,
-    get_extraction_api_ids,
     get_fetch_missing_max_per_source,
     get_fetch_missing_retry_after_days,
     get_fetch_stale_after_days,
-    get_hal_collections,
     get_unpaywall_max_per_run,
     get_unpaywall_recheck_after_days,
     get_years,
 )
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.structures import insert_perimeter, insert_structure
 
 
 class TestGetYears:
@@ -68,94 +63,6 @@ class TestFormeImposeeEnBase:
     def test_un_delai_hors_forme_est_refuse(self, sa_sync_conn, valeur):
         with pytest.raises(IntegrityError, match="config_delay_is_positive_integer"):
             set_config(sa_sync_conn, "fetch_stale_after_days", valeur)
-
-
-class TestGetHalCollections:
-    def test_derivees_des_structures_du_perimetre(self, sa_sync_conn):
-        conn = sa_sync_conn
-        structure = insert_structure(conn, "cfg_labo_a", hal_collection="LABO-A")
-        insert_perimeter(conn, "cfg_perim", root_structure_ids=[structure], materialize=True)
-        set_config(conn, "perimeter_extraction", "cfg_perim")
-
-        assert get_hal_collections(conn) == {"LABO-A": "cfg_labo_a"}
-
-    def test_perimetre_designe_mais_inexistant(self, sa_sync_conn):
-        conn = sa_sync_conn
-        set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
-
-        assert get_hal_collections(conn) == {}
-
-    def test_perimetre_dont_aucune_structure_ne_depose_dans_hal(self, sa_sync_conn):
-        conn = sa_sync_conn
-        structure = insert_structure(conn, "cfg_labo_sans_collection")
-        insert_perimeter(
-            conn, "cfg_perim_sans_collection", root_structure_ids=[structure], materialize=True
-        )
-        set_config(conn, "perimeter_extraction", "cfg_perim_sans_collection")
-
-        assert get_hal_collections(conn) == {}
-
-    def test_sans_perimetre_configure(self, sa_sync_conn):
-        conn = sa_sync_conn
-        conn.execute(text("DELETE FROM config WHERE key = 'perimeter_extraction'"))
-
-        assert get_hal_collections(conn) == {}
-
-
-class TestGetExtractionApiIds:
-    def test_identifiants_des_structures_du_perimetre(self, sa_sync_conn):
-        conn = sa_sync_conn
-        premiere = insert_structure(conn, "cfg_labo_b", api_ids={"openalex": ["I1", "I2"]})
-        seconde = insert_structure(conn, "cfg_labo_c", api_ids={"openalex": ["I2", "I3"]})
-        insert_perimeter(
-            conn, "cfg_perim_ids", root_structure_ids=[premiere, seconde], materialize=True
-        )
-        set_config(conn, "perimeter_extraction", "cfg_perim_ids")
-
-        # Dédupliqués, dans l'ordre de première rencontre.
-        assert get_extraction_api_ids(conn, "openalex") == ["I1", "I2", "I3"]
-
-    def test_identifiant_unique_ecrit_sans_liste(self, sa_sync_conn):
-        conn = sa_sync_conn
-        structure = insert_structure(conn, "cfg_labo_d", api_ids={"scanr": "S1"})
-        insert_perimeter(
-            conn, "cfg_perim_scalaire", root_structure_ids=[structure], materialize=True
-        )
-        set_config(conn, "perimeter_extraction", "cfg_perim_scalaire")
-
-        assert get_extraction_api_ids(conn, "scanr") == ["S1"]
-
-    def test_identifiants_d_une_forme_inattendue_ignores(self, sa_sync_conn):
-        """Une valeur qui n'est ni une liste ni une chaîne ne désigne aucun identifiant."""
-        conn = sa_sync_conn
-        premiere = insert_structure(conn, "cfg_labo_f", api_ids={"openalex": {"id": "I1"}})
-        seconde = insert_structure(conn, "cfg_labo_g", api_ids={"openalex": ["I2"]})
-        insert_perimeter(
-            conn, "cfg_perim_formes", root_structure_ids=[premiere, seconde], materialize=True
-        )
-        set_config(conn, "perimeter_extraction", "cfg_perim_formes")
-
-        assert get_extraction_api_ids(conn, "openalex") == ["I2"]
-
-    def test_source_absente_des_structures(self, sa_sync_conn):
-        conn = sa_sync_conn
-        structure = insert_structure(conn, "cfg_labo_e", api_ids={"openalex": ["I1"]})
-        insert_perimeter(conn, "cfg_perim_autre", root_structure_ids=[structure], materialize=True)
-        set_config(conn, "perimeter_extraction", "cfg_perim_autre")
-
-        assert get_extraction_api_ids(conn, "wos") == []
-
-    def test_sans_perimetre_configure(self, sa_sync_conn):
-        conn = sa_sync_conn
-        conn.execute(text("DELETE FROM config WHERE key = 'perimeter_extraction'"))
-
-        assert get_extraction_api_ids(conn, "openalex") == []
-
-    def test_perimetre_configure_mais_vide(self, sa_sync_conn):
-        conn = sa_sync_conn
-        set_config(conn, "perimeter_extraction", "cfg_perim_inexistant")
-
-        assert get_extraction_api_ids(conn, "openalex") == []
 
 
 class TestPlafondsParRun:

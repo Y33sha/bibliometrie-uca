@@ -2,7 +2,6 @@
 
 import dataclasses
 import logging
-from unittest.mock import patch
 
 from pipeline.graph import NODES
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -35,11 +34,9 @@ def _run(
         name: dataclasses.replace(step, run=runner(name.removeprefix("publishers_journals.")))
         for name, step in publishers_journals.build().steps.items()
     }
-    with patch(
-        "pipeline.runtime.config.source_credentials_missing",
-        return_value=credentials_missing,
-    ):
-        return PublishersJournalsPhase(steps).run(contexte())
+    return PublishersJournalsPhase(steps).run(
+        contexte(credentials_missing=lambda _source: credentials_missing)
+    )
 
 
 def test_les_noeuds_s_enchainent_dans_l_ordre_du_graphe(contexte):

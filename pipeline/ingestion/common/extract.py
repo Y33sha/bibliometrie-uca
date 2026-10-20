@@ -232,15 +232,15 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
         return OpenalexExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
     def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from pipeline.ingestion.credentials import get_wos_api_key
         from pipeline.ingestion.wos.harvest import WosClient, WosExtractor
-        from pipeline.runtime.config import get_wos_api_key
 
         client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, client)
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
+        from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.harvest import ScanrClient, ScanrExtractor
-        from pipeline.runtime.config import get_scanr_credentials
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
         return ScanrExtractor(conn, source_log, client)

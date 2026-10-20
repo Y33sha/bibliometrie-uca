@@ -420,6 +420,7 @@ class TestPhaseRelations:
                 logger=logging.getLogger("test"),
                 options=RunOptions(),
                 maintain=lambda operation: None,
+                credentials_missing=lambda _source: None,
             )
         )
 

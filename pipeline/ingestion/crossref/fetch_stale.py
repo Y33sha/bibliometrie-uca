@@ -13,10 +13,9 @@ from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping, as_str
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
-from pipeline.http.polite_pool import build_user_agent
+from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
-from pipeline.runtime.config import get_polite_pool_email
 
 
 class CrossrefStaleRefetch(StaleRefetch):
