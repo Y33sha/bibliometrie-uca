@@ -134,7 +134,7 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return OpenalexPersonExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.hal.harvest import HalClient
+        from pipeline.ingestion.hal.api import HalClient
         from pipeline.ingestion.hal.person_search import HalPersonExtractor
 
         return HalPersonExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))

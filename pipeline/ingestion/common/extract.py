@@ -205,7 +205,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
     from pipeline.ingestion.api_params import API_BASE_URLS
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.hal.harvest import HalClient, HalExtractor
+        from pipeline.ingestion.hal.api import HalClient
+        from pipeline.ingestion.hal.harvest import HalExtractor
 
         return HalExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 

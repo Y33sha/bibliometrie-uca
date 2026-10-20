@@ -15,8 +15,9 @@ from pipeline.ingestion.common.person_search import (
     PersonSearchExtractor,
     PersonSearchPage,
 )
+from pipeline.ingestion.hal.api import HalClient
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.ingestion.hal.harvest import HalClient, build_query
+from pipeline.ingestion.hal.harvest import build_query
 
 # Champ Solr de chaque type d'identifiant.
 _FIELDS = {

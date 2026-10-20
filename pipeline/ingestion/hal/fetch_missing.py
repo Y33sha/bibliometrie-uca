@@ -18,11 +18,10 @@ from sqlalchemy import Connection, text
 
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from domain.types import JsonValue
 from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.http_retry import lookup_json_async
-from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
+from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.api_params import HAL_DELAY
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
@@ -31,7 +30,8 @@ from pipeline.ingestion.common.failed_lookups import (
     record_failed_lookup,
 )
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.hal.fields import HAL_FIELDS_STR, extract_doi, extract_id
+from pipeline.ingestion.hal.api import search_one
+from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
@@ -105,25 +105,6 @@ def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
     Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """
     return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
-
-
-async def search_one(
-    client: httpx2.AsyncClient, query: str, *, label: str
-) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Premier document de la recherche Solr `query`, ou `NOT_FOUND` quand la réponse est vide."""
-    outcome = await lookup_json_async(
-        client,
-        "GET",
-        API_BASE_URLS["hal"],
-        params={"q": query, "fl": HAL_FIELDS_STR, "wt": "json", "rows": "1"},
-        timeout=15,
-        not_found_statuses=frozenset(),
-        label=label,
-    )
-    if isinstance(outcome, NotFound | Unavailable):
-        return outcome
-    docs = as_sequence(at_path(outcome, "response").get("docs"))
-    return as_mapping(docs[0]) if docs else NOT_FOUND
 
 
 def _stage(conn: Connection, doc: Mapping[str, JsonValue]) -> bool:
