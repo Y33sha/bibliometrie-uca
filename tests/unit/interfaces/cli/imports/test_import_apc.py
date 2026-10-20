@@ -21,7 +21,7 @@ from interfaces.cli.imports.import_apc import (
     parse_year,
     read_payments,
 )
-from pipeline.transformation.structures.address_resolution import StructureNameForm
+from pipeline.transformation.structures.name_recognition import MatchableNameForm
 
 
 class TestInstitutionFilter:
@@ -150,14 +150,14 @@ class TestNonOaFeePayment:
 class TestStructureResolver:
     _UCA, _LMV, _CNRS = 1, 2, 3
     _FORMS = [
-        StructureNameForm(
+        MatchableNameForm(
             1, _UCA, "universite clermont auvergne", False, None, False, StructureType.UNIVERSITE
         ),
-        StructureNameForm(2, _LMV, "lmv", True, [_UCA], False, StructureType.LABO),
-        StructureNameForm(
+        MatchableNameForm(2, _LMV, "lmv", True, [_UCA], False, StructureType.LABO),
+        MatchableNameForm(
             3, _LMV, "laboratoire magmas et volcans", False, None, False, StructureType.LABO
         ),
-        StructureNameForm(4, _CNRS, "cnrs", True, None, False, StructureType.ONR),
+        MatchableNameForm(4, _CNRS, "cnrs", True, None, False, StructureType.ONR),
     ]
 
     def test_laboratoire_reconnu_par_son_nom(self):

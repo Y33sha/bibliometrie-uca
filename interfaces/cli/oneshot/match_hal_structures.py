@@ -26,10 +26,7 @@ from domain.normalize import normalize_text
 from domain.structures.structure import StructureType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.transformation.structures.address_resolution import (
-    AddressMatcher,
-    AddressResolutionQueries,
-)
+from pipeline.transformation.structures.name_recognition import StructureNameMatcher
 
 log = setup_logger("match_hal_structures", os.path.dirname(__file__))
 
@@ -75,7 +72,7 @@ _CANDIDATES = text(f"""
 
 def _scanr_candidates(conn: Connection) -> list[dict]:
     """Candidates de la voie scanR : structure HAL citée par une affiliation scanR dont le nom désigne un seul laboratoire du périmètre, et une autre structure du périmètre."""
-    matcher = AddressMatcher(AddressResolutionQueries().load_name_forms(conn))
+    matcher = StructureNameMatcher.load(conn)
     labs = dict(
         conn.execute(
             text(f"""

@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `pipeline.transformation.structures.address_resolution`."""
+"""Tests d'intégration des requêtes de `pipeline.transformation.structures.address_resolution`."""
 
 from functools import partial
 
@@ -16,17 +16,6 @@ from tests.integration.helpers.structures import insert_structure, insert_struct
 _uca_form = partial(insert_structure_name_form, form_text="uca")
 
 _Q = AddressResolutionQueries()
-
-
-class TestLoadNameForms:
-    def test_returns_all_forms(self, sa_sync_conn):
-        s = insert_structure(sa_sync_conn, name="X")
-        f = _uca_form(sa_sync_conn, s)
-        rows = _Q.load_name_forms(sa_sync_conn)
-        assert any(r.id == f for r in rows)
-        ours = next(r for r in rows if r.id == f)
-        assert ours.structure_id == s
-        assert ours.form_text == "uca"
 
 
 class TestCountAddresses:
