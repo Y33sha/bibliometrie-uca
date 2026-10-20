@@ -6,13 +6,12 @@ import pytest
 
 from domain.structures.name_forms import is_short_form
 from domain.structures.structure import StructureType
-from pipeline.transformation.structures import name_recognition
+from pipeline.transformation.structures import address_resolution, name_recognition
 from pipeline.transformation.structures.address_resolution import (
-    DetectedStructure,
-    KeptPair,
     process_addresses,
     run_resolution,
 )
+from pipeline.transformation.structures.detections import ADDRESS_STRUCTURES, Detection
 from pipeline.transformation.structures.name_recognition import (
     MatchableNameForm,
     StructureNameMatcher,
@@ -51,20 +50,10 @@ def _form(
 
 
 class _FakeQueries:
-    """Stub du port `AddressResolutionQueries` avec instrumentation."""
+    """Lecture des adresses, sans base."""
 
-    def __init__(
-        self,
-        *,
-        addresses: list[tuple[int, str]] | None = None,
-        obsolete_per_chunk: int = 0,
-    ) -> None:
+    def __init__(self, *, addresses: list[tuple[int, str]] | None = None) -> None:
         self._addresses = addresses or []
-        self._obsolete_per_chunk = obsolete_per_chunk
-
-        self.upserts: list[DetectedStructure] = []
-        self.delete_calls: list[tuple[list[int], list[KeptPair]]] = []
-        self.unflag_calls: list[tuple[list[int], list[KeptPair]]] = []
 
     def count_addresses(self, conn: object) -> int:
         return len(self._addresses)
@@ -75,22 +64,6 @@ class _FakeQueries:
         avail = sorted(a for a in self._addresses if a[0] > after_id)
         return avail[:limit]
 
-    def delete_obsolete_detections_bulk(
-        self, conn: object, addr_ids: list[int], kept_pairs: list[KeptPair]
-    ) -> int:
-        self.delete_calls.append((list(addr_ids), list(kept_pairs)))
-        return self._obsolete_per_chunk
-
-    def unflag_obsolete_detections_bulk(
-        self, conn: object, addr_ids: list[int], kept_pairs: list[KeptPair]
-    ) -> None:
-        self.unflag_calls.append((list(addr_ids), list(kept_pairs)))
-
-    def upsert_detected_structures_bulk(
-        self, conn: object, detections: list[DetectedStructure]
-    ) -> None:
-        self.upserts.extend(detections)
-
 
 class _FakeConn:
     def __init__(self) -> None:
@@ -98,6 +71,19 @@ class _FakeConn:
 
     def commit(self) -> None:
         self.commits += 1
+
+
+@pytest.fixture
+def syncs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[list[Detection], list[int]]]:
+    """Appels à `sync_detections` : `(detections, scope)` par tranche."""
+    calls: list[tuple[list[Detection], list[int]]] = []
+
+    def record(conn, table, detections, *, scope):
+        assert table is ADDRESS_STRUCTURES
+        calls.append((list(detections), list(scope)))
+
+    monkeypatch.setattr(address_resolution, "sync_detections", record)
+    return calls
 
 
 @pytest.fixture
@@ -114,7 +100,7 @@ def name_forms(monkeypatch: pytest.MonkeyPatch) -> list[MatchableNameForm]:
 
 
 class TestRunResolution:
-    def test_processes_all_addresses(self, logger, name_forms):
+    def test_processes_all_addresses(self, logger, name_forms, syncs):
         """Charge les formes, matche toutes les adresses, écrit les détections."""
         name_forms.append(_form(1, "limos", form_id=10))
         queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
@@ -122,9 +108,9 @@ class TestRunResolution:
 
         run_resolution(conn, queries, perimeter_ids={1}, logger=logger)
 
-        assert queries.upserts == [(101, 1, 10)]
+        assert syncs == [([(101, 1, 10)], [101])]
 
-    def test_no_addresses_skips_writes(self, logger, name_forms):
+    def test_no_addresses_skips_writes(self, logger, name_forms, syncs):
         """Si `fetch_addresses_chunk` retourne [], aucun upsert."""
         name_forms.append(_form(1, "limos", form_id=10))
         queries = _FakeQueries(addresses=[])
@@ -132,12 +118,11 @@ class TestRunResolution:
 
         run_resolution(conn, queries, perimeter_ids={1}, logger=logger)
 
-        assert queries.upserts == []
-        assert queries.delete_calls == []
+        assert syncs == []
 
 
 class TestProcessAddresses:
-    def test_in_perimeter_counted(self, logger):
+    def test_in_perimeter_counted(self, logger, syncs):
         """Une adresse qui matche une structure du périmètre incrémente in_perimeter."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
@@ -150,10 +135,10 @@ class TestProcessAddresses:
         assert processed == 1
         assert in_perimeter == 1
         assert affil_count == 1
-        assert queries.upserts == [(101, 1, 10)]
+        assert syncs == [([(101, 1, 10)], [101])]
         assert conn.commits == 1
 
-    def test_out_of_perimeter_not_counted(self, logger):
+    def test_out_of_perimeter_not_counted(self, logger, syncs):
         """Match hors périmètre : affiliations créées mais in_perimeter reste à 0."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
@@ -166,8 +151,8 @@ class TestProcessAddresses:
         assert in_perimeter == 0
         assert affil_count == 1
 
-    def test_no_match_still_syncs(self, logger):
-        """Adresse sans match : aucun upsert, mais delete bulk appelé (retrait d'obsolètes)."""
+    def test_no_match_still_syncs(self, logger, syncs):
+        """Adresse sans match : la synchronisation de sa tranche retire ses liens non détectés."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(101, "univ paris saclay")])
         conn = _FakeConn()
@@ -178,21 +163,9 @@ class TestProcessAddresses:
 
         assert in_perimeter == 0
         assert affil_count == 0
-        assert queries.upserts == []
-        # delete bulk toujours appelé (kept_pairs vide) pour retirer d'anciennes détections.
-        assert queries.delete_calls == [([101], [])]
+        assert syncs == [([], [101])]
 
-    def test_obsolete_removed_counted(self, logger):
-        """Le rowcount de delete_obsolete_detections_bulk alimente removed_count."""
-        matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
-        queries = _FakeQueries(addresses=[(101, "lab limos clermont")], obsolete_per_chunk=2)
-        conn = _FakeConn()
-
-        process_addresses(conn, queries, matcher, {1}, logger)
-
-        assert queries.delete_calls == [([101], [(101, 1)])]
-
-    def test_chunked_one_commit_per_chunk(self, logger):
+    def test_chunked_one_commit_per_chunk(self, logger, syncs):
         """Une tranche = un commit ; `chunk_size` borne la tranche (pagination keyset)."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         queries = _FakeQueries(addresses=[(i, "lab limos clermont") for i in range(1, 4)])
@@ -202,3 +175,4 @@ class TestProcessAddresses:
 
         # 3 adresses, chunk_size=2 → tranches [1, 2] et [3] → 2 commits.
         assert conn.commits == 2
+        assert [scope for _, scope in syncs] == [[1, 2], [3]]
