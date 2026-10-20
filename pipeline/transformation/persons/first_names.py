@@ -9,8 +9,9 @@ from sqlalchemy import Connection
 
 from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
-from pipeline.transformation.persons.person_writes import PersonWrites, rename_person
+from pipeline.transformation.persons.person_writes import rename_person
 
 
 class FirstNameCompletion(NamedTuple):
@@ -21,7 +22,7 @@ class FirstNameCompletion(NamedTuple):
 
 
 def complete_reduced_first_names(
-    conn: Connection, queries: PersonsMatchingQueries, *, writes: PersonWrites
+    conn: Connection, queries: PersonsMatchingQueries, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
     """Donne à chaque personne au prénom réduit le prénom plein que ses signatures attestent seul."""
     reduced = {}
@@ -37,7 +38,7 @@ def complete_reduced_first_names(
         attested = attested_full_first_names(namesake.last_name, initials, names.get(person_id, ()))
         if len(attested) == 1:
             (first_name,) = attested.values()
-            rename_person(person_id, namesake.last_name, first_name, writes=writes)
+            rename_person(person_id, namesake.last_name, first_name, repo=repo)
             completed += 1
         elif attested:
             conflicting.add(person_id)

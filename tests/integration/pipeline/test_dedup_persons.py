@@ -24,10 +24,10 @@ from sqlalchemy import text
 from application.services.persons.core import add_name_form, create_person
 from domain.normalize import normalize_text
 from infrastructure.repositories import person_repository
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
-from pipeline.transformation.persons.person_writes import PersonWrites
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,
@@ -105,8 +105,8 @@ def _get_person_identifiers(conn, person_id):
 
 
 def _run_cascade(conn):
-    arbitrate_identifier_conflicts(conn, _queries, _logger, writes=PersonWrites(conn))
-    run_cascade(conn, _queries, _logger, writes=PersonWrites(conn))
+    arbitrate_identifier_conflicts(conn, _queries, _logger, repo=PgPersonRepository(conn))
+    run_cascade(conn, _queries, _logger, repo=PgPersonRepository(conn))
 
 
 # ── Scénarios ────────────────────────────────────────────────────
@@ -519,7 +519,7 @@ class TestCascadeRun:
                 sa_sync_conn,
                 _queries,
                 _logger,
-                writes=PersonWrites(sa_sync_conn),
+                repo=PgPersonRepository(sa_sync_conn),
                 orphans_log=logging.getLogger("test_orphelines"),
             )
 

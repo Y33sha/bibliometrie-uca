@@ -12,6 +12,7 @@ from sqlalchemy import Connection
 
 from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.matching import STRONG_PERSON_IDENTIFIER_TYPES, form_matches_person
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -20,7 +21,7 @@ from pipeline.runtime.observability.libelles import (
     rien_a_faire,
 )
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
-from pipeline.transformation.persons.person_writes import IdentifierConflict, PersonWrites
+from pipeline.transformation.persons.person_writes import IdentifierConflict
 from pipeline.transformation.persons.requalify_identifiers import IdentifierConsensus
 
 
@@ -52,7 +53,7 @@ def resolve_identifier_transfers(
     *,
     consensus: IdentifierConsensus,
     queries: PersonsMatchingQueries,
-    writes: PersonWrites,
+    repo: PgPersonRepository,
     logger: logging.Logger,
 ) -> dict[str, int]:
     """Arbitre les conflits d'attribution collectés et transfère les identifiants captés, d'après le `consensus` des valeurs d'identifiant (`compute_identifier_consensus`).
@@ -94,11 +95,11 @@ def resolve_identifier_transfers(
             continue  # aucun candidat du consensus, ou ambiguïté → triage manuel
         target = matching[0]
         id_type, id_value = key
-        ident = writes.find_identifier(id_type, id_value)
+        ident = repo.find_identifier(id_type, id_value)
         if ident is None or ident.person_id != owner_id:
             continue  # l'état a changé entre la collecte et la résolution
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
-        writes.update_identifier(ident)
+        repo.update_identifier(ident)
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
         logger.info(

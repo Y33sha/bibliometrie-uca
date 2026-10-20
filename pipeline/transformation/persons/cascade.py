@@ -27,7 +27,7 @@ Garde de rejet : les personnes rejetées pour la publication (`rejected_authorsh
 import logging
 from collections import defaultdict
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_name
 from domain.persons.identifiers import PersonIdentifierType
@@ -48,6 +48,8 @@ from domain.persons.matching import (
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, initials_extend
 from domain.persons.person import validated_name
+from domain.sources.registry import require_known_source
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.progression import attente, progression
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
@@ -61,9 +63,26 @@ from pipeline.transformation.persons.loading import (
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.metrics import CascadeResult, log_matching_breakdown
 from pipeline.transformation.persons.person_writes import (
-    PersonWrites,
     add_identifiers_from_authorships as add_identifiers,
 )
+
+_LINK_AUTHORSHIP = text("""
+    UPDATE source_authorships
+    SET person_id = :pid, resolution_mode = CAST(:mode AS resolution_mode)
+    WHERE id = :aid AND source = :src
+""")
+
+
+def link_authorship(
+    conn: Connection, person_id: int, source: str, source_authorship_id: int, resolution_mode: str
+) -> None:
+    """Rattache une signature à une personne, avec le canal de résolution (`identifier`, `name` ou `cross_source`). Lève `ValidationError` sur une source hors registre."""
+    require_known_source(source)
+    conn.execute(
+        _LINK_AUTHORSHIP,
+        {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
+    )
+
 
 # ---------------------------------------------------------------------------
 # Passe de cascade
@@ -81,10 +100,11 @@ class _Cascade:
         conn: Connection,
         queries: PersonsMatchingQueries,
         *,
-        writes: PersonWrites,
+        repo: PgPersonRepository,
         conflicting: frozenset[int] = frozenset(),
     ) -> None:
-        self._writes = writes
+        self._conn = conn
+        self._repo = repo
 
         in_perimeter = get_all_unlinked_authorships(conn, queries)
         out_of_perimeter = get_out_of_perimeter_candidates(conn, queries)
@@ -265,14 +285,15 @@ class _Cascade:
             self.resolved_cross_source_ids.add(a.source_authorship_id)
             if reason == MatchReason.CROSS_SOURCE and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
-        self._writes.link_authorship(
+        link_authorship(
+            self._conn,
             pid,
             a.source,
             a.source_authorship_id,
             RESOLUTION_MODE_BY_REASON[reason],
         )
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
-        add_identifiers(pid, [a.identifiers], writes=self._writes)
+        add_identifiers(pid, [a.identifiers], repo=self._repo)
         self._complete_first_name(pid, a)
         self.matched_counts[reason] += 1
         if not a.in_perimeter:
@@ -287,14 +308,15 @@ class _Cascade:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.source_authorship_id)
         last, first = validated_name(a.last_name or a.name.display(), a.first_name or "")
-        marker = self._writes.create(last, first)
-        self._writes.link_authorship(
+        marker = self._repo.create(last, first)
+        link_authorship(
+            self._conn,
             marker,
             a.source,
             a.source_authorship_id,
             "name",
         )
-        add_identifiers(marker, [a.identifiers], writes=self._writes)
+        add_identifiers(marker, [a.identifiers], repo=self._repo)
         self._index_namesake(Namesake(marker, last, first))
         # La personne créée ancre aussi le cross-source de son groupe, pour les autres signatures du même auteur.
         if a.group_id is not None:
@@ -331,7 +353,7 @@ class _Cascade:
             or not initials_extend(initials, first_name)
         ):
             return
-        self._writes.update_name(pid, *validated_name(namesake.last_name, first_name))
+        self._repo.update_name(pid, *validated_name(namesake.last_name, first_name))
         self._index_namesake(namesake._replace(first_name=first_name))
         self.first_names_completed += 1
 
@@ -356,7 +378,7 @@ def run_cascade(
     queries: PersonsMatchingQueries,
     logger: logging.Logger,
     *,
-    writes: PersonWrites,
+    repo: PgPersonRepository,
     orphans_log: logging.Logger | None = None,
 ) -> CascadeResult:
     """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
@@ -368,7 +390,7 @@ def run_cascade(
     Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
     etape(logger, "Identification des personnes")
-    completion = complete_reduced_first_names(conn, queries, writes=writes)
+    completion = complete_reduced_first_names(conn, queries, repo=repo)
     logger.info(
         "%s%s d'après les signatures",
         BRANCHE,
@@ -380,7 +402,7 @@ def run_cascade(
         c = _Cascade(
             conn,
             queries,
-            writes=writes,
+            repo=repo,
             conflicting=completion.conflicting,
         )
         c.first_names_completed = completion.completed
