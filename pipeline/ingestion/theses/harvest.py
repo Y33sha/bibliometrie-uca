@@ -6,22 +6,20 @@ Interroge en une seule requête l'ensemble des PPN d'établissement du périmèt
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence
+from domain.types import as_int, as_mapping, as_sequence
 from infrastructure.read_models.perimeters import get_extraction_api_ids
-from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import THESES_DELAY, THESES_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
     stage_document,
 )
+from pipeline.ingestion.theses.api import ThesesClient
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -39,28 +37,6 @@ class ThesesExtractConfig:
 def build_query(ppns: list[str]) -> str:
     """Recherche theses.fr sur l'un des PPN d'établissement de soutenance."""
     return f"etabSoutenancePpn:({' OR '.join(ppns)})"
-
-
-class ThesesClient:
-    """Client de la recherche theses.fr, limité à un appel toutes les `THESES_DELAY` secondes."""
-
-    def __init__(self, base_url: str) -> None:
-        self._url = base_url
-        self._throttle = Throttle(THESES_DELAY)
-
-    def fetch_page(self, query: str, *, debut: int) -> Mapping[str, JsonValue]:
-        """Une page de `THESES_PER_PAGE` thèses, à partir du rang `debut`."""
-        params: dict[str, str | int | float | bool | None] = {
-            "q": query,
-            "debut": debut,
-            "nombre": THESES_PER_PAGE,
-        }
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "GET", self._url, params=params, timeout=30, label=f"theses debut={debut}"
-                )
-            )
 
 
 def extract_theses(

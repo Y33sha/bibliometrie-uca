@@ -232,7 +232,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return ScanrExtractor(conn, source_log, client)
 
     def theses(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.theses.harvest import ThesesClient, ThesesExtractor
+        from pipeline.ingestion.theses.api import ThesesClient
+        from pipeline.ingestion.theses.harvest import ThesesExtractor
 
         return ThesesExtractor(conn, source_log, ThesesClient(API_BASE_URLS["theses"]))
 
