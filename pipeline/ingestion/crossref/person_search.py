@@ -10,13 +10,13 @@ from collections.abc import Mapping
 from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.polite_pool import build_user_agent
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchExtractor,
     PersonSearchPage,
 )
-from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.polite_pool import build_user_agent
 from pipeline.runtime.config import get_polite_pool_email
 
 # Documents par page. Une notice de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.

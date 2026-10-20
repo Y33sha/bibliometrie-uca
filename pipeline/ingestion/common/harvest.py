@@ -17,8 +17,8 @@ from sqlalchemy import Connection
 
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
+from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.runtime.config import get_years
 from pipeline.runtime.observability.libelles import (
     SUITE_DE_BRANCHE,

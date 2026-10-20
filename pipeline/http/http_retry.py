@@ -25,14 +25,14 @@ from typing import cast
 import httpx2
 
 from domain.types import JsonValue
-from pipeline.ingestion.http.circuit_breaker import (
+from pipeline.http.circuit_breaker import (
     SourceCircuitBreaker,
     SourceUnavailableError,
     get_current_breaker,
 )
-from pipeline.ingestion.http.http_status import raise_for_status
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
-from pipeline.ingestion.http.tls import tls_context
+from pipeline.http.http_status import raise_for_status
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
+from pipeline.http.tls import tls_context
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +228,7 @@ async def lookup_json_async(
     not_found_statuses: frozenset[int] = frozenset({404}),
     label: str = "",
 ) -> LookupOutcome[JsonValue]:
-    """Requête d'un élément par `http_request_with_retry_async`, classée en issue (cf. `pipeline.ingestion.http.lookup`).
+    """Requête d'un élément par `http_request_with_retry_async`, classée en issue (cf. `pipeline.http.lookup`).
 
     Un statut de `not_found_statuses` donne `NOT_FOUND`. Toute autre erreur HTTP, une erreur réseau, une réponse illisible ou un circuit-breaker déclenché donnent `UNAVAILABLE`.
 

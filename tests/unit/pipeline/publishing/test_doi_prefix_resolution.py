@@ -10,8 +10,8 @@ import logging
 from dataclasses import dataclass, field
 from unittest.mock import MagicMock
 
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.transformation.publishing.doi_prefixes import PendingPublisherPrefix
 from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_crossref_publishers,

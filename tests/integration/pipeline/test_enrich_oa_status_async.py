@@ -15,8 +15,8 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
+from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-from pipeline.ingestion.http.lookup import LookupOutcome
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics

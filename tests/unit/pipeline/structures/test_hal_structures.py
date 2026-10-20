@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.transformation.structures.hal_structures import (
     fetch_hal_structures,
     run_refresh_hal_structures,

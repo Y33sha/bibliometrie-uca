@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.ingestion.openalex.fetch_truncated import FetchTruncatedPhase, refetch_openalex
 

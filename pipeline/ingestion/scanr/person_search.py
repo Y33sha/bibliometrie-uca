@@ -11,12 +11,12 @@ from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchExtractor,
     PersonSearchPage,
 )
-from pipeline.ingestion.http.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.ingestion.scanr.harvest import ScanrClient
 

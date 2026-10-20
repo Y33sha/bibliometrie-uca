@@ -12,8 +12,8 @@ import httpx2
 
 from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping
-from pipeline.ingestion.http.http_retry import lookup_json_async
-from pipeline.ingestion.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
+from pipeline.http.http_retry import lookup_json_async
+from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {

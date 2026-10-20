@@ -29,9 +29,8 @@ from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.ingestion.common.parallel import RunParallel
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import open_tx
@@ -39,6 +38,7 @@ from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
+from pipeline.runtime.parallel import RunParallel
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 if TYPE_CHECKING:
@@ -186,7 +186,7 @@ def build() -> Phase:
     `pipeline/runtime/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `pipeline/ingestion/common/extract.py` ; ici, le câblage : registre des extracteurs, primitif de parallélisme, lecture de la date de dernière extraction.
     """
     from infrastructure.observability.phase_executions import get_last_daily_extract_date
-    from pipeline.ingestion.common.parallel import run_parallel
+    from pipeline.runtime.parallel import run_parallel
 
     registry = _extractors()
 
@@ -217,7 +217,7 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
     `wos` et `scanr` lisent leurs identifiants d'API en configuration.
 
     Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
-    from pipeline.ingestion.http.api_params import API_BASE_URLS
+    from pipeline.ingestion.api_params import API_BASE_URLS
 
     def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
         from pipeline.ingestion.hal.harvest import HalClient, HalExtractor

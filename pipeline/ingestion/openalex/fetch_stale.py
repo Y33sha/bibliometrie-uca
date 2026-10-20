@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import httpx2
 
+from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
-from pipeline.ingestion.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.fields import extract_doi
 

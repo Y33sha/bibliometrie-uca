@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from pipeline.ingestion.http.fetch_pool import RequestPace
+from pipeline.http.fetch_pool import RequestPace
 
 
 @pytest.mark.asyncio

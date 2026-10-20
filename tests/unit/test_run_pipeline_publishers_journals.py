@@ -83,7 +83,7 @@ def test_phase_propagates_substep_signals():
 
 
 def test_enrichissement_openalex_au_debit_d_openalex():
-    from pipeline.ingestion.http.api_params import OPENALEX_DELAY
+    from pipeline.ingestion.api_params import OPENALEX_DELAY
 
     with (
         patch("pipeline.transformation.publishing.publishers_journals.open_tx"),

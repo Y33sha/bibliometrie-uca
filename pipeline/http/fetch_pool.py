@@ -16,8 +16,8 @@ from collections.abc import Awaitable, Callable, Sequence
 import httpx2
 from sqlalchemy import Connection
 
-from pipeline.ingestion.http.circuit_breaker import get_current_breaker
-from pipeline.ingestion.http.tls import tls_context
+from pipeline.http.circuit_breaker import get_current_breaker
+from pipeline.http.tls import tls_context
 
 
 class RequestPace:

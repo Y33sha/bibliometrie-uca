@@ -20,7 +20,7 @@ from infrastructure.db.tables import (
     ror_organizations,
     ror_relations as ror_relations_table,
 )
-from pipeline.ingestion.http.dump_download import DumpUnavailableError
+from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.ingestion.ror.dump import ZenodoRorDumpSource, dump_version
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics

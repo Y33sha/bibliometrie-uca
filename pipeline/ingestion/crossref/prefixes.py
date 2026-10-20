@@ -15,15 +15,15 @@ import httpx2
 
 from domain.publications.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping
-from pipeline.ingestion.http.api_params import API_BASE_URLS
-from pipeline.ingestion.http.http_retry import lookup_json_async
-from pipeline.ingestion.http.lookup import (
+from pipeline.http.http_retry import lookup_json_async
+from pipeline.http.lookup import (
     NOT_FOUND,
     UNAVAILABLE,
     LookupOutcome,
     NotFound,
     Unavailable,
 )
+from pipeline.ingestion.api_params import API_BASE_URLS
 
 logger = logging.getLogger(__name__)
 

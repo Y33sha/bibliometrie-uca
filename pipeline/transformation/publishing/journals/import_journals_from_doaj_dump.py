@@ -16,7 +16,7 @@ from sqlalchemy import Connection
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
-from pipeline.ingestion.http.dump_download import DumpUnavailableError
+from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.libelles import BRANCHE, accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente

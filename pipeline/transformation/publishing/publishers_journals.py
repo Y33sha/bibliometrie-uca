@@ -22,7 +22,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
@@ -258,7 +258,7 @@ def _run_resolve_datacite_publishers(
 
 
 def _prefixes_user_agent() -> str:
-    from pipeline.ingestion.http.polite_pool import build_user_agent
+    from pipeline.http.polite_pool import build_user_agent
     from pipeline.runtime.config import get_polite_pool_email_optional
 
     return build_user_agent(get_polite_pool_email_optional() or "")
@@ -268,7 +268,7 @@ def _run_enrich_journals_from_openalex(
     _ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
-    from pipeline.ingestion.http.api_params import API_BASE_URLS, OPENALEX_DELAY
+    from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
     from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
     from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
         run_enrich_journals_from_openalex,
@@ -293,12 +293,12 @@ def _run_check_journals_in_sudoc(
     _ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
-    from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
-    from pipeline.ingestion.http.api_params import (
+    from pipeline.ingestion.api_params import (
         API_BASE_URLS,
         SUDOC_MAX_CONCURRENT,
         SUDOC_MAX_PER_SECOND,
     )
+    from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
     from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
         run_check_journals_in_sudoc,
     )
@@ -406,8 +406,8 @@ def _run_learn_journal_doi_namespaces(
 def _run_enrich_journals_from_doaj(
     _ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
+    from pipeline.http.polite_pool import build_user_agent
     from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
-    from pipeline.ingestion.http.polite_pool import build_user_agent
     from pipeline.runtime.config import (
         get_doaj_refresh_after_days,
         get_polite_pool_email_optional,

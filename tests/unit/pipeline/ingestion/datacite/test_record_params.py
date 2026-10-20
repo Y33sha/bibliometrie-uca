@@ -5,11 +5,11 @@ import asyncio
 import httpx2
 import pytest
 
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.datacite import fields
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
 from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
 from pipeline.ingestion.datacite.harvest import DataciteClient
-from pipeline.ingestion.http.api_params import API_BASE_URLS
 
 _DOIS = "https://api.datacite.org/dois"
 _EMPTY = {"data": [], "links": {}, "meta": {"total": 0}}

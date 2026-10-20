@@ -19,6 +19,10 @@ from sqlalchemy import Connection, text
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
+from pipeline.http.fetch_pool import run_fetch_pool
+from pipeline.http.http_retry import lookup_json_async
+from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
     forget_failed_doi_lookups,
@@ -28,10 +32,6 @@ from pipeline.ingestion.common.failed_lookups import (
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.hal.fields import HAL_FIELDS_STR, extract_doi, extract_id
-from pipeline.ingestion.http.api_params import API_BASE_URLS, HAL_DELAY
-from pipeline.ingestion.http.fetch_pool import run_fetch_pool
-from pipeline.ingestion.http.http_retry import lookup_json_async
-from pipeline.ingestion.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression

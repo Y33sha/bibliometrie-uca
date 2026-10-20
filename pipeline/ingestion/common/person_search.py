@@ -18,13 +18,13 @@ from domain.sources.person_search import PERSON_SEARCH_IDENTIFIERS, SEARCHED_IDE
 from domain.sources.registry import Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
     scoped_logger,
     stage_document,
 )
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.runtime.observability.libelles import accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression

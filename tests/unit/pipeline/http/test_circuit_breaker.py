@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipeline.ingestion.http.circuit_breaker import (
+from pipeline.http.circuit_breaker import (
     SourceCircuitBreaker,
     SourceUnavailableError,
 )

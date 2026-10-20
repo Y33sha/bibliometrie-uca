@@ -8,11 +8,11 @@ from __future__ import annotations
 import httpx2
 import pytest
 
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.datacite.prefixes import (
     _parse_datacite_prefix_payload,
     fetch_datacite_prefix,
 )
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 
 
 def _datacite_payload(

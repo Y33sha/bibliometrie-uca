@@ -19,8 +19,8 @@ from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
-from pipeline.ingestion.http.fetch_pool import run_fetch_pool
-from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.http.fetch_pool import run_fetch_pool
+from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext

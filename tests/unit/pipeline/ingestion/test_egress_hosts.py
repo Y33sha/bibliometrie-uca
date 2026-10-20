@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 
 from infrastructure import PROJECT_ROOT
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.complements.doaj import ALLOWED_DUMP_HOSTS, DOAJ_CSV_DUMP_URL
-from pipeline.ingestion.http.api_params import API_BASE_URLS
 
 HOTES_DECLARES = frozenset(
     {

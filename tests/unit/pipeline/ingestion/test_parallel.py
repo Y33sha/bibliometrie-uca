@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipeline.ingestion.common.parallel import run_parallel
+from pipeline.runtime.parallel import run_parallel
 
 
 def test_returns_results_by_label():

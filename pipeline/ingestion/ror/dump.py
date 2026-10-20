@@ -20,16 +20,16 @@ from domain.errors import ValidationError
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
 from domain.types import as_mapping, as_sequence, as_str
-from pipeline.ingestion.http.api_params import API_BASE_URLS
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.http.dump_download import (
+from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.dump_download import (
     DumpDownloadError,
     DumpUnavailableError,
     write_capped,
 )
-from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.http_status import raise_for_status
-from pipeline.ingestion.http.tls import tls_context
+from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.http_status import raise_for_status
+from pipeline.http.tls import tls_context
+from pipeline.ingestion.api_params import API_BASE_URLS
 
 ZENODO_HOST = "zenodo.org"
 

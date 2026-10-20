@@ -9,7 +9,7 @@ import pytest
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord
-from pipeline.ingestion.http.circuit_breaker import reset_current_breaker, set_current_breaker
+from pipeline.http.circuit_breaker import reset_current_breaker, set_current_breaker
 from pipeline.transformation.publishing.journals import check_journals_in_sudoc as mod
 from pipeline.transformation.publishing.journals.journals import (
     JournalSudocRow,

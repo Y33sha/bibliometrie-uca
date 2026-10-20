@@ -6,13 +6,13 @@ import httpx2
 import pytest
 
 from domain.sources.staging import StagingEntryMode
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.crossref import person_search
 from pipeline.ingestion.crossref.person_search import (
     CrossrefClient,
     CrossrefPersonExtractor,
     build_orcid_filter,
 )
-from pipeline.ingestion.http.api_params import API_BASE_URLS
 from tests.helpers.extractors import arguments_du_run, extracteur
 
 _WORKS = "https://api.crossref.org/works"

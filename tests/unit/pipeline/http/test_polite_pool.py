@@ -1,6 +1,6 @@
 """Test du helper User-Agent polite pool partagé."""
 
-from pipeline.ingestion.http.polite_pool import build_user_agent
+from pipeline.http.polite_pool import build_user_agent
 
 
 def test_build_user_agent_includes_email():

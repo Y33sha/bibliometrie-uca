@@ -2,9 +2,9 @@
 
 import httpx2
 
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
-from pipeline.ingestion.http.api_params import API_BASE_URLS
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_publication
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging

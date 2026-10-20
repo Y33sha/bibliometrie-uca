@@ -16,9 +16,9 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text, to_plain_text
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.http.fetch_pool import run_fetch_pool
-from pipeline.ingestion.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.fetch_pool import run_fetch_pool
+from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.runtime.observability.libelles import BRANCHE, accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression

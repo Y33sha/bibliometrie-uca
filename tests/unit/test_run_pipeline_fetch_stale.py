@@ -10,11 +10,11 @@
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from pipeline.ingestion.common import fetch_stale
-from pipeline.ingestion.http.circuit_breaker import (
+from pipeline.http.circuit_breaker import (
     SourceCircuitBreaker,
     get_current_breaker,
 )
+from pipeline.ingestion.common import fetch_stale
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics

@@ -8,8 +8,8 @@ from __future__ import annotations
 import httpx2
 import pytest
 
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix, parse_member_id
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 
 _BASE = "https://api.crossref.org"
 

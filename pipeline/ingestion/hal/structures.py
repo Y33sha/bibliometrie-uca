@@ -4,9 +4,9 @@ from collections.abc import Collection, Mapping, Sequence
 
 from domain.structures.hal_structures import HAL_STRUCTURE_FIELDS
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from pipeline.ingestion.http.api_params import API_BASE_URLS, HAL_DELAY
-from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.throttle import Throttle
+from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.throttle import Throttle
+from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
 
 # Identifiants par requête : la requête Solr reste courte, et la réponse tient en une page.
 HAL_STRUCTURES_BATCH = 100
