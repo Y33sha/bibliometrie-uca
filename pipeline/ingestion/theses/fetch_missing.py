@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.fetch_pool import run_fetch_pool
@@ -35,7 +35,7 @@ _NNT_PENDING = pending_failed_lookup_sql(source_sql="'theses'", id_type="nnt", v
 _MISSING_NNTS_SQL = text(
     f"""
     SELECT DISTINCT {_NNT} AS nnt
-    FROM source_publications sp
+    FROM source_records sp
     WHERE sp.source <> 'theses'
       AND {_NNT} IS NOT NULL
       AND NOT EXISTS (

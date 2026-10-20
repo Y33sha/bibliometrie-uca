@@ -12,7 +12,7 @@ class JournalRecompute(Protocol):
     """Recalculs ciblés des publications d'une revue."""
 
     def requalify_publications(self, conn: Connection, journal_id: int) -> int:
-        """Rejoue les corrections des `source_publications` de la revue et recalcule ses publications. Retourne le nombre de publications dont le `doc_type` change."""
+        """Rejoue les corrections des `source_records` de la revue et recalcule ses publications. Retourne le nombre de publications dont le `doc_type` change."""
         ...
 
     def merge_journals(self, conn: Connection, target_id: int, source_id: int) -> None:

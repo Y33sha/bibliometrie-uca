@@ -19,7 +19,7 @@ from tests.integration.helpers.seeds import (
 )
 
 _cleanup_after_module = truncate_after_module(
-    "structure_name_forms", "structure_tutelles", "structures", "audit_log"
+    "structure_name_forms", "structure_parents", "structures", "audit_log"
 )
 
 

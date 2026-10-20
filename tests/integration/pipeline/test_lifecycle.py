@@ -14,10 +14,10 @@ from pipeline.transformation.publications.lifecycle import (
 )
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.redirects import redirect_of
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 _notice = partial(
-    insert_source_publication, source="openalex", title="T", pub_year=2024, doc_type="article"
+    insert_source_record, source="openalex", title="T", publication_year=2024, doc_type="article"
 )
 
 

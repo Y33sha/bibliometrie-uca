@@ -1,6 +1,6 @@
 """Ordre-dépendance de la phase persons — canal nominal.
 
-Deux signatures d'une **même personne** sans identifiant partagé, l'une en forme pleine (« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit `sa.id` (ORDER BY déterministe de `fetch_unlinked_authorships`).
+Deux signatures d'une **même personne** sans identifiant partagé, l'une en forme pleine (« Jean Martin »), l'autre en forme initiale (« J Martin »). L'ordre de traitement suit `sa.id` (ORDER BY déterministe de `fetch_unlinked_contributions`).
 
 La création live sème la map en mémoire via `compute_person_name_forms` (ordres + initiales) : une signature initiale rattrape une personne créée en forme pleine. Dans l'ordre inverse, la signature pleine rejoint la personne réduite par ses initiales compatibles, et la personne prend le prénom plein. Les deux ordres donnent une seule personne dès le premier run.
 
@@ -21,23 +21,23 @@ from pipeline.transformation.persons.purge import purge
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 _LOG = logging.getLogger("test")
 
 
 def _seed_signature(conn, *, pub_id, raw_name, name_norm):
-    """Publication + source_publication + signature in-périmètre non rattachée, portant
+    """Publication + source_record + signature in-périmètre non rattachée, portant
     l'identité `name_norm` (sans identifiant). L'id de la signature = `pub_id`, ce qui
     fixe l'ordre de traitement."""
     insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
-    insert_source_publication(
+    insert_source_record(
         conn,
         pub_id,
         source_id=f"hal-{pub_id}",
         title=f"pub {pub_id}",
         row_id=pub_id,
-        pub_year=2024,
+        publication_year=2024,
         doc_type="ART",
     )
     insert_signature(
@@ -54,14 +54,14 @@ def _seed_two_notices(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2,
     """Une publication vue par HAL (notice `sa1_id`) et OpenAlex (notice `sa2_id`), une signature non rattachée chacune, en position 0. `grouped` : les deux signatures forment un groupe, celui d'un même auteur."""
     insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
     for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
-        insert_source_publication(
+        insert_source_record(
             conn,
             pub_id,
             source=source,
             source_id=f"{source}-{sp_id}",
             title=f"pub {pub_id}",
             row_id=sp_id,
-            pub_year=2024,
+            publication_year=2024,
             doc_type="ART",
         )
     for sa_id, source, raw, norm in (
@@ -116,7 +116,7 @@ def _martin_count(conn) -> int:
 
 def _person_of(conn, sa_id):
     return conn.execute(
-        text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa_id}
+        text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": sa_id}
     ).scalar_one()
 
 
@@ -149,7 +149,7 @@ def _seed_person(conn, last_name, first_name, *, signatures=()):
     for sa_id in signatures:
         conn.execute(
             text(
-                "UPDATE source_authorships SET person_id = :p, resolution_mode = 'name' "
+                "UPDATE source_contributions SET person_id = :p, resolution_mode = 'name' "
                 "WHERE id = :s"
             ),
             {"p": pid, "s": sa_id},

@@ -2,14 +2,14 @@
 
 from pipeline.ingestion.theses.fetch_missing import get_missing_nnts
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
 def _carry(conn, source, source_id, nnt):
     """Notice `source` qui contient le NNT `nnt`, avec sa ligne staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
-    insert_source_publication(
+    insert_source_record(
         conn,
         insert_publication(conn),
         source=source,

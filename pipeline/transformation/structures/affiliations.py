@@ -5,7 +5,7 @@ La phase s'arrête en échec si le périmètre d'extraction ne contient aucune s
 1. **Référentiel ROR** (tâche `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
 2. **Référentiel des structures HAL** (tâche `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
 3. **Résolution des adresses** (tâche `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (tâche `affiliations.resolve_thesis_partners`).
-4. **Signatures du périmètre** (tâche `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les structures qu'elles atteignent (vue `source_authorship_structures`) et l'identité des personnes RH.
+4. **Signatures du périmètre** (tâche `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_contributions`, d'après les structures qu'elles atteignent (vue `source_contribution_structures`) et l'identité des personnes RH.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ from pipeline.transformation.structures.hal_structures import (
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 from pipeline.transformation.structures.perimeter_evidence import (
-    refresh_source_authorship_structures,
+    refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
 from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
@@ -113,10 +113,10 @@ class AffiliationsPhase:
 
 
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
-    """Pose les indices de l'entrée dans le périmètre sur les `source_authorships` : rafraîchit la matview `source_authorship_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
+    """Pose les indices de l'entrée dans le périmètre sur les `source_contributions` : rafraîchit la matview `source_contribution_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}rattachement en cours", logger) as ligne:
-        refresh_source_authorship_structures(conn)
+        refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
         ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
 

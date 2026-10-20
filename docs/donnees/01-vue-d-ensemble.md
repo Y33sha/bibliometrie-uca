@@ -6,7 +6,7 @@
 
 Les trois principales entités métier sont matérialisées dans trois tables: `publications`, `persons`, `structures`.
 
-Une quatrième table `authorships` matérialise la relation entre les trois. Une `authorship` représente la contribution d'**un** auteur à **une** publication. Ses attributs :
+Une quatrième table `contributions` matérialise la relation entre les trois. Une `contribution` représente la contribution d'**un** auteur à **une** publication. Ses attributs :
 - rôle (généralement `auteur`, sauf pour les thèses: `rapporteur`, `president_jury`, etc.),
 - auteur [correspondant](../glossaire.md#auteur-correspondant) ou non,
 - position auteur (= ordre dans la liste, pour les publications multi-auteurs),
@@ -15,9 +15,9 @@ Une quatrième table `authorships` matérialise la relation entre les trois. Une
 ```mermaid
 erDiagram
     direction LR
-    Publications ||--|{ Authorships : a_pour_auteurs
-    Persons ||--|{ Authorships : est_auteur_de
-    Authorships }o--|{ Structures : est_affilie_a
+    Publications ||--|{ Contributions : a_pour_auteurs
+    Persons ||--|{ Contributions : est_auteur_de
+    Contributions }o--|{ Structures : est_affilie_a
 ```
 
 ## Séparation sources / vue consolidée
@@ -34,24 +34,24 @@ Légende:
 ```mermaid
 flowchart LR
     subgraph sources
-        source_publications-->source_authorships
-        source_authorships-->author_identifying_keys
+        source_records-->source_contributions
+        source_contributions-->contributor_information
     end
     subgraph consolidé
-        publications---authorships
-        persons---authorships
-        authorships-.->|via matview authorship_structures|structures
+        publications---contributions
+        persons---contributions
+        contributions-.->|via matview contribution_structures|structures
 
     end
-    source_authorships-->addresses
-    source_publications--->publications
-    author_identifying_keys--->persons
+    source_contributions-->addresses
+    source_records--->publications
+    contributor_information--->persons
     addresses---structures
 
     classDef manuel  fill:#8e5,stroke:#5a3
     classDef auto fill:#adf,stroke:#58c
     class structures manuel;
-    class source_authorships,source_publications,publications,authorships,persons,addresses,author_identifying_keys auto
+    class source_contributions,source_records,publications,contributions,persons,addresses,contributor_information auto
 ```
 
 ## Schémas PostgreSQL
@@ -59,7 +59,7 @@ flowchart LR
 Les tables se répartissent en un schéma par domaine. Le `search_path` de la base liste ces schémas : les requêtes nomment les tables sans leur schéma. Les types énumérés, les extensions et `alembic_version` sont dans `public`.
 
 - [`sources`](02-sources.md) — tables sources et staging
-- [`publications`](03-publications.md) — référentiel consolidé, authorships, sujets
+- [`publications`](03-publications.md) — référentiel consolidé, contributions, sujets
 - [`publishing`](04-publishing.md) — revues, monographies, éditeurs, APC
 - [`persons`](05-persons.md) — référentiel consolidé, identifiants, name forms, données RH, décisions humaines sur les signatures
 - [`structures`](06-structures.md) — référentiel institutionnel, périmètres, adresses

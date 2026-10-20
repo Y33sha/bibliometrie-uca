@@ -1,6 +1,6 @@
 """Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
 
-Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `authorships.py`.
+Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `contributions.py`.
 
 L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
@@ -13,7 +13,7 @@ from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
-    NameFormAuthorshipsResponse,
+    NameFormContributionsResponse,
     NameFormSummaryOut,
     PersonAddressesResponse,
     PersonDashboardResponse,
@@ -30,7 +30,7 @@ from application.ports.read_models.persons_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import commands as person_commands
 from domain.merge import MergedEntity
@@ -38,7 +38,7 @@ from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
     audit_repo,
-    authorship_repo,
+    contribution_repo,
     db_conn,
     entity_detail,
     person_repo,
@@ -50,8 +50,8 @@ from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     AddIdentifier,
     AddIdentifierResponse,
-    DetachAuthorships,
-    DetachAuthorshipsResponse,
+    DetachContributions,
+    DetachContributionsResponse,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
     MarkDistinctPersons,
@@ -99,7 +99,7 @@ def person_filters(
 ) -> PersonFilters:
     """Filtres communs à la liste des personnes et à ses facettes.
 
-    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `active=true` retient les personnes qui ont une authorship ou une fiche RH ; l'annuaire public le pose aussi. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
+    `department`, `role` et `exclusion` acceptent plusieurs valeurs séparées par des virgules. `exclusion` prend des motifs d'exclusion et `none` pour les personnes retenues ; omis, il laisse tout passer, et l'annuaire public pose `exclusion=none`. `active=true` retient les personnes qui ont une contribution ou une fiche RH ; l'annuaire public le pose aussi. `lab_id` restreint aux personnes d'un laboratoire et y restreint leurs dénombrements.
     """
     return PersonFilters(
         search=search,
@@ -321,7 +321,7 @@ def person_addresses(
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonAddressesResponse:
-    """Adresses distinctes utilisées dans les authorships sources de cette personne."""
+    """Adresses distinctes utilisées dans les contributions sources de cette personne."""
     return queries.person_addresses(person_id, page=page, per_page=per_page)
 
 
@@ -365,14 +365,14 @@ def person_name_forms(
     return queries.person_name_forms(person_id)
 
 
-@router.get("/{person_id}/name-form-authorships", response_model=NameFormAuthorshipsResponse)
-def name_form_authorships(
+@router.get("/{person_id}/name-form-contributions", response_model=NameFormContributionsResponse)
+def name_form_contributions(
     person_id: int,
     name_form: TextParam = Query(...),
     queries: PersonsQueries = Depends(persons_queries),
-) -> NameFormAuthorshipsResponse:
-    """Authorships sources + autres personnes partageant une forme de nom."""
-    return queries.name_form_authorships(person_id, name_form)
+) -> NameFormContributionsResponse:
+    """Contributions sources + autres personnes partageant une forme de nom."""
+    return queries.name_form_contributions(person_id, name_form)
 
 
 # ── Une personne : identifiants ──────────────────────────────────
@@ -472,26 +472,26 @@ def merge_persons(
     return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
 
 
-@router.post("/{person_id}/detach-authorships", response_model=DetachAuthorshipsResponse)
-def detach_authorships(
+@router.post("/{person_id}/detach-contributions", response_model=DetachContributionsResponse)
+def detach_contributions(
     person_id: int,
-    body: DetachAuthorships,
+    body: DetachContributions,
     conn: Connection = Depends(db_conn),
     persons: PersonRepository = Depends(person_repo),
-    authorships: AuthorshipRepository = Depends(authorship_repo),
+    contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
-) -> DetachAuthorshipsResponse:
+) -> DetachContributionsResponse:
     """Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet."""
-    return DetachAuthorshipsResponse.model_validate(
-        person_commands.detach_authorships(
+    return DetachContributionsResponse.model_validate(
+        person_commands.detach_contributions(
             conn,
             person_id,
             [
-                {"source": a.source, "source_authorship_id": a.source_authorship_id}
-                for a in body.authorships
+                {"source": a.source, "source_contribution_id": a.source_contribution_id}
+                for a in body.contributions
             ],
             repo=persons,
-            authorship_repo=authorships,
+            contribution_repo=contributions,
             audit_repo=audit,
         )
     )
@@ -503,12 +503,12 @@ def update_name_form_status(
     body: UpdateNameFormStatus,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
-    authorships: AuthorshipRepository = Depends(authorship_repo),
+    contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_authorships`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
     row = person_commands.update_name_form_status(
         conn,
@@ -516,7 +516,7 @@ def update_name_form_status(
         body.name_form,
         body.status,
         repo=repo,
-        authorship_repo=authorships,
+        contribution_repo=contributions,
         audit_repo=audit,
     )
     return NameFormStatusResponse(**row)

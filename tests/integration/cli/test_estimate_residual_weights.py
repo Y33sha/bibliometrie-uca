@@ -6,20 +6,20 @@ from interfaces.cli.dev import estimate_residual_weights as script
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
-from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_identity
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def _notice(conn, publication_id, source, source_id, names):
-    notice = insert_source_publication(conn, publication_id, source=source, source_id=source_id)
+    notice = insert_source_record(conn, publication_id, source=source, source_id=source_id)
     for pos, (last, first) in enumerate(names):
         insert_signature(
             conn,
             notice,
             source=source,
             author_position=pos,
-            identity_id=upsert_split_identity(conn, last, first),
+            contributor_information_id=upsert_split_identity(conn, last, first),
         )
     return notice
 

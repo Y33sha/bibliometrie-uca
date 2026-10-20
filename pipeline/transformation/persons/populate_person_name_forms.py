@@ -1,10 +1,10 @@
 """Peuplement de `person_name_forms` à partir des sources existantes.
 
-Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (persons + source_authorships), puis synchronise la table par diff (insert/update/delete).
+Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (persons + source_contributions), puis synchronise la table par diff (insert/update/delete).
 
 Sources :
 1. `persons.last_name` + `persons.first_name` (source: `'persons'`) — inclut les personnes exclues, qui restent des ancres du matching.
-2. le nom normalisé de l'identité des signatures (`author_identifying_keys.author_name_normalized`, toutes sources biblio).
+2. le nom normalisé de l'identité des signatures (`contributor_information.author_name_normalized`, toutes sources biblio).
 
 L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
 """
@@ -57,7 +57,7 @@ def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
 
 
 def create_temp_raw_forms_table(conn: Connection) -> None:
-    """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes issues de `source_authorships` sont lues directement par la query d'agrégation, sans transiter par cette table."""
+    """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes issues de `source_contributions` sont lues directement par la query d'agrégation, sans transiter par cette table."""
     conn.execute(text("CREATE TEMP TABLE _raw_forms (name_form TEXT, person_id INT, source TEXT)"))
 
 
@@ -94,8 +94,8 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
                 UNION
                 SELECT aik.author_name_normalized AS name_form,
                        sa.person_id, sa.source::text AS source
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sa.person_id IS NOT NULL
                   AND aik.author_name_normalized IS NOT NULL
                   AND aik.author_name_normalized != ''

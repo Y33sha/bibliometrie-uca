@@ -21,7 +21,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
-    insert_source_publication,
+    insert_source_record,
 )
 from tests.integration.helpers.structures import insert_structure, insert_structure_name_form
 
@@ -235,7 +235,7 @@ class TestGetAddressRawText:
 class TestGetAddressPublications:
     def test_returns_linked_publications(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn, "T", doi="10.1/a")
-        sd = insert_source_publication(sa_sync_conn, pub, source_id="h-1", title="T")
+        sd = insert_source_record(sa_sync_conn, pub, source_id="h-1", title="T")
         sa_id = insert_signature(sa_sync_conn, sd)
         addr = insert_address(sa_sync_conn, "rue X")
         insert_signature_address(sa_sync_conn, sa_id, address_id=addr)

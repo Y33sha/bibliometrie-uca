@@ -785,7 +785,7 @@ export interface paths {
          * Get Structure
          * @description Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
          *
-         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_tutelles` ; les enfants inversement. 404 si la structure n'existe pas.
+         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_parents` ; les enfants inversement. 404 si la structure n'existe pas.
          */
         get: operations["get_structure_api_structures__structure_id__get"];
         /**
@@ -1209,7 +1209,7 @@ export interface paths {
         };
         /**
          * Person Addresses
-         * @description Adresses distinctes utilisées dans les authorships sources de cette personne.
+         * @description Adresses distinctes utilisées dans les contributions sources de cette personne.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
         put?: never;
@@ -1302,7 +1302,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/name-form-authorships": {
+    "/api/persons/{person_id}/name-form-contributions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1310,10 +1310,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Name Form Authorships
-         * @description Authorships sources + autres personnes partageant une forme de nom.
+         * Name Form Contributions
+         * @description Contributions sources + autres personnes partageant une forme de nom.
          */
-        get: operations["name_form_authorships_api_persons__person_id__name_form_authorships_get"];
+        get: operations["name_form_contributions_api_persons__person_id__name_form_contributions_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1410,7 +1410,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/detach-authorships": {
+    "/api/persons/{person_id}/detach-contributions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1420,10 +1420,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Detach Authorships
+         * Detach Contributions
          * @description Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet.
          */
-        post: operations["detach_authorships_api_persons__person_id__detach_authorships_post"];
+        post: operations["detach_contributions_api_persons__person_id__detach_contributions_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1447,12 +1447,12 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_authorships`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
     };
-    "/api/authorships/orphans/count": {
+    "/api/contributions/orphans/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -1460,10 +1460,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Orphan Authorships Count
+         * Orphan Contributions Count
          * @description Nombre de signatures du périmètre qu'aucune personne ne porte.
          */
-        get: operations["orphan_authorships_count_api_authorships_orphans_count_get"];
+        get: operations["orphan_contributions_count_api_contributions_orphans_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1472,7 +1472,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/authorships/orphans": {
+    "/api/contributions/orphans": {
         parameters: {
             query?: never;
             header?: never;
@@ -1480,10 +1480,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Orphan Authorships
+         * List Orphan Contributions
          * @description Liste les signatures du périmètre qu'aucune personne ne porte.
          */
-        get: operations["list_orphan_authorships_api_authorships_orphans_get"];
+        get: operations["list_orphan_contributions_api_contributions_orphans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1492,7 +1492,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/authorships/orphans/facets": {
+    "/api/contributions/orphans/facets": {
         parameters: {
             query?: never;
             header?: never;
@@ -1500,10 +1500,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Orphan Authorships Facets
+         * Orphan Contributions Facets
          * @description Facette laboratoires des signatures orphelines.
          */
-        get: operations["orphan_authorships_facets_api_authorships_orphans_facets_get"];
+        get: operations["orphan_contributions_facets_api_contributions_orphans_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1512,7 +1512,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/authorships/orphans/assign": {
+    "/api/contributions/orphans/assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -1522,19 +1522,19 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Assign Orphan Authorship
+         * Assign Orphan Contribution
          * @description Attribue une signature orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_authorship`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`AuthorshipAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`ContributionAlreadyAssignedError`).
          */
-        post: operations["assign_orphan_authorship_api_authorships_orphans_assign_post"];
+        post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/authorships/orphans/batch-assign": {
+    "/api/contributions/orphans/batch-assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -1544,19 +1544,19 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Batch Assign Orphan Authorships
+         * Batch Assign Orphan Contributions
          * @description Attribue plusieurs signatures orphelines à une personne existante.
          *
          *     Les signatures absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les signatures rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
-        post: operations["batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post"];
+        post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/authorships/{authorship_id}/exclude": {
+    "/api/contributions/{contribution_id}/exclude": {
         parameters: {
             query?: never;
             header?: never;
@@ -1570,12 +1570,12 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Exclude Authorship
+         * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     Enregistre la paire (publication, personne) dans `rejected_authorships`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
-        patch: operations["exclude_authorship_api_authorships__authorship_id__exclude_patch"];
+        patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
     };
     "/api/hal-problems/duplicate-accounts": {
@@ -2604,7 +2604,7 @@ export interface components {
             /** Found Countries */
             found_countries: components["schemas"]["FoundCountry"][];
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
         };
         /**
          * AddressListResponse
@@ -2645,7 +2645,7 @@ export interface components {
             /** Structures */
             structures: components["schemas"]["AddressStructureSummary"][];
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
         };
         /** AddressPublicationItem */
         AddressPublicationItem: {
@@ -2654,7 +2654,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doi */
             doi: string | null;
             /** Doc Type */
@@ -2785,14 +2785,14 @@ export interface components {
             readonly pages: number;
         };
         /**
-         * AssignOrphanAuthorship
+         * AssignOrphanContribution
          * @description Attribution unitaire, seule à savoir créer la personne au passage.
          *
-         *     `source_authorships.id` est une clé primaire : l'id désigne la signature à lui seul.
+         *     `source_contributions.id` est une clé primaire : l'id désigne la signature à lui seul.
          */
-        AssignOrphanAuthorship: {
-            /** Source Authorship Id */
-            source_authorship_id: number;
+        AssignOrphanContribution: {
+            /** Source Contribution Id */
+            source_contribution_id: number;
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
@@ -2826,12 +2826,12 @@ export interface components {
             authenticated: boolean;
         };
         /**
-         * BatchAssignOrphanAuthorships
+         * BatchAssignOrphanContributions
          * @description Attribution en lot à une personne existante.
          */
-        BatchAssignOrphanAuthorships: {
-            /** Source Authorship Ids */
-            source_authorship_ids: number[];
+        BatchAssignOrphanContributions: {
+            /** Source Contribution Ids */
+            source_contribution_ids: number[];
             /** Person Id */
             person_id: number;
             /**
@@ -2935,10 +2935,10 @@ export interface components {
             value: unknown;
         };
         /**
-         * ConsolidatedAuthorshipOut
-         * @description Authorship consolidée (liens certifiés person ↔ publication).
+         * ConsolidatedContributionOut
+         * @description Contribution consolidée (liens certifiés person ↔ publication).
          */
-        ConsolidatedAuthorshipOut: {
+        ConsolidatedContributionOut: {
             /** Author Position */
             author_position: number | null;
             /** In Perimeter */
@@ -3050,20 +3050,20 @@ export interface components {
              */
             deleted: boolean;
         };
-        /** DetachAuthorships */
-        DetachAuthorships: {
-            /** Authorships */
-            authorships: components["schemas"]["SourceAuthorshipRef"][];
+        /** DetachContributions */
+        DetachContributions: {
+            /** Contributions */
+            contributions: components["schemas"]["SourceContributionRef"][];
         };
         /**
-         * DetachAuthorshipsResponse
-         * @description Décompte d'un détachement de signatures : signatures détachées, authorships supprimées, formes de nom nettoyées.
+         * DetachContributionsResponse
+         * @description Décompte d'un détachement de signatures : signatures détachées, contributions supprimées, formes de nom nettoyées.
          */
-        DetachAuthorshipsResponse: {
+        DetachContributionsResponse: {
             /** Detached */
             detached: number;
-            /** Deleted Authorships */
-            deleted_authorships: number;
+            /** Deleted Contributions */
+            deleted_contributions: number;
             /** Cleaned Forms */
             cleaned_forms: number;
         };
@@ -3200,7 +3200,7 @@ export interface components {
             /** Raw Text */
             raw_text: string;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
             /** Structures */
             structures: components["schemas"]["AddressStructureSummary"][];
             /** Matched Forms */
@@ -3278,7 +3278,7 @@ export interface components {
             /** Idref */
             idref: string | null;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
         };
         /** HalAffiliationConflictPub */
         HalAffiliationConflictPub: {
@@ -3287,7 +3287,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doc Type */
             doc_type: string;
             /** Doi */
@@ -3336,7 +3336,7 @@ export interface components {
             /** Hal Doc Type */
             hal_doc_type: string | null;
             /** Hal Pub Year */
-            hal_pub_year: number | null;
+            hal_publication_year: number | null;
             /** Hal Title */
             hal_title: string | null;
             /** Author Count */
@@ -3414,7 +3414,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doc Type */
             doc_type: string;
             /** Doi */
@@ -3451,7 +3451,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doc Type */
             doc_type: string;
             /** Doi */
@@ -3578,7 +3578,7 @@ export interface components {
             is_in_doaj: boolean;
             journal_type: components["schemas"]["JournalType"] | null;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
             /** Doaj Url */
             doaj_url: string | null;
             /** Issn Details */
@@ -3655,7 +3655,7 @@ export interface components {
          * JournalListItem
          * @description Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
          *
-         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
+         *     `pub_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
          */
         JournalListItem: {
             /** Id */
@@ -3672,7 +3672,7 @@ export interface components {
             is_in_doaj: boolean;
             journal_type: components["schemas"]["JournalType"] | null;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
             /** Doaj Url */
             doaj_url: string | null;
         };
@@ -3809,7 +3809,7 @@ export interface components {
         };
         /**
          * MonographListItem
-         * @description Ligne de la liste des monographies. `pub_count` compte les publications qu'elle contient.
+         * @description Ligne de la liste des monographies. `publication_count` compte les publications qu'elle contient.
          */
         MonographListItem: {
             /** Id */
@@ -3833,7 +3833,7 @@ export interface components {
             /** Journal Title */
             journal_title: string | null;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
         };
         /** MonographListResponse */
         MonographListResponse: {
@@ -3880,25 +3880,25 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** NameFormAuthorshipRef */
-        NameFormAuthorshipRef: {
+        /** NameFormContributionRef */
+        NameFormContributionRef: {
             /** Source */
             source: string;
-            /** Source Authorship Id */
-            source_authorship_id: number;
+            /** Source Contribution Id */
+            source_contribution_id: number;
             /** Publication Id */
             publication_id: number;
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doi */
             doi: string | null;
         };
-        /** NameFormAuthorshipsResponse */
-        NameFormAuthorshipsResponse: {
-            /** Authorships */
-            authorships: components["schemas"]["NameFormAuthorshipRef"][];
+        /** NameFormContributionsResponse */
+        NameFormContributionsResponse: {
+            /** Contributions */
+            contributions: components["schemas"]["NameFormContributionRef"][];
             /** Other Persons */
             other_persons: components["schemas"]["OtherPersonOut"][];
         };
@@ -3972,7 +3972,7 @@ export interface components {
             /** Shared Count */
             shared_count: number;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
         };
         /** NameFormUpdate */
         NameFormUpdate: {
@@ -4015,12 +4015,12 @@ export interface components {
             /** Person Id */
             person_id: number;
         };
-        /** OrphanAuthorshipOut */
-        OrphanAuthorshipOut: {
+        /** OrphanContributionOut */
+        OrphanContributionOut: {
             /** Source */
             source: string;
-            /** Source Authorship Id */
-            source_authorship_id: number;
+            /** Source Contribution Id */
+            source_contribution_id: number;
             /** Full Name */
             full_name: string;
             /** Last Name */
@@ -4032,30 +4032,30 @@ export interface components {
             /** Pub Title */
             pub_title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Labs */
             labs: components["schemas"]["PubLabItem"][];
         };
         /**
-         * OrphanAuthorshipsFacetsResponse
+         * OrphanContributionsFacetsResponse
          * @description Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire.
          */
-        OrphanAuthorshipsFacetsResponse: {
+        OrphanContributionsFacetsResponse: {
             /** Labs */
             labs: components["schemas"]["FacetOption"][];
             /** No Lab Count */
             no_lab_count: number;
         };
-        /** OrphanAuthorshipsResponse */
-        OrphanAuthorshipsResponse: {
+        /** OrphanContributionsResponse */
+        OrphanContributionsResponse: {
             /** Total */
             total: number;
             /** Page */
             page: number;
             /** Per Page */
             per_page: number;
-            /** Authorships */
-            authorships: components["schemas"]["OrphanAuthorshipOut"][];
+            /** Contributions */
+            contributions: components["schemas"]["OrphanContributionOut"][];
             /** Pages */
             readonly pages: number;
         };
@@ -4347,7 +4347,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doi */
             doi: string | null;
             /** Author Name */
@@ -4542,7 +4542,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doi */
             doi: string | null;
             /** Doi Ra */
@@ -4584,16 +4584,16 @@ export interface components {
         };
         /**
          * PublicationDetailResponse
-         * @description Détail complet d'une publication : métadonnées + sources + authorships.
+         * @description Détail complet d'une publication : métadonnées + sources + contributions.
          */
         PublicationDetailResponse: {
             publication: components["schemas"]["PublicationDetailCore"];
             /** Sources */
-            sources: components["schemas"]["SourcePublicationOut"][];
-            /** Authorships */
-            authorships: components["schemas"]["ConsolidatedAuthorshipOut"][];
-            /** Theses Authorships */
-            theses_authorships: components["schemas"]["ThesesAuthorshipOut"][];
+            sources: components["schemas"]["SourceRecordOut"][];
+            /** Contributions */
+            contributions: components["schemas"]["ConsolidatedContributionOut"][];
+            /** Theses Contributions */
+            theses_contributions: components["schemas"]["ThesesContributionOut"][];
             thesis_meta: components["schemas"]["ThesisMeta"] | null;
             /** Structures */
             structures: {
@@ -4618,7 +4618,7 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doi */
             doi: string | null;
             /** Doc Type */
@@ -4659,8 +4659,8 @@ export interface components {
             apc: components["schemas"]["PubApcPayment"][] | null;
             /** Is Corresponding */
             is_corresponding: boolean | null;
-            /** Authorship Id */
-            authorship_id: number | null;
+            /** Contribution Id */
+            contribution_id: number | null;
             /** Hal Collections */
             hal_collections: string[] | null;
         };
@@ -4685,7 +4685,7 @@ export interface components {
             /** Title */
             title: string;
             /** Source Publications */
-            source_publications: components["schemas"]["SourcePublicationMetadataOut"][];
+            source_records: components["schemas"]["SourceRecordMetadataOut"][];
             /** Signatures */
             signatures: components["schemas"]["SourceSignatureOut"][];
             /** Structures */
@@ -4749,7 +4749,7 @@ export interface components {
             /** Journal Count */
             journal_count: number;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
         };
@@ -4773,7 +4773,7 @@ export interface components {
          * PublisherListItem
          * @description Ligne de la liste des éditeurs.
          *
-         *     `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+         *     `publication_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
          */
         PublisherListItem: {
             /** Id */
@@ -4789,7 +4789,7 @@ export interface components {
             /** Journal Count */
             journal_count: number;
             /** Pub Count */
-            pub_count: number;
+            publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
         };
@@ -4878,7 +4878,7 @@ export interface components {
          * RelatedPublicationOut
          * @description Une publication apparentée, vue depuis la publication courante.
          *
-         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
+         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`publication_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
          */
         RelatedPublicationOut: {
             /** Relation Type */
@@ -4890,7 +4890,7 @@ export interface components {
             /** Title */
             title?: string | null;
             /** Pub Year */
-            pub_year?: number | null;
+            publication_year?: number | null;
             /** Doc Type */
             doc_type?: string | null;
             /** Source */
@@ -5027,20 +5027,20 @@ export interface components {
             /** Message */
             message: string;
         };
-        /** SourceAuthorshipRef */
-        SourceAuthorshipRef: {
+        /** SourceContributionRef */
+        SourceContributionRef: {
             /** Source */
             source: string;
-            /** Source Authorship Id */
-            source_authorship_id: number;
+            /** Source Contribution Id */
+            source_contribution_id: number;
         };
         /**
-         * SourcePublicationMetadataOut
+         * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
          *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
-        SourcePublicationMetadataOut: {
+        SourceRecordMetadataOut: {
             /** Id */
             id: number;
             /** Source */
@@ -5060,7 +5060,7 @@ export interface components {
             /** Doc Type */
             doc_type: string | null;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Language */
             language: string | null;
             /** Language Name */
@@ -5096,8 +5096,8 @@ export interface components {
             /** Article Number */
             article_number: string | null;
         };
-        /** SourcePublicationOut */
-        SourcePublicationOut: {
+        /** SourceRecordOut */
+        SourceRecordOut: {
             /** Source */
             source: string;
             /** Source Id */
@@ -5121,7 +5121,7 @@ export interface components {
             /** Id */
             id: number;
             /** Source Publication Id */
-            source_publication_id: number;
+            source_record_id: number;
             /** Position */
             position: number | null;
             /** Full Name */
@@ -5466,7 +5466,7 @@ export interface components {
             /** Signatures */
             signatures: number;
             /** Matched Signatures */
-            matched_signatures: number;
+            matched_source_contributions: number;
         };
         /**
          * SuspectMergeOut
@@ -5478,13 +5478,13 @@ export interface components {
             /** Title */
             title: string;
             /** Pub Year */
-            pub_year: number | null;
+            publication_year: number | null;
             /** Doc Type */
             doc_type: string;
             /** Signatures */
             signatures: number;
             /** Matched Signatures */
-            matched_signatures: number;
+            matched_source_contributions: number;
             /** Notices */
             notices: components["schemas"]["SuspectMergeNoticeOut"][];
         };
@@ -5501,8 +5501,8 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** ThesesAuthorshipOut */
-        ThesesAuthorshipOut: {
+        /** ThesesContributionOut */
+        ThesesContributionOut: {
             /** Id */
             id: number;
             /** Author Position */
@@ -7832,7 +7832,7 @@ export interface operations {
             };
         };
     };
-    name_form_authorships_api_persons__person_id__name_form_authorships_get: {
+    name_form_contributions_api_persons__person_id__name_form_contributions_get: {
         parameters: {
             query: {
                 name_form: string;
@@ -7851,7 +7851,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
+                    "application/json": components["schemas"]["NameFormContributionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8005,7 +8005,7 @@ export interface operations {
             };
         };
     };
-    detach_authorships_api_persons__person_id__detach_authorships_post: {
+    detach_contributions_api_persons__person_id__detach_contributions_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8016,7 +8016,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DetachAuthorships"];
+                "application/json": components["schemas"]["DetachContributions"];
             };
         };
         responses: {
@@ -8026,7 +8026,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetachAuthorshipsResponse"];
+                    "application/json": components["schemas"]["DetachContributionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8075,7 +8075,7 @@ export interface operations {
             };
         };
     };
-    orphan_authorships_count_api_authorships_orphans_count_get: {
+    orphan_contributions_count_api_contributions_orphans_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8095,7 +8095,7 @@ export interface operations {
             };
         };
     };
-    list_orphan_authorships_api_authorships_orphans_get: {
+    list_orphan_contributions_api_contributions_orphans_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8115,7 +8115,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrphanAuthorshipsResponse"];
+                    "application/json": components["schemas"]["OrphanContributionsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8129,7 +8129,7 @@ export interface operations {
             };
         };
     };
-    orphan_authorships_facets_api_authorships_orphans_facets_get: {
+    orphan_contributions_facets_api_contributions_orphans_facets_get: {
         parameters: {
             query?: {
                 search?: string;
@@ -8147,7 +8147,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrphanAuthorshipsFacetsResponse"];
+                    "application/json": components["schemas"]["OrphanContributionsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8161,7 +8161,7 @@ export interface operations {
             };
         };
     };
-    assign_orphan_authorship_api_authorships_orphans_assign_post: {
+    assign_orphan_contribution_api_contributions_orphans_assign_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8170,7 +8170,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["AssignOrphanAuthorship"];
+                "application/json": components["schemas"]["AssignOrphanContribution"];
             };
         };
         responses: {
@@ -8203,7 +8203,7 @@ export interface operations {
             };
         };
     };
-    batch_assign_orphan_authorships_api_authorships_orphans_batch_assign_post: {
+    batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -8212,7 +8212,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["BatchAssignOrphanAuthorships"];
+                "application/json": components["schemas"]["BatchAssignOrphanContributions"];
             };
         };
         responses: {
@@ -8245,12 +8245,12 @@ export interface operations {
             };
         };
     };
-    exclude_authorship_api_authorships__authorship_id__exclude_patch: {
+    exclude_contribution_api_contributions__contribution_id__exclude_patch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                authorship_id: number;
+                contribution_id: number;
             };
             cookie?: never;
         };

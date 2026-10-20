@@ -9,12 +9,12 @@ from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
 )
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.journals import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
-from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 
@@ -42,8 +42,8 @@ class TestGetPublicationDetail:
     def test_returns_full_detail(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn, title="Test Pub", doi="10.1/abc")
-        sd = insert_source_publication(sa_sync_conn, pub, source="hal", source_id="hal-1")
-        insert_authorship(sa_sync_conn, pub, person_id=pid)
+        sd = insert_source_record(sa_sync_conn, pub, source="hal", source_id="hal-1")
+        insert_contribution(sa_sync_conn, pub, person_id=pid)
         insert_signature(sa_sync_conn, sd, person_id=pid)
 
         detail = get_publication_detail(sa_sync_conn, pub)
@@ -51,19 +51,19 @@ class TestGetPublicationDetail:
         assert detail.publication.id == pub
         assert detail.publication.doi == "10.1/abc"
         assert any(s.source == "hal" for s in detail.sources)
-        assert len(detail.authorships) == 1
-        assert detail.authorships[0].source_hal is True
+        assert len(detail.contributions) == 1
+        assert detail.contributions[0].source_hal is True
 
     def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
         # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
         pub = insert_publication(sa_sync_conn, doi="10.9001/set")
-        insert_source_publication(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
+        insert_source_record(sa_sync_conn, pub, source="datacite", source_id="dc-parent")
         for source_id, corrected_by in (
             ("oa-piece", "DATACITE_PACKAGE_PIECE"),
             ("oa-chapter", "OUVRAGE_VS_CHAPITRE"),
         ):
-            insert_source_publication(
+            insert_source_record(
                 sa_sync_conn,
                 pub,
                 source="openalex",
@@ -85,8 +85,8 @@ class TestGetPublicationDetail:
             text("UPDATE publications SET meta = CAST(:m AS jsonb) WHERE id = :id"),
             {"m": json.dumps({"date_soutenance": "2023-05-10"}), "id": pub},
         )
-        # source_publications theses avec meta
-        insert_source_publication(
+        # source_records theses avec meta
+        insert_source_record(
             sa_sync_conn,
             pub,
             source="theses",
@@ -122,26 +122,20 @@ class TestGetPublicationDetail:
         assert detail is not None
         assert detail.publication.doi_ra is None
 
-    def test_multiple_source_publications_same_source(self, sa_sync_conn):
+    def test_multiple_source_records_same_source(self, sa_sync_conn):
         """Deux notices OpenAlex d'une même publication sont toutes deux dans `sources`, la plus récente d'abord."""
         pub = insert_publication(sa_sync_conn, title="Multi-OA")
         # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
-        sd_old = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
+        sd_old = insert_source_record(sa_sync_conn, pub, source="openalex", source_id="W1-OLD")
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_publications SET created_at = '2026-01-01'::timestamptz "
-                "WHERE id = :id"
-            ),
+            text("UPDATE source_records SET created_at = '2026-01-01'::timestamptz WHERE id = :id"),
             {"id": sd_old},
         )
         insert_signature(sa_sync_conn, sd_old, source="openalex", raw_author_name="Alice")
         # Row OpenAlex la plus récente, avec 1 auteur "Bob"
-        sd_new = insert_source_publication(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
+        sd_new = insert_source_record(sa_sync_conn, pub, source="openalex", source_id="W2-NEW")
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_publications SET created_at = '2026-05-01'::timestamptz "
-                "WHERE id = :id"
-            ),
+            text("UPDATE source_records SET created_at = '2026-05-01'::timestamptz WHERE id = :id"),
             {"id": sd_new},
         )
         insert_signature(sa_sync_conn, sd_new, source="openalex", raw_author_name="Bob")
@@ -156,8 +150,8 @@ class TestGetPublicationDetail:
 
         pid = insert_person(sa_sync_conn, "X", first_name="Y")
         pub = insert_publication(sa_sync_conn)
-        aid = insert_authorship(sa_sync_conn, pub, person_id=pid)
-        add_authorship_structure(sa_sync_conn, aid, lab_id)
+        aid = insert_contribution(sa_sync_conn, pub, person_id=pid)
+        add_contribution_structure(sa_sync_conn, aid, lab_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail is not None
@@ -169,7 +163,7 @@ class TestGetPublicationDetail:
 class TestGetPublicationExternalIdentifiers:
     def test_aggregates_and_dedups(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             pub,
             source="openalex",
@@ -177,7 +171,7 @@ class TestGetPublicationExternalIdentifiers:
             external_ids={"pmid": "123", "arxiv_id": "2401.001"},
         )
         # Même PMID sur une seconde source : dédupliqué.
-        insert_source_publication(sa_sync_conn, pub, external_ids={"pmid": "123"})
+        insert_source_record(sa_sync_conn, pub, external_ids={"pmid": "123"})
 
         ids = get_publication_external_identifiers(sa_sync_conn, pub)
         # Ordre = `_EXTERNAL_IDENTIFIER_KEYS` (arxiv avant pmid), une seule entrée par valeur.
@@ -190,14 +184,14 @@ class TestGetPublicationExternalIdentifiers:
         # Le `source_id` de la source `theses` *est* le NNT : le lien source theses.fr couvre
         # déjà l'identifiant, l'entrée `nnt` externe ferait doublon.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             pub,
             source="theses",
             source_id="2017CLFAC011",
             external_ids={"nnt": "2017CLFAC011"},
         )
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
         )
 
@@ -207,7 +201,7 @@ class TestGetPublicationExternalIdentifiers:
     def test_nnt_kept_without_theses_source(self, sa_sync_conn):
         # NNT porté par un enregistrement HAL sans source theses.fr moissonnée : le lien reste utile.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
         )
 

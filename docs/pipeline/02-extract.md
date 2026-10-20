@@ -55,7 +55,7 @@ Chaque ligne périmée est réinterrogée par son identifiant natif :
 - absence confirmée → `disappeared_at` posé ;
 - erreur transitoire → laissée, retentée plus tard.
 
-La sélection se borne aux années de la fenêtre courante, lues sur `source_publications.pub_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ramasse seulement ce qui vient de franchir le délai.
+La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ramasse seulement ce qui vient de franchir le délai.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 

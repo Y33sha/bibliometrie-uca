@@ -13,8 +13,8 @@ from sqlalchemy import Connection
 
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.config_repository import ConfigRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -23,8 +23,8 @@ from application.ports.repositories.structure_repository import StructureReposit
 
 from .address_repository import PgAddressRepository
 from .audit_repository import PgAuditRepository
-from .authorship_repository import PgAuthorshipRepository
 from .config_repository import PgConfigRepository
+from .contribution_repository import PgContributionRepository
 from .journal_repository import PgJournalRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
@@ -40,8 +40,8 @@ def audit_repository(conn: Connection) -> AuditRepository:
     return PgAuditRepository(conn)
 
 
-def authorship_repository(conn: Connection) -> AuthorshipRepository:
-    return PgAuthorshipRepository(conn)
+def contribution_repository(conn: Connection) -> ContributionRepository:
+    return PgContributionRepository(conn)
 
 
 def config_repository(conn: Connection) -> ConfigRepository:

@@ -11,16 +11,16 @@ from domain.publications.aggregation import refresh_from_sources
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_records.source_record import SourceRecord
 
 
-def _sp(**overrides) -> SourcePublication:
+def _sp(**overrides) -> SourceRecord:
     defaults = {
         "id": 1,
         "source": "datacite",
         "source_id": "s",
         "title": "Titre",
-        "pub_year": 2020,
+        "publication_year": 2020,
         "doc_type": "dataset",
         "doi": "10.9001/set",
         "journal_id": None,
@@ -38,11 +38,11 @@ def _sp(**overrides) -> SourcePublication:
         "meta": None,
     }
     defaults.update(overrides)
-    return SourcePublication(**defaults)  # type: ignore[arg-type]
+    return SourceRecord(**defaults)  # type: ignore[arg-type]
 
 
 def _pub() -> Publication:
-    return Publication(id=10, title="obsolète", pub_year=2020)
+    return Publication(id=10, title="obsolète", publication_year=2020)
 
 
 # `openalex` prioritaire sur `datacite` : sans dépriorisation, la pièce OpenAlex gagnerait le titre.
@@ -139,7 +139,7 @@ class TestChampsAgreges:
     def test_chaque_champ_vient_de_la_source(self):
         source = _sp(
             title="Blé <i>durum</i>",
-            pub_year=2021,
+            publication_year=2021,
             doi="10.1234/ABC",
             journal_id=7,
             monograph_id=9,
@@ -155,7 +155,7 @@ class TestChampsAgreges:
         pub = _pub()
         refresh_from_sources(pub, [source], source_priority=_PRIORITY)
         assert pub.title_normalized == "ble durum"
-        assert pub.pub_year == 2021
+        assert pub.publication_year == 2021
         assert pub.doi == DOI("10.1234/abc")
         assert pub.journal_id == 7
         assert pub.monograph_id == 9

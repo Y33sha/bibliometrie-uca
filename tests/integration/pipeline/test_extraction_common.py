@@ -13,14 +13,16 @@ from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_di
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 # Publication de 2020 sans titre normalisé ni type.
-_publication = partial(insert_publication, normalize_title=False, pub_year=2020, doc_type=None)
+_publication = partial(
+    insert_publication, normalize_title=False, publication_year=2020, doc_type=None
+)
 
 # Notice de titre « T ».
-_notice = partial(insert_source_publication, title="T")
+_notice = partial(insert_source_record, title="T")
 
 # ── fingerprint ─────────────────────────────────────────────────
 
@@ -144,9 +146,9 @@ class TestCleanDoi:
 
 
 def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
-    """Publication `in_perimeter` + source_publication `source` rattaché.
+    """Publication `in_perimeter` + source_record `source` rattaché.
 
-    Le pool de la recherche par DOI ne part que des `source_publications` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
+    Le pool de la recherche par DOI ne part que des `source_records` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
     pub_id = _publication(conn, "T", in_perimeter=True)
     _notice(conn, pub_id, source=source, source_id=sid, doi=doi, external_ids=external_ids)
 
@@ -189,7 +191,7 @@ class TestGetMissingDois:
 
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == ["10.1234/manquant"]
 
-    def test_excludes_out_of_perimeter_source_publications(self, sa_sync_conn):
+    def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
         pub_id = _publication(sa_sync_conn, "T", in_perimeter=False)
         _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1", doi="10.1234/out")
@@ -211,8 +213,8 @@ class TestGetMissingDois:
         assert "10.1038/nature.1" in result
         assert "10.99999/x.1" not in result
 
-    def test_includes_related_dois_from_source_publications(self, sa_sync_conn):
-        """Les related_dois d'un source_publication in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
+    def test_includes_related_dois_from_source_records(self, sa_sync_conn):
+        """Les related_dois d'un source_record in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
         _add_inperim_sp(
             sa_sync_conn,
             "openalex",
@@ -225,7 +227,7 @@ class TestGetMissingDois:
         assert "10.9999/preprint" in result
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
-        """Un arxiv_id d'un source_publication in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
+        """Un arxiv_id d'un source_record in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
         _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"})
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" in result
@@ -345,17 +347,17 @@ class TestGetStaleSourceIds:
 
     def test_year_filter_scopes_to_window_and_keeps_null(self, sa_sync_conn):
         # W1 hors fenêtre (exclue), W2 dans la fenêtre (gardée), W3 sans
-        # source_publications → pub_year NULL, conservée (LEFT JOIN conservateur).
+        # source_records → publication_year NULL, conservée (LEFT JOIN conservateur).
         for sid in ("W1", "W2", "W3"):
             insert_staging(sa_sync_conn, "openalex", source_id=sid, seen_days_ago=100)
-        _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2020)
-        _notice(sa_sync_conn, source="openalex", source_id="W2", pub_year=2023)
+        _notice(sa_sync_conn, source="openalex", source_id="W1", publication_year=2020)
+        _notice(sa_sync_conn, source="openalex", source_id="W2", publication_year=2023)
         rows = get_stale_source_ids(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(rows) == ["W2", "W3"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
-        _notice(sa_sync_conn, source="openalex", source_id="W1", pub_year=2010)
+        _notice(sa_sync_conn, source="openalex", source_id="W1", publication_year=2010)
         assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == ["W1"]
 
     def test_the_threshold_comes_from_the_argument(self, sa_sync_conn):

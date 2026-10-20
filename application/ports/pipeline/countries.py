@@ -17,14 +17,14 @@ class CountryRecompute(Protocol):
         """Compose `addresses.countries` des `address_ids` à partir de leurs candidats, par la préséance du domaine. Retourne le nombre d'adresses dont le pays change."""
         ...
 
-    def refresh_source_publications_countries_for_addresses(
+    def refresh_source_records_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
-        """Recalcule `source_publications.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
+        """Recalcule `source_records.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
         ...
 
     def refresh_publications_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
-        """Recalcule `publications.countries` (union des `source_publications.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
+        """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
         ...

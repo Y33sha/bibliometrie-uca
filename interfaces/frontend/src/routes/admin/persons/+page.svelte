@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api, ApiError, orphanAuthorships, persons as personsApi } from "$lib/api";
+  import { api, ApiError, orphanContributions, persons as personsApi } from "$lib/api";
   import { toast } from "$lib/dialogs.svelte";
   import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
@@ -20,7 +20,7 @@
     PersonSearchResult,
   } from "./types";
   import type { components } from "$lib/api/schema";
-  type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
+  type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
@@ -324,7 +324,7 @@
   /* ── Orphans ── */
 
   async function loadOrphanCount() {
-    const data = await api<{ total: number }>("/api/authorships/orphans/count");
+    const data = await api<{ total: number }>("/api/contributions/orphans/count");
     orphanCount = data.total;
   }
 
@@ -382,18 +382,18 @@
 
   async function openDetachModal(personId: number, nameForm: string) {
     detachModal = { personId, nameForm, publications: [], otherPersons: [], loading: true };
-    const data = await api<{ authorships: NameFormAuthorshipRef[]; other_persons: OtherPerson[] }>(
-      `/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`,
+    const data = await api<{ contributions: NameFormContributionRef[]; other_persons: OtherPerson[] }>(
+      `/api/persons/${personId}/name-form-contributions?name_form=${encodeURIComponent(nameForm)}`,
     );
     // Le rejet porte sur la publication entière : on regroupe les sources par publication pour n'afficher qu'une ligne par publication.
     const byPub = new Map<number, DetachPublication>();
-    for (const r of data.authorships) {
+    for (const r of data.contributions) {
       let pub = byPub.get(r.publication_id);
       if (!pub) {
-        pub = { pub_id: r.publication_id, title: r.title, pub_year: r.pub_year, sources: [], checked: true };
+        pub = { pub_id: r.publication_id, title: r.title, publication_year: r.publication_year, sources: [], checked: true };
         byPub.set(r.publication_id, pub);
       }
-      pub.sources.push({ source: r.source, source_authorship_id: r.source_authorship_id });
+      pub.sources.push({ source: r.source, source_contribution_id: r.source_contribution_id });
     }
     detachModal = {
       personId,
@@ -412,8 +412,8 @@
       return;
     }
     // Une référence de source par publication suffit : le backend détache toutes les sources de la publication.
-    await personsApi.detachAuthorships(detachModal.personId, {
-      authorships: toDetach.map((p) => p.sources[0]),
+    await personsApi.detachContributions(detachModal.personId, {
+      contributions: toDetach.map((p) => p.sources[0]),
     });
     detachModal = null;
     await loadTable();
@@ -555,8 +555,8 @@
 />
 
 {#if orphanCount > 0}
-  <a href="{base}/admin/orphan-authorships" class="orphan-link">
-    {orphanCount} authorship{orphanCount > 1 ? "s" : ""} {institution.name} orpheline{orphanCount > 1
+  <a href="{base}/admin/orphan-contributions" class="orphan-link">
+    {orphanCount} contribution{orphanCount > 1 ? "s" : ""} {institution.name} orpheline{orphanCount > 1
       ? "s"
       : ""} (non reliée{orphanCount > 1 ? "s" : ""} à une personne)
   </a>

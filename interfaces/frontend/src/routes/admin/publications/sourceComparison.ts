@@ -1,8 +1,8 @@
 import type { components } from '$lib/api/schema';
-import { AUTHORSHIP_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
+import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
 import { SOURCE_ORDER } from '$lib/sources';
 
-export type SourceRecord = components['schemas']['SourcePublicationMetadataOut'];
+export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceSignature = components['schemas']['SourceSignatureOut'];
 
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
@@ -123,10 +123,10 @@ function fields(records: SourceRecord[]): Field[] {
 			compared: (r) => r.doc_type,
 		},
 		{
-			key: 'pub_year',
+			key: 'publication_year',
 			label: 'Année',
-			cell: (r) => ({ text: r.pub_year?.toString() ?? null }),
-			compared: (r) => r.pub_year,
+			cell: (r) => ({ text: r.publication_year?.toString() ?? null }),
+			compared: (r) => r.publication_year,
 		},
 		{
 			key: 'journal',
@@ -187,8 +187,8 @@ export interface AuthorRow {
 /** Rôles d'une signature autres qu'auteur, dans l'ordre d'affichage. */
 export function otherRoles(s: SourceSignature): string[] {
 	const rank = (role: string) => {
-		const i = AUTHORSHIP_ROLE_ORDER.indexOf(role);
-		return i < 0 ? AUTHORSHIP_ROLE_ORDER.length : i;
+		const i = CONTRIBUTION_ROLE_ORDER.indexOf(role);
+		return i < 0 ? CONTRIBUTION_ROLE_ORDER.length : i;
 	};
 	return (s.roles ?? []).filter((r) => r !== 'author').sort((a, b) => rank(a) - rank(b));
 }
@@ -199,7 +199,7 @@ export function authorRows(records: SourceRecord[], signatures: SourceSignature[
 	const members = new Map<string, SourceSignature[]>();
 	const present = new Set<number>();
 	for (const s of signatures) {
-		const col = column.get(s.source_publication_id);
+		const col = column.get(s.source_record_id);
 		if (col === undefined) continue;
 		const key = s.group_id != null ? `g${s.group_id}` : `s${s.id}`;
 		members.set(key, [...(members.get(key) ?? []), s]);
@@ -207,7 +207,7 @@ export function authorRows(records: SourceRecord[], signatures: SourceSignature[
 	}
 	const rows = [...members].map(([key, group]) => {
 		const cells: (SourceSignature | null)[] = records.map(() => null);
-		for (const s of group) cells[column.get(s.source_publication_id)!] = s;
+		for (const s of group) cells[column.get(s.source_record_id)!] = s;
 		const positions = group.map((s) => s.position).filter((p): p is number => p != null);
 		return {
 			row: { key, cells, divergent: group.length < present.size },

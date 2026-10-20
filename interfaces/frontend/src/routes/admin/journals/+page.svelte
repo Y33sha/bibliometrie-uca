@@ -231,7 +231,7 @@
 				{#snippet item(r)}
 					{r.title}
 					{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
-					<span class="muted"> ({r.pub_count} publis)</span>
+					<span class="muted"> ({r.publication_count} publis)</span>
 				{/snippet}
 			</Picker>
 		{:else}

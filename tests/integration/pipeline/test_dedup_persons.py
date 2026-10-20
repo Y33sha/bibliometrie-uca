@@ -6,14 +6,14 @@ PostgreSQL. La logique pure des sous-décisions est testée hors BDD dans
 
 Périmètre des scénarios :
 
-- Match cross-source : authorship rattachée à la `person_id` d'une autre
+- Match cross-source : contribution rattachée à la `person_id` d'une autre
   source à la même `(publication_id, author_position)`.
 - Match par identifier : ORCID connu (confirmed) → matche ; ORCID rejected →
   pas de match.
 - Match par name_form : forme connue uniquement (rattache) / ambiguë (skip).
 - Création : forme inconnue, auteur autorisé → crée.
 - Import des identifiants : tout match propage les identifiants de
-  l'authorship vers la personne (statut `pending`, vérifiables admin).
+  la contribution vers la personne (statut `pending`, vérifiables admin).
 """
 
 import logging
@@ -27,17 +27,17 @@ from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,
     insert_person_name_form,
-    insert_rejected_authorship,
+    insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 # Notice de 2024, de titre « Test ».
-_notice = partial(insert_source_publication, title="Test", pub_year=2024)
+_notice = partial(insert_source_record, title="Test", publication_year=2024)
 _logger = logging.getLogger("test")
 
 
@@ -55,10 +55,10 @@ def _set_name_form_status(conn, person_id, raw_name, status):
     )
 
 
-def _insert_authorship(
+def _insert_contribution(
     conn,
     source,
-    source_publication_id,
+    source_record_id,
     raw_author_name,
     *,
     position=0,
@@ -66,30 +66,30 @@ def _insert_authorship(
     person_id=None,
     identifiers=None,
 ):
-    """Insère une source_authorship.
+    """Insère une source_contribution.
 
     `identifiers` est un dict d'identifiants observés porté par l'identité
-    (`author_identifying_keys.person_identifiers`, JSONB) :
+    (`contributor_information.identifiers`, JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
     """
     normalized = normalize_text(raw_author_name)
     return insert_signature(
         conn,
-        source_publication_id,
+        source_record_id,
         source=source,
         author_position=position,
         raw_author_name=raw_author_name,
         author_name_normalized=normalized,
-        person_identifiers=identifiers,
+        identifiers=identifiers,
         person_id=person_id,
         in_perimeter=in_perimeter,
     )
 
 
-def _get_person_id(conn, source_authorship_id):
+def _get_person_id(conn, source_contribution_id):
     return conn.execute(
-        text("SELECT person_id FROM source_authorships WHERE id = :id"),
-        {"id": source_authorship_id},
+        text("SELECT person_id FROM source_contributions WHERE id = :id"),
+        {"id": source_contribution_id},
     ).scalar_one_or_none()
 
 
@@ -116,7 +116,7 @@ class TestPasseDeCreation:
         """Un nom inconnu hors périmètre reste sans personne, sans en introduire une."""
         pub = insert_publication(sa_sync_conn)
         sp = _notice(sa_sync_conn, pub, source="openalex", source_id="W1")
-        signature = _insert_authorship(
+        signature = _insert_contribution(
             sa_sync_conn, "openalex", sp, "Inconnue Hors Perimetre", in_perimeter=False
         )
 
@@ -130,7 +130,7 @@ class TestPasseDeCreation:
         """Le pendant : dans le périmètre, un nom inconnu introduit sa personne."""
         pub = insert_publication(sa_sync_conn)
         sp = _notice(sa_sync_conn, pub, source="openalex", source_id="W2")
-        signature = _insert_authorship(
+        signature = _insert_contribution(
             sa_sync_conn, "openalex", sp, "Inconnue Du Perimetre", in_perimeter=True
         )
 
@@ -150,7 +150,7 @@ class TestIdentifierPromotion:
             "hal_person_id": 11581,
             "idhal": "nina-radosevic-robin",
         }
-        signature = _insert_authorship(
+        signature = _insert_contribution(
             sa_sync_conn, "hal", sp, "Radosevic-Robin Nina", identifiers=identifiers
         )
 
@@ -164,13 +164,13 @@ class TestIdentifierPromotion:
 
 class TestCascadeRun:
     def test_cross_source_links_and_imports_identifiers(self, sa_sync_conn):
-        """Cross-source : authorship OA non-rattachée + HAL rattachée même position
+        """Cross-source : contribution OA non-rattachée + HAL rattachée même position
         → matche, et les identifiants OA sont importés."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-100")
-        _insert_authorship(
+        _insert_contribution(
             sa_sync_conn,
             "hal",
             hal_sd,
@@ -181,7 +181,7 @@ class TestCascadeRun:
         )
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W111")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,
@@ -209,7 +209,7 @@ class TestCascadeRun:
         )
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W333")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,
@@ -230,7 +230,7 @@ class TestCascadeRun:
         )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-200")
-        hal_as = _insert_authorship(
+        hal_as = _insert_contribution(
             sa_sync_conn,
             "hal",
             hal_sd,
@@ -254,7 +254,7 @@ class TestCascadeRun:
         )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-201")
-        hal_as = _insert_authorship(
+        hal_as = _insert_contribution(
             sa_sync_conn,
             "hal",
             hal_sd,
@@ -296,7 +296,7 @@ class TestCascadeRun:
         )
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-202")
-        hal_as = _insert_authorship(
+        hal_as = _insert_contribution(
             sa_sync_conn, "hal", hal_sd, "Jean Dupond", identifiers={"hal_person_id": "111222"}
         )
 
@@ -321,7 +321,7 @@ class TestCascadeRun:
         _set_name_form_status(sa_sync_conn, person_a, "Van Lander", "confirmed")
 
         hal_sd = _notice(sa_sync_conn, pub, source_id="hal-203")
-        hal_as = _insert_authorship(
+        hal_as = _insert_contribution(
             sa_sync_conn, "hal", hal_sd, "Van Lander", identifiers={"hal_person_id": "987654"}
         )
 
@@ -342,7 +342,7 @@ class TestCascadeRun:
         )
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W444")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,
@@ -357,11 +357,11 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, oa_as) != person_id
 
     def test_wos_orcid_not_used_as_match_signal(self, sa_sync_conn):
-        """ORCID porté par une authorship WoS → ignoré comme signal de matching.
+        """ORCID porté par une contribution WoS → ignoré comme signal de matching.
 
         L'ORCID WoS (`PreferredORCID`) est attribué par le matching algorithmique
         interne de Web of Science, régulièrement fautif. Même quand il pointe vers
-        un ORCID confirmé en base, il ne doit pas rattacher l'authorship (cf.
+        un ORCID confirmé en base, il ne doit pas rattacher la contribution (cf.
         `ORCID_MATCH_SOURCES`). Le nom ne matchant pas non plus → pas de
         rattachement à la personne seedée.
         """
@@ -376,7 +376,7 @@ class TestCascadeRun:
         )
 
         wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:111")
-        wos_as = _insert_authorship(
+        wos_as = _insert_contribution(
             sa_sync_conn,
             "wos",
             wos_sd,
@@ -401,7 +401,7 @@ class TestCascadeRun:
         )
 
         dc_sd = _notice(sa_sync_conn, pub, source="datacite", source_id="10.5281/zenodo.1")
-        dc_as = _insert_authorship(
+        dc_as = _insert_contribution(
             sa_sync_conn,
             "datacite",
             dc_sd,
@@ -417,13 +417,13 @@ class TestCascadeRun:
     def test_name_form_match_imports_identifiers(self, sa_sync_conn):
         """Match par name_form → identifiers importés en pending (pour vérification
         manuelle ultérieure). Sans cet import, une base initialement vide n'aurait
-        jamais d'identifiers, vu que la 1ère authorship créerait la personne et les
+        jamais d'identifiers, vu que la 1ère contribution créerait la personne et les
         suivantes (matching name_form) ne propageraient rien."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W666")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,
@@ -466,7 +466,7 @@ class TestCascadeRun:
             scanr_sd,
             source="scanr",
             raw_author_name="Yannick Kitutila W.",
-            identity_id=upsert_split_identity(sa_sync_conn, "yannick kitutila", "w"),
+            contributor_information_id=upsert_split_identity(sa_sync_conn, "yannick kitutila", "w"),
             in_perimeter=True,
         )
         native = insert_signature(
@@ -474,7 +474,7 @@ class TestCascadeRun:
             hal_sd,
             raw_last_name="Kitutila W.",
             raw_first_name="Yannick",
-            identity_id=upsert_split_identity(sa_sync_conn, "kitutila w", "yannick"),
+            contributor_information_id=upsert_split_identity(sa_sync_conn, "kitutila w", "yannick"),
             in_perimeter=True,
         )
 
@@ -497,7 +497,7 @@ class TestCascadeRun:
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W777")
-        oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")
+        oa_as = _insert_contribution(sa_sync_conn, "openalex", oa_sd, "J Dupont")
 
         _run_cascade(sa_sync_conn)
 
@@ -509,7 +509,7 @@ class TestCascadeRun:
         pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
         sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
-        orphan = _insert_authorship(sa_sync_conn, "openalex", sd, "J Dupont")
+        orphan = _insert_contribution(sa_sync_conn, "openalex", sd, "J Dupont")
 
         with caplog.at_level(logging.INFO, logger="test_orphelines"):
             run_cascade(
@@ -525,9 +525,9 @@ class TestCascadeRun:
         assert f"[{pid1}, {pid2}]" in line
 
     def test_rejected_pair_blocks_identifier_match(self, sa_sync_conn):
-        """Paire (publi, personne) dans `rejected_authorships` → un match par
+        """Paire (publi, personne) dans `rejected_contributions` → un match par
         identifiant vers cette personne est annulé. La cascade ne ré-attache
-        pas le `person_id` rejeté à la `source_authorship`."""
+        pas le `person_id` rejeté à la `source_contribution`."""
         pub = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         insert_person_identifier(
@@ -537,10 +537,10 @@ class TestCascadeRun:
             id_value="0000-0001-2345-6789",
             status="confirmed",
         )
-        insert_rejected_authorship(sa_sync_conn, pub, person_id=person_id, ignore_conflict=True)
+        insert_rejected_contribution(sa_sync_conn, pub, person_id=person_id, ignore_conflict=True)
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W999")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,
@@ -561,21 +561,21 @@ class TestCascadeRun:
         pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
         add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
-        insert_rejected_authorship(sa_sync_conn, pub, person_id=pid1, ignore_conflict=True)
+        insert_rejected_contribution(sa_sync_conn, pub, person_id=pid1, ignore_conflict=True)
 
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W778")
-        oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")
+        oa_as = _insert_contribution(sa_sync_conn, "openalex", oa_sd, "J Dupont")
 
         _run_cascade(sa_sync_conn)
 
         assert _get_person_id(sa_sync_conn, oa_as) == pid2
 
     def test_unknown_name_creates_person_with_identifiers(self, sa_sync_conn):
-        """Forme inconnue + authorship-auteur → crée la personne et importe ses
+        """Forme inconnue + contribution-auteur → crée la personne et importe ses
         identifiants."""
         pub = insert_publication(sa_sync_conn)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="W888")
-        oa_as = _insert_authorship(
+        oa_as = _insert_contribution(
             sa_sync_conn,
             "openalex",
             oa_sd,

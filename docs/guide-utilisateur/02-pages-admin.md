@@ -47,16 +47,16 @@ Gestion du référentiel de personnes :
 - **Édition du nom**.
 - **Rejet** : marquer une personne comme fausse entité (mauvais parsing, noms d'équipes de recherche…).
 - **Identifiants** : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), compte HAL, avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
-- **Formes de nom** : chaque personne a des formes de nom normalisées issues des sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre personne). Cliquer sur une forme ouvre un modal permettant de consulter les authorships liées et de les détacher.
+- **Formes de nom** : chaque personne a des formes de nom normalisées issues des sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre personne). Cliquer sur une forme ouvre un modal permettant de consulter les contributions liées et de les détacher.
 - **Fusion** : le bouton "Fusionner" permet de chercher un doublon et de fusionner deux personnes. Bloqué si les deux ont une fiche RH.
 
-#### Authorships orphelines (`/admin/orphan-authorships`)
+#### Contributions orphelines (`/admin/orphan-contributions`)
 
-Authorships UCA dont l'auteur n'est pas encore identifié (`person_id = NULL`). Pour chaque authorship, on peut :
+Contributions UCA dont l'auteur n'est pas encore identifié (`person_id = NULL`). Pour chaque contribution, on peut :
 
 - **Attribuer** à une personne existante (recherche par nom)
-- **Créer** une nouvelle personne et lui attribuer l'authorship
-- **Traitement par lot** : sélectionner plusieurs authorships et les attribuer en une fois
+- **Créer** une nouvelle personne et lui attribuer la contribution
+- **Traitement par lot** : sélectionner plusieurs contributions et les attribuer en une fois
 
 Le dropdown de recherche affiche le département RH (si existant) ou l'id interne (sinon) pour départager les homonymes.
 

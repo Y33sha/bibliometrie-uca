@@ -5,8 +5,8 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.publications.doc_types import DocType
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.keys import (
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     SCALAR_CONFIRMATION_ID_TYPES,
 )
@@ -18,7 +18,7 @@ from infrastructure.sql_fragments import raw_column
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Une `source_publication` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
+    """Une `source_record` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
 
     Son DOI d'origine et son `notice_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
@@ -87,16 +87,16 @@ _SCALAR_KEY_ROWS = "".join(
     f"""
         UNION
         SELECT sp.publication_id, '{k}', sp.external_ids->>'{k}'
-        FROM source_publications sp
+        FROM source_records sp
         WHERE sp.publication_id IS NOT NULL AND sp.external_ids->>'{k}' IS NOT NULL"""
     for k in SCALAR_CONFIRMATION_ID_TYPES
 )
 
-# Paires de publications distinctes partageant une clé de confirmation (`source_publications.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
+# Paires de publications distinctes partageant une clé de confirmation (`source_records.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
         SELECT sp.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
-        FROM source_publications sp
+        FROM source_records sp
         CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'{ExternalIdType.HAL_ID}') h
         WHERE sp.publication_id IS NOT NULL
           AND jsonb_typeof(sp.external_ids->'{ExternalIdType.HAL_ID}') = 'array'
@@ -114,10 +114,10 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
 # Signal #3 — rapprochement par titre de l'œuvre dépendante (erratum, preprint) à son parent. Erratum : titre parent = suffixe du titre erratum. Preprint : titre identique. Garde d'ambiguïté : un seul candidat substantiel, sinon abstention.
 _ERRATUM_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
-        SELECT id, title_normalized AS t, pub_year AS y
+        SELECT id, title_normalized AS t, publication_year AS y
         FROM publications
         WHERE doc_type = '{DocType.ERRATUM.value}'
-          AND title_normalized IS NOT NULL AND pub_year IS NOT NULL
+          AND title_normalized IS NOT NULL AND publication_year IS NOT NULL
     ),
     candidate AS (
         SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
@@ -128,7 +128,7 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
           ON p.id <> c.id
          AND p.doc_type <> '{DocType.ERRATUM.value}'
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-         AND p.pub_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
+         AND p.publication_year BETWEEN c.y - {_TITLE_MATCH_YEAR_WINDOW} AND c.y
          AND right(c.t, length(p.title_normalized)) = p.title_normalized
     ),
     substantive_count AS (
@@ -144,10 +144,10 @@ _ERRATUM_TITLE_MATCHES_SQL = text(f"""
 # Preprint → version publiée : titre identique, parent publié dans [année … année + 2]. Garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre.
 _PREPRINT_TITLE_MATCHES_SQL = text(f"""
     WITH child AS (
-        SELECT id, title_normalized AS t, pub_year AS y
+        SELECT id, title_normalized AS t, publication_year AS y
         FROM publications
         WHERE doc_type = '{DocType.PREPRINT.value}' AND title_normalized IS NOT NULL
-          AND length(title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH} AND pub_year IS NOT NULL
+          AND length(title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH} AND publication_year IS NOT NULL
     ),
     candidate AS (
         SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
@@ -157,7 +157,7 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
           ON p.doc_type <> '{DocType.PREPRINT.value}'
          AND p.title_normalized = c.t
          AND length(p.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-         AND p.pub_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
+         AND p.publication_year BETWEEN c.y AND c.y + {_TITLE_MATCH_YEAR_WINDOW}
     ),
     substantive_count AS (
         SELECT child_id, count(*) FILTER (WHERE substantive) AS n
@@ -174,7 +174,7 @@ class PublicationRelationsQueries:
     """Requêtes de la phase `relations`."""
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
-        """Les `source_publications` rattachées dont le `meta` déclare des relations."""
+        """Les `source_records` rattachées dont le `meta` déclare des relations."""
         # Le DOI d'origine, et non le DOI corrigé : c'est lui que la notice déclare, et c'est son
         # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
@@ -182,7 +182,7 @@ class PublicationRelationsQueries:
                 SELECT sp.publication_id, sp.source::text AS source, sp.meta,
                        lower({raw_column("doi")}) AS doi,
                        p.doc_type::text AS doc_type, sp.doc_type AS notice_doc_type
-                FROM source_publications sp
+                FROM source_records sp
                 JOIN publications p ON p.id = sp.publication_id
                 WHERE (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
                    OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')

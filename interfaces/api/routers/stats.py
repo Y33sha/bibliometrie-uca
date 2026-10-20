@@ -96,7 +96,7 @@ def pivot_schema(
 
 @router.get("/pivot", response_model=PivotResponse)
 def pivot(
-    measure: str = Query("pub_count"),
+    measure: str = Query("publication_count"),
     group: str = Query(""),
     group2: str = Query(""),
     filters: StatsFilters = Depends(stats_filters),

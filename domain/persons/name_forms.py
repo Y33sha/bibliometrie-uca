@@ -1,6 +1,6 @@
 """Value object `PersonNameForm` + factory `compute_person_name_forms`.
 
-Une forme de nom est une chaîne « prénom nom » normalisée, destinée au matching. Elle a le format de `author_identifying_keys.author_name_normalized` : une forme de personne se compare telle quelle à l'identité d'une signature.
+Une forme de nom est une chaîne « prénom nom » normalisée, destinée au matching. Elle a le format de `contributor_information.author_name_normalized` : une forme de personne se compare telle quelle à l'identité d'une signature.
 
 Du point de vue domain, une forme de nom est entièrement définie par sa string normalisée — VO immuable, égalité par valeur.
 
@@ -32,7 +32,7 @@ class PersonNameForm:
 
 
 def name_form(last_name: str, first_name: str | None) -> str:
-    """Forme « prénom nom » d'un nom et d'un prénom normalisés, parties vides omises. Même calcul que `author_identifying_keys.author_name_normalized`."""
+    """Forme « prénom nom » d'un nom et d'un prénom normalisés, parties vides omises. Même calcul que `contributor_information.author_name_normalized`."""
     return " ".join(part for part in (first_name, last_name) if part)
 
 

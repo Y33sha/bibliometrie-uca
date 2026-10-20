@@ -1,0 +1,47 @@
+# Source_contributions — cycle de vie
+
+*À jour le 2026-09-14.*
+
+Une signature est un auteur tel qu'**une** source le porte sur un document : une ligne par position d'auteur dans un [enregistrement source](source_records.md). C'est la pièce qui relie tout le reste. Elle porte une identité d'auteur telle que la source la donne, reçoit une personne de la phase `persons`, puis un rattachement à l'[contribution](contributions.md) consolidée. Cinq phases du pipeline écrivent successivement dans sa ligne ; l'API n'y touche qu'en éditant les personnes.
+
+Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce qu'elles concernent : les rôles dans `domain/publications/contribution_roles.py`, l'extraction propre à chaque source dans `domain/sources/`, les identifiants dans `domain/persons/`.
+
+## Tables
+
+| Table | Rôle | Colonnes notables |
+|---|---|---|
+| `source_contributions` | La signature | `source`, `source_record_id`, `contributor_information_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `perimeter_evidence`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries`, `countries_dirty`, `neutralized_identifiers` |
+| `contributor_information` | Identité d'auteur dédoublonnée | `author_name_normalized`, `identifiers`, `key_hash` (calculé, unique) |
+| `source_contribution_addresses` | Lien entre une signature et ses adresses | `source_contribution_id`, `address_id` |
+| `source_contribution_structures` | Vue matérialisée : signature ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
+| `confirmed_source_contributions` | Signature épinglée par une décision humaine | `(source_contribution_id, person_id)` |
+
+L'enregistrement source parent est décrit dans [source_records](source_records.md), la contribution consolidée en aval dans [contributions](contributions.md), qui porte aussi `rejected_contributions`.
+
+`contributor_information_id` et `person_id` répondent à deux questions différentes. L'identité — nom normalisé et identifiants — est un fait que la source fournit, enregistré dès `normalize`. La personne est le résultat de la résolution, attribué plus tard par la phase `persons`. L'identité sert de clé pour charger les correspondances de la résolution, et à dédoublonner des signatures identiques.
+
+## Écriture par le pipeline
+
+1. **`normalize` — naissance.** Les signatures d'un enregistrement sont réécrites en bloc, avec leur source, leur position, leur rôle, le nom d'auteur brut et leur identité. L'identité est obtenue en dédoublonnant `contributor_information` sur son empreinte calculée — nom normalisé et identifiants réunis ; celles que plus aucune signature ne porte sont supprimées en fin de phase. Les adresses sont créées au besoin et reliées à la signature, comme ses ROR et ses structures HAL. Un identifiant porté par plusieurs signatures du même enregistrement reste sur l'identité, et chacune de ces signatures l'inscrit dans `neutralized_identifiers` avec le motif `shared` : la résolution l'ignore pour elles.
+2. **`affiliations` — appartenance au périmètre.** La vue matérialisée `source_contribution_structures` est rafraîchie. `perimeter_evidence` reçoit les indices de l'entrée de la signature dans le périmètre : structures atteintes dans la vue, identité d'une personne RH. `in_perimeter` est vrai quand la signature a au moins un indice.
+3. **`persons` — attribution d'une personne.** La cascade de résolution pose `person_id` et retient dans `resolution_mode` par quel moyen : identifiant, nom, ou report depuis une autre source. Les signatures épinglées à la main sont reposées en premier, et certaines remises à nul ciblées permettent à la phase de converger quel que soit l'ordre de traitement.
+4. **`countries` — pays.** `countries` réunit les pays retenus des adresses de la signature, ceux de ses organisations ROR sans adresse et ceux de ses structures HAL. Il est recalculé pour une signature marquée `countries_dirty` ou liée à une adresse marquée. Un changement de pays dans les référentiels ROR et HAL marque les signatures qui citent l'organisation ou la structure.
+
+## Écriture par l'API — édition manuelle
+
+Aucune colonne structurelle n'est écrite par l'API. L'édition manuelle, décrite côté [personnes](persons.md), n'agit que sur le rattachement à une personne.
+
+**Épingler une signature** l'inscrit dans `confirmed_source_contributions`. La décision porte sur cette signature précisément, et la phase `persons` la repose à chaque passage.
+
+**Détacher une personne d'une publication** met à nul le `person_id` de **toutes** les signatures de ce couple, quelle que soit leur source, et inscrit la paire dans `rejected_contributions`.
+
+**Fusionner deux personnes** repointe simplement le `person_id`.
+
+## Lecture par le pipeline
+
+- La phase `persons` lit les signatures du périmètre non encore rattachées, avec leur identité, leur nom normalisé et leurs rôles.
+- La phase `contributions` consolide les couples personne–publication attestés par les signatures rattachées et en recompose les attributs.
+
+## Lecture par l'API
+
+Le détail d'une publication montre les **auteurs tels que chaque source les donne** : pour chaque source, les signatures de l'import le plus récent, avec leurs adresses, leurs structures et leurs rôles. La fiche personne, elle, s'appuie sur les contributions consolidées.

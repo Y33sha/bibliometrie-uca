@@ -9,13 +9,13 @@ from interfaces.cli.maintenance.delete_notices_out_of_window import (
     count_targets,
     fetch_cutoff,
 )
-from pipeline.ingestion.common.source_publications import delete_source_publications_before
+from pipeline.ingestion.common.source_records import delete_source_records_before
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_staging
 
-_notice = partial(insert_source_publication, title="Titre", keys_dirty=False)
+_notice = partial(insert_source_record, title="Titre", keys_dirty=False)
 
 
 def _publication(conn) -> int:
@@ -23,20 +23,22 @@ def _publication(conn) -> int:
         title="T",
         title_normalized="t",
         doc_type="article",
-        pub_year=2016,
+        publication_year=2016,
         doi=None,
         oa_status="unknown",
     )
 
 
-def _notice_staged(conn, publication_id, *, source: str, source_id: str, pub_year: int) -> int:
+def _notice_staged(
+    conn, publication_id, *, source: str, source_id: str, publication_year: int
+) -> int:
     staging_id = insert_staging(conn, source, source_id=source_id, processed=True)
     return _notice(
         conn,
         publication_id,
         source=source,
         source_id=source_id,
-        pub_year=pub_year,
+        publication_year=publication_year,
         staging_id=staging_id,
     )
 
@@ -54,38 +56,40 @@ def test_l_annee_de_debut_est_lue_en_configuration(sa_sync_conn_owner):
 def test_la_notice_ancienne_part_avec_sa_ligne_de_staging(sa_sync_conn_owner):
     conn = sa_sync_conn_owner
     ancienne = _notice_staged(
-        conn, _publication(conn), source="hal", source_id="hal-1998", pub_year=1998
+        conn, _publication(conn), source="hal", source_id="hal-1998", publication_year=1998
     )
     staging_id = conn.execute(
-        text("SELECT staging_id FROM source_publications WHERE id = :id"), {"id": ancienne}
+        text("SELECT staging_id FROM source_records WHERE id = :id"), {"id": ancienne}
     ).scalar_one()
 
     assert count_targets(conn, 2017) == {"hal": 1}
-    assert delete_source_publications_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (1, 1)
-    assert not _existe(conn, "source_publications", ancienne)
+    assert delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (1, 1)
+    assert not _existe(conn, "source_records", ancienne)
     assert not _existe(conn, "staging", staging_id)
 
 
 def test_la_soeur_dans_la_plage_reste_et_se_reconcilie(sa_sync_conn_owner):
     conn = sa_sync_conn_owner
     publication = _publication(conn)
-    _notice_staged(conn, publication, source="openalex", source_id="W2016", pub_year=2016)
-    soeur = _notice_staged(conn, publication, source="hal", source_id="hal-2017", pub_year=2017)
+    _notice_staged(conn, publication, source="openalex", source_id="W2016", publication_year=2016)
+    soeur = _notice_staged(
+        conn, publication, source="hal", source_id="hal-2017", publication_year=2017
+    )
 
-    delete_source_publications_before(conn, 2017, exempt_sources=EXEMPT_SOURCES)
+    delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES)
 
-    assert _existe(conn, "source_publications", soeur)
+    assert _existe(conn, "source_records", soeur)
     assert conn.execute(
-        text("SELECT keys_dirty FROM source_publications WHERE id = :id"), {"id": soeur}
+        text("SELECT keys_dirty FROM source_records WHERE id = :id"), {"id": soeur}
     ).scalar_one()
 
 
 def test_la_these_ancienne_reste(sa_sync_conn_owner):
     conn = sa_sync_conn_owner
     these = _notice_staged(
-        conn, _publication(conn), source="theses", source_id="2005CLF21600", pub_year=2005
+        conn, _publication(conn), source="theses", source_id="2005CLF21600", publication_year=2005
     )
 
     assert count_targets(conn, 2017) == {}
-    assert delete_source_publications_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (0, 0)
-    assert _existe(conn, "source_publications", these)
+    assert delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (0, 0)
+    assert _existe(conn, "source_records", these)

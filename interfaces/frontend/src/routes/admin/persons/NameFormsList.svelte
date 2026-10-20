@@ -65,12 +65,12 @@
         >
       {/if}
     </span>
-    {#if nf.pub_count > 0}
+    {#if nf.publication_count > 0}
       <button
         class="status-chip"
         class:confirmed={nf.status === "confirmed"}
         class:rejected={nf.status === "rejected"}
-        title="Voir les {nf.pub_count} publication(s) liée(s)"
+        title="Voir les {nf.publication_count} publication(s) liée(s)"
         onclick={() => onopenDetail(personId, nf.name_form)}
       >
         {nf.name_form}
@@ -84,8 +84,8 @@
         {nf.name_form}
       </span>
     {/if}
-    <span class="pub-count" class:zero={nf.pub_count === 0}>
-      {nf.pub_count} pub.
+    <span class="pub-count" class:zero={nf.publication_count === 0}>
+      {nf.publication_count} pub.
     </span>
     {#if nf.shared_count > 0}
       <span

@@ -18,7 +18,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import OaStatus
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 

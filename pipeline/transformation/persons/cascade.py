@@ -1,14 +1,14 @@
-"""Cascade de rattachement des personnes aux `source_authorships` : `match` puis `create`.
+"""Cascade de rattachement des personnes aux `source_contributions` : `match` puis `create`.
 
 Deux populations de candidats traversent la même cascade :
 
-- **In-périmètre** (`source_authorships.in_perimeter = TRUE`) : authorships dont la source a détecté une affiliation dans le périmètre. Éligibles à tous les barreaux.
-- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même groupe de signatures qu'un authorship déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
+- **In-périmètre** (`source_contributions.in_perimeter = TRUE`) : contributions dont la source a détecté une affiliation dans le périmètre. Éligibles à tous les barreaux.
+- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même groupe de signatures qu'une contribution déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
 
 `match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
 
 1. **ORCID** déposé par l'auteur (sources de `ORCID_MATCH_SOURCES`).
-2. **`hal_person_id`** — compte HAL, porté par les authorships HAL.
+2. **`hal_person_id`** — compte HAL, porté par les contributions HAL.
 3. **IdRef**.
 4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne, dans l'ordre « prénom nom » puis, pour une signature au nom et prénom inversés, « nom prénom » ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
 5. **Cross-source** — même groupe de signatures, nom compatible ; inopérant au bootstrap.
@@ -21,7 +21,7 @@ Un match par identifiant est **corroboré par le nom** : refusé (et journalisé
 
 Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
-Garde de rejet : les personnes rejetées pour la publication (`rejected_authorships`) sont éliminées des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
+Garde de rejet : les personnes rejetées pour la publication (`rejected_contributions`) sont éliminées des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
 """
 
 import logging
@@ -62,15 +62,15 @@ from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, a
 from pipeline.runtime.observability.progression import attente, progression
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.loading import (
-    EnrichedAuthorship,
-    get_all_unlinked_authorships,
+    EnrichedContribution,
+    get_all_unlinked_contributions,
     get_cross_source_candidates,
     get_out_of_perimeter_candidates,
-    load_linked_authorships_by_group,
+    load_linked_contributions_by_group,
 )
 from pipeline.transformation.persons.metrics import CascadeResult, log_matching_breakdown
 from pipeline.transformation.persons.person_writes import (
-    add_identifiers_from_authorships as add_identifiers,
+    add_identifiers_from_contributions as add_identifiers,
 )
 from pipeline.transformation.persons.store import PersonsStore
 
@@ -140,21 +140,21 @@ def fetch_rejected_person_ids_by_pub(conn: Connection) -> dict[int, frozenset[in
     return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
 
-_LINK_AUTHORSHIP = text("""
-    UPDATE source_authorships
+_LINK_CONTRIBUTION = text("""
+    UPDATE source_contributions
     SET person_id = :pid, resolution_mode = CAST(:mode AS resolution_mode)
     WHERE id = :aid AND source = :src
 """)
 
 
-def link_authorship(
-    conn: Connection, person_id: int, source: str, source_authorship_id: int, resolution_mode: str
+def link_contribution(
+    conn: Connection, person_id: int, source: str, source_contribution_id: int, resolution_mode: str
 ) -> None:
     """Rattache une signature à une personne, avec le canal de résolution (`identifier`, `name` ou `cross_source`). Lève `ValidationError` sur une source hors registre."""
     require_known_source(source)
     conn.execute(
-        _LINK_AUTHORSHIP,
-        {"pid": person_id, "aid": source_authorship_id, "src": source, "mode": resolution_mode},
+        _LINK_CONTRIBUTION,
+        {"pid": person_id, "aid": source_contribution_id, "src": source, "mode": resolution_mode},
     )
 
 
@@ -179,17 +179,17 @@ class _Cascade:
         self._conn = conn
         self._repo = repo
 
-        in_perimeter = get_all_unlinked_authorships(conn)
+        in_perimeter = get_all_unlinked_contributions(conn)
         out_of_perimeter = get_out_of_perimeter_candidates(conn)
         cross_source = get_cross_source_candidates(conn)
-        self.authorships = in_perimeter + out_of_perimeter + cross_source
+        self.contributions = in_perimeter + out_of_perimeter + cross_source
         self.in_perimeter_total = len(in_perimeter)
         self.out_of_perimeter_total = len(out_of_perimeter)
         # Signatures déjà liées en cross-source, re-jugées ce run. Celles qu'aucune passe ne re-résout (absentes de `resolved_cross_source_ids`) ont perdu leur ancre : la phase les détache.
-        self.cross_source_candidate_ids = {a.source_authorship_id for a in cross_source}
+        self.cross_source_candidate_ids = {a.source_contribution_id for a in cross_source}
         self.resolved_cross_source_ids: set[int] = set()
 
-        self._linked_index = load_linked_authorships_by_group(conn)
+        self._linked_index = load_linked_contributions_by_group(conn)
         self._idref_map = fetch_identifier_to_person_map(conn, "idref")
         self._orcid_map = fetch_identifier_to_person_map(conn, "orcid")
         self._hal_account_map = fetch_identifier_to_person_map(conn, "hal_person_id")
@@ -203,7 +203,7 @@ class _Cascade:
             self._index_namesake(namesake._replace(conflicting=namesake.person_id in conflicting))
         self.first_names_completed = 0
         # Signatures du périmètre restées sans personne en passe `create`, avec le motif du `skip`.
-        self.orphans: list[tuple[EnrichedAuthorship, str]] = []
+        self.orphans: list[tuple[EnrichedContribution, str]] = []
 
         self.matched_counts: dict[str, int] = defaultdict(int)
         self.skipped_counts: dict[str, int] = defaultdict(int)
@@ -216,7 +216,7 @@ class _Cascade:
         self.corroboration_rejected_ids: set[tuple[str, str]] = set()
 
     def _cross_and_name(
-        self, a: EnrichedAuthorship
+        self, a: EnrichedContribution
     ) -> tuple[int | None, NameFormDecision, frozenset[int]]:
         """Décision cross-source + forme de nom, contre les index vivants."""
         cross_source_match: int | None = None
@@ -224,7 +224,7 @@ class _Cascade:
             candidates = self._linked_index.get(a.group_id, [])
             if candidates:
                 cross_source_match = decide_cross_source_match(
-                    authorship_source=a.source,
+                    contribution_source=a.source,
                     last_norm=a.last_norm,
                     first_norm=a.first_norm,
                     candidates=candidates,
@@ -237,14 +237,14 @@ class _Cascade:
             name_form_outcome = NameFormDecision(action="skip", reason=MatchReason.OUT_OF_PERIMETER)
         return cross_source_match, name_form_outcome, rejected_for_pub
 
-    def _rejected_for(self, a: EnrichedAuthorship) -> frozenset[int]:
+    def _rejected_for(self, a: EnrichedContribution) -> frozenset[int]:
         """Personnes rejetées pour la publication de la signature."""
         if a.publication_id is None:
             return frozenset()
         return self._rejected_by_pub.get(a.publication_id, frozenset())
 
     def _name_form_outcome(
-        self, a: EnrichedAuthorship, rejected_for_pub: frozenset[int]
+        self, a: EnrichedContribution, rejected_for_pub: frozenset[int]
     ) -> NameFormDecision:
         """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
         person_ids = next(
@@ -258,14 +258,14 @@ class _Cascade:
             compatible_person_ids=compatible,
         )
 
-    def name_form_undecidable(self, a: EnrichedAuthorship) -> bool:
+    def name_form_undecidable(self, a: EnrichedContribution) -> bool:
         """Vrai quand la forme du nom est connue mais ne désigne aucune personne unique, par homonymie ou parce que toutes ses personnes sont rejetées pour la publication : la signature ne peut ni se rattacher par son nom, ni créer de personne."""
         return (
             self._name_form_outcome(a, self._rejected_for(a)).reason
             in UNDECIDABLE_NAME_FORM_REASONS
         )
 
-    def decide_full(self, a: EnrichedAuthorship) -> PersonMatchDecision:
+    def decide_full(self, a: EnrichedContribution) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         idref = a.identifiers.get(PersonIdentifierType.IDREF)
@@ -303,7 +303,7 @@ class _Cascade:
             rejected_person_ids=rejected_for_pub,
         )
 
-    def decide_cross_and_name(self, a: EnrichedAuthorship) -> PersonMatchDecision:
+    def decide_cross_and_name(self, a: EnrichedContribution) -> PersonMatchDecision:
         """Décision cross-source + nom seulement (sans identifiant). Pour `create` : les restantes n'ont aucun match identifiant, sinon `match` les aurait prises."""
         cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
         return decide_person_match(
@@ -315,7 +315,7 @@ class _Cascade:
             rejected_person_ids=rejected_for_pub,
         )
 
-    def resolve_or_create(self, a: EnrichedAuthorship) -> bool:
+    def resolve_or_create(self, a: EnrichedContribution) -> bool:
         """Rattache, crée ou écarte la signature d'après la décision cross-source et nom. Rend `True` sur une création."""
         decision = self.decide_cross_and_name(a)
         if decision.action == "match":
@@ -337,7 +337,7 @@ class _Cascade:
             forms = {f: self._name_form_map.get(f) for f in a.name_forms}
             orphans_log.info(
                 "signature %d (%s) « %s » : %s ; formes %s ; initiales compatibles %s ; rejetées pour la publication %s",
-                a.source_authorship_id,
+                a.source_contribution_id,
                 a.source,
                 a.name.display(),
                 reason,
@@ -347,7 +347,7 @@ class _Cascade:
             )
 
     def apply_match(
-        self, a: EnrichedAuthorship, pid: int | None, reason: MatchReason | None
+        self, a: EnrichedContribution, pid: int | None, reason: MatchReason | None
     ) -> bool:
         """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
         assert (
@@ -355,14 +355,14 @@ class _Cascade:
         )  # garantis par decide_person_match action=match
         if a.current_person_id is not None:
             # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
-            self.resolved_cross_source_ids.add(a.source_authorship_id)
+            self.resolved_cross_source_ids.add(a.source_contribution_id)
             if reason == MatchReason.CROSS_SOURCE and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
-        link_authorship(
+        link_contribution(
             self._conn,
             pid,
             a.source,
-            a.source_authorship_id,
+            a.source_contribution_id,
             RESOLUTION_MODE_BY_REASON[reason],
         )
         # Identifiants ajoutés en `pending` quelle que soit la source du match.
@@ -376,17 +376,17 @@ class _Cascade:
             self._linked_index[a.group_id].append((pid, a.last_norm, a.first_norm, a.source))
         return True
 
-    def apply_create(self, a: EnrichedAuthorship) -> None:
+    def apply_create(self, a: EnrichedContribution) -> None:
         if a.current_person_id is not None:
             # Ancienne signature cross-source qui rejoint une création : couverte ce run.
-            self.resolved_cross_source_ids.add(a.source_authorship_id)
+            self.resolved_cross_source_ids.add(a.source_contribution_id)
         last, first = validated_name(a.last_name or a.name.display(), a.first_name or "")
         marker = self._repo.create(last, first)
-        link_authorship(
+        link_contribution(
             self._conn,
             marker,
             a.source,
-            a.source_authorship_id,
+            a.source_contribution_id,
             "name",
         )
         add_identifiers(marker, [a.identifiers], repo=self._repo)
@@ -412,7 +412,7 @@ class _Cascade:
             if namesake.person_id not in form_person_ids:
                 form_person_ids.append(namesake.person_id)
 
-    def _complete_first_name(self, pid: int, a: EnrichedAuthorship) -> None:
+    def _complete_first_name(self, pid: int, a: EnrichedContribution) -> None:
         """Donne à une personne au prénom réduit le prénom plein compatible de la signature qui la rejoint (« Tnourji A. » → « Tnourji Abdellah ») : une signature d'un autre prénom plein ne s'y rattache plus par ses initiales."""
         namesake = self._namesake_of.get(pid)
         if namesake is None or namesake.conflicting:
@@ -477,12 +477,12 @@ def run_cascade(
             conflicting=completion.conflicting,
         )
         c.first_names_completed = completion.completed
-        total = len(c.authorships)
+        total = len(c.contributions)
         ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} à examiner")
 
-    unresolved: list[EnrichedAuthorship] = []
+    unresolved: list[EnrichedContribution] = []
     with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
-        for a in c.authorships:
+        for a in c.contributions:
             avancement.avance()
             decision = c.decide_full(a)
             if decision.action == "match":
@@ -503,10 +503,10 @@ def run_cascade(
     non_identifiees = [a for a in sans_personne if a.allow_create]
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme indécidable le reste.
     indecidables = [a for a in non_identifiees if c.name_form_undecidable(a)]
-    indecidables_ids = {a.source_authorship_id for a in indecidables}
+    indecidables_ids = {a.source_contribution_id for a in indecidables}
     # Les signatures au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
     a_creer = sorted(
-        (a for a in non_identifiees if a.source_authorship_id not in indecidables_ids),
+        (a for a in non_identifiees if a.source_contribution_id not in indecidables_ids),
         key=lambda a: not a.name.split_by_source,
     )
 

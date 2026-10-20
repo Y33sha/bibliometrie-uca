@@ -51,7 +51,7 @@
 	type Publication = components['schemas']['PublicationListItem'] & {
 		// Champs présents quand l'API est appelée avec `person_id` (cf. routes /api/publications côté backend qui enrichit la réponse). Optionnels car non garantis hors contexte personne.
 		is_corresponding?: boolean | null;
-		authorship_id?: number | null;
+		contribution_id?: number | null;
 		hal_collections?: string[] | null;
 	};
 
@@ -92,7 +92,7 @@
 		apcMode = 'institution' as ApcMode,
 		perPage = 100,
 		restrictToPublications = false,
-		onExcludeAuthorship,
+		onExcludeContribution,
 		onopenPublication,
 		activePublicationId = null,
 	}: {
@@ -107,7 +107,7 @@
 		showCorrespondingColumn?: boolean;
 		/** Affiche la facet du périmètre de l'établissement (in_perimeter). */
 		showPerimeterFacet?: boolean;
-		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure l'authorship. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
+		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure la contribution. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
 		/** Mode de rendu du tag APC :
 		 *  - 'institution' : paiements sur un budget du périmètre de l'établissement (défaut)
@@ -117,7 +117,7 @@
 		perPage?: number;
 		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
-		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
+		onExcludeContribution?: (contributionId: number, pubId: number) => void | boolean | Promise<void | boolean>;
 		/** Ouvre la publication dans la page hôte au lieu de naviguer vers sa fiche. Un clic modifié (Ctrl, Cmd, Maj, Alt) garde la navigation. */
 		onopenPublication?: (pubId: number) => void;
 		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
@@ -527,8 +527,8 @@
 	}
 
 	async function onExcludeClick(p: Publication) {
-		if (!onExcludeAuthorship || p.authorship_id == null) return;
-		const result = await onExcludeAuthorship(p.authorship_id, p.id);
+		if (!onExcludeContribution || p.contribution_id == null) return;
+		const result = await onExcludeContribution(p.contribution_id, p.id);
 		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
 		if (result === false) return;
 		pubs.items = pubs.items.filter((item) => item.id !== p.id);
@@ -654,7 +654,7 @@
 				<tr class:active-row={p.id === activePublicationId}>
 					{#if showAdminExclude}
 						<td class="exclude-cell">
-							{#if p.authorship_id != null}
+							{#if p.contribution_id != null}
 								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
 									onclick={() => onExcludeClick(p)}>✕</button>
 							{/if}
@@ -663,7 +663,7 @@
 					{#if col('type')}<td>
 						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
-					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
+					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					<td><a href="{base}/publications/{p.id}" class="pub-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
 					{#if col('journal')}<td class="journal-cell pub-col-journal">
 						{#if p.journal_id}

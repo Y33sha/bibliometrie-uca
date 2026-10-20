@@ -1,8 +1,8 @@
-"""Requêtes d'écriture des signatures (`source_authorships`), des adresses et de leurs liens, communes à toutes les sources.
+"""Requêtes d'écriture des signatures (`source_contributions`), des adresses et de leurs liens, communes à toutes les sources.
 
-Les colonnes de `source_authorships` sont identiques pour toutes les sources, seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule** requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`.
+Les colonnes de `source_contributions` sont identiques pour toutes les sources, seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule** requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`.
 
-Consommé par le writer partagé `write_source_authorships`. L'INSERT des `source_authorships` et du pivot reçoit seulement des signatures absentes de la base, ou dont les liens pivot sont supprimés au préalable : il se passe d'`ON CONFLICT`. L'upsert des identités (`author_identifying_keys`, table partagée) et celui des `addresses` gardent leur `ON CONFLICT`.
+Consommé par le writer partagé `write_source_contributions`. L'INSERT des `source_contributions` et du pivot reçoit seulement des signatures absentes de la base, ou dont les liens pivot sont supprimés au préalable : il se passe d'`ON CONFLICT`. L'upsert des identités (`contributor_information`, table partagée) et celui des `addresses` gardent leur `ON CONFLICT`.
 """
 
 import hashlib
@@ -20,7 +20,7 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 class SignatureNameFields(TypedDict):
     """Colonnes de nom d'une signature (`signature_name_fields`).
 
-    Sur `source_authorships`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`author_identifying_keys`), le découpage retenu normalisé.
+    Sur `source_contributions`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`contributor_information`), le découpage retenu normalisé.
     """
 
     raw_author_name: str | None
@@ -30,42 +30,42 @@ class SignatureNameFields(TypedDict):
     first_name_normalized: str | None
 
 
-class SourceAuthorshipItem(SignatureNameFields):
-    """Une signature à écrire dans `source_authorships` (toutes sources).
+class SourceContributionItem(SignatureNameFields):
+    """Une signature à écrire dans `source_contributions` (toutes sources).
 
-    `person_identifiers` est nullable selon ce que la source fournit.
+    `identifiers` est nullable selon ce que la source fournit.
 
-    `author_position` est nul pour les signatures qui n'occupent pas de rang d'auteur — les rôles non-auteur d'une thèse (direction, rapport, jury, présidence). La contrainte `(source_publication_id, author_position)` les tolère, les `NULL` étant distincts entre eux.
+    `author_position` est nul pour les signatures qui n'occupent pas de rang d'auteur — les rôles non-auteur d'une thèse (direction, rapport, jury, présidence). La contrainte `(source_record_id, author_position)` les tolère, les `NULL` étant distincts entre eux.
     """
 
     source: str
-    source_publication_id: int
+    source_record_id: int
     author_position: int | None
     is_corresponding: bool
     collective: bool
     roles: Sequence[str] | None
-    person_identifiers: Mapping[str, JsonValue] | None
+    identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None
-    """Identifiants de `person_identifiers` que la résolution des personnes ignore pour cette signature, avec leur motif (`IdentifierNeutralization`)."""
+    """Identifiants de `identifiers` que la résolution des personnes ignore pour cette signature, avec leur motif (`IdentifierNeutralization`)."""
     content_hash: str | None
     """Empreinte des champs écrits (`signature_content_hash`), adresses comprises."""
 
 
-class SourceAuthorshipUpdate(SourceAuthorshipItem):
+class SourceContributionUpdate(SourceContributionItem):
     """Une signature en base, réécrite en place : son identifiant, puis les champs de la signature entrante qui lui est rapprochée."""
 
     id: int
 
 
-class StoredSourceAuthorship(NamedTuple):
+class StoredSourceContribution(NamedTuple):
     """Une signature en base d'une notice : identifiant, position, identité, empreinte, marque collective et rôles."""
 
     id: int
     author_position: int | None
     last_name_normalized: str | None
     first_name_normalized: str | None
-    person_identifiers: JsonValue
+    identifiers: JsonValue
     content_hash: str | None
     collective: bool
     roles: list[str] | None
@@ -78,29 +78,29 @@ class AddressBatchItem(TypedDict):
     norm: str
 
 
-class AuthorshipAddressItem(TypedDict):
-    """Ligne du batch insert `source_authorship_addresses` : pivot (authorship, adresse)."""
+class ContributionAddressItem(TypedDict):
+    """Ligne du batch insert `source_contribution_addresses` : pivot (contribution, adresse)."""
 
     sa_id: int
     addr_id: int
 
 
-class AuthorshipRorItem(TypedDict):
-    """Ligne du batch insert `source_authorship_rors` : ROR attribué par la source à une signature, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
+class ContributionRorItem(TypedDict):
+    """Ligne du batch insert `source_contribution_rors` : ROR attribué par la source à une signature, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
 
     sa_id: int
     ror_id: str
     addr_id: int | None
 
 
-# Sentinelles du `key_hash`, alignées sur la colonne générée `author_identifying_keys.key_hash` :
+# Sentinelles du `key_hash`, alignées sur la colonne générée `contributor_information.key_hash` :
 # `E'\x01'` tient lieu de NULL, `E'\x1f'` sépare les champs — des octets de contrôle absents des
 # vraies valeurs. Un test d'intégration garde l'alignement avec la colonne générée.
 _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
-# Colonnes de la clé d'identité d'`author_identifying_keys`, dans l'ordre du `key_hash`.
-IDENTITY_KEY_COLUMNS = ("last_name_normalized", "first_name_normalized", "person_identifiers")
+# Colonnes de la clé d'identité d'`contributor_information`, dans l'ordre du `key_hash`.
+IDENTITY_KEY_COLUMNS = ("last_name_normalized", "first_name_normalized", "identifiers")
 
 
 def key_hash_sql(exprs: Sequence[str]) -> str:
@@ -119,7 +119,7 @@ def mark_signatures_to_resync(conn: Connection, source: str) -> int:
     """Vide l'empreinte du bloc auteurs des notices de `source` : leur prochaine normalisation synchronise leurs signatures. Rend le nombre de notices marquées."""
     return conn.execute(
         text("""
-            UPDATE source_publications SET authors_hash = NULL
+            UPDATE source_records SET authors_hash = NULL
             WHERE source = :source AND authors_hash IS NOT NULL
         """),
         {"source": source},
@@ -127,15 +127,15 @@ def mark_signatures_to_resync(conn: Connection, source: str) -> int:
 
 
 def delete_orphan_identities(conn: Connection) -> int:
-    """Supprime les identités de `author_identifying_keys` que plus aucune signature ne référence.
+    """Supprime les identités de `contributor_information` que plus aucune signature ne référence.
 
-    Une identité devient orpheline quand la dernière `source_authorships` qui la portait change de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste appuyé sur l'index `idx_sa_identity`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre d'identités supprimées.
+    Une identité devient orpheline quand la dernière `source_contributions` qui la portait change de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste appuyé sur l'index `idx_source_contributions_contributor_information`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre d'identités supprimées.
     """
     return conn.execute(
         text("""
-            DELETE FROM author_identifying_keys aik
+            DELETE FROM contributor_information aik
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_authorships sa WHERE sa.identity_id = aik.id
+                SELECT 1 FROM source_contributions sa WHERE sa.contributor_information_id = aik.id
             )
         """)
     ).rowcount
@@ -150,24 +150,24 @@ def delete_orphan_addresses(conn: Connection) -> int:
         text("""
             DELETE FROM addresses a
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_authorship_addresses saa WHERE saa.address_id = a.id
+                SELECT 1 FROM source_contribution_addresses saa WHERE saa.address_id = a.id
             )
         """)
     ).rowcount
 
 
-class AuthorshipsBatchQueries:
+class ContributionsBatchQueries:
     """Opérations SQL par lot pour l'écriture des signatures."""
 
-    def upsert_source_authorships_batch(
-        self, conn: Connection, values: list[SourceAuthorshipItem]
+    def upsert_source_contributions_batch(
+        self, conn: Connection, values: list[SourceContributionItem]
     ) -> None:
-        """L'identité de l'auteur (`IDENTITY_KEY_COLUMNS`) vit sur la table dédupliquée `author_identifying_keys` ; la signature porte seulement une FK `identity_id`. Deux requêtes dans la transaction du writer :
+        """L'identité de l'auteur (`IDENTITY_KEY_COLUMNS`) vit sur la table dédupliquée `contributor_information` ; la signature porte seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
 
         1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les identités du document, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque identité récurrente à chaque document).
-        2. **Insert des signatures** — `identity_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_publication_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`signature_name_fields`).
+        2. **Insert des signatures** — `contributor_information_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_record_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`signature_name_fields`).
 
-        Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `author_identifying_keys` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
+        Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `contributor_information` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
         """
         if not values:
             return
@@ -182,7 +182,7 @@ class AuthorshipsBatchQueries:
                 "raw_author_name": v["raw_author_name"],
                 "raw_last_name": v["raw_last_name"],
                 "raw_first_name": v["raw_first_name"],
-                "person_identifiers": v["person_identifiers"],
+                "identifiers": v["identifiers"],
                 "neutralized_identifiers": v["neutralized_identifiers"],
                 "content_hash": v["content_hash"],
             }
@@ -191,25 +191,25 @@ class AuthorshipsBatchQueries:
         # 1. Upsert des identités du lot (dédup par clé, sans churn).
         conn.execute(
             text(f"""
-                INSERT INTO author_identifying_keys ({_KEY_COLUMNS_SQL})
+                INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
                 SELECT DISTINCT t.last_name_normalized, t.first_name_normalized,
-                       t.person_identifiers
+                       t.identifiers
                 FROM jsonb_to_recordset(:payload) AS t(
                     last_name_normalized text, first_name_normalized text,
-                    person_identifiers jsonb)
+                    identifiers jsonb)
                 ON CONFLICT ({_KEY_COLUMNS_SQL}) DO NOTHING
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
         # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
-        # position, (source_publication_id, author_position) reste unique. `identity_id` résolu
+        # position, (source_record_id, author_position) reste unique. `contributor_information_id` résolu
         # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
         stmt = text(
             """
-            INSERT INTO source_authorships
-                (source, source_publication_id, author_position,
+            INSERT INTO source_contributions
+                (source, source_record_id, author_position,
                  is_corresponding, collective, roles, raw_author_name, raw_last_name,
-                 raw_first_name, identity_id, neutralized_identifiers, content_hash)
+                 raw_first_name, contributor_information_id, neutralized_identifiers, content_hash)
             SELECT :source, :spid, t.author_position,
                    t.is_corresponding, t.collective, t.roles, t.raw_author_name, t.raw_last_name,
                    t.raw_first_name, aik.id, t.neutralized_identifiers, t.content_hash
@@ -217,8 +217,8 @@ class AuthorshipsBatchQueries:
                 author_position smallint, last_name_normalized text, first_name_normalized text,
                 is_corresponding boolean, collective boolean, roles text[],
                 raw_author_name text, raw_last_name text, raw_first_name text,
-                person_identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
-            JOIN author_identifying_keys aik
+                identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
+            JOIN contributor_information aik
               ON aik.key_hash = """
             + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
         ).bindparams(bindparam("payload", type_=Jsonb))
@@ -226,46 +226,48 @@ class AuthorshipsBatchQueries:
             stmt,
             {
                 "source": values[0]["source"],
-                "spid": values[0]["source_publication_id"],
+                "spid": values[0]["source_record_id"],
                 "payload": payload,
             },
         )
 
-    def fetch_stored_source_authorships(
-        self, conn: Connection, source_publication_id: int
-    ) -> list[StoredSourceAuthorship]:
+    def fetch_stored_source_contributions(
+        self, conn: Connection, source_record_id: int
+    ) -> list[StoredSourceContribution]:
         rows = conn.execute(
             text("""
                 SELECT sa.id, sa.author_position, aik.last_name_normalized,
-                       aik.first_name_normalized, aik.person_identifiers, sa.content_hash,
+                       aik.first_name_normalized, aik.identifiers, sa.content_hash,
                        sa.collective, sa.roles
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                WHERE sa.source_publication_id = :spid
+                FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
+                WHERE sa.source_record_id = :spid
             """),
-            {"spid": source_publication_id},
+            {"spid": source_record_id},
         ).all()
-        return [StoredSourceAuthorship(*r) for r in rows]
+        return [StoredSourceContribution(*r) for r in rows]
 
-    def mark_authorships_dirty(self, conn: Connection, source_publication_id: int) -> None:
-        """Pose `authorships_dirty` sur la publication de la notice."""
+    def mark_contributions_dirty(self, conn: Connection, source_record_id: int) -> None:
+        """Pose `contributions_dirty` sur la publication de la notice."""
         conn.execute(
             text("""
-                UPDATE publications p SET authorships_dirty = true
-                FROM source_publications sp
-                WHERE sp.id = :spid AND p.id = sp.publication_id AND NOT p.authorships_dirty
+                UPDATE publications p SET contributions_dirty = true
+                FROM source_records sp
+                WHERE sp.id = :spid AND p.id = sp.publication_id AND NOT p.contributions_dirty
             """),
-            {"spid": source_publication_id},
+            {"spid": source_record_id},
         )
 
-    def delete_source_authorships(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contributions(self, conn: Connection, ids: list[int]) -> None:
         if ids:
-            conn.execute(text("DELETE FROM source_authorships WHERE id = ANY(:ids)"), {"ids": ids})
+            conn.execute(
+                text("DELETE FROM source_contributions WHERE id = ANY(:ids)"), {"ids": ids}
+            )
 
-    def update_source_authorships_batch(
-        self, conn: Connection, values: list[SourceAuthorshipUpdate]
+    def update_source_contributions_batch(
+        self, conn: Connection, values: list[SourceContributionUpdate]
     ) -> None:
-        # Une seule instruction : la contrainte `(source_publication_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
+        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
         if not values:
             return
         payload = [
@@ -285,7 +287,7 @@ class AuthorshipsBatchQueries:
         ]
         conn.execute(
             text("""
-                UPDATE source_authorships sa
+                UPDATE source_contributions sa
                 SET author_position = t.author_position,
                     is_corresponding = t.is_corresponding,
                     collective = t.collective,
@@ -306,54 +308,54 @@ class AuthorshipsBatchQueries:
         )
 
     def set_author_counts(
-        self, conn: Connection, source_publication_id: int, author_count: int, distinct: int
+        self, conn: Connection, source_record_id: int, author_count: int, distinct: int
     ) -> None:
         """Écrit `author_count` et `distinct_author_count` de la notice."""
         conn.execute(
             text("""
-                UPDATE source_publications
+                UPDATE source_records
                 SET author_count = :n, distinct_author_count = :d
                 WHERE id = :id AND (author_count, distinct_author_count) IS DISTINCT FROM (:n, :d)
             """),
-            {"n": author_count, "d": distinct, "id": source_publication_id},
+            {"n": author_count, "d": distinct, "id": source_record_id},
         )
 
-    def fetch_authors_hash(self, conn: Connection, source_publication_id: int) -> str | None:
+    def fetch_authors_hash(self, conn: Connection, source_record_id: int) -> str | None:
         return conn.execute(
-            text("SELECT authors_hash FROM source_publications WHERE id = :id"),
-            {"id": source_publication_id},
+            text("SELECT authors_hash FROM source_records WHERE id = :id"),
+            {"id": source_record_id},
         ).scalar_one_or_none()
 
-    def set_authors_hash(
-        self, conn: Connection, source_publication_id: int, authors_hash: str
-    ) -> None:
+    def set_authors_hash(self, conn: Connection, source_record_id: int, authors_hash: str) -> None:
         conn.execute(
-            text("UPDATE source_publications SET authors_hash = :h WHERE id = :id"),
-            {"h": authors_hash, "id": source_publication_id},
+            text("UPDATE source_records SET authors_hash = :h WHERE id = :id"),
+            {"h": authors_hash, "id": source_record_id},
         )
 
-    def delete_source_authorship_addresses(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contribution_addresses(self, conn: Connection, ids: list[int]) -> None:
         if ids:
             conn.execute(
                 text(
-                    "DELETE FROM source_authorship_addresses WHERE source_authorship_id = ANY(:ids)"
+                    "DELETE FROM source_contribution_addresses WHERE source_contribution_id = ANY(:ids)"
                 ),
                 {"ids": ids},
             )
 
-    def delete_source_authorship_rors(self, conn: Connection, ids: list[int]) -> None:
-        if ids:
-            conn.execute(
-                text("DELETE FROM source_authorship_rors WHERE source_authorship_id = ANY(:ids)"),
-                {"ids": ids},
-            )
-
-    def delete_source_authorship_hal_structures(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contribution_rors(self, conn: Connection, ids: list[int]) -> None:
         if ids:
             conn.execute(
                 text(
-                    "DELETE FROM source_authorship_hal_structures"
-                    " WHERE source_authorship_id = ANY(:ids)"
+                    "DELETE FROM source_contribution_rors WHERE source_contribution_id = ANY(:ids)"
+                ),
+                {"ids": ids},
+            )
+
+    def delete_source_contribution_hal_structures(self, conn: Connection, ids: list[int]) -> None:
+        if ids:
+            conn.execute(
+                text(
+                    "DELETE FROM source_contribution_hal_structures"
+                    " WHERE source_contribution_id = ANY(:ids)"
                 ),
                 {"ids": ids},
             )
@@ -395,14 +397,14 @@ class AuthorshipsBatchQueries:
         """Ajoute les pays candidats `(adresse, pays)` du moyen `method` (`CountryCandidatesStore.add`)."""
         CountryCandidatesStore(conn).add(method, rows)
 
-    def insert_source_authorship_addresses_batch(
-        self, conn: Connection, values: list[AuthorshipAddressItem]
+    def insert_source_contribution_addresses_batch(
+        self, conn: Connection, values: list[ContributionAddressItem]
     ) -> None:
         # Pas d'ON CONFLICT : le writer supprime les liens d'une signature réécrite avant de les réinsérer, et déduplique les couples (sa_id, addr_id).
         if not values:
             return
         stmt = text("""
-            INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
+            INSERT INTO source_contribution_addresses (source_contribution_id, address_id)
             SELECT sa_id, addr_id
             FROM unnest(:sa_ids ::integer[], :addr_ids ::integer[]) AS t(sa_id, addr_id)
         """)
@@ -414,7 +416,7 @@ class AuthorshipsBatchQueries:
             },
         )
 
-    def insert_source_authorship_hal_structures_batch(
+    def insert_source_contribution_hal_structures_batch(
         self, conn: Connection, values: list[tuple[int, int]]
     ) -> None:
         """Écrit les couples (signature, structure HAL). Le writer supprime d'abord ceux d'une signature réécrite."""
@@ -422,7 +424,7 @@ class AuthorshipsBatchQueries:
             return
         conn.execute(
             text("""
-                INSERT INTO source_authorship_hal_structures (source_authorship_id, hal_structure_id)
+                INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)
                 SELECT sa_id, hal_structure_id
                 FROM unnest(:sa_ids ::integer[], :hal_structure_ids ::integer[]) AS t(sa_id, hal_structure_id)
             """),
@@ -432,15 +434,15 @@ class AuthorshipsBatchQueries:
             },
         )
 
-    def insert_source_authorship_rors_batch(
-        self, conn: Connection, values: list[AuthorshipRorItem]
+    def insert_source_contribution_rors_batch(
+        self, conn: Connection, values: list[ContributionRorItem]
     ) -> None:
         # Pas d'ON CONFLICT : le writer supprime les ROR d'une signature réécrite avant de les réinsérer, et les ROR d'une signature forment un ensemble.
         if not values:
             return
         conn.execute(
             text("""
-                INSERT INTO source_authorship_rors (source_authorship_id, ror_id, address_id)
+                INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id)
                 SELECT sa_id, ror_id, addr_id
                 FROM unnest(:sa_ids ::integer[], :ror_ids ::text[], :addr_ids ::integer[])
                     AS t(sa_id, ror_id, addr_id)

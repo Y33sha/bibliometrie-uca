@@ -69,11 +69,11 @@ _REJECTED_SECTION = "Retour Couperin"
 
 _INSERT = text("""
     INSERT INTO apc_payments (
-        doi, amount_eur_ht, billing_year, pub_year, publisher_name, journal_name, issn,
+        doi, amount_eur_ht, billing_year, publication_year, publisher_name, journal_name, issn,
         institution, budget, coman_id, lab_name, remarks, open_access_fee,
         source_file, publication_id
     ) VALUES (
-        :doi, :amount_eur_ht, :billing_year, :pub_year, :publisher_name, :journal_name, :issn,
+        :doi, :amount_eur_ht, :billing_year, :publication_year, :publisher_name, :journal_name, :issn,
         :institution, :budget, :coman_id, :lab_name, :remarks, :open_access_fee,
         :source_file, :publication_id
     )
@@ -125,7 +125,7 @@ def open_apc_payment(row: Mapping[str, str]) -> Payment:
         "doi": clean_doi(row.get("doi")),
         "amount_eur_ht": parse_amount(row.get("euro")),
         "billing_year": period,
-        "pub_year": period,
+        "publication_year": period,
         "publisher_name": clean(row.get("publisher")),
         "journal_name": clean(row.get("journal_full_title")),
         "issn": clean(row.get("issn")) or clean(row.get("issn_l")),
@@ -146,7 +146,7 @@ def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
         "doi": clean_doi(row.get("DOI")),
         "amount_eur_ht": parse_amount(row.get("Montant payé en EURHT")),
         "billing_year": parse_year(row.get("Année de facturation")),
-        "pub_year": parse_year(row.get("Année de publication")),
+        "publication_year": parse_year(row.get("Année de publication")),
         "publisher_name": clean(row.get("Editeur")),
         "journal_name": clean(row.get("Revue")),
         "issn": clean(row.get("ISSN")),
@@ -171,7 +171,7 @@ def institution_survey_payment(row: Mapping[str, str], *, open_access_fee: bool)
         "doi": clean_doi(row.get("doi")),
         "amount_eur_ht": parse_amount(row.get("montant_euros_ht")),
         "billing_year": parse_year(row.get("année_facturation")),
-        "pub_year": None,
+        "publication_year": None,
         "publisher_name": None,
         "journal_name": None,
         "issn": None,

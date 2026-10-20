@@ -38,7 +38,7 @@
               {#if r.publication_id}
                 <a href="{base}/publications/{r.publication_id}"><PublicationTitle titre={r.title ?? r.doi} /></a>
                 <span class="meta">
-                  {#if r.pub_year}{r.pub_year}{/if}{#if r.pub_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
+                  {#if r.publication_year}{r.publication_year}{/if}{#if r.publication_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
                 </span>
               {:else}
                 <a href="https://doi.org/{r.doi}" target="_blank" rel="noopener">{r.doi}</a>

@@ -11,27 +11,27 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv,
     list_publications,
 )
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
-from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 # Laboratoire « LAB ».
 _lab = partial(insert_structure, code="LAB")
 
 # Notice de titre « T ».
-_notice = partial(insert_source_publication, title="T")
+_notice = partial(insert_source_record, title="T")
 
 
 def _attach(conn, pub_id, lab_id):
-    """Authorship reliant la publi à un labo via la matview authorship_structures
+    """Contribution reliant la publi à un labo via la matview contribution_structures
     (semée par la chaîne source minimale)."""
-    aid = insert_authorship(
+    aid = insert_contribution(
         conn, pub_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
-    add_authorship_structure(conn, aid, lab_id)
+    add_contribution_structure(conn, aid, lab_id)
 
 
 class TestSearch:
@@ -274,10 +274,10 @@ class TestExcludedPersonLab:
             person = insert_person(
                 sa_sync_conn, "X", first_name="Y", exclusion=exclusion, normalizer="lower"
             )
-            aid = insert_authorship(
+            aid = insert_contribution(
                 sa_sync_conn, pub, person_id=person, in_perimeter=True, roles=["author"]
             )
-            add_authorship_structure(sa_sync_conn, aid, lab)
+            add_contribution_structure(sa_sync_conn, aid, lab)
 
         def listed(lab):
             res = list_publications(

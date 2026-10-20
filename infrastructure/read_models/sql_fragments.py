@@ -11,13 +11,13 @@ def signature_display_name(signature: str = "sa") -> str:
     )
 
 
-def authorship_has_signature_from(source: str, authorship: str = "a") -> str:
-    """Condition vraie quand l'authorship aliasée `authorship` est attestée par une signature de `source` : même publication par sa notice, même personne."""
+def contribution_has_signature_from(source: str, contribution: str = "a") -> str:
+    """Condition vraie quand la contribution aliasée `contribution` est attestée par une signature de `source` : même publication par sa notice, même personne."""
     return (
-        "EXISTS (SELECT 1 FROM source_authorships sa_src"
-        " JOIN source_publications sp_src ON sp_src.id = sa_src.source_publication_id"
-        f" WHERE sp_src.publication_id = {authorship}.publication_id"
-        f" AND sa_src.person_id = {authorship}.person_id AND sa_src.source = '{source}')"
+        "EXISTS (SELECT 1 FROM source_contributions sa_src"
+        " JOIN source_records sp_src ON sp_src.id = sa_src.source_record_id"
+        f" WHERE sp_src.publication_id = {contribution}.publication_id"
+        f" AND sa_src.person_id = {contribution}.person_id AND sa_src.source = '{source}')"
     )
 
 

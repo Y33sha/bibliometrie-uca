@@ -84,7 +84,7 @@ class OaStatusQueries:
                        array_agg(sp.source::text ORDER BY sp.id) AS sources,
                        array_agg(sp.oa_status::text ORDER BY sp.id) AS statuses
                 FROM publications p
-                JOIN source_publications sp ON sp.publication_id = p.id
+                JOIN source_records sp ON sp.publication_id = p.id
                 WHERE lower(p.doi) = ANY(:dois)
                 GROUP BY p.id
             """),

@@ -1,6 +1,6 @@
 """Phase `metadata_correction` — sous-étape **cluster** (corrections de DOI par groupe).
 
-Corrige le DOI de certaines source_publications afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
+Corrige le DOI de certaines source_records afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
 
 - **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
@@ -9,7 +9,7 @@ Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur to
 
 Après une divergence, les notices qui gardent le DOI perdent les clés de confirmation qu'elles partagent avec les notices qui le perdent, par exemple le dépôt HAL d'une communication recopié par la notice OpenAlex du volume d'actes. Les valeurs retirées sont notées sous `raw_metadata.removed_external_ids`, que la sous-étape unaire réapplique.
 
-Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`) et des identifiants d'avant retrait, donc une `source_publication` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
+Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`) et des identifiants d'avant retrait, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
 """
 
 import logging
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.source_publications.metadata_correction.shared_doi import (
+from domain.source_records.metadata_correction.shared_doi import (
     REMOVED_EXTERNAL_IDS,
     ConfirmationIdRemoval,
     DoiClusterDecision,
@@ -29,7 +29,7 @@ from domain.source_publications.metadata_correction.shared_doi import (
     notice_own_ids,
     resolve_cluster_doi_corrections,
 )
-from domain.source_publications.raw_metadata import (
+from domain.source_records.raw_metadata import (
     CORRECTED_BY,
     raw_value,
     removal_entry,
@@ -57,7 +57,7 @@ def _compute_update(
     decision: DoiClusterDecision | None,
     removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_publication` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
     raw_doi = raw_value(row.raw_metadata, "doi", row.doi)
     raw_metadata = {
         k: v for k, v in row.raw_metadata.items() if k not in ("doi", REMOVED_EXTERNAL_IDS)
@@ -125,7 +125,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 @dataclass
 class ClusterCorrectionStats:
-    """Bilan de la passe cluster : `source_publications` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt, ouvrage/chapitre, chapitres distincts, volume d'actes/communication)."""
+    """Bilan de la passe cluster : `source_records` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt, ouvrage/chapitre, chapitres distincts, volume d'actes/communication)."""
 
     examined: int
     corrected: int

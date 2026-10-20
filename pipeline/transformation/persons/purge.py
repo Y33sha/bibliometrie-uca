@@ -27,19 +27,19 @@ from infrastructure.sql_fragments import (
 
 
 def reorphan_ambiguous_nominal(conn: Connection) -> int:
-    """Une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_authorships`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion.
+    """Une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_source_contributions`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion.
 
-    Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la signature (`rejected_authorships`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette signature.
+    Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la signature (`rejected_contributions`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette signature.
     """
     # Les candidates (nominales, non épinglées, à forme ambiguë) sont matérialisées d'abord : le
     # décompte par signature et la jointure vers la publication ne portent que sur elles.
     return conn.execute(
         text(f"""
             WITH candidates AS MATERIALIZED (
-                SELECT sa.id, sa.source_publication_id,
+                SELECT sa.id, sa.source_record_id,
                        aik.author_name_normalized AS name_form
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sa.resolution_mode = '{ResolutionMode.NAME.value}'
                   AND NOT {pinned("sa.id")}
                   AND aik.author_name_normalized IN (
@@ -50,10 +50,10 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
                       HAVING count(DISTINCT person_id) >= 2
                   )
             )
-            UPDATE source_authorships sa
+            UPDATE source_contributions sa
             SET {DETACHED_SIGNATURE}
             FROM candidates c
-            JOIN source_publications sp ON sp.id = c.source_publication_id
+            JOIN source_records sp ON sp.id = c.source_record_id
             WHERE sa.id = c.id
               AND (
                   SELECT count(DISTINCT pnf.person_id)
@@ -67,15 +67,15 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
 
 
 def delete_empty_persons(conn: Connection) -> int:
-    """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_authorships` — typiquement une forme réduite dont les signatures ont rejoint la forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
+    """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_contributions` — typiquement une forme réduite dont les signatures ont rejoint la forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
 
     Une personne vide est conservée si elle a une notice RH, ou une décision humaine (`person_without_decision_sql`). Une personne rejetée reste ainsi un candidat connu, écarté par son rejet, au lieu d'être recréée à l'identique par la cascade.
     """
     return conn.execute(
         text(f"""
             DELETE FROM persons p
-            WHERE NOT EXISTS (SELECT 1 FROM source_authorships sa WHERE sa.person_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id)
+            WHERE NOT EXISTS (SELECT 1 FROM source_contributions sa WHERE sa.person_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
               AND {person_without_decision_sql("p")}
         """)
     ).rowcount
@@ -90,10 +90,10 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
               AND pi.status = '{AttributionStatus.PENDING.value}'
               AND NOT EXISTS (
                   SELECT 1
-                  FROM source_authorships sa
-                  JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                  FROM source_contributions sa
+                  JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                   WHERE sa.person_id = pi.person_id
-                    AND aik.person_identifiers ->> pi.id_type::text = pi.id_value
+                    AND aik.identifiers ->> pi.id_type::text = pi.id_value
                     AND NOT {identifier_neutralized("pi.id_type::text")}
               )
         """)

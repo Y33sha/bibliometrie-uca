@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import text
 
 from interfaces.cli.oneshot.merge_reviewed_person_duplicates import merge_pairs
-from tests.integration.helpers.persons import insert_person, insert_person_rh
+from tests.integration.helpers.persons import insert_hr_record, insert_person
 
 
 @pytest.fixture
@@ -50,8 +50,8 @@ def test_une_personne_disparue_sans_redirection_est_ignoree(conn):
 
 def test_deux_fiches_rh_sont_ignorees(conn):
     a, b = insert_person(conn, "Martin"), insert_person(conn, "Martin")
-    insert_person_rh(conn, a)
-    insert_person_rh(conn, b)
+    insert_hr_record(conn, a)
+    insert_hr_record(conn, b)
 
     assert merge_pairs(conn, [(a, b)], apply=True) == {"deux fiches RH": 1}
     assert _exists(conn, a) and _exists(conn, b)

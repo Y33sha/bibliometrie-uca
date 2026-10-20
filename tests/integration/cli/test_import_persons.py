@@ -1,4 +1,4 @@
-"""Import RH : création de la personne et de sa fiche `persons_rh`, déduplication sur nom normalisé, service et fonction."""
+"""Import RH : création de la personne et de sa fiche `hr_records`, déduplication sur nom normalisé, service et fonction."""
 
 from sqlalchemy import text
 
@@ -20,7 +20,7 @@ def test_personne_et_fiche_rh_creees(sa_sync_conn):
     row = sa_sync_conn.execute(
         text("""
             SELECT prh.email, prh.role_title, prh.department_name
-            FROM persons p JOIN persons_rh prh ON prh.person_id = p.id
+            FROM persons p JOIN hr_records prh ON prh.person_id = p.id
             WHERE p.last_name_normalized = 'durand' AND p.first_name_normalized = 'marie'
         """)
     ).one()

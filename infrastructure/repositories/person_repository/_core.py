@@ -114,7 +114,7 @@ def set_exclusion(conn: Connection, person_id: int, exclusion: PersonExclusion |
 def ids_with_rh(conn: Connection, person_ids: list[int]) -> set[int]:
     return set(
         conn.execute(
-            text("SELECT DISTINCT person_id FROM persons_rh WHERE person_id = ANY(:ids)"),
+            text("SELECT DISTINCT person_id FROM hr_records WHERE person_id = ANY(:ids)"),
             {"ids": person_ids},
         ).scalars()
     )

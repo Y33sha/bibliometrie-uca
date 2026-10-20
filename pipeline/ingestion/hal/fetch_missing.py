@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.fetch_pool import run_fetch_pool
@@ -48,7 +48,7 @@ _HAL_ID_PENDING = pending_failed_lookup_sql(
 _MISSING_HAL_IDS_SQL = text(
     f"""
     SELECT DISTINCT h.hal_id
-    FROM source_publications sp
+    FROM source_records sp
     JOIN publications p ON p.id = sp.publication_id
     CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
     WHERE sp.source IN ('openalex', 'scanr')
@@ -68,18 +68,18 @@ _NNT_PENDING = pending_failed_lookup_sql(
 _MISSING_NNTS_SQL = text(
     f"""
     SELECT sp.external_ids ->> '{ExternalIdType.NNT}' AS nnt
-    FROM source_publications sp
+    FROM source_records sp
     JOIN publications p ON p.id = sp.publication_id
     WHERE sp.source = 'theses'
       AND p.in_perimeter
       AND sp.external_ids ->> '{ExternalIdType.NNT}' IS NOT NULL
       AND p.doc_type != 'ongoing_thesis'
       AND NOT EXISTS (
-          SELECT 1 FROM source_publications hal
+          SELECT 1 FROM source_records hal
           WHERE hal.publication_id = p.id AND hal.source = 'hal'
       )
       AND NOT EXISTS (
-          SELECT 1 FROM source_publications hal
+          SELECT 1 FROM source_records hal
           WHERE hal.source = 'hal' AND hal.external_ids ->> '{ExternalIdType.NNT}' = sp.external_ids ->> '{ExternalIdType.NNT}'
       )
       AND NOT {_NNT_PENDING}
@@ -88,9 +88,9 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """hal-ids que des `source_publications` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
+    """hal-ids que des `source_records` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
 
-    Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_publications` du run précédent : les documents extraits pendant le run y entrent au run suivant.
+    Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_records` du run précédent : les documents extraits pendant le run y entrent au run suivant.
 
     Écarte les hal-ids déjà cherchés en vain : HAL attribue les hal-ids, l'échec est définitif.
     """
@@ -100,7 +100,7 @@ def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT des `source_publications` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_publications` HAL.
+    """NNT des `source_records` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_records` HAL.
 
     Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """

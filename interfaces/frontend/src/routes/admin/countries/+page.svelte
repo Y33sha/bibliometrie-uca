@@ -242,7 +242,7 @@
 			<tr>
 				<td><input type="checkbox" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
 				<td class="addr-cell">{a.raw_text}</td>
-				<td class="num-cell">{a.pub_count}</td>
+				<td class="num-cell">{a.publication_count}</td>
 				<td>
 					<div class="country-cell">
 					{#each a.countries ?? [] as c}

@@ -16,7 +16,7 @@ from functools import partial
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_doi_prefix,
-    seed_in_perimeter_authorships,
+    seed_in_perimeter_contributions,
     seed_journal,
     seed_publication,
     seed_publication_subject,
@@ -130,7 +130,7 @@ class TestListPublishers:
         with_data = seed_publisher("WithPubsPub")
         jid = seed_journal(publisher_id=with_data)
         _publication("p1", journal_id=jid)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get("/api/publishers", params={"with_pubs": "true", "per_page": 200})
         assert r.status_code == 200
         names = {p["name"] for p in r.json()["publishers"]}
@@ -182,9 +182,9 @@ class TestGetPublisher:
         assert "publisher_type" in body
         assert "doi_prefixes" in body
         assert "journal_count" in body
-        assert "pub_count" in body
+        assert "publication_count" in body
         assert body["journal_count"] == 0
-        assert body["pub_count"] == 0
+        assert body["publication_count"] == 0
 
     def test_doi_prefixes_aggregated(self, client):
         """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
@@ -247,8 +247,8 @@ class TestPublisherDashboard:
             _publication("p1", doc_type="article", oa_status="gold", journal_id=j_journal)
             _publication("p2", doc_type="article", oa_status="closed", journal_id=j_journal)
             _publication("p3", doc_type="conference_paper", oa_status=None, journal_id=j_proc)
-        seed_in_perimeter_authorships(j_journal)
-        seed_in_perimeter_authorships(j_proc)
+        seed_in_perimeter_contributions(j_journal)
+        seed_in_perimeter_contributions(j_proc)
         r = client.get(f"/api/publishers/{pid}/dashboard")
         assert r.status_code == 200
         body = r.json()
@@ -285,7 +285,7 @@ class TestPublisherSubjects:
             (pub_ids[0], gen_id),
         ):
             seed_publication_subject(pub_id, subject_id=subject_id)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200
         body = r.json()

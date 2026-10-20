@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `authorships` — supprime les revues vides.
+"""Sous-étape de la phase `contributions` — supprime les revues vides.
 
 Une revue vide n'a ni enregistrement, ni publication, ni monographie, ni paiement APC. Ses formes de nom partent avec elle : un enregistrement de ce titre chez cet éditeur crée de nouveau sa revue. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 """
@@ -19,7 +19,7 @@ LIBELLE = "Revues vides"
 _EMPTY_JOURNALS = text(f"""
     SELECT j.id, j.title, p.name AS publisher, {active_issns("j.id")} AS issns
     FROM journals j LEFT JOIN publishers p ON p.id = j.publisher_id
-    WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.journal_id = j.id)
+    WHERE NOT EXISTS (SELECT 1 FROM source_records s WHERE s.journal_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.journal_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.journal_id = j.id)
       AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.journal_id = j.id)

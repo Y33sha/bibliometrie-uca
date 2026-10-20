@@ -18,7 +18,7 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 _LOG = logging.getLogger("test")
 _IDREF = "109964128"  # IdRef réel (valide au regard du value object)
@@ -28,13 +28,13 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
     """Publication + signature in-périmètre non rattachée, portant l'identité
     `(name_norm, {idref})`. `sa_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
     insert_publication(conn, f"pub {sa_id}", row_id=sa_id)
-    insert_source_publication(
+    insert_source_record(
         conn,
         sa_id,
         source_id=f"hal-{sa_id}",
         title=f"pub {sa_id}",
         row_id=sa_id,
-        pub_year=2024,
+        publication_year=2024,
         doc_type="ART",
     )
     insert_signature(
@@ -43,7 +43,7 @@ def _seed(conn, *, sa_id, raw_name, name_norm, idref):
         row_id=sa_id,
         raw_author_name=raw_name,
         author_name_normalized=name_norm,
-        person_identifiers={"idref": idref},
+        identifiers={"idref": idref},
         in_perimeter=True,
     )
 

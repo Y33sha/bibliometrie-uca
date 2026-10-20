@@ -146,10 +146,10 @@ class _PublicationFacetsBuilder:
         where_sql, binds = self._clauses_skipping("year")
         rows = self.conn.execute(
             text(f"""
-                SELECT p.pub_year::text AS value, COUNT(*) AS count
+                SELECT p.publication_year::text AS value, COUNT(*) AS count
                 FROM publications p
-                WHERE {where_sql} AND p.pub_year IS NOT NULL
-                GROUP BY p.pub_year ORDER BY p.pub_year DESC
+                WHERE {where_sql} AND p.publication_year IS NOT NULL
+                GROUP BY p.publication_year ORDER BY p.publication_year DESC
             """),
             binds,
         )
@@ -157,7 +157,7 @@ class _PublicationFacetsBuilder:
 
     def _facet_labs(self) -> tuple[list[FacetOption], int]:
         where_sql, binds = self._clauses_skipping("lab")
-        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure authorships ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
+        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure contributions ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
         labs_rows = self.conn.execute(
             text(f"""
                 SELECT s.id::text AS value, COALESCE(s.acronym, s.name) AS label,
@@ -266,12 +266,12 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM authorships a
+                        SELECT 1 FROM contributions a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
                           AND a.is_corresponding = TRUE
                     )) AS yes_count,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM authorships a
+                        SELECT 1 FROM contributions a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
                           AND a.is_corresponding = TRUE
                     )) AS no_count
@@ -402,12 +402,12 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM authorships a
+                        SELECT 1 FROM contributions a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
                           AND a.in_perimeter = TRUE
                     )) AS yes,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM authorships a
+                        SELECT 1 FROM contributions a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
                           AND a.in_perimeter = TRUE
                     )) AS no

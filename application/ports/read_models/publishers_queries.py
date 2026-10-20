@@ -41,7 +41,7 @@ class DoiPrefixInfo(BaseModel):
 class PublisherListItem(BaseModel):
     """Ligne de la liste des éditeurs.
 
-    `pub_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
+    `publication_count` compte les seules publications du périmètre, sommées sur les revues de l'éditeur.
     """
 
     id: int
@@ -50,7 +50,7 @@ class PublisherListItem(BaseModel):
     country: str | None
     publisher_type: str
     journal_count: int
-    pub_count: int
+    publication_count: int
     doi_prefixes: list[DoiPrefixInfo]
 
 

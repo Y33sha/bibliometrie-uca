@@ -6,7 +6,7 @@
 from sqlalchemy import Connection
 
 from application.ports.pipeline.journal_recompute import JournalRecompute
-from application.ports.pipeline.pub_count import PubCountRecompute
+from application.ports.pipeline.publication_count import PubCountRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
@@ -39,7 +39,7 @@ def merge_publishers(
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
     recompute: JournalRecompute,
-    pub_count_recompute: PubCountRecompute,
+    publication_count_recompute: PubCountRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible (transferts revues +
@@ -51,7 +51,7 @@ def merge_publishers(
         publisher_repo=publisher_repo,
         journal_repo=journal_repo,
         recompute=recompute,
-        pub_count_recompute=pub_count_recompute,
+        publication_count_recompute=publication_count_recompute,
         audit_repo=audit_repo,
     )
     conn.commit()

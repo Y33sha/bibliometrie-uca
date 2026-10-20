@@ -57,7 +57,7 @@ class PersonFilters:
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
     exclusions: list[PersonExclusion | None] = field(default_factory=list)
-    # Personne qui a au moins une authorship ou une fiche RH. Une personne conservée pour ses seules décisions ne l'est pas.
+    # Personne qui a au moins une contribution ou une fiche RH. Une personne conservée pour ses seules décisions ne l'est pas.
     active: bool | None = None
     lab_id: int | None = None
 
@@ -89,7 +89,7 @@ class NameFormSummaryOut(BaseModel):
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
     shared_count: int
-    pub_count: int
+    publication_count: int
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ class PersonProfileResponse(BaseModel):
 class PersonThesis(BaseModel):
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doi: str | None
     author_name: str | None
     author_person_id: int | None
@@ -218,16 +218,16 @@ class PersonDashboardResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Admin : name forms (utilisés par `name_form_authorships`)
+# DTOs Admin : name forms (utilisés par `name_form_contributions`)
 # ---------------------------------------------------------------------------
 
 
-class NameFormAuthorshipRef(BaseModel):
+class NameFormContributionRef(BaseModel):
     source: str
-    source_authorship_id: int
+    source_contribution_id: int
     publication_id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doi: str | None
 
 
@@ -239,8 +239,8 @@ class OtherPersonOut(BaseModel):
     has_rh: bool
 
 
-class NameFormAuthorshipsResponse(BaseModel):
-    authorships: list[NameFormAuthorshipRef]
+class NameFormContributionsResponse(BaseModel):
+    contributions: list[NameFormContributionRef]
     other_persons: list[OtherPersonOut]
 
 
@@ -368,9 +368,9 @@ class PersonsQueries(Protocol):
 
     # ── Admin : name forms ─────────────────────────────────────────
 
-    def name_form_authorships(
+    def name_form_contributions(
         self, person_id: int, name_form: str
-    ) -> NameFormAuthorshipsResponse: ...
+    ) -> NameFormContributionsResponse: ...
 
     def ambiguous_name_forms_count(self) -> int: ...
 

@@ -10,11 +10,11 @@
 
 **Le référentiel Personnes sert de modèle.** La page `admin/persons` porte des onglets : la liste, puis quatre files de triage avec leur compteur. Un clic ouvre un volet droit (`?person=<id>` dans l'URL), large de 480 pixels au plus. Les verdicts qui s'y prennent — formes de nom rejetées, signatures détachées, personnes déclarées distinctes — sont des entrées que le pipeline relit à chaque passage.
 
-**La comparaison des sources** vit dans la page publique d'une publication (`publications/[id]/SourceComparison.svelte`, 501 lignes), réservée à l'administration connectée. Elle aligne les auteurs par position pour quatre sources codées en dur : HAL, OpenAlex, WoS, ScanR. La réponse de l'API (`PublicationDetailResponse`) porte une liste de signatures par source nommée (`hal_authorships`, `openalex_authorships`…) : Crossref et DataCite n'y figurent pas.
+**La comparaison des sources** vit dans la page publique d'une publication (`publications/[id]/SourceComparison.svelte`, 501 lignes), réservée à l'administration connectée. Elle aligne les auteurs par position pour quatre sources codées en dur : HAL, OpenAlex, WoS, ScanR. La réponse de l'API (`PublicationDetailResponse`) porte une liste de signatures par source nommée (`hal_contributions`, `openalex_contributions`…) : Crossref et DataCite n'y figurent pas.
 
 **Une conception antérieure existe.** La fiche archivée [dédoublonnage par paires gardées](archived/2026-06-26_DATA_dedup-pairwise-gated.md) esquisse des « contrôles admin » sur le modèle opt-out : le pipeline fusionne d'office, l'administration contrôle a posteriori.
 - Détecteur de fusions suspectes : recouvrement d'auteurs faible ou nul, titre court ou générique, `container_title` divergent pour les chapitres, groupe anormalement gros.
-- Verdicts ancrés sur les `source_publications`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion forcée (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
+- Verdicts ancrés sur les `source_records`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion forcée (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
 
 La fiche [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md) renvoie un cas de fusion erronée à « l'outil admin de dédoublonnage ».
 

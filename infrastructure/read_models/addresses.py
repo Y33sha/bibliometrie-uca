@@ -125,12 +125,12 @@ class PgAddressesQueries(AddressesQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT a.id, a.raw_text, a.pub_count,
+                SELECT a.id, a.raw_text, a.publication_count,
                        ast_filter.is_confirmed,
                        (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
                        ({address_structures_json("a.id")}) AS structures
                 {from_clause}
-                ORDER BY a.pub_count DESC, a.id
+                ORDER BY a.publication_count DESC, a.id
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
@@ -145,7 +145,7 @@ class PgAddressesQueries(AddressesQueries):
                 structures=[
                     AddressStructureSummary.model_validate(s) for s in (r.structures or [])
                 ],
-                pub_count=r.pub_count,
+                publication_count=r.publication_count,
             )
             for r in rows
         ]
@@ -174,18 +174,18 @@ class PgAddressesQueries(AddressesQueries):
         rows = self._conn.execute(
             text(f"""
                 SELECT DISTINCT ON (p.id)
-                    p.id, p.title, p.pub_year, p.doi,
+                    p.id, p.title, p.publication_year, p.doi,
                     p.doc_type::text AS doc_type,
                     j.title AS journal_title,
                     {signature_display_name()} AS author_name,
                     sd.source_id
-                FROM source_authorship_addresses saa
-                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                FROM source_contribution_addresses saa
+                JOIN source_contributions sa ON sa.id = saa.source_contribution_id
+                JOIN source_records sd ON sd.id = sa.source_record_id
                 JOIN publications p ON p.id = sd.publication_id
                 LEFT JOIN journals j ON j.id = p.journal_id
                 WHERE saa.address_id = :id AND sd.publication_id IS NOT NULL
-                ORDER BY p.id, p.pub_year DESC
+                ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),
             {"id": addr_id, "lim": limit},
@@ -194,7 +194,7 @@ class PgAddressesQueries(AddressesQueries):
             AddressPublicationItem(
                 id=r.id,
                 title=r.title,
-                pub_year=r.pub_year,
+                publication_year=r.publication_year,
                 doi=r.doi,
                 doc_type=r.doc_type,
                 journal_title=r.journal_title,
@@ -235,7 +235,7 @@ class PgAddressesQueries(AddressesQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT a.id, a.raw_text, a.countries, a.pub_count,
+                SELECT a.id, a.raw_text, a.countries, a.publication_count,
                        (SELECT json_agg(json_build_object(
                                    'country_code', f.country_code, 'methods', f.methods
                                ) ORDER BY f.country_code)
@@ -245,7 +245,7 @@ class PgAddressesQueries(AddressesQueries):
                               GROUP BY acc.country_code) f) AS found_countries
                 FROM addresses a
                 {where}
-                ORDER BY a.pub_count DESC, a.raw_text
+                ORDER BY a.publication_count DESC, a.raw_text
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
@@ -257,7 +257,7 @@ class PgAddressesQueries(AddressesQueries):
                 raw_text=r.raw_text,
                 countries=sorted(r.countries) if r.countries else None,
                 found_countries=[FoundCountry.model_validate(f) for f in r.found_countries or []],
-                pub_count=r.pub_count,
+                publication_count=r.publication_count,
             )
             for r in rows
         ]

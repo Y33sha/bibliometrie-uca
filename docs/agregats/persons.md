@@ -13,11 +13,11 @@ Une personne est un chercheur unifié à travers les sources : plusieurs signatu
 | `persons` | La personne unifiée | `last_name` / `first_name` et leurs formes normalisées, `rejected` |
 | `person_identifiers` | Attribution d'un identifiant externe à une personne | `person_id`, `id_type`, `id_value`, `source` (`manual` ou `auto`), `status`, unicité `(id_type, id_value)` |
 | `person_name_forms` | Formes de nom sous lesquelles une personne apparaît | clé `(name_form, person_id)`, `sources`, `status` |
-| `persons_rh` | Fiche annuaire issue du système d'information | `person_id` unique, suppression refusée tant qu'elle existe, `email`, fonction, département, structure, dates |
+| `hr_records` | Fiche annuaire issue du système d'information | `person_id` unique, suppression refusée tant qu'elle existe, `email`, fonction, département, structure, dates |
 | `distinct_persons` | Paires déclarées comme deux personnes différentes | `(person_id_a, person_id_b)`, avec `a < b` |
-| `rejected_authorships` | Paires publication–personne écartées durablement | `(publication_id, person_id)` |
+| `rejected_contributions` | Paires publication–personne écartées durablement | `(publication_id, person_id)` |
 
-`source_authorships.person_id` rattache une signature à une personne. `resolution_mode` retient par quel moyen la résolution a été faite : identifiant, nom, ou report d'une autre source.
+`source_contributions.person_id` rattache une signature à une personne. `resolution_mode` retient par quel moyen la résolution a été faite : identifiant, nom, ou report d'une autre source.
 
 ## Écriture par le pipeline
 
@@ -38,21 +38,21 @@ Ce qu'une exécution inscrit devient ce que la suivante lit, si bien que la conv
 
 Routeur `interfaces/api/routers/persons.py`, commandes dans `application/services/persons/commands.py`, adaptateur `PgPersonRepository`. Une commande vaut une transaction.
 
-**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, authorships, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses signatures y sont détachées et l'authorship supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
+**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, contributions, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses signatures y sont détachées et la contribution supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
 
 **Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
 
 **Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes calculées.
 
-**Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les signatures de cette forme et supprime les authorships devenues orphelines.
+**Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les signatures de cette forme et supprime les contributions devenues orphelines.
 
-**Détacher des authorships** (`POST /api/persons/{id}/detach-authorships`). Inscrit le rejet durable, détache les signatures, supprime la ligne consolidée et nettoie les formes restées sans emploi.
+**Détacher des contributions** (`POST /api/persons/{id}/detach-contributions`). Inscrit le rejet durable, détache les signatures, supprime la ligne consolidée et nettoie les formes restées sans emploi.
 
 **Déclarer deux personnes distinctes** inscrit la paire dans `distinct_persons`, ce qui l'écarte des files de doublons.
 
 **Importer un ORCID authentifié** pose un statut que rien ne peut dégrader ensuite. L'import s'annonce par un réglage de session borné à sa transaction, seul contexte que le déclencheur Postgres accepte.
 
-Aucun point d'entrée n'écrit `persons_rh` : la fiche annuaire vient d'un import, et la fusion se contente de la transférer.
+Aucun point d'entrée n'écrit `hr_records` : la fiche annuaire vient d'un import, et la fusion se contente de la transférer.
 
 ## Lecture par le pipeline
 
@@ -69,7 +69,7 @@ Port `PersonsQueries`, adaptateurs dans `infrastructure/read_models/persons/`.
 
 | Usage | Ce qui est servi |
 |---|---|
-| Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les signatures, les authorships et les publications |
+| Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les signatures, les contributions et les publications |
 | Annuaire, listes, recherche, facettes, statistiques | Listes publiques et d'administration, filtrables par laboratoire |
 | Files de doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
 

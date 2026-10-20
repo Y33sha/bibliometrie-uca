@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from pipeline import run as run_pipeline
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publications.authorships import authorships as authorships_phase
+from pipeline.transformation.publications.contributions import contributions as contributions_phase
 
 
 @contextmanager
@@ -15,26 +15,28 @@ def _fake_tx():
     yield MagicMock()
 
 
-def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
+def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
     """Adresses, revues et éditeurs se comptent des mêmes publications et signatures.
 
-    La phase `authorships` les stabilise : leurs décomptes s'y recalculent ensemble.
+    La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
     """
-    address_pub_count = MagicMock()
-    address_pub_count.recompute_pub_count.return_value = 0
+    address_publication_count = MagicMock()
+    address_publication_count.recompute_publication_count.return_value = 0
     build_queries = MagicMock()
-    pub_counts = MagicMock()
-    pub_counts.refresh_journal_pub_counts.return_value = 0
-    pub_counts.refresh_publisher_pub_counts.return_value = 0
+    publication_counts = MagicMock()
+    publication_counts.refresh_journal_publication_counts.return_value = 0
+    publication_counts.refresh_publisher_publication_counts.return_value = 0
     with (
         patch.object(
-            authorships_phase,
-            "build_authorships",
+            contributions_phase,
+            "build_contributions",
             return_value=PhaseMetrics(details={"summary": {}}),
         ),
-        patch.object(authorships_phase, "purge_orphan_publications", return_value=0),
+        patch.object(contributions_phase, "purge_orphan_publications", return_value=0),
     ):
-        authorships_phase.AuthorshipsPhase(build_queries, pub_counts, address_pub_count).run(
+        contributions_phase.ContributionsPhase(
+            build_queries, publication_counts, address_publication_count
+        ).run(
             PhaseContext(
                 open_tx=_fake_tx,
                 logger=logging.getLogger("test"),
@@ -43,9 +45,9 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
                 credentials_missing=lambda _source: None,
             )
         )
-    address_pub_count.recompute_pub_count.assert_called_once()
-    pub_counts.refresh_journal_pub_counts.assert_called_once()
-    pub_counts.refresh_publisher_pub_counts.assert_called_once()
+    address_publication_count.recompute_publication_count.assert_called_once()
+    publication_counts.refresh_journal_publication_counts.assert_called_once()
+    publication_counts.refresh_publisher_publication_counts.assert_called_once()
 
 
 def test_resolve_ra_runs_after_normalize_before_publishers_journals():

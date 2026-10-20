@@ -72,7 +72,7 @@ EM_MAX_PAIRS = 5_000_000
 U_MAX_PAIRS = 10_000_000
 
 _PUBLICATIONS_SQL = text("""
-    SELECT publication_id, sum(author_count)::integer FROM source_publications
+    SELECT publication_id, sum(author_count)::integer FROM source_records
     WHERE publication_id IS NOT NULL
     GROUP BY 1 HAVING count(*) > 1
     ORDER BY 1

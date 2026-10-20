@@ -53,7 +53,7 @@ class JournalIssnDetail(BaseModel):
 class JournalListItem(BaseModel):
     """Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
 
-    `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
+    `pub_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
     """
 
     id: int
@@ -64,7 +64,7 @@ class JournalListItem(BaseModel):
     pub_name: str | None
     is_in_doaj: bool
     journal_type: JournalType | None
-    pub_count: int
+    publication_count: int
     doaj_url: str | None
 
 

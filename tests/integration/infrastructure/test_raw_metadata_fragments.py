@@ -2,10 +2,10 @@
 
 from sqlalchemy import text
 
-from domain.source_publications.raw_metadata import raw_value, stash_entry
+from domain.source_records.raw_metadata import raw_value, stash_entry
 from infrastructure.sql_fragments import corrected, corrected_by, raw_column, stashed_raw
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 _RAW_METADATA = {
     "doc_type": stash_entry("journal-article", "MAP_DOC_TYPE"),
@@ -15,12 +15,12 @@ _RAW_METADATA = {
 
 def _read(conn, expression, notice):
     return conn.execute(
-        text(f"SELECT {expression} FROM source_publications sp WHERE sp.id = :id"), {"id": notice}
+        text(f"SELECT {expression} FROM source_records sp WHERE sp.id = :id"), {"id": notice}
     ).scalar_one()
 
 
 def test_les_fragments_lisent_raw_metadata_comme_raw_value(sa_sync_conn):
-    notice = insert_source_publication(
+    notice = insert_source_record(
         sa_sync_conn,
         insert_publication(sa_sync_conn),
         source="crossref",

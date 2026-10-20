@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-16)
-"""Remplit `source_authorships.countries` pour le stock (`refresh_source_contribution_countries`), par lots d'identifiants validés un à un.
+"""Remplit `source_contributions.countries` pour le stock (`refresh_source_contribution_countries`), par lots d'identifiants validés un à un.
 
 Les signatures modifiées sont marquées `countries_dirty` : la phase `countries` suivante recalcule les pays des notices et des publications. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé.
 
@@ -35,7 +35,9 @@ def main() -> int:
     started = time.monotonic()
     changed = 0
     with get_sync_engine().connect() as conn:
-        min_id, max_id = conn.execute(text("SELECT min(id), max(id) FROM source_authorships")).one()
+        min_id, max_id = conn.execute(
+            text("SELECT min(id), max(id) FROM source_contributions")
+        ).one()
         conn.commit()
         lo = args.from_id if args.from_id is not None else min_id
         while lo <= max_id:

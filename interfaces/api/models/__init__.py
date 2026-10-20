@@ -25,15 +25,15 @@ from interfaces.api.models.addresses import (
     SetCountry,
 )
 from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
-from interfaces.api.models.authorships import (
-    AssignOrphanAuthorship,
-    BatchAssignOrphanAuthorships,
+from interfaces.api.models.config import ConfigValueUpdate
+from interfaces.api.models.contributions import (
+    AssignOrphanContribution,
+    BatchAssignOrphanContributions,
     CreatePersonName,
     OrphanAssignResponse,
     OrphanBatchAssignResponse,
-    SourceAuthorshipRef,
+    SourceContributionRef,
 )
-from interfaces.api.models.config import ConfigValueUpdate
 from interfaces.api.models.errors import (
     BlockingJournalItem,
     PublisherMergeBlockedResponse,
@@ -47,8 +47,8 @@ from interfaces.api.models.perimeters import (
 from interfaces.api.models.persons import (
     AddIdentifier,
     AddIdentifierResponse,
-    DetachAuthorships,
-    DetachAuthorshipsResponse,
+    DetachContributions,
+    DetachContributionsResponse,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
     MarkDistinctPersons,
@@ -73,9 +73,9 @@ __all__ = [
     "AddIdentifierResponse",
     "AddressPublicationsResponse",
     "AddressReviewResponse",
-    "AssignOrphanAuthorship",
+    "AssignOrphanContribution",
     "AuthCheckResponse",
-    "BatchAssignOrphanAuthorships",
+    "BatchAssignOrphanContributions",
     "BatchCountryResponse",
     "BatchReviewAction",
     "BatchSetCountry",
@@ -85,8 +85,8 @@ __all__ = [
     "CreatePersonName",
     "CreatedIdResponse",
     "DeletedResponse",
-    "DetachAuthorships",
-    "DetachAuthorshipsResponse",
+    "DetachContributions",
+    "DetachContributionsResponse",
     "EnumOption",
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
@@ -111,7 +111,7 @@ __all__ = [
     "TutelleCreate",
     "ReviewAction",
     "SetCountry",
-    "SourceAuthorshipRef",
+    "SourceContributionRef",
     "StructureCreate",
     "StructureTutelleCreateResponse",
     "StructureUpdate",

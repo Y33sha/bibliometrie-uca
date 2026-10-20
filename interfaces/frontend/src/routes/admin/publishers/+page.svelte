@@ -177,7 +177,7 @@
 				onclose={closeMerge}
 			>
 				{#snippet item(r)}
-					{r.name} <span class="muted">({r.journal_count} revues, {r.pub_count} publis)</span>
+					{r.name} <span class="muted">({r.journal_count} revues, {r.publication_count} publis)</span>
 				{/snippet}
 			</Picker>
 		{:else}

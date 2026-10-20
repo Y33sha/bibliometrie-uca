@@ -32,7 +32,7 @@ Les [APC](glossaire.md#apc) (si présents) sont payés par la structure de ratta
 
 L'information "auteur correspondant" est inégalement renseignée dans les métadonnées des sources.
 
-## Authorship
+## Contribution
 Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](glossaire.md#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
 
 ## Collection HAL

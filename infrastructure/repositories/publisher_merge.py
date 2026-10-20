@@ -31,7 +31,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "publisher_type": fill_empty(
         "publishers", "publisher_type", empty=PublisherType.UNKNOWN.value
     ).of_nature(DataNature.MIXED),
-    "pub_count": untouched("publishers", "pub_count"),
+    "publication_count": untouched("publishers", "publication_count"),
 }
 
 

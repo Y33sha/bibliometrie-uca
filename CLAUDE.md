@@ -19,7 +19,7 @@
 
 #### Style
 - Utiliser le **présent intemporel**: ne jamais supposer connu l'état antérieur du code. Bannir tout vocabulaire ancré temporellement (`nouveau`, `désormais`, `ne plus`...). Ne jamais renvoyer à des fichiers transitoires (todo, roadmaps).
-- Ecrire d'une manière intelligible hors contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_publication, `pub` pour publication...).
+- Ecrire d'une manière intelligible hors contexte des conversations; **éviter le jargon** interne au projet et les abréviations maison (`SP` pour source_record, `pub` pour publication...).
 - **Ecrire des phrases courtes.** Pour lier les idées: parataxe > coordination (lorsque nécessaire) > subordination (à éviter). "ce qui explique que" => "donc"
 - **Eviter les redondances.** Quand une phrase a deux parties séparées par deux-points, supprimer l'une des deux si elle ne fait que reformuler ou annoncer l'autre.
 - **Préférer l'affirmation à la négation.** Dire "seul, seulement" au lieu de "ne... que". Eviter les doubles négations.
@@ -58,14 +58,14 @@ A jour au 2026-10-11
 `fetch_missing` — Rattrapage cross-source (hal-id, NNT, DOI)
 `fetch_stale` — Rafraîchissement des docs stale
 `fetch_truncated` — Re-fetch OpenAlex tronqués (100 auteurs)
-`normalize` — Normalisation staging → source_publications, source_authorships, addresses
+`normalize` — Normalisation staging → source_records, source_contributions, addresses
 `affiliations` — Résolution adresses → structures UCA
 `resolve_ra` — Résolution Registration Agency des DOI
 `publishers_journals` — Enrichissement journals (DOI, APC, DOAJ)
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
 `persons` — Création personnes
-`authorships` — Construction de la table consolidée
+`contributions` — Construction de la table consolidée
 `relations` — Relations sémantiques entre publications
 `subjects` — Sujets/mots-clés
 `countries` — Détection pays

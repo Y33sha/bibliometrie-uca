@@ -75,7 +75,10 @@ class TestListMonographs:
         _seed_publications(few, 1)
         _seed_publications(many, 3)
         r = client.get("/api/monographs", params={"search": title, "sort": "pubs_desc"})
-        assert [(m["id"], m["pub_count"]) for m in r.json()["monographs"]] == [(many, 3), (few, 1)]
+        assert [(m["id"], m["publication_count"]) for m in r.json()["monographs"]] == [
+            (many, 3),
+            (few, 1),
+        ]
 
 
 class TestMonographsFacets:

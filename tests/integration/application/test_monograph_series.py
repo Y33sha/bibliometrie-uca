@@ -11,7 +11,7 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
 )
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from tests.integration.helpers.journals import insert_journal
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def _volume(conn, repo, title: str, source_id: str) -> int:
         publisher_id=None,
         journal_id=journal_id,
     )
-    insert_source_publication(
+    insert_source_record(
         conn,
         source="crossref",
         source_id=source_id,

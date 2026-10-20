@@ -9,8 +9,8 @@ Vue globale du modèle : l'ingestion par source en haut, les référentiels cons
 ```mermaid
 flowchart TB
     subgraph ingestion["Ingestion — tables sources (par source)"]
-        staging --> source_publications --> source_authorships
-        source_authorships --> source_authorship_addresses --> addresses
+        staging --> source_records --> source_contributions
+        source_contributions --> source_contribution_addresses --> addresses
     end
 
     subgraph publishing["Revues & éditeurs"]
@@ -19,19 +19,19 @@ flowchart TB
 
     subgraph canon["Référentiel consolidé"]
         publications
-        authorships
+        contributions
         structures
         persons
     end
 
-    source_publications -->|match / create| publications
-    source_authorships -->|match / create| persons
-    source_authorships --> authorships
-    authorships --> publications
-    authorships --> persons
-    authorships -.->|via matview authorship_structures| structures
+    source_records -->|match / create| publications
+    source_contributions -->|match / create| persons
+    source_contributions --> contributions
+    contributions --> publications
+    contributions --> persons
+    contributions -.->|via matview contribution_structures| structures
     addresses --> address_structures --> structures
-    source_publications --- publishing
+    source_records --- publishing
     publications --- publishing
 
     subgraph satP["Satellites publication"]
@@ -41,13 +41,13 @@ flowchart TB
     end
     subgraph satS["Structures & périmètre"]
         structure_name_forms
-        structure_tutelles
+        structure_parents
         perimeters --> perimeter_structures
     end
     subgraph satN["Satellites personne"]
         person_identifiers
         person_name_forms
-        persons_rh
+        hr_records
     end
 
     publications --- satP
@@ -67,12 +67,12 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `alembic_version` | révision de schéma appliquée — technique | `public` |
 | `apc_payments` | frais de publication (import CSV) | [publishing](04-publishing.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](07-ref-et-ops.md) |
-| `author_identifying_keys` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `identity_id` | [sources](02-sources.md) |
-| `authorship_structures` | *vue matérialisée* : structures liées à une authorship | [publications](03-publications.md) |
-| `authorships` | table consolidée personne × publication | [publications](03-publications.md) |
+| `contributor_information` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
+| `contribution_structures` | *vue matérialisée* : structures liées à une contribution | [publications](03-publications.md) |
+| `contributions` | table consolidée personne × publication | [publications](03-publications.md) |
 | `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](07-ref-et-ops.md) |
-| `confirmed_authorships` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
+| `confirmed_source_contributions` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
 | `countries` | référentiel des pays | [ref](07-ref-et-ops.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](04-publishing.md) |
@@ -89,7 +89,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [persons](05-persons.md) |
 | `person_name_forms` | formes de noms pour reconnaître une personne | [persons](05-persons.md) |
 | `persons` | référentiel des personnes du périmètre | [persons](05-persons.md) |
-| `persons_rh` | satellite des données RH (import CSV) | [persons](05-persons.md) |
+| `hr_records` | satellite des données RH (import CSV) | [persons](05-persons.md) |
 | `pipeline_phase_executions` | historique d'exécution des phases — technique | [ops](07-ref-et-ops.md) |
 | `place_name_forms` | formes de noms pour la détection des pays | [ref](07-ref-et-ops.md) |
 | `publication_relations` | relations sémantiques entre publications | [publications](03-publications.md) |
@@ -99,18 +99,18 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `publications_detail` | satellite 1:1 (abstract, keywords, topics, biblio) | [publications](03-publications.md) |
 | `publisher_name_forms` | formes de noms pour reconnaître un éditeur | [publishing](04-publishing.md) |
 | `publishers` | référentiel des éditeurs | [publishing](04-publishing.md) |
-| `rejected_authorships` | rejets manuels de paires personne × publication | [persons](05-persons.md) |
+| `rejected_contributions` | rejets manuels de paires personne × publication | [persons](05-persons.md) |
 | `ror_dump_imports` | imports du dump ROR | [ref](07-ref-et-ops.md) |
 | `ror_organizations` | organisations du Research Organization Registry | [ref](07-ref-et-ops.md) |
 | `ror_relations` | relations parent/enfant entre organisations ROR | [ref](07-ref-et-ops.md) |
-| `source_authorship_addresses` | liaison authorship source ↔ adresse | [sources](02-sources.md) |
-| `source_authorship_rors` | ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
-| `source_authorship_structures` | *vue matérialisée* : affiliations résolues d'un authorship source | [sources](02-sources.md) |
-| `source_authorships` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
-| `source_publications` | un enregistrement par document par source | [sources](02-sources.md) |
+| `source_contribution_addresses` | liaison contribution source ↔ adresse | [sources](02-sources.md) |
+| `source_contribution_rors` | ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
+| `source_contribution_structures` | *vue matérialisée* : affiliations résolues d'une contribution source | [sources](02-sources.md) |
+| `source_contributions` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
+| `source_records` | un enregistrement par document par source | [sources](02-sources.md) |
 | `staging` | ingestion brute par source, payload vidé après normalisation | [sources](02-sources.md) |
 | `structure_name_forms` | formes de noms pour la détection des structures | [structures](06-structures.md) |
-| `structure_tutelles` | rattachement hiérarchique entre structures | [structures](06-structures.md) |
+| `structure_parents` | rattachement hiérarchique entre structures | [structures](06-structures.md) |
 | `structures` | référentiel institutionnel | [structures](06-structures.md) |
 | `subject_cooccurrences` | *vue matérialisée* : paires de sujets co-présents | [publications](03-publications.md) |
 | `subjects` | référentiel des sujets / mots-clés | [publications](03-publications.md) |

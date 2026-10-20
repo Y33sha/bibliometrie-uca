@@ -1,6 +1,6 @@
-"""Normalisation d'une source, du staging vers `source_publications`, `source_authorships` et `addresses`.
+"""Normalisation d'une source, du staging vers `source_records`, `source_contributions` et `addresses`.
 
-Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron fait la boucle : chargement des lignes à traiter, un SAVEPOINT par notice (une erreur isolée ne perd pas le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_publications` et les signatures sont injectées à la construction.
+Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron fait la boucle : chargement des lignes à traiter, un SAVEPOINT par notice (une erreur isolée ne perd pas le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_records` et les signatures sont injectées à la construction.
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.common.source_publications import SourcePublicationQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_records import SourceRecordQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.runtime.observability.libelles import (
     SUITE_DE_BRANCHE,
@@ -79,8 +79,8 @@ class SourceNormalizer(ABC):
         if not row.raw_data:
             self._staging.mark_done(conn, row.id)
             return None
-        title, pub_year = self.minimal_metadata(row)
-        if not has_minimal_publication_metadata(title, pub_year):
+        title, publication_year = self.minimal_metadata(row)
+        if not has_minimal_publication_metadata(title, publication_year):
             return self._reject(conn, row)
         result = self.normalize_record(conn, row)
         if result is False:
@@ -89,7 +89,7 @@ class SourceNormalizer(ABC):
 
     def _reject(self, conn: Connection, row: StagingRow) -> bool:
         """Écarte une notice refusée : l'enregistrement qu'elle avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme notice incomplète."""
-        self._staging.discard_source_publication(conn, row.id)
+        self._staging.discard_source_record(conn, row.id)
         self._staging.mark_done(conn, row.id)
         return False
 
@@ -201,13 +201,13 @@ class BibliographicNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: SourcePublicationQueries,
+        queries: SourceRecordQueries,
         container_stores: ContainerStores,
         publisher_store: PublisherStore,
-        authorship_queries: AuthorshipsBatchQueries,
+        contribution_queries: ContributionsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._container_stores = container_stores
         self._publisher_store = publisher_store
-        self._authorship_queries = authorship_queries
+        self._contribution_queries = contribution_queries

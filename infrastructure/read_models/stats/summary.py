@@ -34,13 +34,13 @@ def _facets_sqls(
 
     year_where, year_binds = assemble_where(_clauses("year"))
     year_sql = f"""
-        SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
+        SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {STATS_BASE} AND {year_where}
-          AND p.pub_year IS NOT NULL
-        GROUP BY p.pub_year
-        ORDER BY p.pub_year DESC
+          AND p.publication_year IS NOT NULL
+        GROUP BY p.publication_year
+        ORDER BY p.publication_year DESC
     """
 
     lab_where, lab_binds = assemble_where(_clauses("lab"))
@@ -151,7 +151,7 @@ def _build_facets_result(
     license_rows: Sequence[Row[tuple[object, ...]]] = (),
 ) -> StatsFacetsResponse:
     return StatsFacetsResponse(
-        years=[FacetOption(value=str(r.pub_year), count=r.n) for r in year_rows],
+        years=[FacetOption(value=str(r.publication_year), count=r.n) for r in year_rows],
         labs=[FacetOption(value=str(r.id), label=r.label, count=r.n) for r in lab_rows],
         oa_statuses=[FacetOption(value=r.value, count=r.n) for r in oa_rows],
         licenses=[

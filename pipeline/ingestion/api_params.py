@@ -33,7 +33,7 @@ API_BASE_URLS: dict[str, str] = {
 
 # Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/)
 HAL_DELAY = 0.5
-# 100 records/page (union de toutes les collections en une requête). Au-delà, les payloads label_xml (TEI) des collections à méga-authorships (CERN/ATLAS/CMS) font time-out le serveur HAL.
+# 100 records/page (union de toutes les collections en une requête). Au-delà, les payloads label_xml (TEI) des collections à méga-contributions (CERN/ATLAS/CMS) font time-out le serveur HAL.
 HAL_PER_PAGE = 100
 
 

@@ -94,7 +94,7 @@
 						<td><a href="{base}/journals/{j.id}">{j.title}</a> <span class="muted">#{j.id}</span></td>
 						<td>{j.pub_name ?? '—'}</td>
 						<td>{issns(j)}</td>
-						<td class="num">{j.pub_count}</td>
+						<td class="num">{j.publication_count}</td>
 						<td class="action">
 							<button class="btn btn-sm" disabled={busy} onclick={() => keep(group, j)}>
 								Garder celle-ci

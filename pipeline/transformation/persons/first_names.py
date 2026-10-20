@@ -23,7 +23,7 @@ def fetch_linked_signature_names(
     rows = conn.execute(
         text("""
             SELECT person_id, raw_author_name, raw_last_name, raw_first_name
-            FROM source_authorships
+            FROM source_contributions
             WHERE person_id = ANY(:ids)
         """),
         {"ids": person_ids},

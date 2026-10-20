@@ -1,8 +1,8 @@
 """Exceptions métier : champs structurés et message lisible."""
 
 from domain.errors import (
-    AuthorshipAlreadyAssignedError,
     CannotAttributeConflict,
+    ContributionAlreadyAssignedError,
     PublisherMergeBlockedError,
     RejectedPairError,
 )
@@ -48,10 +48,10 @@ class TestPublisherMergeBlockedError:
         assert str(exc) == "Fusion bloquée par 2 paires de revues à traiter manuellement"
 
 
-class TestAuthorshipAlreadyAssignedError:
+class TestContributionAlreadyAssignedError:
     def test_nomme_la_signature_et_sa_detentrice(self):
-        exc = AuthorshipAlreadyAssignedError(7, 42)
-        assert (exc.authorship_id, exc.owner_person_id) == (7, 42)
+        exc = ContributionAlreadyAssignedError(7, 42)
+        assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
         assert str(exc) == (
             "La signature #7 est déjà attribuée à la personne #42 ; "
             "seule une signature orpheline peut être attribuée."

@@ -48,7 +48,7 @@ def _build_publisher_where(
         parts.append("p.country = ANY(:countries)")
         binds["countries"] = filters.countries
     if filters.with_pubs:
-        parts.append("p.pub_count > 0")
+        parts.append("p.publication_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -57,8 +57,8 @@ _SORT_MAP = {
     "name_desc": "p.name DESC",
     "journals_asc": "journal_count ASC, p.name ASC",
     "journals_desc": "journal_count DESC, p.name ASC",
-    "pubs_asc": "pub_count ASC, p.name ASC",
-    "pubs_desc": "pub_count DESC, p.name ASC",
+    "pubs_asc": "publication_count ASC, p.name ASC",
+    "pubs_desc": "publication_count DESC, p.name ASC",
 }
 
 
@@ -83,7 +83,7 @@ _PUBLISHER_COLUMNS = f"""
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
     (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
-    p.pub_count,
+    p.publication_count,
     {_doi_prefixes_sql()} AS doi_prefixes
 """.strip()
 
@@ -100,7 +100,7 @@ def _row_to_publisher(row: Row[tuple[object, ...]]) -> Publisher:
         country=row.country,
         publisher_type=row.publisher_type,
         journal_count=row.journal_count,
-        pub_count=row.pub_count,
+        publication_count=row.publication_count,
         doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
     )
 

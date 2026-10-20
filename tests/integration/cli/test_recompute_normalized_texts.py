@@ -4,12 +4,12 @@ from sqlalchemy import text
 
 from interfaces.cli.oneshot.recompute_normalized_texts import _repoint_signatures
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def test_une_signature_en_ecriture_non_latine_rejoint_l_identite_de_son_nom(sa_sync_conn):
     """Régression : la lecture en curseur serveur s'étendait aux écritures qui la suivent, que PostgreSQL refuse."""
-    sp = insert_source_publication(sa_sync_conn, insert_publication(sa_sync_conn, "P"))
+    sp = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn, "P"))
     sa = insert_signature(
         sa_sync_conn, sp, raw_last_name="馬場", raw_first_name="重樹", author_name_normalized=""
     )
@@ -19,7 +19,7 @@ def test_une_signature_en_ecriture_non_latine_rejoint_l_identite_de_son_nom(sa_s
     assert sa_sync_conn.execute(
         text("""
             SELECT aik.last_name_normalized, aik.first_name_normalized
-            FROM source_authorships sa JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+            FROM source_contributions sa JOIN contributor_information aik ON aik.id = sa.contributor_information_id
             WHERE sa.id = :sa
         """),
         {"sa": sa},

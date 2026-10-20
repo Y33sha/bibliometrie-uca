@@ -31,7 +31,7 @@
 <div class="pub-header">
   <div class="pub-meta">
     {#if pub.doc_type}<span class="doc-type-tag">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-    {#if pub.pub_year}<span class="pub-year">{pub.pub_year}</span>{/if}
+    {#if pub.publication_year}<span class="pub-year">{pub.publication_year}</span>{/if}
   </div>
   <h1 class="pub-title-main"><PublicationTitle titre={pub.title} /></h1>
 

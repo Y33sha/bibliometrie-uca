@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_publications`.
+"""Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_records`.
 
 Trois tâches (`pipeline.graph`), chacune dans sa propre transaction, dans l'ordre du graphe :
 

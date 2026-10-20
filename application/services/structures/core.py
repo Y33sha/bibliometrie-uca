@@ -1,6 +1,6 @@
 """Service Structures — écritures sur l'agrégat Structure, transaction-agnostiques.
 
-Couvre les tables `structures`, `structure_tutelles` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
+Couvre les tables `structures`, `structure_parents` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
 """
 
 from typing import cast
@@ -135,7 +135,7 @@ def delete_structure(
     emit_event(audit_repo, "structure.deleted", "structure", structure_id, snapshot)
 
 
-# ── structure_tutelles ────────────────────────────────────────────
+# ── structure_parents ────────────────────────────────────────────
 
 
 def create_tutelle(

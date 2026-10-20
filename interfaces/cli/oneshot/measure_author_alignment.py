@@ -72,15 +72,15 @@ def _publication_ids(conn: Connection, full_max: int, sample_large: int, seed: i
     rows = conn.execute(
         text("""
             WITH multi AS (
-                SELECT publication_id FROM source_publications
+                SELECT publication_id FROM source_records
                 WHERE publication_id IS NOT NULL AND source <> 'theses'
                 GROUP BY 1 HAVING count(DISTINCT source) >= 2
             )
             SELECT sp.publication_id, max(n.n) AS size
-            FROM source_publications sp
+            FROM source_records sp
             JOIN multi m USING (publication_id)
             JOIN LATERAL (
-                SELECT count(*) AS n FROM source_authorships sa WHERE sa.source_publication_id = sp.id
+                SELECT count(*) AS n FROM source_contributions sa WHERE sa.source_record_id = sp.id
             ) n ON true
             WHERE sp.source <> 'theses'
             GROUP BY 1
@@ -121,10 +121,10 @@ def _notices(
                        sa.author_position, aik.last_name_normalized AS ln,
                        coalesce(aik.first_name_normalized, '') AS fn,
                        coalesce(sa.raw_author_name, concat_ws(' ', sa.raw_first_name, sa.raw_last_name)) AS raw_name,
-                       aik.person_identifiers, sa.neutralized_identifiers
-                FROM source_publications sp
-                JOIN source_authorships sa ON sa.source_publication_id = sp.id
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                       aik.identifiers, sa.neutralized_identifiers
+                FROM source_records sp
+                JOIN source_contributions sa ON sa.source_record_id = sp.id
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sp.publication_id = ANY(:ids) AND sp.source <> 'theses'
                   AND 'author' = ANY(sa.roles) AND sa.author_position IS NOT NULL
                   AND NOT sa.collective
@@ -136,7 +136,7 @@ def _notices(
             neutralized = set((r.neutralized_identifiers or {}).keys())
             identifiers = {
                 t: str(v)
-                for t, v in (r.person_identifiers or {}).items()
+                for t, v in (r.identifiers or {}).items()
                 if t in _STRONG and t not in neutralized and v
             }
             by_pub[r.publication_id][(r.notice_id, r.source, bool(r.from_hal))].append(

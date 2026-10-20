@@ -7,7 +7,7 @@ import json
 import uuid
 
 from domain.normalize import normalize_text
-from tests.integration.helpers.authorships import upsert_identity_on_cursor
+from tests.integration.helpers.contributions import upsert_identity_on_cursor
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.persons import NORMALIZERS
 from tests.integration.helpers.rows import perimeter_evidence
@@ -24,11 +24,13 @@ def _insert(sql: str, params: tuple) -> int:
         return cur.fetchone()["id"]
 
 
-def seed_address(raw_text: str, *, countries: list[str] | None = None, pub_count: int = 1) -> int:
+def seed_address(
+    raw_text: str, *, countries: list[str] | None = None, publication_count: int = 1
+) -> int:
     return _insert(
-        "INSERT INTO addresses (raw_text, normalized_text, countries, pub_count) "
+        "INSERT INTO addresses (raw_text, normalized_text, countries, publication_count) "
         "VALUES (%s, lower(%s), %s, %s) RETURNING id",
-        (raw_text, raw_text, countries, pub_count),
+        (raw_text, raw_text, countries, publication_count),
     )
 
 
@@ -108,7 +110,7 @@ def seed_add_to_perimeter(structure_id: int, *, code: str, name: str) -> int:
 def seed_tutelle(parent_id: int, *, child_id: int) -> int:
     """Tutelle de `parent_id` sur `child_id`."""
     return _insert(
-        "INSERT INTO structure_tutelles (parent_id, child_id) VALUES (%s, %s) RETURNING id",
+        "INSERT INTO structure_parents (parent_id, child_id) VALUES (%s, %s) RETURNING id",
         (parent_id, child_id),
     )
 
@@ -244,18 +246,18 @@ def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str])
         )
 
 
-def seed_rejected_authorship(publication_id: int, *, person_id: int) -> None:
+def seed_rejected_contribution(publication_id: int, *, person_id: int) -> None:
     """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par notice de la publication. Une publication sans notice en reçoit une."""
     with owner_pool() as cur:
         cur.execute(
-            "INSERT INTO source_publications (source, source_id, title, publication_id) "
+            "INSERT INTO source_records (source, source_id, title, publication_id) "
             "SELECT 'hal', 'rejet-' || %s, 'X', %s "
-            "WHERE NOT EXISTS (SELECT 1 FROM source_publications WHERE publication_id = %s)",
+            "WHERE NOT EXISTS (SELECT 1 FROM source_records WHERE publication_id = %s)",
             (publication_id, publication_id, publication_id),
         )
         cur.execute(
-            "INSERT INTO rejected_authorships (source_publication_id, person_id) "
-            "SELECT id, %s FROM source_publications WHERE publication_id = %s",
+            "INSERT INTO rejected_contributions (source_record_id, person_id) "
+            "SELECT id, %s FROM source_records WHERE publication_id = %s",
             (person_id, publication_id),
         )
 
@@ -273,7 +275,7 @@ def seed_publication(
 ) -> int:
     """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
     return _insert(
-        "INSERT INTO publications (title, title_normalized, pub_year, doc_type, oa_status, "
+        "INSERT INTO publications (title, title_normalized, publication_year, doc_type, oa_status, "
         "journal_id, monograph_id, perimeter_evidence) "
         "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, "
         "CAST(%s AS perimeter_evidence[])) "
@@ -291,23 +293,23 @@ def seed_publication(
     )
 
 
-def seed_authorship(
+def seed_contribution(
     publication_id: int,
     *,
     person_id: int,
     in_perimeter: bool = False,
     roles: list[str] | None = None,
 ) -> int:
-    """Authorship de `publication_id` et `person_id`. Les valeurs par défaut sont celles du schéma."""
+    """Contribution de `publication_id` et `person_id`. Les valeurs par défaut sont celles du schéma."""
     return _insert(
-        "INSERT INTO authorships (publication_id, person_id, perimeter_evidence, roles) "
+        "INSERT INTO contributions (publication_id, person_id, perimeter_evidence, roles) "
         "VALUES (%s, %s, CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
         (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
     )
 
 
-def seed_in_perimeter_authorships(journal_id: int) -> None:
-    """Pose une authorship du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `pub_count` de la revue et de son éditeur."""
+def seed_in_perimeter_contributions(journal_id: int) -> None:
+    """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
     with owner_pool() as cur:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
         pub_ids = [r["id"] for r in cur.fetchall()]
@@ -318,10 +320,10 @@ def seed_in_perimeter_authorships(journal_id: int) -> None:
                 normalizer="normalize_text",
                 first_name_normalized="jane",
             )
-            seed_authorship(pid, person_id=person_id, in_perimeter=True, roles=["author"])
+            seed_contribution(pid, person_id=person_id, in_perimeter=True, roles=["author"])
         cur.execute(
             "UPDATE publications p SET perimeter_evidence = coalesce(("
-            "SELECT array_agg(DISTINCT e ORDER BY e) FROM authorships a JOIN persons pe "
+            "SELECT array_agg(DISTINCT e ORDER BY e) FROM contributions a JOIN persons pe "
             "ON pe.id = a.person_id AND pe.exclusion IS NULL "
             "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
             "WHERE a.publication_id = p.id), '{}') "
@@ -329,25 +331,25 @@ def seed_in_perimeter_authorships(journal_id: int) -> None:
             (journal_id,),
         )
         cur.execute(
-            "UPDATE journals j SET pub_count = COALESCE((SELECT COUNT(*) "
+            "UPDATE journals j SET publication_count = COALESCE((SELECT COUNT(*) "
             "FROM publications p WHERE p.journal_id = j.id AND p.in_perimeter "
             "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
             (journal_id,),
         )
         cur.execute(
-            "UPDATE publishers pub SET pub_count = COALESCE((SELECT SUM(j.pub_count) "
+            "UPDATE publishers pub SET publication_count = COALESCE((SELECT SUM(j.publication_count) "
             "FROM journals j WHERE j.publisher_id = pub.id), 0) "
             "WHERE pub.id = (SELECT publisher_id FROM journals WHERE id = %s)",
             (journal_id,),
         )
 
 
-def seed_source_publication(
+def seed_source_record(
     source: str = "hal",
     *,
     source_id: str | None = None,
     title: str = "T",
-    pub_year: int | None = 2024,
+    publication_year: int | None = 2024,
     publication_id: int | None = None,
     journal_id: int | None = None,
     doc_type: str | None = None,
@@ -359,7 +361,7 @@ def seed_source_publication(
         "source": source,
         "source_id": source_id or uniq("sid"),
         "title": title,
-        "pub_year": pub_year,
+        "publication_year": publication_year,
         "publication_id": publication_id,
         "journal_id": journal_id,
         "doc_type": doc_type,
@@ -369,13 +371,13 @@ def seed_source_publication(
     values = {column: value for column, value in values.items() if value is not None}
     placeholders = ["CAST(%s AS jsonb)" if column == "raw_metadata" else "%s" for column in values]
     return _insert(
-        f"INSERT INTO source_publications ({', '.join(values)}) "
+        f"INSERT INTO source_records ({', '.join(values)}) "
         f"VALUES ({', '.join(placeholders)}) RETURNING id",
         tuple(values.values()),
     )
 
 
-def seed_source_authorship(
+def seed_source_contribution(
     source: str = "hal",
     source_pub_id: int | None = None,
     person_id: int | None = None,
@@ -384,12 +386,12 @@ def seed_source_authorship(
     author_position: int = 0,
 ) -> int:
     """Signature de nom brut `raw_author_name`, sur une notice semée au besoin."""
-    sp = source_pub_id or seed_source_publication(source=source)
+    sp = source_pub_id or seed_source_record(source=source)
     with owner_pool() as cur:
         iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
         cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
-            "person_id, perimeter_evidence, raw_author_name, identity_id) "
+            "INSERT INTO source_contributions (source, source_record_id, author_position, "
+            "person_id, perimeter_evidence, raw_author_name, contributor_information_id) "
             "VALUES (%s, %s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
             (
                 source,

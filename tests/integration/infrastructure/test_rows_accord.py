@@ -17,7 +17,7 @@ from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
-from pipeline.transformation.publications.consolidation import source_publications_of
+from pipeline.transformation.publications.consolidation import source_records_of
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     PgMetadataCorrectionQueries,
 )
@@ -54,7 +54,7 @@ class TestRelevesRendantUneListe:
         assert queries.fetch_journal_by_doi_candidates(sa_sync_conn_owner) == []
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
-        assert source_publications_of(sa_sync_conn_owner, 1) == []
+        assert source_records_of(sa_sync_conn_owner, 1) == []
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
         """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""
@@ -98,7 +98,7 @@ TYPES_EXERCES = {
     "_JournalRow",
     "_PerimeterRow",
     "_PublisherRow",
-    "_SourcePublicationRow",
+    "_SourceRecordRow",
     "_StructureNameFormRow",
     "_StructureRow",
 }

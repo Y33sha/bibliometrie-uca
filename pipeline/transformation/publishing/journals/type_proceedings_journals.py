@@ -55,7 +55,7 @@ _RECORD_TYPES_OF_UNKNOWN_JOURNALS = text(f"""
            array_agg(s.source::text ORDER BY s.id) AS sources,
            array_agg({raw_column("doc_type", "s")} ORDER BY s.id) AS raw_types
     FROM journals j
-    JOIN source_publications s ON s.journal_id = j.id
+    JOIN source_records s ON s.journal_id = j.id
     WHERE j.journal_type = 'unknown' AND NOT 'journal_type' = ANY(j.manual_fields)
     GROUP BY j.id
     ORDER BY j.id

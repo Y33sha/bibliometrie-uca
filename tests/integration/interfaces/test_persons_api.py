@@ -13,7 +13,7 @@ import pytest
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
-    seed_authorship,
+    seed_contribution,
     seed_person,
     seed_person_identifier,
     seed_person_name_form,
@@ -25,10 +25,10 @@ from tests.integration.helpers.seeds import (
 _persons_name_form = partial(seed_person_name_form, sources=["persons"])
 
 _cleanup_after_module = truncate_after_module(
-    "authorships",
-    "source_authorships",
-    "author_identifying_keys",
-    "source_publications",
+    "contributions",
+    "source_contributions",
+    "contributor_information",
+    "source_records",
     "publications",
     "persons",
     "person_identifiers",
@@ -87,10 +87,10 @@ class TestPersonsList:
         assert r.status_code == 200
 
     def test_active_keeps_persons_with_a_publication(self, client):
-        """`active=true` écarte une personne sans authorship ni fiche RH, conservée pour ses décisions."""
+        """`active=true` écarte une personne sans contribution ni fiche RH, conservée pour ses décisions."""
         name = uniq("Actif")
         with_publication = seed_person(name, "A")
-        seed_authorship(seed_publication(), person_id=with_publication)
+        seed_contribution(seed_publication(), person_id=with_publication)
         seed_person(name, "B")
 
         r = client.get("/api/persons", params={"search": name, "active": "true"})
@@ -163,7 +163,7 @@ class TestPersonList:
         assert r.status_code == 422
 
     def test_unknown_sort_rejected(self, client):
-        r = client.get("/api/persons", params={"sort": "pub_count_desc"})
+        r = client.get("/api/persons", params={"sort": "publication_count_desc"})
         assert r.status_code == 422
 
 
@@ -434,28 +434,28 @@ class TestMergePersons:
 # ── Name forms / detach ─────────────────────────────────────────
 
 
-class TestNameFormAuthorships:
+class TestNameFormContributions:
     def test_ok(self, client):
         pid = seed_person("Nameform", "Test")
         nf = uniq("Nameform Test")
         _persons_name_form(pid, name_form=nf)
-        r = client.get(f"/api/persons/{pid}/name-form-authorships", params={"name_form": nf})
+        r = client.get(f"/api/persons/{pid}/name-form-contributions", params={"name_form": nf})
         assert r.status_code == 200
 
 
-class TestDetachAuthorships:
+class TestDetachContributions:
     def test_requires_admin(self, client):
         r = client.post(
-            "/api/persons/1/detach-authorships",
-            json={"authorships": []},
+            "/api/persons/1/detach-contributions",
+            json={"contributions": []},
         )
         assert r.status_code == 401
 
     def test_ok_empty(self, auth_client):
         pid = seed_person()
         r = auth_client.post(
-            f"/api/persons/{pid}/detach-authorships",
-            json={"authorships": []},
+            f"/api/persons/{pid}/detach-contributions",
+            json={"contributions": []},
         )
         assert r.status_code == 200
 

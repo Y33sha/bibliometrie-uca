@@ -1,4 +1,4 @@
-"""Synchronisation des signatures d'une notice renormalisée (`sync_source_authorships`, `write_source_authorships`)."""
+"""Synchronisation des signatures d'une notice renormalisée (`sync_source_contributions`, `write_source_contributions`)."""
 
 from functools import partial
 
@@ -8,24 +8,24 @@ from domain.persons.signature_name import SignatureName
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signature_queries import (
-    AuthorshipsBatchQueries,
+    ContributionsBatchQueries,
     mark_signatures_to_resync,
 )
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
-    sync_source_authorships,
-    write_source_authorships,
+    sync_source_contributions,
+    write_source_contributions,
 )
-from tests.integration.helpers.authorships import insert_confirmed_authorship
+from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 # Notice Crossref « 10.9999/sync », de titre « t ».
-_notice = partial(insert_source_publication, source="crossref", source_id="10.9999/sync", title="t")
+_notice = partial(insert_source_record, source="crossref", source_id="10.9999/sync", title="t")
 
-_Q = AuthorshipsBatchQueries()
+_Q = ContributionsBatchQueries()
 
 
 def _rec(position: int, raw: str, **fields) -> AuthorRecord:
@@ -33,15 +33,15 @@ def _rec(position: int, raw: str, **fields) -> AuthorRecord:
 
 
 def _write(conn, sp: int, records: list[AuthorRecord]) -> None:
-    write_source_authorships(conn, _Q, "crossref", sp, records)
+    write_source_contributions(conn, _Q, "crossref", sp, records)
 
 
 def _signatures(conn, sp: int) -> dict[int, tuple[int, str]]:
     """Position → (identifiant, nom brut) des signatures de la notice."""
     rows = conn.execute(
         text(
-            "SELECT author_position, id, raw_author_name FROM source_authorships "
-            "WHERE source_publication_id = :sp"
+            "SELECT author_position, id, raw_author_name FROM source_contributions "
+            "WHERE source_record_id = :sp"
         ),
         {"sp": sp},
     ).all()
@@ -52,8 +52,8 @@ def _addresses(conn, sa_id: int) -> list[str]:
     return (
         conn.execute(
             text(
-                "SELECT a.raw_text FROM source_authorship_addresses l "
-                "JOIN addresses a ON a.id = l.address_id WHERE l.source_authorship_id = :i "
+                "SELECT a.raw_text FROM source_contribution_addresses l "
+                "JOIN addresses a ON a.id = l.address_id WHERE l.source_contribution_id = :i "
                 "ORDER BY a.raw_text"
             ),
             {"i": sa_id},
@@ -66,10 +66,10 @@ def _addresses(conn, sa_id: int) -> list[str]:
 def _pin(conn, sa_id: int) -> int:
     person = insert_person(conn, "Xu", first_name="Zhilu", normalizer="lower")
     conn.execute(
-        text("UPDATE source_authorships SET person_id = :p WHERE id = :i"),
+        text("UPDATE source_contributions SET person_id = :p WHERE id = :i"),
         {"p": person, "i": sa_id},
     )
-    insert_confirmed_authorship(conn, sa_id, person_id=person)
+    insert_confirmed_source_contribution(conn, sa_id, person_id=person)
     return person
 
 
@@ -93,13 +93,15 @@ def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
     assert _signatures(conn, sp)[2][0] == xu_id
     assert (
         conn.execute(
-            text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": xu_id}
+            text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": xu_id}
         ).scalar_one()
         == person
     )
     assert (
         conn.execute(
-            text("SELECT person_id FROM confirmed_authorships WHERE source_authorship_id = :i"),
+            text(
+                "SELECT person_id FROM confirmed_source_contributions WHERE source_contribution_id = :i"
+            ),
             {"i": xu_id},
         ).scalar_one()
         == person
@@ -158,7 +160,9 @@ def test_auteur_disparu_supprime_avec_son_epinglage(sa_sync_conn):
     assert set(_signatures(conn, sp)) == {0}
     assert (
         conn.execute(
-            text("SELECT count(*) FROM confirmed_authorships WHERE source_authorship_id = :i"),
+            text(
+                "SELECT count(*) FROM confirmed_source_contributions WHERE source_contribution_id = :i"
+            ),
             {"i": xu_id},
         ).scalar_one()
         == 0
@@ -177,9 +181,9 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     assert _addresses(conn, sa_id) == ["Labo B"]
 
 
-def _authorships_dirty(conn, publication_id: int) -> bool:
+def _contributions_dirty(conn, publication_id: int) -> bool:
     return conn.execute(
-        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication_id}
+        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication_id}
     ).scalar_one()
 
 
@@ -190,19 +194,19 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
     _write(
         conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")]), _rec(1, "Xu, Z.")]
     )
-    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
 
     _write(
         conn, sp, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")]), _rec(1, "Xu, Z.")]
     )
-    assert not _authorships_dirty(conn, publication)
+    assert not _contributions_dirty(conn, publication)
 
     _write(
         conn, sp, [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean", addresses=[AddressRecord("Labo B")])]
     )
-    assert _authorships_dirty(conn, publication)
+    assert _contributions_dirty(conn, publication)
 
-    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
     _write(
         conn,
         sp,
@@ -213,9 +217,9 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _authorships_dirty(conn, publication)
+    assert _contributions_dirty(conn, publication)
 
-    conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
     _write(
         conn,
         sp,
@@ -226,7 +230,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _authorships_dirty(conn, publication)
+    assert _contributions_dirty(conn, publication)
 
 
 def test_decomptes_des_auteurs_de_la_notice(sa_sync_conn):
@@ -246,7 +250,7 @@ def test_decomptes_des_auteurs_de_la_notice(sa_sync_conn):
     )
 
     counts = conn.execute(
-        text("SELECT author_count, distinct_author_count FROM source_publications WHERE id = :sp"),
+        text("SELECT author_count, distinct_author_count FROM source_records WHERE id = :sp"),
         {"sp": sp},
     ).one()
     assert tuple(counts) == (2, 1)
@@ -260,8 +264,8 @@ def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):
 
     rows = conn.execute(
         text(
-            "SELECT author_position, collective FROM source_authorships "
-            "WHERE source_publication_id = :sp ORDER BY author_position"
+            "SELECT author_position, collective FROM source_contributions "
+            "WHERE source_record_id = :sp ORDER BY author_position"
         ),
         {"sp": sp},
     ).all()
@@ -281,7 +285,7 @@ def test_signature_devenue_collective_reinseree_sans_personne(sa_sync_conn):
     assert new_id != old_id
     assert (
         conn.execute(
-            text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": new_id}
+            text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": new_id}
         ).scalar_one()
         is None
     )
@@ -291,7 +295,7 @@ def _rors(conn, sa_id: int) -> list[str]:
     return (
         conn.execute(
             text(
-                "SELECT ror_id FROM source_authorship_rors WHERE source_authorship_id = :i "
+                "SELECT ror_id FROM source_contribution_rors WHERE source_contribution_id = :i "
                 "ORDER BY ror_id"
             ),
             {"i": sa_id},
@@ -319,8 +323,8 @@ def _hal_structures(conn, sa_id: int) -> list[int]:
     return (
         conn.execute(
             text(
-                "SELECT hal_structure_id FROM source_authorship_hal_structures"
-                " WHERE source_authorship_id = :i ORDER BY hal_structure_id"
+                "SELECT hal_structure_id FROM source_contribution_hal_structures"
+                " WHERE source_contribution_id = :i ORDER BY hal_structure_id"
             ),
             {"i": sa_id},
         )
@@ -364,9 +368,9 @@ def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
     rows = conn.execute(
         text("""
             SELECT r.ror_id, a.raw_text
-            FROM source_authorship_rors r
+            FROM source_contribution_rors r
             LEFT JOIN addresses a ON a.id = r.address_id
-            WHERE r.source_authorship_id = :i
+            WHERE r.source_contribution_id = :i
             ORDER BY r.ror_id
         """),
         {"i": sa_id},
@@ -382,14 +386,14 @@ def test_signature_inchangee_laissee_en_l_etat(sa_sync_conn):
     _write(conn, sp, records)
     sa_id = _signatures(conn, sp)[0][0]
     conn.execute(
-        text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"), {"i": sa_id}
+        text("UPDATE source_contributions SET countries_dirty = false WHERE id = :i"), {"i": sa_id}
     )
 
     _write(conn, sp, records)
 
     assert (
         conn.execute(
-            text("SELECT countries_dirty FROM source_authorships WHERE id = :i"), {"i": sa_id}
+            text("SELECT countries_dirty FROM source_contributions WHERE id = :i"), {"i": sa_id}
         ).scalar_one()
         is False
     )
@@ -406,7 +410,7 @@ def _build_upper(block) -> list[AuthorRecord]:
 
 
 def _sync(conn, sp: int, names: list[str], build=_build) -> None:
-    sync_source_authorships(conn, _Q, "crossref", sp, {"names": names}, build)
+    sync_source_contributions(conn, _Q, "crossref", sp, {"names": names}, build)
 
 
 def test_bloc_inchange_laisse_les_signatures_en_l_etat(sa_sync_conn):
@@ -451,7 +455,7 @@ def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
 def test_signature_sans_position_garde_sa_confirmation(sa_sync_conn):
     """Thèse renormalisée avec un rapporteur de plus : le directeur, sans position d'auteur, garde son identifiant et sa confirmation ; les signatures insérées reçoivent leurs adresses."""
     conn = sa_sync_conn
-    sp = insert_source_publication(conn, source="theses", source_id="s123", title="t")
+    sp = insert_source_record(conn, source="theses", source_id="s123", title="t")
     lab = [AddressRecord(text="LIMOS")]
 
     def thesis(*extra: AuthorRecord) -> list[AuthorRecord]:
@@ -463,26 +467,28 @@ def test_signature_sans_position_garde_sa_confirmation(sa_sync_conn):
             *extra,
         ]
 
-    write_source_authorships(conn, _Q, "theses", sp, thesis())
+    write_source_contributions(conn, _Q, "theses", sp, thesis())
     director_id = _signatures(conn, sp)[None][0]
     person = _pin(conn, director_id)
 
     reviewer = AuthorRecord(
         None, SignatureName(raw="Durand, Paul"), roles=["reviewer"], addresses=lab
     )
-    write_source_authorships(conn, _Q, "theses", sp, thesis(reviewer))
+    write_source_contributions(conn, _Q, "theses", sp, thesis(reviewer))
 
     rows = conn.execute(
         text(
-            "SELECT id, raw_author_name FROM source_authorships "
-            "WHERE source_publication_id = :sp AND author_position IS NULL ORDER BY id"
+            "SELECT id, raw_author_name FROM source_contributions "
+            "WHERE source_record_id = :sp AND author_position IS NULL ORDER BY id"
         ),
         {"sp": sp},
     ).all()
     assert [r.id for r in rows][0] == director_id
     assert (
         conn.execute(
-            text("SELECT person_id FROM confirmed_authorships WHERE source_authorship_id = :i"),
+            text(
+                "SELECT person_id FROM confirmed_source_contributions WHERE source_contribution_id = :i"
+            ),
             {"i": director_id},
         ).scalar()
         == person

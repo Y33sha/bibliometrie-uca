@@ -80,7 +80,7 @@ class CountryCandidatesStore:
                 WITH added AS (
                     INSERT INTO address_country_candidates (address_id, country_code, method)
                     SELECT DISTINCT sar.address_id, ro.country_code, 'ror'::country_detection_method
-                    FROM source_authorship_rors sar
+                    FROM source_contribution_rors sar
                     JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
                     JOIN countries c ON c.code = ro.country_code
                     WHERE sar.address_id IS NOT NULL

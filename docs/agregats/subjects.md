@@ -18,7 +18,7 @@ Deux libellés qui ne diffèrent que par la casse convergent vers un seul sujet,
 
 ## Écriture par le pipeline
 
-Une seule phase écrit ces tables, `subjects`, exécutée après `authorships`. Elle comporte deux étapes inséparables, chacune dans sa transaction.
+Une seule phase écrit ces tables, `subjects`, exécutée après `contributions`. Elle comporte deux étapes inséparables, chacune dans sa transaction.
 
 **Ingestion.** Sont retenues les publications jamais traitées, et celles modifiées depuis le dernier enregistrement de leurs sujets. La sélection compare ces deux dates, sans colonne de marquage comme en portent d'autres phases. Leurs liens **non rejetés** sont effacés, puis reconstruits enregistrement source par enregistrement source : l'extracteur propre à chaque source réduit ses thématiques à une liste de libellés, un cache mutualise l'écriture d'un même libellé — y compris entre sources —, et les liens sont insérés en une fois avec leur source. Les sujets restés sans aucun lien sont supprimés en fin d'étape. `--rebuild-subjects` vide la date d'enregistrement des sujets de toutes les publications : l'ingestion reprend alors tout le stock.
 
@@ -34,7 +34,7 @@ Une seule phase écrit ces tables, `subjects`, exécutée après `authorships`. 
 
 L'ingestion lit les thématiques dans les enregistrements source, et non dans le détail consolidé de la publication : c'est ce qui permet de retenir quelle source a fourni chaque lien. Les co-occurrences lisent les liens non rejetés.
 
-Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `authorships` a déjà supprimé en amont les publications hors périmètre, si bien que les liens ne portent que sur le périmètre et que les deux valeurs dérivées en héritent.
+Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `contributions` a déjà supprimé en amont les publications hors périmètre, si bien que les liens ne portent que sur le périmètre et que les deux valeurs dérivées en héritent.
 
 ## Lecture par l'API
 

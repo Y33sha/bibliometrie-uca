@@ -100,7 +100,7 @@ def test_la_resolution_des_adresses_suit_leur_nettoyage():
 def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
     deps = dependencies(TASKS)["subjects.usage"]
-    assert "authorships.publications_in_perimeter" not in deps
+    assert "contributions.publications_in_perimeter" not in deps
 
 
 def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publication():
@@ -119,9 +119,9 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
 
 
 def test_les_statistiques_des_signatures_sont_rafraichies_apres_persons():
-    """`normalize` et `persons` réécrivent en masse `source_authorships.person_id`, que la construction des authorships filtre ensuite."""
+    """`normalize` et `persons` réécrivent en masse `source_contributions.person_id`, que la construction des contributions filtre ensuite."""
     purge = next(n for n in TASKS if n.name == "persons.purge")
-    assert "ANALYZE source_authorships" in purge.maintenance
+    assert "ANALYZE source_contributions" in purge.maintenance
 
 
 def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():

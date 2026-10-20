@@ -5,7 +5,7 @@ Couvre :
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
 - `extract_pub_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
 - `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
-- `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
+- `process_record` : orchestration (cascade publisher → journal → document → contributions), staging mark_done.
 - `WosNormalizer.process_work` : wiring de la classe.
 
 Mocks : `WosNormalizeQueries`, `StagingQueries`, `JournalRepository`, `PublisherRepository`. `find_or_create_journal` / `find_or_create_publisher` monkeypatchés pour isoler la logique de wiring.
@@ -376,7 +376,7 @@ def _make_api_record(  # noqa: C901
     doi: str = "10.1/abc",
     title: str = "Test Title",
     journal_title: str | None = "Test Journal",
-    pub_year: int | str | None = 2024,
+    publication_year: int | str | None = 2024,
     doctype: str | dict = "Article",
     publisher_name: str | None = "Test Publisher",
     issn: str | None = "0123-4567",
@@ -422,8 +422,8 @@ def _make_api_record(  # noqa: C901
         page_obj["end"] = page_end
 
     pub_info: dict[str, Any] = {}
-    if pub_year is not None:
-        pub_info["pubyear"] = pub_year
+    if publication_year is not None:
+        pub_info["pubyear"] = publication_year
     if vol:
         pub_info["vol"] = vol
     if issue:
@@ -489,7 +489,7 @@ class TestExtractFromApi:
         assert rec["doi"] == "10.1/abc"
         assert rec["title"] == "Test Title"
         assert rec["journal_title"] == "Test Journal"
-        assert rec["pub_year"] == 2024
+        assert rec["publication_year"] == 2024
         assert rec["doc_type"] == "Article"
         assert rec["publisher_name"] == "Test Publisher"
         assert rec["issn"] == "0123-4567"
@@ -525,15 +525,15 @@ class TestExtractFromApi:
         rec = extract_from_api(raw, None)
         assert rec["title"] == "(sans titre)"
 
-    def test_pub_year_invalid_string(self):
-        raw = _make_api_record(pub_year="notayear")
+    def test_publication_year_invalid_string(self):
+        raw = _make_api_record(publication_year="notayear")
         rec = extract_from_api(raw, None)
-        assert rec["pub_year"] is None
+        assert rec["publication_year"] is None
 
-    def test_pub_year_none(self):
-        raw = _make_api_record(pub_year=None)
+    def test_publication_year_none(self):
+        raw = _make_api_record(publication_year=None)
         rec = extract_from_api(raw, None)
-        assert rec["pub_year"] is None
+        assert rec["publication_year"] is None
 
     def test_doc_type_as_dict(self):
         """L'API peut renvoyer chaque doctype comme `{"content": "..."}`."""
@@ -760,7 +760,7 @@ class TestExtractFromExport:
         rec = extract_from_export(_export_row(), None)
         assert rec["ut"] == "WOS:001"
         assert rec["doi"] == "10.1/xyz"
-        assert rec["pub_year"] == 2025
+        assert rec["publication_year"] == 2025
         assert rec["doc_type"] == "Article"
         assert rec["language"] == "English"
         assert rec["journal_title"] == "JOURNAL OF TESTS"
@@ -800,7 +800,7 @@ class TestExtractPubMetadata:
     def test_basic_with_journal_id(self):
         rec = {
             "title": "T",
-            "pub_year": 2024,
+            "publication_year": 2024,
             "doc_type": "article",
             "doi": "10.1/x",
             "oa_status": "gold",
@@ -816,7 +816,7 @@ class TestExtractPubMetadata:
         """Si pas de journal_id (titre non matché), on garde `journal_title` comme `container_title`."""
         rec = {
             "title": "T",
-            "pub_year": 2024,
+            "publication_year": 2024,
             "doc_type": "article",
             "doi": None,
             "oa_status": None,
@@ -880,7 +880,7 @@ class TestUpsertWrappers:
 class TestInsertWosDocument:
     def test_forwards_pub_meta_and_rec_extras_to_queries(self):
         queries = MagicMock()
-        queries.upsert_source_publication.return_value = 555
+        queries.upsert_source_record.return_value = 555
         rec = {
             "ut": "WOS:1",
             "abstract": "abs",
@@ -894,7 +894,7 @@ class TestInsertWosDocument:
         pub_meta = PublicationMetadata(
             doi="10.1/x",
             title="T",
-            pub_year=2024,
+            publication_year=2024,
             doc_type="article",
             nnt=None,
             journal_id=42,
@@ -906,11 +906,11 @@ class TestInsertWosDocument:
         result = insert_wos_document(None, queries, rec, staging_id=10, pub_meta=pub_meta)
 
         assert result == 555
-        row_arg = queries.upsert_source_publication.call_args.args[1]
+        row_arg = queries.upsert_source_record.call_args.args[1]
         assert row_arg.source_id == "WOS:1"
         assert row_arg.doi == "10.1/x"
         assert row_arg.title == "T"
-        assert row_arg.pub_year == 2024
+        assert row_arg.publication_year == 2024
         assert row_arg.doc_type == "article"
         assert row_arg.journal_id == 42
         assert row_arg.oa_status == "gold"
@@ -921,12 +921,12 @@ class TestInsertWosDocument:
 
     def test_none_pub_meta_values_propagate(self):
         queries = MagicMock()
-        queries.upsert_source_publication.return_value = 1
+        queries.upsert_source_record.return_value = 1
         rec = {"ut": "WOS:1"}
         pub_meta = PublicationMetadata(
             doi=None,
             title="T",
-            pub_year=None,
+            publication_year=None,
             doc_type="other",
             nnt=None,
             journal_id=None,
@@ -936,7 +936,7 @@ class TestInsertWosDocument:
         )
         insert_wos_document(None, queries, rec, staging_id=5, pub_meta=pub_meta)
 
-        row_arg = queries.upsert_source_publication.call_args.args[1]
+        row_arg = queries.upsert_source_record.call_args.args[1]
         assert row_arg.journal_id is None
         assert row_arg.oa_status is None
         assert row_arg.doi is None
@@ -1008,7 +1008,7 @@ class TestBuildWosAuthorRecords:
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
         # `researcher_id` porté ; l'ORCID WoS en entrée est ignoré (non moissonné).
-        assert rec0.person_identifiers == {"researcher_id": "R-1"}
+        assert rec0.identifiers == {"researcher_id": "R-1"}
         assert [a.text for a in rec0.addresses] == ["addr-X"]
 
     def test_no_organizations_no_addresses(self, logger):
@@ -1041,7 +1041,7 @@ class TestProcessRecord:
                 "ut": "WOS:1",
                 "doi": doi,
                 "title": "T",
-                "pub_year": 2024,
+                "publication_year": 2024,
                 "doc_type": "article",
                 "publisher_name": "X",
                 "journal_title": "J",
@@ -1065,9 +1065,9 @@ class TestProcessRecord:
         )
 
         queries = MagicMock()
-        queries.upsert_source_publication.return_value = 555
+        queries.upsert_source_record.return_value = 555
         staging_queries = MagicMock()
-        authorship_queries = MagicMock()
+        contribution_queries = MagicMock()
 
         row = staging_row(staging_id=1, source_id="WOS:1", doi="10.1/x")
         result = process_record(
@@ -1078,12 +1078,12 @@ class TestProcessRecord:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging_queries,
-            authorship_queries=authorship_queries,
+            contribution_queries=contribution_queries,
         )
 
         assert result is True
         # Synchronisation des signatures (via le writer partagé).
-        authorship_queries.fetch_stored_source_authorships.assert_called_once()
+        contribution_queries.fetch_stored_source_contributions.assert_called_once()
         # `mark_done` appelée avec le bon staging_id.
         staging_queries.mark_done.assert_called_once_with(None, 1)
 
@@ -1096,7 +1096,7 @@ class TestProcessRecord:
                 "ut": "",  # vide → fallback attendu
                 "doi": doi,
                 "title": "T",
-                "pub_year": 2024,
+                "publication_year": 2024,
                 "doc_type": "article",
                 "publisher_name": None,
                 "journal_title": None,
@@ -1119,7 +1119,7 @@ class TestProcessRecord:
             captured["ut"] = row_arg.source_id
             return 42
 
-        queries.upsert_source_publication.side_effect = capture_ut
+        queries.upsert_source_record.side_effect = capture_ut
 
         row = staging_row(staging_id=1, source_id="WOS:fallback", doi=None)
         process_record(
@@ -1130,7 +1130,7 @@ class TestProcessRecord:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=MagicMock(),
-            authorship_queries=MagicMock(),
+            contribution_queries=MagicMock(),
         )
 
         assert captured["ut"] == "WOS:fallback"
@@ -1153,7 +1153,7 @@ class TestProcessRecord:
                 container_stores=MagicMock(),
                 publisher_store=MagicMock(),
                 staging_queries=MagicMock(),
-                authorship_queries=MagicMock(),
+                contribution_queries=MagicMock(),
             )
 
 
@@ -1169,7 +1169,7 @@ class TestWosNormalizer:
             queries=MagicMock(),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            authorship_queries=MagicMock(),
+            contribution_queries=MagicMock(),
         )
 
         captured: dict[str, Any] = {}
@@ -1191,5 +1191,5 @@ class TestWosNormalizer:
             "container_stores",
             "publisher_store",
             "staging_queries",
-            "authorship_queries",
+            "contribution_queries",
         }

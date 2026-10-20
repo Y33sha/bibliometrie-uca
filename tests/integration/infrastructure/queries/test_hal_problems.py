@@ -5,23 +5,23 @@ from functools import partial
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
-from tests.integration.helpers.authorships import insert_authorship
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
-    insert_source_publication,
+    insert_source_record,
 )
 from tests.integration.helpers.structures import (
-    add_authorship_structure,
+    add_contribution_structure,
     add_to_perimeter,
     insert_structure,
 )
 
 # Notice de 2024, de titre « T ».
-_notice = partial(insert_source_publication, title="T", pub_year=2024)
+_notice = partial(insert_source_record, title="T", publication_year=2024)
 
 
 def _q(conn) -> PgHalProblemsQueries:
@@ -48,7 +48,7 @@ def _create_hal_sa_with_hal_id(
         sd,
         person_id=person_id,
         raw_author_name=raw_author_name,
-        person_identifiers={"hal_person_id": hal_person_id},
+        identifiers={"hal_person_id": hal_person_id},
     )
 
 
@@ -154,10 +154,10 @@ class TestHalMissingCollections:
         assert res.lab_acronym is None  # structure sans acronyme
 
 
-def _create_authorship_uca(conn, pub_id, lab_id, position=0):
-    """Authorship du périmètre rattachée à `lab_id`. Retourne sa personne, que portent les signatures qui l'attestent."""
+def _create_contribution_uca(conn, pub_id, lab_id, position=0):
+    """Contribution du périmètre rattachée à `lab_id`. Retourne sa personne, que portent les signatures qui l'attestent."""
     person_id = insert_person(conn)
-    authorship_id = insert_authorship(
+    contribution_id = insert_contribution(
         conn,
         pub_id,
         person_id=person_id,
@@ -165,7 +165,7 @@ def _create_authorship_uca(conn, pub_id, lab_id, position=0):
         in_perimeter=True,
         roles=["author"],
     )
-    add_authorship_structure(conn, authorship_id, lab_id)
+    add_contribution_structure(conn, contribution_id, lab_id)
     return person_id
 
 
@@ -178,8 +178,8 @@ def _create_address_for_sa(conn, sa_id):
 
 
 class TestHalAffiliationConflicts:
-    """Logique : publi avec ≥1 SP HAL ayant ≥1 authorship in_perimeter,
-    ≥1 SP WoS/OpenAlex, et aucune SP WoS/OA n'ayant d'authorship in_perimeter."""
+    """Logique : publi avec ≥1 SP HAL ayant ≥1 contribution in_perimeter,
+    ≥1 SP WoS/OpenAlex, et aucune SP WoS/OA n'ayant de contribution in_perimeter."""
 
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
@@ -190,7 +190,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="Conflict OA")
         lab = _create_lab(sa_sync_conn, code="LAB-OA")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-oa-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-1")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex")
@@ -203,7 +203,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="Conflict WoS")
         lab = _create_lab(sa_sync_conn, code="LAB-WOS")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-wos-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         wos_sd = _notice(sa_sync_conn, pub, source="wos", source_id="WOS:1")
         wos_sa = insert_signature(sa_sync_conn, wos_sd, source="wos")
@@ -213,13 +213,13 @@ class TestHalAffiliationConflicts:
         assert pub in [p.id for p in res.publications]
 
     def test_ignores_oa_without_address(self, sa_sync_conn):
-        # Sans adresse sur les authorships OA, la source n'a pas "examiné"
+        # Sans adresse sur les contributions OA, la source n'a pas "examiné"
         # l'affiliation — l'absence d'in_perimeter est du silence, pas un
         # désaveu. Garde-fou contre les faux positifs.
         pub = insert_publication(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-noaddr-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-noaddr")
         insert_signature(sa_sync_conn, oa_sd, source="openalex")
@@ -233,7 +233,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-pos-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-pos")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex", author_position=1)
@@ -248,7 +248,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="ScanR only")
         lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-scanr-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         sr_sd = _notice(sa_sync_conn, pub, source="scanr", source_id="sr-1")
         sr_sa = insert_signature(sa_sync_conn, sr_sd, source="scanr")
@@ -262,7 +262,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="OA confirms")
         lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-confirm-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-confirm")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex", in_perimeter=True)
@@ -277,7 +277,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-mixed-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
         oa_sd = _notice(sa_sync_conn, pub, source="openalex", source_id="oa-mixed")
         oa_sa = insert_signature(sa_sync_conn, oa_sd, source="openalex")
@@ -294,7 +294,7 @@ class TestHalAffiliationConflicts:
         pub = insert_publication(sa_sync_conn, title="HAL only")
         lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
         hal_sd = _notice(sa_sync_conn, pub, source_id="h-only-1")
-        uca_person = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        uca_person = _create_contribution_uca(sa_sync_conn, pub, lab, position=0)
         insert_signature(sa_sync_conn, hal_sd, person_id=uca_person, in_perimeter=True)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)

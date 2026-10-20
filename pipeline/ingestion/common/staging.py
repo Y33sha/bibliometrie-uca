@@ -22,7 +22,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
-from pipeline.ingestion.common.source_publications import delete_source_publication_of_staging
+from pipeline.ingestion.common.source_records import delete_source_record_of_staging
 
 _logger = logging.getLogger(__name__)
 
@@ -206,8 +206,8 @@ class StagingQueries:
         ).all()
         return [_row(r) for r in rows]
 
-    def discard_source_publication(self, conn: Connection, staging_id: int) -> None:
-        delete_source_publication_of_staging(conn, staging_id)
+    def discard_source_record(self, conn: Connection, staging_id: int) -> None:
+        delete_source_record_of_staging(conn, staging_id)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).

@@ -27,7 +27,7 @@ from infrastructure.read_models.entity_facet import entity_name_clause
 _COLUMNS = """
     m.id, m.title, m.proceedings, m.year, m.isbn, m.eisbn,
     m.publisher_id, p.name AS pub_name, m.journal_id, j.title AS journal_title,
-    (SELECT count(*) FROM publications pu WHERE pu.monograph_id = m.id) AS pub_count
+    (SELECT count(*) FROM publications pu WHERE pu.monograph_id = m.id) AS publication_count
 """
 
 _FROM = """
@@ -41,8 +41,8 @@ _SORT_MAP: dict[MonographSort, str] = {
     "title_desc": "m.title_normalized DESC, m.id",
     "year_asc": "m.year ASC NULLS LAST, m.title_normalized",
     "year_desc": "m.year DESC NULLS LAST, m.title_normalized",
-    "pubs_asc": "pub_count ASC, m.title_normalized",
-    "pubs_desc": "pub_count DESC, m.title_normalized",
+    "pubs_asc": "publication_count ASC, m.title_normalized",
+    "pubs_desc": "publication_count DESC, m.title_normalized",
 }
 
 

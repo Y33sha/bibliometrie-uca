@@ -15,7 +15,7 @@
 # Données
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * [ ] place_name_forms n'a pas de clé étrangère vers countries
-* [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_authorships? - gestion manuelle, détection automatisée) / Cf personne 62293
+* [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_contributions? - gestion manuelle, détection automatisée) / Cf personne 62293
 * [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * [ ] titres de revues: OpenAlex zappe les apostrophes; corriger
 * [ ] conserver l'historique des structures

@@ -47,18 +47,18 @@ def _insert_hal_staging(conn, doc):
 def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
 
-    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.common.source_publications import (
-        SourcePublicationQueries,
+    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_records import (
+        SourceRecordQueries,
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.hal.normalize import process_work
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourcePublicationQueries()
+    queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    authorship_queries = AuthorshipsBatchQueries()
+    contribution_queries = ContributionsBatchQueries()
     container_stores = ContainerStores.of(conn)
     publisher_store = PublisherStore(conn)
 
@@ -85,7 +85,7 @@ def _run_normalize_hal(conn):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=staging_queries,
-            authorship_queries=authorship_queries,
+            contribution_queries=contribution_queries,
         ):
             processed += 1
     return processed
@@ -97,7 +97,7 @@ def _get_pub_oa_status(conn, hal_id):
         text("""
             SELECT p.oa_status::text AS oa_status
             FROM publications p
-            JOIN source_publications sd ON sd.publication_id = p.id
+            JOIN source_records sd ON sd.publication_id = p.id
             WHERE sd.source = 'hal' AND sd.source_id = :hal_id
         """),
         {"hal_id": hal_id},
@@ -151,7 +151,7 @@ class TestHalReprocessingUpdatesOaStatus:
         """Un re-traitement où le dépôt HAL disparaît met à jour le statut.
 
         Avec refresh_from_sources, le statut est recalculé depuis les
-        source_publications : si HAL n'a plus de fileMain_s et que
+        source_records : si HAL n'a plus de fileMain_s et que
         openAccess_bool passe à false, c'est closed.
         """
         hal_id = HAL_DOC_CLOSED["halId_s"]
@@ -192,7 +192,7 @@ class TestHalReprocessingUpdatesOaStatus:
                 INSERT INTO unpaywall (doi, oa_status, checked_at)
                 SELECT lower(doi), 'closed', now() FROM publications
                 WHERE id = (
-                    SELECT publication_id FROM source_publications
+                    SELECT publication_id FROM source_records
                     WHERE source = 'hal' AND source_id = :hid
                 )
             """),

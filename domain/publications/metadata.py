@@ -46,12 +46,12 @@ OA_RANK: dict[str, int] = {
 OA_STATUSES: frozenset[str] = frozenset(OA_RANK)
 
 # Valeur canonique de `publications.oa_status` quand aucune source n'a
-# de signal exploitable. Convention : `source_publications.oa_status`
+# de signal exploitable. Convention : `source_records.oa_status`
 # accepte NULL (= la source ne s'est pas prononcée), mais au niveau
 # canonique on matérialise l'absence de signal par 'unknown' (vraie
 # valeur de l'enum, classée en queue d'`OA_RANK`). À utiliser comme
 # fallback après `best_oa_status(...)` ou pour défaut sur
-# `source_publications.oa_status` orphelin.
+# `source_records.oa_status` orphelin.
 OA_STATUS_UNKNOWN_DEFAULT = OaStatus.UNKNOWN
 
 # Ventilation des statuts en trois niveaux d'accès : `oa_status` est la forme fine,
@@ -79,7 +79,7 @@ OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
 
 
 class _OaSignalSource(Protocol):
-    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une `source_publication`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass mutable qu'un `frozen` (comme `SourcePublication`)."""
+    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une `source_record`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass mutable qu'un `frozen` (comme `SourceRecord`)."""
 
     @property
     def source(self) -> str: ...
@@ -154,14 +154,14 @@ def _decode_html_entities_once(s: str) -> str:
     return _HTML_ENTITY_RE.sub(repl, s)
 
 
-def has_minimal_publication_metadata(title: str | None, pub_year: int | None) -> bool:
+def has_minimal_publication_metadata(title: str | None, publication_year: int | None) -> bool:
     """Indique si une publication candidate a les métadonnées minimales nécessaires à sa création.
 
     Invariant posé à l'insertion : titre non vide ET année renseignée. Une publication sans ces deux champs n'a pas de valeur métier (pas de référence biblio consultable, pas d'année pour les statistiques) et est filtrée par les normalizers en amont de `find_or_create`.
 
-    Une `pub_year` à 0 est considérée comme absente (cas pathologique : `bool(0) is False`).
+    Une `publication_year` à 0 est considérée comme absente (cas pathologique : `bool(0) is False`).
     """
-    return bool(title) and bool(pub_year)
+    return bool(title) and bool(publication_year)
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -186,5 +186,5 @@ def clean_publication_title(title: str | None) -> str | None:
 
 
 def normalized_title(title: str | None) -> str:
-    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la valeur matérialisée dans `source_publications.title_normalized`, identique à ce que le matcher calcule à la volée."""
+    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la valeur matérialisée dans `source_records.title_normalized`, identique à ce que le matcher calcule à la volée."""
     return normalize_text(clean_publication_title(title) or "")

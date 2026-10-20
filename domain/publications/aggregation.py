@@ -1,9 +1,9 @@
 """Agrégation cross-sources de l'aggregate Publication.
 
-Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublication`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
+Encapsule les règles d'agrégation : à partir des `source_records` attachées à une publication canonique (lues via `SourceRecord`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
-- **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
+- **Scalaires nullable** (`title`, `doi`, `doc_type`, `publication_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
 - **`oa_status`** : le statut le plus ouvert des sources, ou le verdict d'Unpaywall sur le DOI de la publication (`publication_oa_status` dans `metadata`).
 - **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
@@ -27,14 +27,14 @@ from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.metadata import publication_oa_status
 from domain.publications.publication import Publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
 
 
 def refresh_from_sources(
     pub: Publication,
-    sources: list[SourcePublication],
+    sources: list[SourceRecord],
     *,
     source_priority: tuple[str, ...],
     secondary_ids: frozenset[int] = frozenset(),
@@ -45,7 +45,7 @@ def refresh_from_sources(
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA tiré des sources et du verdict d'Unpaywall (`publication_oa_status`), union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
-    `secondary_ids` liste les `source_publications` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
+    `secondary_ids` liste les `source_records` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
 
     `monograph_journals` donne l'entrée de `journals` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `journal_id` prend celle de sa monographie.
 
@@ -67,7 +67,9 @@ def refresh_from_sources(
     pub.doc_type = arbitrate_conference(
         arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
     )
-    pub.pub_year = as_int(first_non_null(sorted_sources, "pub_year")) or pub.pub_year
+    pub.publication_year = (
+        as_int(first_non_null(sorted_sources, "publication_year")) or pub.publication_year
+    )
 
     new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
     pub.doi = DOI(new_doi_str) if new_doi_str else None
@@ -100,7 +102,7 @@ def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:
     return tuple(texte for v in valeurs or () if (texte := as_str(v)))
 
 
-def license_by_source(sources: list[SourcePublication], order: tuple[Source, ...]) -> str | None:
+def license_by_source(sources: list[SourceRecord], order: tuple[Source, ...]) -> str | None:
     """Première licence des `sources` dans l'ordre de sources `order`, puis dans l'ordre de `sources`."""
     for source in order:
         for s in sources:
@@ -109,7 +111,7 @@ def license_by_source(sources: list[SourcePublication], order: tuple[Source, ...
     return None
 
 
-def first_non_null(sources: list[SourcePublication], attr: str) -> JsonValue:
+def first_non_null(sources: list[SourceRecord], attr: str) -> JsonValue:
     """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents.
 
     La valeur rendue dépend de l'attribut lu — texte pour le titre, entier pour l'année, liste pour les mots-clés. Ce sont toutes des valeurs de colonne, donc des valeurs JSON : l'appelant les repose telles quelles sur la publication canonique.
@@ -123,7 +125,7 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> JsonValue:
     return None
 
 
-def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[JsonValue] | None:
+def merge_lists_dedup_ci(sources: list[SourceRecord], attr: str) -> list[JsonValue] | None:
     """Union dédupliquée des listes `source.<attr>`. Déduplication insensible à la casse pour le texte, par valeur sinon. Préserve l'ordre d'apparition. None si toutes vides ou nulles.
 
     Les listes consommées sont textuelles en pratique — mots-clés, pays —, mais l'attribut est lu par son nom : le type est celui d'une valeur de colonne.
@@ -139,7 +141,7 @@ def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Js
     return result or None
 
 
-def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str, JsonValue] | None:
+def shallow_merge_jsonb(sources: list[SourceRecord], attr: str) -> dict[str, JsonValue] | None:
     """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
     for s in sources:
@@ -152,7 +154,7 @@ def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str
 
 
 def topics_by_source(
-    sources: list[SourcePublication],
+    sources: list[SourceRecord],
 ) -> dict[str, JsonValue] | None:
     """Indexe les `topics` par source. Schémas radicalement différents par source — chacun reste sous sa propre clé pour préserver la forme native (liste hiérarchique OpenAlex, dict ScanR, etc.)."""
     out: dict[str, JsonValue] = {}
@@ -162,10 +164,10 @@ def topics_by_source(
     return out or None
 
 
-def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) -> str:
+def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
-    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
+    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_record`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
 
     CrossRef (priorité 2) renvoie `journal-article` pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`. Un `data_paper` déclaré par HAL seul compte pour `article`.
     """
@@ -181,9 +183,7 @@ def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) ->
     return "other"
 
 
-def _corroborated_doc_type(
-    source: SourcePublication, sources: list[SourcePublication]
-) -> str | None:
+def _corroborated_doc_type(source: SourceRecord, sources: list[SourceRecord]) -> str | None:
     """`doc_type` de `source`, ramené à `article` pour un `data_paper` de HAL qu'aucune autre source ne déclare."""
     if (
         source.source == Source.HAL

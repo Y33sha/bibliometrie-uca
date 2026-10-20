@@ -36,7 +36,7 @@ _RECORDS = text(f"""
            normalized.id AS journal_id, j.title AS journal_title,
            coalesce({has_active_issn("j.id")}, false) AS journal_has_issn,
            sp.monograph_id, m.title AS monograph_title
-    FROM source_publications sp
+    FROM source_records sp
     CROSS JOIN LATERAL (
         SELECT CASE WHEN sp.raw_metadata ? 'journal_id'
                     THEN (sp.raw_metadata->'journal_id'->>'raw')::int

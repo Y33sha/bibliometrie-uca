@@ -1,11 +1,11 @@
-"""Semis des tables sources pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`) : notices (`source_publications`), signatures (`source_authorships`) et liens signature ↔ adresse (`source_authorship_addresses`)."""
+"""Semis des tables sources pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`) : notices (`source_records`), signatures (`source_contributions`) et liens signature ↔ adresse (`source_contribution_addresses`)."""
 
 import datetime
 import json
 
 from sqlalchemy import Connection
 
-from tests.integration.helpers.authorships import upsert_identity
+from tests.integration.helpers.contributions import upsert_identity
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
@@ -13,7 +13,7 @@ def _jsonb(value: object) -> str | None:
     return json.dumps(value) if value is not None else None
 
 
-def insert_source_publication(
+def insert_source_record(
     conn: Connection,
     publication_id: int | None = None,
     *,
@@ -23,7 +23,7 @@ def insert_source_publication(
     row_id: int | None = None,
     title_normalized: str | None = None,
     doi: str | None = None,
-    pub_year: int | None = None,
+    publication_year: int | None = None,
     doc_type: str | None = None,
     journal_id: int | None = None,
     monograph_id: int | None = None,
@@ -47,7 +47,7 @@ def insert_source_publication(
     """Insère une notice et renvoie son `id`. `row_id` fixe l'`id`."""
     return insert_row(
         conn,
-        "source_publications",
+        "source_records",
         {
             "id": row_id,
             "source": source,
@@ -56,7 +56,7 @@ def insert_source_publication(
             "title_normalized": title_normalized,
             "publication_id": publication_id,
             "doi": doi,
-            "pub_year": pub_year,
+            "publication_year": publication_year,
             "doc_type": doc_type,
             "journal_id": journal_id,
             "monograph_id": monograph_id,
@@ -83,7 +83,7 @@ def insert_source_publication(
 
 def insert_signature(
     conn: Connection,
-    source_publication_id: int,
+    source_record_id: int,
     *,
     source: str = "hal",
     row_id: int | None = None,
@@ -92,8 +92,8 @@ def insert_signature(
     raw_last_name: str | None = None,
     raw_first_name: str | None = None,
     author_name_normalized: str | None = None,
-    person_identifiers: dict[str, object] | None = None,
-    identity_id: int | None = None,
+    identifiers: dict[str, object] | None = None,
+    contributor_information_id: int | None = None,
     person_id: int | None = None,
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
@@ -103,22 +103,22 @@ def insert_signature(
 ) -> int:
     """Insère une signature et renvoie son `id`. `row_id` fixe l'`id`.
 
-    L'identité est `identity_id`, sinon celle de forme `author_name_normalized` et d'identifiants `person_identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
+    L'identité est `contributor_information_id`, sinon celle de forme `author_name_normalized` et d'identifiants `identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
     """
     if raw_author_name is None and raw_last_name is None:
         raw_author_name = "X"
     return insert_row(
         conn,
-        "source_authorships",
+        "source_contributions",
         {
             "id": row_id,
             "source": source,
-            "source_publication_id": source_publication_id,
+            "source_record_id": source_record_id,
             "author_position": author_position,
-            "identity_id": (
-                identity_id
-                if identity_id is not None
-                else upsert_identity(conn, author_name_normalized, person_identifiers)
+            "contributor_information_id": (
+                contributor_information_id
+                if contributor_information_id is not None
+                else upsert_identity(conn, author_name_normalized, identifiers)
             ),
             "raw_author_name": raw_author_name,
             "raw_last_name": raw_last_name,
@@ -141,11 +141,11 @@ def insert_signature(
 
 
 def insert_signature_address(
-    conn: Connection, source_authorship_id: int, *, address_id: int
+    conn: Connection, source_contribution_id: int, *, address_id: int
 ) -> int:
-    """Lie la signature `source_authorship_id` à l'adresse `address_id` et renvoie l'`id` du lien."""
+    """Lie la signature `source_contribution_id` à l'adresse `address_id` et renvoie l'`id` du lien."""
     return insert_row(
         conn,
-        "source_authorship_addresses",
-        {"source_authorship_id": source_authorship_id, "address_id": address_id},
+        "source_contribution_addresses",
+        {"source_contribution_id": source_contribution_id, "address_id": address_id},
     )

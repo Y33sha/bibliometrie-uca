@@ -633,7 +633,7 @@
 							<div class="addr-text">{addr.raw_text}</div>
 							<div class="addr-meta">
 								<span class="pub-count-tag"
-									>{addr.pub_count} publi{addr.pub_count > 1 ? 's' : ''}</span
+									>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
 									<span class={structTagClass(s)}>{s.acronym || s.name}</span>
@@ -674,7 +674,7 @@
 											<PublicationTitle titre={p.title || '(sans titre)'} />
 										</div>
 										<div class="pub-meta-inline">
-											{p.pub_year}
+											{p.publication_year}
 											{#if p.doc_type}&middot; {p.doc_type}{/if}
 											{#if p.author_name}&middot; {p.author_name}{/if}
 											{#if p.journal_title}&middot; {p.journal_title}{/if}

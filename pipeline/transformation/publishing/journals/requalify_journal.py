@@ -14,7 +14,7 @@ from pipeline.transformation.publications.store import PublicationStore
 
 
 def correct_journal_records(conn: Connection, journal_id: int) -> int:
-    """Recalcule et persiste les corrections unaires des `source_publications` d'une revue. Retourne le nombre de `source_publications` corrigées."""
+    """Recalcule et persiste les corrections unaires des `source_records` d'une revue. Retourne le nombre de `source_records` corrigées."""
     queries = PgMetadataCorrectionQueries()
     rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
     hal_rows = {
@@ -26,7 +26,7 @@ def correct_journal_records(conn: Connection, journal_id: int) -> int:
 
 
 def requalify_journal_publications(conn: Connection, journal_id: int) -> int:
-    """Rejoue les corrections des `source_publications` de la revue, puis recalcule chacune de ses publications.
+    """Rejoue les corrections des `source_records` de la revue, puis recalcule chacune de ses publications.
 
     Retourne le nombre de publications dont le `doc_type` change. Une publication supprimée par le recalcul n'est pas comptée.
     """

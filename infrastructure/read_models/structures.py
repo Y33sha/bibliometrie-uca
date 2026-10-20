@@ -27,20 +27,20 @@ from infrastructure.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
-# Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure d'authorship, et tenant le rôle d'auteur. S'applique à un alias `a` sur `authorships`.
+# Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure de contribution, et tenant le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
 AUTHOR_SIGNATURE = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}
     AND EXISTS (
-        SELECT 1 FROM authorship_structures aus
-        WHERE aus.authorship_id = a.id AND aus.structure_id = :structure_id
+        SELECT 1 FROM contribution_structures aus
+        WHERE aus.contribution_id = a.id AND aus.structure_id = :structure_id
     )
 """
 
 # Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
 AUTHORED_PUBLICATION = f"""
     EXISTS (
-        SELECT 1 FROM authorships a
+        SELECT 1 FROM contributions a
         WHERE a.publication_id = p.id AND {AUTHOR_SIGNATURE}
     )
 """
@@ -76,7 +76,7 @@ def _list_structures_sql(
                     'type', sp.structure_type::text,
                     'relation_id', sr.id
                 ) ORDER BY sp.name)
-                FROM structure_tutelles sr
+                FROM structure_parents sr
                 JOIN structures sp ON sp.id = sr.parent_id
                 WHERE sr.child_id = s.id
                ) AS tutelles
@@ -162,7 +162,7 @@ class PgStructuresQueries(StructuresQueries):
             text("""
                 SELECT sr.id AS relation_id,
                        sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
-                FROM structure_tutelles sr
+                FROM structure_parents sr
                 JOIN structures sp ON sp.id = sr.parent_id
                 WHERE sr.child_id = :id
                 ORDER BY sp.name
@@ -174,7 +174,7 @@ class PgStructuresQueries(StructuresQueries):
             text("""
                 SELECT sr.id AS relation_id,
                        sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
-                FROM structure_tutelles sr
+                FROM structure_parents sr
                 JOIN structures sc ON sc.id = sr.child_id
                 WHERE sr.parent_id = :id
                 ORDER BY sc.name
@@ -195,8 +195,8 @@ class PgStructuresQueries(StructuresQueries):
             text(f"""
                 SELECT COUNT(*) AS n
                 FROM publications p
-                JOIN authorships a ON a.publication_id = p.id
-                JOIN authorship_structures aus ON aus.authorship_id = a.id
+                JOIN contributions a ON a.publication_id = p.id
+                JOIN contribution_structures aus ON aus.contribution_id = a.id
                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
                   AND aus.structure_id = :id
                   AND {has_author_role("a")}
@@ -265,8 +265,8 @@ class PgStructuresQueries(StructuresQueries):
         rows = self._conn.execute(
             text(
                 entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM authorships a "
-                    "JOIN authorship_structures aus ON aus.authorship_id = a.id "
+                    "EXISTS (SELECT 1 FROM contributions a "
+                    "JOIN contribution_structures aus ON aus.contribution_id = a.id "
                     "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
                     f"AND {has_author_role('a')})"
                 )
@@ -281,14 +281,14 @@ class PgStructuresQueries(StructuresQueries):
 
         pubs_year_rows = self._conn.execute(
             text(f"""
-                SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
+                SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
-                JOIN authorships a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SIGNATURE}
-                  AND p.pub_year IS NOT NULL
-                  AND p.pub_year >= :min_year
-                GROUP BY p.pub_year
-                ORDER BY p.pub_year
+                  AND p.publication_year IS NOT NULL
+                  AND p.publication_year >= :min_year
+                GROUP BY p.publication_year
+                ORDER BY p.publication_year
             """),
             {"structure_id": structure_id, "min_year": current_year - 6},
         ).all()
@@ -298,7 +298,7 @@ class PgStructuresQueries(StructuresQueries):
                 SELECT
                     {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
-                JOIN authorships a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SIGNATURE}
             """),
             {"structure_id": structure_id},
@@ -314,7 +314,7 @@ class PgStructuresQueries(StructuresQueries):
                                         WHERE c <> ALL(:non_international))
                     ) AS international
                 FROM publications p
-                JOIN authorships a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SIGNATURE}
                   AND p.doc_type = '{DocType.ARTICLE.value}'
             """),
@@ -341,7 +341,7 @@ class PgStructuresQueries(StructuresQueries):
         ).all()
 
         return StructureDashboardResponse(
-            pubs_by_year=[PubYearCount(year=r.pub_year, count=r.n) for r in pubs_year_rows],
+            pubs_by_year=[PubYearCount(year=r.publication_year, count=r.n) for r in pubs_year_rows],
             oa=DashboardOa(
                 open_access=oa.open_access,
                 embargoed=oa.embargoed,
@@ -374,7 +374,7 @@ class PgStructuresQueries(StructuresQueries):
                 SELECT
                     (SELECT count(*) FROM structure_name_forms WHERE structure_id = s.id)
                         AS name_forms,
-                    (SELECT count(*) FROM structure_tutelles
+                    (SELECT count(*) FROM structure_parents
                      WHERE s.id IN (parent_id, child_id)) AS tutelles,
                     (SELECT count(*) FROM address_structures
                      WHERE structure_id = s.id AND is_confirmed) AS confirmed_links,

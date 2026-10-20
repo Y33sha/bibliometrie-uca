@@ -33,8 +33,8 @@ _A_MARQUER = """
               AND jsonb_array_length(s.raw_data -> 'authorships') = :cap
           OR (
               SELECT count(*)
-              FROM source_publications sp
-              JOIN source_authorships sa ON sa.source_publication_id = sp.id
+              FROM source_records sp
+              JOIN source_contributions sa ON sa.source_record_id = sp.id
               WHERE sp.staging_id = s.id
           ) = :cap
       )

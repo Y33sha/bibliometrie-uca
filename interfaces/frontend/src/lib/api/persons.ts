@@ -7,7 +7,7 @@ type IdentifierReassignResponse = components['schemas']['IdentifierReassignRespo
 type MergeResponse = components['schemas']['MergeResponse'];
 type OkResponse = components['schemas']['OkResponse'];
 type NameFormStatusResponse = components['schemas']['NameFormStatusResponse'];
-type DetachAuthorshipsResponse = components['schemas']['DetachAuthorshipsResponse'];
+type DetachContributionsResponse = components['schemas']['DetachContributionsResponse'];
 export type PersonExclusion = components['schemas']['PersonExclusion'];
 
 export function merge(targetId: number, sourceId: number): Promise<MergeResponse> {
@@ -32,11 +32,11 @@ export function setExclusion(
 	return patch<OkResponse>(`/api/persons/${personId}/exclusion`, { exclusion });
 }
 
-export function detachAuthorships(
+export function detachContributions(
 	personId: number,
 	body: Record<string, unknown>
-): Promise<DetachAuthorshipsResponse> {
-	return post<DetachAuthorshipsResponse>(`/api/persons/${personId}/detach-authorships`, body);
+): Promise<DetachContributionsResponse> {
+	return post<DetachContributionsResponse>(`/api/persons/${personId}/detach-contributions`, body);
 }
 
 export function updateNameFormStatus(

@@ -31,7 +31,7 @@ class TestExtractLocationsDataHalIds:
 
 from domain.publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
 from domain.publications.identifiers import extract_hal_id_from_url
-from domain.source_publications.doc_types import _SOURCE_MAPS, map_doc_type
+from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 # is_hal_primary_location migré vers domain/sources/openalex.is_hal_location
 # (cf. tests/unit/domain/sources/test_openalex.py).
@@ -263,19 +263,19 @@ class TestFirstDocTypeArbitration:
     """Arbitrage `article` générique vs sous-type plus précis.
 
     L'arbitrage opère sur des `doc_type` déjà **canoniques et corrigés** (mapping
-    source→canonique persisté en amont sur la `source_publication`), pas sur les
+    source→canonique persisté en amont sur la `source_record`), pas sur les
     nomenclatures sources brutes."""
 
     @staticmethod
-    def _src(source: str, doc_type: str | None) -> "SourcePublication":  # noqa: F821
-        from domain.source_publications.source_publication import SourcePublication
+    def _src(source: str, doc_type: str | None) -> "SourceRecord":  # noqa: F821
+        from domain.source_records.source_record import SourceRecord
 
-        return SourcePublication(
+        return SourceRecord(
             id=None,
             source=source,
             source_id="x",
             title="x",
-            pub_year=None,
+            publication_year=None,
             doc_type=doc_type,
             doi=None,
             journal_id=None,
@@ -426,7 +426,7 @@ class TestThesesExtractPubMetadata:
         meta = extract_pub_metadata(these)
         assert meta.title == "Titre de la thèse"
         assert meta.doc_type == "thesis"
-        assert meta.pub_year == 2023
+        assert meta.publication_year == 2023
         assert meta.doi == "10.1234/test"
         assert meta.nnt == "2023UCFA0069"
         assert meta.oa_status == "closed"
@@ -439,19 +439,19 @@ class TestThesesExtractPubMetadata:
         }
         meta = extract_pub_metadata(these)
         assert meta.doc_type == "ongoing_thesis"
-        assert meta.pub_year == 2022
+        assert meta.publication_year == 2022
         assert meta.doi is None
         assert meta.nnt is None
 
     def test_no_dates(self):
         meta = extract_pub_metadata({"titrePrincipal": "X"})
         assert meta.doc_type == "ongoing_thesis"
-        assert meta.pub_year is None
+        assert meta.publication_year is None
 
     def test_malformed_date(self):
-        """Date non parseable → pub_year reste None."""
+        """Date non parseable → publication_year reste None."""
         meta = extract_pub_metadata({"titrePrincipal": "X", "dateSoutenance": "date-invalide"})
-        assert meta.pub_year is None
+        assert meta.publication_year is None
 
     def test_no_title(self):
         meta = extract_pub_metadata({})
@@ -498,9 +498,9 @@ class TestThesesBuildSourceMeta:
         assert _build_source_meta(these) is None
 
 
-# ── authorship_roles ─────────────────────────────────────────────
+# ── contribution_roles ─────────────────────────────────────────────
 
-from domain.publications.authorship_roles import map_role, merge_roles
+from domain.publications.contribution_roles import map_role, merge_roles
 
 
 class TestMapRole:

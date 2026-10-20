@@ -18,7 +18,7 @@ from pipeline.transformation.publications.subjects.subject_extractors import (
 from pipeline.transformation.publications.subjects.subject_ingestion import run
 from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.subjects import insert_subject
 
 
@@ -116,7 +116,7 @@ def _publications_updated(metrics):
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
@@ -133,7 +133,7 @@ class TestRunOrchestrator:
 
     def test_reingests_on_content_change(self, sa_sync_conn, queries):
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
@@ -142,9 +142,7 @@ class TestRunOrchestrator:
         # Changement de contenu : nouveau topic, puis enregistrement de la publication
         # recalculée depuis ses sources, qui vide `subjects_ingested_at`.
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_publications SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"
-            ),
+            text("UPDATE source_records SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"),
             {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
         )
         repo = PublicationStore(sa_sync_conn)
@@ -159,7 +157,7 @@ class TestRunOrchestrator:
     def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
         # Une publication sans sujet est datée comme les autres : elle ne revient pas.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(sa_sync_conn, pub)
+        insert_source_record(sa_sync_conn, pub)
         logger = logging.getLogger("test")
 
         assert _publications_updated(run(sa_sync_conn, queries, logger)) == 1
@@ -168,7 +166,7 @@ class TestRunOrchestrator:
     def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
         # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
@@ -183,10 +181,10 @@ class TestRunOrchestrator:
     def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
         # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, source="openalex", source_id="oa1", topics=[{"topic": "Physics"}]
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
@@ -196,10 +194,10 @@ class TestRunOrchestrator:
     def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
         # Un même label depuis deux sources → un seul subject, deux liens (un par source).
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             pub,
             source="theses",
@@ -218,7 +216,7 @@ class TestRunOrchestrator:
     def test_rebuild_reingests_all(self, sa_sync_conn, queries):
         # `rebuild=True` ré-ingère même une publication non modifiée.
         pub = insert_publication(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
@@ -228,10 +226,10 @@ class TestRunOrchestrator:
         # Avec rebuild : ré-ingérée quand même.
         assert run(sa_sync_conn, queries, logger, rebuild=True).new == 1
 
-    def test_ignores_unlinked_source_publications(self, sa_sync_conn, queries):
+    def test_ignores_unlinked_source_records(self, sa_sync_conn, queries):
         # source_pub orphelin (publication_id NULL) : jamais sélectionné, son concept
         # n'est pas ingéré.
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, source="openalex", source_id="oa-orphan", topics=[{"topic": "ghosttopic"}]
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))

@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Supprime les notices parues avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Les notices de theses.fr restent : ce moissonnage couvre tout l'historique des établissements.
 
-Les notices sœurs sont marquées à réconcilier (`delete_source_publications_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
+Les notices sœurs sont marquées à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
 Usage :
     python -m interfaces.cli.maintenance.delete_notices_out_of_window [--dry-run]
@@ -17,7 +17,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.common.source_publications import delete_source_publications_before
+from pipeline.ingestion.common.source_records import delete_source_records_before
 
 log = setup_logger("delete_notices_out_of_window", os.path.dirname(__file__))
 
@@ -37,8 +37,8 @@ def count_targets(conn: Connection, cutoff: int) -> dict[str, int]:
     """Notices parues avant `cutoff`, par source, hors `EXEMPT_SOURCES`."""
     rows = conn.execute(
         text("""
-            SELECT source::text, count(*) FROM source_publications
-            WHERE pub_year < :cutoff AND source::text <> ALL(:exempt)
+            SELECT source::text, count(*) FROM source_records
+            WHERE publication_year < :cutoff AND source::text <> ALL(:exempt)
             GROUP BY 1 ORDER BY 2 DESC
         """),
         {"cutoff": cutoff, "exempt": list(EXEMPT_SOURCES)},
@@ -66,9 +66,7 @@ def main() -> int:
         return 0
 
     with engine.begin() as conn:
-        deleted, staged = delete_source_publications_before(
-            conn, cutoff, exempt_sources=EXEMPT_SOURCES
-        )
+        deleted, staged = delete_source_records_before(conn, cutoff, exempt_sources=EXEMPT_SOURCES)
     log.info("Supprimées : %d notices, %d lignes de staging", deleted, staged)
     return 0
 

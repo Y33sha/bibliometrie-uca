@@ -1,9 +1,9 @@
 """Idempotence : normalisation CrossRef.
 
 CrossRef est ingérée DOI-driven (cf. `fetch_missing_doi`) puis
-normalisée vers `source_publications` + `source_authorships`. Les
+normalisée vers `source_records` + `source_contributions`. Les
 affiliations textuelles alimentent `addresses` /
-`source_authorship_addresses`, ce qui permet à la phase `affiliations`
+`source_contribution_addresses`, ce qui permet à la phase `affiliations`
 de poser `in_perimeter` sur les SA crossref.
 
 Vérifie :
@@ -92,18 +92,18 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.common.source_publications import (
-        SourcePublicationQueries,
+    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_records import (
+        SourceRecordQueries,
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourcePublicationQueries()
+    queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    authorship_queries = AuthorshipsBatchQueries()
+    contribution_queries = ContributionsBatchQueries()
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = CrossrefNormalizer(
@@ -113,7 +113,7 @@ def _run_normalize_crossref(conn):
         queries,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
-        authorship_queries=authorship_queries,
+        contribution_queries=contribution_queries,
     )
 
     rows = conn.execute(
@@ -137,16 +137,16 @@ def _count_crossref(conn) -> dict[str, int]:
 
     counts: dict[str, int] = {}
     counts["sp"] = conn.execute(
-        text("SELECT COUNT(*) AS n FROM source_publications WHERE source = 'crossref'")
+        text("SELECT COUNT(*) AS n FROM source_records WHERE source = 'crossref'")
     ).scalar_one()
     counts["sa"] = conn.execute(
-        text("SELECT COUNT(*) AS n FROM source_authorships WHERE source = 'crossref'")
+        text("SELECT COUNT(*) AS n FROM source_contributions WHERE source = 'crossref'")
     ).scalar_one()
     counts["saa"] = conn.execute(
         text("""
             SELECT COUNT(*) AS n
-            FROM source_authorship_addresses saa
-            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            FROM source_contribution_addresses saa
+            JOIN source_contributions sa ON sa.id = saa.source_contribution_id
             WHERE sa.source = 'crossref'
         """)
     ).scalar_one()
@@ -167,7 +167,7 @@ class TestNormalizeCrossrefIdempotence:
         counts_1 = _count_crossref(sa_sync_conn)
         assert processed_1 == 2
         assert counts_1["sp"] == 2
-        # 2 auteurs sur le 1er record, 0 sur le 2nd → 2 source_authorships.
+        # 2 auteurs sur le 1er record, 0 sur le 2nd → 2 source_contributions.
         assert counts_1["sa"] == 2
         # 2 affiliations distinctes (UCA, CNRS) liées via address linker.
         assert counts_1["saa"] == 2
@@ -192,9 +192,9 @@ class TestNormalizeCrossrefIdempotence:
         rows = sa_sync_conn.execute(
             text("""
                 SELECT sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
-                       aik.last_name_normalized, aik.person_identifiers
-                FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                       aik.last_name_normalized, aik.identifiers
+                FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sa.source = 'crossref'
                 ORDER BY sa.author_position
             """)
@@ -208,19 +208,19 @@ class TestNormalizeCrossrefIdempotence:
             "Alice",
         )
         assert rows[0].last_name_normalized == "curie"
-        assert rows[0].person_identifiers is not None
-        assert rows[0].person_identifiers.get("orcid") == "0000-0002-1825-0097"
+        assert rows[0].identifiers is not None
+        assert rows[0].identifiers.get("orcid") == "0000-0002-1825-0097"
 
         # Deuxième auteur : pas d'ORCID.
         assert (rows[1].raw_last_name, rows[1].raw_first_name) == ("Pasteur", "Bob")
-        assert rows[1].person_identifiers is None
+        assert rows[1].identifiers is None
 
-        # Les affiliations sont routées vers addresses + source_authorship_addresses.
+        # Les affiliations sont routées vers addresses + source_contribution_addresses.
         addr_rows = sa_sync_conn.execute(
             text("""
                 SELECT a.raw_text
-                FROM source_authorship_addresses saa
-                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                FROM source_contribution_addresses saa
+                JOIN source_contributions sa ON sa.id = saa.source_contribution_id
                 JOIN addresses a ON a.id = saa.address_id
                 WHERE sa.source = 'crossref'
                 ORDER BY a.raw_text

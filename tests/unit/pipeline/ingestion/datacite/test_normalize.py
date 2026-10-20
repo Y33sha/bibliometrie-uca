@@ -17,14 +17,14 @@ from pipeline.ingestion.datacite.normalize import (
     build_datacite_author_records,
     get_biblio,
     get_container_facts,
-    process_authorships,
+    process_contributions,
     process_work,
     upsert_containers,
     upsert_publisher,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourcePublicationQueries,
+    FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
 )
@@ -55,7 +55,7 @@ class TestAuthorRecords:
             ]
         }
         recs = build_datacite_author_records(attrs)
-        assert [r.person_identifiers for r in recs] == [
+        assert [r.identifiers for r in recs] == [
             {"orcid": "0000-0002-1825-0097"},
             {"orcid": "0000-0001-5109-3700"},
         ]
@@ -76,7 +76,7 @@ class TestAuthorRecords:
                 }
             ]
         }
-        assert build_datacite_author_records(attrs)[0].person_identifiers == {
+        assert build_datacite_author_records(attrs)[0].identifiers == {
             "orcid": "0000-0002-1825-0097"
         }
 
@@ -96,7 +96,7 @@ class TestAuthorRecords:
                 }
             ]
         }
-        assert build_datacite_author_records(attrs)[0].person_identifiers is None
+        assert build_datacite_author_records(attrs)[0].identifiers is None
 
     def test_shared_orcid_kept_on_each_record(self):
         """L'extracteur rend l'ORCID de chaque creator tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
@@ -117,7 +117,7 @@ class TestAuthorRecords:
             ]
         }
         recs = build_datacite_author_records(attrs)
-        assert [r.person_identifiers for r in recs] == [
+        assert [r.identifiers for r in recs] == [
             {"orcid": "0000-0002-1825-0097"},
             {"orcid": "0000-0002-1825-0097"},
         ]
@@ -210,7 +210,7 @@ class TestCreatorsIllisibles:
 
     def test_identifiant_qui_n_est_pas_un_objet_ignore(self):
         attrs = {"creators": [{"name": "Doe, J.", "nameIdentifiers": ["0000-0002-1825-0097"]}]}
-        assert build_datacite_author_records(attrs)[0].person_identifiers is None
+        assert build_datacite_author_records(attrs)[0].identifiers is None
 
 
 class TestChampsIgnores:
@@ -236,7 +236,7 @@ class TestChampsIgnores:
                 }
             ]
         }
-        assert build_datacite_author_records(attrs)[0].person_identifiers == {
+        assert build_datacite_author_records(attrs)[0].identifiers == {
             "orcid": "0000-0002-1825-0097"
         }
 
@@ -256,7 +256,7 @@ class TestChampsIgnores:
                 }
             ]
         }
-        assert build_datacite_author_records(attrs)[0].person_identifiers == {
+        assert build_datacite_author_records(attrs)[0].identifiers == {
             "orcid": "0000-0002-1825-0097"
         }
 
@@ -277,13 +277,13 @@ class TestChampsIgnores:
         assert [a.text for a in addresses] == ["Un labo"]
 
 
-class TestProcessAuthorships:
+class TestProcessContributions:
     def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
         """Les creators deviennent les signatures du document versé."""
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_datacite,
-            "sync_source_authorships",
+            "sync_source_contributions",
             lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
@@ -295,7 +295,7 @@ class TestProcessAuthorships:
             ]
         }
 
-        process_authorships(MagicMock(), MagicMock(), attrs, 555)
+        process_contributions(MagicMock(), MagicMock(), attrs, 555)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
         assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
@@ -400,7 +400,7 @@ class TestProcessWork:
             "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries,
-            "authorship_queries": MagicMock(),
+            "contribution_queries": MagicMock(),
         }
 
     @pytest.fixture(autouse=True)
@@ -410,11 +410,11 @@ class TestProcessWork:
         monkeypatch.setattr(
             normalize_datacite, "upsert_containers", lambda a, p, **kw: Containers(None, None)
         )
-        monkeypatch.setattr(normalize_datacite, "process_authorships", lambda *a, **kw: None)
+        monkeypatch.setattr(normalize_datacite, "process_contributions", lambda *a, **kw: None)
 
     @pytest.fixture
-    def queries(self) -> FakeSourcePublicationQueries:
-        return FakeSourcePublicationQueries()
+    def queries(self) -> FakeSourceRecordQueries:
+        return FakeSourceRecordQueries()
 
     @pytest.fixture
     def staging(self) -> FakeStagingQueries:
@@ -433,7 +433,7 @@ class TestProcessWork:
         assert document.source == "datacite"
         assert document.doi == "10.5281/zenodo.1"
         assert document.title == "Un jeu de données"
-        assert document.pub_year == 2024
+        assert document.publication_year == 2024
         assert document.oa_status is None  # DataCite ne renseigne pas l'accès ouvert
 
     def test_dois_apparentes_rassembles(self, queries, staging, logger):
@@ -493,7 +493,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        authorship_queries=MagicMock(),
+        contribution_queries=MagicMock(),
     )
     row = staging_row()
 
@@ -509,7 +509,7 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        authorship_queries=MagicMock(),
+        contribution_queries=MagicMock(),
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,

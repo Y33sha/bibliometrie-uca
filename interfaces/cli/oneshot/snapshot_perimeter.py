@@ -3,8 +3,8 @@
 
 L'instantané garde, à chaque niveau, les indices d'entrée dans le périmètre et les structures atteintes :
 
-- signatures du périmètre ou rattachées à une structure : source, indices, couples (structure, indice) de `source_authorship_structures` ;
-- authorships du périmètre, par couple (publication, personne) : indices ;
+- signatures du périmètre ou rattachées à une structure : source, indices, couples (structure, indice) de `source_contribution_structures` ;
+- contributions du périmètre, par couple (publication, personne) : indices ;
 - publications : type, indices, structures (`publication_structures`), pays, titre ;
 - adresses : nombre total, nombre sans signature.
 
@@ -39,24 +39,24 @@ _EXAMPLES = 5
 
 _SIGNATURES = text("""
     WITH ids AS (
-        SELECT id FROM source_authorships WHERE in_perimeter = true
+        SELECT id FROM source_contributions WHERE in_perimeter = true
         UNION
-        SELECT DISTINCT source_authorship_id FROM source_authorship_structures
+        SELECT DISTINCT source_contribution_id FROM source_contribution_structures
     )
     SELECT sa.id, sp.source::text AS source, sa.perimeter_evidence::text[] AS evidence
     FROM ids
-    JOIN source_authorships sa ON sa.id = ids.id
-    JOIN source_publications sp ON sp.id = sa.source_publication_id
+    JOIN source_contributions sa ON sa.id = ids.id
+    JOIN source_records sp ON sp.id = sa.source_record_id
 """)
 
 _SIGNATURE_STRUCTURES = text("""
-    SELECT source_authorship_id, structure_id, evidence::text AS evidence
-    FROM source_authorship_structures
+    SELECT source_contribution_id, structure_id, evidence::text AS evidence
+    FROM source_contribution_structures
 """)
 
-_AUTHORSHIPS = text("""
+_CONTRIBUTIONS = text("""
     SELECT publication_id, person_id, perimeter_evidence::text[] AS evidence
-    FROM authorships
+    FROM contributions
     WHERE in_perimeter
 """)
 
@@ -75,13 +75,13 @@ _PUBLICATIONS = text("""
 _ADDRESSES = text("""
     SELECT count(*) AS total,
            count(*) FILTER (WHERE NOT EXISTS (
-               SELECT 1 FROM source_authorship_addresses saa WHERE saa.address_id = a.id
+               SELECT 1 FROM source_contribution_addresses saa WHERE saa.address_id = a.id
            )) AS orphans
     FROM addresses a
 """)
 
 Snapshot = dict[str, Any]
-"""`{"signatures": {id: [source, indices, [[structure_id, indice], …]]}, "authorships": {"publication:personne": indices}, "publications": {id: [type, indices, structures, pays, titre]}, "addresses": {"total": n, "orphans": n}}`"""
+"""`{"signatures": {id: [source, indices, [[structure_id, indice], …]]}, "contributions": {"publication:personne": indices}, "publications": {id: [type, indices, structures, pays, titre]}, "addresses": {"total": n, "orphans": n}}`"""
 
 
 def snapshot() -> Snapshot:
@@ -89,15 +89,15 @@ def snapshot() -> Snapshot:
         log.info("Signatures…")
         structures: defaultdict[int, list[list[object]]] = defaultdict(list)
         for r in conn.execute(_SIGNATURE_STRUCTURES):
-            structures[r.source_authorship_id].append([r.structure_id, r.evidence])
+            structures[r.source_contribution_id].append([r.structure_id, r.evidence])
         signatures = {
             str(r.id): [r.source, sorted(r.evidence), sorted(structures.get(r.id, []))]
             for r in conn.execute(_SIGNATURES)
         }
-        log.info("Authorships…")
-        authorships = {
+        log.info("Contributions…")
+        contributions = {
             f"{r.publication_id}:{r.person_id}": sorted(r.evidence)
-            for r in conn.execute(_AUTHORSHIPS)
+            for r in conn.execute(_CONTRIBUTIONS)
         }
         log.info("Publications…")
         publications = {
@@ -113,7 +113,7 @@ def snapshot() -> Snapshot:
         addresses = conn.execute(_ADDRESSES).one()._asdict()
     return {
         "signatures": signatures,
-        "authorships": authorships,
+        "contributions": contributions,
         "publications": publications,
         "addresses": addresses,
     }
@@ -139,7 +139,7 @@ def _structure_labels(conn: Connection, ids: Iterable[int]) -> dict[int, str]:
 
 def _existing_signatures(conn: Connection, ids: Iterable[str]) -> set[str]:
     rows = conn.execute(
-        text("SELECT id FROM source_authorships WHERE id = ANY(CAST(:ids AS int[]))"),
+        text("SELECT id FROM source_contributions WHERE id = ANY(CAST(:ids AS int[]))"),
         {"ids": sorted(int(i) for i in ids)},
     )
     return {str(r.id) for r in rows}
@@ -174,14 +174,14 @@ def _compare_signatures(conn: Connection, before: Snapshot, after: Snapshot) -> 
     _log_tally("liens à une structure perdus, par source et indice", lost)
 
 
-def _compare_authorships(before: Snapshot, after: Snapshot) -> None:
-    b, a = before["authorships"], after["authorships"]
-    log.info("─── Authorships du périmètre : %d avant, %d après ───", len(b), len(a))
+def _compare_contributions(before: Snapshot, after: Snapshot) -> None:
+    b, a = before["contributions"], after["contributions"]
+    log.info("─── Contributions du périmètre : %d avant, %d après ───", len(b), len(a))
     log.info("  entrées : %d, sorties : %d", len(a.keys() - b.keys()), len(b.keys() - a.keys()))
     changes = Counter(
         f"{'+'.join(b[k])} → {'+'.join(a[k])}" for k in b.keys() & a.keys() if b[k] != a[k]
     )
-    _log_tally("authorships dont les indices changent", changes)
+    _log_tally("contributions dont les indices changent", changes)
 
 
 def _describe_publication(key: str, record: list[Any]) -> str:
@@ -267,7 +267,7 @@ def _compare(before: Snapshot, after: Snapshot) -> None:
     log.info("─── Adresses : %s avant, %s après ───", before["addresses"], after["addresses"])
     with get_sync_engine().connect() as conn:
         _compare_signatures(conn, before, after)
-        _compare_authorships(before, after)
+        _compare_contributions(before, after)
         _compare_publications(conn, before, after)
     _compare_countries(before, after)
 
@@ -288,10 +288,10 @@ def main() -> int:
     path = _SNAPSHOTS / f"perimeter_{datetime.now(UTC):%Y%m%d_%H%M}.json.gz"
     path.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode()))
     log.info(
-        "Instantané écrit : %s (%d signatures, %d authorships, %d publications)",
+        "Instantané écrit : %s (%d signatures, %d contributions, %d publications)",
         path,
         len(data["signatures"]),
-        len(data["authorships"]),
+        len(data["contributions"]),
         len(data["publications"]),
     )
     return 0

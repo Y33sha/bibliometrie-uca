@@ -9,7 +9,7 @@ from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
-from pipeline.transformation.publishing.pub_counts import PubCountRecompute
+from pipeline.transformation.publishing.publication_counts import PubCountRecompute
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from pipeline.transformation.structures.perimeter_evidence import (
     SourceContributionPerimeterRecompute,

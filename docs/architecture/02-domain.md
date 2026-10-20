@@ -10,8 +10,8 @@ Les invariants de chaque agrégat, ses tables et son cycle de vie sont décrits 
 
 Entités avec identité, comportement et invariants métier.
 
-- **`SourcePublication`** (`domain/source_publications/`) est une publication telle que moissonnée depuis une source.
-- **`Publication`** (`domain/publications/`) est l'entité unifiée que le pipeline dérive de plusieurs `SourcePublication`. Décider lesquelles désignent le même document est le travail de la résolution d'entités.
+- **`SourceRecord`** (`domain/source_records/`) est une publication telle que moissonnée depuis une source.
+- **`Publication`** (`domain/publications/`) est l'entité unifiée que le pipeline dérive de plusieurs `SourceRecord`. Décider lesquelles désignent le même document est le travail de la résolution d'entités.
 - **`Person`** (`domain/persons/`) est l'entité unifiée que le pipeline dérive de plusieurs signatures désignant la même personne.
 - **`IdentifierAttribution`** (`domain/persons/`) est l'attribution d'un identifiant à une personne : un même couple `(id_type, id_value)` ne peut être attribué qu'à une seule. L'attribution porte un statut de confirmation (`confirmed`, `rejected`, `pending`, `authenticated`).
 - **`Structure`** (`domain/structures/`) est un établissement ou unité de recherche. Les relations de tutelle entre structures forment un graphe acyclique.

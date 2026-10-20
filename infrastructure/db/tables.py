@@ -6,7 +6,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 
 Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
-Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`authorship_structures`, `publication_author_alignment`, `publication_structures`, `source_authorship_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
+Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
 from sqlalchemy import (
@@ -81,8 +81,7 @@ audit_log = Table(
         Text,
         nullable=False,
         comment=(
-            "Type de l'entité affectée : person, publication, structure, "
-            "journal, publisher, authorship."
+            "Type de l'entité affectée : address, journal, perimeter, person, publication, structure."
         ),
     ),
     Column(
@@ -248,8 +247,8 @@ structures = Table(
 )
 
 
-structure_tutelles = Table(
-    "structure_tutelles",
+structure_parents = Table(
+    "structure_parents",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("parent_id", Integer, nullable=False),
@@ -258,9 +257,9 @@ structure_tutelles = Table(
     UniqueConstraint(
         "parent_id",
         "child_id",
-        name="structure_tutelles_parent_id_child_id_key",
+        name="structure_parents_parent_id_child_id_key",
     ),
-    CheckConstraint("parent_id <> child_id", name="structure_tutelles_no_self_reference"),
+    CheckConstraint("parent_id <> child_id", name="structure_parents_no_self_reference"),
     schema="structures",
 )
 
@@ -397,7 +396,7 @@ journals = Table(
     # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_pubs` / le tri / l'affichage.
-    Column("pub_count", Integer, nullable=False, server_default="0"),
+    Column("publication_count", Integer, nullable=False, server_default="0"),
     # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
@@ -530,8 +529,8 @@ publishers = Table(
         server_default="unknown",
     ),
     # Compte matérialisé des publications in-perimeter de l'éditeur (= somme de ses
-    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.pub_count`.
-    Column("pub_count", Integer, nullable=False, server_default="0"),
+    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.publication_count`.
+    Column("publication_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     schema="publishing",
 )
@@ -615,10 +614,10 @@ addresses = Table(
     Column("raw_text", Text, nullable=False),
     Column("normalized_text", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("pub_count", Integer, server_default="0"),
+    Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
     # Refresh pays incrémental : True = `countries` vient de changer, les
-    # `source_authorships` liés sont à recalculer. Posé gratuitement à l'écriture
+    # `source_contributions` liés sont à recalculer. Posé gratuitement à l'écriture
     # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
     # fin de cascade.
     Column("countries_dirty", Boolean, nullable=False, server_default="false"),
@@ -706,11 +705,11 @@ idref_structures = Table(
 )
 
 
-# ── Authorships (table consolidée + sources) ────────────────────────────────
+# ── Contributions (table consolidée + sources) ────────────────────────────────
 
 
-authorships = Table(
-    "authorships",
+contributions = Table(
+    "contributions",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
@@ -732,39 +731,39 @@ authorships = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
-    UniqueConstraint("publication_id", "person_id", name="authorships_publication_person_uq"),
+    UniqueConstraint("publication_id", "person_id", name="contributions_publication_person_uq"),
     schema="publications",
 )
 
 
-# `authorship_structures` est une MATERIALIZED VIEW (DDL via migration
-# a2c6e4f8b1d7), pas une table : dérivée des `source_authorship_structures` des
-# `source_authorships` reliées à une authorship, hors authorships d'une personne
+# `contribution_structures` est une MATERIALIZED VIEW (DDL via migration
+# a2c6e4f8b1d7), pas une table : dérivée des `source_contribution_structures` des
+# `source_contributions` reliées à une contribution, hors contributions d'une personne
 # exclue. Pas modélisée dans le metadata
 # SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 #
 # `publication_structures` (MATERIALIZED VIEW, migration d8b3f5a2c9e6) : lien
-# publication↔structure dédoublonné, dérivé d'`authorships` × `authorship_structures`.
+# publication↔structure dédoublonné, dérivé d'`contributions` × `contribution_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
-# + REFRESH dans le pipeline, après `authorship_structures`).
+# + REFRESH dans le pipeline, après `contribution_structures`).
 
 
-rejected_authorships = Table(
-    "rejected_authorships",
+rejected_contributions = Table(
+    "rejected_contributions",
     metadata,
-    Column("source_publication_id", Integer, nullable=False),
+    Column("source_record_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
-    PrimaryKeyConstraint("source_publication_id", "person_id", name="rejected_authorships_pkey"),
+    PrimaryKeyConstraint("source_record_id", "person_id", name="rejected_contributions_pkey"),
     schema="persons",
 )
 
 
 grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
 
-source_authorship_groups = Table(
-    "source_authorship_groups",
+source_contribution_groups = Table(
+    "source_contribution_groups",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
@@ -772,37 +771,37 @@ source_authorship_groups = Table(
     Column("resolution_mode", resolution_mode_enum),
     Column("reference_position", SmallInteger),
     UniqueConstraint(
-        "publication_id", "person_id", name="source_authorship_groups_publication_person_uq"
+        "publication_id", "person_id", name="source_contribution_groups_publication_person_uq"
     ),
     comment=(
-        "Signatures d'un même auteur dans une publication, avec au maximum une signature par "
-        "notice. reference_position : position dans la liste la plus longue. Une personne "
-        "correspond au maximum à un groupe par publication."
+        "Contributions sources d'un même auteur dans une publication, avec au maximum une "
+        "contribution source par enregistrement source. reference_position : position dans la "
+        "liste la plus longue. Une personne correspond au maximum à un groupe par publication."
     ),
     schema="publications",
 )
 
 
-grouped_source_authorships = Table(
-    "grouped_source_authorships",
+source_contribution_group_members = Table(
+    "source_contribution_group_members",
     metadata,
-    Column("source_authorship_id", Integer, primary_key=True),
+    Column("source_contribution_id", Integer, primary_key=True),
     Column("group_id", Integer, nullable=False),
-    Column("source_publication_id", Integer, nullable=False),
+    Column("source_record_id", Integer, nullable=False),
     Column("method", grouping_method_enum, nullable=False),
     Column("score", REAL),
     Column("margin", REAL),
     UniqueConstraint(
-        "group_id", "source_publication_id", name="grouped_source_authorships_group_notice_uq"
+        "group_id", "source_record_id", name="source_contribution_group_members_group_record_uq"
     ),
     CheckConstraint(
         "method = 'model' OR (score IS NULL AND margin IS NULL)",
-        name="grouped_source_authorships_score_check",
+        name="source_contribution_group_members_score_check",
     ),
     comment=(
-        "Appartenance d'une signature à son groupe. method : origine du lien. score et margin, "
-        "en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure "
-        "autre possibilité de l'affectation."
+        "Appartenance d'une contribution source à son groupe. method : origine du lien. score et "
+        "margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la "
+        "meilleure autre possibilité de l'affectation."
     ),
     schema="publications",
 )
@@ -813,16 +812,16 @@ grouped_source_authorships = Table(
 
 
 # Identités d'auteur dédupliquées : la clé (nom et prénom normalisés,
-# identifiants) est extraite des signatures `source_authorships` (une identité
+# identifiants) est extraite des signatures `source_contributions` (une identité
 # pour ~35 signatures). L'unique est `NULLS NOT DISTINCT` : les signatures sans
 # identifiant collapsent sur leur seul nom, sans recourir à un sentinel `'{}'`.
-author_identifying_keys = Table(
-    "author_identifying_keys",
+contributor_information = Table(
+    "contributor_information",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text),
-    Column("person_identifiers", Jsonb),
+    Column("identifiers", Jsonb),
     # Forme normalisée « prénom nom », parties vides omises.
     Column(
         "author_name_normalized",
@@ -845,15 +844,15 @@ author_identifying_keys = Table(
         Computed(
             r"md5(coalesce((last_name_normalized)::text, E'\x01') || E'\x1f' "
             r"|| coalesce((first_name_normalized)::text, E'\x01') || E'\x1f' "
-            r"|| coalesce((person_identifiers)::text, E'\x01'))",
+            r"|| coalesce((identifiers)::text, E'\x01'))",
             persisted=True,
         ),
     ),
     UniqueConstraint(
         "last_name_normalized",
         "first_name_normalized",
-        "person_identifiers",
-        name="author_identifying_keys_key",
+        "identifiers",
+        name="contributor_information_key",
         postgresql_nulls_not_distinct=True,
     ),
     schema="sources",
@@ -862,23 +861,23 @@ author_identifying_keys = Table(
 
 # Arbitrages admin au grain de la signature : la paire (signature, personne) que la
 # cascade de la phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
-confirmed_authorships = Table(
-    "confirmed_authorships",
+confirmed_source_contributions = Table(
+    "confirmed_source_contributions",
     metadata,
-    Column("source_authorship_id", Integer, nullable=False),
+    Column("source_contribution_id", Integer, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    PrimaryKeyConstraint("source_authorship_id", name="confirmed_authorships_pkey"),
+    PrimaryKeyConstraint("source_contribution_id", name="confirmed_source_contributions_pkey"),
     schema="persons",
 )
 
 
-source_authorships = Table(
-    "source_authorships",
+source_contributions = Table(
+    "source_contributions",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("source", source_type_enum, nullable=False),
-    Column("source_publication_id", Integer, nullable=False),
+    Column("source_record_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     # Indices de l'entrée dans le périmètre ; `in_perimeter` en découle.
     Column(
@@ -893,17 +892,17 @@ source_authorships = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    # Refresh pays incrémental : True = les pays dérivés (source_publications,
-    # publications) sont à recalculer depuis les adresses de ce source_authorship.
-    # Posé par normalize (nouveaux source_authorships) et la détection (adresse
+    # Refresh pays incrémental : True = les pays dérivés (source_records,
+    # publications) sont à recalculer depuis les adresses de ce source_contribution.
+    # Posé par normalize (nouveaux source_contributions) et la détection (adresse
     # changée), remis à False par le refresh.
     Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column(
         "countries",
         ARRAY(Text),
         comment=(
-            "Pays de la signature : pays retenus de ses adresses, de ses organisations ROR sans"
-            " adresse et de ses structures HAL."
+            "Pays de la contribution source : pays retenus de ses adresses, de ses organisations ROR "
+            "sans adresse et de ses structures HAL."
         ),
     ),
     Column(
@@ -912,16 +911,17 @@ source_authorships = Table(
         nullable=False,
         server_default="false",
         comment=(
-            "Signature collective (collaboration, consortium, groupe d'étude…), posée par la"
-            " normalisation d'après le signal de la source ou d'après le nom."
+            "Contribution source collective (collaboration, consortium, groupe d'étude…), posée par "
+            "la normalisation d'après le signal de la source ou d'après le nom."
         ),
     ),
     Column(
         "duplicate_of",
         Integer,
         comment=(
-            "Doublon d'auteur : signature qui répète, dans la liste d'auteurs de sa notice, la"
-            " signature référencée. Écrite par la phase author_grouping."
+            "Doublon d'auteur : contribution source qui répète, dans la liste d'auteurs de son "
+            "enregistrement source, la contribution source référencée. Écrite par la phase "
+            "author_grouping."
         ),
     ),
     Column("person_id", Integer),
@@ -932,21 +932,21 @@ source_authorships = Table(
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute
-    # (contrainte `source_authorships_name_form`).
+    # (contrainte `source_contributions_name_form`).
     Column("raw_author_name", Text),
     Column("raw_last_name", Text),
     Column("raw_first_name", Text),
-    # FK vers `author_identifying_keys` (identité dédupliquée : nom normalisé +
+    # FK vers `contributor_information` (identité dédupliquée : nom normalisé +
     # identifiants observés de la signature). La contrainte FK n'est pas
     # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
     # MetaData).
-    Column("identity_id", Integer, nullable=False),
+    Column("contributor_information_id", Integer, nullable=False),
     Column(
         "neutralized_identifiers",
         Jsonb,
         comment=(
-            "Identifiants de l'identité que la résolution des personnes ignore pour cette"
-            ' signature, avec leur motif : {"orcid": "shared"}.'
+            "Identifiants des informations du contributeur que la résolution des personnes ignore "
+            'pour cette contribution source, avec leur motif : {"orcid": "shared"}.'
         ),
     ),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -958,76 +958,76 @@ source_authorships = Table(
     CheckConstraint(
         "num_nonnulls(raw_author_name, raw_last_name) = 1"
         " AND (raw_first_name IS NULL OR raw_last_name IS NOT NULL)",
-        name="source_authorships_name_form",
+        name="source_contributions_name_form",
     ),
     # Vérifiée en fin d'instruction : la mise à jour des signatures d'une notice permute des positions en une seule instruction.
     UniqueConstraint(
-        "source_publication_id",
+        "source_record_id",
         "author_position",
-        name="source_authorships_pub_pos_key",
+        name="source_contributions_record_position_key",
         deferrable=True,
         initially="IMMEDIATE",
     ),
     # Index couvrant : `person_id` en tête sert les recherches par personne ;
-    # `identity_id` en colonne incluse permet l'index-only scan de la projection
+    # `contributor_information_id` en colonne incluse permet l'index-only scan de la projection
     # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
-    # qui rejoint `author_identifying_keys` sur `identity_id`.
+    # qui rejoint `contributor_information` sur `contributor_information_id`.
     schema="sources",
 )
 
 
-source_authorship_addresses = Table(
-    "source_authorship_addresses",
+source_contribution_addresses = Table(
+    "source_contribution_addresses",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("source_authorship_id", Integer, nullable=False),
+    Column("source_contribution_id", Integer, nullable=False),
     Column("address_id", Integer, nullable=False),
     UniqueConstraint(
-        "source_authorship_id",
+        "source_contribution_id",
         "address_id",
-        name="source_authorship_addresses_source_authorship_id_address_id_key",
+        name="source_contribution_addresses_key",
     ),
     schema="sources",
 )
 
 
-source_authorship_hal_structures = Table(
-    "source_authorship_hal_structures",
+source_contribution_hal_structures = Table(
+    "source_contribution_hal_structures",
     metadata,
-    Column("source_authorship_id", Integer, nullable=False),
+    Column("source_contribution_id", Integer, nullable=False),
     Column("hal_structure_id", Integer, nullable=False),
     PrimaryKeyConstraint(
-        "source_authorship_id", "hal_structure_id", name="source_authorship_hal_structures_pkey"
+        "source_contribution_id", "hal_structure_id", name="source_contribution_hal_structures_pkey"
     ),
     schema="sources",
 )
 
 
-source_authorship_rors = Table(
-    "source_authorship_rors",
+source_contribution_rors = Table(
+    "source_contribution_rors",
     metadata,
-    Column("source_authorship_id", Integer, nullable=False),
+    Column("source_contribution_id", Integer, nullable=False),
     Column("ror_id", Text, nullable=False),
     Column("address_id", Integer),
     UniqueConstraint(
-        "source_authorship_id",
+        "source_contribution_id",
         "ror_id",
         "address_id",
-        name="source_authorship_rors_key",
+        name="source_contribution_rors_key",
         postgresql_nulls_not_distinct=True,
     ),
     comment=(
-        "ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation, "
-        "ou à la seule signature quand l'affiliation est sans texte (address_id vide). ror_id est "
-        "sans clé étrangère vers ror_organizations : une source peut citer un ROR absent du dump "
-        "importé."
+        "ROR attribués par la source à une contribution source, rattachés à l'adresse de leur "
+        "affiliation, ou à la seule contribution source quand l'affiliation est sans texte "
+        "(address_id vide). ror_id est sans clé étrangère vers ror_organizations : une source "
+        "peut citer un ROR absent du dump importé."
     ),
     schema="sources",
 )
 
 
-# `source_authorship_structures` est une MATERIALIZED VIEW (DDL via migration
-# e8f1a3c5d7b9), pas une table : dérivée de `source_authorship_addresses ⋈
+# `source_contribution_structures` est une MATERIALIZED VIEW (DDL via migration
+# e8f1a3c5d7b9), pas une table : dérivée de `source_contribution_addresses ⋈
 # address_structures ⋈ perimeter_structures` (périmètre d'affiliation). Non
 # modélisée dans le metadata SQLAlchemy — accès en SQL brut par nom (lectures)
 # ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
@@ -1059,8 +1059,8 @@ persons = Table(
 )
 
 
-persons_rh = Table(
-    "persons_rh",
+hr_records = Table(
+    "hr_records",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("person_id", Integer, nullable=False),
@@ -1071,7 +1071,7 @@ persons_rh = Table(
     Column("end_date", Date),
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    UniqueConstraint("person_id", name="persons_rh_person_id_key"),
+    UniqueConstraint("person_id", name="hr_records_person_id_key"),
     schema="persons",
 )
 
@@ -1092,7 +1092,7 @@ person_identifiers = Table(
 
 
 # Formes de nom désignant une personne. `name_form` est une chaîne « prénom nom »
-# normalisée, au format de `author_identifying_keys.author_name_normalized`.
+# normalisée, au format de `contributor_information.author_name_normalized`.
 person_name_forms = Table(
     "person_name_forms",
     metadata,
@@ -1116,7 +1116,7 @@ publications = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("doc_type", doc_type_enum, server_default="other"),
-    Column("pub_year", SmallInteger, nullable=False),
+    Column("publication_year", SmallInteger, nullable=False),
     Column("doi", Text),
     Column("oa_status", oa_type_enum, server_default="unknown"),
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
@@ -1135,7 +1135,7 @@ publications = Table(
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
     # `publications` étroite (scans listes/facettes).
-    # Indices des authorships de personnes non exclues, maintenus par la phase `authorships` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
+    # Indices des contributions de personnes non exclues, maintenus par la phase `contributions` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
         ARRAY(perimeter_evidence_enum),
@@ -1153,17 +1153,17 @@ publications = Table(
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
     Column(
-        "authorships_dirty",
+        "contributions_dirty",
         Boolean,
         nullable=False,
         server_default="true",
         comment=(
-            "Groupes de signatures à recalculer : une notice a rejoint ou quitté la publication,"
-            " ou ses signatures ont changé."
+            "Groupes de contributions sources à recalculer : un enregistrement source a rejoint ou "
+            "quitté la publication, ou ses contributions sources ont changé."
         ),
     ),
-    # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
-    # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
+    # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
+    # publication_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
     # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
     # composantes ne produit jamais deux publications au même DOI (assignation à
@@ -1189,8 +1189,8 @@ publications_detail = Table(
 )
 
 
-source_publications = Table(
-    "source_publications",
+source_records = Table(
+    "source_records",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("source", source_type_enum, nullable=False),
@@ -1198,7 +1198,7 @@ source_publications = Table(
     Column("doi", Text),
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
-    Column("pub_year", SmallInteger),
+    Column("publication_year", SmallInteger),
     Column("doc_type", Text),
     Column("publication_id", Integer),
     Column("staging_id", Integer),
@@ -1243,34 +1243,43 @@ source_publications = Table(
     Column(
         "authors_hash",
         Text,
-        comment="Empreinte de la partie auteurs du payload source, à la dernière synchronisation des signatures.",
+        comment=(
+            "Empreinte de la partie auteurs du payload source, à la dernière synchronisation des "
+            "contributions sources."
+        ),
     ),
     Column(
         "author_count",
         Integer,
         nullable=False,
         server_default="0",
-        comment="Signatures de la notice qui ont le rôle author et ne sont pas collectives, telles que la source les donne.",
+        comment=(
+            "Contributions sources de l'enregistrement source qui ont le rôle author et ne sont pas "
+            "collectives, telles que la source les donne."
+        ),
     ),
     Column(
         "distinct_author_count",
         Integer,
         nullable=False,
         server_default="0",
-        comment="Noms complets normalisés distincts parmi les signatures comptées par author_count.",
+        comment=(
+            "Noms complets normalisés distincts parmi les contributions sources comptées par "
+            "author_count."
+        ),
     ),
-    UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
+    UniqueConstraint("source", "source_id", name="source_records_source_source_id_key"),
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",
-        name="source_publications_external_ids_is_object",
+        name="source_records_external_ids_is_object",
     ),
     CheckConstraint(
         "impact IS NULL OR jsonb_typeof(impact) = 'object'",
-        name="source_publications_impact_is_object",
+        name="source_records_impact_is_object",
     ),
     CheckConstraint(
         "jsonb_typeof(raw_metadata) = 'object'",
-        name="source_publications_raw_metadata_is_object",
+        name="source_records_raw_metadata_is_object",
     ),
     schema="sources",
 )
@@ -1308,7 +1317,7 @@ apc_payments = Table(
     Column("doi", Text),
     Column("amount_eur_ht", Numeric(12, 2)),
     Column("billing_year", SmallInteger),
-    Column("pub_year", SmallInteger),
+    Column("publication_year", SmallInteger),
     Column("budget", Text),
     Column("institution", Text),
     Column("coman_id", Integer),

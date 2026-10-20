@@ -109,7 +109,7 @@ class PgAddressRepository(AddressRepository):
     ) -> set[int]:
         """Cf. docstring du port.
 
-        Condition miroir du lien adresse → structure de la matview `source_authorship_structures`, à garder synchronisée.
+        Condition miroir du lien adresse → structure de la matview `source_contribution_structures`, à garder synchronisée.
         """
         if not address_ids:
             return set()

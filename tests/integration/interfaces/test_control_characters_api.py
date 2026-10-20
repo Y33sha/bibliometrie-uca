@@ -6,10 +6,10 @@ PostgreSQL n'accepte l'octet NUL dans aucun champ texte, et le driver écarte la
 import pytest
 
 _CHEMINS = [
-    ("/api/authorships/orphans", {"page": 1, "per_page": 50, "search": "\x00"}),
+    ("/api/contributions/orphans", {"page": 1, "per_page": 50, "search": "\x00"}),
     ("/api/feedback/false-negatives", {"structure_id": 10, "search": "\x00"}),
     ("/api/feedback/false-positives", {"structure_id": 10, "search": "\x00"}),
-    ("/api/persons/10/name-form-authorships", {"name_form": "\x00"}),
+    ("/api/persons/10/name-form-contributions", {"name_form": "\x00"}),
     ("/api/subjects", {"page": 1, "per_page": 50, "search": "\x00", "min_count": 1}),
 ]
 

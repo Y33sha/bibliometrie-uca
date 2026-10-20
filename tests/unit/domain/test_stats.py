@@ -7,14 +7,14 @@ from domain.stats import DIMENSIONS, MEASURES, validate_pivot
 
 
 def test_validate_returns_measure_and_dimensions():
-    measure, dims = validate_pivot("pub_count", ["year", "oa_access"])
-    assert measure is MEASURES["pub_count"]
+    measure, dims = validate_pivot("publication_count", ["year", "oa_access"])
+    assert measure is MEASURES["publication_count"]
     assert [d.key for d in dims] == ["year", "oa_access"]
 
 
 def test_validate_allows_zero_groups():
-    measure, dims = validate_pivot("pub_count", [])
-    assert measure.key == "pub_count"
+    measure, dims = validate_pivot("publication_count", [])
+    assert measure.key == "publication_count"
     assert dims == []
 
 
@@ -25,23 +25,23 @@ def test_validate_rejects_unknown_measure():
 
 def test_validate_rejects_unknown_dimension():
     with pytest.raises(ValidationError, match="Dimension inconnue : 'bogus'"):
-        validate_pivot("pub_count", ["bogus"])
+        validate_pivot("publication_count", ["bogus"])
 
 
 def test_validate_rejects_repeated_group():
     with pytest.raises(ValidationError, match="Groupement répété : 'year'"):
-        validate_pivot("pub_count", ["year", "year"])
+        validate_pivot("publication_count", ["year", "year"])
 
 
 def test_validate_rejects_non_groupable_dimension():
     # `apc` est filtrable mais pas un axe de ventilation.
     assert DIMENSIONS["apc"].groupable is False
     with pytest.raises(ValidationError, match="Dimension non groupable : 'apc'"):
-        validate_pivot("pub_count", ["apc"])
+        validate_pivot("publication_count", ["apc"])
 
 
 def test_validate_allows_lab_grouping():
     # Le laboratoire (forte cardinalité) est groupable : il sert d'axe de comparaison.
     assert DIMENSIONS["lab"].cardinality == "high"
-    _, dims = validate_pivot("pub_count", ["lab"])
+    _, dims = validate_pivot("publication_count", ["lab"])
     assert [d.key for d in dims] == ["lab"]

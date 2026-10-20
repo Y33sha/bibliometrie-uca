@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-07.*
 
-Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_publications.source=...` dédié. Les données récupérées sont écrites directement sur les tables du référentiel, par la phase d'enrichissement concernée.
+Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_records.source=...` dédié. Les données récupérées sont écrites directement sur les tables du référentiel, par la phase d'enrichissement concernée.
 
 ## Unpaywall
 

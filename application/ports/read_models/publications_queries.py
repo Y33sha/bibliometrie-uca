@@ -125,7 +125,7 @@ class PublicationListItem(BaseModel):
 
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doi: str | None
     doc_type: str
     oa_status: str
@@ -146,7 +146,7 @@ class PublicationListItem(BaseModel):
     lab_items: list[PubLabItem] | None
     apc: list[PubApcPayment] | None
     is_corresponding: bool | None
-    authorship_id: int | None
+    contribution_id: int | None
     hal_collections: list[str] | None
 
 
@@ -191,7 +191,7 @@ class PublicationDetailCore(BaseModel):
 
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doi: str | None
     doi_ra: str | None  # registration agency du préfixe DOI (Crossref / DataCite), via doi_prefixes
     doc_type: str
@@ -216,7 +216,7 @@ class PublicationDetailCore(BaseModel):
     publisher_name: str | None
 
 
-class SourcePublicationOut(BaseModel):
+class SourceRecordOut(BaseModel):
     source: str
     source_id: str
     doi: str | None
@@ -234,8 +234,8 @@ class ExternalIdentifierOut(BaseModel):
     value: str
 
 
-class ConsolidatedAuthorshipOut(BaseModel):
-    """Authorship consolidée (liens certifiés person ↔ publication)."""
+class ConsolidatedContributionOut(BaseModel):
+    """Contribution consolidée (liens certifiés person ↔ publication)."""
 
     author_position: int | None
     in_perimeter: bool
@@ -248,10 +248,10 @@ class ConsolidatedAuthorshipOut(BaseModel):
     person_id: int
     last_name: str
     first_name: str
-    has_rh: bool  # la personne est rattachée au référentiel RH (persons_rh)
+    has_rh: bool  # la personne est rattachée au référentiel RH (hr_records)
 
 
-class ThesesAuthorshipOut(BaseModel):
+class ThesesContributionOut(BaseModel):
     id: int
     author_position: int | None
     full_name: str | None
@@ -299,24 +299,24 @@ class StructureInfo(BaseModel):
 class RelatedPublicationOut(BaseModel):
     """Une publication apparentée, vue depuis la publication courante.
 
-    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`."""
+    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`publication_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`."""
 
     relation_type: str
     doi: str | None = None
     publication_id: int | None = None
     title: str | None = None
-    pub_year: int | None = None
+    publication_year: int | None = None
     doc_type: str | None = None
     source: str
 
 
 class PublicationDetailResponse(BaseModel):
-    """Détail complet d'une publication : métadonnées + sources + authorships."""
+    """Détail complet d'une publication : métadonnées + sources + contributions."""
 
     publication: PublicationDetailCore
-    sources: list[SourcePublicationOut]
-    authorships: list[ConsolidatedAuthorshipOut]
-    theses_authorships: list[ThesesAuthorshipOut]
+    sources: list[SourceRecordOut]
+    contributions: list[ConsolidatedContributionOut]
+    theses_contributions: list[ThesesContributionOut]
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
@@ -325,7 +325,7 @@ class PublicationDetailResponse(BaseModel):
     external_identifiers: list[ExternalIdentifierOut]
 
 
-class SourcePublicationMetadataOut(BaseModel):
+class SourceRecordMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
@@ -339,7 +339,7 @@ class SourcePublicationMetadataOut(BaseModel):
     title: str
     title_normalized: str | None  # forme de comparaison du titre
     doc_type: str | None
-    pub_year: int | None
+    publication_year: int | None
     language: str | None
     language_name: str | None
     language_raw: str | None
@@ -366,7 +366,7 @@ class SourceSignatureOut(BaseModel):
     """
 
     id: int
-    source_publication_id: int
+    source_record_id: int
     position: int | None
     full_name: str | None
     roles: list[str] | None
@@ -387,7 +387,7 @@ class PublicationSourcesResponse(BaseModel):
     """Enregistrements sources d'une publication, toutes sources confondues, leurs signatures, et les structures que ces signatures citent."""
 
     title: str
-    source_publications: list[SourcePublicationMetadataOut]
+    source_records: list[SourceRecordMetadataOut]
     signatures: list[SourceSignatureOut]
     structures: dict[str, StructureInfo]
 
@@ -398,7 +398,7 @@ class SuspectMergeNoticeOut(BaseModel):
     source: str
     source_id: str
     signatures: int
-    matched_signatures: int
+    matched_source_contributions: int
 
 
 class SuspectMergeOut(BaseModel):
@@ -406,10 +406,10 @@ class SuspectMergeOut(BaseModel):
 
     publication_id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doc_type: str
     signatures: int
-    matched_signatures: int
+    matched_source_contributions: int
     notices: list[SuspectMergeNoticeOut]
 
 

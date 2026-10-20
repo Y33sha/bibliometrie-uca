@@ -1,12 +1,12 @@
-"""Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Tâches `normalize.<source>`.
+"""Phase `normalize` : normalisation du staging vers `source_records`, `source_contributions` et `addresses`. Tâches `normalize.<source>`.
 
-Les `source_publications` sortent sans `publication_id` : la phase `publications` les assigne. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
+Les `source_records` sortent sans `publication_id` : la phase `publications` les assigne. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
 
 La phase enchaîne ses tâches (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
-2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
-3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `author_identifying_keys` que plus aucune signature ne référence) ;
+2. la suppression des `source_records` dont le staging porte `disappeared_at` ;
+3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `contributor_information` que plus aucune signature ne référence) ;
 4. le nettoyage des adresses orphelines, pour la même raison. Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
 """
 
@@ -27,14 +27,14 @@ from pipeline.ingestion.common.normalizer import (
     SourceNormalizer,
 )
 from pipeline.ingestion.common.signature_queries import (
-    AuthorshipsBatchQueries,
+    ContributionsBatchQueries,
     delete_orphan_addresses,
     delete_orphan_identities,
     mark_signatures_to_resync,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    delete_disappeared_source_publications,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    delete_disappeared_source_records,
 )
 from pipeline.ingestion.common.staging import StagingQueries
 from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
@@ -194,7 +194,7 @@ def _run_mark_signatures_to_resync(ctx: PhaseContext, source: str) -> None:
 
 def _run_prune_disappeared(ctx: PhaseContext) -> int:
     with ctx.open_tx() as conn:
-        return delete_disappeared_source_publications(conn)
+        return delete_disappeared_source_records(conn)
 
 
 def _run_cleanup_orphan_identities(ctx: PhaseContext) -> int:
@@ -217,10 +217,10 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             conn,
             logger,
             StagingQueries(raw_store),
-            SourcePublicationQueries(),
+            SourceRecordQueries(),
             container_stores=ContainerStores.of(conn),
             publisher_store=PublisherStore(conn),
-            authorship_queries=AuthorshipsBatchQueries(),
+            contribution_queries=ContributionsBatchQueries(),
         )
 
     return {
@@ -228,8 +228,8 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             conn,
             logger,
             StagingQueries(raw_store),
-            SourcePublicationQueries(),
-            batch_queries=AuthorshipsBatchQueries(),
+            SourceRecordQueries(),
+            batch_queries=ContributionsBatchQueries(),
         ),
         "crossref": _biblio(CrossrefNormalizer),
         "datacite": _biblio(DataciteNormalizer),

@@ -4,17 +4,17 @@
 
 ## Extraction RH
 
-Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `persons_rh`.
+Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `hr_records`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin;
-- Rattaché à une personne du référentiel via `persons_rh.person_id`;
+- Rattaché à une personne du référentiel via `hr_records.person_id`;
 - Sert de filtre dans la [liste des personnes](../guide-utilisateur/01-pages-publiques.md#liste-persons) (filtre "Base RH") et permet d'afficher une *blue checkmark* sur les personnes concernées.
 
 Données fournies datées du 15/12/2025. La date est documentée dans la colonne `hr_export_date`. Cette extraction contient uniquement les **enseignants-chercheurs UCA**: pas les chercheurs CNRS, Inrae, etc., ni les personnels BIATSS UCA.
 
-L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*authorships*](../glossaire.md#authorship).
+L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*contributions*](../glossaire.md#contribution).
 
-La [création de personnes](../pipeline/08-persons.md) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `persons_rh`.
-La FK sur la table `persons_rh` permet:
+La [création de personnes](../pipeline/08-persons.md) se fait via les contributions des publications, indépendamment de l'existence d'une entrée `hr_records`.
+La FK sur la table `hr_records` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes lors de fusions de doublons.
 

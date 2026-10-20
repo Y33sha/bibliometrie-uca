@@ -13,21 +13,21 @@ from collections.abc import Mapping
 from sqlalchemy import Connection
 
 from domain.dates import french_date_to_iso
-from domain.publications.authorship_roles import THESES_FIELD_ROLES
+from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
@@ -43,16 +43,16 @@ def extract_pub_metadata(these: Mapping[str, JsonValue]) -> PublicationMetadata:
     date_soutenance = french_date_to_iso(as_str(these.get("dateSoutenance")))
     date_inscription = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
 
-    # pub_year = soutenance > première inscription (cascade theses.fr)
+    # publication_year = soutenance > première inscription (cascade theses.fr)
     year_source = date_soutenance or date_inscription
-    pub_year = int(year_source[:4]) if year_source else None
+    publication_year = int(year_source[:4]) if year_source else None
 
     doi = clean_doi(as_str(these.get("doi")))
     nnt_clean = normalize_nnt(as_str(these.get("nnt")))
 
     return PublicationMetadata(
         title=title,
-        pub_year=pub_year,
+        publication_year=publication_year,
         doc_type=derive_theses_doc_type(date_soutenance),
         doi=doi,
         nnt=nnt_clean,
@@ -69,7 +69,7 @@ def extract_pub_metadata(these: Mapping[str, JsonValue]) -> PublicationMetadata:
 
 
 def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Construit le meta jsonb pour source_publications à partir des données brutes."""
+    """Construit le meta jsonb pour source_records à partir des données brutes."""
     meta: dict[str, JsonValue] = {}
     ds = french_date_to_iso(as_str(these.get("dateSoutenance")))
     di = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
@@ -108,15 +108,15 @@ def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] |
 
 def insert_source_document(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     these: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
     pub_meta: PublicationMetadata,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour theses.fr.
+    """Crée/retrouve l'entrée source_records pour theses.fr.
 
-    Les métadonnées canoniques (titre, doc_type, pub_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
+    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta.nnt
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
@@ -142,16 +142,16 @@ def insert_source_document(
     source_meta = _build_source_meta(these)
     source_meta_json = source_meta if source_meta else None
 
-    return queries.upsert_source_publication(
+    return queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="theses",
             source_id=theses_id,
             staging_id=staging_id,
             doi=pub_meta.doi,
             external_ids=external_ids,
             title=pub_meta.title or "",
-            pub_year=pub_meta.pub_year,
+            publication_year=pub_meta.publication_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
             container_title=pub_meta.container_title,
@@ -165,7 +165,7 @@ def insert_source_document(
 
 
 # =============================================================
-# SOURCE AUTHORSHIPS
+# SOURCE CONTRIBUTIONS
 # =============================================================
 
 
@@ -177,32 +177,32 @@ def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
     """Une signature par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
-    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les signatures à leurs structures (vue `source_authorship_structures`).
+    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les signatures à leurs structures (vue `source_contribution_structures`).
     """
     return [
         AuthorRecord(
             position=a.author_position,
             name=a.name,
             roles=a.roles,
-            person_identifiers=dict(a.person_identifiers) if a.person_identifiers else None,
+            identifiers=dict(a.identifiers) if a.identifiers else None,
         )
         for a in aggregate_thesis_persons(block)
     ]
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
     these: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
     *,
-    batch_queries: AuthorshipsBatchQueries,
+    batch_queries: ContributionsBatchQueries,
 ) -> None:
     """Synchronise les signatures de la thèse depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
         batch_queries,
         "theses",
-        source_publication_id,
+        source_record_id,
         extract_theses_author_block(these),
         build_theses_author_records,
     )
@@ -215,11 +215,11 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     staging_queries: StagingQueries,
-    batch_queries: AuthorshipsBatchQueries,
+    batch_queries: ContributionsBatchQueries,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = staging_row.id
@@ -228,10 +228,8 @@ def process_work(
 
     pub_meta = extract_pub_metadata(these)
 
-    source_publication_id = insert_source_document(
-        conn, queries, these, staging_id, theses_id, pub_meta
-    )
-    process_authorships(conn, these, source_publication_id, batch_queries=batch_queries)
+    source_record_id = insert_source_document(conn, queries, these, staging_id, theses_id, pub_meta)
+    process_contributions(conn, these, source_record_id, batch_queries=batch_queries)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -246,8 +244,8 @@ class ThesesNormalizer(SourceNormalizer):
         conn: Connection,
         logger: logging.Logger,
         staging_queries: StagingQueries,
-        queries: SourcePublicationQueries,
-        batch_queries: AuthorshipsBatchQueries,
+        queries: SourceRecordQueries,
+        batch_queries: ContributionsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -255,7 +253,7 @@ class ThesesNormalizer(SourceNormalizer):
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         pub_meta = extract_pub_metadata(row.raw_data)
-        return pub_meta.title, pub_meta.pub_year
+        return pub_meta.title, pub_meta.publication_year
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         return process_work(

@@ -11,7 +11,7 @@ Une structure est une unité de l'établissement ou un partenaire : composante, 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `structures` | La structure | `code` (unique), `name`, `acronym`, `structure_type`, `ror_id`, `rnsr_id`, `hal_collection`, `api_ids` |
-| `structure_tutelles` | Rattachement hiérarchique d'une structure à une autre | `parent_id`, `child_id`, unicité du couple, une structure ne pouvant se rattacher à elle-même |
+| `structure_parents` | Rattachement hiérarchique d'une structure à une autre | `parent_id`, `child_id`, unicité du couple, une structure ne pouvant se rattacher à elle-même |
 | `structure_name_forms` | Formes de nom servant à reconnaître une structure dans une adresse | `structure_id`, `form_text` normalisé, `is_word_boundary`, `is_excluding`, `requires_context_of` |
 
 Les périmètres, dont les racines sont des structures, ont leur propre fiche : [perimeters](perimeters.md).
@@ -20,7 +20,7 @@ Les périmètres, dont les racines sont des structures, ont leur propre fiche : 
 
 Routeur `interfaces/api/routers/structures.py`, commandes dans `application/services/structures/commands.py`, adaptateur `PgStructureRepository`. C'est le seul chemin d'écriture.
 
-**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le repository valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux authorships.
+**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le repository valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux contributions.
 
 **Rattachements** (`POST /api/structures/relations`, `DELETE`). La création charge d'abord les ancêtres du parent, puis le domaine refuse l'auto-rattachement et tout rattachement qui refermerait un cycle. Créer un rattachement qui existe déjà ne produit rien.
 

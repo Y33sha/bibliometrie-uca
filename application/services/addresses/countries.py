@@ -1,4 +1,4 @@
-"""Pays des adresses — saisie manuelle, résolution, propagation vers `source_publications` et `publications`.
+"""Pays des adresses — saisie manuelle, résolution, propagation vers `source_records` et `publications`.
 
 Une saisie manuelle s'écrit en candidats `manual` par `AddressRepository`, qui l'emportent sur les autres moyens. La résolution de `addresses.countries` et le recalcul des pays des notices et des publications appartiennent au pipeline, qui les expose par `CountryRecompute`.
 """
@@ -96,14 +96,14 @@ def batch_set_country_by_filter(
 def propagate_countries_to_publications(
     conn: Connection, address_ids: list[int], *, country_recompute: CountryRecompute
 ) -> None:
-    """Propage addresses.countries → source_publications.countries → publications.countries.
+    """Propage addresses.countries → source_records.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en tâche de fond). Recalcule depuis les adresses, idempotent.
     """
     if not address_ids:
         return
 
-    docs = country_recompute.refresh_source_publications_countries_for_addresses(conn, address_ids)
+    docs = country_recompute.refresh_source_records_countries_for_addresses(conn, address_ids)
     pubs = country_recompute.refresh_publications_countries_for_addresses(conn, address_ids)
 
     if docs or pubs:

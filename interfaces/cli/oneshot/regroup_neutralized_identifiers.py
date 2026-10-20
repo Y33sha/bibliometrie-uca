@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
 """Marque à regrouper les publications dont les groupes d'auteurs ont pu s'appuyer sur un identifiant neutralisé.
 
-Visées : les publications à plusieurs notices dont une signature neutralise son ORCID ou son IdRef. Elles reçoivent `authorships_dirty`, et la phase `author_grouping` recalcule leurs groupes au run suivant.
+Visées : les publications à plusieurs notices dont une signature neutralise son ORCID ou son IdRef. Elles reçoivent `contributions_dirty`, et la phase `author_grouping` recalcule leurs groupes au run suivant.
 
 Usage :
     python -m interfaces.cli.oneshot.regroup_neutralized_identifiers [--dry-run]
@@ -21,24 +21,24 @@ log = setup_logger("regroup_neutralized_identifiers", os.path.dirname(__file__))
 
 _TARGETS = """
     SELECT DISTINCT sp.publication_id
-    FROM source_authorships sa
-    JOIN source_publications sp ON sp.id = sa.source_publication_id
+    FROM source_contributions sa
+    JOIN source_records sp ON sp.id = sa.source_record_id
     WHERE sp.publication_id IS NOT NULL
       AND sa.neutralized_identifiers ?| array['orcid', 'idref']
       AND EXISTS (
-          SELECT 1 FROM source_publications o
+          SELECT 1 FROM source_records o
           WHERE o.publication_id = sp.publication_id AND o.id <> sp.id
       )
 """
 
 _COUNT_SQL = text(f"""
-    SELECT count(*) AS cibles, count(*) FILTER (WHERE NOT p.authorships_dirty) AS a_marquer
+    SELECT count(*) AS cibles, count(*) FILTER (WHERE NOT p.contributions_dirty) AS a_marquer
     FROM publications p WHERE p.id IN ({_TARGETS})
 """)
 
 _MARK_DIRTY_SQL = text(f"""
-    UPDATE publications p SET authorships_dirty = true
-    WHERE p.id IN ({_TARGETS}) AND NOT p.authorships_dirty
+    UPDATE publications p SET contributions_dirty = true
+    WHERE p.id IN ({_TARGETS}) AND NOT p.contributions_dirty
 """)
 
 

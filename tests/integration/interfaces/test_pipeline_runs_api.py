@@ -57,7 +57,7 @@ def _seed_phase(
 @pytest.fixture(scope="module")
 def seeded_runs() -> dict[str, int]:
     """Deux runs : A tout vert, B avec une phase en warning et publications plus lente."""
-    publications_details = {"tables": {"source_publications": {"before": 1000, "after": 800}}}
+    publications_details = {"tables": {"source_records": {"before": 1000, "after": 800}}}
 
     run_a = _next_run_id()
     _seed_phase(run_a, "normalize", status="ok", duration_s=5.0)
@@ -128,7 +128,7 @@ def test_get_run_detail(client, seeded_runs):
 
     publications = next(p for p in detail["phases"] if p["phase"] == "publications")
     # Volumes avant/après conservés tels quels dans details (pas de ratio de rendement).
-    assert publications["details"]["tables"]["source_publications"] == {
+    assert publications["details"]["tables"]["source_records"] == {
         "before": 1000,
         "after": 800,
     }

@@ -10,8 +10,8 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 
 
-class SourcePublicationTopics(NamedTuple):
-    """Le champ `topics` d'une `source_publication`, avec sa publication et sa source — matière première par-source de la ré-ingestion des concepts."""
+class SourceRecordTopics(NamedTuple):
+    """Le champ `topics` d'une `source_record`, avec sa publication et sa source — matière première par-source de la ré-ingestion des concepts."""
 
     publication_id: int
     source: str
@@ -124,17 +124,17 @@ class SubjectsIngestionQueries:
             )
         ).rowcount
 
-    def select_source_publications_for_pubs(
+    def select_source_records_for_pubs(
         self, conn: Connection, *, publication_ids: list[int]
-    ) -> list[SourcePublicationTopics]:
-        """Le `topics` de chaque `source_publication` des publications données, avec sa source."""
+    ) -> list[SourceRecordTopics]:
+        """Le `topics` de chaque `source_record` des publications données, avec sa source."""
         if not publication_ids:
             return []
         rows = conn.execute(
             text(
                 """
                 SELECT publication_id, source::text AS source, topics
-                FROM source_publications
+                FROM source_records
                 WHERE publication_id = ANY(:ids)
                 ORDER BY publication_id
                 """
@@ -142,9 +142,7 @@ class SubjectsIngestionQueries:
             {"ids": publication_ids},
         ).all()
         return [
-            SourcePublicationTopics(
-                publication_id=r.publication_id, source=r.source, topics=r.topics
-            )
+            SourceRecordTopics(publication_id=r.publication_id, source=r.source, topics=r.topics)
             for r in rows
         ]
 

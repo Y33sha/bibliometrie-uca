@@ -8,7 +8,7 @@ Un éditeur publie les revues et reçoit les frais de publication. Il se reconna
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type`, `pub_count` |
+| `publishers` | L'éditeur | `name` / `name_normalized`, `country`, `openalex_id` (unique), `publisher_type`, `publication_count` |
 | `publisher_name_forms` | Formes de nom permettant de reconnaître un éditeur | `publisher_id`, `form_normalized` |
 | `doi_prefixes` | Correspondance entre un préfixe de DOI et un éditeur | `publisher_id`, `crossref_member_id`, `datacite_client_symbol`, `crossref_checked_at`, `datacite_checked_at` |
 
@@ -36,7 +36,7 @@ L'opération est refusée quand deux revues de même titre, une chez chaque édi
 
 ## Lecture par le pipeline
 
-`journals.pub_count` est recalculé d'abord, puis `publishers.pub_count` en est la somme. La phase `authorships` fait ce calcul en totalité une fois le périmètre posé ; une fusion administrative ne recalcule que les éditeurs concernés.
+`journals.publication_count` est recalculé d'abord, puis `publishers.publication_count` en est la somme. La phase `contributions` fait ce calcul en totalité une fois le périmètre posé ; une fusion administrative ne recalcule que les éditeurs concernés.
 
 ## Lecture par l'API
 

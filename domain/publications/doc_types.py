@@ -1,6 +1,6 @@
 """Taxonomie canonique des `doc_type` : enum, ensembles et familles.
 
-Vocabulaire partagé de la couche canonique — la valeur de l'enum PostgreSQL `doc_type` de la table `publications`, ses sous-types d'article prioritaires à l'arbitrage, et le regroupement en familles pour la ventilation. Le mapping des nomenclatures sources vers cette taxonomie vit côté source (`domain/source_publications/doc_types.py`).
+Vocabulaire partagé de la couche canonique — la valeur de l'enum PostgreSQL `doc_type` de la table `publications`, ses sous-types d'article prioritaires à l'arbitrage, et le regroupement en familles pour la ventilation. Le mapping des nomenclatures sources vers cette taxonomie vit côté source (`domain/source_records/doc_types.py`).
 """
 
 from enum import StrEnum

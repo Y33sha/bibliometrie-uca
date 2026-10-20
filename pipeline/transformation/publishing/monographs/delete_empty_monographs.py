@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `authorships` — supprime les monographies vides.
+"""Sous-étape de la phase `contributions` — supprime les monographies vides.
 
 Une monographie vide n'est portée par aucun enregistrement ni aucune publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore portée par une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
 """
@@ -15,7 +15,7 @@ LIBELLE = "Monographies vides"
 
 _DELETE_EMPTY = text("""
     DELETE FROM monographs m
-    WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.monograph_id = m.id)
+    WHERE NOT EXISTS (SELECT 1 FROM source_records s WHERE s.monograph_id = m.id)
       AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.monograph_id = m.id)
     RETURNING m.id, m.title
 """)

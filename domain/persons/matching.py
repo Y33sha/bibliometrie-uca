@@ -1,4 +1,4 @@
-"""Règles pures de matching d'authorships à des personnes."""
+"""Règles pures de matching de contributions à des personnes."""
 
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
@@ -39,7 +39,7 @@ class PersonNameForms(NamedTuple):
 # taux d'accord de l'IdRef ScanR vs sources fiables avant de le garder ou de le
 # source-restreindre comme l'ORCID.
 ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
-"""Sources dont l'ORCID porté par une authorship est déposé par l'auteur, fiable comme signal de matching personne.
+"""Sources dont l'ORCID porté par une contribution est déposé par l'auteur, fiable comme signal de matching personne.
 
 - `crossref` : ORCID fourni par l'auteur à l'éditeur lors de la soumission.
 - `datacite` : ORCID du créateur, déposé avec la notice (`creators[].nameIdentifiers`).
@@ -78,7 +78,7 @@ class MatchReason(StrEnum):
 
 
 class ResolutionMode(StrEnum):
-    """Canal de résolution par lequel la cascade a posé le `person_id` d'une signature, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_authorships.resolution_mode`, il porte les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
+    """Canal de résolution par lequel la cascade a posé le `person_id` d'une signature, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_contributions.resolution_mode`, il porte les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
 
     IDENTIFIER = "identifier"
     NAME = "name"
@@ -175,20 +175,20 @@ def attested_full_first_names(
 
 
 def decide_cross_source_match(
-    authorship_source: str,
+    contribution_source: str,
     last_norm: str,
     first_norm: str,
     candidates: list[tuple[int, str, str, str]],
 ) -> int | None:
-    """Décide si une authorship peut être rattachée à la `person` d'une autre signature de son groupe (signatures du même auteur dans la publication, `grouped_source_authorships`).
+    """Décide si une contribution peut être rattachée à la `person` d'une autre signature de son groupe (signatures du même auteur dans la publication, `source_contribution_group_members`).
 
     Quand HAL a déjà rattaché un auteur à la personne 42, la signature OpenAlex du même groupe reçoit la même personne, à condition que son nom soit compatible.
 
     Paramètres :
 
-    - `authorship_source` : source de l'authorship qu'on cherche à rattacher. Sert à exclure les candidats de la même source (qui ne porteraient aucun signal supplémentaire).
-    - `last_norm`, `first_norm` : nom normalisé de l'authorship.
-    - `candidates` : liste de tuples `(person_id, last_norm, first_norm, source)` — les authorships déjà rattachées du même groupe.
+    - `contribution_source` : source de la contribution qu'on cherche à rattacher. Sert à exclure les candidats de la même source (qui ne porteraient aucun signal supplémentaire).
+    - `last_norm`, `first_norm` : nom normalisé de la contribution.
+    - `candidates` : liste de tuples `(person_id, last_norm, first_norm, source)` — les contributions déjà rattachées du même groupe.
 
     Cascade :
 
@@ -198,7 +198,7 @@ def decide_cross_source_match(
     """
     matched_pid: int | None = None
     for pid, ln, fn, src in candidates:
-        if src == authorship_source:
+        if src == contribution_source:
             continue
         if names_compatible(last_norm, first_norm, ln, fn):
             if matched_pid is not None and matched_pid != pid:
@@ -215,7 +215,7 @@ UNDECIDABLE_NAME_FORM_REASONS = frozenset(
 
 @dataclass(frozen=True)
 class NameFormDecision:
-    """Décision résultant du lookup d'une authorship dans `person_name_forms`.
+    """Décision résultant du lookup d'une contribution dans `person_name_forms`.
 
     Trois actions possibles : `match` (rattacher à une personne existante), `create` (créer une personne), `skip` (ne rien faire — soit ambiguïté de nom, soit création interdite par `allow_create`). Le `reason` dit pourquoi un `skip`, et distingue le `match` par initiales compatibles (`compatible_name`) du `match` par forme exacte, sans motif.
     """
@@ -233,7 +233,7 @@ def decide_name_form_outcome(
 ) -> NameFormDecision:
     """Arbitre la décision de matching après lookup dans `person_name_forms`.
 
-    `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship traitée (store `rejected_authorships`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
+    `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution traitée (store `rejected_contributions`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
 
     `compatible_person_ids` : personnes de même nom de famille que la signature désigne par ses initiales (`compatible_namesakes`). Consultées seulement quand la forme exacte est inconnue.
 
@@ -381,10 +381,10 @@ def decide_person_match(
     2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la signature dans le TEI HAL.
     3. **IdRef** (`idref_match`).
     4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne, ou, à forme inconnue, seule personne aux initiales compatibles (`reason="compatible_name"`). Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
-    5. **Cross-source** (`cross_source_match`) — match par le groupe de signatures, avec une authorship d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
+    5. **Cross-source** (`cross_source_match`) — match par le groupe de signatures, avec une contribution d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
     6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
 
-    `rejected_person_ids` : personnes déjà rejetées pour la publication de l'authorship (store `rejected_authorships`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse l'authorship orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
+    `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution (store `rejected_contributions`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse la contribution orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
 
     Pure, testable sans BDD : les paramètres sont précalculés par le caller via prefetch.
     """

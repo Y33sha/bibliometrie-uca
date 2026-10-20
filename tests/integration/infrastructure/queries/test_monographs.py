@@ -24,10 +24,10 @@ from pipeline.transformation.publishing.monographs.type_proceedings_volumes impo
 )
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher
 from tests.integration.helpers.redirects import redirect_of
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 # Notice de titre « Chapitre ».
-_chapter = partial(insert_source_publication, title="Chapitre")
+_chapter = partial(insert_source_record, title="Chapitre")
 
 _PAPER = "9783030580803"
 _ELECTRONIC = "9783030580810"
@@ -101,7 +101,7 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
 
     assert tuple(_row(sa_sync_conn, target))[:3] == (_PAPER, None, 2024)
     moved = sa_sync_conn.execute(
-        text("SELECT monograph_id FROM source_publications WHERE source_id = 'hal-fusion'")
+        text("SELECT monograph_id FROM source_records WHERE source_id = 'hal-fusion'")
     ).scalar_one()
     assert moved == target
     gone = sa_sync_conn.execute(

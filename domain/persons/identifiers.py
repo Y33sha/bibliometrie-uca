@@ -67,7 +67,7 @@ PERSON_IDENTIFIER_LABELS: dict[PersonIdentifierType, str] = {
 
 # Deux vues du vocabulaire :
 #
-# - `PERSON_IDENTIFIER_TYPES` : tous les types admissibles dans `person_identifiers`. La promotion depuis les `source_authorships` (`add_identifiers_from_authorships`) et l'interface d'administration les couvrent tous.
+# - `PERSON_IDENTIFIER_TYPES` : tous les types admissibles dans `person_identifiers`. La promotion depuis les `source_contributions` (`add_identifiers_from_contributions`) et l'interface d'administration les couvrent tous.
 # - `PUBLIC_PERSON_IDENTIFIER_TYPES` : les types de l'interface publique, seuls attribuables à la main. `hal_person_id` en est exclu : l'extraction l'observe dans le TEI HAL.
 #
 # Un type ajouté à l'enum entre automatiquement dans `PERSON_IDENTIFIER_TYPES`, et dans `PUBLIC_...` seulement s'il doit apparaître dans l'interface publique.
@@ -300,11 +300,11 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
     return value_object(raw).value
 
 
-# ── Construction du dict JSONB `source_authorships.person_identifiers` ────
+# ── Construction du dict JSONB `source_contributions.identifiers` ────
 
 
 def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
-    """Construit le dict d'identifiants pour `source_authorships.person_identifiers`.
+    """Construit le dict d'identifiants pour `source_contributions.identifiers`.
 
     Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict vide → None.
     """

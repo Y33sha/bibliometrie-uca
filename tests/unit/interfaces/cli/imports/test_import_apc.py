@@ -111,7 +111,7 @@ class TestOpenApcPayment:
         payment = open_apc_payment(self._ROW)
         assert payment["doi"] == "10.1/abc"
         assert payment["amount_eur_ht"] == 1850.5
-        assert (payment["billing_year"], payment["pub_year"]) == (2023, 2023)
+        assert (payment["billing_year"], payment["publication_year"]) == (2023, 2023)
         assert payment["institution"] == "Université Clermont Auvergne"
         assert payment["issn"] == "1234-5678"
         assert payment["remarks"] == "hybrid"
@@ -206,7 +206,7 @@ class TestInstitutionSurvey:
         assert payment["doi"] == "10.3390/biom15050740"
         assert payment["amount_eur_ht"] == 2883.13
         assert payment["billing_year"] == 2025
-        assert payment["pub_year"] is None
+        assert payment["publication_year"] is None
         assert payment["payer_ror"] == "01a8ajp46"
         assert payment["lab_name"] == "NEURO-DOL"
         assert payment["remarks"] == "Co-écrit — Couperin : Retenu"

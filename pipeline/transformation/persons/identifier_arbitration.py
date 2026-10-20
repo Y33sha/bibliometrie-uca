@@ -54,7 +54,7 @@ from pipeline.transformation.persons.store import PersonsStore
 class IdentityIdentifier(NamedTuple):
     """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
 
-    identity_id: int
+    contributor_information_id: int
     name: str
     value: str
 
@@ -78,17 +78,17 @@ _MISPLACED = IdentifierNeutralization.MISPLACED.value
 
 
 def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
-    """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
+    """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`contributor_information`), jointes aux `source_contributions` (index `contributor_information_id`) pour le comptage.
 
     Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
     rows = conn.execute(
         text(f"""
-            SELECT aik.person_identifiers->>:id_type AS id_value,
+            SELECT aik.identifiers->>:id_type AS id_value,
                    aik.author_name_normalized AS name,
                    count(*) AS votes
-            FROM author_identifying_keys aik
-            JOIN source_authorships sa ON sa.identity_id = aik.id
-            WHERE aik.person_identifiers ? :id_type
+            FROM contributor_information aik
+            JOIN source_contributions sa ON sa.contributor_information_id = aik.id
+            WHERE aik.identifiers ? :id_type
               AND aik.author_name_normalized IS NOT NULL
               AND {person_signature("sa")}
               AND NOT {_ID_TYPE_SHARED}
@@ -103,13 +103,15 @@ def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str
     return votes
 
 
-def fetch_identity_identifiers(conn: Connection, id_type: str) -> list[IdentityIdentifier]:
+def fetch_contributor_information_identifiers(
+    conn: Connection, id_type: str
+) -> list[IdentityIdentifier]:
     """Identités portant un identifiant du type, avec leur nom normalisé."""
     rows = conn.execute(
         text("""
-            SELECT id, author_name_normalized AS name, person_identifiers->>:id_type AS value
-            FROM author_identifying_keys
-            WHERE person_identifiers ? :id_type AND author_name_normalized IS NOT NULL
+            SELECT id, author_name_normalized AS name, identifiers->>:id_type AS value
+            FROM contributor_information
+            WHERE identifiers ? :id_type AND author_name_normalized IS NOT NULL
         """),
         {"id_type": id_type},
     ).all()
@@ -119,16 +121,19 @@ def fetch_identity_identifiers(conn: Connection, id_type: str) -> list[IdentityI
 def write_misplaced_neutralizations(
     conn: Connection, misplaced: Mapping[int, Sequence[str]]
 ) -> MisplacedNeutralizations:
-    """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `authorships_dirty`."""
+    """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `contributions_dirty`."""
     payload = [
-        {"identity_id": identity_id, "carte": dict.fromkeys(id_types, _MISPLACED)}
-        for identity_id, id_types in misplaced.items()
+        {
+            "contributor_information_id": contributor_information_id,
+            "carte": dict.fromkeys(id_types, _MISPLACED),
+        }
+        for contributor_information_id, id_types in misplaced.items()
     ]
     rows = conn.execute(
         text(f"""
             WITH marques AS (
-                SELECT m.identity_id, m.carte
-                FROM jsonb_to_recordset(:payload) AS m(identity_id integer, carte jsonb)
+                SELECT m.contributor_information_id, m.carte
+                FROM jsonb_to_recordset(:payload) AS m(contributor_information_id integer, carte jsonb)
             ),
             cibles AS (
                 SELECT sa.id,
@@ -142,9 +147,9 @@ def write_misplaced_neutralizations(
                                '{{}}'::jsonb),
                            '{{}}'::jsonb
                        ) AS apres
-                FROM source_authorships sa
-                LEFT JOIN marques m ON m.identity_id = sa.identity_id
-                WHERE m.identity_id IS NOT NULL
+                FROM source_contributions sa
+                LEFT JOIN marques m ON m.contributor_information_id = sa.contributor_information_id
+                WHERE m.contributor_information_id IS NOT NULL
                    OR (sa.neutralized_identifiers IS NOT NULL
                        AND EXISTS (
                            SELECT 1 FROM jsonb_each_text(sa.neutralized_identifiers) AS e(k, v)
@@ -152,17 +157,17 @@ def write_misplaced_neutralizations(
                        ))
             ),
             modifiees AS (
-                UPDATE source_authorships sa
+                UPDATE source_contributions sa
                 SET neutralized_identifiers = c.apres
                 FROM cibles c
                 WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
-                RETURNING sa.id, sa.source_publication_id, sa.resolution_mode, c.avant, c.apres
+                RETURNING sa.id, sa.source_record_id, sa.resolution_mode, c.avant, c.apres
             ),
             regroupees AS (
-                UPDATE publications p SET authorships_dirty = true
-                FROM source_publications sp
-                WHERE sp.id IN (SELECT source_publication_id FROM modifiees)
-                  AND p.id = sp.publication_id AND NOT p.authorships_dirty
+                UPDATE publications p SET contributions_dirty = true
+                FROM source_records sp
+                WHERE sp.id IN (SELECT source_record_id FROM modifiees)
+                  AND p.id = sp.publication_id AND NOT p.contributions_dirty
             )
             SELECT id,
                    coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
@@ -222,10 +227,10 @@ def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tupl
     """Agrégat sur les signatures rattachées dont l'identité contient l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
     rows = conn.execute(
         text(f"""
-            SELECT aik.person_identifiers->>:id_type AS id_value, sa.person_id
-            FROM source_authorships sa
-            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            WHERE aik.person_identifiers ? :id_type
+            SELECT aik.identifiers->>:id_type AS id_value, sa.person_id
+            FROM source_contributions sa
+            JOIN contributor_information aik ON aik.id = sa.contributor_information_id
+            WHERE aik.identifiers ? :id_type
               AND NOT {_ID_TYPE_NEUTRALIZED}
               AND sa.person_id IS NOT NULL
               AND {trusted_identifier_sql(id_type, "sa")}
@@ -242,13 +247,13 @@ def null_identifier_signatures(
     """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
     return conn.execute(
         text(f"""
-            UPDATE source_authorships sa
+            UPDATE source_contributions sa
             SET {DETACHED_SIGNATURE}
-            FROM author_identifying_keys aik
-            WHERE sa.identity_id = aik.id
+            FROM contributor_information aik
+            WHERE sa.contributor_information_id = aik.id
               AND sa.person_id = :old_owner
               AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
-              AND aik.person_identifiers->>:id_type = :id_value
+              AND aik.identifiers->>:id_type = :id_value
               AND NOT {_ID_TYPE_NEUTRALIZED}
               AND NOT {pinned("sa.id")}
         """),
@@ -280,9 +285,9 @@ def requalify_misplaced_identifiers(
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
-        for identity in fetch_identity_identifiers(conn, id_type):
+        for identity in fetch_contributor_information_identifiers(conn, id_type):
             if identifier_misplaced(identity.name, consensus.get((id_type, identity.value))):
-                misplaced[identity.identity_id].append(id_type)
+                misplaced[identity.contributor_information_id].append(id_type)
 
     written = write_misplaced_neutralizations(conn, misplaced)
     detached = PersonsStore(conn).detach_signatures(written.to_detach) if written.to_detach else 0

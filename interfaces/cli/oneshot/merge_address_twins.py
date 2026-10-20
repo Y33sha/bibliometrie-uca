@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-16)
 """Fusionne les adresses de même forme normalisée, et supprime les adresses de forme normalisée vide.
 
-Prépare l'unicité de `addresses.normalized_text`. Chaque groupe de jumelles garde l'adresse de plus grand `pub_count`, la plus ancienne à égalité :
+Prépare l'unicité de `addresses.normalized_text`. Chaque groupe de jumelles garde l'adresse de plus grand `publication_count`, la plus ancienne à égalité :
 
 - ses signatures, ROR et liens aux structures réunissent ceux des jumelles ;
 - un lien à une structure confirmé sur une jumelle et infirmé sur une autre redevient à examiner ;
@@ -55,7 +55,7 @@ _STEPS = (
         SELECT id AS old_id, keeper
         FROM (
             SELECT id, first_value(id) OVER (
-                PARTITION BY normalized_text ORDER BY pub_count DESC NULLS LAST, id
+                PARTITION BY normalized_text ORDER BY publication_count DESC NULLS LAST, id
             ) AS keeper
             FROM addresses
             WHERE normalized_text <> ''
@@ -66,9 +66,9 @@ _STEPS = (
     (
         "liens aux signatures repris",
         """
-        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-        SELECT DISTINCT saa.source_authorship_id, t.keeper
-        FROM source_authorship_addresses saa
+        INSERT INTO source_contribution_addresses (source_contribution_id, address_id)
+        SELECT DISTINCT saa.source_contribution_id, t.keeper
+        FROM source_contribution_addresses saa
         JOIN _twins t ON t.old_id = saa.address_id
         ON CONFLICT DO NOTHING
         """,
@@ -76,9 +76,9 @@ _STEPS = (
     (
         "ROR repris",
         """
-        INSERT INTO source_authorship_rors (source_authorship_id, ror_id, address_id)
-        SELECT DISTINCT r.source_authorship_id, r.ror_id, t.keeper
-        FROM source_authorship_rors r
+        INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id)
+        SELECT DISTINCT r.source_contribution_id, r.ror_id, t.keeper
+        FROM source_contribution_rors r
         JOIN _twins t ON t.old_id = r.address_id
         ON CONFLICT DO NOTHING
         """,

@@ -1,6 +1,6 @@
-"""Cohérence entre `structure_tutelles` et les relations parent/enfant du ROR.
+"""Cohérence entre `structure_parents` et les relations parent/enfant du ROR.
 
-La comparaison se fait sur les clôtures transitives. Un parent ROR est couvert s'il est un ancêtre dans `structure_tutelles`. Une tutelle est couverte si son parent est un ancêtre dans le ROR.
+La comparaison se fait sur les clôtures transitives. Un parent ROR est couvert s'il est un ancêtre dans `structure_parents`. Une tutelle est couverte si son parent est un ancêtre dans le ROR.
 """
 
 from collections import defaultdict
@@ -15,7 +15,7 @@ class TutelleCoherence:
     """Écarts entre les deux référentiels.
 
     - `absent_from_ror` : tutelles `(parent, enfant)` dont le parent est absent des ancêtres ROR de l'enfant.
-    - `uncovered_ror_parents` : couples `(parent, enfant)` de structures dont le parent ROR est absent des ancêtres de l'enfant dans `structure_tutelles`.
+    - `uncovered_ror_parents` : couples `(parent, enfant)` de structures dont le parent ROR est absent des ancêtres de l'enfant dans `structure_parents`.
     - `outside_parents` : couples `(structure, parent ROR)` dont le parent est absent de `structures`.
     - `outside_children` : couples `(structure, enfant ROR)` dont l'enfant est absent de `structures`.
     - `shared_ror_ids` : ROR attribués à plusieurs structures.

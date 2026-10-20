@@ -24,8 +24,8 @@ _CANDIDATES_SQL = text(r"""
     SELECT p.id, p.last_name, p.first_name
     FROM persons p
     WHERE p.last_name_normalized ~ '^([a-z] )*[a-z]$'
-      AND NOT EXISTS (SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM confirmed_authorships ca WHERE ca.person_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM confirmed_source_contributions ca WHERE ca.person_id = p.id)
       AND NOT EXISTS (
           SELECT 1 FROM person_identifiers pi WHERE pi.person_id = p.id AND pi.status = 'confirmed'
       )

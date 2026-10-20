@@ -20,7 +20,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		title: 'Titre',
 		title_normalized: 'titre',
 		doc_type: 'article',
-		pub_year: 2024,
+		publication_year: 2024,
 		language: 'en',
 		language_name: 'Anglais',
 		language_raw: null,
@@ -125,7 +125,7 @@ describe('comparisonRows', () => {
 function signature(overrides: Partial<SourceSignature>): SourceSignature {
 	return {
 		id: 1,
-		source_publication_id: 1,
+		source_record_id: 1,
 		position: 0,
 		full_name: 'Anne Martin',
 		roles: ['author'],
@@ -149,9 +149,9 @@ describe('authorRows', () => {
 
 	it("réunit les signatures d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
 		const rows = authorRows(records, [
-			signature({ id: 11, source_publication_id: 1, position: 1, group_id: 7, group_position: 1 }),
-			signature({ id: 21, source_publication_id: 2, position: 0, group_id: 7, group_position: 1 }),
-			signature({ id: 10, source_publication_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			signature({ id: 11, source_record_id: 1, position: 1, group_id: 7, group_position: 1 }),
+			signature({ id: 21, source_record_id: 2, position: 0, group_id: 7, group_position: 1 }),
+			signature({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells.map((c) => c?.id ?? null))).toEqual([
 			[10, null],
@@ -162,9 +162,9 @@ describe('authorRows', () => {
 
 	it('place une signature hors des groupes à sa position, et les signatures sans position en dernier', () => {
 		const rows = authorRows(records, [
-			signature({ id: 30, source_publication_id: 1, position: null, roles: ['jury_member'] }),
-			signature({ id: 12, source_publication_id: 1, position: 2, collective: true }),
-			signature({ id: 10, source_publication_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			signature({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
+			signature({ id: 12, source_record_id: 1, position: 2, collective: true }),
+			signature({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);
 	});

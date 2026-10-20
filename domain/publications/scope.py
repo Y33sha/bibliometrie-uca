@@ -5,9 +5,9 @@ OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "memoir"})
 
 Une œuvre dont le `doc_type` canonique résolu appartient à cet ensemble n'a pas de ligne
 `publications` : le module du cycle de vie la supprime après l'arbitrage du type
-(`pipeline/transformation/publications/lifecycle.py`). Ses `source_publications` et
-`source_authorships` subsistent, détachées : sans publication, elles ne génèrent ni
-authorship canonique ni personne.
+(`pipeline/transformation/publications/lifecycle.py`). Ses `source_records` et
+`source_contributions` subsistent, détachées : sans publication, elles ne génèrent ni
+contribution canonique ni personne.
 
 Justifications :
 

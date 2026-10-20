@@ -73,7 +73,7 @@ class JournalMergeCandidate(NamedTuple):
     title: str
     issns: frozenset[str]
     """ISSN actifs."""
-    pub_count: int
+    publication_count: int
 
 
 class JournalPublicationPair(NamedTuple):
@@ -98,7 +98,7 @@ _VERIFIED = """
 # Revues vérifiées qui partagent leur ISSN-L, la cible de la fusion en tête de chaque groupe.
 _JOURNALS_SHARING_ISSNL = text(f"""
     WITH {_VERIFIED}
-    SELECT i.issn AS issnl, array_agg(j.id ORDER BY j.pub_count DESC, j.id) AS ids
+    SELECT i.issn AS issnl, array_agg(j.id ORDER BY j.publication_count DESC, j.id) AS ids
     FROM journal_issns i
     JOIN verifiees v ON v.id = i.journal_id
     JOIN journals j ON j.id = i.journal_id
@@ -113,8 +113,8 @@ _JOURNALS_SHARING_ISSNL = text(f"""
 _JOURNALS_SHARING_ACTIVE_ISSN = text(f"""
     WITH {_VERIFIED}
     SELECT i.issn,
-           array_agg(j.id ORDER BY j.pub_count DESC, j.id) AS ids,
-           array_agg(j.title ORDER BY j.pub_count DESC, j.id) AS titles
+           array_agg(j.id ORDER BY j.publication_count DESC, j.id) AS ids,
+           array_agg(j.title ORDER BY j.publication_count DESC, j.id) AS titles
     FROM journal_issns i
     JOIN verifiees v ON v.id = i.journal_id
     JOIN journals j ON j.id = i.journal_id
@@ -137,14 +137,14 @@ _JOURNALS_SHARING_AN_INACTIVE_ISSN = text(f"""
         JOIN verifiees vb ON vb.id = b.journal_id
         WHERE a.status NOT IN ('active', 'malformed') AND b.status = 'active'
     ), revues AS (
-        SELECT j.id, j.pub_count,
-               (SELECT min(s.pub_year) FROM source_publications s WHERE s.journal_id = j.id)
+        SELECT j.id, j.publication_count,
+               (SELECT min(s.publication_year) FROM source_records s WHERE s.journal_id = j.id)
                    AS premiere_annee
         FROM journals j
         WHERE j.id IN (SELECT x_id FROM paires UNION SELECT y_id FROM paires)
     )
     SELECT p.issn,
-           (SELECT array_agg(r.id ORDER BY r.premiere_annee DESC NULLS LAST, r.pub_count DESC, r.id)
+           (SELECT array_agg(r.id ORDER BY r.premiere_annee DESC NULLS LAST, r.publication_count DESC, r.id)
             FROM revues r WHERE r.id IN (p.x_id, p.y_id)) AS ids
     FROM paires p
     ORDER BY p.issn
@@ -156,7 +156,7 @@ _JOURNALS_SHARING_AN_INACTIVE_ISSN = text(f"""
 _SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
         SELECT journal_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
-        FROM source_publications
+        FROM source_records
         WHERE journal_id IS NOT NULL AND doi IS NOT NULL
         GROUP BY journal_id
     ), paires_de_titre AS (
@@ -165,7 +165,7 @@ _SAME_TITLE_DUPLICATES = text(f"""
         GROUP BY title_normalized
         HAVING count(*) = 2
     ), revues AS (
-        SELECT j.id, j.title_normalized, j.pub_count,
+        SELECT j.id, j.title_normalized, j.publication_count,
                {has_active_issn("j.id")} AS a_issn,
                p.pfx
         FROM journals j
@@ -173,7 +173,7 @@ _SAME_TITLE_DUPLICATES = text(f"""
         JOIN prefixes p ON p.id = j.id
     )
     SELECT x.title_normalized,
-           (SELECT array_agg(r.id ORDER BY r.pub_count DESC, r.a_issn DESC, r.id)
+           (SELECT array_agg(r.id ORDER BY r.publication_count DESC, r.a_issn DESC, r.id)
             FROM revues r WHERE r.id IN (x.id, y.id)) AS ids
     FROM revues x
     JOIN revues y ON y.title_normalized = x.title_normalized AND x.id < y.id
@@ -185,7 +185,7 @@ _SAME_TITLE_DUPLICATES = text(f"""
 _JOURNALS_SHARING_A_PUBLICATION = text(f"""
     WITH rattachements AS (
         SELECT DISTINCT publication_id, journal_id
-        FROM source_publications
+        FROM source_records
         WHERE publication_id IS NOT NULL AND journal_id IS NOT NULL
     ), paires AS (
         SELECT a.journal_id AS first_id, b.journal_id AS second_id, count(*) AS publications
@@ -194,9 +194,9 @@ _JOURNALS_SHARING_A_PUBLICATION = text(f"""
         GROUP BY a.journal_id, b.journal_id
     )
     SELECT p.publications,
-           x.id AS first_id, x.title AS first_title, x.pub_count AS first_pub_count,
+           x.id AS first_id, x.title AS first_title, x.publication_count AS first_publication_count,
            {active_issns("x.id")} AS first_issns,
-           y.id AS second_id, y.title AS second_title, y.pub_count AS second_pub_count,
+           y.id AS second_id, y.title AS second_title, y.publication_count AS second_publication_count,
            {active_issns("y.id")} AS second_issns
     FROM paires p
     JOIN journals x ON x.id = p.first_id
@@ -244,10 +244,10 @@ def find_journals_sharing_a_publication(conn: Connection) -> list[JournalPublica
     return [
         JournalPublicationPair(
             JournalMergeCandidate(
-                r.first_id, r.first_title, frozenset(r.first_issns), r.first_pub_count
+                r.first_id, r.first_title, frozenset(r.first_issns), r.first_publication_count
             ),
             JournalMergeCandidate(
-                r.second_id, r.second_title, frozenset(r.second_issns), r.second_pub_count
+                r.second_id, r.second_title, frozenset(r.second_issns), r.second_publication_count
             ),
             r.publications,
         )
@@ -328,7 +328,7 @@ def _compatible_pairs(pairs: Sequence[JournalPublicationPair]) -> list[MergeGrou
 
 def _merge_priority(journal: JournalMergeCandidate) -> tuple[bool, int, int]:
     """Rang de cible : la revue qui a un ISSN, puis celle qui a le plus de publications, puis la plus ancienne."""
-    return (bool(journal.issns), journal.pub_count, -journal.id)
+    return (bool(journal.issns), journal.publication_count, -journal.id)
 
 
 def _merge_groups(

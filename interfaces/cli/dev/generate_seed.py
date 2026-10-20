@@ -89,7 +89,7 @@ INSTITUTION_SEED = SeedSpec(
     ),
     tables=(
         {"table": tables.structures},
-        {"table": tables.structure_tutelles},
+        {"table": tables.structure_parents},
         {"table": tables.perimeters},
         {"table": tables.structure_name_forms},
         {"table": tables.config, "where": f"key IN ({_INSTITUTION_KEYS_SQL})"},

@@ -2,8 +2,8 @@
 
 Les relations modélisées ici lient des publications **distinctes** (pas des doublons). Deux sources déclarent des relations, avec des vocabulaires différents :
 
-- **DataCite** : `relatedIdentifiers[].relationType` (`IsSupplementTo`, `IsPartOf`…), stocké dans `source_publications.meta.related_identifiers`.
-- **Crossref** : clés de `meta.relation` (`is-preprint-of`, `erratum`…), stocké dans `source_publications.meta.relation`.
+- **DataCite** : `relatedIdentifiers[].relationType` (`IsSupplementTo`, `IsPartOf`…), stocké dans `source_records.meta.related_identifiers`.
+- **Crossref** : clés de `meta.relation` (`is-preprint-of`, `erratum`…), stocké dans `source_records.meta.relation`.
 
 Ce module fige un jeu de **types canoniques** (directionnels) et le mapping de chaque vocabulaire source vers ce jeu. Les types hors scope renvoient `None`.
 
@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 from domain.publications.identifiers import clean_doi
-from domain.source_publications.metadata_correction.shared_doi import (
+from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     meme_oeuvre_declaree,
 )

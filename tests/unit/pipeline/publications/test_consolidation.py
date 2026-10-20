@@ -1,6 +1,6 @@
 """Tests unitaires du recalcul d'une publication (`pipeline/transformation/publications/consolidation.py`).
 
-Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `journal_id` de la publication peuvent venir de `source_publications` différentes. Une correction qui dépend de la revue, appliquée à chaque source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
+Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `journal_id` de la publication peuvent venir de `source_records` différentes. Une correction qui dépend de la revue, appliquée à chaque source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
 """
 
 from domain.publications.identifiers import DOI
@@ -14,7 +14,7 @@ def _pub(**overrides: object) -> Publication:
     defaults: dict[str, object] = {
         "id": 1,
         "title": "Un titre",
-        "pub_year": 2020,
+        "publication_year": 2020,
         "doc_type": "preprint",
         "journal_id": 7,
     }

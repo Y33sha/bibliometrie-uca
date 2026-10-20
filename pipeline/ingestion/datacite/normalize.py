@@ -22,32 +22,32 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.impact import Impact
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
     extract_datacite_meta,
-    extract_datacite_pub_year,
+    extract_datacite_publication_year,
     extract_related_dois,
     get_abstract,
     get_cited_by_count,
@@ -99,7 +99,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
         book_title=None if issn else title,
         issns=source_issns(unknown=[issn]),
         isbns=tuple(get_isbns(attributes)),
-        year=extract_datacite_pub_year(attributes, max_year=today().year + 1),
+        year=extract_datacite_publication_year(attributes, max_year=today().year + 1),
     )
 
 
@@ -199,7 +199,7 @@ def _creator_affiliations(
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Un creator `Organizational` donne une signature collective. ORCID sur `person_identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
+    Un creator `Organizational` donne une signature collective. ORCID sur `identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -224,8 +224,8 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
                 position=position,
                 name=name,
                 collective=creator.get("nameType") == "Organizational",
-                roles=[AuthorshipRole.AUTHOR],
-                person_identifiers=ids if ids else None,
+                roles=[ContributionRole.AUTHOR],
+                identifiers=ids if ids else None,
                 addresses=addresses,
                 ror_ids=signature_rors,
             )
@@ -238,18 +238,18 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
     return {"creators": attributes.get("creators")}
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     attributes: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures DataCite de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "datacite",
-        source_publication_id,
+        source_record_id,
         extract_datacite_author_block(attributes),
         build_datacite_author_records,
     )
@@ -262,13 +262,13 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -282,9 +282,9 @@ def process_work(
         return False
 
     title = get_title(attributes)
-    pub_year = extract_datacite_pub_year(attributes, max_year=today().year + 1)
+    publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
     # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
-    assert isinstance(title, str) and isinstance(pub_year, int)
+    assert isinstance(title, str) and isinstance(publication_year, int)
 
     publisher_id = upsert_publisher(attributes, publisher_store=publisher_store)
     containers = upsert_containers(attributes, publisher_id, container_stores=container_stores)
@@ -297,16 +297,16 @@ def process_work(
     if isbns := get_isbns(attributes):
         external_ids[ExternalIdType.ISBN] = isbns
 
-    source_publication_id = queries.upsert_source_publication(
+    source_record_id = queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="datacite",
             source_id=doi,
             staging_id=staging_id,
             doi=doi,
             external_ids=external_ids or None,
             title=title,
-            pub_year=pub_year,
+            publication_year=publication_year,
             doc_type=extract_datacite_doc_type_token(attributes),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
@@ -321,7 +321,7 @@ def process_work(
             meta=extract_datacite_meta(attributes),
         ),
     )
-    process_authorships(conn, authorship_queries, attributes, source_publication_id)
+    process_contributions(conn, contribution_queries, attributes, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -334,7 +334,7 @@ class DataciteNormalizer(BibliographicNormalizer):
         attributes = row.raw_data.get("attributes")
         if not isinstance(attributes, dict):
             return None, None
-        return get_title(attributes), extract_datacite_pub_year(
+        return get_title(attributes), extract_datacite_publication_year(
             attributes, max_year=today().year + 1
         )
 
@@ -347,5 +347,5 @@ class DataciteNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

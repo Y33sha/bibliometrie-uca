@@ -4,7 +4,7 @@
 
 Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage :
 
-1. **Sujets OpenAlex hors-sujet** : les sujets OpenAlex (`publication_subjects.source = 'openalex'`) sont fréquemment aberrants à l'inspection — bruit de l'algo OA sur les revues généralistes / pluridisciplinaires, ou attribution thématique retenue sans filtrage. Le `score` OpenAlex figure dans `source_publications.topics`, et l'ingestion l'ignore.
+1. **Sujets OpenAlex hors-sujet** : les sujets OpenAlex (`publication_subjects.source = 'openalex'`) sont fréquemment aberrants à l'inspection — bruit de l'algo OA sur les revues généralistes / pluridisciplinaires, ou attribution thématique retenue sans filtrage. Le `score` OpenAlex figure dans `source_records.topics`, et l'ingestion l'ignore.
 
 2. **Pas de circuit d'édition manuelle** : la colonne `publication_subjects.rejected` (boolean default false) n'est pas exposée à l'admin. Pas de voie ouverte pour marquer manuellement un sujet comme non pertinent.
 
@@ -14,9 +14,9 @@ Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage
 
 5. **Domaines HAL réduits à leurs codes** : 28 186 notices HAL sur 52 500 (base locale) portent seulement des codes de domaine (`0.shs`, `1.shs.hist`). Elles ont été normalisées avant le passage au champ `fr_domainAllCodeLabel_fs`, qui porte les libellés, et jamais renormalisées depuis. L'extracteur n'en tire aucun sujet. Leurs données brutes portent seulement `domain_s` : une renormalisation effacerait leurs domaines. Le référentiel des domaines de l'API HAL (`ref/domain`, 393 codes, chemin complet des libellés) couvre 388 des 400 codes présents ; les 12 autres sont des codes retirés.
 
-6. **Libellés stockés dans chaque notice** : chaque `source_publication` porte le texte de ses sujets. Plusieurs sources donnent pourtant un code : domaines HAL, topics OpenAlex (`T11930`), vedettes sudoc de ScanR (PPN). Changer un libellé demande de renormaliser toutes les notices qui le portent.
+6. **Libellés stockés dans chaque notice** : chaque `source_record` porte le texte de ses sujets. Plusieurs sources donnent pourtant un code : domaines HAL, topics OpenAlex (`T11930`), vedettes sudoc de ScanR (PPN). Changer un libellé demande de renormaliser toutes les notices qui le portent.
 
-7. **Hiérarchie aplatie** : `subjects` contient un libellé par sujet, sans vocabulaire ni parent. Les libellés identiques de deux vocabulaires fusionnent. La chaîne domain → field → subfield → topic d'OpenAlex existe seulement dans `source_publications.topics`.
+7. **Hiérarchie aplatie** : `subjects` contient un libellé par sujet, sans vocabulaire ni parent. Les libellés identiques de deux vocabulaires fusionnent. La chaîne domain → field → subfield → topic d'OpenAlex existe seulement dans `source_records.topics`.
 
 ### Classifieurs ISTEX
 
@@ -42,7 +42,7 @@ Aucun ne rend de score par document.
 
 Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**. Couper bas perd des topics légitimes (faux négatifs massifs). Couper haut ne nettoie pas le bruit injecté par surfaccrochage lexical de l'algo OA. → Piste « seuil de score » seule abandonnée.
 
-**Lift entre domains OpenAlex (level 0)** : 6 paires possibles entre Health / Life / Physical / Social. La paire Health × Life est sur-attendue (1.34) ; toutes les autres sous-attendues (0.27 à 0.62). Sur la paire la plus suspecte (Health × Physical, 1070 publis), validation à l'œil de 15 publis : **~67 % ont au moins un domain manifestement aberrant**, et l'arbitrage est **lisible directement sur les labels HAL / WoS / theses_discipline** des autres source_publications (Neurosciences, Chimie, Sciences Terre, etc.) sans mapping ontologique sophistiqué.
+**Lift entre domains OpenAlex (level 0)** : 6 paires possibles entre Health / Life / Physical / Social. La paire Health × Life est sur-attendue (1.34) ; toutes les autres sous-attendues (0.27 à 0.62). Sur la paire la plus suspecte (Health × Physical, 1070 publis), validation à l'œil de 15 publis : **~67 % ont au moins un domain manifestement aberrant**, et l'arbitrage est **lisible directement sur les labels HAL / WoS / theses_discipline** des autres source_records (Neurosciences, Chimie, Sciences Terre, etc.) sans mapping ontologique sophistiqué.
 
 **Co-occurrences sujet-sujet** : la piste « paire unique entre deux sujets fréquents » a été écartée — les aberrations OpenAlex sont **récurrentes** (un sujet `Health Sciences` mal accroché à des publis hors-santé reproduit la même co-occurrence souvent), donc les paires uniques ratent précisément les vrais bruits.
 
@@ -52,10 +52,10 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 
 - **Statut** : one-shot bootstrap, pas une phase pipeline. Vocation à disparaître quand une classification autonome sera rodée.
 - **Granularité** : domains OpenAlex (level 0, 4 valeurs). Le mapping ontologique reste petit et tractable à ce grain.
-- **Arbitres** : `hal_domain`, `wos_subject`, `theses_discipline` (labels des autres `source_publications`) + `journals.doaj_payload->>'Subjects'` (premier niveau LCC du journal DOAJ). Multi-affectation acceptée (un label peut peser pour plusieurs domains OA en cas d'ambiguïté inhérente — ex. « Neurosciences » → health + life).
+- **Arbitres** : `hal_domain`, `wos_subject`, `theses_discipline` (labels des autres `source_records`) + `journals.doaj_payload->>'Subjects'` (premier niveau LCC du journal DOAJ). Multi-affectation acceptée (un label peut peser pour plusieurs domains OA en cas d'ambiguïté inhérente — ex. « Neurosciences » → health + life).
 - **Règle de rejet** : pour une publi avec ≥2 domains OA, un domain est rejeté si son support arbitre vaut 0 **et** qu'au moins un autre domain de la publi a un support > 0. La variante « autre support ≥ 2 » a été testée sur sample : elle perd 12 vrais positifs sur 20 cas exclus (arbitres HAL minimalistes type « Sciences du Vivant » seul ne franchissent jamais le seuil). Trade-off défavorable, on garde le seuil souple.
 - **Précision empirique attendue** : ~70-80 % sur sample (sample 15 publis : 10 vrais positifs, 1 faux positif clair, 4 borderline).
-- **Cascade obligatoire** : le rejet d'un domain entraîne le rejet en cascade des descendants OpenAlex sur la publi (field / subfield / topic rattachés à ce domain). Chaque entrée de `source_publications.topics` contient les 4 niveaux de la chaîne : la cascade y lit la hiérarchie.
+- **Cascade obligatoire** : le rejet d'un domain entraîne le rejet en cascade des descendants OpenAlex sur la publi (field / subfield / topic rattachés à ce domain). Chaque entrée de `source_records.topics` contient les 4 niveaux de la chaîne : la cascade y lit la hiérarchie.
 
 **Classifieurs ISTEX avant Specter2.** Les classifieurs ISTEX donnent un arbitre indépendant de l'algorithme OpenAlex, et des sujets aux publications qui n'en ont aucun. Specter2 se prototype seulement si leur évaluation montre qu'ils ne suffisent pas.
 
@@ -76,7 +76,7 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 ## Phasage
 
 - [ ] **Phase 0 — Correspondance code → sujet** : schéma de la table (source, code, sujet) ; normalisation des codes par source (domaines HAL depuis `domain_s`, topics OpenAlex, vedettes sudoc ScanR) ; remplissage depuis les référentiels des sources (API HAL `ref/domain`…) ; ingestion par la table. Les 28 186 notices HAL réduites à leurs codes retrouvent leurs sujets.
-- [ ] **Phase 1 — One-shot `cleanup_oa_subjects`** : `interfaces/cli/oneshot/cleanup_oa_subjects.py`. Mapping arbitre en data du script (dict Python). SQL set-based : détection des rejets candidats + cascade descendants via la hiérarchie de `source_publications.topics`. UPDATE `publication_subjects SET rejected = TRUE`. Tests sur cas tirés du prototype SQL. `--dry-run` pour itération.
+- [ ] **Phase 1 — One-shot `cleanup_oa_subjects`** : `interfaces/cli/oneshot/cleanup_oa_subjects.py`. Mapping arbitre en data du script (dict Python). SQL set-based : détection des rejets candidats + cascade descendants via la hiérarchie de `source_records.topics`. UPDATE `publication_subjects SET rejected = TRUE`. Tests sur cas tirés du prototype SQL. `--dry-run` pour itération.
 - [ ] **Phase 2 — Ajustements UI** : filtrer `rejected = TRUE` partout sauf `/publications/[id]`. Style barré + grisé sur `/publications/[id]`. Vérifier que `recompute_usage_counts` et `recompute_cooccurrences` filtrent bien (déjà OK côté SQL au moment de la rédaction).
 - [ ] **Phase 3 — Évaluation des classifieurs ISTEX** : appeler halClass et openAlexClass sur un échantillon de publications dont les sujets HAL, WoS ou theses.fr sont connus. Mesurer l'accord avec ces sujets et avec les domains OpenAlex. Mesurer la couverture : part des publications pourvues d'un résumé, et d'un résumé anglais. Trancher l'usage : arbitre du bootstrap, source de sujets pour les publications sans sujet, ou rien.
 - [ ] **Phase 4 — Prototype Specter2**, si la phase 3 conclut que les classifieurs ISTEX ne suffisent pas : extraction embeddings (Specter2 base via HuggingFace, batch sur titres + abstracts existants). Persistance vecteurs (pgvector ou fichier numpy + lookup).

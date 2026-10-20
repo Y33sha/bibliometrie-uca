@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from domain.structures.hal_structures import HalStructureStatus, parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructuresQueries
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def _structure(docid: int, *, parents=(), aliases=()):
@@ -48,14 +48,14 @@ def test_relations_reconstruites_depuis_parent_ids(sa_sync_conn):
 def test_ids_to_fetch_ecarte_les_structures_et_alias_connus(sa_sync_conn):
     queries = HalStructuresQueries(sa_sync_conn)
     queries.save([_structure(2, aliases=[9])], {9: 2})
-    record = insert_source_publication(sa_sync_conn, source="hal", source_id="hal-1")
+    record = insert_source_record(sa_sync_conn, source="hal", source_id="hal-1")
     for hal_structure_id in (2, 9, 4):
         signature = insert_signature(
             sa_sync_conn, record, source="hal", author_position=hal_structure_id
         )
         sa_sync_conn.execute(
             text(
-                "INSERT INTO source_authorship_hal_structures (source_authorship_id, hal_structure_id)"
+                "INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)"
                 " VALUES (:s, :h)"
             ),
             {"s": signature, "h": hal_structure_id},
@@ -71,7 +71,7 @@ def test_un_changement_de_pays_marque_les_signatures_de_la_structure_et_de_ses_a
 ):
     queries = HalStructuresQueries(sa_sync_conn)
     queries.save([_structure(2, aliases=[9]), _structure(3)], {9: 2})
-    record = insert_source_publication(sa_sync_conn, source="hal", source_id="hal-1")
+    record = insert_source_record(sa_sync_conn, source="hal", source_id="hal-1")
     cited = {}
     for position, hal_structure_id in enumerate((2, 9, 3)):
         cited[hal_structure_id] = insert_signature(
@@ -79,18 +79,18 @@ def test_un_changement_de_pays_marque_les_signatures_de_la_structure_et_de_ses_a
         )
         sa_sync_conn.execute(
             text(
-                "INSERT INTO source_authorship_hal_structures (source_authorship_id, hal_structure_id)"
+                "INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)"
                 " VALUES (:s, :h)"
             ),
             {"s": cited[hal_structure_id], "h": hal_structure_id},
         )
-    sa_sync_conn.execute(text("UPDATE source_authorships SET countries_dirty = false"))
+    sa_sync_conn.execute(text("UPDATE source_contributions SET countries_dirty = false"))
 
     queries.save([replace(_structure(2, aliases=[9]), country_code="fr"), _structure(3)], {9: 2})
 
     dirty = set(
         sa_sync_conn.execute(
-            text("SELECT id FROM source_authorships WHERE countries_dirty")
+            text("SELECT id FROM source_contributions WHERE countries_dirty")
         ).scalars()
     )
     assert dirty == {cited[2], cited[9]}

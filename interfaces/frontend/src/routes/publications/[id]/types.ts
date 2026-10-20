@@ -7,10 +7,10 @@
 import type { components } from "$lib/api/schema";
 
 export type PubDetail = components["schemas"]["PublicationDetailCore"];
-export type Source = components["schemas"]["SourcePublicationOut"];
-export type Authorship = components["schemas"]["ConsolidatedAuthorshipOut"];
+export type Source = components["schemas"]["SourceRecordOut"];
+export type Contribution = components["schemas"]["ConsolidatedContributionOut"];
 export type { StructInfo } from "$lib/structureLabels";
-export type ThesisAuthorship = components["schemas"]["ThesesAuthorshipOut"];
+export type ThesisContribution = components["schemas"]["ThesesContributionOut"];
 export type ThesisMeta = components["schemas"]["ThesisMeta"];
 export type Subject = components["schemas"]["SubjectOut"];
 export type RelatedPublication = components["schemas"]["RelatedPublicationOut"];

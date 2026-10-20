@@ -24,7 +24,7 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'agrégat Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_authorships)."""
+    """Contrat d'accès à l'agrégat Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_contributions)."""
 
     # ── persons ────────────────────────────────────────────────────
 
@@ -54,7 +54,7 @@ class PersonRepository(Protocol):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def ids_with_rh(self, person_ids: list[int]) -> set[int]:
-        """Ids, parmi `person_ids`, des personnes qui ont une fiche RH (`persons_rh`)."""
+        """Ids, parmi `person_ids`, des personnes qui ont une fiche RH (`hr_records`)."""
         ...
 
     def merge_into(self, target_id: int, source_id: int) -> None:
@@ -128,5 +128,5 @@ class PersonRepository(Protocol):
         ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
-        """Élague les formes de nom attestées par une source : garde celles qu'au moins une `source_authorship` active de la personne porte encore, supprime les autres. Se limite aux formes `pending` ; les formes calculées (source `'persons'`) et les verdicts `confirmed`/`rejected` sont préservés. Retourne le nombre de formes supprimées."""
+        """Élague les formes de nom attestées par une source : garde celles qu'au moins une `source_contribution` active de la personne porte encore, supprime les autres. Se limite aux formes `pending` ; les formes calculées (source `'persons'`) et les verdicts `confirmed`/`rejected` sont préservés. Retourne le nombre de formes supprimées."""
         ...

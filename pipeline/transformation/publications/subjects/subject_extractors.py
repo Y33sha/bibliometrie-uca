@@ -1,4 +1,4 @@
-"""Extraction des libellés de concept par source, depuis le champ `topics` d'une `source_publication`.
+"""Extraction des libellés de concept par source, depuis le champ `topics` d'une `source_record`.
 
 Chaque source expose ses concepts dans un format `topics` distinct ; ces fonctions pures le réduisent à une liste de libellés. L'upsert et la liaison sont communs (orchestrateur `ingestion`). Le registre `SUBJECT_EXTRACTORS` associe chaque source à son extracteur et à la langue de ses libellés ; une source absente (CrossRef : mots-clés libres seuls) ne produit aucun concept.
 """

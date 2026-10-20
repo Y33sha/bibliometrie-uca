@@ -42,8 +42,8 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public, sources, publications, pe
 REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops FROM bibliometrie_app;
 
 GRANT INSERT, UPDATE, DELETE ON
-    structures.address_structures, publications.authorships, structures.perimeters, persons.person_name_forms,
-    persons.persons, persons.rejected_authorships, structures.structure_name_forms, structures.structures
+    structures.address_structures, publications.contributions, structures.perimeters, persons.person_name_forms,
+    persons.persons, persons.rejected_contributions, structures.structure_name_forms, structures.structures
 TO bibliometrie_app;
 
 -- Un identifiant de personne s'ajoute et se rejette ; il ne se supprime pas, le rejet
@@ -54,13 +54,13 @@ TO bibliometrie_app;
 
 -- Un pays saisi à la main s'ajoute en candidat `manual`, et se retire.
 GRANT INSERT, DELETE ON
-    structures.address_country_candidates, structures.perimeter_structures, structures.structure_tutelles
+    structures.address_country_candidates, structures.perimeter_structures, structures.structure_parents
 TO bibliometrie_app;
 
 -- `INSERT … ON CONFLICT DO UPDATE` exige le droit de mise à jour, que la ligne entre en
 -- conflit ou non.
 GRANT INSERT, UPDATE, DELETE ON
-    persons.confirmed_authorships
+    persons.confirmed_source_contributions
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
@@ -81,8 +81,8 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE ON
-    structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_authorships,
-    sources.source_publications, publications.source_authorship_groups
+    structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_contributions,
+    sources.source_records, publications.source_contribution_groups
 TO bibliometrie_app;
 
 -- Une table créée par une migration future est lisible, et rien de plus : sa nature se

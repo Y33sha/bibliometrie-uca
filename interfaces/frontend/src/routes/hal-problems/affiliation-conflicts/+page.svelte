@@ -59,7 +59,7 @@
 		{#each list.items as pub}
 			<div class="pub-card">
 				<div class="pub-meta-line">
-					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
+					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{lab.acronym || lab.name}</span>{/each}
 					<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>

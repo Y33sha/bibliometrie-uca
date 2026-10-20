@@ -10,23 +10,23 @@ Une publication est la référence unifiée d'un document : plusieurs enregistre
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `pub_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `subjects_ingested_at`, `meta` |
-| `authorships` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
+| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `publication_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `subjects_ingested_at`, `meta` |
+| `contributions` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
 | `publication_relations` | Lien orienté entre deux publications | `from_publication_id`, `relation_type`, `target_publication_id` **ou** `target_doi`, `source` |
 | `apc_payments` | Frais de publication, importés puis corrigés à la main | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
 | `publications_detail` | Complément de métadonnées servi au détail | `publication_id`, recalculé à chaque `refresh_from_sources` |
 
-En amont se trouvent les [enregistrements sources](source_publications.md). La construction des `authorships` relève de la fiche [authorships](authorships.md) ; ils apparaissent ici comme le lien vers les [personnes](persons.md).
+En amont se trouvent les [enregistrements sources](source_records.md). La construction des `contributions` relève de la fiche [contributions](contributions.md) ; ils apparaissent ici comme le lien vers les [personnes](persons.md).
 
 ## Écriture par le pipeline
 
-La phase `publications` constitue les publications ; les phases `relations`, `oa_status`, `countries` et `authorships` enrichissent ensuite certaines colonnes.
+La phase `publications` constitue les publications ; les phases `relations`, `oa_status`, `countries` et `contributions` enrichissent ensuite certaines colonnes.
 
 **Regroupement (`pipeline/transformation/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
 
 **Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail.
 
-**Suppression (`pipeline/transformation/publications/lifecycle.py`).** Une publication existe si elle a au moins un enregistrement source, un type de document admissible et au moins une authorship. Après un recalcul, le module du cycle de vie supprime une publication sans enregistrement source ou de type non admissible ; ses enregistrements sources s'en détachent. La phase `authorships` supprime les publications sans authorship. Une publication réunie à une autre est dissoute : ses paiements APC passent à la publication conservée, son identifiant redirige vers elle, puis elle est supprimée.
+**Suppression (`pipeline/transformation/publications/lifecycle.py`).** Une publication existe si elle a au moins un enregistrement source, un type de document admissible et au moins une contribution. Après un recalcul, le module du cycle de vie supprime une publication sans enregistrement source ou de type non admissible ; ses enregistrements sources s'en détachent. La phase `contributions` supprime les publications sans contribution. Une publication réunie à une autre est dissoute : ses paiements APC passent à la publication conservée, son identifiant redirige vers elle, puis elle est supprimée.
 
 **Relations (`pipeline/transformation/publications/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
 
@@ -38,7 +38,7 @@ Les liens vont du dépendant vers le parent, et les liens inverses sont dédoubl
 
 **Statut *open access* (`pipeline/transformation/publications/oa_status.py`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
 
-**Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `authorships` y reporte l'appartenance au périmètre.
+**Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `contributions` y reporte l'appartenance au périmètre.
 
 ## Écriture par l'API
 
@@ -46,7 +46,7 @@ L'API n'écrit rien sur les publications. Une valeur consolidée fausse se corri
 
 ## Lecture par le pipeline
 
-- La phase `authorships` consolide les signatures en `authorships` et lit les publications pour y reporter le périmètre.
+- La phase `contributions` consolide les signatures en `contributions` et lit les publications pour y reporter le périmètre.
 - La phase `subjects` verse les thématiques des enregistrements sources vers les sujets, en ne reprenant que les publications dont le contenu a changé.
 - La phase `countries` lit la propagation venue des adresses.
 

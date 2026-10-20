@@ -45,7 +45,7 @@ def _merge_isbns(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 MERGE_STEPS: dict[str, MergeStep] = {
-    "source_publications": transfer("source_publications", "monograph_id"),
+    "source_records": transfer("source_records", "monograph_id"),
     "publications": transfer("publications", "monograph_id"),
     "title": untouched("monographs", "title", "title_normalized"),
     "created_at": untouched("monographs", "created_at"),

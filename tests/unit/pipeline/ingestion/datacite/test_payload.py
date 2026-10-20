@@ -1,12 +1,12 @@
 """Tests des extracteurs purs `domain.sources.datacite` et du mapping
 doc_type DataCite."""
 
-from domain.source_publications.doc_types import map_doc_type
+from domain.source_records.doc_types import map_doc_type
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
     extract_datacite_meta,
-    extract_datacite_pub_year,
+    extract_datacite_publication_year,
     extract_related_dois,
     get_abstract,
     get_cited_by_count,
@@ -39,13 +39,13 @@ class TestGetTitle:
 
 class TestPubYear:
     def test_valid(self):
-        assert extract_datacite_pub_year({"publicationYear": 2020}, max_year=2027) == 2020
+        assert extract_datacite_publication_year({"publicationYear": 2020}, max_year=2027) == 2020
 
     def test_above_max(self):
-        assert extract_datacite_pub_year({"publicationYear": 2999}, max_year=2027) is None
+        assert extract_datacite_publication_year({"publicationYear": 2999}, max_year=2027) is None
 
     def test_non_int(self):
-        assert extract_datacite_pub_year({"publicationYear": None}, max_year=2027) is None
+        assert extract_datacite_publication_year({"publicationYear": None}, max_year=2027) is None
 
 
 class TestPublisher:
@@ -454,13 +454,13 @@ class TestBornesDeLAnnee:
     """L'année retenue tombe entre 1500 et `max_year`, bornes incluses."""
 
     def test_la_borne_basse_est_incluse(self):
-        assert extract_datacite_pub_year({"publicationYear": 1500}, max_year=2030) == 1500
+        assert extract_datacite_publication_year({"publicationYear": 1500}, max_year=2030) == 1500
 
     def test_juste_en_dessous_de_la_borne_basse_est_ecarte(self):
-        assert extract_datacite_pub_year({"publicationYear": 1499}, max_year=2030) is None
+        assert extract_datacite_publication_year({"publicationYear": 1499}, max_year=2030) is None
 
     def test_la_borne_haute_est_incluse(self):
-        assert extract_datacite_pub_year({"publicationYear": 2030}, max_year=2030) == 2030
+        assert extract_datacite_publication_year({"publicationYear": 2030}, max_year=2030) == 2030
 
     def test_juste_au_dessus_de_la_borne_haute_est_ecarte(self):
-        assert extract_datacite_pub_year({"publicationYear": 2031}, max_year=2030) is None
+        assert extract_datacite_publication_year({"publicationYear": 2031}, max_year=2030) is None

@@ -6,12 +6,12 @@ Référentiel consolidé des productions de recherche et de leurs contributions.
 
 ```mermaid
 flowchart LR
-    structures --- authorships
-    authorships --- publications
-    authorships --- persons
+    structures --- contributions
+    contributions --- publications
+    contributions --- persons
     structures --- apc_payments
     apc_payments ---|DOI| publications
-    source_publications-->|match_or_create|publications
+    source_records-->|match_or_create|publications
     publications---|publication_subjects|subjects
     publications---journals
     journals---publishers
@@ -22,9 +22,9 @@ flowchart LR
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
-    class source_publications,publications,journals,publishers,authorships,persons,subjects auto
+    class source_records,publications,journals,publishers,contributions,persons,subjects auto
     classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,authorships main
+    class structures,publications,persons,contributions main
 ```
 
 Légende :
@@ -37,22 +37,22 @@ Légende :
 - **`publications_detail`** : satellite 1:1 de `publications` qui contient les métadonnées volumineuses. Cf. [données dérivées](08-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 
-## `authorships` — table consolidée des contributions
+## `contributions` — table consolidée des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `pipeline/transformation/publications/authorships/build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `contribution_structures`). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
 
-**Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_authorships`.
+**Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_contributions`.
 
 Colonnes notables :
 
 - `in_perimeter` : TRUE si une signature de la personne sur cette publication entre dans le périmètre (`perimeter_evidence` non vide)
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-`authorship_structures (authorship_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_authorship_structures` des signatures qui attestent l'authorship (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `authorships`.
+`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_contribution_structures` des signatures qui attestent la contribution (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `contributions`.
 
 **Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une signature orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
 
-**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships`. `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
+**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_contributions`. `in_perimeter`, les liens via `contribution_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
 
 ## Sujets / mots-clés
 
@@ -69,6 +69,6 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `publications` | pipeline | `pipeline/transformation/publications/consolidation.py` (`refresh_from_sources` recalcule depuis les sources) |
 | `publications_detail` | pipeline | `pipeline/transformation/publications/store.py` |
 | `publication_relations` | pipeline | phase `relations` |
-| `authorships` | pipeline | `build_authorships.py` (consolidée depuis les sources) |
+| `contributions` | pipeline | `build_contributions.py` (consolidée depuis les sources) |
 | `subjects`, `publication_subjects` | pipeline | `pipeline/transformation/publications/subjects/subject_ingestion.py` |
 | `subject_cooccurrences` | pipeline | `pipeline/transformation/publications/subjects/subject_cooccurrences.py` (matview) |

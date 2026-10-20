@@ -3,7 +3,7 @@
 import logging
 from unittest.mock import MagicMock
 
-from domain.source_publications.raw_metadata import stash_entry
+from domain.source_records.raw_metadata import stash_entry
 from pipeline.transformation.publications.correction.correct_unary import (
     DOC_TYPE_MAP_MARKER,
     LANGUAGE_MAP_MARKER,

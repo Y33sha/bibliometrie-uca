@@ -5,5 +5,5 @@ L'adresse n'a pas d'objet de domaine : le cluster de tables est porté par `Addr
 Sous-modules :
 - `commands` : command handlers de l'API (frontière transactionnelle, commit).
 - `structure_links` : validation manuelle des rattachements adresse ↔ structure (confirmer / rejeter / réinitialiser).
-- `countries` : attribution manuelle des pays, propagation vers les `source_publications` et `publications`.
+- `countries` : attribution manuelle des pays, propagation vers les `source_records` et `publications`.
 """

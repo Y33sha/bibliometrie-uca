@@ -4,17 +4,18 @@ from sqlalchemy import text
 
 from interfaces.cli.oneshot.regroup_neutralized_identifiers import mark
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def _publication(conn, *, notices, neutralized):
     """Publication de `notices` notices, non marquée ; sa première notice a une signature d'ORCID neutralisé si `neutralized`."""
     publication = insert_publication(conn)
     conn.execute(
-        text("UPDATE publications SET authorships_dirty = false WHERE id = :p"), {"p": publication}
+        text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
+        {"p": publication},
     )
     for rank in range(notices):
-        notice = insert_source_publication(
+        notice = insert_source_record(
             conn, publication, source="crossref", source_id=f"c-{publication}-{rank}"
         )
         insert_signature(
@@ -22,7 +23,7 @@ def _publication(conn, *, notices, neutralized):
             notice,
             source="crossref",
             author_name_normalized="jean dupont",
-            person_identifiers={"orcid": "0000-0001-2345-6789"},
+            identifiers={"orcid": "0000-0001-2345-6789"},
             neutralized_identifiers={"orcid": "shared"} if neutralized and rank == 0 else None,
         )
     return publication
@@ -30,7 +31,7 @@ def _publication(conn, *, notices, neutralized):
 
 def _dirty(conn, publication):
     return conn.execute(
-        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication}
+        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
     ).scalar_one()
 
 

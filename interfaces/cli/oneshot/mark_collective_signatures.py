@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-18)
-"""Marque `source_authorships.collective` sur le stock d'après la règle du nom (`is_collective_name`), par lots d'identifiants validés un à un.
+"""Marque `source_contributions.collective` sur le stock d'après la règle du nom (`is_collective_name`), par lots d'identifiants validés un à un.
 
 Les décomptes d'auteurs des notices touchées sont recalculés et leurs publications sont à regrouper. La phase `persons` suivante détache les signatures marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé. `--contains` restreint l'examen aux noms bruts qui contiennent un texte.
 
@@ -29,7 +29,7 @@ def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = N
     rows = conn.execute(
         text("""
             SELECT id, raw_author_name, raw_last_name, raw_first_name
-            FROM source_authorships
+            FROM source_contributions
             WHERE id BETWEEN :lo AND :hi AND NOT collective
               AND (CAST(:pattern AS text) IS NULL
                    OR concat_ws(' ', raw_author_name, raw_first_name, raw_last_name) ILIKE :pattern)
@@ -52,8 +52,8 @@ def mark_collective(conn: Connection, ids: list[int]) -> None:
     notice_ids = list(
         conn.execute(
             text("""
-                UPDATE source_authorships SET collective = true WHERE id = ANY(:ids)
-                RETURNING source_publication_id
+                UPDATE source_contributions SET collective = true WHERE id = ANY(:ids)
+                RETURNING source_record_id
             """),
             {"ids": ids},
         ).scalars()
@@ -61,9 +61,9 @@ def mark_collective(conn: Connection, ids: list[int]) -> None:
     backfill_notices(conn, sorted(set(notice_ids)))
     conn.execute(
         text("""
-            UPDATE publications p SET authorships_dirty = true
-            FROM source_publications sp
-            WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+            UPDATE publications p SET contributions_dirty = true
+            FROM source_records sp
+            WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
         """),
         {"notices": notice_ids},
     )
@@ -82,7 +82,9 @@ def main() -> int:
     started = time.monotonic()
     marked = 0
     with get_sync_engine().connect() as conn:
-        min_id, max_id = conn.execute(text("SELECT min(id), max(id) FROM source_authorships")).one()
+        min_id, max_id = conn.execute(
+            text("SELECT min(id), max(id) FROM source_contributions")
+        ).one()
         conn.commit()
         lo = args.from_id if args.from_id is not None else min_id
         while lo <= max_id:

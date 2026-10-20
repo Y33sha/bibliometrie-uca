@@ -22,25 +22,25 @@ from pipeline.transformation.publications.relations_queries import (
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 _Q = PublicationRelationsQueries()
 
 # Notice de titre « t ».
-_notice = partial(insert_source_publication, title="t")
+_notice = partial(insert_source_record, title="t")
 
 # Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
 
 
-def _pub(conn, *, doc_type, title_normalized, doi, pub_year=2024) -> int:
+def _pub(conn, *, doc_type, title_normalized, doi, publication_year=2024) -> int:
     return insert_publication(
         conn,
         title_normalized,
         title_normalized=title_normalized,
         doc_type=doc_type,
         doi=doi,
-        pub_year=pub_year,
+        publication_year=publication_year,
     )
 
 
@@ -105,14 +105,14 @@ class TestFetchErratumTitleMatches:
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/parent",
-            pub_year=2020,
+            publication_year=2020,
         )
         _pub(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
-            pub_year=2024,
+            publication_year=2024,
         )
         assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
 
@@ -133,14 +133,14 @@ class TestFetchPreprintTitleMatches:
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/pub",
-            pub_year=2025,
+            publication_year=2025,
         )
         pre = _pub(
             sa_sync_conn,
             doc_type="preprint",
             title_normalized=PARENT_TITLE,
             doi="10.1/pre",
-            pub_year=2024,
+            publication_year=2024,
         )
         matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
@@ -174,14 +174,14 @@ class TestFetchPreprintTitleMatches:
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/old",
-            pub_year=2022,
+            publication_year=2022,
         )
         _pub(
             sa_sync_conn,
             doc_type="preprint",
             title_normalized=PARENT_TITLE,
             doi="10.1/pre",
-            pub_year=2024,
+            publication_year=2024,
         )
         assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
 
@@ -217,7 +217,7 @@ class TestRelationTargetDeletionCascades:
 
 def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
     """Notice DataCite dont l'étape de correction a substitué le DOI."""
-    insert_source_publication(
+    insert_source_record(
         conn,
         publication_id,
         source="datacite",
@@ -400,7 +400,7 @@ class TestPhaseRelations:
         b = _pub(sa_sync_conn, doc_type="article", title_normalized="t-pr-b", doi="10.1/pr-b")
         _notice(sa_sync_conn, a, source_id="hal-pr-1", external_ids={"hal_id": ["hal-pr-1"]})
         _notice(sa_sync_conn, b, source_id="hal-pr-2", external_ids={"hal_id": ["hal-pr-1"]})
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             a,
             source="datacite",

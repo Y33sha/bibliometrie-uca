@@ -152,7 +152,7 @@ class DoiPrefixesQueries:
     def find_doi_with_prefix(self, prefix: str) -> str | None:
         """Un DOI de ce préfixe porté par un enregistrement, qui sert à retrouver le membre Crossref déposant."""
         return self._conn.execute(
-            text("SELECT doi FROM source_publications WHERE doi LIKE :motif LIMIT 1"),
+            text("SELECT doi FROM source_records WHERE doi LIKE :motif LIMIT 1"),
             {"motif": f"{prefix}/%"},
         ).scalar()
 

@@ -1,0 +1,144 @@
+"""Tests d'intégration pour `pipeline.ingestion.common.source_records`."""
+
+from functools import partial
+
+from sqlalchemy import text
+
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
+)
+from tests.integration.helpers.staging import insert_staging
+
+# Ligne de staging theses.fr « t-stg ».
+_thesis_staging = partial(insert_staging, source="theses", source_id="t-stg")
+
+_Q = SourceRecordQueries()
+
+
+def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
+    defaults = {
+        "source": "theses",
+        "source_id": "2023ABC001",
+        "staging_id": staging_id,
+        "title": "Ma thèse",
+        "publication_year": 2023,
+        "doc_type": "thesis",
+    }
+    return SourceRecordUpsert(**{**defaults, **overrides})
+
+
+class TestUpsertSourceRecord:
+    def test_inserts_new(self, sa_sync_conn):
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, language="fr"))
+        row = sa_sync_conn.execute(
+            text("SELECT title, language FROM source_records WHERE id = :id"),
+            {"id": sp_id},
+        ).one()
+        assert row.title == "Ma thèse"
+        assert row.language == "fr"
+
+    def test_reimport_keeps_row_identity(self, sa_sync_conn):
+        """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        first = _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        second = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, language="fr"))
+        assert first == second
+
+    def test_reimport_overwrites_metadata(self, sa_sync_conn):
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(
+            sa_sync_conn, _row(staging_id, title="Titre initial", language="en")
+        )
+        _Q.upsert_source_record(
+            sa_sync_conn, _row(staging_id, title="Titre corrigé", language="fr")
+        )
+        row = sa_sync_conn.execute(
+            text("SELECT title, language FROM source_records WHERE id = :id"),
+            {"id": sp_id},
+        ).one()
+        assert row.title == "Titre corrigé"
+        assert row.language == "fr"
+
+    def test_reimport_without_a_value_clears_it(self, sa_sync_conn):
+        """Le dernier import fait autorité : une valeur absente de l'import courant est effacée."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(
+            sa_sync_conn,
+            _row(staging_id, impact={"cited_by_count": 500}, abstract="Un résumé", language="fr"),
+        )
+        _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        row = sa_sync_conn.execute(
+            text("SELECT impact, abstract, language FROM source_records WHERE id = :id"),
+            {"id": sp_id},
+        ).one()
+        assert row.impact is None
+        assert row.abstract is None
+        assert row.language is None
+
+    def test_reimport_marks_keys_dirty(self, sa_sync_conn):
+        """`keys_dirty` signale la ligne à la phase `publications`, qui recalcule son rattachement."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        sa_sync_conn.execute(
+            text("UPDATE source_records SET keys_dirty = false WHERE id = :id"),
+            {"id": sp_id},
+        )
+        _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        assert sa_sync_conn.execute(
+            text("SELECT keys_dirty FROM source_records WHERE id = :id"),
+            {"id": sp_id},
+        ).scalar_one()
+
+    def test_reimport_clears_the_original_values_of_corrections(self, sa_sync_conn):
+        """Régression : une valeur d'origine gardée d'un import précédent l'emportait sur la valeur fraîche à la correction suivante."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        sa_sync_conn.execute(
+            text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
+            {"raw": '{"doc_type": {"raw": "conference-paper", "corrected_by": "X"}}', "id": sp_id},
+        )
+        _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT raw_metadata FROM source_records WHERE id = :id"), {"id": sp_id}
+            ).scalar_one()
+            == {}
+        )
+
+    def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
+        """La colonne est `NOT NULL` et contrainte à un objet JSON."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, external_ids=None))
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT external_ids FROM source_records WHERE id = :id"),
+                {"id": sp_id},
+            ).scalar_one()
+            == {}
+        )
+
+    def test_external_ids_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
+        """Chaque valeur passe par son value object. Une valeur invalide ou une clé inconnue est écartée et journalisée."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        sp_id = _Q.upsert_source_record(
+            sa_sync_conn,
+            _row(
+                staging_id,
+                external_ids={
+                    "hal_id": ["HAL-04123456v2", "10995/102143"],
+                    "nnt": "2023abc001",
+                    "pmc": "PMC9016621",
+                },
+            ),
+        )
+        assert sa_sync_conn.execute(
+            text("SELECT external_ids FROM source_records WHERE id = :id"),
+            {"id": sp_id},
+        ).scalar_one() == {"hal_id": ["hal-04123456"], "nnt": "2023ABC001"}
+        logged = [r.getMessage() for r in caplog.records if "external_ids écarté" in r.getMessage()]
+        assert logged == [
+            "external_ids écarté (theses 2023ABC001) : hal_id = '10995/102143'",
+            "external_ids écarté (theses 2023ABC001) : pmc = 'PMC9016621'",
+        ]

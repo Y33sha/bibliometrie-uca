@@ -23,7 +23,7 @@ Le pipeline interroge CrossRef par DOI, pour les documents découverts par les a
 
 ## Données récupérées
 
-- **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
+- **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_publication_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
 - **Auteurs** : nom complet, ORCID si présent, affiliation textuelle
 
 ## Exemple de payload
@@ -80,11 +80,11 @@ Crossref déclare ses relations dans `meta.relation`, sous des clés comme `is-p
 
 ### Affiliations mal renseignées
 
-29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de résolution des personnes et dans le build des authorships. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
+29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_contribution_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_contributions` CrossRef dans la cascade de résolution des personnes et dans le build des contributions. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
 ### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
 
-CrossRef rend `journal-article` pour tous les sous-types d'article (review, data_paper, conference_paper, editorial, letter, erratum, retraction). Le type est stocké tel quel dans `source_publications.doc_type`, et l'arbitrage final ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)) préfère un sous-type plus précis exposé par une source moins prioritaire (HAL, OpenAlex) — cf. `ARTICLE_SUBTYPES`. Sur tous les autres types (book-chapter, posted-content/preprint, monograph, etc.), CrossRef domine en tant que 2ᵉ priorité.
+CrossRef rend `journal-article` pour tous les sous-types d'article (review, data_paper, conference_paper, editorial, letter, erratum, retraction). Le type est stocké tel quel dans `source_records.doc_type`, et l'arbitrage final ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)) préfère un sous-type plus précis exposé par une source moins prioritaire (HAL, OpenAlex) — cf. `ARTICLE_SUBTYPES`. Sur tous les autres types (book-chapter, posted-content/preprint, monograph, etc.), CrossRef domine en tant que 2ᵉ priorité.
 
 ### `oa_status` non dérivé
 
@@ -92,5 +92,5 @@ CrossRef n'expose pas un statut OA fiable. `oa_status` reste NULL côté CrossRe
 
 ### Année de publication
 
-CrossRef expose plusieurs dates (`issued`, `published-print`, `published-online`, `created`). [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py) choisit la plus pertinente avec un plafond `current_year + 1` (les éditeurs déposent parfois des années farfelues).
+CrossRef expose plusieurs dates (`issued`, `published-print`, `published-online`, `created`). [`extract_crossref_publication_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py) choisit la plus pertinente avec un plafond `current_year + 1` (les éditeurs déposent parfois des années farfelues).
 

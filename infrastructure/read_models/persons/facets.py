@@ -25,7 +25,7 @@ from infrastructure.read_models.filters import (
     person_search_clause,
 )
 
-_BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
+_BASE_FROM = "persons p LEFT JOIN hr_records prh ON prh.person_id = p.id"
 
 
 def _yesno(predicate: str, prefix: str = "") -> str:
