@@ -103,7 +103,8 @@ D'autres modules réunissent des connaissances sans rapport :
 ### Phase 4 — `persons`
 
 - [x] `PersonWrites` remplacé par `PgPersonRepository`. 8cf288f6a
-- [ ] Arbitrage des identifiants en un module.
+- [x] Arbitrage des identifiants en un module. 7705ac171
+- [x] Renommage et attribution d'un identifiant dans `PgPersonRepository`, pour la phase et l'API. dd383c632
 - [ ] SQL de `matching.py` et `name_forms.py` : store des personnes pour l'accès partagé, le reste dans les modules qui l'utilisent.
 - [ ] `loading.py` : champs projetés jamais lus.
 
@@ -143,4 +144,3 @@ D'autres modules réunissent des connaissances sans rapport :
 - Nom du module qui expose `build()`, puisque la phase regroupe des nœuds pour l'affichage.
 - Périmètre de la phase 8 : le renommage d'`authorships` touche le schéma, l'API et le frontend ; celui des phases touche la ligne de commande, les runs enregistrés et l'administration.
 - Vérification des lectures et écritures que `graph.py` déclare pour chaque nœud. Les tests en tirent l'ordre des phases, mais rien ne les confronte au SQL. Piste : sur un run audité, capturer les requêtes du pipeline par les événements de SQLAlchemy, les attribuer au nœud en cours et les analyser par `sqlglot`, au niveau de la colonne. `sqlglot` se limite aux dépendances de développement.
-- Renommer une personne ou lui attribuer un identifiant s'écrit deux fois : `person_writes.py` pour la phase `persons`, `application/services/persons/core.py` pour l'API. Piste : des méthodes de `PgPersonRepository` qui appliquent les règles de `domain.persons`, appelées par les deux.
