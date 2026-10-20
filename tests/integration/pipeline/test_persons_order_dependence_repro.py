@@ -17,7 +17,6 @@ from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.purge import purge
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person_name_form
@@ -84,9 +83,8 @@ def _seed_two_notices(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2,
 
 def _run_create(conn):
     """Arbitrage des conflits d'identifiant (no-op ici, pas d'identifiant) puis la cascade."""
-    q = PersonsMatchingQueries()
-    arbitrate_identifier_conflicts(conn, q, _LOG, repo=PgPersonRepository(conn))
-    run_cascade(conn, q, _LOG, repo=PgPersonRepository(conn))
+    arbitrate_identifier_conflicts(conn, _LOG, repo=PgPersonRepository(conn))
+    run_cascade(conn, _LOG, repo=PgPersonRepository(conn))
 
 
 def _populate_canonical_forms(conn):
@@ -107,7 +105,7 @@ def _run_phase(conn):
     la purge appelée directement — l'ordre reproduit `PersonsPhase`."""
     _run_create(conn)
     _populate_canonical_forms(conn)
-    purge(conn, PersonsMatchingQueries())
+    purge(conn)
 
 
 def _martin_count(conn) -> int:

@@ -27,7 +27,6 @@ from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
     insert_person_identifier,
@@ -39,8 +38,6 @@ from tests.integration.helpers.sources import insert_signature, insert_source_pu
 
 # Notice de 2024, de titre « Test ».
 _notice = partial(insert_source_publication, title="Test", pub_year=2024)
-
-_queries = PersonsMatchingQueries()
 _logger = logging.getLogger("test")
 
 
@@ -105,8 +102,8 @@ def _get_person_identifiers(conn, person_id):
 
 
 def _run_cascade(conn):
-    arbitrate_identifier_conflicts(conn, _queries, _logger, repo=PgPersonRepository(conn))
-    run_cascade(conn, _queries, _logger, repo=PgPersonRepository(conn))
+    arbitrate_identifier_conflicts(conn, _logger, repo=PgPersonRepository(conn))
+    run_cascade(conn, _logger, repo=PgPersonRepository(conn))
 
 
 # ── Scénarios ────────────────────────────────────────────────────
@@ -517,7 +514,6 @@ class TestCascadeRun:
         with caplog.at_level(logging.INFO, logger="test_orphelines"):
             run_cascade(
                 sa_sync_conn,
-                _queries,
                 _logger,
                 repo=PgPersonRepository(sa_sync_conn),
                 orphans_log=logging.getLogger("test_orphelines"),

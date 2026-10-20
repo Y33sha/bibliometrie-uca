@@ -1,6 +1,7 @@
 """La cascade personnes ignore les signatures collectives."""
 
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
+from pipeline.transformation.persons.loading import fetch_unlinked_authorships
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -28,9 +29,7 @@ def test_signature_collective_absente_des_candidates(sa_sync_conn):
     _signature(sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-1")
     _signature(sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-2")
 
-    names = {
-        r.name.display() for r in PersonsMatchingQueries().fetch_unlinked_authorships(sa_sync_conn)
-    }
+    names = {r.name.display() for r in fetch_unlinked_authorships(sa_sync_conn)}
 
     assert "Jean Zetaindividu" in names
     assert "Zeta Consortium" not in names
@@ -42,6 +41,6 @@ def test_signature_collective_ne_vote_pas(sa_sync_conn):
         sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-7", orcid=_ORCID
     )
 
-    votes = PersonsMatchingQueries().fetch_identifier_votes(sa_sync_conn, "orcid")
+    votes = fetch_identifier_votes(sa_sync_conn, "orcid")
 
     assert votes[_ORCID] == {"jean zetaindividu": 1}

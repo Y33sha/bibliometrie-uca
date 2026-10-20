@@ -23,11 +23,17 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
-from infrastructure.repositories.person_repository import PgPersonRepository
+from infrastructure.repositories.person_repository import (
+    PgPersonRepository,
+)
+from infrastructure.sql_fragments import (
+    DETACHED_SIGNATURE,
+    pinned,
+)
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -35,17 +41,39 @@ from pipeline.runtime.observability.progression import attente
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.metrics import build_metrics
-from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
 from pipeline.transformation.persons.populate_person_name_forms import populate
 from pipeline.transformation.persons.purge import purge
+from pipeline.transformation.persons.store import PersonsStore
+
+
+def enforce_confirmed_authorships(conn: Connection) -> int:
+    """Réapplique les épinglages admin (`confirmed_authorships`, must-link) : pose `source_authorships.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET person_id = ca.person_id
+            FROM confirmed_authorships ca
+            WHERE ca.source_authorship_id = sa.id
+              AND sa.person_id IS DISTINCT FROM ca.person_id
+        """)
+    ).rowcount
+
+
+def detach_copies(conn: Connection) -> int:
+    """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
+    return conn.execute(
+        text(f"""
+            UPDATE source_authorships sa
+            SET {DETACHED_SIGNATURE}
+            WHERE sa.duplicate_of IS NOT NULL AND sa.person_id IS NOT NULL
+              AND NOT {pinned("sa.id")}
+        """)
+    ).rowcount
 
 
 @dataclass(frozen=True)
 class PersonsPhase:
-    persons_queries: PersonsMatchingQueries
-    name_forms_queries: PersonNameFormsQueries
     repo_factory: Callable[[Connection], PgPersonRepository]
     orphans_log: logging.Logger | None = None
 
@@ -79,11 +107,11 @@ class PersonsPhase:
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         """Épinglages, détachement des copies, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
-        persons_queries, logger = self.persons_queries, ctx.logger
+        logger = ctx.logger
         with ctx.open_tx() as conn:
             repo = self.repo_factory(conn)
 
-            n_enforced = persons_queries.enforce_confirmed_authorships(conn)
+            n_enforced = enforce_confirmed_authorships(conn)
             if n_enforced:
                 etape(logger, "Épinglages réappliqués")
                 logger.info(
@@ -92,7 +120,7 @@ class PersonsPhase:
                     accord(n_enforced, "signature recalée", "signatures recalées"),
                 )
 
-            n_copies = persons_queries.detach_copies(conn)
+            n_copies = detach_copies(conn)
             if n_copies:
                 etape(logger, "Auteurs en double dans la liste d'une notice")
                 logger.info(
@@ -101,10 +129,9 @@ class PersonsPhase:
                     accord(n_copies, "doublon détaché", "doublons détachés"),
                 )
 
-            arbitration = arbitrate_identifier_conflicts(conn, persons_queries, logger, repo=repo)
+            arbitration = arbitrate_identifier_conflicts(conn, logger, repo=repo)
             cascade_result = run_cascade(
                 conn,
-                persons_queries,
                 logger,
                 repo=repo,
                 orphans_log=self.orphans_log,
@@ -114,7 +141,7 @@ class PersonsPhase:
             stale = sorted(
                 cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
             )
-            cross_source_detached = persons_queries.detach_source_authorships(conn, stale)
+            cross_source_detached = PersonsStore(conn).detach_signatures(stale)
 
         return build_metrics(
             cascade_result,
@@ -128,13 +155,13 @@ class PersonsPhase:
             ctx.open_tx() as conn,
             attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", ctx.logger) as ligne,
         ):
-            counts = populate(conn, self.name_forms_queries)
+            counts = populate(conn)
             ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
         return PhaseMetrics(extras=counts._asdict())
 
     def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            counts = purge(conn, self.persons_queries)
+            counts = purge(conn)
         return PhaseMetrics(extras=dict(counts))
 
 
@@ -142,12 +169,7 @@ class PersonsPhase:
 
 
 def build() -> Phase:
-    from pipeline.transformation.persons.matching import PersonsMatchingQueries
-    from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
-
     return PersonsPhase(
-        PersonsMatchingQueries(),
-        PersonNameFormsQueries(),
         repo_factory=PgPersonRepository,
         orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
     )

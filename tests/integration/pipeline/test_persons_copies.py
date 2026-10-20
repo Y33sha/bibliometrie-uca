@@ -2,13 +2,12 @@
 
 from sqlalchemy import text
 
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.loading import fetch_unlinked_authorships
+from pipeline.transformation.persons.persons import detach_copies
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
-
-_Q = PersonsMatchingQueries()
 
 
 def _original_and_copy(conn, source_id, *, person_id=None):
@@ -43,7 +42,7 @@ def _person(conn, signature):
 def test_une_copie_n_est_pas_a_rattacher(sa_sync_conn):
     original, copy = _original_and_copy(sa_sync_conn, "hal-1")
 
-    unlinked = {a.source_authorship_id for a in _Q.fetch_unlinked_authorships(sa_sync_conn)}
+    unlinked = {a.source_authorship_id for a in fetch_unlinked_authorships(sa_sync_conn)}
 
     assert original in unlinked
     assert copy not in unlinked
@@ -56,7 +55,7 @@ def test_une_copie_rattachee_perd_sa_personne_sauf_epinglage(sa_sync_conn):
     _, pinned = _original_and_copy(conn, "hal-2", person_id=person)
     insert_confirmed_authorship(conn, pinned, person_id=person)
 
-    assert _Q.detach_copies(conn) == 1
+    assert detach_copies(conn) == 1
 
     assert (_person(conn, original), _person(conn, copy), _person(conn, pinned)) == (
         person,

@@ -11,18 +11,34 @@ L'arbitrage est ordre-indépendant : le consensus agrège tous les porteurs, et 
 
 import logging
 from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from typing import NamedTuple
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierOrigin
+from domain.persons.identifiers import (
+    PERSON_IDENTIFIER_TYPES,
+    AttributionStatus,
+    IdentifierNeutralization,
+    IdentifierOrigin,
+)
 from domain.persons.matching import (
     STRONG_PERSON_IDENTIFIER_TYPES,
+    PersonNameForms,
+    ResolutionMode,
     consensus_name,
     form_matches_person,
     identifier_misplaced,
 )
+from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories.person_repository import PgPersonRepository
+from infrastructure.sql_fragments import (
+    DETACHED_SIGNATURE,
+    identifier_neutralized,
+    person_signature,
+    pinned,
+    trusted_identifier_sql,
+)
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -32,19 +48,223 @@ from pipeline.runtime.observability.libelles import (
     rien_a_faire,
 )
 from pipeline.runtime.observability.progression import attente
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.store import PersonsStore
+
+
+class IdentityIdentifier(NamedTuple):
+    """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
+
+    identity_id: int
+    name: str
+    value: str
+
+
+class MisplacedNeutralizations(NamedTuple):
+    """Résultat d'une réécriture des neutralisations `misplaced`."""
+
+    neutralized: int
+    """Signatures qui gagnent un identifiant neutralisé."""
+    to_detach: list[int]
+    """Parmi elles, les signatures résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
+
+
+# Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
+_ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
+
+# Même condition, restreinte au partage de la valeur entre signatures d'un document.
+_ID_TYPE_SHARED = identifier_neutralized(":id_type", reason=IdentifierNeutralization.SHARED.value)
+
+_MISPLACED = IdentifierNeutralization.MISPLACED.value
+
+
+def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
+    """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`author_identifying_keys`), jointes aux `source_authorships` (index `identity_id`) pour le comptage.
+
+    Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
+    rows = conn.execute(
+        text(f"""
+            SELECT aik.person_identifiers->>:id_type AS id_value,
+                   aik.author_name_normalized AS name,
+                   count(*) AS votes
+            FROM author_identifying_keys aik
+            JOIN source_authorships sa ON sa.identity_id = aik.id
+            WHERE aik.person_identifiers ? :id_type
+              AND aik.author_name_normalized IS NOT NULL
+              AND {person_signature("sa")}
+              AND NOT {_ID_TYPE_SHARED}
+              AND {trusted_identifier_sql(id_type, "sa")}
+            GROUP BY 1, 2
+        """),
+        {"id_type": id_type},
+    ).all()
+    votes: dict[str, dict[str, int]] = {}
+    for r in rows:
+        votes.setdefault(r.id_value, {})[r.name] = int(r.votes)
+    return votes
+
+
+def fetch_identity_identifiers(conn: Connection, id_type: str) -> list[IdentityIdentifier]:
+    """Identités portant un identifiant du type, avec leur nom normalisé."""
+    rows = conn.execute(
+        text("""
+            SELECT id, author_name_normalized AS name, person_identifiers->>:id_type AS value
+            FROM author_identifying_keys
+            WHERE person_identifiers ? :id_type AND author_name_normalized IS NOT NULL
+        """),
+        {"id_type": id_type},
+    ).all()
+    return [IdentityIdentifier(r.id, r.name, r.value) for r in rows]
+
+
+def write_misplaced_neutralizations(
+    conn: Connection, misplaced: Mapping[int, Sequence[str]]
+) -> MisplacedNeutralizations:
+    """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{identity_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `authorships_dirty`."""
+    payload = [
+        {"identity_id": identity_id, "carte": dict.fromkeys(id_types, _MISPLACED)}
+        for identity_id, id_types in misplaced.items()
+    ]
+    rows = conn.execute(
+        text(f"""
+            WITH marques AS (
+                SELECT m.identity_id, m.carte
+                FROM jsonb_to_recordset(:payload) AS m(identity_id integer, carte jsonb)
+            ),
+            cibles AS (
+                SELECT sa.id,
+                       sa.neutralized_identifiers AS avant,
+                       NULLIF(
+                           coalesce(m.carte, '{{}}'::jsonb)
+                           || coalesce(
+                               (SELECT jsonb_object_agg(e.k, e.v)
+                                  FROM jsonb_each(sa.neutralized_identifiers) AS e(k, v)
+                                 WHERE e.v <> to_jsonb('{_MISPLACED}'::text)),
+                               '{{}}'::jsonb),
+                           '{{}}'::jsonb
+                       ) AS apres
+                FROM source_authorships sa
+                LEFT JOIN marques m ON m.identity_id = sa.identity_id
+                WHERE m.identity_id IS NOT NULL
+                   OR (sa.neutralized_identifiers IS NOT NULL
+                       AND EXISTS (
+                           SELECT 1 FROM jsonb_each_text(sa.neutralized_identifiers) AS e(k, v)
+                           WHERE e.v = '{_MISPLACED}'
+                       ))
+            ),
+            modifiees AS (
+                UPDATE source_authorships sa
+                SET neutralized_identifiers = c.apres
+                FROM cibles c
+                WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
+                RETURNING sa.id, sa.source_publication_id, sa.resolution_mode, c.avant, c.apres
+            ),
+            regroupees AS (
+                UPDATE publications p SET authorships_dirty = true
+                FROM source_publications sp
+                WHERE sp.id IN (SELECT source_publication_id FROM modifiees)
+                  AND p.id = sp.publication_id AND NOT p.authorships_dirty
+            )
+            SELECT id,
+                   coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
+                   AND NOT {pinned("modifiees.id")} AS a_detacher
+            FROM modifiees
+            WHERE EXISTS (
+                SELECT 1 FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
+                WHERE NOT coalesce(avant ? k, false)
+            )
+            ORDER BY id
+        """).bindparams(bindparam("payload", type_=Jsonb)),
+        {"payload": payload},
+    ).all()
+    return MisplacedNeutralizations(
+        neutralized=len(rows), to_detach=[r.id for r in rows if r.a_detacher]
+    )
+
+
+def fetch_person_name_forms(conn: Connection, person_ids: list[int]) -> dict[int, PersonNameForms]:
+    """Les formes `confirmed` accompagnent le nom-prénom canonique pour l'arbitrage des transferts (`form_matches_person`) : une personne peut matcher le consensus par une forme validée que le canonique ne recouvre pas (changement de nom). Les formes `pending` — vecteur de contamination des captures — sont exclues."""
+    if not person_ids:
+        return {}
+    rows = conn.execute(
+        text(f"""
+            SELECT p.id,
+                   p.last_name_normalized AS ln,
+                   p.first_name_normalized AS fn,
+                   COALESCE(
+                       array_agg(nf.name_form)
+                           FILTER (WHERE nf.status = '{AttributionStatus.CONFIRMED.value}'),
+                       ARRAY[]::text[]
+                   ) AS confirmed_forms
+            FROM persons p
+            LEFT JOIN person_name_forms nf ON nf.person_id = p.id
+            WHERE p.id = ANY(:ids)
+            GROUP BY p.id, p.last_name_normalized, p.first_name_normalized
+        """),
+        {"ids": list(person_ids)},
+    ).all()
+    return {r.id: PersonNameForms(r.ln or "", r.fn or "", list(r.confirmed_forms)) for r in rows}
+
+
+def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
+    """Sert au balayage frontal des conflits d'attribution : le propriétaire attribué d'une valeur, à confronter aux personnes qui en portent des signatures."""
+    rows = conn.execute(
+        text(f"""
+            SELECT id_value, person_id, status
+            FROM person_identifiers
+            WHERE id_type = :t AND status <> '{AttributionStatus.REJECTED.value}'
+        """),
+        {"t": id_type},
+    ).all()
+    return {r.id_value: (r.person_id, r.status) for r in rows}
+
+
+def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tuple[str, int]]:
+    """Agrégat sur les signatures rattachées dont l'identité contient l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
+    rows = conn.execute(
+        text(f"""
+            SELECT aik.person_identifiers->>:id_type AS id_value, sa.person_id
+            FROM source_authorships sa
+            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+            WHERE aik.person_identifiers ? :id_type
+              AND NOT {_ID_TYPE_NEUTRALIZED}
+              AND sa.person_id IS NOT NULL
+              AND {trusted_identifier_sql(id_type, "sa")}
+            GROUP BY 1, 2
+        """),
+        {"id_type": id_type},
+    ).all()
+    return [(r.id_value, r.person_id) for r in rows]
+
+
+def null_identifier_signatures(
+    conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
+) -> int:
+    """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
+    return conn.execute(
+        text(f"""
+            UPDATE source_authorships sa
+            SET {DETACHED_SIGNATURE}
+            FROM author_identifying_keys aik
+            WHERE sa.identity_id = aik.id
+              AND sa.person_id = :old_owner
+              AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
+              AND aik.person_identifiers->>:id_type = :id_value
+              AND NOT {_ID_TYPE_NEUTRALIZED}
+              AND NOT {pinned("sa.id")}
+        """),
+        {"old_owner": old_owner_person_id, "id_type": id_type, "id_value": id_value},
+    ).rowcount
+
 
 IdentifierConsensus = dict[tuple[str, str], str]
 """`{(id_type, id_value): nom du consensus}` pour les valeurs dont le consensus désigne un nom."""
 
 
-def compute_identifier_consensus(
-    conn: Connection, queries: PersonsMatchingQueries
-) -> IdentifierConsensus:
+def compute_identifier_consensus(conn: Connection) -> IdentifierConsensus:
     """Consensus de chaque valeur d'identifiant, tous types confondus."""
     consensus: IdentifierConsensus = {}
     for id_type in PERSON_IDENTIFIER_TYPES:
-        for value, votes in queries.fetch_identifier_votes(conn, id_type).items():
+        for value, votes in fetch_identifier_votes(conn, id_type).items():
             if (name := consensus_name(votes)) is not None:
                 consensus[(id_type, value)] = name
     return consensus
@@ -53,7 +273,6 @@ def compute_identifier_consensus(
 def requalify_misplaced_identifiers(
     conn: Connection,
     consensus: IdentifierConsensus,
-    queries: PersonsMatchingQueries,
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés et détache les signatures qu'ils ont pu rattacher.
 
@@ -61,14 +280,12 @@ def requalify_misplaced_identifiers(
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
-        for identity in queries.fetch_identity_identifiers(conn, id_type):
+        for identity in fetch_identity_identifiers(conn, id_type):
             if identifier_misplaced(identity.name, consensus.get((id_type, identity.value))):
                 misplaced[identity.identity_id].append(id_type)
 
-    written = queries.write_misplaced_neutralizations(conn, misplaced)
-    detached = (
-        queries.detach_source_authorships(conn, written.to_detach) if written.to_detach else 0
-    )
+    written = write_misplaced_neutralizations(conn, misplaced)
+    detached = PersonsStore(conn).detach_signatures(written.to_detach) if written.to_detach else 0
     return {"neutralized": written.neutralized, "detached": detached}
 
 
@@ -85,19 +302,17 @@ class IdentifierConflict(NamedTuple):
     owner_status: str
 
 
-def detect_identifier_conflicts(
-    conn: Connection, queries: PersonsMatchingQueries
-) -> list[IdentifierConflict]:
+def detect_identifier_conflicts(conn: Connection) -> list[IdentifierConflict]:
     """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
 
     Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
     """
     conflicts: list[IdentifierConflict] = []
     for id_type in STRONG_PERSON_IDENTIFIER_TYPES:
-        owners = queries.fetch_identifier_owners(conn, id_type)
+        owners = fetch_identifier_owners(conn, id_type)
         if not owners:
             continue
-        for id_value, bearer_person_id in queries.fetch_identifier_bearer_persons(conn, id_type):
+        for id_value, bearer_person_id in fetch_identifier_bearer_persons(conn, id_type):
             owner = owners.get(id_value)
             if owner is None or bearer_person_id == owner[0]:
                 continue
@@ -112,7 +327,6 @@ def resolve_identifier_transfers(
     conflicts: list[IdentifierConflict],
     *,
     consensus: IdentifierConsensus,
-    queries: PersonsMatchingQueries,
     repo: PgPersonRepository,
     logger: logging.Logger,
 ) -> dict[str, int]:
@@ -127,7 +341,7 @@ def resolve_identifier_transfers(
 
     # Nom-prénom + formes confirmées des personnes impliquées (propriétaires et candidats).
     person_ids = {c.candidate_person_id for c in pending} | {c.owner_person_id for c in pending}
-    persons = queries.fetch_person_name_forms(conn, sorted(person_ids))
+    persons = fetch_person_name_forms(conn, sorted(person_ids))
 
     # Une valeur peut apparaître dans plusieurs conflits (candidats distincts) : on regroupe pour trancher une seule fois, la personne du consensus l'emportant.
     candidates_by_value: dict[tuple[str, str], set[int]] = defaultdict(set)
@@ -161,7 +375,7 @@ def resolve_identifier_transfers(
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
-        detached = queries.null_identifier_signatures(conn, id_type, id_value, owner_id)
+        detached = null_identifier_signatures(conn, id_type, id_value, owner_id)
         logger.info(
             "%sTransfert %s=%s : personne %d → %d (consensus %r), %s %s",
             BRANCHE,
@@ -188,7 +402,6 @@ def resolve_identifier_transfers(
 
 def arbitrate_identifier_conflicts(
     conn: Connection,
-    queries: PersonsMatchingQueries,
     logger: logging.Logger,
     *,
     repo: PgPersonRepository,
@@ -199,8 +412,8 @@ def arbitrate_identifier_conflicts(
     """
     etape(logger, "Identifiants mal placés et conflits d'attribution")
     with attente(BRANCHE, logger) as ligne:
-        consensus = compute_identifier_consensus(conn, queries)
-        requalified = requalify_misplaced_identifiers(conn, consensus, queries)
+        consensus = compute_identifier_consensus(conn)
+        requalified = requalify_misplaced_identifiers(conn, consensus)
         if requalified["neutralized"]:
             ligne.conclut(
                 f"{BRANCHE}Identifiants mal placés neutralisés sur "
@@ -209,10 +422,10 @@ def arbitrate_identifier_conflicts(
         else:
             ligne.efface()
     with attente(BRANCHE, logger) as ligne:
-        conflicts = detect_identifier_conflicts(conn, queries)
+        conflicts = detect_identifier_conflicts(conn)
         ligne.efface()
     transferred = resolve_identifier_transfers(
-        conn, conflicts, consensus=consensus, queries=queries, repo=repo, logger=logger
+        conn, conflicts, consensus=consensus, repo=repo, logger=logger
     )["transferred"]
 
     return {

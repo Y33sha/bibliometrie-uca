@@ -8,6 +8,7 @@ from application.services.authorships.assign_orphans import assign_orphan_author
 from application.services.authorships.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from infrastructure.repositories import authorship_repository, person_repository
+from pipeline.transformation.persons.persons import enforce_confirmed_authorships
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -107,7 +108,5 @@ def test_enforce_restores_pinned_signature(sa_sync_conn):
     )
     assert _sa_person(sa_sync_conn, sa) is None
 
-    from pipeline.transformation.persons.matching import PersonsMatchingQueries
-
-    assert PersonsMatchingQueries().enforce_confirmed_authorships(sa_sync_conn) == 1
+    assert enforce_confirmed_authorships(sa_sync_conn) == 1
     assert _sa_person(sa_sync_conn, sa) == pid
