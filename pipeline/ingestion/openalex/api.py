@@ -13,9 +13,34 @@ from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.throttle import Throttle
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY, OPENALEX_PER_PAGE
 from pipeline.ingestion.credentials import get_openalex_api_key
-from pipeline.ingestion.openalex.fields import SELECT_FIELDS
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
+
+SELECT_FIELDS = ",".join(
+    [
+        "id",
+        "doi",
+        "title",
+        "display_name",
+        "publication_year",
+        "publication_date",
+        "type",
+        "language",
+        "primary_location",
+        "locations",
+        "authorships",
+        "open_access",
+        "cited_by_count",
+        "fwci",
+        "citation_normalized_percentile",
+        "biblio",
+        "is_retracted",
+        "topics",
+        "keywords",
+        "abstract_inverted_index",
+    ]
+)
+"""Champs demandés à l'API (`select`)."""
 
 
 def credential_params() -> dict[str, str]:

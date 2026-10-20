@@ -21,14 +21,8 @@ from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.wos.api import search
-from pipeline.ingestion.wos.fields import (
-    extract_doi,
-    extract_ut,
-    filter_doi_for_wos,
-    get_records,
-    get_records_found,
-)
+from pipeline.ingestion.wos.api import filter_doi_for_wos, get_records, get_records_found, search
+from pipeline.ingestion.wos.fields import extract_doi, extract_ut
 
 log = logging.getLogger(__name__)
 
