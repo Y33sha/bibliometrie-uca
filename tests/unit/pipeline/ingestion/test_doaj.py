@@ -8,8 +8,12 @@ import logging
 import httpx2
 import pytest
 
-from pipeline.http.dump_download import DumpDownloadError
-from pipeline.ingestion.complements.doaj import DOAJ_CSV_DUMP_URL, fetch_doaj_dump
+from pipeline.http.dump_download import DumpDownloadError, download_dump
+from pipeline.ingestion.complements.doaj import (
+    ALLOWED_DUMP_HOSTS,
+    DOAJ_CSV_DUMP_URL,
+    MAX_DUMP_BYTES,
+)
 
 _S3 = "https://doaj-live-journal-csv.s3.amazonaws.com/dump.csv"
 _CSV = b"Journal title,ISSN\nRevue,1234-5678\n"
@@ -17,9 +21,17 @@ _CSV = b"Journal title,ISSN\nRevue,1234-5678\n"
 log = logging.getLogger(__name__)
 
 
-def _fetch(tmp_path, **kwargs):
+def _fetch(tmp_path, *, max_bytes=MAX_DUMP_BYTES):
     dest = tmp_path / "dump.csv"
-    fetch_doaj_dump(str(dest), user_agent="test", logger=log, **kwargs)
+    download_dump(
+        DOAJ_CSV_DUMP_URL,
+        str(dest),
+        label="DOAJ",
+        user_agent="test",
+        logger=log,
+        max_bytes=max_bytes,
+        allowed_redirect_hosts=ALLOWED_DUMP_HOSTS,
+    )
     return dest
 
 
