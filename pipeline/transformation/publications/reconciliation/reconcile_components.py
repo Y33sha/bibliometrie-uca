@@ -21,6 +21,7 @@ from sqlalchemy import Connection
 
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
 from domain.source_publications.keys import project_confirmation_keys
+from infrastructure.db.savepoint import savepoint
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
@@ -30,7 +31,6 @@ from pipeline.runtime.observability.libelles import (
     rien_a_faire,
 )
 from pipeline.runtime.observability.progression import attente, progression
-from pipeline.runtime.savepoint import savepoint
 from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.reconciliation.reconciliation import (
     PublicationsReconciliationQueries,

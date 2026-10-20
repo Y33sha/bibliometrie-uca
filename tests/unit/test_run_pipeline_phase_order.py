@@ -39,6 +39,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
                 logger=logging.getLogger("test"),
                 options=RunOptions(),
                 maintain=lambda op: None,
+                credentials_missing=lambda _source: None,
             )
         )
     address_pub_count.recompute_pub_count.assert_called_once()

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import httpx2
 import pytest
@@ -130,7 +130,11 @@ def _run(
         max_concurrent=max_concurrent,
     ).run(
         PhaseContext(
-            open_tx=_open_tx, logger=logger, options=RunOptions(), maintain=lambda op: None
+            open_tx=_open_tx,
+            logger=logger,
+            options=RunOptions(),
+            maintain=lambda op: None,
+            credentials_missing=lambda _source: None,
         )
     )
 
@@ -280,15 +284,15 @@ def test_skips_without_unpaywall_configuration(logger):
         ),
     )
 
-    with patch(
-        "pipeline.runtime.config.source_credentials_missing",
-        return_value="email polite pool absent",
-    ):
-        metrics = phase.run(
-            PhaseContext(
-                open_tx=open_tx, logger=logger, options=RunOptions(), maintain=lambda op: None
-            )
+    metrics = phase.run(
+        PhaseContext(
+            open_tx=open_tx,
+            logger=logger,
+            options=RunOptions(),
+            maintain=lambda op: None,
+            credentials_missing=lambda _source: "adresse polite pool absente",
         )
+    )
 
     open_tx.assert_not_called()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

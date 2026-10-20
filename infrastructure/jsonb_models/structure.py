@@ -10,7 +10,7 @@ class StructureApiIds(JsonbModel):
 
     Identifiants API externes d'une structure, **indexés par source**. Chaque source peut avoir 0, 1 ou plusieurs IDs (une structure fusionnée dans OpenAlex garde parfois deux entrées distinctes). Les valeurs sont des **listes de strings**, même quand il n'y a qu'un seul ID.
 
-    Alimente les filtres d'affiliation à l'extraction (via `pipeline/runtime/config.py`, `get_extraction_api_ids`).
+    Alimente les filtres d'affiliation à l'extraction (via `infrastructure/read_models/perimeters.py`, `get_extraction_api_ids`).
 
     Clés strictes (whitelist `domain.sources.STRUCTURE_API_SOURCES`) : `extra="forbid"` rejette toute clé inconnue. Un test de synchronisation vérifie que les champs du modèle correspondent à la whitelist.
     """

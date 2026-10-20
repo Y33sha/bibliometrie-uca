@@ -257,8 +257,7 @@ def _run_resolve_datacite_publishers(
 
 
 def _prefixes_user_agent() -> str:
-    from pipeline.http.polite_pool import build_user_agent
-    from pipeline.runtime.config import get_polite_pool_email_optional
+    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
 
     return build_user_agent(get_polite_pool_email_optional() or "")
 
@@ -413,12 +412,9 @@ def _run_learn_journal_doi_namespaces(
 def _run_enrich_journals_from_doaj(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    from pipeline.http.polite_pool import build_user_agent
+    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
     from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
-    from pipeline.runtime.config import (
-        get_doaj_refresh_after_days,
-        get_polite_pool_email_optional,
-    )
+    from pipeline.runtime.config import get_doaj_refresh_after_days
     from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
         run_enrich_journals_from_doaj,
     )

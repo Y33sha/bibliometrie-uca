@@ -21,16 +21,13 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
-    return fetch_stale.build().run(phase_context(options))
+    return fetch_stale.build().run(phase_context(options, credentials_missing=lambda _source: None))
 
 
 def _called_targets(stack) -> MagicMock:
     """Patche les I/O de la phase `fetch_stale` et retourne le mock des sources refetch."""
     run_one = stack.enter_context(
         patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
-    )
-    stack.enter_context(
-        patch("pipeline.runtime.config.source_credentials_missing", return_value=None)
     )
     # Fenêtre d'années : évite tout accès base (get_years lit la config).
     stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
@@ -102,9 +99,6 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
         )
         stack.enter_context(
             patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock())
-        )
-        stack.enter_context(
-            patch("pipeline.runtime.config.source_credentials_missing", return_value=None)
         )
         stack.enter_context(patch("pipeline.runtime.config.get_years", return_value=[2024]))
         stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))

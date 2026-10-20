@@ -21,8 +21,8 @@ from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.credentials import get_scanr_credentials
 from pipeline.ingestion.scanr.fields import extract_id
-from pipeline.runtime.config import get_scanr_credentials
 
 
 class ScanrDoiSearch:

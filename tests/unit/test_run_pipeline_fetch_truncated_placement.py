@@ -27,7 +27,9 @@ def test_refetch_not_called_in_extract():
         patch.object(extract, "_run_extract", return_value=PhaseMetrics()),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
-        extract.build().run(phase_context(RunOptions(mode="full")))
+        extract.build().run(
+            phase_context(RunOptions(mode="full"), credentials_missing=lambda _source: None)
+        )
     assert refetch.call_count == 0
 
 
@@ -40,18 +42,25 @@ def test_refetch_not_called_in_normalize():
         patch.object(normalize, "_run_cleanup_orphan_addresses", return_value=0),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
-        normalize.build().run(phase_context(RunOptions(mode="full", sources={"openalex", "hal"})))
+        normalize.build().run(
+            phase_context(
+                RunOptions(mode="full", sources={"openalex", "hal"}),
+                credentials_missing=lambda _source: None,
+            )
+        )
     assert refetch.call_count == 0
 
 
 def test_refetch_called_in_own_phase_when_openalex_present():
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        patch("pipeline.runtime.config.source_credentials_missing", return_value=None),
         patch(_REFETCH, new_callable=AsyncMock, return_value=PhaseMetrics()) as refetch,
     ):
         fetch_truncated.build().run(
-            phase_context(RunOptions(mode="full", sources={"openalex", "hal"}))
+            phase_context(
+                RunOptions(mode="full", sources={"openalex", "hal"}),
+                credentials_missing=lambda _source: None,
+            )
         )
     assert refetch.call_count == 1
 
@@ -59,6 +68,9 @@ def test_refetch_called_in_own_phase_when_openalex_present():
 def test_refetch_skipped_in_own_phase_without_openalex():
     with patch(_REFETCH, new_callable=AsyncMock) as refetch:
         fetch_truncated.build().run(
-            phase_context(RunOptions(mode="full", sources={"hal", "scanr"}))
+            phase_context(
+                RunOptions(mode="full", sources={"hal", "scanr"}),
+                credentials_missing=lambda _source: None,
+            )
         )
     assert refetch.call_count == 0

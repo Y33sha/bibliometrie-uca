@@ -226,13 +226,10 @@ def build() -> Phase:
     Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
     """
 
+    from pipeline.http.polite_pool import get_polite_pool_email_optional
     from pipeline.ingestion.api_params import API_BASE_URLS
     from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-    from pipeline.runtime.config import (
-        get_polite_pool_email_optional,
-        get_unpaywall_max_per_run,
-        get_unpaywall_recheck_after_days,
-    )
+    from pipeline.runtime.config import get_unpaywall_max_per_run, get_unpaywall_recheck_after_days
     from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 
     base_url = API_BASE_URLS["unpaywall"]

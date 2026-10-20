@@ -11,13 +11,6 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing import publishers_journals
 
 
-def _patch_credentials_present():
-    return patch(
-        "pipeline.runtime.config.source_credentials_missing",
-        side_effect=lambda source: None,
-    )
-
-
 def test_phase_aggregates_substep_counters():
     publishers = PhaseMetrics()
     publishers.add(new=1, publisher_matched=2)
@@ -26,7 +19,6 @@ def test_phase_aggregates_substep_counters():
 
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        _patch_credentials_present(),
         patch.object(
             publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
         ),
@@ -41,7 +33,9 @@ def test_phase_aggregates_substep_counters():
         ),
         patch.object(publishers_journals, "_run_enrich_journals_from_doaj", return_value=doaj),
     ):
-        metrics = publishers_journals.build().run(phase_context(RunOptions()))
+        metrics = publishers_journals.build().run(
+            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+        )
 
     # Les compteurs des sous-étapes sont remontés : le résumé n'est pas « no-op ».
     assert metrics.new == 1
@@ -58,7 +52,6 @@ def test_phase_propagates_substep_signals():
 
     with (
         patch("infrastructure.db.engine.get_sync_engine"),
-        _patch_credentials_present(),
         patch.object(
             publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
         ),
@@ -77,7 +70,9 @@ def test_phase_propagates_substep_signals():
             publishers_journals, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()
         ),
     ):
-        metrics = publishers_journals.build().run(phase_context(RunOptions()))
+        metrics = publishers_journals.build().run(
+            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+        )
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 

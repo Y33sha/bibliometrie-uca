@@ -5,18 +5,10 @@ Les dépendances techniques sont injectées (runners par canal et par source, pa
 
 import logging
 
-import pytest
-
 from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
-
-
-@pytest.fixture(autouse=True)
-def _identifiants_presents(monkeypatch):
-    """Toutes les sources ont leurs identifiants : les tests choisissent eux-mêmes les sources non configurées."""
-    monkeypatch.setattr("pipeline.runtime.config.source_credentials_missing", lambda _source: None)
 
 
 def _sync_run_parallel(thunks):

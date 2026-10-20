@@ -1,4 +1,4 @@
-"""Tests unitaires du context manager `pipeline.runtime.savepoint.savepoint`."""
+"""Tests unitaires du context manager `infrastructure.db.savepoint.savepoint`."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.runtime.savepoint import rollback_unless_invalidated, savepoint
+from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 
 
 def test_success_commits_savepoint():

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from pipeline.runtime.context import PhaseContext, RunOptions
+from pipeline.runtime.context import CredentialsMissing, PhaseContext, RunOptions
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -37,6 +37,12 @@ def maintain(operation: str) -> None:
         conn.execute(text(operation))
 
 
-def phase_context(options: RunOptions) -> PhaseContext:
-    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables."""
-    return PhaseContext(open_tx=open_tx, logger=log, options=options, maintain=maintain)
+def phase_context(options: RunOptions, *, credentials_missing: CredentialsMissing) -> PhaseContext:
+    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables, contrôle des identifiants d'accès."""
+    return PhaseContext(
+        open_tx=open_tx,
+        logger=log,
+        options=options,
+        maintain=maintain,
+        credentials_missing=credentials_missing,
+    )

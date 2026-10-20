@@ -43,6 +43,7 @@ from pipeline.ingestion.common import (
     fetch_stale,
     normalize,
 )
+from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
@@ -396,7 +397,8 @@ def _run_one_phase(
                         rebuild_subjects=args.rebuild_subjects,
                         raw_store=args.raw_store,
                         normalize_full=args.normalize_full,
-                    )
+                    ),
+                    credentials_missing=source_credentials_missing,
                 )
             )
         except (KeyboardInterrupt, Exception) as e:

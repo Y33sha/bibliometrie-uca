@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.common.harvest import (
@@ -23,7 +24,6 @@ from pipeline.ingestion.common.harvest import (
     stage_document,
 )
 from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
-from pipeline.runtime.config import get_extraction_api_ids
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 

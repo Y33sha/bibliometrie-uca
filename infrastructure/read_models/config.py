@@ -1,6 +1,6 @@
 """Query services pour les paramètres applicatifs (table `config`).
 
-Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, collections HAL, comptes de service des sources — vivent à part, dans `pipeline/runtime/config.py`.
+Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, plafonds et délais d'interrogation — vivent à part, dans `pipeline/runtime/config.py`.
 """
 
 from sqlalchemy import Connection, select, text

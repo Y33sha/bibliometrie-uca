@@ -14,6 +14,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping
+from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.throttle import Throttle
@@ -32,9 +33,6 @@ from pipeline.ingestion.wos.fields import (
     extract_ut,
     get_records,
     get_records_found,
-)
-from pipeline.runtime.config import (
-    get_extraction_api_ids,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression

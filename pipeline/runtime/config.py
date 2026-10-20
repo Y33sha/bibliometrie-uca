@@ -1,6 +1,6 @@
-"""Lecture de la configuration du pipeline.
+"""Lecture de la configuration d'exploitation du pipeline : années couvertes, plafonds et délais d'interrogation.
 
-Deux origines, selon la nature du réglage. Les paramètres d'exploitation — années couvertes, périmètre d'extraction, collections HAL, identifiants de structure par source — vivent dans la table `config` et se modifient depuis l'interface d'administration. Les identifiants d'accès aux sources externes, eux, sont des secrets : ils viennent de l'environnement du processus, comme les autres secrets de l'application.
+Ces paramètres vivent dans la table `config` et se modifient depuis l'interface d'administration. Le périmètre d'extraction se lit dans `infrastructure/read_models/perimeters.py`, les identifiants d'accès aux sources dans `pipeline/ingestion/credentials.py`.
 """
 
 import logging
@@ -9,7 +9,6 @@ from sqlalchemy import Connection, text
 
 from domain.dates import today
 from domain.types import JsonValue
-from infrastructure.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -118,112 +117,3 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
     if start_year is not None and start_year <= current_year:
         return list(range(start_year, current_year + 1))
     return [current_year]
-
-
-def get_hal_collections(conn: Connection) -> dict[str, str]:
-    """Collections HAL {code_hal: label} des structures du périmètre d'extraction qui en portent une."""
-    from infrastructure.read_models.perimeters import get_extraction_structure_ids
-
-    structure_ids = get_extraction_structure_ids(conn)
-    if not structure_ids:
-        return {}
-    rows = conn.execute(
-        text(
-            "SELECT hal_collection, COALESCE(acronym, name) AS label "
-            "FROM structures "
-            "WHERE id = ANY(:ids) "
-            "AND hal_collection IS NOT NULL AND hal_collection != ''"
-        ),
-        {"ids": list(structure_ids)},
-    ).all()
-    return {r.hal_collection: r.label for r in rows}
-
-
-def get_openalex_api_key() -> str | None:
-    """Clé d'API OpenAlex, ou `None` si elle n'est pas configurée."""
-    return settings.openalex_api_key.get_secret_value() or None
-
-
-def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
-    """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
-
-    Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
-    """
-    from infrastructure.read_models.perimeters import get_extraction_structure_ids
-
-    struct_ids = get_extraction_structure_ids(conn)
-    if not struct_ids:
-        return []
-    rows = conn.execute(
-        text("SELECT api_ids->:src AS ids FROM structures WHERE id = ANY(:ids) AND api_ids ? :src"),
-        {"src": source, "ids": list(struct_ids)},
-    ).all()
-    result: list[str] = []
-    for row in rows:
-        ids = row.ids
-        if isinstance(ids, list):
-            result.extend(ids)
-        elif isinstance(ids, str):
-            # Tolérance d'un scalaire (cf. `StructureApiIds._ensure_list`).
-            result.append(ids)
-    return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
-
-
-def get_polite_pool_email_optional() -> str | None:
-    """Adresse annoncée en polite pool, ou `None` si elle n'est pas configurée (sans lever).
-
-    Pour les consommateurs qui la traitent comme facultative : OpenAlex, dont l'accès au polite pool peut aussi passer par une clé d'API. Ceux qui l'exigent utilisent `get_polite_pool_email`.
-    """
-    return settings.polite_pool_email or None
-
-
-def get_polite_pool_email() -> str:
-    """Adresse annoncée en polite pool aux API externes (Crossref, DataCite, Unpaywall, …).
-
-    Lève si elle n'est pas configurée. Une adresse inventée expose à un blocage côté serveur.
-    """
-    email = get_polite_pool_email_optional()
-    if email is not None:
-        return email
-    raise RuntimeError(
-        "POLITE_POOL_EMAIL manquant dans l'environnement — requis pour le polite pool "
-        "des API (Crossref, DataCite, Unpaywall, etc.)."
-    )
-
-
-def get_wos_api_key() -> str:
-    """Clé d'API Web of Science, chaîne vide si elle n'est pas configurée."""
-    return settings.wos_api_key.get_secret_value()
-
-
-def get_scanr_credentials() -> tuple[str, str]:
-    """Identifiants de l'API ScanR, `("", "")` si l'un des deux manque."""
-    user, password = settings.scanr_username, settings.scanr_password.get_secret_value()
-    if user and password:
-        return user, password
-    return "", ""
-
-
-def source_credentials_missing(source: str) -> str | None:
-    """Motif d'absence des credentials d'API d'une source, ou `None` si utilisable.
-
-    Consultée par `access_source`, par lequel passe tout appel à une API tierce : un accès dont cette fonction renvoie un motif est sauté avec un avertissement. HAL, theses.fr, DOI.org et DOAJ sont des API publiques sans credential (jamais de motif). L'adresse polite pool est traitée comme un identifiant : Crossref, DataCite et Unpaywall en dépendent, et OpenAlex l'accepte à défaut de clé d'API. Le périmètre d'interrogation (collections, identifiants de structure, PPN) est un contrôle distinct, propre à l'extraction bulk.
-    """
-    if source in ("hal", "theses"):
-        return None
-    if source == "openalex":
-        if get_openalex_api_key() or get_polite_pool_email_optional():
-            return None
-        return "ni clé d'API ni adresse polite pool (OPENALEX_API_KEY / POLITE_POOL_EMAIL)"
-    if source == "wos":
-        return None if get_wos_api_key() else "clé d'API absente (WOS_API_KEY)"
-    if source == "scanr":
-        user, password = get_scanr_credentials()
-        if user and password:
-            return None
-        return "identifiants absents (SCANR_USERNAME / SCANR_PASSWORD)"
-    if source in ("crossref", "datacite", "unpaywall"):
-        if get_polite_pool_email_optional():
-            return None
-        return "adresse polite pool absente (POLITE_POOL_EMAIL)"
-    return None

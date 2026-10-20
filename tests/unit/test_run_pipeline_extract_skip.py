@@ -32,7 +32,10 @@ def test_phase_extract_full_skips_unconfigured_source():
         patch.object(extract, "_run_extract", side_effect=_extract),
     ):
         metrics = extract.build().run(
-            phase_context(RunOptions(mode="full", sources={"openalex", "theses"}))
+            phase_context(
+                RunOptions(mode="full", sources={"openalex", "theses"}),
+                credentials_missing=lambda _source: None,
+            )
         )
 
     assert _table_keys(metrics) == {"theses"}
@@ -52,7 +55,9 @@ def test_phase_extract_daily_hal_unconfigured():
         patch.object(extract, "_extraction_structure_count", return_value=1),
         patch.object(extract, "_run_extract", side_effect=_extract),
     ):
-        metrics = extract.build().run(phase_context(RunOptions(mode="daily")))
+        metrics = extract.build().run(
+            phase_context(RunOptions(mode="daily"), credentials_missing=lambda _source: None)
+        )
 
     assert _table_keys(metrics) == set()
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
