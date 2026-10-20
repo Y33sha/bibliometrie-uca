@@ -82,7 +82,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] `RunOptions` résolues une fois : ensemble de sources explicite, politique du mode. fd7d41c5d
 - [x] `runtime/config.py` : identifiants d'accès vers `ingestion/`, collections HAL et identifiants d'API vers `infrastructure/read_models/perimeters.py`. `savepoint.py` vers `infrastructure/db/`. Le contexte de phase transmet le contrôle des identifiants à `access_source`. a5061104b
 - [x] Interface de `run_nodes` et de `PhaseMetrics` : ligne de clôture optionnelle, `resume`, `add(total=…)`, `Node.group`, `Node.lot`. c5b8b7f43, a40b48acd, a9ff9b186
-- [ ] Description d'une phase en un seul endroit.
+- [x] Description d'une phase en un seul endroit. 48ebb9f81
 
 ### Phase 2 — `ingestion/common` et `complements`
 
