@@ -1,6 +1,5 @@
 """Normalisation des données HAL : staging → tables structurées."""
 
-import logging
 from collections.abc import Mapping
 from datetime import date
 from functools import lru_cache
@@ -613,7 +612,6 @@ def process_authorships(
 def process_work(
     conn: Connection,
     queries: SourcePublicationQueries,
-    logger: logging.Logger,
     staging_row: StagingRow,
     *,
     container_repo: ContainerGatewayQueries,
@@ -664,7 +662,6 @@ class HalNormalizer(BibliographicNormalizer):
         return process_work(
             conn,
             self._queries,
-            self.logger,
             row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,

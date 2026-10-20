@@ -533,7 +533,6 @@ class TestProcessWork:
         rendu = process_work(
             MagicMock(),
             queries,
-            logger,
             staging_row(staging_id=42, source_id="sc-1", raw=raw),
             container_repo=MagicMock(),
             publisher_repo=MagicMock(),
@@ -577,7 +576,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_scanr,
         "process_work",
-        lambda conn, queries, logger, row, **kw: vus.update(row=row, **kw) or True,
+        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = ScanrNormalizer(
         conn=MagicMock(),
