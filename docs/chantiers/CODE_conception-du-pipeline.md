@@ -110,7 +110,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 5 — `structures`
 
-- [ ] Reconnaissance des formes de nom de structures hors de `address_resolution.py`.
+- [x] Reconnaissance des formes de nom de structures hors de `address_resolution.py`. 627f38a48
 - [ ] Synchronisation des détections commune aux adresses et à IdRef.
 - [ ] Modules du périmètre : `perimeter`, `perimeter_evidence`, `in_perimeter`, port `AffiliationsQueries`.
 - [ ] Place de `countries/`.
