@@ -124,7 +124,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 7 — `publishing`
 
-- [ ] SQL de `journals/journals.py` réparti par étape ; stores des revues, monographies et éditeurs.
+- [x] SQL de `journals/journals.py` réparti par étape ; stores des revues, monographies et éditeurs. 23e96abb6, 22217be80, d99f7ecb1
 - [ ] Requalification par revue dans `journals/`, fusion des monographies sur le modèle des revues.
 - [ ] Liste des DOI connus tirée d'une vue commune avec `candidate_dois`.
 - [ ] Noms : étape DOAJ, `pub_id` d'éditeur.
