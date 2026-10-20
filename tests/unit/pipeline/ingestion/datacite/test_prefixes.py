@@ -86,7 +86,7 @@ def test_parse_datacite_prefix_payload_non_dict_returns_none():
 
 async def _fetch(prefix: str):
     async with httpx2.AsyncClient() as client:
-        return await fetch_datacite_prefix(client, prefix, user_agent="ua")
+        return await fetch_datacite_prefix(client, prefix)
 
 
 @pytest.mark.asyncio

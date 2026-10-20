@@ -19,14 +19,13 @@ from sqlalchemy import Connection
 from domain.publications.identifiers import clean_doi
 from domain.sources.registry import DOI_ORG
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_mapping
-from pipeline.http.http_retry import lookup_json_async
+from domain.types import JsonValue
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
+from pipeline.ingestion.datacite.api import search_dois
+from pipeline.ingestion.datacite.fields import record_doi
 
 
 class DataciteDoiSearch:
@@ -39,34 +38,15 @@ class DataciteDoiSearch:
     max_concurrent = 3
     request_delay_s = 0.9
 
-    def __init__(self) -> None:
-        self.base_url = API_BASE_URLS["datacite"]
-        self.headers = api_headers()
-
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
-        # Batch : `query=doi:"a" OR doi:"b" …`. Le champ `doi` est requêté en phrase exacte ; on remappe ensuite les nœuds reçus aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume.
-        clause = " OR ".join(f'doi:"{d}"' for d in dois)
-        outcome = await lookup_json_async(
-            client,
-            "GET",
-            f"{self.base_url}/dois",
-            params={"query": clause, "page[size]": len(dois), **RECORD_PARAMS},
-            headers=self.headers,
-            timeout=30,
-            not_found_statuses=frozenset(),
-            label=f"{len(dois)} DOI",
-        )
-        if isinstance(outcome, NotFound | Unavailable):
+        records = await search_dois(client, dois)
+        if isinstance(records, NotFound | Unavailable):
             return DoiBatchResult()
-        records = as_mapping(outcome).get("data")
-        if not isinstance(records, list):
-            return DoiBatchResult()
-
-        # DOI demandés non retournés = confirmés absents de DataCite.
+        # Les nœuds reçus se rapportent aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume. DOI demandés non retournés = confirmés absents de DataCite.
         found: dict[str, Mapping[str, JsonValue]] = {}
-        for rec in records:
-            if doi := record_doi(as_mapping(rec)):
-                found[doi] = as_mapping(rec)
+        for record in records:
+            if doi := record_doi(record):
+                found[doi] = record
         return DoiBatchResult(
             records=list(found.values()),
             not_found=[d for d in dois if clean_doi(d) not in found],
