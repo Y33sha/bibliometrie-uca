@@ -73,14 +73,13 @@ def _run(contexte, lots, *, build_metrics=None):
     adresses = _FakeAddressPubCountQueries()
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
-    with patch.object(
-        phase,
-        "build_authorships",
-        return_value=metrics,
+    with (
+        patch.object(phase, "build_authorships", return_value=metrics),
+        patch.object(
+            phase, "purge_orphan_publications", side_effect=purge.purge_orphan_publications
+        ),
     ):
-        rendu = phase.AuthorshipsPhase(_FakeBuildQueries(), purge, pub_counts, adresses).run(
-            contexte()
-        )
+        rendu = phase.AuthorshipsPhase(_FakeBuildQueries(), pub_counts, adresses).run(contexte())
     return rendu, purge, pub_counts
 
 
@@ -156,11 +155,11 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     metrics.details["summary"] = {}
     with (
         patch.object(phase, "build_authorships", return_value=metrics),
+        patch.object(phase, "purge_orphan_publications", return_value=0),
         caplog.at_level(logging.INFO, logger="test"),
     ):
         rendu = phase.AuthorshipsPhase(
             _FakeBuildQueries(),
-            _FakePurgeQueries([]),
             _FakePubCountsQueries(),
             _FakeAddressPubCountQueries(),
             empty_containers=(

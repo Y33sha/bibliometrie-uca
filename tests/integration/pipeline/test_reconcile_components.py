@@ -1,6 +1,6 @@
 """Intégration : passe de réconciliation des composantes (merge-only).
 
-Valide le SQL neuf (voisinage 1-hop, fetch dirty, clear) sur vraie base, et le bout-en-bout `run()` (fusion + nettoyage du drapeau) — `conn.commit` neutralisé pour rester dans la transaction rollbackée.
+Valide le SQL neuf (voisinage 1-hop, fetch dirty, clear) sur vraie base, et le bout-en-bout `reconcile()` (fusion + nettoyage du drapeau), dans la transaction rollbackée.
 """
 
 import logging
@@ -10,13 +10,13 @@ from sqlalchemy import bindparam, text
 
 from domain.merge import MergedEntity
 from domain.source_publications.keys import project_confirmation_keys
-from pipeline.transformation.publications.reconciliation.reconcile_components import reconcile, run
-from pipeline.transformation.publications.reconciliation.reconciliation import (
-    PublicationsReconciliationQueries,
+from pipeline.transformation.publications.reconciliation import (
+    fetch_dirty_source_publication_ids,
+    fetch_reconciliation_universe,
     mark_keys_dirty,
+    mark_publication_siblings_dirty,
+    reconcile,
 )
-
-_Q = PublicationsReconciliationQueries()
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
@@ -68,7 +68,7 @@ class TestUniverse:
         neighbor = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
         _notice(conn, unrelated_pub, source_id="c", doi="10.9/z", keys_dirty=False)
 
-        universe = {r.id for r in _Q.fetch_reconciliation_universe(conn)}
+        universe = {r.id for r in fetch_reconciliation_universe(conn)}
         assert universe == {dirty, neighbor}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
@@ -83,14 +83,14 @@ class TestUniverse:
             keys_dirty=False,
             external_ids={"hal_id": ["hal-1", "hal-2"]},
         )
-        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'une notice est le premier identifiant qu'elle liste : les suivants ne relient rien."""
         conn = sa_sync_conn
         dirty = _notice(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
         _notice(conn, source_id="b", keys_dirty=False, external_ids={"hal_id": ["hal-1", "hal-2"]})
-        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty}
+        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
         """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
@@ -112,33 +112,28 @@ class TestUniverse:
             doc_type="thesis",
             keys_dirty=False,
         )
-        assert {r.id for r in _Q.fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
         """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
         orphan = _notice(conn, source_id="orphan", doi="10.1/x")
-        assert _Q.fetch_dirty_source_publication_ids(conn) == [orphan]
+        assert fetch_dirty_source_publication_ids(conn) == [orphan]
 
 
 class TestEndToEnd:
-    def test_two_pubs_sharing_doi_merged(self, sa_sync_conn, monkeypatch):
+    def test_two_pubs_sharing_doi_merged(self, sa_sync_conn):
         """Deux pubs dont les SP partagent un DOI → fusion. Les pubs n'ont pas (encore) le DOI en
         colonne (`UNIQUE(lower(doi))` interdit deux pubs au même DOI) : aucune ne le porte, donc
         l'ancre tombe sur le `min(source_publication_id)`."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
         sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x")
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_publication_id.
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
@@ -148,23 +143,16 @@ class TestEndToEnd:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
-    def test_pub_keeping_sources_outside_neighborhood_survives_without_redirect(
-        self, sa_sync_conn, monkeypatch
-    ):
+    def test_pub_keeping_sources_outside_neighborhood_survives_without_redirect(self, sa_sync_conn):
         """La SP voisine rejoint l'ancre ; sa publication garde une autre SP, hors du voisinage. Elle survit, sans redirection."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
         sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
         sp_other = _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         assert _sp_state(conn, sp_a)[0] == pub_a
         assert _sp_state(conn, sp_b)[0] == pub_a
@@ -172,10 +160,9 @@ class TestEndToEnd:
         assert _pub_exists(conn, pub_b)
         assert redirect_of(conn, MergedEntity.PUBLICATION, pub_b) is None
 
-    def test_les_publications_touchees_regroupent_leurs_signatures(self, sa_sync_conn, monkeypatch):
+    def test_les_publications_touchees_regroupent_leurs_signatures(self, sa_sync_conn):
         """La publication qui reçoit une notice et celle qui en perd une sont à regrouper. Une publication dont la notice réexaminée reste en place ne l'est pas."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         untouched = _seed_pub(conn)
@@ -185,60 +172,42 @@ class TestEndToEnd:
         _notice(conn, untouched, source_id="d", doi="10.9/z")
         conn.execute(text("UPDATE publications SET authorships_dirty = false"))
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         dirty = dict(conn.execute(text("SELECT id, authorships_dirty FROM publications")).all())
         assert dirty[pub_a] and dirty[pub_b]
         assert not dirty[untouched]
 
-    def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(
-        self, sa_sync_conn, monkeypatch, caplog
-    ):
+    def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(self, sa_sync_conn, caplog):
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
 
         with caplog.at_level(logging.INFO, logger=logger.name):
-            run(
-                conn,
-                PublicationsReconciliationQueries(),
-                logger,
-            )
+            reconcile(conn, logger)
 
         assert "Aucun document nouveau ou mis à jour" in caplog.text
         assert "Rien à faire" in caplog.text
         assert "Recalcul" not in caplog.text
 
-    def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, monkeypatch, caplog):
+    def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, caplog):
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         _notice(conn, pub_a, source_id="a", doi="10.1/x")
         _notice(conn, pub_b, source_id="b", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
-            run(
-                conn,
-                PublicationsReconciliationQueries(),
-                logger,
-            )
+            reconcile(conn, logger)
 
         assert "résolus en 1 publication (1 déjà existante, 0 nouvelle ; 1 doublon" in caplog.text
 
-    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, monkeypatch, caplog):
+    def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, caplog):
         """Sous `rebuild`, l'étape annonce une reconstruction complète."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         _notice(conn, _seed_pub(conn), source_id="a", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
-            run(
+            reconcile(
                 conn,
-                PublicationsReconciliationQueries(),
                 logger,
                 rebuild=True,
             )
@@ -246,20 +215,15 @@ class TestEndToEnd:
         assert "(reconstruction complète)" in caplog.text
         assert "nouveaux ou mis à jour" not in caplog.text
 
-    def test_pub_with_two_dois_splits(self, sa_sync_conn, monkeypatch):
+    def test_pub_with_two_dois_splits(self, sa_sync_conn):
         """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
         Y part sur un nouveau pub."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub = _seed_pub(conn, doi="10.1/x")
         sp_x = _notice(conn, pub, source_id="x", doi="10.1/x", external_ids={"hal_id": ["h"]})
         sp_y = _notice(conn, pub, source_id="y", doi="10.2/y", external_ids={"hal_id": ["h"]})
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
         assert _sp_state(conn, sp_x) == (pub, False)
@@ -269,10 +233,9 @@ class TestEndToEnd:
         assert _pub_exists(conn, pub)
         assert _pub_exists(conn, y_pub)
 
-    def test_two_theses_sharing_title_year_merged(self, sa_sync_conn, monkeypatch):
+    def test_two_theses_sharing_title_year_merged(self, sa_sync_conn):
         """Deux thèses cross-source, même titre (long) + année, sans DOI/NNT/hal partagé → fusion par token bloc métadonnée."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(
@@ -290,11 +253,7 @@ class TestEndToEnd:
             doc_type="thesis",
         )
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
@@ -302,20 +261,15 @@ class TestEndToEnd:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
-    def test_distinct_dois_not_merged(self, sa_sync_conn, monkeypatch):
+    def test_distinct_dois_not_merged(self, sa_sync_conn):
         """Deux pubs à DOI distincts partageant un hal_id : pas de fusion (cannot-link DOI)."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn, doi="10.1/x")
         pub_b = _seed_pub(conn, doi="10.2/y")
         sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]})
         sp_b = _notice(conn, pub_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]})
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         assert _pub_exists(conn, pub_a)
         assert _pub_exists(conn, pub_b)
@@ -327,10 +281,9 @@ class TestEndToEnd:
 class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"
 
-    def test_two_conference_papers_merged(self, sa_sync_conn, monkeypatch):
+    def test_two_conference_papers_merged(self, sa_sync_conn):
         """Deux conference_paper cross-source, même titre (long) + année, sans DOI → fusion par token bloc."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(
@@ -340,11 +293,7 @@ class TestMetadataBlock:
             conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="conference_paper"
         )
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
@@ -352,10 +301,9 @@ class TestMetadataBlock:
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
 
-    def test_short_title_not_merged(self, sa_sync_conn, monkeypatch):
+    def test_short_title_not_merged(self, sa_sync_conn):
         """Titre court (≤ seuil) → pas de token bloc, pas de fusion (garde de longueur)."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(
@@ -365,21 +313,16 @@ class TestMetadataBlock:
             conn, pub_b, source_id="b", title_normalized="court titre", doc_type="conference_paper"
         )
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         assert _pub_exists(conn, pub_a)
         assert _pub_exists(conn, pub_b)
         assert _sp_state(conn, sp_a)[1] is False
         assert _sp_state(conn, sp_b)[1] is False
 
-    def test_different_doc_type_not_merged(self, sa_sync_conn, monkeypatch):
+    def test_different_doc_type_not_merged(self, sa_sync_conn):
         """Même titre long + année mais doc_type différents → pas de fusion (doc_type dans la clé)."""
         conn = sa_sync_conn
-        monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
         sp_a = _notice(
@@ -389,11 +332,7 @@ class TestMetadataBlock:
             conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="book_chapter"
         )
 
-        run(
-            conn,
-            PublicationsReconciliationQueries(),
-            logger,
-        )
+        reconcile(conn, logger)
 
         assert _pub_exists(conn, pub_a)
         assert _pub_exists(conn, pub_b)
@@ -521,7 +460,7 @@ class TestUniverseMatchesPythonTokens:
                 ).bindparams(bindparam("ids")),
                 {"i": i, "ids": ids},
             )
-            sql_neighbors = {r.id for r in _Q.fetch_reconciliation_universe(conn)} & seeded - {i}
+            sql_neighbors = {r.id for r in fetch_reconciliation_universe(conn)} & seeded - {i}
             py_neighbors = {j for j in ids if j != i and toks[i] & toks[j]}
             assert sql_neighbors == py_neighbors, (
                 f"divergence SP {i} : SQL={sql_neighbors} Python={py_neighbors}"
@@ -542,10 +481,7 @@ class TestExternalDoiCarrier:
         # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
         insert_signature(conn, sp1, source="openalex", author_position=None, in_perimeter=True)
 
-        reconcile(
-            conn,
-            PublicationsReconciliationQueries(),
-        )
+        reconcile(conn, logger)
 
         assert _pub_exists(conn, orphan_pub)
         assert _sp_state(conn, sp1)[0] == orphan_pub
@@ -605,7 +541,7 @@ class TestStaleMembership:
         other = _notice(conn, _seed_pub(conn), source_id="other", keys_dirty=False)
         orphan = _notice(conn, source_id="orphan", keys_dirty=False)
 
-        assert _Q.mark_publication_siblings_dirty(conn) == 1
+        assert mark_publication_siblings_dirty(conn) == 1
         assert _sp_state(conn, preprint)[1] is True
         assert _sp_state(conn, other)[1] is False
         assert _sp_state(conn, orphan)[1] is False
@@ -614,7 +550,7 @@ class TestStaleMembership:
         conn = sa_sync_conn
         pub, preprint, published = self._seed_drifted_pair(conn)
 
-        reconcile(conn, _Q)
+        reconcile(conn, logger)
 
         preprint_pub, preprint_dirty = _sp_state(conn, preprint)
         published_pub, published_dirty = _sp_state(conn, published)
@@ -650,7 +586,7 @@ class TestFirstHalIdKey:
             conn, pub, source_id="W1", external_ids={"hal_id": ["hal-01234567", "hal-07654321"]}
         )
 
-        reconcile(conn, _Q)
+        reconcile(conn, logger)
 
         assert _sp_state(conn, bridge)[0] == _sp_state(conn, first)[0]
         assert _sp_state(conn, second)[0] != _sp_state(conn, first)[0]
