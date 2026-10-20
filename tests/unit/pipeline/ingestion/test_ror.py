@@ -12,7 +12,7 @@ from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
 from pipeline.http.dump_download import DumpDownloadError, DumpUnavailableError
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.ror.dump import (
+from pipeline.ingestion.complements.ror import (
     ZenodoRorDumpSource,
     fetch_ror_dump,
     find_latest_ror_dump,

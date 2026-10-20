@@ -16,7 +16,7 @@ from pathlib import Path
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
-from pipeline.ingestion.ror.dump import fetch_ror_dump, read_ror_dump
+from pipeline.ingestion.complements.ror import fetch_ror_dump, read_ror_dump
 from pipeline.transformation.structures.ror import RorDumpQueries, import_ror_dump
 
 log = setup_logger("import_ror_dump", os.path.dirname(__file__))

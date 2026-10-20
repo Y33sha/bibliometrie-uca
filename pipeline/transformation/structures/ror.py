@@ -21,7 +21,7 @@ from infrastructure.db.tables import (
     ror_relations as ror_relations_table,
 )
 from pipeline.http.dump_download import DumpUnavailableError
-from pipeline.ingestion.ror.dump import ZenodoRorDumpSource, dump_version
+from pipeline.ingestion.complements.ror import ZenodoRorDumpSource, dump_version
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable

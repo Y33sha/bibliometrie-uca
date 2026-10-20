@@ -8,11 +8,9 @@ from __future__ import annotations
 import csv
 import io
 import logging
-import tempfile
 import zipfile
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from pathlib import Path
 
 import httpx2
 
@@ -24,7 +22,8 @@ from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.dump_download import (
     DumpDownloadError,
     DumpUnavailableError,
-    write_capped,
+    download_dump,
+    downloaded_dump,
 )
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.http_status import raise_for_status
@@ -111,31 +110,15 @@ def fetch_ror_dump(
 ) -> RorDumpFile:
     """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la rend."""
     dump = find_latest_ror_dump(user_agent=user_agent)
-    download_ror_dump(dump, dest_path, user_agent=user_agent, logger=logger)
+    download_dump(
+        dump.url,
+        dest_path,
+        label="ROR",
+        user_agent=user_agent,
+        logger=logger,
+        max_bytes=MAX_DUMP_BYTES,
+    )
     return dump
-
-
-def download_ror_dump(
-    dump: RorDumpFile,
-    dest_path: str,
-    *,
-    user_agent: str,
-    logger: logging.Logger,
-    timeout: float = 180.0,
-    max_bytes: int = MAX_DUMP_BYTES,
-) -> None:
-    """Télécharge l'archive `dump` vers `dest_path`.
-
-    Lève `httpx2.HTTPError` sur un échec de transport ou un statut d'erreur, redirection comprise, et `DumpDownloadError` au-delà de `max_bytes`.
-    """
-    logger.info("Téléchargement du dump ROR %s …", dump.name)
-    with (
-        httpx2.Client(timeout=timeout, follow_redirects=False, verify=tls_context()) as client,
-        client.stream("GET", dump.url, headers={"User-Agent": user_agent}) as resp,
-    ):
-        raise_for_status(resp)
-        written = write_capped(resp, dest_path, max_bytes, label="ROR")
-    logger.info("Dump ROR téléchargé : %s (%d octets)", dest_path, written)
 
 
 def read_ror_dump(archive_path: str) -> Iterator[RorOrganization]:
@@ -201,12 +184,15 @@ class ZenodoRorDumpSource:
         """Organisations de l'archive `version`, téléchargée le temps de la lecture. Lève `DumpUnavailableError`."""
         if self._latest is None or self._latest.name != version:
             raise DumpUnavailableError(f"Version {version} absente de la dernière liste lue.")
-        with tempfile.TemporaryDirectory() as tmp:
-            archive = str(Path(tmp) / version)
+        with downloaded_dump(
+            self._latest.url,
+            file_name=version,
+            label="ROR",
+            user_agent=self._user_agent,
+            logger=self._logger,
+            max_bytes=MAX_DUMP_BYTES,
+        ) as archive:
             try:
-                download_ror_dump(
-                    self._latest, archive, user_agent=self._user_agent, logger=self._logger
-                )
                 yield from read_ror_dump(archive)
             except _UNAVAILABLE as e:
                 raise DumpUnavailableError(str(e)) from e
