@@ -7,6 +7,8 @@ Chaque document est relu **par son identifiant natif** (`staging.source_id`), av
 - source indisponible (réseau, 429, réponse illisible) → rien, nouvelle tentative au run suivant.
 
 Le délai étale la charge sans `LIMIT` : chaque passe ramasse seulement les documents qui viennent de le franchir. Seule la requête par identifiant natif est propre à chaque source (`StaleRefetch.fetch_by_native_id`).
+
+Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`, `year`) borne la relecture aux années que le run moissonne. `theses` relit tout son historique, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source, etape
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
@@ -35,8 +37,6 @@ from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 COMMIT_EVERY = 50
-
-_SECTION = "Relecture des documents dans leur source"
 
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
@@ -58,7 +58,6 @@ class FetchStalePhase:
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
         if not options.policy.fetch_stale:
-            etape(logger, _SECTION)
             logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
@@ -83,7 +82,6 @@ class FetchStalePhase:
             {
                 f"fetch_stale.{source}": TaskStep(
                     task(source),
-                    section=_SECTION,
                     label=source_label(source),
                     progress_bar=True,
                     when=retenue(source),
@@ -269,13 +267,6 @@ async def refresh(
 
 
 def build() -> Phase:
-    """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
-
-    Chaque row est réinterrogée par son identifiant natif (`staging.source_id`), avec ou sans DOI : trouvée, son `last_seen_at` et son `raw_data` sont rafraîchis ; absente de sa source, elle reçoit un `disappeared_at` ; sur échec réseau, elle attend le run suivant. Le délai `fetch_stale_after_days` étale la charge, chaque passe ramassant seulement les rows qui viennent de le franchir.
-
-    Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`/`year`, via `source_publications.pub_year`) borne le rafraîchissement aux années que le run moissonne. `theses` ramène tout son historique, comme à l'extraction, sauf sous `--year`. WoS est opt-in (`--include-wos`).
-    """
-
     return FetchStalePhase(
         refresh_one=_run_fetch_stale,
         get_years_for_window=_get_years_for_window,

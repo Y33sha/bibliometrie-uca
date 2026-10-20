@@ -11,6 +11,8 @@ Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâch
 
 Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
+Les publications hors scope sont écartées (`domain/publications/scope`).
+
 `open_tx` gère le commit : `managed_transaction` commite en sortie de bloc si succès, rollback sinon.
 """
 
@@ -142,10 +144,6 @@ class PersonsPhase:
 
 
 def build() -> Phase:
-    """Rattachement des signatures aux personnes, et création des personnes inconnues.
-
-    Une transaction enchaîne la réapplication des épinglages posés par l'administration, l'arbitrage des identifiants, le rattachement des signatures aux personnes connues et la création des personnes pour les signatures restantes. Suivent la régénération des formes de nom, puis la purge des formes devenues ambiguës et des personnes vidées, chacune dans sa transaction. Les publications hors scope sont écartées (`domain/publications/scope`).
-    """
     from pipeline.transformation.persons.matching import PersonsMatchingQueries
     from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
 

@@ -1,8 +1,10 @@
 """Phase `publications` : assignation des `source_publications` aux publications, en une seule passe.
 
-`reconcile_components` clusterise le voisinage des SP dirty par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation (match/create/skip d'un orphelin) et réconciliation (merge/split de publications matérialisées) sont des facettes du même primitif.
+Les documents sources modifiés et leur voisinage sont regroupés par composante connexe de leurs clés de confirmation — DOI, NNT, hal_id, PMID, et pour les thèses le couple titre-année (`reconcile_components`). Chaque document rejoint la publication qui ancre sa partition. Rattacher un document, fusionner deux publications ou en scinder une sont trois lectures du même regroupement.
 
-`--rebuild-publications` re-dirtie tout le stock au début de la réconciliation : celle-ci dégénère alors en cluster-then-materialize global (après une évolution des règles de clés).
+La phase suit `metadata_correction`, qui a substitué le DOI de concept aux DOI de version DataCite : le regroupement se fait alors sur le concept.
+
+`--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
 
 La réconciliation est suivie de la suppression des publications restées sans source : celles que la réconciliation a vidées, et celles dont la phase `normalize` a retiré les derniers documents disparus.
 
@@ -108,14 +110,6 @@ def _reconcile(
 
 
 def build() -> Phase:
-    """Assignation des `source_publications` aux publications, en une seule passe.
-
-    Les documents sources modifiés et leur voisinage sont regroupés par composante connexe de leurs clés de confirmation — DOI, NNT, hal_id, PMID, et pour les thèses le couple titre-année. Chaque document rejoint la publication qui ancre sa partition. Rattacher un document, fusionner deux publications ou en scinder une sont trois lectures du même regroupement.
-
-    La phase suit `metadata_correction`, qui a substitué le DOI de concept aux DOI de version DataCite : le regroupement se fait alors sur le concept.
-
-    `--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
-    """
     from pipeline.transformation.publications.reconciliation.reconciliation import (
         PublicationsReconciliationQueries,
     )

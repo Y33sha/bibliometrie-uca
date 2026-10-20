@@ -21,7 +21,7 @@ from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.extract import Extracteur
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.runtime.parallel import RunParallel
@@ -30,7 +30,6 @@ from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
-_SECTION = "Moissonnage par personne"
 
 SearchOne = Callable[
     [PhaseContext, str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics
@@ -46,7 +45,6 @@ class ExtractByPersonPhase:
         """Exécute en parallèle la tâche de chaque source retenue et assemble les métriques."""
         options = ctx.options
         if not options.policy.extract_by_person:
-            etape(ctx.logger, _SECTION)
             ctx.logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return PhaseMetrics()
         effective = set(PERSON_SEARCHED_SOURCES) & options.sources
@@ -73,7 +71,6 @@ class ExtractByPersonPhase:
             {
                 f"extract_by_person.{source}": TaskStep(
                     task(source),
-                    section=_SECTION,
                     label=source_label(source),
                     progress_bar=True,
                     threshold=5,
@@ -97,7 +94,6 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 
 
 def build() -> Phase:
-    """Moissonnage des sources par l'identifiant des personnes RH, vers le staging."""
     from pipeline.runtime.parallel import run_parallel
 
     registry = _extractors()

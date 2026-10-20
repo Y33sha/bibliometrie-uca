@@ -1,5 +1,7 @@
 """Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Tâches `normalize.<source>`.
 
+Les `source_publications` sortent sans `publication_id` : la phase `publications` les assigne. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
+
 La phase enchaîne ses tâches (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
@@ -269,14 +271,13 @@ class NormalizePhase:
         steps = {
             f"normalize.{source}": TaskStep(
                 self._normalize_task(source),
-                section="Normalisation",
                 label=source_label(source),
                 progress_bar=True,
                 when=_retenue(source),
             )
             for source in sources
         }
-        steps["normalize.prune_disappeared"] = TaskStep(self._prune, section="Normalisation")
+        steps["normalize.prune_disappeared"] = TaskStep(self._prune)
         steps["normalize.cleanup_orphan_identities"] = TaskStep(
             self._cleanup, section="Maintenance des tables", label="Identités d'auteur orphelines"
         )
@@ -353,10 +354,6 @@ type ConstructeurNormalizer = Callable[[Connection, logging.Logger], SourceNorma
 
 
 def build() -> Phase:
-    """Normalisation du staging vers les tables sources.
-
-    Écrit les `source_publications` avec leurs métadonnées — résumé, mots-clés, sujets, références — et leurs signatures, en laissant `publication_id` à NULL : la phase `publications` assigne le document à sa publication. Le `raw_data` du staging est vidé après traitement. Pour HAL, les ORCID et IdRef sont extraits du TEI.
-    """
     return _NormalizeSelonOptions()
 
 

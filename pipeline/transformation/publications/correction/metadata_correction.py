@@ -86,7 +86,6 @@ class MetadataCorrectionPhase:
 
 
 def build() -> Phase:
-    """Correction des métadonnées des documents sources."""
     from pipeline.transformation.publications.correction.metadata_correction_queries import (
         PgMetadataCorrectionQueries,
     )
