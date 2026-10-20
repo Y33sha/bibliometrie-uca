@@ -39,7 +39,7 @@ def build_query(years: list[int] | None, since: str | None = None) -> str:
     """Requête Solr (`q`) : années de publication et/ou date de dernière modification.
 
     - `years` borne `producedDateY_i:[min TO max]`.
-    - `since` (`YYYY-MM-DD`) borne `modifiedDate_tdate:[since TO *]`, date de dernière modification de la notice, qui vaut la date de dépôt pour une notice jamais modifiée.
+    - `since` (`YYYY-MM-DD`) borne `modifiedDate_tdate:[since TO *]`, date de dernière modification du dépôt, qui vaut la date de dépôt pour un dépôt jamais modifié.
 
     Les deux filtres se combinent en AND. Au moins un des deux est requis.
     """
@@ -125,7 +125,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
     def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les notices modifiées depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
+        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))

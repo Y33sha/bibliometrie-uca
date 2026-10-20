@@ -2,7 +2,7 @@
 
 Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
-- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des signatures collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
+- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
 - `doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
 - `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
@@ -199,7 +199,7 @@ def _creator_affiliations(
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
 
-    Un creator `Organizational` donne une signature collective. ORCID sur `identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la signature pour une affiliation sans texte, `roles=['author']` explicite.
+    Un creator `Organizational` donne une contribution source collective. ORCID sur `identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la contribution source pour une affiliation sans texte, `roles=['author']` explicite.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -244,7 +244,7 @@ def process_contributions(
     attributes: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures DataCite de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources DataCite de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,
@@ -283,7 +283,7 @@ def process_work(
 
     title = get_title(attributes)
     publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
-    # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
+    # Garanti par `SourceNormalizer.process_work`, qui filtre les enregistrements sources sans titre ou sans année.
     assert isinstance(title, str) and isinstance(publication_year, int)
 
     publisher_id = upsert_publisher(attributes, publisher_store=publisher_store)

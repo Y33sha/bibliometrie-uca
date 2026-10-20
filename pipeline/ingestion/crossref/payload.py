@@ -1,6 +1,6 @@
-"""Lecture des notices Crossref par la normalisation.
+"""Lecture des enregistrements sources Crossref par la normalisation.
 
-Interprétation des champs propres au schéma CrossRef Works API — extracteurs et nettoyeurs qui encapsulent les conventions CrossRef.
+Interprétation des champs propres au schéma CrossRef Works API — fonctions de lecture et nettoyeurs qui encapsulent les conventions CrossRef.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_records.meta` (JSONB).
 """
@@ -49,7 +49,7 @@ _ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRON
 
 
 def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[JournalIssn, ...]:
-    """ISSN d'une notice CrossRef. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
+    """ISSN d'un enregistrement source Crossref. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
     typed = []
     for entree in as_sequence(msg.get("issn-type")):
         issn_obj = as_mapping(entree)

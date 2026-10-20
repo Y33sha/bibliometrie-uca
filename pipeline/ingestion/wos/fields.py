@@ -1,4 +1,4 @@
-"""Identité d'un record WoS : UID et DOI."""
+"""Identifiants d'un enregistrement WoS : UID et DOI."""
 
 from __future__ import annotations
 

@@ -175,9 +175,9 @@ def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
-    """Une signature par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
+    """Une contribution source par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
-    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les signatures à leurs structures (vue `source_contribution_structures`).
+    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
     """
     return [
         AuthorRecord(
@@ -197,7 +197,7 @@ def process_contributions(
     *,
     batch_queries: ContributionsBatchQueries,
 ) -> None:
-    """Synchronise les signatures de la thèse depuis son bloc auteurs."""
+    """Synchronise les contributions sources de la thèse depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         batch_queries,

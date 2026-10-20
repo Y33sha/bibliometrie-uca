@@ -39,7 +39,7 @@ _ARCHIVE_SUFFIX = "-ror-data.zip"
 _CSV_SUFFIX = "-ror-data.csv"
 
 ROR_DATA_CONCEPT_DOI = "10.5281/zenodo.6347574"
-"""DOI conceptuel du dump sur Zenodo. Sa notice DataCite donne la version la plus récente (`v2.14`)."""
+"""DOI conceptuel du dump sur Zenodo. Ses métadonnées DataCite donnent la version la plus récente (`v2.14`)."""
 
 
 def dump_version(archive_name: str) -> str:
@@ -48,7 +48,7 @@ def dump_version(archive_name: str) -> str:
 
 
 def published_ror_version(*, user_agent: str) -> str | None:
-    """Version la plus récente du dump, d'après la notice DataCite de son DOI conceptuel. `None` si DataCite ne répond pas."""
+    """Version la plus récente du dump, d'après les métadonnées DataCite de son DOI conceptuel. `None` si DataCite ne répond pas."""
     try:
         response = httpx2.get(
             f"{API_BASE_URLS['datacite']}/dois/{ROR_DATA_CONCEPT_DOI}",

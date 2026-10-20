@@ -60,7 +60,7 @@ class AddressRecord:
 class AuthorRecord:
     """DTO auteur partagé : sortie du parsing source, entrée du writer.
 
-    `position` : rang d'auteur, `None` pour une signature sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la signature sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la signature (`structId`). `collective` : la source déclare la signature collective. Le writer marque aussi collective une signature dont le nom désigne un collectif (`is_collective_name`).
+    `position` : rang d'auteur, `None` pour une contribution source sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la contribution source sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la contribution source (`structId`). `collective` : la source déclare la contribution source collective. Le writer marque aussi collective une contribution source dont le nom désigne un collectif (`is_collective_name`).
     """
 
     position: int | None
@@ -75,7 +75,7 @@ class AuthorRecord:
 
 
 AuthorBlock = Mapping[str, JsonValue]
-"""Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'une notice."""
+"""Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'un enregistrement source."""
 
 
 def sync_source_contributions(
@@ -86,9 +86,9 @@ def sync_source_contributions(
     block: AuthorBlock,
     build: Callable[[AuthorBlock], list[AuthorRecord]],
 ) -> None:
-    """Synchronise les signatures d'une notice depuis le bloc auteurs de son payload.
+    """Synchronise les contributions sources d'un enregistrement source depuis le bloc auteurs de son payload.
 
-    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_source_contributions_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
+    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les contributions sources en l'état. `mark_source_contributions_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
     block_hash = fingerprint(dict(block))
     if queries.fetch_authors_hash(conn, source_record_id) == block_hash:
@@ -104,11 +104,11 @@ def write_source_contributions(
     source_record_id: int,
     records: list[AuthorRecord],
 ) -> None:
-    """Synchronise les signatures d'une notice avec `records` (`plan_source_contribution_sync`).
+    """Synchronise les contributions sources d'un enregistrement source avec `records` (`plan_source_contribution_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `contributions_dirty` sur la publication de la notice. La notice reçoit son nombre de signatures d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `contributions_dirty` sur la publication de l'enregistrement source. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
-    Une signature entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
+    Une contribution source entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
     neutralizations = shared_identifier_neutralizations([rec.identifiers for rec in records])
     items: list[SourceContributionItem] = []
@@ -215,7 +215,7 @@ def write_source_contributions(
     )
     ror_items: dict[tuple[int, str, int | None], ContributionRorItem] = {}
     for key, source_contribution_id in sorted(source_contribution_id_by_key.items()):
-        # Un ROR que porte une adresse de la signature n'est pas répété sur la signature seule.
+        # Un ROR d'une adresse de la contribution source reste absent de la contribution source seule.
         on_addresses = frozenset().union(*(a.ror_ids for a in records[key].addresses))
         rors_by_address: list[tuple[frozenset[RorId], int | None]] = [
             (records[key].ror_ids - on_addresses, None),
@@ -245,7 +245,7 @@ def _inserted_ids(
     known_ids: set[int],
     inserted: Mapping[int, SourceContributionItem],
 ) -> dict[int, int]:
-    """Identifiants des signatures insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une signature insérée de même position et de même identité. Deux signatures de même position et de même identité sont indiscernables : l'ordre de leur rapprochement est indifférent."""
+    """Identifiants des contributions sources insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une contribution source insérée de même position et de mêmes informations du contributeur. Deux contributions sources de même position et de mêmes informations du contributeur sont indiscernables : l'ordre de leur rapprochement est indifférent."""
     new_ids: dict[Hashable, list[int]] = defaultdict(list)
     for row in sorted(rows, key=lambda r: r.id):
         if row.id not in known_ids:
@@ -257,7 +257,7 @@ def _inserted_ids(
 
 
 def contributor_name_fields(name: ContributorName) -> ContributorNameFields:
-    """Colonnes de nom d'une signature : nom fourni par la source, et découpage retenu normalisé."""
+    """Colonnes de nom d'une contribution source : nom fourni par la source, et découpage retenu normalisé."""
     last, first = name.normalized()
     return {
         "raw_author_name": name.raw,
@@ -274,7 +274,7 @@ def _contributor_information(
     identifiers: object,
     collective: bool,
 ) -> Hashable:
-    """Clé d'appariement d'une signature : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une signature qui devient collective est donc réinsérée sans personne."""
+    """Clé d'appariement d'une contribution source : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une contribution source qui devient collective est donc réinsérée sans personne."""
     ids = json.dumps(identifiers, sort_keys=True) if identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
 

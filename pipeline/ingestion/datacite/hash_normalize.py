@@ -1,8 +1,8 @@
-"""Neutralisation, pour la détection de changement, de ce qui varie dans un nœud DataCite sans que la notice change.
+"""Neutralisation, pour la détection de changement, de ce qui varie dans un nœud DataCite sans que l'enregistrement change.
 
-Un même DOI se lit par deux routes : la liste (`/dois?query=…`, extraction et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute la notice XML encodée (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, rend `[]` là où la liste rend `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans le hash.
+Un même DOI se lit par deux routes : la liste (`/dois?query=…`, moissonnage et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute l'enregistrement XML encodé (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, rend `[]` là où la liste rend `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans le hash.
 
-`strip_volatile_for_hash` renvoie une copie du nœud sans ces champs, à seule fin de calculer le hash. Les métadonnées lues par la normalisation restent dans le hash : une modification réelle de la notice reste détectée. Le payload stocké reste fidèle à la source.
+`strip_volatile_for_hash` renvoie une copie du nœud sans ces champs, à seule fin de calculer le hash. Les métadonnées lues par la normalisation restent dans le hash : une modification réelle de l'enregistrement reste détectée. Le payload stocké reste fidèle à la source.
 """
 
 from collections.abc import Mapping

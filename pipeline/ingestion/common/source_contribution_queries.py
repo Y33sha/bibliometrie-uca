@@ -1,8 +1,8 @@
-"""Requêtes d'écriture des signatures (`source_contributions`), des adresses et de leurs liens, communes à toutes les sources.
+"""Requêtes d'écriture des contributions sources (`source_contributions`), des adresses et de leurs liens, communes à toutes les sources.
 
 Les colonnes de `source_contributions` sont identiques pour toutes les sources, seul `source` paramètre l'INSERT. Chaque opération de batch est une **seule** requête : le lot est transmis en JSONB (ou en tableaux parallèles pour le pivot) et étendu côté serveur via `jsonb_to_recordset` / `unnest`.
 
-Consommé par le writer partagé `write_source_contributions`. L'INSERT des `source_contributions` et du pivot reçoit seulement des signatures absentes de la base, ou dont les liens pivot sont supprimés au préalable : il se passe d'`ON CONFLICT`. L'upsert des identités (`contributor_information`, table partagée) et celui des `addresses` gardent leur `ON CONFLICT`.
+Consommé par le writer partagé `write_source_contributions`. L'INSERT des `source_contributions` et du pivot reçoit seulement des contributions sources absentes de la base, ou dont les liens pivot sont supprimés au préalable : il se passe d'`ON CONFLICT`. L'upsert des informations du contributeur (`contributor_information`, table partagée) et celui des `addresses` gardent leur `ON CONFLICT`.
 """
 
 import hashlib
@@ -18,9 +18,9 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
 class ContributorNameFields(TypedDict):
-    """Colonnes de nom d'une signature (`contributor_name_fields`).
+    """Colonnes de nom d'une contribution source (`contributor_name_fields`).
 
-    Sur `source_contributions`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`contributor_information`), le découpage retenu normalisé.
+    Sur `source_contributions`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur les informations du contributeur (`contributor_information`), le découpage retenu normalisé.
     """
 
     raw_author_name: str | None
@@ -31,11 +31,11 @@ class ContributorNameFields(TypedDict):
 
 
 class SourceContributionItem(ContributorNameFields):
-    """Une signature à écrire dans `source_contributions` (toutes sources).
+    """Une contribution source à écrire dans `source_contributions` (toutes sources).
 
     `identifiers` est nullable selon ce que la source fournit.
 
-    `author_position` est nul pour les signatures qui n'occupent pas de rang d'auteur — les rôles non-auteur d'une thèse (direction, rapport, jury, présidence). La contrainte `(source_record_id, author_position)` les tolère, les `NULL` étant distincts entre eux.
+    `author_position` est nul pour les contributions sources sans rang d'auteur — les rôles non-auteur d'une thèse (direction, rapport, jury, présidence). La contrainte `(source_record_id, author_position)` les tolère, les `NULL` étant distincts entre eux.
     """
 
     source: str
@@ -47,19 +47,19 @@ class SourceContributionItem(ContributorNameFields):
     identifiers: Mapping[str, JsonValue] | None
     """Lu seulement (sérialisé en JSONB) : `Mapping` accepte les dictionnaires plus étroits que les sources produisent, tel le `dict[str, str]` des identifiants de thèse."""
     neutralized_identifiers: Mapping[str, str] | None
-    """Identifiants de `identifiers` que la résolution des personnes ignore pour cette signature, avec leur motif (`IdentifierNeutralization`)."""
+    """Identifiants de `identifiers` que la résolution des personnes ignore pour cette contribution source, avec leur motif (`IdentifierNeutralization`)."""
     content_hash: str | None
     """Empreinte des champs écrits (`signature_content_hash`), adresses comprises."""
 
 
 class SourceContributionUpdate(SourceContributionItem):
-    """Une signature en base, réécrite en place : son identifiant, puis les champs de la signature entrante qui lui est rapprochée."""
+    """Une contribution source en base, réécrite en place : son identifiant, puis les champs de la contribution source entrante qui lui est rapprochée."""
 
     id: int
 
 
 class StoredSourceContributionRow(NamedTuple):
-    """Une signature en base d'une notice : identifiant, position, identité, empreinte, marque collective et rôles."""
+    """Une contribution source en base d'un enregistrement source : identifiant, position, informations du contributeur, empreinte, marque collective et rôles."""
 
     id: int
     author_position: int | None
@@ -86,7 +86,7 @@ class ContributionAddressItem(TypedDict):
 
 
 class ContributionRorItem(TypedDict):
-    """Ligne du batch insert `source_contribution_rors` : ROR attribué par la source à une signature, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
+    """Ligne du batch insert `source_contribution_rors` : ROR attribué par la source à une contribution source, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
 
     source_contribution_id: int
     ror_id: str
@@ -99,7 +99,7 @@ class ContributionRorItem(TypedDict):
 _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
-# Colonnes de la clé d'identité d'`contributor_information`, dans l'ordre du `key_hash`.
+# Colonnes de la clé de `contributor_information`, dans l'ordre du `key_hash`.
 CONTRIBUTOR_INFORMATION_KEY_COLUMNS = (
     "last_name_normalized",
     "first_name_normalized",
@@ -108,7 +108,7 @@ CONTRIBUTOR_INFORMATION_KEY_COLUMNS = (
 
 
 def key_hash_sql(exprs: Sequence[str]) -> str:
-    """Expression SQL du `key_hash` d'une identité, pour le lookup indexé.
+    """Expression SQL du `key_hash` d'une ligne de `contributor_information`, pour le lookup indexé.
 
     `exprs` : expressions SQL des champs de la clé (colonnes de table ou bind params), dans l'ordre de `CONTRIBUTOR_INFORMATION_KEY_COLUMNS`.
     """
@@ -120,7 +120,7 @@ _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
-    """Vide l'empreinte du bloc auteurs des notices de `source` : leur prochaine normalisation synchronise leurs signatures. Rend le nombre de notices marquées."""
+    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Rend le nombre d'enregistrements sources marqués."""
     return conn.execute(
         text("""
             UPDATE source_records SET authors_hash = NULL
@@ -131,9 +131,9 @@ def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
 
 
 def delete_orphan_contributor_information(conn: Connection) -> int:
-    """Supprime les identités de `contributor_information` que plus aucune signature ne référence.
+    """Supprime les lignes de `contributor_information` qu'aucune contribution source ne référence.
 
-    Une identité devient orpheline quand la dernière `source_contributions` qui la portait change de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste appuyé sur l'index `idx_source_contributions_contributor_information`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre d'identités supprimées.
+    Une ligne devient orpheline quand la dernière contribution source qui la référençait change de clé (nom ou identifiants corrigés) et bascule vers une autre ligne. Balayage ensembliste appuyé sur l'index `idx_source_contributions_contributor_information`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre de lignes supprimées.
     """
     return conn.execute(
         text("""
@@ -146,9 +146,9 @@ def delete_orphan_contributor_information(conn: Connection) -> int:
 
 
 def delete_orphan_addresses(conn: Connection) -> int:
-    """Supprime les adresses que plus aucune signature ne référence, avec leurs liens aux structures.
+    """Supprime les adresses qu'aucune contribution source ne référence, avec leurs liens aux structures.
 
-    Une adresse devient orpheline quand la dernière signature qui la référençait est réécrite sans elle ou supprimée avec sa notice. Retourne le nombre d'adresses supprimées.
+    Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Retourne le nombre d'adresses supprimées.
     """
     return conn.execute(
         text("""
@@ -161,15 +161,15 @@ def delete_orphan_addresses(conn: Connection) -> int:
 
 
 class ContributionsBatchQueries:
-    """Opérations SQL par lot pour l'écriture des signatures."""
+    """Opérations SQL par lot pour l'écriture des contributions sources."""
 
     def upsert_source_contributions_batch(
         self, conn: Connection, values: list[SourceContributionItem]
     ) -> None:
-        """L'identité de l'auteur (`CONTRIBUTOR_INFORMATION_KEY_COLUMNS`) vit sur la table dédupliquée `contributor_information` ; la signature porte seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
+        """Les informations du contributeur (`CONTRIBUTOR_INFORMATION_KEY_COLUMNS`) sont dans la table dédupliquée `contributor_information` ; la contribution source a seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
 
-        1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les identités du document, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque identité récurrente à chaque document).
-        2. **Insert des signatures** — `contributor_information_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_record_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`contributor_name_fields`).
+        1. **Upsert des informations du contributeur du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les lignes de l'enregistrement source, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque ligne récurrente à chaque enregistrement source).
+        2. **Insert des contributions sources** — `contributor_information_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_record_id`, invariants au sein d'un enregistrement source, sont hoistés. Les noms normalisés sont fournis pré-calculés (`contributor_name_fields`).
 
         Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `contributor_information` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
         """
@@ -192,7 +192,7 @@ class ContributionsBatchQueries:
             }
             for v in values
         ]
-        # 1. Upsert des identités du lot (dédup par clé, sans churn).
+        # 1. Upsert des informations du contributeur du lot (dédup par clé, sans churn).
         conn.execute(
             text(f"""
                 INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
@@ -205,7 +205,7 @@ class ContributionsBatchQueries:
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
-        # 2. Insert des signatures. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
+        # 2. Insert des contributions sources. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
         # position, (source_record_id, author_position) reste unique. `contributor_information_id` résolu
         # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
         stmt = text(
@@ -252,7 +252,7 @@ class ContributionsBatchQueries:
         return [StoredSourceContributionRow(*r) for r in rows]
 
     def mark_contributions_dirty(self, conn: Connection, source_record_id: int) -> None:
-        """Pose `contributions_dirty` sur la publication de la notice."""
+        """Pose `contributions_dirty` sur la publication de l'enregistrement source."""
         conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
@@ -314,7 +314,7 @@ class ContributionsBatchQueries:
     def set_author_counts(
         self, conn: Connection, source_record_id: int, author_count: int, distinct: int
     ) -> None:
-        """Écrit `author_count` et `distinct_author_count` de la notice."""
+        """Écrit `author_count` et `distinct_author_count` de l'enregistrement source."""
         conn.execute(
             text("""
                 UPDATE source_records
@@ -404,7 +404,7 @@ class ContributionsBatchQueries:
     def insert_source_contribution_addresses_batch(
         self, conn: Connection, values: list[ContributionAddressItem]
     ) -> None:
-        # Pas d'ON CONFLICT : le writer supprime les liens d'une signature réécrite avant de les réinsérer, et déduplique les couples (source_contribution_id, addr_id).
+        # Pas d'ON CONFLICT : le writer supprime les liens d'une contribution source réécrite avant de les réinsérer, et déduplique les couples (source_contribution_id, addr_id).
         if not values:
             return
         stmt = text("""
@@ -423,7 +423,7 @@ class ContributionsBatchQueries:
     def insert_source_contribution_hal_structures_batch(
         self, conn: Connection, values: list[tuple[int, int]]
     ) -> None:
-        """Écrit les couples (signature, structure HAL). Le writer supprime d'abord ceux d'une signature réécrite."""
+        """Écrit les couples (contribution source, structure HAL). Le writer supprime d'abord ceux d'une contribution source réécrite."""
         if not values:
             return
         conn.execute(
@@ -443,7 +443,7 @@ class ContributionsBatchQueries:
     def insert_source_contribution_rors_batch(
         self, conn: Connection, values: list[ContributionRorItem]
     ) -> None:
-        # Pas d'ON CONFLICT : le writer supprime les ROR d'une signature réécrite avant de les réinsérer, et les ROR d'une signature forment un ensemble.
+        # Pas d'ON CONFLICT : le writer supprime les ROR d'une contribution source réécrite avant de les réinsérer, et les ROR d'une contribution source forment un ensemble.
         if not values:
             return
         conn.execute(

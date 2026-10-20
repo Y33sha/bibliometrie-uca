@@ -118,7 +118,7 @@ def _parse_api_authors(
         daisng_id = str(daisng) if daisng else None
         researcher_id = as_str(name_obj.get("r_id"))
 
-        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer sur l'identité d'auteur (où sa source serait perdue et où il deviendrait un faux signal de matching).
+        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer dans les informations du contributeur (où sa source serait perdue et où il deviendrait un faux signal de matching).
         # Les ORCID fiables viennent des sources à dépôt auteur (`ORCID_MATCH_SOURCES`).
 
         is_corresponding = as_str(name_obj.get("reprint")) == "Y"
@@ -562,7 +562,7 @@ def insert_wos_document(
 # WOS CONTRIBUTIONS — identifiants sur source_contributions
 # =============================================================
 # Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas conservé.
-# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (contributor_information.identifiers).
+# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — figure dans les informations du contributeur (contributor_information.identifiers).
 
 
 def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
@@ -642,7 +642,7 @@ def process_contributions(
     rec: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures WoS de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources WoS de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,
