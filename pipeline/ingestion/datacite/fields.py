@@ -4,13 +4,13 @@ from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
+from pipeline.http.polite_pool import polite_user_agent
 
 
 def api_headers() -> dict[str, str]:
     """En-têtes d'une requête DataCite : `User-Agent` du polite pool, réponse JSON:API."""
     return {
-        "User-Agent": build_user_agent(get_polite_pool_email()),
+        "User-Agent": polite_user_agent(),
         "Accept": "application/vnd.api+json",
     }
 

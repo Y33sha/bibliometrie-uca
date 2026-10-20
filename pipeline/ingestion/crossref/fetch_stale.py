@@ -13,7 +13,7 @@ from domain.publications.identifiers import clean_doi
 from domain.types import as_mapping, as_str
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
-from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
+from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
 
@@ -26,7 +26,7 @@ class CrossrefStaleRefetch(StaleRefetch):
 
     def __init__(self) -> None:
         self.base_url = API_BASE_URLS["crossref"]
-        self.headers = {"User-Agent": build_user_agent(get_polite_pool_email())}
+        self.headers = {"User-Agent": polite_user_agent()}
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         url = f"{self.base_url}/works/{urllib.parse.quote(source_id, safe='/()')}"

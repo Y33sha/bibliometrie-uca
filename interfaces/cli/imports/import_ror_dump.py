@@ -15,7 +15,7 @@ from pathlib import Path
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
+from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import fetch_ror_dump, read_ror_dump
 from pipeline.transformation.structures.ror import RorDumpQueries, import_ror_dump
 
@@ -45,7 +45,7 @@ def main() -> None:
         return
 
     # Le dump est public : l'adresse du polite pool y est facultative.
-    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    user_agent = default_user_agent()
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
         archive_path = tmp.name
     try:

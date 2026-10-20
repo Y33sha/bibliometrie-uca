@@ -124,7 +124,7 @@ class TestRunAsyncOrchestrator:
 
         with (
             patch.object(doi_search, "doi_existence", _existence),
-            patch.object(doi_search, "_doi_org_user_agent", lambda: "test"),
+            patch.object(doi_search, "polite_user_agent", lambda: "test"),
         ):
             result = await _run(adapter, ["10.1/connu", "10.1/inconnu"], recorded=recorded)
 

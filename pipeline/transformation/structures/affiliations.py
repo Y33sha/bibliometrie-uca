@@ -151,13 +151,11 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
 
 def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
+    from pipeline.http.polite_pool import default_user_agent
     from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
     from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
 
     # Le dump est public : l'adresse du polite pool y est facultative.
-    source = ZenodoRorDumpSource(
-        user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=ctx.logger
-    )
+    source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
         return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=ctx.logger)

@@ -21,7 +21,7 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_str
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
+from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
@@ -39,7 +39,7 @@ class CrossrefDoiSearch:
 
     def __init__(self) -> None:
         self.base_url = API_BASE_URLS["crossref"]
-        self.headers = {"User-Agent": build_user_agent(get_polite_pool_email())}
+        self.headers = {"User-Agent": polite_user_agent()}
 
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         doi = dois[0]
