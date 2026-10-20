@@ -14,7 +14,7 @@ from sqlalchemy import Connection, text
 from domain.structures.hal_structures import HalStructure, parse_hal_structure
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.hal.structures import HAL_STRUCTURES_BATCH
+from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression, progression

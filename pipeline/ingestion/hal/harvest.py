@@ -13,23 +13,19 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from domain.types import as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_hal_collections
-from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import HAL_DELAY, HAL_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
     stage_document,
 )
-from pipeline.ingestion.hal.fields import HAL_FIELDS, extract_doi, extract_id
+from pipeline.ingestion.hal.api import HalClient
+from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
-
-type SolrParams = dict[str, str | int | float | bool | None]
 
 
 @dataclass(frozen=True)
@@ -62,41 +58,6 @@ def build_collections_fq(collection_codes: list[str]) -> str:
     """Filtre Solr `collCode_s:("C1" OR "C2" …)` sur toutes les collections. Les codes sont entre guillemets : certains contiennent un tiret (`CHU-CLERMONTFERRAND`), que Solr lirait comme un opérateur."""
     terms = " OR ".join(f'"{code}"' for code in collection_codes)
     return f"collCode_s:({terms})"
-
-
-class HalClient:
-    """Client de l'API de recherche HAL (Solr), limité à un appel toutes les `HAL_DELAY` secondes."""
-
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url.rstrip('/')}/"
-        self._throttle = Throttle(HAL_DELAY)
-
-    def _get(self, params: SolrParams, label: str) -> Mapping[str, JsonValue]:
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
-            )
-
-    def count(self, query: str, fq: str) -> int:
-        """Nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
-        params: SolrParams = {"q": query, "fq": fq, "rows": 0, "wt": "json"}
-        return as_int(at_path(self._get(params, "HAL comptage"), "response").get("numFound")) or 0
-
-    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> Mapping[str, JsonValue]:
-        """Une page en pagination `cursorMark`, avec tous les champs de `HAL_FIELDS`.
-
-        `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` de la réponse précédente. `sort=docid asc`, clé unique, est requis par `cursorMark`.
-        """
-        params: SolrParams = {
-            "q": query,
-            "fq": fq,
-            "fl": ",".join(HAL_FIELDS),
-            "rows": HAL_PER_PAGE,
-            "sort": "docid asc",
-            "cursorMark": cursor_mark,
-            "wt": "json",
-        }
-        return self._get(params, f"HAL cursor={cursor_mark[:16]}")
 
 
 def extract_union(

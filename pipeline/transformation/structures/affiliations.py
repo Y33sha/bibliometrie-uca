@@ -133,7 +133,7 @@ def build() -> Phase:
 
 def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> PhaseMetrics:
     """Chargement du référentiel des structures HAL, sur sa propre connexion."""
-    from pipeline.ingestion.hal.structures import HalStructuresClient
+    from pipeline.ingestion.hal.api import HalStructuresClient
     from pipeline.transformation.structures.hal_structures import (
         HalStructuresQueries,
         run_refresh_hal_structures,
