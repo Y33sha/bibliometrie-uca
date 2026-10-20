@@ -105,7 +105,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] `PersonWrites` remplacé par `PgPersonRepository`. 8cf288f6a
 - [x] Arbitrage des identifiants en un module. 7705ac171
 - [x] Renommage et attribution d'un identifiant dans `PgPersonRepository`, pour la phase et l'API. dd383c632
-- [ ] SQL de `matching.py` et `name_forms.py` : store des personnes pour l'accès partagé, le reste dans les modules qui l'utilisent.
+- [x] SQL de `matching.py` et `name_forms.py` : store des personnes pour l'accès partagé, le reste dans les modules qui l'utilisent. 1c5a58429
 - [ ] `loading.py` : champs projetés jamais lus.
 
 ### Phase 5 — `structures`
