@@ -1,6 +1,6 @@
 """Client api.crossref.org : éditeur + membre Crossref d'un préfixe DOI.
 
-`GET /prefixes/<prefix>` renvoie le nom du publisher et l'ID membre Crossref d'un préfixe. Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'Crossref'`. Polite pool via header `User-Agent` (mailto).
+`GET /prefixes/<prefix>` renvoie le nom du publisher et l'ID membre Crossref d'un préfixe. Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'Crossref'`.
 
 Un préfixe reste parfois enregistré au nom d'un compte qui ne dépose plus, pendant qu'un autre compte dépose sous ce préfixe : un second compte de la même maison, ou celui du groupe qui l'a rachetée. `GET /members/<id>` donne le nom déclaré d'un membre et son nombre de dépôts ; à zéro, `GET /works/<doi>` sur un DOI du préfixe nomme le membre déposant, dont le nom déclaré fait alors foi.
 """
@@ -9,21 +9,18 @@ from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Mapping
 
 import httpx2
 
 from domain.publications.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping
-from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import (
     NOT_FOUND,
-    UNAVAILABLE,
     LookupOutcome,
     NotFound,
     Unavailable,
 )
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.crossref.api import get_message
 
 logger = logging.getLogger(__name__)
 
@@ -44,33 +41,11 @@ def parse_member_id(member: JsonValue) -> int | None:
     return None
 
 
-async def _get_message(
-    client: httpx2.AsyncClient, url: str, *, user_agent: str, label: str
-) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Corps `message` d'une réponse de l'API Crossref. Une réponse sans `message` compte pour une source indisponible."""
-    headers = {"User-Agent": user_agent, "Accept": "application/json"}
-    outcome = await lookup_json_async(
-        client, "GET", url, headers=headers, timeout=15, max_retries=3, label=label
-    )
-    if isinstance(outcome, NotFound | Unavailable):
-        return outcome
-    msg = as_mapping(outcome).get("message")
-    if not isinstance(msg, dict):
-        logger.warning("%s : réponse sans `message`", url)
-        return UNAVAILABLE
-    return as_mapping(msg)
-
-
 async def member_profile(
-    client: httpx2.AsyncClient, member_id: int, *, user_agent: str
+    client: httpx2.AsyncClient, member_id: int
 ) -> LookupOutcome[tuple[str, int]]:
     """`(nom déclaré, nombre de DOI déposés)` d'un membre Crossref."""
-    msg = await _get_message(
-        client,
-        f"{API_BASE_URLS['crossref']}/members/{member_id}",
-        user_agent=user_agent,
-        label=f"membre {member_id}",
-    )
+    msg = await get_message(client, f"members/{member_id}", label=f"membre {member_id}", timeout=15)
     if isinstance(msg, NotFound | Unavailable):
         return msg
     name = msg.get("primary-name")
@@ -78,16 +53,9 @@ async def member_profile(
     return (name, total) if isinstance(name, str) and isinstance(total, int) else NOT_FOUND
 
 
-async def depositing_member(
-    client: httpx2.AsyncClient, doi: str, *, user_agent: str
-) -> LookupOutcome[int]:
+async def depositing_member(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[int]:
     """Membre Crossref qui a déposé ce DOI, d'après sa notice."""
-    msg = await _get_message(
-        client,
-        f"{API_BASE_URLS['crossref']}/works/{doi}",
-        user_agent=user_agent,
-        label=f"notice {doi}",
-    )
+    msg = await get_message(client, f"works/{doi}", label=f"notice {doi}", timeout=15)
     if isinstance(msg, NotFound | Unavailable):
         return msg
     member = parse_member_id(msg.get("member"))
@@ -95,7 +63,7 @@ async def depositing_member(
 
 
 async def fetch_crossref_prefix(
-    client: httpx2.AsyncClient, prefix: str, sample_doi: str | None = None, *, user_agent: str
+    client: httpx2.AsyncClient, prefix: str, sample_doi: str | None = None
 ) -> LookupOutcome[tuple[str, int | None]]:
     """Interroge `api.crossref.org/prefixes/<prefix>` pour récupérer name + member.
 
@@ -107,12 +75,7 @@ async def fetch_crossref_prefix(
     cleaned = str(parsed) if parsed else None
     if not cleaned:
         return NOT_FOUND
-    msg = await _get_message(
-        client,
-        f"{API_BASE_URLS['crossref']}/prefixes/{cleaned}",
-        user_agent=user_agent,
-        label=f"prefix {cleaned}",
-    )
+    msg = await get_message(client, f"prefixes/{cleaned}", label=f"prefix {cleaned}", timeout=15)
     if isinstance(msg, NotFound | Unavailable):
         return msg
     name = msg.get("name")
@@ -122,19 +85,19 @@ async def fetch_crossref_prefix(
     registered = (name, member)
     if member is None or not sample_doi:
         return registered
-    profile = await member_profile(client, member, user_agent=user_agent)
+    profile = await member_profile(client, member)
     if isinstance(profile, Unavailable):
         return profile
     if isinstance(profile, NotFound) or profile[1] > 0:
         return registered
-    depositing = await depositing_member(client, sample_doi, user_agent=user_agent)
+    depositing = await depositing_member(client, sample_doi)
     if isinstance(depositing, Unavailable):
         return depositing
     if isinstance(depositing, NotFound) or depositing == member:
         return registered
     # Le nom vient du membre déposant, non de la notice : celle-ci porte l'imprint, qui varie d'un
     # dépôt à l'autre sous un même compte.
-    deposited_by = await member_profile(client, depositing, user_agent=user_agent)
+    deposited_by = await member_profile(client, depositing)
     if isinstance(deposited_by, Unavailable):
         return deposited_by
     if isinstance(deposited_by, NotFound):

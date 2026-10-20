@@ -9,17 +9,13 @@ from collections.abc import Mapping
 
 from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.polite_pool import polite_user_agent
+from domain.types import JsonValue, as_str
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchExtractor,
     PersonSearchPage,
 )
-
-# Documents par page. Une notice de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
-_ROWS = 50
+from pipeline.ingestion.crossref.api import CrossrefClient
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
@@ -31,31 +27,6 @@ def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> st
             f"until-pub-date:{last_year}",
         ]
     )
-
-
-class CrossrefClient:
-    """Client de `GET /works`."""
-
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url}/works"
-        self._headers = {"User-Agent": polite_user_agent()}
-
-    def fetch_page(self, filters: str, cursor: str | None, label: str) -> PersonSearchPage:
-        """Une page des œuvres que désigne `filters` : la première quand `cursor` est `None`. Une page vide clôt la pagination."""
-        data = as_mapping(
-            http_request_with_retry(
-                "GET",
-                self._url,
-                params={"filter": filters, "rows": _ROWS, "cursor": cursor or "*"},
-                headers=self._headers,
-                timeout=120,
-                label=label,
-            )
-        )
-        message = as_mapping(data.get("message"))
-        records = [as_mapping(item) for item in as_sequence(message.get("items"))]
-        following = as_str(message.get("next-cursor"))
-        return PersonSearchPage(records=records, next_token=following if records else None)
 
 
 class CrossrefPersonExtractor(PersonSearchExtractor[CrossrefClient]):

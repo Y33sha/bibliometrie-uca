@@ -204,7 +204,6 @@ def build() -> Phase:
 def _run_resolve_crossref_publishers(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    from pipeline.http.polite_pool import polite_user_agent
     from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -212,16 +211,13 @@ def _run_resolve_crossref_publishers(
         run_resolve_crossref_publishers,
     )
 
-    user_agent = polite_user_agent()
     with ctx.open_tx() as conn:
         return run_resolve_crossref_publishers(
             conn,
             ctx.logger,
             repo=DoiPrefixesQueries(conn),
             publisher_repo=PublisherGatewayQueries(conn),
-            fetch_prefix_fn=lambda client, prefix, sample_doi: fetch_crossref_prefix(
-                client, prefix, sample_doi, user_agent=user_agent
-            ),
+            fetch_prefix_fn=fetch_crossref_prefix,
             breaker=breaker,
         )
 

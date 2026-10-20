@@ -9,6 +9,7 @@ import pytest
 
 from domain.persons.identifiers import PersonIdentifierType
 from domain.sources.staging import StagingEntryMode
+from infrastructure.settings import settings
 from pipeline.ingestion.common import harvest, person_search
 from pipeline.ingestion.common.staging import UpsertOutcome
 
@@ -18,6 +19,12 @@ _SIGNAUX = {
     UpsertOutcome.UPDATED: (False, True),
     UpsertOutcome.UNCHANGED: (False, False),
 }
+
+
+@pytest.fixture(autouse=True)
+def _adresse_polite_pool(monkeypatch):
+    """Les clients des sources annoncent une adresse de test au polite pool."""
+    monkeypatch.setattr(settings, "polite_pool_email", "test@example.org")
 
 
 @dataclass(frozen=True)
