@@ -86,7 +86,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 2 — `ingestion/common` et `complements`
 
-- [ ] Contrat des sources séparé de l'orchestrateur, pour `normalize`, `fetch_missing` et `fetch_stale`.
+- [x] Contrat des sources séparé de l'orchestrateur, pour `normalize`, `fetch_missing` et `fetch_stale`. 7aa00af58
 - [ ] `staging.py` scindé ; suppression des `source_publications` dans `source_publications.py`.
 - [ ] `ror/dump.py` dans `complements/` ; téléchargement des dumps commun.
 - [ ] `User-Agent` construit par `polite_pool.py`.
