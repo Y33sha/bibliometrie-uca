@@ -1,6 +1,6 @@
 """Moissonnage DataCite : tâche `harvest.datacite`.
 
-Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre d'extraction, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles signatures relèvent du périmètre.
+Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre de moissonnage, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles contributions sources relèvent du périmètre.
 
 Les paramètres de requête comprennent `RECORD_PARAMS` (`api.py`), comme ceux des phases `fetch_missing` et `fetch_stale`. Le lien `next` de la pagination les reprend.
 """

@@ -1,4 +1,4 @@
-"""Identité d'un work OpenAlex : identifiant et DOI."""
+"""Identifiants d'un work OpenAlex : identifiant OpenAlex et DOI."""
 
 from __future__ import annotations
 

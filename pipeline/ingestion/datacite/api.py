@@ -1,4 +1,4 @@
-"""Accès à l'API DataCite : en-têtes, moissonnage de `/dois`, lecture des notices par DOI, préfixes.
+"""Accès à l'API DataCite : en-têtes, moissonnage de `/dois`, lecture des enregistrements par DOI, préfixes.
 
 DataCite reconnaît le polite pool au `User-Agent` porteur d'un mailto. Ses réponses suivent JSON:API.
 """
@@ -87,7 +87,7 @@ class DataciteClient:
 async def search_dois(
     client: httpx2.AsyncClient, dois: list[str]
 ) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Notices des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`. Un DOI absent de DataCite manque à la liste.
+    """Enregistrements des DOI d'un lot, par `GET /dois?query=doi:"a" OR doi:"b" …`. Un DOI absent de DataCite manque à la liste.
 
     Le champ `doi` est requêté en phrase exacte. La liste suit un ordre quelconque.
     """
@@ -111,7 +111,7 @@ async def search_dois(
 
 
 async def fetch_doi(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Notice JSON:API `data` de `GET /dois/{doi}`. Un 404 vaut DOI absent de DataCite."""
+    """Enregistrement JSON:API `data` de `GET /dois/{doi}`. Un 404 vaut DOI absent de DataCite."""
     outcome = await lookup_json_async(
         client,
         "GET",

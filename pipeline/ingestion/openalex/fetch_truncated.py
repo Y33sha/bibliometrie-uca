@@ -41,7 +41,7 @@ _SELECT_TRUNCATED_SQL = text(
     """
 )
 
-# Réécrit `raw_data` sans recalculer `raw_hash` (cf. docstring du module), lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les signatures complètes.
+# Réécrit `raw_data` sans recalculer `raw_hash` (cf. docstring du module), lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
 _UPDATE_SQL = text(
     """
     UPDATE staging

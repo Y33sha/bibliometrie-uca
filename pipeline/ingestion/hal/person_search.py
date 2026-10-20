@@ -38,7 +38,7 @@ def build_identifiers_fq(identifiers: Identifiers) -> str:
 
 
 class HalPersonHarvester(PersonSearchHarvester[HalClient]):
-    """Notices HAL des personnes RH, cherchées par ORCID, idHAL et IdRef."""
+    """Enregistrements HAL des personnes qui ont une fiche RH, cherchées par ORCID, idHAL et IdRef."""
 
     SOURCE = "hal"
     BATCH_SIZE: ClassVar[int] = 30

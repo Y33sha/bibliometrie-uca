@@ -20,7 +20,7 @@ from pipeline.ingestion.common.person_search import PersonSearchPage
 
 logger = logging.getLogger(__name__)
 
-# Documents par page. Une notice de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
+# Documents par page. Un enregistrement de grande collaboration pèse environ 500 Kio, et Crossref refuse une réponse de plus de 100 Mio.
 _ROWS = 50
 
 
@@ -85,7 +85,7 @@ async def get_message(
 async def fetch_work(
     client: httpx2.AsyncClient, doi: str
 ) -> LookupOutcome[Mapping[str, JsonValue]]:
-    """Notice de `GET /works/{doi}`. Crossref accepte le DOI tel quel dans le chemin, barres obliques comprises."""
+    """Enregistrement de `GET /works/{doi}`. Crossref accepte le DOI tel quel dans le chemin, barres obliques comprises."""
     return await get_message(
         client, f"works/{urllib.parse.quote(doi, safe='/()')}", label=f"DOI {doi}"
     )

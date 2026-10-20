@@ -286,10 +286,10 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
     """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
 
     - nom et prénom séparés (`family`, `given`) ;
-    - entrée à `name` seul : signature collective ;
+    - entrée à `name` seul : contribution source collective ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `identifiers` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_contributions crossref ;
-    - identifiants ROR de chaque affiliation : sur son adresse, sur la signature pour une affiliation sans nom ;
+    - identifiants ROR de chaque affiliation : sur son adresse, sur la contribution source pour une affiliation sans nom ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
     """
     authors = msg.get("author") or []
@@ -342,7 +342,7 @@ def process_contributions(
     msg: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures Crossref de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources Crossref de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,
@@ -377,7 +377,7 @@ def process_work(
 
     title = get_title(msg)
     publication_year = get_publication_year(msg)
-    # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
+    # Garanti par `SourceNormalizer.process_work`, qui filtre les enregistrements sources sans titre ou sans année.
     assert isinstance(title, str) and isinstance(publication_year, int)
 
     publisher_id = upsert_publisher(msg, publisher_store=publisher_store)

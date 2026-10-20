@@ -1,6 +1,6 @@
 """Recherche par DOI dans une source cible : les DOI vus dans les autres sources et absents de la cible, interrogés par lots.
 
-Chaque source implémente `DoiSearch` (`pipeline/ingestion/<source>/fetch_missing.py`) : requête d'un lot, écriture d'une notice. `fetch_missing_doi` fait la boucle commune.
+Chaque source implémente `DoiSearch` (`pipeline/ingestion/<source>/fetch_missing.py`) : requête d'un lot, écriture d'un enregistrement source. `fetch_missing_doi` fait la boucle commune.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ from pipeline.runtime.observability.progression import progression
 
 @dataclass(frozen=True, slots=True)
 class DoiBatchResult:
-    """Réponse d'une source à un lot de DOI : notices trouvées, et DOI dont la source a confirmé l'absence.
+    """Réponse d'une source à un lot de DOI : enregistrements sources trouvés, et DOI dont la source a confirmé l'absence.
 
     Un DOI du lot présent dans aucune des deux listes attend le run suivant : la source était indisponible, ou sa réponse ne permet pas de conclure.
 
@@ -52,7 +52,7 @@ class DoiBatchResult:
 
 
 class DoiSearch(Protocol):
-    """Recherche par DOI dans une source : requête d'un lot de DOI, écriture d'une notice reçue.
+    """Recherche par DOI dans une source : requête d'un lot de DOI, écriture d'un enregistrement source reçu.
 
     Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées, pause de chaque worker après sa requête.
     """
@@ -66,7 +66,7 @@ class DoiSearch(Protocol):
         """Interroge l'API pour un lot de 1 à `batch_size` DOI."""
 
     def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        """Écrit la notice dans `staging` et efface les échecs que ses DOI démentent. Rend `True` sur une insertion. Ne commite pas."""
+        """Écrit l'enregistrement source dans `staging` et efface les échecs que ses DOI démentent. Rend `True` sur une insertion. Ne commite pas."""
 
 
 # Pour crossref et datacite, les DOI candidats sont filtrés sur l'agence d'enregistrement (RA) de leur préfixe.
@@ -143,7 +143,7 @@ async def fetch_missing_doi(
     limit: int | None = None,
     breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
-    """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les notices trouvées dans `staging`.
+    """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les enregistrements sources trouvés dans `staging`.
 
     Les requêtes tournent en parallèle via `run_fetch_pool` (pool de `search.max_concurrent` workers), ce qui borne le débit au rate-limit de l'API. Les écritures restent séquentielles. Chaque lot est committé en une transaction.
 
@@ -151,7 +151,7 @@ async def fetch_missing_doi(
 
     Quand la source est l'agence d'enregistrement des DOI cherchés (`_TARGET_RA`), un DOI absent est soumis à doi.org. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG` ; un DOI qu'il connaît en est effacé.
 
-    `total` = DOI traités, `new` = notices insérées, `extras["fetched"]` = notices reçues, `extras["not_found"]` = DOI confirmés absents, `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
+    `total` = DOI traités, `new` = enregistrements sources insérés, `extras["fetched"]` = enregistrements sources reçus, `extras["not_found"]` = DOI confirmés absents, `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
     """
     slog = scoped_logger(log, search.source_key)
     dois = get_missing_dois(conn, search.source_key, retry_after_days=retry_after_days)

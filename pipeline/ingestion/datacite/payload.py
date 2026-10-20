@@ -1,6 +1,6 @@
-"""Lecture des notices DataCite par la normalisation.
+"""Lecture des enregistrements sources DataCite par la normalisation.
 
-Interprétation des champs propres au schéma DataCite (réponse JSON:API `api.datacite.org/dois/{doi}`, nœud `data.attributes`). Extracteurs et nettoyeurs qui encapsulent les conventions DataCite.
+Interprétation des champs propres au schéma DataCite (réponse JSON:API `api.datacite.org/dois/{doi}`, nœud `data.attributes`). Fonctions de lecture et nettoyeurs qui encapsulent les conventions DataCite.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API DataCite (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré, comme pour Crossref.
 """
@@ -219,7 +219,7 @@ _CITATION_IN_PAGES = re.compile(r"doi:|\((?:1[89]|20)\d\d\)", re.IGNORECASE)
 def container_names_a_journal(
     doc_type_token: str | None, title: str, pages: Iterable[str | None]
 ) -> bool:
-    """Le conteneur d'une notice DataCite désigne la revue, la collection ou le recueil d'actes qui publie le document.
+    """Le conteneur d'un enregistrement source DataCite désigne la revue, la collection ou le recueil d'actes qui publie le document.
 
     Le type brut (`extract_datacite_doc_type_token`) est celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un préprint, un rapport, un logiciel ou un jeu de données n'a pas de revue. Le conteneur ne vient pas d'une citation en texte libre : les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent ainsi l'article publié, et DataCite en découpe mal le titre et les pages.
     """

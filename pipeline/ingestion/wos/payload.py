@@ -1,6 +1,6 @@
-"""Lecture des notices Web of Science par la normalisation.
+"""Lecture des enregistrements sources Web of Science par la normalisation.
 
-Interprétation des champs propres au schéma WoS Expanded API — prédicats et extracteurs qui encapsulent la connaissance de la sémantique WoS.
+Interprétation des champs propres au schéma WoS Expanded API — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique WoS.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API WoS (frontière dynamique avec une source externe, schéma non typé).
 
@@ -63,7 +63,7 @@ def is_wos_author_exploitable(author: Mapping[str, JsonValue]) -> bool:
 
 # TODO: quand `journals.oa_model` sera disponible côté pipeline, ce mapping
 # devient superflu (signal OA WoS trop pauvre) : retirer `journal_oas_gold`
-# de l'extracteur et supprimer cette fonction.
+# de la fonction de lecture et supprimer cette fonction.
 def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str | None:
     """Mapping du signal OA WoS API → enum oa_status canonique.
 

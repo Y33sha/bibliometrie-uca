@@ -17,7 +17,7 @@ from pipeline.ingestion.common.person_search import (
 from pipeline.ingestion.datacite.api import DataciteClient
 from pipeline.ingestion.datacite.fields import record_doi
 
-# Documents par page. Une notice de grande collaboration compte un millier de créateurs (environ 200 Kio).
+# Documents par page. Un enregistrement de grande collaboration compte un millier de créateurs (environ 200 Kio).
 _PAGE_SIZE = 25
 
 

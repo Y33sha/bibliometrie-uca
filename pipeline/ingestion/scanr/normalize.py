@@ -282,8 +282,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     - identifiants `orcid`/`idref` (sous `denormalized`) ;
     - `roles` via `map_role('scanr', role)` ;
     - affiliations feuilles sans `structId` → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
-    - affiliations feuilles avec `structId` → structures HAL de la signature. Leur nom est celui d'une fiche du référentiel HAL : il n'est pas une adresse ;
-    - ROR de chaque affiliation : sur son adresse, sur la signature pour les affiliations sans adresse.
+    - affiliations feuilles avec `structId` → structures HAL de la contribution source. Leur nom est celui d'une fiche du référentiel HAL : il n'est pas une adresse ;
+    - ROR de chaque affiliation : sur son adresse, sur la contribution source pour les affiliations sans adresse.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
@@ -343,7 +343,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
 
 def merge_person_roles(records: list[AuthorRecord]) -> list[AuthorRecord]:
-    """Une signature par personne, comme chez theses.fr. scanR liste une personne une fois par rôle (membre du jury et rapporteur). Une entrée de même nom et de mêmes identifiants qu'une précédente, avec un autre rôle, se fond dans celle-ci : rôles (`merge_roles`), adresses et structures réunis. Une entrée qui répète les mêmes rôles reste à part. Les positions se renumérotent dans l'ordre."""
+    """Une contribution source par personne, comme chez theses.fr. scanR liste une personne une fois par rôle (membre du jury et rapporteur). Une entrée de même nom et de mêmes identifiants qu'une précédente, avec un autre rôle, se fond dans celle-ci : rôles (`merge_roles`), adresses et structures réunis. Une entrée qui répète les mêmes rôles reste à part. Les positions se renumérotent dans l'ordre."""
     kept: list[AuthorRecord] = []
     by_person: dict[tuple[object, ...], AuthorRecord] = {}
     for record in records:
@@ -377,7 +377,7 @@ def process_contributions(
     doc: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures ScanR de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources ScanR de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,

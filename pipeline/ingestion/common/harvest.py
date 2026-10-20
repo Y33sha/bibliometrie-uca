@@ -95,7 +95,7 @@ class HarvestPhase:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 if depuis is not None and source == "hal":
                     ctx.logger.info(
-                        "%sMode incrémental : notices HAL modifiées depuis le %s (%s)",
+                        "%sMode incrémental : enregistrements HAL modifiés depuis le %s (%s)",
                         BRANCHE,
                         date_to_french(depuis[0]),
                         depuis[1],

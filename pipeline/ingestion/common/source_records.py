@@ -1,6 +1,6 @@
 """Écriture et suppression des `source_records`. L'écriture est commune aux normaliseurs de toutes les sources.
 
-Une `source_record` est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule l'identité `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
+Un enregistrement source est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule la clé `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
 
 L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes marquées `keys_dirty` — ce que chaque écriture fait ici. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
@@ -31,7 +31,7 @@ class SourceRecordUpsert:
     Deux colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture. `publication_id` est le rattachement à la publication canonique, que la phase `publications` pose et que l'import ne connaît pas.
     """
 
-    # Identité de l'enregistrement source
+    # Clé de l'enregistrement source
     source: str
     source_id: str
     """Identifiant natif de la source : hal-id, id OpenAlex, UT WoS, id ScanR, id theses.fr ou NNT, DOI pour crossref et datacite."""
@@ -208,7 +208,7 @@ def delete_disappeared_source_records(conn: Connection) -> int:
 def delete_source_records_before(
     conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
 ) -> tuple[int, int]:
-    """Supprime les notices parues avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Les notices des sources `exempt_sources` restent.
+    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Les enregistrements sources des sources `exempt_sources` restent.
 
     Rend le nombre de `source_records` et de lignes de `staging` supprimées.
     """

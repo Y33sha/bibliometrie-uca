@@ -18,7 +18,7 @@ from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
 
 type SolrParams = dict[str, str | int | float | bool | None]
 
-# Champs Solr demandés : un champ absent de la liste manque aux notices reçues.
+# Champs Solr demandés : un champ absent de la liste manque aux enregistrements reçus.
 HAL_FIELDS = [
     "halId_s",
     "doiId_s",

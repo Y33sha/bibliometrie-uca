@@ -1,4 +1,4 @@
-"""Lecture des notices ScanR par la normalisation : affiliations feuilles, NNT, concepts, statut open access.
+"""Lecture des enregistrements sources ScanR par la normalisation : affiliations feuilles, NNT, concepts, statut open access.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé)."""
 

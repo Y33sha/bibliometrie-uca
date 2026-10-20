@@ -1,6 +1,6 @@
-"""Lecture des notices OpenAlex par la normalisation.
+"""Lecture des enregistrements sources OpenAlex par la normalisation.
 
-Interprétation des champs propres au schéma OpenAlex — prédicats et extracteurs qui encapsulent la connaissance de la sémantique OpenAlex.
+Interprétation des champs propres au schéma OpenAlex — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique OpenAlex.
 
 Les payloads reçus de l'API sont décrits par `JsonValue` : leur forme est celle qu'ils ont, non celle que le schéma annonce, et chaque champ lu passe par un accesseur qui la contrôle.
 """
@@ -231,9 +231,9 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]
 
     `hal_id` est **multivalué** : une œuvre peut référencer plusieurs dépôts HAL (chapitres, versions, doublons), tous collectés (liste dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un document → premier match gagnant (l'ordre des URLs est significatif : le caller choisit typiquement landing_page_url avant pdf_url).
 
-    Les extracteurs d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans `domain.publications.identifiers` (neutres, réutilisés par HAL).
+    Les fonctions de lecture d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans `domain.publications.identifiers` (neutres, réutilisés par HAL).
 
-    Pas de normalisation du NNT ici (à l'inverse de `extract_nnt_from_location`) — extracteur opportuniste depuis une URL, la normalisation est laissée au caller.
+    Pas de normalisation du NNT ici (à l'inverse de `extract_nnt_from_location`) — lecture opportuniste depuis une URL, la normalisation est laissée au caller.
     """
     external_ids: dict[str, str | list[str]] = {}
     hal_ids: list[str] = []

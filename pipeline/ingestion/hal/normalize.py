@@ -74,9 +74,9 @@ def upsert_publisher(publisher_name: str, *, publisher_store: PublisherStore) ->
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN de la notice TEI.
+    """Ce que HAL dit du conteneur d'un document : la revue ou la collection (`journalTitle_s`), le livre ou le volume d'actes (`bookTitle_s`), et les ISBN du TEI.
 
-    Une communication porte presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : seul, le congrès désigne un événement. Quand la notice porte un ISBN, le volume existe : il prend le titre de la source (`source_s`), à défaut celui du congrès.
+    Une communication cite presque toujours le congrès (`conferenceTitle_s`), avec ou sans actes publiés : seul, le congrès désigne un événement. Quand le dépôt a un ISBN, le volume existe : il prend le titre de la source (`source_s`), à défaut celui du congrès.
     """
     journal_title = hal_text_field(doc.get("journalTitle_s"))
     isbns = tuple(parse_tei_isbns(hal_text_field(doc.get("label_xml"))))
@@ -173,7 +173,7 @@ def build_hal_external_ids(
 ) -> dict[str, JsonValue]:
     """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
-    `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
@@ -297,9 +297,9 @@ _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 
 @lru_cache(maxsize=1)
 def _parse_tei(label_xml: str) -> Element:
-    """Lit le TEI joint à une notice HAL.
+    """Lit le TEI joint à un dépôt HAL.
 
-    Le cache garde l'arbre de la dernière notice : les lecteurs du TEI (ISBN, embargo, identifiants d'auteurs) reçoivent la même chaîne pendant la normalisation d'une notice, et partagent une seule analyse. Ils ne modifient pas l'arbre.
+    Le cache garde l'arbre du dernier dépôt : les lecteurs du TEI (ISBN, embargo, identifiants d'auteurs) reçoivent la même chaîne pendant la normalisation d'un dépôt, et partagent une seule analyse. Ils ne modifient pas l'arbre.
 
     L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en porte.
     """
@@ -493,7 +493,7 @@ def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
     """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
 
-    Les champs Solr alignés donnent le nom, le rôle et le `hal_person_id` de chaque auteur. Le TEI donne ses identifiants (ORCID, IdRef, idHAL), ses nom et prénom, ses structures directes (`hal_structure_ids`) et leurs ROR (`ror_ids`). HAL donne des structures de son référentiel, sans texte d'affiliation : les signatures sont sans adresse.
+    Les champs Solr alignés donnent le nom, le rôle et le `hal_person_id` de chaque auteur. Le TEI donne ses identifiants (ORCID, IdRef, idHAL), ses nom et prénom, ses structures directes (`hal_structure_ids`) et leurs ROR (`ror_ids`). HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources sont sans adresse.
     """
     qualities = [hal_text_field(q) for q in as_sequence(doc.get("authQuality_s"))]
     # ORCID, IdRef et idHAL par auteur, extraits du TEI : seul champ HAL qui les attache proprement à chaque position d'auteur.
@@ -593,7 +593,7 @@ def process_contributions(
     doc: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures HAL de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources HAL de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,

@@ -1,6 +1,6 @@
 """Normalisation d'une source, du staging vers `source_records`, `source_contributions` et `addresses`.
 
-Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron fait la boucle : chargement des lignes à traiter, un SAVEPOINT par notice (une erreur isolée ne perd pas le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_records` et les signatures sont injectées à la construction.
+Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron fait la boucle : chargement des lignes à traiter, un SAVEPOINT par enregistrement source (une erreur isolée garde le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_records` et les contributions sources sont injectées à la construction.
 """
 
 from __future__ import annotations
@@ -43,8 +43,8 @@ class SourceNormalizer(ABC):
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
-    - `minimal_metadata(row)` : abstrait, titre et année de la notice
-    - `normalize_record(conn, row) -> bool | None` : abstrait, logique métier d'une notice complète
+    - `minimal_metadata(row)` : abstrait, titre et année de l'enregistrement source
+    - `normalize_record(conn, row) -> bool | None` : abstrait, logique métier d'un enregistrement source complet
     - `preload_caches(conn)` : pré-chargement optionnel
     - `cleanup()` : libération des caches après commit final
     """
@@ -65,16 +65,16 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        """Titre et année de la notice, lus dans son payload."""
+        """Titre et année de l'enregistrement source, lus dans son payload."""
 
     @abstractmethod
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Normalise une notice qui porte les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (notice refusée, sans rien écrire)."""
+        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (enregistrement refusé, sans rien écrire)."""
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        """Traite une ligne staging. Retourne True (ok), None (skip), False (notice refusée).
+        """Traite une ligne staging. Retourne True (ok), None (skip), False (enregistrement refusé).
 
-        Une notice vide est sautée. Une notice sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
+        Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
             self._staging.mark_done(conn, row.id)
@@ -88,13 +88,13 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, conn: Connection, row: StagingRow) -> bool:
-        """Écarte une notice refusée : l'enregistrement qu'elle avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme notice incomplète."""
+        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme enregistrement incomplet."""
         self._staging.discard_source_record(conn, row.id)
         self._staging.mark_done(conn, row.id)
         return False
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
-        """Pré-chargement optionnel, avant la boucle sur les notices."""
+        """Pré-chargement optionnel, avant la boucle sur les enregistrements sources."""
 
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
         """Libération des caches in-memory."""

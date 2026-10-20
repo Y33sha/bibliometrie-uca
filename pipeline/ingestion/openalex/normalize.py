@@ -379,7 +379,7 @@ def insert_openalex_document(  # noqa: C901
 # =============================================================
 # OPENALEX AUTHORS — identifiants sur source_contributions
 # =============================================================
-# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, sur l'identité de la signature (contributor_information.identifiers).
+# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, dans les informations du contributeur (contributor_information.identifiers).
 
 
 def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
@@ -425,7 +425,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - ORCID déposé (`raw_orcid`) sur `identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
     - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte ;
-    - ROR des institutions : sur l'adresse dont le texte les désigne, sur la signature pour les autres ;
+    - ROR des institutions : sur l'adresse dont le texte les désigne, sur la contribution source pour les autres ;
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
@@ -494,7 +494,7 @@ def process_contributions(
     work: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
-    """Synchronise les signatures OpenAlex de la notice depuis son bloc auteurs."""
+    """Synchronise les contributions sources OpenAlex de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
         conn,
         contribution_queries,

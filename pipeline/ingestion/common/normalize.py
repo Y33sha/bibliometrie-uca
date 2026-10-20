@@ -6,7 +6,7 @@ La phase enchaîne ses tâches (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des `source_records` dont le staging porte `disappeared_at` ;
-3. le nettoyage des identités d'auteur orphelines (la normalisation réassigne des signatures et la suppression précédente en retire, laissant des `contributor_information` que plus aucune signature ne référence) ;
+3. le nettoyage des informations du contributeur orphelines (la normalisation réassigne des contributions sources et la suppression précédente en retire, laissant des lignes de `contributor_information` qu'aucune contribution source ne référence) ;
 4. le nettoyage des adresses orphelines, pour la même raison. Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
 """
 
@@ -73,7 +73,7 @@ class NormalizePhase:
     cleanup_orphan_addresses: Callable[[PhaseContext], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Normalise les sources retenues, retire les documents disparus, nettoie les identités et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
+        """Normalise les sources retenues, retire les enregistrements sources disparus, nettoie les informations du contributeur et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
             f"normalize.{source}": TaskStep(
@@ -86,7 +86,9 @@ class NormalizePhase:
         }
         steps["normalize.prune_disappeared"] = TaskStep(self._prune)
         steps["normalize.cleanup_orphan_contributor_information"] = TaskStep(
-            self._cleanup, section="Maintenance des tables", label="Identités d'auteur orphelines"
+            self._cleanup,
+            section="Maintenance des tables",
+            label="Informations du contributeur orphelines",
         )
         steps["normalize.cleanup_orphan_addresses"] = TaskStep(
             self._cleanup_addresses, section="Maintenance des tables", label="Adresses orphelines"
@@ -143,7 +145,7 @@ class NormalizePhase:
         supprimees = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
         if supprimees:
-            metrics.report = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
+            metrics.report = f"{accord(supprimees, 'ligne supprimée', 'lignes supprimées')}"
         return metrics
 
     def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -167,7 +169,7 @@ def build() -> Phase:
 class _NormalizeSelonOptions:
     """Construit les normaliseurs selon les options du run (`--raw-store`), puis exécute `NormalizePhase`.
 
-    Avec `--normalize-full`, chaque source marque d'abord toutes ses notices à resynchroniser.
+    Avec `--normalize-full`, chaque source marque d'abord tous ses enregistrements sources à resynchroniser.
     """
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
