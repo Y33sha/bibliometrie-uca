@@ -15,7 +15,6 @@ from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
@@ -26,6 +25,7 @@ from pipeline.runtime.observability.libelles import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
@@ -122,7 +122,7 @@ def build() -> Phase:
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = build_user_agent(get_polite_pool_email_optional() or "")
-    return NodePhase(
+    return SingleTaskPhase(
         "resolve_ra.resolve_prefixes",
         ResolveRaPhase(
             DoiPrefixesQueries,

@@ -1,6 +1,6 @@
-"""Recherche par DOI dans DataCite : nœud `fetch_missing.doi.datacite`.
+"""Recherche par DOI dans DataCite : tâche `fetch_missing.doi.datacite`.
 
-DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source mais absents du staging DataCite, on interroge l'endpoint `GET /dois` en **batch** via `query=doi:"a" OR doi:"b" …` (réponse JSON:API, liste de nœuds `data`) et on insère chaque nœud (id + `attributes` + `relationships`) dans `staging` avec `source='datacite'`.
+DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source mais absents du staging DataCite, on interroge l'endpoint `GET /dois` en **batch** via `query=doi:"a" OR doi:"b" …` (réponse JSON:API, liste de tâches `data`) et on insère chaque nœud (id + `attributes` + `relationships`) dans `staging` avec `source='datacite'`.
 
 Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette au-delà d'une dizaine de clauses `OR` (mesuré : ~0,3 s à 10 DOI, ~2,6 s à 20), on reste à 10 — coût par DOI minimal, et c'est alors le rate-limit qui borne. Les DOI absents de la réponse d'un batch sont les introuvables (cf. ci-dessous).
 

@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un document Web of Science par son identifiant natif : nœud `fetch_stale.wos`.
+"""Nouvelle lecture d'un document Web of Science par son identifiant natif : tâche `fetch_stale.wos`.
 
 Refetch d'une row par son UT WoS (`staging.source_id`) via une requête Advanced Search `UT=(<ut>)`. Un lot sans correspondance (HTTP 400) ou une réponse valide sans record = UT confirmé absent.
 """

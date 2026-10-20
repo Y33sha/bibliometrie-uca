@@ -1,4 +1,4 @@
-"""Moissonnage Web of Science : nœud `extract.wos`.
+"""Moissonnage Web of Science : tâche `extract.wos`.
 
 Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : celle par `queryId` rend des pages vides.
 """

@@ -1,6 +1,6 @@
 """Couverture des compteurs sur-mesure par leur libellé français.
 
-La ligne de bilan d'un nœud passe par `PhaseMetrics.as_summary()`, qui affiche la clé brute d'un compteur dont le libellé manque. Ce test relève dans le code les clés que les phases produisent et les confronte à la table des libellés.
+La ligne de bilan d'une tâche passe par `PhaseMetrics.as_summary()`, qui affiche la clé brute d'un compteur dont le libellé manque. Ce test relève dans le code les clés que les phases produisent et les confronte à la table des libellés.
 """
 
 from __future__ import annotations

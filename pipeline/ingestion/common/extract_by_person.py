@@ -1,6 +1,6 @@
 """Phase `extract_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
 
-Un nœud par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
+Une tâche par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
 
 Les identifiants de personne que chaque source accepte sont dans `domain/sources/person_search.py`.
 """
@@ -20,12 +20,12 @@ from pipeline.graph import PERSON_SEARCHED_SOURCES
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.extract import Extracteur
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.runtime.parallel import RunParallel
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -43,7 +43,7 @@ class ExtractByPersonPhase:
     run_parallel: RunParallel
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute en parallèle le nœud de chaque source retenue et assemble les métriques."""
+        """Exécute en parallèle la tâche de chaque source retenue et assemble les métriques."""
         options = ctx.options
         if not options.policy.extract_by_person:
             etape(ctx.logger, _SECTION)
@@ -51,7 +51,7 @@ class ExtractByPersonPhase:
             return PhaseMetrics()
         effective = set(PERSON_SEARCHED_SOURCES) & options.sources
 
-        def node(source: str) -> NodeRun:
+        def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 args = argparse.Namespace(start_year=options.start_year, year=options.year)
                 try:
@@ -68,11 +68,11 @@ class ExtractByPersonPhase:
         def retenue(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in effective
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "extract_by_person",
             {
-                f"extract_by_person.{source}": NodeStep(
-                    node(source),
+                f"extract_by_person.{source}": TaskStep(
+                    task(source),
                     section=_SECTION,
                     label=source_label(source),
                     progress_bar=True,
@@ -85,7 +85,7 @@ class ExtractByPersonPhase:
             parallel=self.run_parallel,
         )
         metrics = PhaseMetrics()
-        for source_metrics in by_node.values():
+        for source_metrics in by_task.values():
             metrics.merge(source_metrics)
         return metrics
 

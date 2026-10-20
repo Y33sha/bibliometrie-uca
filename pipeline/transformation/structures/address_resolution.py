@@ -1,4 +1,4 @@
-"""Résolution des adresses : rattachement aux structures et détection du périmètre. Nœud `affiliations.resolve_addresses`.
+"""Résolution des adresses : rattachement aux structures et détection du périmètre. Tâche `affiliations.resolve_addresses`.
 
 Lit les formes de noms depuis `structure_name_forms` et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
 """

@@ -5,7 +5,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 - s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : HAL en incrémental depuis la dernière extraction quotidienne réussie ;
-- sinon : un nœud par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
+- sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
 Les dépendances techniques sont injectées par le composition-root :
@@ -31,12 +31,12 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
 from pipeline.runtime.parallel import RunParallel
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 if TYPE_CHECKING:
@@ -79,7 +79,7 @@ class ExtractPhase:
     get_last_daily_extract_date: GetLastDailyExtractDate
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Retient les sources effectives selon le mode, exécute leurs nœuds en parallèle, et assemble les métriques."""
+        """Retient les sources effectives selon le mode, exécute leurs tâches en parallèle, et assemble les métriques."""
         options = ctx.options
         if self.count_extraction_structures(ctx) == 0:
             raise EmptyExtractionPerimeterError()
@@ -92,7 +92,7 @@ class ExtractPhase:
             # Le mode quotidien moissonne HAL seul.
             effective &= {"hal"}
 
-        def node(source: str) -> NodeRun:
+        def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 if depuis is not None and source == "hal":
                     ctx.logger.info(
@@ -120,11 +120,11 @@ class ExtractPhase:
         def retenue(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in effective
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "extract",
             {
-                f"extract.{source}": NodeStep(
-                    node(source),
+                f"extract.{source}": TaskStep(
+                    task(source),
                     section="Moissonnage par affiliation",
                     label=source_label(source),
                     progress_bar=True,
@@ -140,7 +140,7 @@ class ExtractPhase:
         metrics = PhaseMetrics()
         by_source: dict[str, dict[str, float | None]] = {}
         for source in HARVESTED_SOURCES:
-            source_metrics = by_node[f"extract.{source}"]
+            source_metrics = by_task[f"extract.{source}"]
             metrics.merge(source_metrics)
             if source in effective and not skipped(source_metrics):
                 by_source[source] = _source_summary(source_metrics)

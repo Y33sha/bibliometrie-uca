@@ -1,4 +1,4 @@
-"""Moissonnage DataCite : nœud `extract.datacite`.
+"""Moissonnage DataCite : tâche `extract.datacite`.
 
 Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre d'extraction, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles signatures relèvent du périmètre.
 

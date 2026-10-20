@@ -1,6 +1,6 @@
-"""Nœud `authorships.build` : liens de la table consolidée `authorships`, à partir des `source_authorships`.
+"""Tâche `authorships.build` : liens de la table consolidée `authorships`, à partir des `source_authorships`.
 
-Insère les authorships manquantes puis supprime les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste). Les nœuds suivants de la phase recomposent les attributs, le périmètre des publications et les matviews.
+Insère les authorships manquantes puis supprime les orphelines (paires `publication_id, person_id` que plus aucune source n'atteste). Les tâches suivantes de la phase recomposent les attributs, le périmètre des publications et les matviews.
 """
 
 import logging

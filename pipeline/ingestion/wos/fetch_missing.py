@@ -1,4 +1,4 @@
-"""Recherche par DOI dans Web of Science : nœud `fetch_missing.doi.wos`.
+"""Recherche par DOI dans Web of Science : tâche `fetch_missing.doi.wos`.
 
 WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`). Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
 

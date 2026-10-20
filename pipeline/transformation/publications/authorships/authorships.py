@@ -1,6 +1,6 @@
 """Phase `authorships` : construction de la table `authorships`.
 
-Nœuds (`pipeline.graph`), chacun dans sa transaction :
+Tâches (`pipeline.graph`), chacune dans sa transaction :
 
 1. **build** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne). Sa maintenance `ANALYZE authorships` précède la propagation.
 2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des authorships (indices de l'entrée dans le périmètre compris), le périmètre des publications et les matviews `authorship_structures`, `publication_structures`.
@@ -18,11 +18,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.authorships.address_pub_count import (
     AddressPubCountQueries,
 )
@@ -48,7 +48,7 @@ class AuthorshipsPhase:
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les nœuds de la phase et retourne les métriques du build."""
+        """Exécute les tâches de la phase et retourne les métriques du build."""
         queries = self.build_queries
 
         def build(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -96,40 +96,40 @@ class AuthorshipsPhase:
             return PhaseMetrics()
 
         synchronisation = "Synchronisation des tables"
-        by_node = run_nodes(
+        by_task = run_tasks(
             "authorships",
             {
-                "authorships.build": NodeStep(build),
-                "authorships.propagate": NodeStep(
+                "authorships.build": TaskStep(build),
+                "authorships.propagate": TaskStep(
                     propagate, section=synchronisation, label="Attributs des liens"
                 ),
-                "authorships.publications_in_perimeter": NodeStep(
+                "authorships.publications_in_perimeter": TaskStep(
                     publications_in_perimeter,
                     section=synchronisation,
                     label="Périmètre des publications",
                 ),
-                "authorships.structures": NodeStep(
+                "authorships.structures": TaskStep(
                     structures, section=synchronisation, label="Structures des liens"
                 ),
-                "authorships.purge_orphan_publications": NodeStep(purge),
-                "authorships.delete_empty_containers": NodeStep(empty_containers),
-                "authorships.pub_counts": NodeStep(pub_counts),
+                "authorships.purge_orphan_publications": TaskStep(purge),
+                "authorships.delete_empty_containers": TaskStep(empty_containers),
+                "authorships.pub_counts": TaskStep(pub_counts),
             },
             ctx,
         )
-        metrics = by_node["authorships.build"]
-        metrics.merge(by_node["authorships.delete_empty_containers"])
+        metrics = by_task["authorships.build"]
+        metrics.merge(by_task["authorships.delete_empty_containers"])
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
-            summary["total_in_perimeter"] = by_node["authorships.propagate"].details["in_perimeter"]
-            summary["publications_purged"] = by_node[
+            summary["total_in_perimeter"] = by_task["authorships.propagate"].details["in_perimeter"]
+            summary["publications_purged"] = by_task[
                 "authorships.purge_orphan_publications"
             ].details["purged"]
         return metrics
 
 
 def _chronometre(t0: float) -> PhaseMetrics:
-    """Métriques d'un nœud de synchronisation, dont le bilan est sa durée."""
+    """Métriques d'une tâche de synchronisation, dont le bilan est sa durée."""
     metrics = PhaseMetrics()
     metrics.report = f"{time.perf_counter() - t0:.1f}s"
     return metrics

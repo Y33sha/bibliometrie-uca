@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un document Crossref par son identifiant natif : nœud `fetch_stale.crossref`.
+"""Nouvelle lecture d'un document Crossref par son identifiant natif : tâche `fetch_stale.crossref`.
 
 CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
 """

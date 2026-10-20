@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-Le nœud charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les signatures qui la citent sont marquées pour la phase `countries`. En mode `full`, le nœud relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+La tâche charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les signatures qui la citent sont marquées pour la phase `countries`. En mode `full`, la tâche relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging

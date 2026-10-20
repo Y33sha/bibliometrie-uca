@@ -18,7 +18,6 @@ from sqlalchemy import Connection
 from domain.publications.metadata import publication_oa_status
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.tls import tls_context
-from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
@@ -30,6 +29,7 @@ from pipeline.runtime.observability.libelles import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
+from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
@@ -236,7 +236,7 @@ def build() -> Phase:
     async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
         return await fetch_oa_status(client, doi, base_url=base_url, email=email)
 
-    return NodePhase(
+    return SingleTaskPhase(
         "oa_status.verify_unpaywall",
         OaStatusPhase(
             OaStatusQueries(),

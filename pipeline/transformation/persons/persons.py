@@ -1,6 +1,6 @@
 """Orchestrateur unique de la phase personnes.
 
-Trois nœuds (`pipeline.graph`). Les quatre premières étapes forment le nœud `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des signatures, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de nœud annule l'ensemble. `populate` (nœud `persons.populate_person_name_forms`) et `purge` (nœud `persons.purge`) ont chacun leur transaction.
+Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des signatures, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_authorships`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'une notice (`duplicate_of`), non épinglés, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
@@ -25,11 +25,11 @@ from sqlalchemy import Connection
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
@@ -48,25 +48,25 @@ class PersonsPhase:
     orphans_log: logging.Logger | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les trois nœuds de la phase personnes et rend ses métriques.
+        """Exécute les trois tâches de la phase personnes et rend ses métriques.
 
         `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
         """
-        by_node = run_nodes(
+        by_task = run_tasks(
             "persons",
             {
-                "persons.resolve": NodeStep(self._resolve),
-                "persons.populate_person_name_forms": NodeStep(
+                "persons.resolve": TaskStep(self._resolve),
+                "persons.populate_person_name_forms": TaskStep(
                     self._populate,
                     section="Rafraîchissement des formes de nom associées aux personnes",
                 ),
-                "persons.purge": NodeStep(self._purge),
+                "persons.purge": TaskStep(self._purge),
             },
             ctx,
         )
-        metrics = by_node["persons.resolve"]
-        purge_counts = by_node["persons.purge"].extras
-        name_form_counts = by_node["persons.populate_person_name_forms"].extras
+        metrics = by_task["persons.resolve"]
+        purge_counts = by_task["persons.purge"].extras
+        name_form_counts = by_task["persons.populate_person_name_forms"].extras
         summary = metrics.details["summary"]
         assert isinstance(summary, dict)
         summary["reorphaned_nominal"] = purge_counts.get("reorphaned", 0)

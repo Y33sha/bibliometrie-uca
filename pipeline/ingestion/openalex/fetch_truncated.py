@@ -1,4 +1,4 @@
-"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex dont la liste d'auteurs est peut-être tronquée. Nœud `fetch_truncated.refetch_openalex`.
+"""Phase `fetch_truncated` : nouvelle lecture des works OpenAlex dont la liste d'auteurs est peut-être tronquée. Tâche `fetch_truncated.refetch_openalex`.
 
 Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works qui atteignent ce plafond ; cette phase les relit un par un par `/works/{id}`, qui rend tous les auteurs.
 
@@ -21,11 +21,11 @@ from infrastructure.db.jsonb import Jsonb
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
-from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
+from pipeline.task_runner import SingleTaskPhase
 
 COMMIT_EVERY = 50
 # Plafond OpenAlex 10 req/s.
@@ -136,4 +136,4 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 def build() -> Phase:
     """Relit les works OpenAlex tronqués à 100 auteurs, par l'accès à OpenAlex."""
 
-    return NodePhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase(), label="Bilan")
+    return SingleTaskPhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase(), label="Bilan")

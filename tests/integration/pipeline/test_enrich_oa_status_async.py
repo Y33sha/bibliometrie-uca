@@ -17,9 +17,9 @@ import pytest
 
 from pipeline.http.lookup import LookupOutcome
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status import (
     MAX_CONCURRENT,
     OaStatusFetcher,
@@ -274,7 +274,7 @@ def test_skips_without_unpaywall_configuration(logger):
     """Sans configuration Unpaywall, l'accès à la source signale son absence et la phase s'arrête avant toute transaction."""
     queries = _FakeQueries([_pub(1, "10.1/a", "closed")])
     open_tx = MagicMock()
-    phase = NodePhase(
+    phase = SingleTaskPhase(
         "oa_status.verify_unpaywall",
         OaStatusPhase(
             queries,

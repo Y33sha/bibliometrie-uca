@@ -73,7 +73,7 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
     assert open_tx.transactions == 4
 
 
-def test_les_deux_noeuds_lisent_le_perimetre_des_personnes(contexte):
+def test_les_deux_taches_lisent_le_perimetre_des_personnes(contexte):
     _, _, vus = _run(contexte)
 
     assert vus["resolution"] == vus["populate"] == set(PERIMETRE)

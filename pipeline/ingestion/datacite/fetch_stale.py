@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un document DataCite par son identifiant natif : nœud `fetch_stale.datacite`.
+"""Nouvelle lecture d'un document DataCite par son identifiant natif : tâche `fetch_stale.datacite`.
 
 DataCite est native du DOI pour ses préfixes : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /dois/{doi}` (nœud JSON:API unique). Un 404 = DOI confirmé absent.
 """

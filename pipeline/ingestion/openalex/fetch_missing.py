@@ -1,4 +1,4 @@
-"""Recherche par DOI dans OpenAlex : nœud `fetch_missing.doi.openalex`.
+"""Recherche par DOI dans OpenAlex : tâche `fetch_missing.doi.openalex`.
 
 Un appel par DOI sur le filtre `doi:...` de `/works`.
 """

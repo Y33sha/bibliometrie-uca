@@ -1,4 +1,4 @@
-"""Moissonnage d'OpenAlex par ORCID : nœud `extract_by_person.openalex`.
+"""Moissonnage d'OpenAlex par ORCID : tâche `extract_by_person.openalex`.
 
 Interroge `/works` avec le filtre `authorships.author.orcid`, qui réunit par OU les ORCID d'un lot, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
 """

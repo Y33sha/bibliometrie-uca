@@ -1,4 +1,4 @@
-"""Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des nœuds `extract_by_person`.
+"""Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `extract_by_person`.
 
 Chaque source interroge des lots de personnes, page après page, sur la plage d'années de l'extraction. Une requête réunit tous les identifiants des personnes du lot, dans les types que la source accepte (`PERSON_SEARCH_IDENTIFIERS`). Un document que plusieurs lots ramènent est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
 """

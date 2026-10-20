@@ -1,4 +1,4 @@
-"""Moissonnage de Crossref par ORCID : nœud `extract_by_person.crossref`.
+"""Moissonnage de Crossref par ORCID : tâche `extract_by_person.crossref`.
 
 Interroge `GET /works` avec le filtre `orcid`, une fois par ORCID du lot : Crossref réunit par OU les filtres de même nom. Les dates de publication bornent la recherche (`from-pub-date`, `until-pub-date`). La pagination suit le curseur (`next-cursor`). Polite pool par le `User-Agent`.
 """

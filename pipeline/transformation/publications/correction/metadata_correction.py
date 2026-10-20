@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_publications`.
 
-Trois nœuds (`pipeline.graph`), chacun dans sa propre transaction, dans l'ordre du graphe :
+Trois tâches (`pipeline.graph`), chacune dans sa propre transaction, dans l'ordre du graphe :
 
 1. **journal_by_doi** — rattache la revue manquante que désigne l'espace de noms du DOI. En premier : le `journal_id` qu'il commit est consommé par l'étape suivante (`journal_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
 2. **unaire** (per-record) — mapping `doc_type` source→canonique puis règles de correction `effective_metadata`.
@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.correction.correct_by_cluster import run as run_cluster
 from pipeline.transformation.publications.correction.correct_unary import run as run_unary
 from pipeline.transformation.publications.correction.journal_by_doi import run as run_journal_by_doi
@@ -29,10 +29,10 @@ class MetadataCorrectionPhase:
     queries: PgMetadataCorrectionQueries
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les trois nœuds, chacun dans sa transaction, et assemble les métriques de la phase."""
-        by_node = run_nodes(_PHASE, self._steps(), ctx)
+        """Exécute les trois tâches, chacune dans sa transaction, et assemble les métriques de la phase."""
+        by_task = run_tasks(_PHASE, self._steps(), ctx)
         journal_by_doi, unary, cluster = (
-            by_node[f"{_PHASE}.{name}"] for name in ("journal_by_doi", "unary", "cluster")
+            by_task[f"{_PHASE}.{name}"] for name in ("journal_by_doi", "unary", "cluster")
         )
 
         metrics = PhaseMetrics()
@@ -52,8 +52,8 @@ class MetadataCorrectionPhase:
         metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
         return metrics
 
-    def _steps(self) -> dict[str, NodeStep]:
-        """Étape de chaque nœud. Chacun écrit sa section du journal et rend examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
+    def _steps(self) -> dict[str, TaskStep]:
+        """Étape de chaque tâche. Chacune écrit sa section du journal et rend examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
         queries = self.queries
 
         def journal_by_doi(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -76,9 +76,9 @@ class MetadataCorrectionPhase:
             )
 
         return {
-            f"{_PHASE}.journal_by_doi": NodeStep(journal_by_doi),
-            f"{_PHASE}.unary": NodeStep(unary),
-            f"{_PHASE}.cluster": NodeStep(cluster),
+            f"{_PHASE}.journal_by_doi": TaskStep(journal_by_doi),
+            f"{_PHASE}.unary": TaskStep(unary),
+            f"{_PHASE}.cluster": TaskStep(cluster),
         }
 
 

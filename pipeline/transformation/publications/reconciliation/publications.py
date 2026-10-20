@@ -6,7 +6,7 @@
 
 La réconciliation est suivie de la suppression des publications restées sans source : celles que la réconciliation a vidées, et celles dont la phase `normalize` a retiré les derniers documents disparus.
 
-Les deux nœuds (`pipeline.graph`) — réconciliation, suppression — sont idempotents ; chacun tourne dans sa propre transaction.
+Les deux tâches (`pipeline.graph`) — réconciliation, suppression — sont idempotentes ; chacune tourne dans sa propre transaction.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.lifecycle import delete_publications_without_sources
 from pipeline.transformation.publications.reconciliation.reconcile_components import (
     run as reconcile_run,
@@ -47,15 +47,15 @@ class PublicationsPhase:
             _delete_publications_without_sources(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "publications",
             {
-                "publications.reconcile": NodeStep(reconcile),
-                "publications.delete_without_sources": NodeStep(delete_without_sources),
+                "publications.reconcile": TaskStep(reconcile),
+                "publications.delete_without_sources": TaskStep(delete_without_sources),
             },
             ctx,
         )
-        metrics = by_node["publications.reconcile"]
+        metrics = by_task["publications.reconcile"]
         with ctx.open_tx() as conn:
             pub_total = reconciliation_queries.count_publications(conn)
         summary = metrics.details["summary"]

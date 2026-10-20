@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un document ScanR par son identifiant natif : nœud `fetch_stale.scanr`.
+"""Nouvelle lecture d'un document ScanR par son identifiant natif : tâche `fetch_stale.scanr`.
 
 Refetch d'une row par son id ScanR (`staging.source_id`) via une requête ElasticSearch `term` sur `id.keyword`. Une réponse ES valide sans hit = id confirmé absent.
 """

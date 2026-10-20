@@ -1,4 +1,4 @@
-"""Moissonnage ScanR : nœud `extract.scanr`.
+"""Moissonnage ScanR : tâche `extract.scanr`.
 
 Interroge l'index Elasticsearch de ScanR sur les affiliations du périmètre, année par année, avec une pagination `search_after`.
 """

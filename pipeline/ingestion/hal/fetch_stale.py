@@ -1,4 +1,4 @@
-"""Nouvelle lecture d'un document HAL par son hal-id : nœud `fetch_stale.hal`.
+"""Nouvelle lecture d'un document HAL par son hal-id : tâche `fetch_stale.hal`.
 
 Requête Solr `halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro document.
 """

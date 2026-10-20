@@ -1,4 +1,4 @@
-"""Moissonnage HAL : nœud `extract.hal`.
+"""Moissonnage HAL : tâche `extract.hal`.
 
 Interroge l'**union** des collections du périmètre en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne l'union côté serveur : chaque document est récupéré une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient.
 

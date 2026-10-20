@@ -89,7 +89,7 @@ class RorDumpQueries:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque `countries_dirty` les signatures qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le nœud `countries.ror` recrée leurs candidats."""
+        """Pour les organisations `ror_ids` : marque `countries_dirty` les signatures qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le tâche `countries.ror` recrée leurs candidats."""
         if not ror_ids:
             return
         self._conn.execute(

@@ -1,4 +1,4 @@
-"""Résolution des laboratoires partenaires de thèse : rattachement de leur PPN IdRef aux structures, par leur nom. Nœud `affiliations.resolve_thesis_partners`.
+"""Résolution des laboratoires partenaires de thèse : rattachement de leur PPN IdRef aux structures, par leur nom. Tâche `affiliations.resolve_thesis_partners`.
 
 Chaque PPN cité par une notice theses.fr (`meta.partenaires`) est résolu par les formes de noms de ses noms, avec le moteur de la résolution des adresses. `idref_structures` garde la forme à l'origine de chaque détection. Comme pour les adresses, une détection qui disparaît est supprimée, et un lien confirmé ou infirmé par l'administration reste en place.
 """

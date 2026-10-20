@@ -1,4 +1,4 @@
-"""Moissonnage de ScanR par identifiant de personne : nœud `extract_by_person.scanr`.
+"""Moissonnage de ScanR par identifiant de personne : tâche `extract_by_person.scanr`.
 
 Interroge l'index Elasticsearch avec une clause `should` qui réunit l'IdRef des auteurs (`authors.person`, sous la forme `idref<IdRef>`) et leur ORCID (`authors.denormalized.orcid`), bornée par l'année. La pagination suit `search_after`, sur le tri par identifiant.
 """

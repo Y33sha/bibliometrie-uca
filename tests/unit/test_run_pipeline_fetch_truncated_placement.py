@@ -17,7 +17,7 @@ from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Le nœud de la phase `fetch_truncated`, lancé via `asyncio.run`.
+# La tâche de la phase `fetch_truncated`, lancée via `asyncio.run`.
 _REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"
 
 

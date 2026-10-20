@@ -2,7 +2,7 @@
 
 1. **Recherche dans HAL** (`pipeline.ingestion.hal.fetch_missing`) : par hal-id (repéré dans OpenAlex et ScanR), puis par NNT (thèses sans document HAL).
 2. **Recherche dans theses.fr** (`pipeline.ingestion.theses.fetch_missing`) : par NNT repéré dans une autre source.
-3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les nœuds `fetch_missing.doi.<source>` forment un lot exécuté en parallèle.
+3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `fetch_missing.doi.<source>` forment un groupe parallèle.
 
 Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`).
 """
@@ -35,7 +35,6 @@ from pipeline.ingestion.common.failed_lookups import (
     record_failed_lookup,
 )
 from pipeline.ingestion.complements.doi_org import doi_existence
-from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import branche_de_source, rien_a_faire
 from pipeline.runtime.observability.logging_scope import scoped_logger
@@ -43,6 +42,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.runtime.parallel import RunParallel
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
@@ -54,7 +54,7 @@ _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
 _THESES_BY_NNT = "fetch_missing.theses_by_nnt"
 
 
-def _doi_node(target: str) -> str:
+def _doi_task(target: str) -> str:
     return f"fetch_missing.doi.{target}"
 
 
@@ -89,45 +89,45 @@ class FetchMissingPhase:
             _HAL_BY_ID: hal,
             _HAL_BY_NNT: hal and options.mode == "full",
             _THESES_BY_NNT: theses,
-            **{_doi_node(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
+            **{_doi_task(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
         }
 
-        def quand(node: str) -> Callable[[PhaseContext], bool]:
-            return lambda _ctx: retenus[node]
+        def quand(task: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: retenus[task]
 
-        def channel(fetch: FetchChannel) -> NodeRun:
+        def channel(fetch: FetchChannel) -> TaskRun:
             return lambda ctx, _breaker: fetch(ctx)
 
-        def doi(target: str) -> NodeRun:
+        def doi(target: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
+                assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
                 return self.fetch_doi_one(ctx, target, breaker)
 
             return run
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "fetch_missing",
             {
-                _HAL_BY_ID: NodeStep(
+                _HAL_BY_ID: TaskStep(
                     channel(self.fetch_hal_by_id),
                     section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
                     when=quand(_HAL_BY_ID),
                 ),
-                _HAL_BY_NNT: NodeStep(
+                _HAL_BY_NNT: TaskStep(
                     channel(self.fetch_hal_by_nnt),
                     section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
                     when=quand(_HAL_BY_NNT),
                 ),
-                _THESES_BY_NNT: NodeStep(
+                _THESES_BY_NNT: TaskStep(
                     channel(self.fetch_theses_by_nnt),
                     section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
                     when=quand(_THESES_BY_NNT),
                 ),
                 **{
-                    _doi_node(target): NodeStep(
+                    _doi_task(target): TaskStep(
                         doi(target),
                         section="Recherche par DOI des documents manquants dans chaque source",
-                        when=quand(_doi_node(target)),
+                        when=quand(_doi_task(target)),
                     )
                     for target in DOI_SEARCHABLE_SOURCES
                 },
@@ -136,7 +136,7 @@ class FetchMissingPhase:
             parallel=self.run_parallel,
         )
 
-        doi_metrics = [by_node[_doi_node(target)] for target in doi_targets]
+        doi_metrics = [by_task[_doi_task(target)] for target in doi_targets]
         # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
         if doi_metrics and all(m.total == 0 and not m.signals for m in doi_metrics):
             rien_a_faire(ctx.logger)
@@ -147,12 +147,12 @@ class FetchMissingPhase:
             _HAL_BY_ID: "hal-id",
             _HAL_BY_NNT: "NNT",
             _THESES_BY_NNT: "NNT theses.fr",
-            **{_doi_node(target): target for target in DOI_SEARCHABLE_SOURCES},
+            **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
         }
-        for node, key in channels.items():
-            metrics.merge(by_node[node])
-            if retenus[node] and not skipped(by_node[node]):
-                by_channel[key] = _summary(by_node[node])
+        for task, key in channels.items():
+            metrics.merge(by_task[task])
+            if retenus[task] and not skipped(by_task[task]):
+                by_channel[key] = _summary(by_task[task])
         if by_channel:
             metrics.details["table"] = {
                 "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]

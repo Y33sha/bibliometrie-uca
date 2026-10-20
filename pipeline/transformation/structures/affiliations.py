@@ -1,11 +1,11 @@
 """Phase `affiliations` : rattachement des signatures aux structures du périmètre.
 
-La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent quatre nœuds (`pipeline.graph`), chacun dans sa propre transaction :
+La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
 
-1. **Référentiel ROR** (nœud `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
-2. **Référentiel des structures HAL** (nœud `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
-3. **Résolution des adresses** (nœud `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (nœud `affiliations.resolve_thesis_partners`).
-4. **Signatures du périmètre** (nœud `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les structures qu'elles atteignent (vue `source_authorship_structures`) et l'identité des personnes RH.
+1. **Référentiel ROR** (tâche `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
+2. **Référentiel des structures HAL** (tâche `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
+3. **Résolution des adresses** (tâche `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (tâche `affiliations.resolve_thesis_partners`).
+4. **Signatures du périmètre** (tâche `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_authorships`, d'après les structures qu'elles atteignent (vue `source_authorship_structures`) et l'identité des personnes RH.
 """
 
 from __future__ import annotations
@@ -17,11 +17,11 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.structures.address_resolution import (
     AddressResolutionQueries,
     run_resolution,
@@ -46,34 +46,34 @@ class AffiliationsPhase:
     resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Contrôle le périmètre d'extraction, exécute ses nœuds et assemble les métriques de la phase."""
+        """Contrôle le périmètre d'extraction, exécute ses tâches et assemble les métriques de la phase."""
         with ctx.open_tx() as conn:
             if self.perimeter_queries.count_extraction_structures(conn) == 0:
                 raise EmptyExtractionPerimeterError()
 
-        by_node = run_nodes(
+        by_task = run_tasks(
             "affiliations",
             {
-                "affiliations.refresh_ror": NodeStep(lambda ctx, _breaker: self.refresh_ror(ctx)),
-                "affiliations.refresh_hal_structures": NodeStep(
+                "affiliations.refresh_ror": TaskStep(lambda ctx, _breaker: self.refresh_ror(ctx)),
+                "affiliations.refresh_hal_structures": TaskStep(
                     lambda ctx, _breaker: self.refresh_hal_structures(
                         ctx, ctx.options.policy.refresh_hal_structures
                     )
                 ),
-                "affiliations.resolve_addresses": NodeStep(
+                "affiliations.resolve_addresses": TaskStep(
                     self._resolve_addresses,
                     section="Identification des structures dans les adresses institutionnelles",
                 ),
-                "affiliations.resolve_thesis_partners": NodeStep(self._resolve_thesis_partners),
-                "affiliations.populate": NodeStep(
+                "affiliations.resolve_thesis_partners": TaskStep(self._resolve_thesis_partners),
+                "affiliations.populate": TaskStep(
                     self._populate, section="Rattachement des structures aux auteurs des documents"
                 ),
             },
             ctx,
         )
-        metrics = by_node["affiliations.resolve_addresses"]
-        metrics.details.update(by_node["affiliations.refresh_ror"].details)
-        metrics.details.update(by_node["affiliations.refresh_hal_structures"].details)
+        metrics = by_task["affiliations.resolve_addresses"]
+        metrics.details.update(by_task["affiliations.refresh_ror"].details)
+        metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
         return metrics
 
     def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

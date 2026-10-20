@@ -1,4 +1,4 @@
-"""Métriques de la phase personnes : compteurs de la cascade et métriques du nœud `persons.resolve`."""
+"""Métriques de la phase personnes : compteurs de la cascade et métriques de la tâche `persons.resolve`."""
 
 import logging
 from typing import NamedTuple
@@ -54,7 +54,7 @@ def build_metrics(
     transferred: int,
     cross_source_detached: int,
 ) -> PhaseMetrics:
-    """Assemble les métriques du nœud `persons.resolve` depuis les compteurs de la cascade. La phase y ajoute ceux de la purge."""
+    """Assemble les métriques de la tâche `persons.resolve` depuis les compteurs de la cascade. La phase y ajoute ceux de la purge."""
     matched = result.matched_counts
     skipped = result.skipped_counts
     linked_total = sum(matched.values())

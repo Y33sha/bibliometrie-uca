@@ -1,4 +1,4 @@
-"""Moissonnage de DataCite par ORCID : nœud `extract_by_person.datacite`.
+"""Moissonnage de DataCite par ORCID : tâche `extract_by_person.datacite`.
 
 Interroge `GET /dois` sur les ORCID des créateurs (`creators.nameIdentifiers.nameIdentifier`).
 """

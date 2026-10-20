@@ -1,6 +1,6 @@
-"""Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Nœuds `normalize.<source>`.
+"""Phase `normalize` : normalisation du staging vers `source_publications`, `source_authorships` et `addresses`. Tâches `normalize.<source>`.
 
-La phase enchaîne ses nœuds (`pipeline.graph`) :
+La phase enchaîne ses tâches (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
 2. la suppression des `source_publications` dont le staging porte `disappeared_at` ;
@@ -26,7 +26,6 @@ from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
@@ -37,6 +36,7 @@ from pipeline.runtime.observability.libelles import (
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
@@ -250,7 +250,7 @@ NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 
 
 def _retenue(source: str) -> Callable[[PhaseContext], bool]:
-    """Condition d'exécution du nœud de `source` : la source fait partie des sources du run."""
+    """Condition d'exécution de la tâche de `source` : la source fait partie des sources du run."""
     return lambda ctx: source in ctx.options.sources
 
 
@@ -267,8 +267,8 @@ class NormalizePhase:
         """Normalise les sources retenues, retire les documents disparus, nettoie les identités et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
-            f"normalize.{source}": NodeStep(
-                self._normalize_node(source),
+            f"normalize.{source}": TaskStep(
+                self._normalize_task(source),
                 section="Normalisation",
                 label=source_label(source),
                 progress_bar=True,
@@ -276,34 +276,34 @@ class NormalizePhase:
             )
             for source in sources
         }
-        steps["normalize.prune_disappeared"] = NodeStep(self._prune, section="Normalisation")
-        steps["normalize.cleanup_orphan_identities"] = NodeStep(
+        steps["normalize.prune_disappeared"] = TaskStep(self._prune, section="Normalisation")
+        steps["normalize.cleanup_orphan_identities"] = TaskStep(
             self._cleanup, section="Maintenance des tables", label="Identités d'auteur orphelines"
         )
-        steps["normalize.cleanup_orphan_addresses"] = NodeStep(
+        steps["normalize.cleanup_orphan_addresses"] = TaskStep(
             self._cleanup_addresses, section="Maintenance des tables", label="Adresses orphelines"
         )
-        by_node = run_nodes("normalize", steps, ctx)
+        by_task = run_tasks("normalize", steps, ctx)
 
         rows = [
             {
-                **cast("dict[str, object]", node.details["row"]),
-                "duration_s": node.duration_s,
+                **cast("dict[str, object]", task.details["row"]),
+                "duration_s": task.duration_s,
             }
             for source in sources
-            if "row" in (node := by_node[f"normalize.{source}"]).details
+            if "row" in (task := by_task[f"normalize.{source}"]).details
         ]
         metrics = PhaseMetrics()
         normalises = sum(cast("int", row["processed"]) for row in rows)
         metrics.add(seen=normalises)
         metrics.details["table"] = {"rows": rows}
-        metrics.details["disappeared_pruned"] = by_node["normalize.prune_disappeared"].extras.get(
+        metrics.details["disappeared_pruned"] = by_task["normalize.prune_disappeared"].extras.get(
             "disappeared", 0
         )
         return metrics
 
-    def _normalize_node(self, source: str) -> NodeRun:
-        """Nœud `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
+    def _normalize_task(self, source: str) -> TaskRun:
+        """Tâche `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
 
         def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             stats = self.normalize_one(ctx, source)
