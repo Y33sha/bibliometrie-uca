@@ -1,22 +1,9 @@
-"""Éléments communs aux accès à l'API DataCite : en-têtes et paramètres de requête, DOI d'un nœud JSON:API."""
+"""Lecture d'un nœud JSON:API de DataCite : son DOI."""
 
 from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_str
-from pipeline.http.polite_pool import polite_user_agent
-
-
-def api_headers() -> dict[str, str]:
-    """En-têtes d'une requête DataCite : `User-Agent` du polite pool, réponse JSON:API."""
-    return {
-        "User-Agent": polite_user_agent(),
-        "Accept": "application/vnd.api+json",
-    }
-
-
-RECORD_PARAMS: dict[str, str] = {"affiliation": "true"}
-"""Paramètres de toute requête qui rapatrie des enregistrements. `affiliation=true` rend les affiliations des créateurs en objets `{name, affiliationIdentifier, affiliationIdentifierScheme}`. Un même DOI garde ainsi la même forme, quel que soit le chemin qui le ramène."""
 
 
 def record_doi(record: Mapping[str, JsonValue]) -> str | None:

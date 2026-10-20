@@ -2,33 +2,29 @@
 
 Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre d'extraction, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles signatures relèvent du périmètre.
 
-Les paramètres de requête comprennent `RECORD_PARAMS`, comme ceux des phases `fetch_missing` et `fetch_stale`. Le lien `next` de la pagination les reprend.
+Les paramètres de requête comprennent `RECORD_PARAMS` (`api.py`), comme ceux des phases `fetch_missing` et `fetch_stale`. Le lien `next` de la pagination les reprend.
 """
 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
     stage_document,
 )
-from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
+from pipeline.ingestion.datacite.api import DataciteClient
+from pipeline.ingestion.datacite.fields import record_doi
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
-
-# Plafond de l'API DataCite pour la taille d'une page.
-_PAGE_SIZE = 1000
 
 
 @dataclass(frozen=True)
@@ -39,14 +35,6 @@ class DataciteExtractConfig:
     keywords: list[str]
 
 
-@dataclass(frozen=True)
-class DatacitePage:
-    """Une page de résultats : ses nœuds, et l'URL de la page suivante (`None` en fin de résultats)."""
-
-    records: list[Mapping[str, JsonValue]]
-    next_url: str | None
-
-
 def build_query(year: int, keywords: list[str]) -> str:
     """Requête `query` DataCite : DOI publiés l'année `year` dont une affiliation de créateur contient l'un des mots-clés, chacun cherché comme expression exacte."""
     clauses = " OR ".join(
@@ -54,50 +42,6 @@ def build_query(year: int, keywords: list[str]) -> str:
         for k in keywords
     )
     return f"publicationYear:{year} AND ({clauses})"
-
-
-class DataciteClient:
-    """Client de `GET /dois`."""
-
-    def __init__(self, base_url: str) -> None:
-        self._url = f"{base_url}/dois"
-        self._headers = api_headers()
-
-    def _get(
-        self, url: str, params: Mapping[str, str | int] | None, label: str
-    ) -> Mapping[str, JsonValue]:
-        return as_mapping(
-            http_request_with_retry(
-                "GET", url, params=params, headers=self._headers, timeout=180, label=label
-            )
-        )
-
-    def count(self, query: str, label: str) -> int:
-        """Nombre de DOI que désigne `query`, lu sur une page vide (`page[size]=0`). `label` nomme la requête dans le journal."""
-        data = self._get(
-            self._url,
-            {"query": query, "page[size]": 0, **RECORD_PARAMS},
-            label=f"({label}, comptage)",
-        )
-        total = as_mapping(data.get("meta")).get("total")
-        return total if isinstance(total, int) else 0
-
-    def fetch_page(
-        self, query: str, next_url: str | None, label: str, *, page_size: int = _PAGE_SIZE
-    ) -> DatacitePage:
-        """Une page des DOI que désigne `query` : la première quand `next_url` est `None`, sinon celle que désigne `next_url`."""
-        if next_url is None:
-            data = self._get(
-                self._url,
-                {"query": query, "page[size]": page_size, "page[cursor]": 1, **RECORD_PARAMS},
-                label=f"({label}, première page)",
-            )
-        else:
-            data = self._get(next_url, None, label=f"({label}, page suivante)")
-        records = [as_mapping(r) for r in as_sequence(data.get("data"))]
-        following = as_str(as_mapping(data.get("links")).get("next"))
-        # Une page vide clôt la pagination, même si l'API annonce encore une suite.
-        return DatacitePage(records=records, next_url=following if records else None)
 
 
 def extract_year(

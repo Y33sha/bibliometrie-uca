@@ -1,6 +1,6 @@
 """Client api.datacite.org/prefixes : provider + client (repository) d'un préfixe DOI.
 
-`GET /prefixes/<prefix>?include=clients,providers` (réponse JSON:API) renvoie le provider DataCite (organisation-mère, occupe le slot `publisher_*`) et le client (repository : Zenodo, NAKALA, INRAE, …). Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'DataCite'`. Polite pool via header `User-Agent` (mailto).
+`GET /prefixes/<prefix>?include=clients,providers` (réponse JSON:API) renvoie le provider DataCite (organisation-mère, occupe le slot `publisher_*`) et le client (repository : Zenodo, NAKALA, INRAE, …). Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'DataCite'`.
 
 Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client. Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
 """
@@ -13,13 +13,12 @@ import httpx2
 
 from domain.publications.identifiers import DoiPrefix
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
-from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.datacite.api import fetch_prefix
 
 
 async def fetch_datacite_prefix(
-    client: httpx2.AsyncClient, prefix: str, *, user_agent: str
+    client: httpx2.AsyncClient, prefix: str
 ) -> LookupOutcome[tuple[str, str, str]]:
     """Interroge `api.datacite.org/prefixes/<prefix>` pour récupérer provider + client.
 
@@ -29,18 +28,7 @@ async def fetch_datacite_prefix(
     cleaned = str(parsed) if parsed else None
     if not cleaned:
         return NOT_FOUND
-    outcome = await lookup_json_async(
-        client,
-        "GET",
-        f"{API_BASE_URLS['datacite']}/prefixes/{cleaned}",
-        params={"include": "clients,providers"},
-        headers={"User-Agent": user_agent, "Accept": "application/vnd.api+json"},
-        timeout=15,
-        max_retries=3,
-        # DataCite répond 400 à chaque appel pour certains préfixes qu'il ne gère pas (10.1713).
-        not_found_statuses=frozenset({400, 404}),
-        label=f"datacite prefix {cleaned}",
-    )
+    outcome = await fetch_prefix(client, cleaned)
     if isinstance(outcome, NotFound | Unavailable):
         return outcome
     parsed_payload = _parse_datacite_prefix_payload(outcome)

@@ -8,7 +8,7 @@ import pytest
 
 from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.ingestion.datacite.harvest import DatacitePage
+from pipeline.ingestion.datacite.api import DatacitePage
 from pipeline.ingestion.datacite.person_search import DatacitePersonExtractor, build_orcid_query
 from tests.helpers.extractors import arguments_du_run, extracteur
 

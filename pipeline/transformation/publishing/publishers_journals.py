@@ -225,7 +225,6 @@ def _run_resolve_crossref_publishers(
 def _run_resolve_datacite_publishers(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    from pipeline.http.polite_pool import polite_user_agent
     from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -233,16 +232,13 @@ def _run_resolve_datacite_publishers(
         run_resolve_datacite_publishers,
     )
 
-    user_agent = polite_user_agent()
     with ctx.open_tx() as conn:
         return run_resolve_datacite_publishers(
             conn,
             ctx.logger,
             repo=DoiPrefixesQueries(conn),
             publisher_repo=PublisherGatewayQueries(conn),
-            fetch_prefix_fn=lambda client, prefix: fetch_datacite_prefix(
-                client, prefix, user_agent=user_agent
-            ),
+            fetch_prefix_fn=fetch_datacite_prefix,
             breaker=breaker,
         )
 

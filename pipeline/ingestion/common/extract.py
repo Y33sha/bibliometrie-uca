@@ -234,7 +234,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return ThesesExtractor(conn, source_log, ThesesClient(API_BASE_URLS["theses"]))
 
     def datacite(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.datacite.harvest import DataciteClient, DataciteExtractor
+        from pipeline.ingestion.datacite.api import DataciteClient
+        from pipeline.ingestion.datacite.harvest import DataciteExtractor
 
         return DataciteExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
 

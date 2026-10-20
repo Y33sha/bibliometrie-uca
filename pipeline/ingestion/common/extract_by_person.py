@@ -116,7 +116,7 @@ def _extractors() -> dict[str, ExtractorFactory]:
     from pipeline.ingestion.api_params import API_BASE_URLS
 
     def datacite(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.datacite.harvest import DataciteClient
+        from pipeline.ingestion.datacite.api import DataciteClient
         from pipeline.ingestion.datacite.person_search import DatacitePersonExtractor
 
         return DatacitePersonExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
