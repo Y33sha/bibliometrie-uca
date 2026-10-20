@@ -7,12 +7,9 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.types import as_mapping
-from pipeline.http.http_retry import lookup_json_async
-from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.http.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
-from pipeline.ingestion.credentials import get_wos_api_key
+from pipeline.ingestion.wos.api import search
 from pipeline.ingestion.wos.fields import extract_doi, get_records
 
 
@@ -22,34 +19,10 @@ class WosStaleRefetch(StaleRefetch):
     max_concurrent = 2
     request_delay_s = 0.5
 
-    def __init__(self) -> None:
-        self.base_url = API_BASE_URLS["wos"]
-        self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
-
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        outcome = await lookup_json_async(
-            client,
-            "GET",
-            self.base_url,
-            headers=self.headers,
-            params={
-                "databaseId": "WOS",
-                "usrQuery": f"UT=({source_id})",
-                "count": 1,
-                "firstRecord": 1,
-            },
-            timeout=60,
-            initial_backoff=4.0,
-            retry_on_empty_body=True,
-            # 400 = requête sans correspondance : UT confirmé absent de WoS.
-            not_found_statuses=frozenset({400}),
-            label=f"UT {source_id}",
-        )
-        if isinstance(outcome, NotFound | Unavailable):
-            return outcome
-        data = as_mapping(outcome)
-        if not data:
-            return UNAVAILABLE
+        data = await search(client, f"UT=({source_id})", count=1, label=f"UT {source_id}")
+        if isinstance(data, NotFound | Unavailable):
+            return data
         records = get_records(data)
         if not records:
             return NOT_FOUND
