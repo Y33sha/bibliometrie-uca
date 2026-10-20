@@ -1,8 +1,10 @@
-"""Tests d'intégration de `PublisherGatewayQueries` : suppression des éditeurs vides."""
+"""Tests d'intégration de la suppression des éditeurs vides."""
 
 from __future__ import annotations
 
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
+    delete_empty_publishers,
+)
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal,
@@ -35,7 +37,7 @@ class TestDeleteEmptyPublishers:
         with_monograph = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
         insert_monograph(sa_sync_conn, "Livre", publisher_id=with_monograph)
 
-        deleted = PublisherGatewayQueries(sa_sync_conn).delete_empty_publishers()
+        deleted = delete_empty_publishers(sa_sync_conn)
 
         ids = {publisher_id for publisher_id, _ in deleted}
         assert empty in ids

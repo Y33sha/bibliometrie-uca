@@ -87,11 +87,11 @@ from pipeline.transformation.publishing.monographs.type_proceedings_volumes impo
     run_type_proceedings_volumes,
 )
 from pipeline.transformation.publishing.publishers import resolve_publishers
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_crossref_publishers,
     run_resolve_datacite_publishers,
 )
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 _PHASE = "publishers_journals"
 
@@ -259,7 +259,7 @@ def _run_resolve_crossref_publishers(
             conn,
             ctx.logger,
             repo=DoiPrefixesQueries(conn),
-            publisher_repo=PublisherGatewayQueries(conn),
+            publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_crossref_prefix,
             breaker=breaker,
         )
@@ -273,7 +273,7 @@ def _run_resolve_datacite_publishers(
             conn,
             ctx.logger,
             repo=DoiPrefixesQueries(conn),
-            publisher_repo=PublisherGatewayQueries(conn),
+            publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
             breaker=breaker,
         )

@@ -157,7 +157,7 @@ class TestUpsertPublisher:
             return 5
 
         monkeypatch.setattr(normalize_hal, "find_or_create_publisher", fake_find)
-        result = upsert_publisher("Elsevier", publisher_repo=MagicMock())
+        result = upsert_publisher("Elsevier", publisher_store=MagicMock())
         assert result == 5
         assert captured["name"] == "Elsevier"
 
@@ -605,7 +605,7 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourcePublicationQueries(),
             "container_repo": MagicMock(),
-            "publisher_repo": MagicMock(),
+            "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": FakeAuthorshipsBatchQueries(),
         }
@@ -691,7 +691,7 @@ def _make_normalizer():
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
         container_repo=MagicMock(),
-        publisher_repo=MagicMock(),
+        publisher_store=MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
     )
 

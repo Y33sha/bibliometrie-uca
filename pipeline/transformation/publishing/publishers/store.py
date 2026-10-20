@@ -1,29 +1,17 @@
-"""Accès PostgreSQL du pipeline à la table `publishers`.
+"""Store des éditeurs : recherche, création et formes de nom de la table `publishers`, pour le pipeline.
 
 L'édition, la fusion et l'enrichissement pays sont dans `infrastructure/repositories/publisher_repository.py`.
 """
 
-from sqlalchemy import Connection, select, text, update
+from sqlalchemy import Connection, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import publisher_name_forms, publishers
 
-# Éditeurs sans revue, sans préfixe DOI, sans paiement APC et sans forme de nom de revue ; leurs
-# propres formes de nom partent avec eux (`ON DELETE CASCADE`).
-_DELETE_EMPTY_PUBLISHERS = text("""
-    DELETE FROM publishers p
-    WHERE NOT EXISTS (SELECT 1 FROM journals j WHERE j.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM doi_prefixes d WHERE d.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM journal_name_forms f WHERE f.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.publisher_id = p.id)
-    RETURNING p.id, p.name
-""")
 
-
-class PublisherGatewayQueries:
-    """Accès PostgreSQL à `publishers` pour le pipeline, via une `Connection` SQLAlchemy."""
+class PublisherStore:
+    """Éditeurs, sur la connexion `conn`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -91,8 +79,3 @@ class PublisherGatewayQueries:
             .returning(publishers.c.id)
         )
         return scalar_int(self._conn.execute(stmt))
-
-    def delete_empty_publishers(self) -> list[tuple[int, str]]:
-        """Supprime les éditeurs sans revue, sans monographie, sans préfixe DOI, sans paiement APC et sans forme de nom de revue, et rend `(id, nom)` de chacun."""
-        rows = self._conn.execute(_DELETE_EMPTY_PUBLISHERS).all()
-        return sorted((r.id, r.name) for r in rows)

@@ -200,7 +200,7 @@ class TestUpsertPublisher:
     def test_no_publisher_name(self):
         from pipeline.ingestion.openalex.normalize import upsert_publisher
 
-        assert upsert_publisher({}, publisher_repo=MagicMock()) is None
+        assert upsert_publisher({}, publisher_store=MagicMock()) is None
 
     def test_happy_path(self, monkeypatch):
         from pipeline.ingestion.openalex.normalize import upsert_publisher
@@ -221,7 +221,7 @@ class TestUpsertPublisher:
                 }
             }
         }
-        result = upsert_publisher(work, publisher_repo=MagicMock())
+        result = upsert_publisher(work, publisher_store=MagicMock())
         assert result == 7
         assert captured["name"] == "Elsevier"
         assert captured["openalex_id"] == "P1"
@@ -238,7 +238,7 @@ class TestUpsertPublisher:
 
         monkeypatch.setattr(normalize_openalex, "find_or_create_publisher", fake_find)
         work = {"primary_location": {"source": {"host_organization_name": "X"}}}
-        upsert_publisher(work, publisher_repo=MagicMock())
+        upsert_publisher(work, publisher_store=MagicMock())
         assert captured["openalex_id"] is None
 
 
@@ -658,7 +658,7 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourcePublicationQueries(),
             "container_repo": MagicMock(),
-            "publisher_repo": MagicMock(),
+            "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": MagicMock(),
         }
@@ -716,7 +716,7 @@ def _make_normalizer():
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
         container_repo=MagicMock(),
-        publisher_repo=MagicMock(),
+        publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
 
@@ -741,7 +741,7 @@ class TestOpenalexNormalizerClass:
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {
             "container_repo",
-            "publisher_repo",
+            "publisher_store",
             "staging_queries",
             "authorship_queries",
         }

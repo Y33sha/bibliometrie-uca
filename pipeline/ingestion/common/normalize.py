@@ -52,7 +52,7 @@ from pipeline.runtime.observability.libelles import (
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
@@ -219,7 +219,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             StagingQueries(raw_store),
             SourcePublicationQueries(),
             container_repo=ContainerGatewayQueries(conn),
-            publisher_repo=PublisherGatewayQueries(conn),
+            publisher_store=PublisherStore(conn),
             authorship_queries=AuthorshipsBatchQueries(),
         )
 

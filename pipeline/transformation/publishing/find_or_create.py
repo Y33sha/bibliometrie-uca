@@ -21,7 +21,7 @@ from domain.publishers.names import publisher_name_key
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def find_or_create_publisher(
     name: str | None,
     *,
     openalex_id: str | None = None,
-    repo: PublisherGatewayQueries,
+    repo: PublisherStore,
 ) -> int | None:
     """Trouve ou crée un éditeur.
 
@@ -64,9 +64,7 @@ def find_or_create_publisher(
     return pub_id
 
 
-def match_or_create_publisher(
-    name: str, *, repo: PublisherGatewayQueries
-) -> tuple[int, bool] | None:
+def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
     """`(id, created)` de l'éditeur que désigne `name`, retrouvé par sa clé de nom ou créé. `None` si le nom ne garde rien à la normalisation.
 
     Le nom est mis à plat d'abord : le nom affiché, le nom normalisé et la clé en dérivent tous (cf. `find_or_create_journal`).

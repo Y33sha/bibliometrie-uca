@@ -32,7 +32,7 @@ from infrastructure.repositories import (
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from pipeline.transformation.publishing.pub_counts import PubCountRecompute
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
     insert_journal_with_issns,
@@ -71,8 +71,8 @@ def publisher_repo(sa_sync_conn):
 
 
 @pytest.fixture
-def publisher_gateway(sa_sync_conn):
-    return PublisherGatewayQueries(sa_sync_conn)
+def publisher_store(sa_sync_conn):
+    return PublisherStore(sa_sync_conn)
 
 
 @pytest.fixture

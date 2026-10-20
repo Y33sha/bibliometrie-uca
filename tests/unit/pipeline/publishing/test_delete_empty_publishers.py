@@ -2,32 +2,24 @@
 
 import logging
 
-from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
-    run_delete_empty_publishers,
-)
+from pipeline.transformation.publishing.publishers import delete_empty_publishers as step
 
 
-class _Repo:
-    def __init__(self, deleted: list[tuple[int, str]]) -> None:
-        self._deleted = deleted
-
-    def delete_empty_publishers(self) -> list[tuple[int, str]]:
-        return self._deleted
-
-
-def test_each_deleted_publisher_is_logged(caplog):
+def test_each_deleted_publisher_is_logged(caplog, monkeypatch):
+    monkeypatch.setattr(
+        step, "delete_empty_publishers", lambda conn: [(75880, "Elsevier [1981-....]")]
+    )
     logger = logging.getLogger("test_editeurs_vides")
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_delete_empty_publishers(
-            logger, publisher_repo=_Repo([(75880, "Elsevier [1981-....]")])
-        )
+        metrics = step.run_delete_empty_publishers(None, logger)
     assert metrics.extras["publishers_deleted"] == 1
     assert "75880 « Elsevier [1981-....] »" in caplog.text
 
 
-def test_without_empty_publisher_nothing_is_logged(caplog):
+def test_without_empty_publisher_nothing_is_logged(caplog, monkeypatch):
+    monkeypatch.setattr(step, "delete_empty_publishers", lambda conn: [])
     logger = logging.getLogger("test_editeurs_vides_aucun")
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_delete_empty_publishers(logger, publisher_repo=_Repo([]))
+        metrics = step.run_delete_empty_publishers(None, logger)
     assert metrics.total == 0
     assert caplog.text == ""

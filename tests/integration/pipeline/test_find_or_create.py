@@ -12,7 +12,7 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_publisher,
 )
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 from tests.integration.helpers.journals import (
     insert_journal_with_issns,
     insert_publisher,
@@ -30,8 +30,8 @@ def gateway(sa_sync_conn):
 
 
 @pytest.fixture
-def publisher_gateway(sa_sync_conn):
-    return PublisherGatewayQueries(sa_sync_conn)
+def publisher_store(sa_sync_conn):
+    return PublisherStore(sa_sync_conn)
 
 
 def _fetch_one(conn, sql_text: str, **params):
@@ -49,51 +49,51 @@ def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
 
 
 class TestFindOrCreatePublisher:
-    def test_returns_none_on_empty_name(self, sa_sync_conn, publisher_gateway):
-        assert find_or_create_publisher(None, repo=publisher_gateway) is None
-        assert find_or_create_publisher("", repo=publisher_gateway) is None
+    def test_returns_none_on_empty_name(self, sa_sync_conn, publisher_store):
+        assert find_or_create_publisher(None, repo=publisher_store) is None
+        assert find_or_create_publisher("", repo=publisher_store) is None
 
-    def test_creates_new_publisher(self, sa_sync_conn, publisher_gateway):
-        pub_id = find_or_create_publisher("Elsevier", repo=publisher_gateway)
+    def test_creates_new_publisher(self, sa_sync_conn, publisher_store):
+        pub_id = find_or_create_publisher("Elsevier", repo=publisher_store)
         assert pub_id is not None
         row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=pub_id)
         assert row.name == "Elsevier"
 
-    def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_gateway):
+    def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_store):
         existing = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P4310310871")
         found = find_or_create_publisher(
-            "Elsevier BV", openalex_id="P4310310871", repo=publisher_gateway
+            "Elsevier BV", openalex_id="P4310310871", repo=publisher_store
         )
         assert found == existing
 
     def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
-        self, sa_sync_conn, publisher_gateway
+        self, sa_sync_conn, publisher_store
     ):
         """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateJournal`)."""
-        premier = find_or_create_publisher("Taylor & Francis", repo=publisher_gateway)
-        second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_gateway)
+        premier = find_or_create_publisher("Taylor & Francis", repo=publisher_store)
+        second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_store)
         assert second == premier
 
-    def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_gateway):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
-        found = find_or_create_publisher("elsevier", repo=publisher_gateway)
+    def test_finds_existing_by_name_form(self, sa_sync_conn, publisher_store):
+        existing = find_or_create_publisher("Elsevier", repo=publisher_store)
+        found = find_or_create_publisher("elsevier", repo=publisher_store)
         assert found == existing
 
-    def test_variantes_de_nom_rejoignent_le_meme_editeur(self, sa_sync_conn, publisher_gateway):
+    def test_variantes_de_nom_rejoignent_le_meme_editeur(self, sa_sync_conn, publisher_store):
         """Cas réels : formes juridiques, dates et « on behalf of » ajoutés par les sources."""
-        elsevier = find_or_create_publisher("Elsevier BV", repo=publisher_gateway)
+        elsevier = find_or_create_publisher("Elsevier BV", repo=publisher_store)
         for variant in (
             "Elsevier [1977-....]",
             "Elsevier Ltd.",
             "Elsevier on behalf of the American College of Cardiology Foundation",
         ):
-            assert find_or_create_publisher(variant, repo=publisher_gateway) == elsevier
+            assert find_or_create_publisher(variant, repo=publisher_store) == elsevier
         row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=elsevier)
         assert row.name == "Elsevier BV"
 
-    def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_gateway):
-        existing = find_or_create_publisher("Elsevier", repo=publisher_gateway)
-        find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_gateway)
+    def test_attaches_openalex_id_if_missing(self, sa_sync_conn, publisher_store):
+        existing = find_or_create_publisher("Elsevier", repo=publisher_store)
+        find_or_create_publisher("Elsevier", openalex_id="P123", repo=publisher_store)
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=existing
         )
@@ -165,10 +165,10 @@ class TestFindOrCreateJournal:
         assert n == 1
         assert found is not None
 
-    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_gateway):
+    def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _journal(sa_sync_conn, issn="0028-0836")
-        pub_id = find_or_create_publisher("Springer", repo=publisher_gateway)
+        pub_id = find_or_create_publisher("Springer", repo=publisher_store)
         _find_or_create(
             "Nature",
             issn="0028-0836",

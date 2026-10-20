@@ -111,13 +111,13 @@ def run_normalize_oa(conn):
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.openalex.normalize import process_work
     from pipeline.transformation.publishing.containers import ContainerGatewayQueries
-    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+    from pipeline.transformation.publishing.publishers.store import PublisherStore
 
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()
     authorship_queries = AuthorshipsBatchQueries()
     container_repo = ContainerGatewayQueries(conn)
-    publisher_repo = PublisherGatewayQueries(conn)
+    publisher_store = PublisherStore(conn)
 
     rows = conn.execute(
         text("""
@@ -135,7 +135,7 @@ def run_normalize_oa(conn):
             queries,
             staging_row,
             container_repo=container_repo,
-            publisher_repo=publisher_repo,
+            publisher_store=publisher_store,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         ):

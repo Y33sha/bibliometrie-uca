@@ -37,7 +37,7 @@ from pipeline.ingestion.common.signature_queries import (
 )
 from pipeline.ingestion.common.signatures import signature_name_fields
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 log = setup_logger("recompute_normalized_texts", os.path.dirname(__file__))
 
@@ -142,9 +142,9 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
         journal_gateway = JournalGatewayQueries(conn)
         for journal_id, form, publisher_id in journals:
             journal_gateway.add_journal_name_form(journal_id, form, publisher_id)
-        publisher_gateway = PublisherGatewayQueries(conn)
+        publisher_store = PublisherStore(conn)
         for publisher_id, key in publishers:
-            publisher_gateway.add_publisher_name_form(publisher_id, key)
+            publisher_store.add_publisher_name_form(publisher_id, key)
     return empty, len(journals), len(publishers)
 
 
