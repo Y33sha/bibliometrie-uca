@@ -89,7 +89,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Contrat des sources séparé de l'orchestrateur, pour `normalize`, `fetch_missing` et `fetch_stale`. 7aa00af58
 - [x] `staging.py` scindé ; suppression des `source_publications` dans `source_publications.py`. 626c47b83
 - [x] `ror/dump.py` dans `complements/` ; téléchargement des dumps commun. 5ef6d1c7c
-- [ ] `User-Agent` construit par `polite_pool.py`.
+- [x] `User-Agent` construit par `polite_pool.py`. ac9fdb98d
 - [ ] Indirections : `SourcePublicationQueries`, `Extracteur`, réexport de `scoped_logger`, fabriques de `BibliographicNormalizer`.
 - [ ] Code mort : `BatchInsertCounts`, délais inutilisés, `API_BASE_URLS["doaj"]`.
 
