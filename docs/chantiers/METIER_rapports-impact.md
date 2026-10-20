@@ -29,6 +29,8 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 - **Citations d'une publication.** Le maximum des `cited_by_count` de ses notices. Un écart suspect entre sources donne lieu à une vérification ciblée sur d'autres sources en ligne. 40 publications ont au moins 10 citations et un maximum supérieur au double du compte OpenAlex.
 - **Calcul à la requête**, dans le script de rapport. La consolidation des indicateurs dans `publications.publications`, nécessaire aux filtres de l'interface, relève d'un chantier ultérieur.
+- **Rôles clés.** Ceux du rapport, choisis par unité. Le tableau InCites vient de l'Inserm : ses rôles PDC conviennent à la médecine.
+- **Présentation.** Lignes par année. La mise en forme PDF décide des agrégations éventuelles.
 
 ## Phasage
 
@@ -50,9 +52,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 ## Questions ouvertes
 
-- **Présentation.** Tableau sur la période, sur le modèle d'InCites, ou lignes par année dans la synthèse.
-- **Rôles clés.** InCites retient premier, dernier et correspondant pour toutes les unités. Le rapport choisit les rôles d'après l'ordre des auteurs propre à l'unité (`KEY_ROLES_BY_STRUCTURE`).
-- **Articles originaux.** Type `article` seul, ou avec `review`.
-- **Publications non anglophones.** Sous-ensemble des deux autres lignes.
-- **FWCI d'une publication à plusieurs notices OpenAlex.** Maximum, moyenne ou notice unique.
-- **Publications sans FWCI** (926). Exclues de la moyenne.
+- **Articles originaux.** Type `article` seul, ou avec `review`. Le prototype retient `article` seul.
+- **Publications non anglophones.** Le prototype les prend dans tous les types, langue renseignée.
+- **FWCI d'une publication à plusieurs notices OpenAlex.** Maximum, moyenne ou notice unique. Le prototype retient le maximum, comme pour les citations et le top 10 %.
+- **Publications sans FWCI** (926). Le prototype les exclut de la moyenne.
