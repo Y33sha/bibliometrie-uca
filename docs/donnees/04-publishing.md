@@ -7,7 +7,7 @@ Revues, monographies, éditeurs et frais de publication.
 ## Tables
 
 - **`journals`** : référentiel des revues.
-- **`journal_issns`** : ISSN des revues.
+- **`journal_issns`** : ISSN des revues, vérifiés sur les notices du Sudoc.
 - **`journal_name_forms`** : formes de noms normalisées pour reconnaître une revue (parallèle à `person_name_forms` et `structure_name_forms`).
 - **`journal_doi_namespaces`** : espaces de noms DOI qui désignent une revue, recalculés par la phase `publishers_journals`.
 - **`monographs`** : livres et volumes d'actes de congrès.

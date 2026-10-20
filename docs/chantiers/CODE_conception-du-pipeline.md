@@ -139,7 +139,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 8 — Vocabulaire
 
-- [x] Glossaire du code (`docs/architecture/08-vocabulaire.md`) : pour chaque notion, le mot des textes et l'identifiant du code. 4053fbda3
+- [x] Vocabulaire : pour chaque notion, le mot des textes et l'identifiant du code, dans `docs/donnees/` et `docs/pipeline/01-vue-d-ensemble.md`. 4053fbda3
 - [x] Renommage du schéma, de l'API et du frontend, en une migration. 1f1375f33
   - `source_publications` → `source_records`, `source_authorships` → `source_contributions`, `authorships` → `contributions` ;
   - `author_identifying_keys` → `contributor_information`, sa colonne `person_identifiers` → `identifiers`, `source_authorships.identity_id` → `contributor_information_id` ;

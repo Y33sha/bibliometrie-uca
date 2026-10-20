@@ -24,8 +24,16 @@ erDiagram
 
 Le modèle repose sur la séparation stricte entre les tables **sources** et le **référentiel** que le pipeline en consolide.
 
-- Les tables sources contiennent les *records* non dédupliqués, normalisés à partir des payloads des API tierces.
+- Les tables sources contiennent les enregistrements sources et leurs contributions sources, non dédupliqués, normalisés à partir des payloads des API tierces.
 - Le référentiel contient les **publications** et les **personnes**, obtenues des sources par résolution d'entités, ainsi que les **structures**, saisies manuellement.
+
+| Niveau | Notion | Table | Ce que c'est |
+|---|---|---|---|
+| source | enregistrement source | `source_records` | Une publication telle qu'une source la décrit (HAL, OpenAlex, Crossref…). |
+| source | contribution source | `source_contributions` | Un contributeur sur un enregistrement source, avec ses rôles et ses adresses. |
+| source | informations du contributeur | `contributor_information` | Le nom et les identifiants qu'une source donne pour un contributeur, partagés par ses contributions sources. |
+| consolidé | publication | `publications` | Une publication du référentiel, construite à partir de ses enregistrements sources. Couvre aussi les jeux de données, les logiciels et les thèses. |
+| consolidé | contribution | `contributions` | Le lien entre une personne et une publication. |
 
 Légende:
 - **vert** : table peuplée manuellement
@@ -61,7 +69,7 @@ Les tables se répartissent en un schéma par domaine. Le `search_path` de la ba
 - [`sources`](02-sources.md) — tables sources et staging
 - [`publications`](03-publications.md) — référentiel consolidé, contributions, sujets
 - [`publishing`](04-publishing.md) — revues, monographies, éditeurs, APC
-- [`persons`](05-persons.md) — référentiel consolidé, identifiants, name forms, données RH, décisions humaines sur les signatures
+- [`persons`](05-persons.md) — référentiel consolidé, identifiants, name forms, données RH, décisions humaines sur les contributions sources
 - [`structures`](06-structures.md) — référentiel institutionnel, périmètres, adresses
 - [`ref` et `ops`](07-ref-et-ops.md) — référentiels externes (pays, langues, ROR) et exploitation (configuration, journaux)
 

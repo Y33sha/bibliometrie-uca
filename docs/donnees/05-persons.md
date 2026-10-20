@@ -4,7 +4,7 @@
 
 Référentiel des individus.
 
-**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication avec une signature UCA. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id`.
+**Périmètre** : `persons` couvre les personnes qui ont au moins une contribution source dans le périmètre. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id`.
 
 ```mermaid
 flowchart LR
@@ -33,17 +33,17 @@ Légende :
 
 ## Tables associées
 
-- **`hr_records`** : table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/10-imports-manuels.md#extraction-rh).
-- **`person_identifiers`** : identifiants persistants — [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` dit d'où vient l'attribution — `manual` pour une décision humaine, `auto` pour une résolution du pipeline — et `status` où elle en est : `pending`, `confirmed`, `rejected` ou `authenticated`. La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
+- **`hr_records`** : fiches RH, table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/10-imports-manuels.md#extraction-rh).
+- **`person_identifiers`** : identifiants de personne, persistants — [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` dit d'où vient l'attribution — `manual` pour une décision humaine, `auto` pour une résolution du pipeline — et `status` où elle en est : `pending`, `confirmed`, `rejected` ou `authenticated`. La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
 - **`person_name_forms`** : formes de noms normalisées, servant à reconnaître une personne existante lors de la création.
 - **`distinct_persons`** : paires de personnes déclarées **distinctes malgré une forme de nom commune** ; les files de triage par nom et par identifiant du référentiel `admin/persons` écartent la paire.
 
 ## Décisions humaines
 
-Deux tables contiennent les arbitrages saisis à la main sur les signatures, et survivent aux reconstructions de la table `contributions` :
+Deux tables contiennent les arbitrages saisis à la main sur les contributions sources, et survivent aux reconstructions de la table `contributions` :
 
-- **`rejected_contributions`** — paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`.
-- **`confirmed_source_contributions`** — signatures épinglées sur une personne. Clé primaire `source_contribution_id`.
+- **`rejected_contributions`** — contributions rejetées : paires (publication, personne) écartées, enregistrées sur chaque enregistrement source de la publication. Clé primaire `(source_record_id, person_id)`.
+- **`confirmed_source_contributions`** — contributions sources confirmées : contributions sources épinglées sur une personne. Clé primaire `source_contribution_id`.
 
 ## Propriété des tables
 

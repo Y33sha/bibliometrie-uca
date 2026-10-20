@@ -1,9 +1,11 @@
-# Mots hors du vocabulaire du code (docs/architecture/08-vocabulaire.md). Les identifiants
-# composés (`source_authorships`) échappent à la règle : seul le mot isolé est visé.
+# Mots hors du vocabulaire du code (docs/donnees/, docs/pipeline/01-vue-d-ensemble.md). Les identifiants
+# composés (`BULK_AUTHORSHIPS_CAP`) échappent à la règle : seul le mot isolé est visé.
 extends: substitution
 message: "Vocabulaire du code : écrire « %s » plutôt que « %s »."
 level: warning
 ignorecase: true
+exceptions:
+  - "notices? (du )?Sudoc"
 swap:
   "notices?": "enregistrement source"
   "authorships?": "contribution"
