@@ -235,7 +235,7 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`person-${personId}-pubs`}
+				apiKey={`person-${personId}-publications`}
 				externalFilters={{
 					personId: Number(personId),
 					personLabel: displayName,
@@ -262,7 +262,7 @@
 			{:else}
 				{#each thesesSections as section (section.role)}
 					<h3 class="thesis-role-heading">{section.label}</h3>
-					<table class="pub-table">
+					<table class="publication-table">
 						<thead>
 							<tr>
 								<th style="width:160px">Auteur</th>
@@ -397,8 +397,8 @@
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
-	/* Theses tab utilise aussi .pub-table */
-	.pub-table td { vertical-align: top; }
+	/* Theses tab utilise aussi .publication-table */
+	.publication-table td { vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }

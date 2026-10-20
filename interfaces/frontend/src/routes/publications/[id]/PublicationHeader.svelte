@@ -28,15 +28,15 @@
   }
 </script>
 
-<div class="pub-header">
-  <div class="pub-meta">
+<div class="publication-header">
+  <div class="publication-meta">
     {#if pub.doc_type}<span class="doc-type-tag">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-    {#if pub.publication_year}<span class="pub-year">{pub.publication_year}</span>{/if}
+    {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
   </div>
-  <h1 class="pub-title-main"><PublicationTitle titre={pub.title} /></h1>
+  <h1 class="publication-title-main"><PublicationTitle titre={pub.title} /></h1>
 
   {#if pub.monograph_id || pub.journal_title || pub.container_title}
-    <div class="pub-journal-line">
+    <div class="publication-journal-line">
       <!-- Le livre ou le volume d'actes, puis sa collection ; sans monographie, la revue ou le titre brut du conteneur. -->
       {#if pub.monograph_id}
         <a href="{base}/monographs/{pub.monograph_id}" class="journal-name">{pub.monograph_title}</a>
@@ -99,20 +99,20 @@
 </div>
 
 <style>
-  .pub-header {
+  .publication-header {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 20px 24px;
     margin-bottom: 16px;
   }
-  .pub-title-main {
+  .publication-title-main {
     font-size: 1.3rem;
     font-weight: 600;
     margin: 0 0 10px;
     line-height: 1.4;
   }
-  .pub-meta {
+  .publication-meta {
     display: flex;
     gap: 10px;
     align-items: center;
@@ -121,7 +121,7 @@
     font-size: 1rem;
     color: var(--muted);
   }
-  .pub-year {
+  .publication-year {
     font-weight: 600;
   }
   .doc-type-tag {
@@ -239,7 +239,7 @@
     background: #eceef0;
   }
 
-  .pub-journal-line {
+  .publication-journal-line {
     display: flex;
     gap: 10px;
     align-items: center;

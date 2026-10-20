@@ -17,7 +17,7 @@ describe('useFacets', () => {
 		apiResponse = { years: [] };
 		const f = useFacets({
 			endpoint: '/api/publications/facets',
-			apiKey: 'pub-facets',
+			apiKey: 'publication-facets',
 			buildParams: () => new URLSearchParams('year=2024'),
 			facets: { years: { type: 'simple', apiKey: 'years' } },
 		});
@@ -25,7 +25,7 @@ describe('useFacets', () => {
 		expect(apiSpy).toHaveBeenCalledOnce();
 		const [url, opts] = apiSpy.mock.calls[0];
 		expect(url).toBe('/api/publications/facets?year=2024');
-		expect(opts).toEqual({ key: 'pub-facets' });
+		expect(opts).toEqual({ key: 'publication-facets' });
 	});
 
 	it('mappe le type "simple" : value/count → text = value', async () => {

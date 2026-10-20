@@ -633,7 +633,7 @@
 			</button>
 		{/if}
 	{/if}
-	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
+	<a class="publication-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
 <!-- Ligne 2 : filtres à facettes, dérivés du registre `pivotSchema` (cf. `facetKeys`). -->
 <div class="toolbar facets-row">
@@ -700,7 +700,7 @@
 		flex-direction: column;
 		min-height: 0;
 	}
-	.pub-link {
+	.publication-link {
 		margin-left: auto;
 		display: inline-flex;
 		align-items: center;
@@ -713,7 +713,7 @@
 		font-size: 0.95rem;
 		font-weight: 500;
 	}
-	.pub-link:hover { opacity: 0.9; }
+	.publication-link:hover { opacity: 0.9; }
 
 	.toolbar {
 		display: flex;

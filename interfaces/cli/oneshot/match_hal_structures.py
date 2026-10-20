@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-15)
 """Rattache à une structure interne (`ref.hal_structures.structure_id`) les structures HAL que la résolution des noms rattache à une structure du périmètre d'extraction.
 
-Une structure HAL est candidate quand une signature la cite, que son statut est `VALID` ou `OLD`, qu'aucune structure interne n'a son ROR et qu'elle n'a pas déjà de structure interne. Deux voies proposent sa structure interne :
+Une structure HAL est candidate quand une contribution source la cite, que son statut est `VALID` ou `OLD`, qu'aucune structure interne n'a son ROR et qu'elle n'a pas déjà de structure interne. Deux voies proposent sa structure interne :
 
 - adresse : une adresse de même texte que son nom est rattachée à une structure du périmètre, par un lien non infirmé, détecté par une forme de nom ou confirmé ;
 - scanR : une affiliation scanR qui cite la structure HAL (`structId`) a un nom que les formes de noms rattachent à un seul laboratoire du périmètre, et à une autre structure du périmètre (université, organisme) qui en confirme le contexte. Les payloads se lisent dans le raw store.
@@ -162,7 +162,7 @@ def main() -> None:
             by_structure[row["structure_id"]].append(row)
         for rs in by_structure.values():
             log.info(
-                "%s : %d structures HAL, %d signatures",
+                "%s : %d structures HAL, %d contributions sources",
                 rs[0]["code"],
                 len(rs),
                 sum(r["source_contributions"] for r in rs),

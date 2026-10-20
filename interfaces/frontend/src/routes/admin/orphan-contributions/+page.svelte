@@ -61,7 +61,7 @@
 		list.load();
 	}
 
-	/** Recharge la liste et la facette après une attribution, qui retire des signatures de la file. */
+	/** Recharge la liste et la facette après une attribution, qui retire des contributions sources de la file. */
 	function reload() {
 		list.load();
 		loadFacets();
@@ -306,7 +306,7 @@
 					<td><span class="tag tag-source">{SOURCE_LABELS[o.source] ?? o.source}</span></td>
 					<td>{o.full_name}</td>
 					<td>
-						<a href="{base}/publications/{o.publication_id}" class="pub-link">
+						<a href="{base}/publications/{o.publication_id}" class="publication-link">
 							{o.publication_year ?? '?'} — {o.publication_title?.slice(0, 80)}{(o.publication_title?.length ?? 0) > 80 ? '…' : ''}
 						</a>
 					</td>
@@ -412,8 +412,8 @@
 	}
 	.toolbar input { width: 300px; }
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
-	.pub-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
-	.pub-link:hover { text-decoration: underline; }
+	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+	.publication-link:hover { text-decoration: underline; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 200px; }

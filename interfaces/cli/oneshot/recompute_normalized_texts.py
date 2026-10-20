@@ -5,7 +5,7 @@ Le script recalcule chaque valeur avec la fonction du pipeline et écrit celles 
 
 - colonnes calculées d'une autre colonne de la même ligne : titres, noms d'éditeurs et de préfixes DOI, noms des personnes, adresses, libellés de sujets. Toutes les lignes sont relues : une forme calculée d'un texte depuis assaini (`&amp;` devenu `&`) est périmée, même en ASCII ;
 - formes de noms des revues et des éditeurs : la forme recalculée d'un titre ou d'un nom non ASCII s'ajoute aux formes existantes, les formes vides sont supprimées ;
-- identités d'auteur : chaque signature dont le nom contient un caractère non ASCII est rattachée à l'identité de son nom recalculé, puis les identités orphelines sont purgées.
+- informations du contributeur : chaque contribution source dont le nom contient un caractère non ASCII est rattachée aux informations du contributeur de son nom recalculé, puis les lignes orphelines sont purgées.
 
 La phase `persons` suivante resynchronise les formes de noms des personnes. Idempotent.
 
@@ -180,7 +180,7 @@ _REPOINT_SQL = text(
 
 
 def _repoint_source_contributions(conn: Connection, *, apply: bool) -> int:
-    """Rattache chaque signature dont le nom normalisé change à l'identité de ce nom. Retourne leur nombre."""
+    """Rattache chaque contribution source dont le nom normalisé change aux informations du contributeur de ce nom. Retourne leur nombre."""
     payload = []
     # Curseur serveur pour cette seule lecture : posé sur la connexion, il s'étendrait aux écritures qui suivent.
     result = conn.execute(
@@ -227,13 +227,15 @@ def main() -> int:
             journals,
             publishers,
         )
-        log.info("signatures…")
+        log.info("contributions sources…")
         log.info(
-            "  %d signatures changent d'identité", _repoint_source_contributions(conn, apply=apply)
+            "  %d contributions sources changent d'informations du contributeur",
+            _repoint_source_contributions(conn, apply=apply),
         )
         if apply:
             log.info(
-                "identités orphelines purgées : %d", delete_orphan_contributor_information(conn)
+                "informations du contributeur orphelines purgées : %d",
+                delete_orphan_contributor_information(conn),
             )
             conn.commit()
             log.info("✓ recalcul appliqué")

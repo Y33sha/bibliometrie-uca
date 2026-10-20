@@ -70,7 +70,7 @@
 		search: async (q, request) => {
 			const data = await request<JournalListResponse>(
 				// Les revues les plus fournies en publications d'abord, comme pour la fusion d'éditeurs.
-				`/api/journals?search=${encodeURIComponent(q)}&sort=pubs_desc&per_page=10`,
+				`/api/journals?search=${encodeURIComponent(q)}&sort=publications_desc&per_page=10`,
 			);
 			return data.journals;
 		},

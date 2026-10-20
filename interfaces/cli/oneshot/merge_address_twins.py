@@ -3,7 +3,7 @@
 
 Prépare l'unicité de `addresses.normalized_text`. Chaque groupe de jumelles garde l'adresse de plus grand `publication_count`, la plus ancienne à égalité :
 
-- ses signatures, ROR et liens aux structures réunissent ceux des jumelles ;
+- ses contributions sources, ROR et liens aux structures réunissent ceux des jumelles ;
 - un lien à une structure confirmé sur une jumelle et infirmé sur une autre redevient à examiner ;
 - ses pays réunissent ceux des jumelles, et `countries_dirty` est posé.
 
@@ -64,7 +64,7 @@ _STEPS = (
         """,
     ),
     (
-        "liens aux signatures repris",
+        "liens aux contributions sources repris",
         """
         INSERT INTO source_contribution_addresses (source_contribution_id, address_id)
         SELECT DISTINCT sca.source_contribution_id, t.keeper

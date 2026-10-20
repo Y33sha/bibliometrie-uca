@@ -419,12 +419,12 @@ th.sorted .sort-arrow {
 
 /* ── Pub table column widths ── */
 /* width: 100% sur le th = idiome HTML table « cette colonne absorbe tout le restant » : les autres colonnes gardent leur largeur, le titre prend la place résiduelle. */
-.pub-col-title {
+.publication-col-title {
 	width: 100%;
 }
 
 /* Min-width : `width` seul est une simple hint en table-layout: auto et la colonne Titre (width: 100%) la grignoterait jusqu'à la min-content-width (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width` est la seule contrainte que l'auto-layout respecte vraiment. */
-.pub-col-journal {
+.publication-col-journal {
 	font-size: 0.9em;
 	min-width: 180px;
 	width: 180px;
@@ -1004,13 +1004,13 @@ th.sorted .sort-arrow {
 }
 
 /* ── Publication title link ── */
-.pub-title {
+.publication-title {
 	font-weight: 500;
 	color: var(--accent);
 	text-decoration: none;
 }
 
-.pub-title:hover {
+.publication-title:hover {
 	text-decoration: underline;
 }
 

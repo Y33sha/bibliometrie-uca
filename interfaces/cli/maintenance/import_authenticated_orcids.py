@@ -8,7 +8,7 @@ et reçoit le statut `authenticated`.
 
 Cet import est **l'unique** contexte autorisé à écrire ce statut : un trigger Postgres
 (`protect_authenticated_identifier`) rejette toute autre écriture de `authenticated` et interdit
-d'en dégrader un existant. L'authentification faisant autorité sur l'identité, un ORCID déjà
+d'en dégrader un existant. L'authentification faisant autorité sur l'attribution, un ORCID déjà
 rattaché à une autre personne est déplacé vers celle de l'email (chaque déplacement est signalé :
 il révèle en général un doublon de personne à fusionner).
 
@@ -76,7 +76,7 @@ def plan_authentications(
 ) -> AuthenticationPlan:
     """Confronte les lignes du fichier aux personnes connues, et trie ce qui peut être authentifié.
 
-    Trois raisons d'écarter une ligne : un ORCID que sa forme rend inexploitable, un email qu'aucune fiche du personnel ne porte, un email que plusieurs personnes portent — l'identité visée étant alors indécidable.
+    Trois raisons d'écarter une ligne : un ORCID que sa forme rend inexploitable, un email absent des fiches du personnel, un email partagé par plusieurs personnes — la personne visée étant alors indécidable.
     """
     entries: list[tuple[int, str]] = []
     malformed: list[str] = []
@@ -103,7 +103,7 @@ def find_reassignments(
 ) -> list[tuple[str, int, int]]:
     """ORCID détenus par une autre personne que celle qui l'a authentifié, et vers qui les déplacer.
 
-    `current` associe chaque ORCID à son porteur actuel — `(personne, statut)` —, tel que le référentiel le rend. L'authentification fait autorité sur l'identité : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
+    `current` associe chaque ORCID à son porteur actuel — `(personne, statut)` —, tel que le référentiel le rend. L'authentification fait autorité sur l'attribution : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
     """
     return [
         (orcid, current[orcid][0], person_id)

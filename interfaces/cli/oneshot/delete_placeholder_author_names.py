@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
-"""Supprime les signatures du stock dont le nom tient lieu de nom absent (« (:Unap) », « None, None »), comme le fait la normalisation (`is_placeholder_name`).
+"""Supprime les contributions sources du stock dont le nom tient lieu de nom absent (« (:Unap) », « None, None »), comme le fait la normalisation (`is_placeholder_name`).
 
-Les décomptes d'auteurs des notices touchées sont recalculés et leurs publications sont à regrouper. Les identités devenues orphelines sont supprimées. La phase `persons` purge les personnes vidées.
+Les décomptes d'auteurs des enregistrements sources touchés sont recalculés et leurs publications sont à regrouper. Les lignes de `contributor_information` devenues orphelines sont supprimées. La phase `persons` purge les personnes vidées.
 
 Usage :
     python -m interfaces.cli.oneshot.delete_placeholder_author_names [--dry-run]
@@ -35,7 +35,7 @@ _MARK_DIRTY_SQL = text("""
 
 
 def placeholder_source_contributions(conn: Connection) -> tuple[list[int], list[int]]:
-    """Signatures dont le nom stocké tient lieu de nom absent, et leurs notices."""
+    """Contributions sources dont le nom stocké tient lieu de nom absent, et leurs enregistrements sources."""
     ids: list[int] = []
     source_records: set[int] = set()
     for r in conn.execute(CANDIDATES_SQL):
@@ -51,7 +51,7 @@ def placeholder_source_contributions(conn: Connection) -> tuple[list[int], list[
 
 
 def delete(conn: Connection, ids: list[int], source_records: list[int]) -> int:
-    """Supprime les signatures, met à jour les notices et les publications. Rend le nombre d'identités orphelines supprimées."""
+    """Supprime les contributions sources, met à jour les enregistrements sources et les publications. Rend le nombre de lignes de `contributor_information` orphelines supprimées."""
     conn.execute(text("DELETE FROM source_contributions WHERE id = ANY(:ids)"), {"ids": ids})
     backfill_source_records(conn, source_records)
     conn.execute(_MARK_DIRTY_SQL, {"source_records": source_records})
@@ -65,14 +65,20 @@ def main() -> int:
 
     with get_sync_engine().connect() as conn:
         ids, source_records = placeholder_source_contributions(conn)
-        log.info("signatures à supprimer : %d, dans %d notices", len(ids), len(source_records))
+        log.info(
+            "contributions sources à supprimer : %d, dans %d enregistrements sources",
+            len(ids),
+            len(source_records),
+        )
         if args.dry_run or not ids:
             conn.rollback()
             return 0
         orphans = delete(conn, ids, source_records)
         conn.commit()
         log.info(
-            "signatures supprimées : %d ; identités orphelines supprimées : %d", len(ids), orphans
+            "contributions sources supprimées : %d ; informations du contributeur orphelines supprimées : %d",
+            len(ids),
+            orphans,
         )
     return 0
 

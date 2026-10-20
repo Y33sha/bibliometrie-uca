@@ -1,12 +1,12 @@
 # STATUS: oneshot (2026-10-10)
 """Audit (lecture seule) : compléter les auteurs tronqués pendant la pagination du moissonnage OpenAlex.
 
-Parcourt une année du moissonnage OpenAlex par curseur, comme la phase `harvest`. Entre la lecture d'une page et la demande de la suivante, retélécharge par son identifiant chaque notice qui compte exactement 100 auteurs dans la liste, plafond des réponses de liste. Rien n'est écrit en base.
+Parcourt une année du moissonnage OpenAlex par curseur, comme la phase `harvest`. Entre la lecture d'une page et la demande de la suivante, retélécharge par son identifiant chaque enregistrement qui compte exactement 100 auteurs dans la liste, plafond des réponses de liste. Rien n'est écrit en base.
 
 Vérifie :
 
-1. que la pagination arrive au bout, avec autant de notices que le total annoncé par OpenAlex ;
-2. combien de notices retéléchargées reviennent avec plus de 100 auteurs, et combien en comptent bien 100.
+1. que la pagination arrive au bout, avec autant d'enregistrements que le total annoncé par OpenAlex ;
+2. combien d'enregistrements retéléchargés reviennent avec plus de 100 auteurs, et combien en comptent bien 100.
 
 Mesure le temps des retéléchargements.
 
@@ -94,14 +94,18 @@ def audit(year: int) -> int:
         if not cursor:
             break
         if pages % 10 == 0:
-            log.info("%d pages, %d / %s notices", pages, fetched, announced)
+            log.info("%d pages, %d / %s enregistrements", pages, fetched, announced)
 
     total = time.monotonic() - started
     log.info(
-        "Année %d : %d pages, %d notices reçues sur %s annoncées", year, pages, fetched, announced
+        "Année %d : %d pages, %d enregistrements reçus sur %s annoncés",
+        year,
+        pages,
+        fetched,
+        announced,
     )
     log.info(
-        "À 100 auteurs dans la liste : %d — plus de 100 en notice seule : %d, 100 exactement : %d, échecs : %d",
+        "À 100 auteurs dans la liste : %d — plus de 100 en lecture unitaire : %d, 100 exactement : %d, échecs : %d",
         flagged,
         complete,
         genuine,

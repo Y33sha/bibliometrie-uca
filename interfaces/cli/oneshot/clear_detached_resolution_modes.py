@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
-"""Retire le mode de résolution des signatures sans personne.
+"""Retire le mode de résolution des contributions sources sans personne.
 
-Les détachements de l'administration (rejet d'une paire, détachement par forme de nom) laissaient le mode de résolution sur la signature détachée.
+Les détachements de l'administration (rejet d'une paire, détachement par forme de nom) laissaient le mode de résolution sur la contribution source détachée.
 
 Usage :
     python -m interfaces.cli.oneshot.clear_detached_resolution_modes [--dry-run]
@@ -23,7 +23,7 @@ _WHERE = "person_id IS NULL AND resolution_mode IS NOT NULL"
 
 
 def clear(conn: Connection) -> int:
-    """Retire le mode de résolution des signatures sans personne. Rend le nombre de signatures modifiées."""
+    """Retire le mode de résolution des contributions sources sans personne. Rend le nombre de contributions sources modifiées."""
     return conn.execute(
         text(f"UPDATE source_contributions SET resolution_mode = NULL WHERE {_WHERE}")
     ).rowcount
@@ -38,7 +38,7 @@ def main() -> int:
         count = conn.execute(
             text(f"SELECT count(*) FROM source_contributions WHERE {_WHERE}")
         ).scalar_one()
-        log.info("signatures sans personne avec un mode de résolution : %d", count)
+        log.info("contributions sources sans personne avec un mode de résolution : %d", count)
         if args.dry_run or not count:
             conn.rollback()
             return 0

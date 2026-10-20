@@ -2,8 +2,8 @@
 
 Couvre :
 - GET /api/hal-problems/duplicate-accounts
-- GET /api/hal-problems/duplicate-pubs-doi
-- GET /api/hal-problems/duplicate-pubs-meta
+- GET /api/hal-problems/duplicate-publications-doi
+- GET /api/hal-problems/duplicate-publications-meta
 - GET /api/hal-problems/missing-collections (lab_id requis, 422 sans collection)
 - GET /api/hal-problems/missing-collections/labs
 - GET /api/hal-problems/affiliation-conflicts
@@ -58,17 +58,19 @@ class TestDuplicateAccounts:
 
 class TestDuplicatePublicationsDoi:
     def test_returns_200(self, client):
-        r = client.get("/api/hal-problems/duplicate-pubs-doi")
+        r = client.get("/api/hal-problems/duplicate-publications-doi")
         assert r.status_code == 200
 
     def test_pagination_params(self, client):
-        r = client.get("/api/hal-problems/duplicate-pubs-doi", params={"page": 2, "per_page": 20})
+        r = client.get(
+            "/api/hal-problems/duplicate-publications-doi", params={"page": 2, "per_page": 20}
+        )
         assert r.status_code == 200
 
 
 class TestDuplicatePublicationsMeta:
     def test_returns_200(self, client):
-        r = client.get("/api/hal-problems/duplicate-pubs-meta")
+        r = client.get("/api/hal-problems/duplicate-publications-meta")
         assert r.status_code == 200
 
 

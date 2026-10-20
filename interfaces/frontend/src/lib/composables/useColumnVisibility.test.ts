@@ -5,7 +5,7 @@ import {
 	type ColumnStorage,
 } from './useColumnVisibility.svelte';
 
-const STORAGE_KEY = 'pub-table-columns';
+const STORAGE_KEY = 'publication-table-columns';
 
 /**
  * Stockage en mémoire, tenant lieu de celui du navigateur.

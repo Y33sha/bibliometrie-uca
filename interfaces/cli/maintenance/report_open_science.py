@@ -644,7 +644,7 @@ def _with_identifier(id_type: str) -> str:
 
 
 def preprint_server(prefixes: Sequence[str], openalex_sources: Sequence[str]) -> str | None:
-    """Serveur de preprints d'une publication, d'après les préfixes de ses DOI, à défaut d'après la source de sa notice OpenAlex."""
+    """Serveur de preprints d'une publication, d'après les préfixes de ses DOI, à défaut d'après la source de son enregistrement source OpenAlex."""
     for prefix in sorted(prefixes):
         if server := PREPRINT_SERVERS.get(prefix):
             return "medRxiv" if server == "bioRxiv" and "medRxiv" in openalex_sources else server

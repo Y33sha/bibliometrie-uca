@@ -632,7 +632,7 @@
 						<div>
 							<div class="addr-text">{addr.raw_text}</div>
 							<div class="addr-meta">
-								<span class="pub-count-tag"
+								<span class="publication-count-tag"
 									>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
@@ -669,11 +669,11 @@
 									Publications ({publications.length})
 								</div>
 								{#each publications as p}
-									<div class="pub-row">
-										<div class="pub-title-link">
+									<div class="publication-row">
+										<div class="publication-title-link">
 											<PublicationTitle titre={p.title || '(sans titre)'} />
 										</div>
-										<div class="pub-meta-inline">
+										<div class="publication-meta-inline">
 											{p.publication_year}
 											{#if p.doc_type}&middot; {p.doc_type}{/if}
 											{#if p.author_name}&middot; {p.author_name}{/if}
@@ -956,7 +956,7 @@
 		color: var(--muted);
 		flex-wrap: wrap;
 	}
-	.pub-count-tag {
+	.publication-count-tag {
 		display: inline-block;
 		font-size: 0.8rem;
 		padding: 1px 7px;
@@ -1010,24 +1010,24 @@
 		letter-spacing: 0.5px;
 	}
 
-	.pub-row {
+	.publication-row {
 		padding: 5px 0;
 		border-bottom: 1px solid #f0f0ee;
 		font-size: 0.85rem;
 	}
-	.pub-row:last-child {
+	.publication-row:last-child {
 		border-bottom: none;
 	}
-	.pub-title-link {
+	.publication-title-link {
 		font-weight: 500;
 		color: var(--text);
 	}
-	.pub-meta-inline {
+	.publication-meta-inline {
 		font-size: 0.8rem;
 		color: var(--muted);
 		margin-top: 2px;
 	}
-	.pub-meta-inline a {
+	.publication-meta-inline a {
 		margin-left: 6px;
 	}
 

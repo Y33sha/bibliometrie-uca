@@ -315,7 +315,7 @@ export interface paths {
         };
         /**
          * Suspect Merges
-         * @description Publications dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice, paginées.
+         * @description Publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans une autre notice, paginées.
          */
         get: operations["suspect_merges_api_publications_suspect_merges_get"];
         put?: never;
@@ -1421,7 +1421,7 @@ export interface paths {
         put?: never;
         /**
          * Detach Contributions
-         * @description Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet.
+         * @description Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet.
          */
         post: operations["detach_contributions_api_persons__person_id__detach_contributions_post"];
         delete?: never;
@@ -1447,7 +1447,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable et détache les contributions sources qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1461,7 +1461,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Count
-         * @description Nombre de signatures du périmètre qu'aucune personne ne porte.
+         * @description Nombre de contributions sources du périmètre qu'aucune personne ne porte.
          */
         get: operations["orphan_contributions_count_api_contributions_orphans_count_get"];
         put?: never;
@@ -1481,7 +1481,7 @@ export interface paths {
         };
         /**
          * List Orphan Contributions
-         * @description Liste les signatures du périmètre qu'aucune personne ne porte.
+         * @description Liste les contributions sources du périmètre qu'aucune personne ne porte.
          */
         get: operations["list_orphan_contributions_api_contributions_orphans_get"];
         put?: never;
@@ -1501,7 +1501,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Facets
-         * @description Facette laboratoires des signatures orphelines.
+         * @description Facette laboratoires des contributions sources orphelines.
          */
         get: operations["orphan_contributions_facets_api_contributions_orphans_facets_get"];
         put?: never;
@@ -1523,9 +1523,9 @@ export interface paths {
         put?: never;
         /**
          * Assign Orphan Contribution
-         * @description Attribue une signature orpheline à une personne, que la requête désigne ou fait créer.
+         * @description Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`ContributionAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source qui porte déjà une personne (`ContributionAlreadyAssignedError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1545,9 +1545,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Contributions
-         * @description Attribue plusieurs signatures orphelines à une personne existante.
+         * @description Attribue plusieurs contributions sources orphelines à une personne existante.
          *
-         *     Les signatures absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les signatures rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les contributions sources absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions sources rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -1573,7 +1573,7 @@ export interface paths {
          * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -1598,7 +1598,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/hal-problems/duplicate-pubs-doi": {
+    "/api/hal-problems/duplicate-publications-doi": {
         parameters: {
             query?: never;
             header?: never;
@@ -1609,7 +1609,7 @@ export interface paths {
          * Hal Duplicate Publications By Doi
          * @description Dépôts HAL avec DOI identique rattachés à la même publication.
          */
-        get: operations["hal_duplicate_publications_by_doi_api_hal_problems_duplicate_pubs_doi_get"];
+        get: operations["hal_duplicate_publications_by_doi_api_hal_problems_duplicate_publications_doi_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1618,7 +1618,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/hal-problems/duplicate-pubs-meta": {
+    "/api/hal-problems/duplicate-publications-meta": {
         parameters: {
             query?: never;
             header?: never;
@@ -1629,7 +1629,7 @@ export interface paths {
          * Hal Duplicate Publications By Metadata
          * @description Doublons possibles : dépôts HAL avec métadonnées identiques.
          */
-        get: operations["hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_pubs_meta_get"];
+        get: operations["hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_publications_meta_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2788,7 +2788,7 @@ export interface components {
          * AssignOrphanContribution
          * @description Attribution unitaire, seule à savoir créer la personne au passage.
          *
-         *     `source_contributions.id` est une clé primaire : l'id désigne la signature à lui seul.
+         *     `source_contributions.id` est une clé primaire : l'id désigne la contribution source à lui seul.
          */
         AssignOrphanContribution: {
             /** Source Contribution Id */
@@ -3057,7 +3057,7 @@ export interface components {
         };
         /**
          * DetachContributionsResponse
-         * @description Décompte d'un détachement de signatures : signatures détachées, contributions supprimées, formes de nom nettoyées.
+         * @description Décompte d'un détachement de contributions sources : contributions sources détachées, contributions supprimées, formes de nom nettoyées.
          */
         DetachContributionsResponse: {
             /** Detached */
@@ -4004,7 +4004,7 @@ export interface components {
         };
         /**
          * OrphanAssignResponse
-         * @description Acquittement de l'attribution d'une signature orpheline : la personne rattachée.
+         * @description Acquittement de l'attribution d'une contribution source orpheline : la personne rattachée.
          */
         OrphanAssignResponse: {
             /**
@@ -4017,7 +4017,7 @@ export interface components {
         };
         /**
          * OrphanBatchAssignResponse
-         * @description Acquittement de l'attribution en lot : le nombre de signatures rattachées.
+         * @description Acquittement de l'attribution en lot : le nombre de contributions sources rattachées.
          */
         OrphanBatchAssignResponse: {
             /**
@@ -4051,7 +4051,7 @@ export interface components {
         };
         /**
          * OrphanContributionsFacetsResponse
-         * @description Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire.
+         * @description Facette laboratoires de la file des contributions sources orphelines : décompte par laboratoire détecté dans la contribution source, et nombre de contributions sources sans laboratoire.
          */
         OrphanContributionsFacetsResponse: {
             /** Labs */
@@ -4672,7 +4672,7 @@ export interface components {
         };
         /**
          * PublicationSourcesResponse
-         * @description Enregistrements sources d'une publication, toutes sources confondues, leurs signatures, et les structures que ces signatures citent.
+         * @description Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures que ces contributions sources citent.
          */
         PublicationSourcesResponse: {
             /** Title */
@@ -4866,7 +4866,7 @@ export interface components {
         };
         /**
          * RejectedPairsResponse
-         * @description 409 des attributions de signatures orphelines : `rejected_pairs` énumère les paires rejetées, à confirmer avec `force`.
+         * @description 409 des attributions de contributions sources orphelines : `rejected_pairs` énumère les paires rejetées, à confirmer avec `force`.
          */
         RejectedPairsResponse: {
             /** Detail */
@@ -5029,9 +5029,9 @@ export interface components {
         };
         /**
          * SourceContributionOut
-         * @description Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
+         * @description Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
+         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `group_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
          */
         SourceContributionOut: {
             /** Id */
@@ -5456,7 +5456,7 @@ export interface components {
         };
         /**
          * SuspectMergeOut
-         * @description Publication dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
+         * @description Publication dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source : ses enregistrements sources ont des listes d'auteurs qui ne se recouvrent pas.
          */
         SuspectMergeOut: {
             /** Publication Id */
@@ -5476,7 +5476,7 @@ export interface components {
         };
         /**
          * SuspectMergeSourceRecordOut
-         * @description Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur.
+         * @description Enregistrement source d'une publication de la file des fusions suspectes, et ses contributions sources d'auteur.
          */
         SuspectMergeSourceRecordOut: {
             /** Source */
@@ -8308,7 +8308,7 @@ export interface operations {
             };
         };
     };
-    hal_duplicate_publications_by_doi_api_hal_problems_duplicate_pubs_doi_get: {
+    hal_duplicate_publications_by_doi_api_hal_problems_duplicate_publications_doi_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8340,7 +8340,7 @@ export interface operations {
             };
         };
     };
-    hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_pubs_meta_get: {
+    hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_publications_meta_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8710,7 +8710,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "pubs_asc" | "pubs_desc";
+                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "publications_asc" | "publications_desc";
                 search?: string;
                 publisher_type?: string;
                 country?: string;
@@ -9035,7 +9035,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "pubs_asc" | "pubs_desc";
+                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "publications_asc" | "publications_desc";
                 search?: string;
                 publisher_id?: number | null;
                 journal_type?: string;
@@ -9434,7 +9434,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "pubs_asc" | "pubs_desc";
+                sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "publications_asc" | "publications_desc";
                 search?: string;
                 type?: string;
                 year?: string;

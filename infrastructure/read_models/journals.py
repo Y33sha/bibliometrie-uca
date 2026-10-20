@@ -141,8 +141,8 @@ _SORT_MAP = {
     "title_desc": "j.title DESC",
     "publisher_asc": "publisher_name ASC NULLS LAST, j.title ASC",
     "publisher_desc": "publisher_name DESC NULLS LAST, j.title ASC",
-    "pubs_asc": "publication_count ASC, j.title ASC",
-    "pubs_desc": "publication_count DESC, j.title ASC",
+    "publications_asc": "publication_count ASC, j.title ASC",
+    "publications_desc": "publication_count DESC, j.title ASC",
 }
 
 

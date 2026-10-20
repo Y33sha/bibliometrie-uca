@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-18)
-"""Calcule `author_count` et `distinct_author_count` des notices du stock d'après leurs signatures en base, comme la normalisation (`is_individual_author`).
+"""Calcule `author_count` et `distinct_author_count` des enregistrements sources du stock d'après leurs contributions sources en base, comme la normalisation (`is_individual_author`).
 
-Les notices se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
+Les enregistrements sources se traitent par lots d'identifiants, un commit par lot. Seules les valeurs qui changent s'écrivent. Idempotent.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_author_counts [--dry-run] [--batch 50000]
@@ -20,12 +20,12 @@ from infrastructure.observability.log import setup_logger
 
 log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 
-# Signature d'auteur individuelle, comme `is_individual_author`.
+# Contribution source d'auteur individuelle, comme `is_individual_author`.
 _AUTHOR = f"NOT sc.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sc.roles)"
 
 
 def _update_counts(conn: Connection, source_records: str, params: dict[str, object]) -> int:
-    """Écrit les décomptes des notices filtrées par la condition SQL `notices` (sur `sp`) qui changent. Rend le nombre de notices modifiées."""
+    """Écrit les décomptes des enregistrements sources filtrés par la condition SQL `source_records` (sur `sr`) qui changent. Rend le nombre d'enregistrements sources modifiés."""
     return conn.execute(
         text(f"""
             UPDATE source_records sr
@@ -48,12 +48,12 @@ def _update_counts(conn: Connection, source_records: str, params: dict[str, obje
 
 
 def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
-    """Écrit les décomptes des notices `[lo, hi]` qui changent. Rend le nombre de notices modifiées."""
+    """Écrit les décomptes des enregistrements sources `[lo, hi]` qui changent. Rend le nombre d'enregistrements sources modifiés."""
     return _update_counts(conn, "sr.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
 
 
 def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> int:
-    """Écrit les décomptes des notices `source_record_ids` qui changent. Rend le nombre de notices modifiées."""
+    """Écrit les décomptes des enregistrements sources `source_record_ids` qui changent. Rend le nombre d'enregistrements sources modifiés."""
     return _update_counts(conn, "sr.id = ANY(:ids)", {"ids": source_record_ids})
 
 
@@ -69,7 +69,7 @@ def main() -> int:
         min_id, max_id = conn.execute(text("SELECT min(id), max(id) FROM source_records")).one()
         conn.commit()
         if min_id is None:
-            log.info("aucune notice")
+            log.info("aucun enregistrement source")
             return 0
         changed = 0
         for lo in range(min_id, max_id + 1, args.batch):
@@ -78,7 +78,9 @@ def main() -> int:
                 conn.rollback()
             else:
                 conn.commit()
-        log.info("notices %s : %d", "à modifier" if args.dry_run else "modifiées", changed)
+        log.info(
+            "enregistrements sources %s : %d", "à modifier" if args.dry_run else "modifiés", changed
+        )
     return 0
 
 

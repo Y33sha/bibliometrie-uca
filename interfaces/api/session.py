@@ -61,8 +61,8 @@ def read_session(token: str) -> str | None:
     """Utilisateur porté par un jeton, ou `None` si la signature ne tient pas, si la forme est illisible ou si `SESSION_MAX_AGE` est passé."""
     if not token or "." not in token:
         return None
-    payload, source_contribution = token.rsplit(".", 1)
-    if not hmac.compare_digest(source_contribution, _sign(payload)):
+    payload, signature = token.rsplit(".", 1)
+    if not hmac.compare_digest(signature, _sign(payload)):
         return None
     admin_user, separator, issued_at = payload.rpartition(_PAYLOAD_SEPARATOR)
     if not separator:

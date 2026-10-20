@@ -82,7 +82,7 @@
 			<col class="col-title" />
 			<col class="col-publisher" />
 			<col class="col-issn" />
-			<col class="col-pubs" />
+			<col class="col-publications" />
 			<col class="col-action" />
 		</colgroup>
 		<thead>
@@ -121,7 +121,7 @@
 	.col-title { width: 38%; }
 	.col-publisher { width: 24%; }
 	.col-issn { width: 16%; }
-	.col-pubs { width: 9%; }
+	.col-publications { width: 9%; }
 	.col-action { width: 13%; }
 	th, td { text-align: left; padding: 4px 8px; overflow-wrap: anywhere; }
 	thead th { font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }

@@ -1,7 +1,7 @@
 /**
  * Composable pour la visibilité des colonnes d'un tableau de publications.
  *
- * - Clé de stockage partagée entre toutes les pages (pub-table-columns)
+ * - Clé de stockage partagée entre toutes les pages (publication-table-columns)
  * - Colonnes fixes (non décochables) définies par `fixed: true`
  * - Colonnes masquées par défaut via `defaultHidden`
  * - Chaque page passe ses propres définitions de colonnes
@@ -12,7 +12,7 @@
  * navigateur, où l'API n'existe pas.
  */
 
-const STORAGE_KEY = 'pub-table-columns';
+const STORAGE_KEY = 'publication-table-columns';
 
 export interface ColumnDef {
 	key: string;

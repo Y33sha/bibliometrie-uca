@@ -1,9 +1,9 @@
 # STATUS: oneshot (2026-10-10)
-"""Marque `authors_truncated` les notices OpenAlex rapatriées par `fetch_missing` avec exactement 100 auteurs.
+"""Marque `authors_truncated` les enregistrements OpenAlex rapatriés par `fetch_missing` avec exactement 100 auteurs.
 
-La recherche par DOI de `fetch_missing` interroge l'endpoint de liste d'OpenAlex, qui plafonne les auteurs à 100, sans poser le marqueur que pose le moissonnage. Ces notices sont restées tronquées. Une fois marquées, la phase `fetch_truncated` du run suivant les retélécharge en entier, et `normalize` réécrit leurs signatures.
+La recherche par DOI de `fetch_missing` interroge l'endpoint de liste d'OpenAlex, qui plafonne les auteurs à 100, sans poser le marqueur que pose le moissonnage. Ces enregistrements sont restés tronqués. Une fois marqués, la phase `fetch_truncated` du run suivant les retélécharge en entier, et `normalize` réécrit leurs contributions sources.
 
-Le nombre d'auteurs se lit dans `raw_data` pour une notice pas encore normalisée, et dans ses signatures sinon.
+Le nombre d'auteurs se lit dans `raw_data` pour un enregistrement pas encore normalisé, et dans ses contributions sources sinon.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_mark_truncated_fetch_missing_openalex             # applique
@@ -54,12 +54,12 @@ def main() -> int:
     params = {"cap": BULK_AUTHORSHIPS_CAP}
     with get_sync_engine().connect() as conn:
         if args.dry_run:
-            log.info("Notices à marquer : %d", conn.execute(_COUNT, params).scalar_one())
+            log.info("Enregistrements à marquer : %d", conn.execute(_COUNT, params).scalar_one())
             log.info("DRY-RUN terminé — aucune écriture")
             return 0
         n = conn.execute(_MARK, params).rowcount
         conn.commit()
-        log.info("✓ %d notices marquées authors_truncated", n)
+        log.info("✓ %d enregistrements marqués authors_truncated", n)
     return 0
 
 

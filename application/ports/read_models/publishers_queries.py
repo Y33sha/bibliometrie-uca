@@ -13,7 +13,12 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 
 # Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
 PublisherSort = Literal[
-    "name_asc", "name_desc", "journals_asc", "journals_desc", "pubs_asc", "pubs_desc"
+    "name_asc",
+    "name_desc",
+    "journals_asc",
+    "journals_desc",
+    "publications_asc",
+    "publications_desc",
 ]
 
 

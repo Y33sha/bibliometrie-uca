@@ -1,16 +1,16 @@
 # STATUS: oneshot (2026-10-15)
 """Alignement des listes d'auteurs d'une même publication entre sources : mesure, phase 1 du chantier `DATA_alignement-auteurs.md`.
 
-Pour chaque publication dont les notices viennent d'au moins deux sources, et pour chaque paire de notices de sources différentes :
+Pour chaque publication dont les enregistrements sources viennent d'au moins deux sources, et pour chaque paire d'enregistrements sources de sources différentes :
 
 - longueur des deux listes d'auteurs ;
-- accord de la position : une signature de la première notice trouve-t-elle, dans la seconde, un nom compatible (`names_compatible`) à la même position, à une autre position, ou nulle part ;
-- accord des identifiants forts (`STRONG_PERSON_IDENTIFIER_TYPES`, hors identifiants neutralisés) : deux signatures qui partagent un identifiant sont-elles à la même position, et leurs noms sont-ils compatibles ; deux signatures à la même position ont-elles deux valeurs différentes du même type ;
-- ambiguïté : nombre de noms compatibles trouvés pour une signature décalée.
+- accord de la position : une contribution source du premier enregistrement source trouve-t-elle, dans le second, un nom compatible (`names_compatible`) à la même position, à une autre position, ou nulle part ;
+- accord des identifiants forts (`STRONG_PERSON_IDENTIFIER_TYPES`, hors identifiants neutralisés) : deux contributions sources qui partagent un identifiant sont-elles à la même position, et leurs noms sont-ils compatibles ; deux contributions sources à la même position ont-elles deux valeurs différentes du même type ;
+- ambiguïté : nombre de noms compatibles trouvés pour une contribution source décalée.
 
-L'accord se mesure aussi sans les paires dépendantes, où une notice recopie un dépôt HAL. Sur les publications à trois sources indépendantes ou plus, un vote désigne la source dont le prénom s'écarte à une position donnée.
+L'accord se mesure aussi sans les paires dépendantes, où un enregistrement source recopie un dépôt HAL. Sur les publications à trois sources indépendantes ou plus, un vote désigne la source dont le prénom s'écarte à une position donnée.
 
-Les notices theses.fr, sans position d'auteur, sont écartées, ainsi que les signatures sans le rôle `author`. Les publications de plus de `--full-max` auteurs sont échantillonnées (`--sample-large`).
+Les enregistrements sources theses.fr, sans position d'auteur, sont écartés, ainsi que les contributions sources sans le rôle `author`. Les publications de plus de `--full-max` auteurs sont échantillonnées (`--sample-large`).
 
 Écrit un rapport Markdown et un échantillon de désaccords à relire à la main. Lecture seule sur la base.
 
@@ -68,7 +68,7 @@ def bucket(size: int) -> str:
 
 
 def _publication_ids(conn: Connection, full_max: int, sample_large: int, seed: int) -> list[int]:
-    """Publications à notices d'au moins deux sources, hors theses.fr : toutes jusqu'à `full_max` auteurs, un échantillon au-delà."""
+    """Publications aux enregistrements sources d'au moins deux sources, hors theses.fr : toutes jusqu'à `full_max` auteurs, un échantillon au-delà."""
     rows = conn.execute(
         text("""
             WITH multi AS (
@@ -106,9 +106,9 @@ type SourceRecordKey = tuple[int, str, bool]
 def _source_records(
     conn: Connection, publication_ids: Sequence[int]
 ) -> Iterator[tuple[int, dict[SourceRecordKey, list[SourceContribution]]]]:
-    """Notices de chaque publication : `(id de notice, source, issue de HAL)` → signatures d'auteur individuelles triées par position.
+    """Enregistrements sources de chaque publication : `(id d'enregistrement source, source, issu de HAL)` → contributions sources d'auteur individuelles triées par position.
 
-    Une notice est issue de HAL quand elle recopie un dépôt HAL : notice scanR à identifiant `hal…`, notice OpenAlex dont la première URL, celle de la location principale, est une page HAL.
+    Un enregistrement source est issu de HAL quand il recopie un dépôt HAL : enregistrement scanR à identifiant `hal…`, enregistrement OpenAlex dont la première URL, celle de la location principale, est une page HAL.
     """
     for start in range(0, len(publication_ids), _BATCH):
         ids = list(publication_ids[start : start + _BATCH])
@@ -236,7 +236,7 @@ def _compare(
 
 
 def _dependent(ka: SourceRecordKey, kb: SourceRecordKey) -> bool:
-    """Vrai quand une notice recopie l'autre, ou quand les deux recopient le même dépôt HAL."""
+    """Vrai quand un enregistrement source recopie l'autre, ou quand les deux recopient le même dépôt HAL."""
     return (ka[1] == "hal" and kb[2]) or (kb[1] == "hal" and ka[2]) or (ka[2] and kb[2])
 
 
@@ -254,7 +254,7 @@ def _first_name_outliers(
 ) -> None:
     """Pour chaque position commune à trois sources ou plus, au même nom de famille et aux noms pas tous compatibles : la source dont le nom s'écarte de tous les autres, eux compatibles entre eux.
 
-    Une notice par source, la plus longue. Les notices recopiées d'un dépôt HAL sont écartées, pour que le vote compte des sources indépendantes.
+    Un enregistrement source par source, le plus long. Les enregistrements sources recopiés d'un dépôt HAL sont écartés, pour que le vote compte des sources indépendantes.
     """
     by_source: dict[str, list[SourceContribution]] = {}
     for (_, source, from_hal), contributions in source_records.items():
@@ -344,7 +344,7 @@ def _pct(n: int, d: int) -> str:
 
 def _position_table(by_bucket: dict[str, Tally], labels: list[str]) -> list[str]:
     lines = [
-        "| Auteurs | Paires de notices | Longueurs égales | Signatures | Même position | Décalée | Décalée, plusieurs noms compatibles | Absente |",
+        "| Auteurs | Paires d'enregistrements | Longueurs égales | Contributions sources | Même position | Décalée | Décalée, plusieurs noms compatibles | Absente |",
         "|---|---|---|---|---|---|---|---|",
     ]
     for label in labels:
@@ -369,7 +369,7 @@ def report(
     lines += _position_table(by_bucket, labels)
     lines += ["", "## Accord de la position, paires indépendantes", ""]
     lines += [
-        "Sans les paires où une notice recopie un dépôt HAL : notice scanR à identifiant `hal…`, notice OpenAlex dont la location principale est HAL.",
+        "Sans les paires où un enregistrement source recopie un dépôt HAL : enregistrement scanR à identifiant `hal…`, enregistrement OpenAlex dont la location principale est HAL.",
         "",
     ]
     lines += _position_table(by_bucket_independent, labels)
@@ -414,7 +414,7 @@ def report(
         "",
         "## Accord de la position, par paire de sources",
         "",
-        "| Sources | Paires de notices | Signatures | Même position | Décalée | Absente |",
+        "| Sources | Paires d'enregistrements | Contributions sources | Même position | Décalée | Absente |",
         "|---|---|---|---|---|---|",
     ]
     for pair, t in sorted(by_sources.items(), key=lambda kv: -kv[1].source_contributions):

@@ -272,7 +272,7 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`lab-${lab.id}-pubs`}
+				apiKey={`lab-${lab.id}-publications`}
 				externalFilters={{
 					labId: lab.id,
 					labLabel: lab.acronym || lab.name,

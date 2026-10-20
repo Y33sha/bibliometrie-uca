@@ -84,7 +84,7 @@
         {nf.name_form}
       </span>
     {/if}
-    <span class="pub-count" class:zero={nf.publication_count === 0}>
+    <span class="publication-count" class:zero={nf.publication_count === 0}>
       {nf.publication_count} pub.
     </span>
     {#if nf.shared_count > 0}
@@ -133,12 +133,12 @@
     align-items: center;
     gap: 4px;
   }
-  .pub-count {
+  .publication-count {
     font-size: 0.72rem;
     color: #666;
     white-space: nowrap;
   }
-  .pub-count.zero {
+  .publication-count.zero {
     color: #bbb;
   }
   .shared {

@@ -80,7 +80,7 @@
 	}
 	type ApcMode = 'institution' | 'person';
 	let {
-		apiKey = 'pub-list',
+		apiKey = 'publication-list',
 		externalFilters,
 		urlSync = true,
 		basePath = '/publications',
@@ -117,9 +117,9 @@
 		perPage?: number;
 		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
-		onExcludeContribution?: (contributionId: number, pubId: number) => void | boolean | Promise<void | boolean>;
+		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
 		/** Ouvre la publication dans la page hôte au lieu de naviguer vers sa fiche. Un clic modifié (Ctrl, Cmd, Maj, Alt) garde la navigation. */
-		onopenPublication?: (pubId: number) => void;
+		onopenPublication?: (publicationId: number) => void;
 		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
 		activePublicationId?: number | null;
 	} = $props();
@@ -409,7 +409,7 @@
 	}
 
 	// --- Composables ---
-	const pubs = usePaginatedFetch<Publication>({
+	const listing = usePaginatedFetch<Publication>({
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
 		// svelte-ignore state_referenced_locally
@@ -461,14 +461,14 @@
 			...urlState(FILTERS, values),
 			search,
 			currentSort,
-			currentPage: pubs.page,
+			currentPage: listing.page,
 		}));
 	}
 
 	function onFilterChange() {
-		pubs.page = 1;
+		listing.page = 1;
 		syncUrl();
-		pubs.load();
+		listing.load();
 		facets.load();
 	}
 
@@ -495,9 +495,9 @@
 	const optionCount = (key: string): number => facets.options[key]?.length ?? 0;
 
 	const onSearchInput = url.debouncedSearch(() => {
-		pubs.page = 1;
+		listing.page = 1;
 		syncUrl();
-		pubs.load();
+		listing.load();
 		facets.load();
 	});
 
@@ -531,13 +531,13 @@
 		const result = await onExcludeContribution(p.contribution_id, p.id);
 		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
 		if (result === false) return;
-		pubs.items = pubs.items.filter((item) => item.id !== p.id);
+		listing.items = listing.items.filter((item) => item.id !== p.id);
 	}
 
-	function onTitleClick(e: MouseEvent, pubId: number) {
+	function onTitleClick(e: MouseEvent, publicationId: number) {
 		if (!onopenPublication || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
 		e.preventDefault();
-		onopenPublication(pubId);
+		onopenPublication(publicationId);
 	}
 
 	onMount(async () => {
@@ -549,7 +549,7 @@
 			restoreValues(FILTERS, restored, values);
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
-			if (restored.currentPage) pubs.page = restored.currentPage as number;
+			if (restored.currentPage) listing.page = restored.currentPage as number;
 		}
 
 		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous » l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
@@ -562,7 +562,7 @@
 		if (needed.length) cv.ensure(needed);
 
 		await facets.load();
-		pubs.load();
+		listing.load();
 	});
 </script>
 
@@ -570,14 +570,14 @@
 	<div class="filter-banner">Filtre actif : {subjectBannerText}</div>
 {/if}
 
-<div class="toolbar-card toolbar-sticky pub-toolbar">
-	<div class="toolbar pub-toolbar-main">
-		<input type="search" class="pub-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-		<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
+<div class="toolbar-card toolbar-sticky publication-toolbar">
+	<div class="toolbar publication-toolbar-main">
+		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
-		{#if showStatsLink}<a href={statsUrl} class="pub-link">Statistiques &rarr;</a>{/if}
+		{#if showStatsLink}<a href={statsUrl} class="publication-link">Statistiques &rarr;</a>{/if}
 	</div>
-	<div class="toolbar pub-toolbar-facets">
+	<div class="toolbar publication-toolbar-facets">
 		<span class="facets-label">Filtrer par&nbsp;:</span>
 		{#each sections.primary as f (f.key)}
 			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
@@ -615,7 +615,7 @@
 {/snippet}
 
 <div class="table-scroll">
-<table class="pub-table">
+<table class="publication-table">
 	<thead>
 		<tr>
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
@@ -623,11 +623,11 @@
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
 				An. <span class="sort-arrow">{yearSortArrow}</span>
 			</th>{/if}
-			<th class="sortable pub-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
+			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
-			{#if col('journal')}<th class="pub-col-journal">Revue</th>{/if}
-			{#if col('publisher')}<th class="pub-col-journal">Éditeur</th>{/if}
+			{#if col('journal')}<th class="publication-col-journal">Revue</th>{/if}
+			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
@@ -647,10 +647,10 @@
 		</tr>
 	</thead>
 	<tbody>
-		{#if pubs.items.length === 0}
-			<TableStatusRow loading={pubs.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
+		{#if listing.items.length === 0}
+			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
-			{#each pubs.items as p (p.id)}
+			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
 					{#if showAdminExclude}
 						<td class="exclude-cell">
@@ -664,15 +664,15 @@
 						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
-					<td><a href="{base}/publications/{p.id}" class="pub-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
-					{#if col('journal')}<td class="journal-cell pub-col-journal">
+					<td><a href="{base}/publications/{p.id}" class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
+					{#if col('journal')}<td class="journal-cell publication-col-journal">
 						{#if p.journal_id}
 							<a href="{base}/journals/{p.journal_id}">{p.journal}</a>
 						{:else}
 							{p.journal || ''}
 						{/if}
 					</td>{/if}
-					{#if col('publisher')}<td class="journal-cell pub-col-journal">
+					{#if col('publisher')}<td class="journal-cell publication-col-journal">
 						{#if p.publisher_id}
 							<a href="{base}/publishers/{p.publisher_id}">{p.publisher}</a>
 						{:else}
@@ -780,7 +780,7 @@
 </table>
 </div>
 
-<Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => { pubs.goToPage(p); syncUrl(); }} />
+<Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 
 <style>
 	.license-cell {
@@ -796,10 +796,10 @@
 		color: #2c3e50;
 	}
 	/* Deux lignes : commandes (recherche extensible, compte, exports, lien stats) puis facettes. */
-	.pub-toolbar { display: flex; flex-direction: column; gap: 8px; }
-	.pub-toolbar .toolbar { margin-bottom: 0; }
-	.pub-search { flex: 1; min-width: 220px; }
-	.pub-link {
+	.publication-toolbar { display: flex; flex-direction: column; gap: 8px; }
+	.publication-toolbar .toolbar { margin-bottom: 0; }
+	.publication-search { flex: 1; min-width: 220px; }
+	.publication-link {
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
@@ -812,7 +812,7 @@
 		font-weight: 500;
 		white-space: nowrap;
 	}
-	.pub-link:hover { opacity: 0.9; }
+	.publication-link:hover { opacity: 0.9; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.more-filters-btn {
 		display: inline-flex;
@@ -847,7 +847,7 @@
 		font-weight: 600;
 		color: var(--muted);
 	}
-	.pub-table {
+	.publication-table {
 		width: 100%;
 		min-width: 760px;
 		border-collapse: collapse;
@@ -856,7 +856,7 @@
 		border-radius: 6px;
 		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé (coins arrondis restent visuellement corrects grâce à border-collapse). */
 	}
-	.pub-table th {
+	.publication-table th {
 		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
@@ -866,14 +866,14 @@
 		border-bottom: 2px solid var(--border);
 		white-space: nowrap;
 	}
-	.pub-table td {
+	.publication-table td {
 		padding: 7px 10px;
 		border-bottom: 1px solid var(--border-subtle);
 		font-size: 0.95rem;
 		vertical-align: top;
 	}
-	.pub-table tr:hover td { background: var(--surface-hover); }
-	.pub-table tr.active-row td { background: var(--accent-light); }
+	.publication-table tr:hover td { background: var(--surface-hover); }
+	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
 
 	/* Statut HAL (lab) */

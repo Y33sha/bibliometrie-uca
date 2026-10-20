@@ -15,7 +15,9 @@ from application.ports.read_models._common import (
 )
 
 # Vocabulaire de tri de la liste des monographies : le champ, puis le sens.
-MonographSort = Literal["title_asc", "title_desc", "year_asc", "year_desc", "pubs_asc", "pubs_desc"]
+MonographSort = Literal[
+    "title_asc", "title_desc", "year_asc", "year_desc", "publications_asc", "publications_desc"
+]
 
 MONOGRAPH_KINDS = ("book", "proceedings")
 """Types de monographie : livre, volume d'actes."""

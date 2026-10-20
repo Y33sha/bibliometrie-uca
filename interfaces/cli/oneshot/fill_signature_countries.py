@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-16)
 """Remplit `source_contributions.countries` pour le stock (`refresh_source_contribution_countries`), par lots d'identifiants validés un à un.
 
-Les signatures modifiées sont marquées `countries_dirty` : la phase `countries` suivante recalcule les pays des notices et des publications. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé.
+Les contributions sources modifiées sont marquées `countries_dirty` : la phase `countries` suivante recalcule les pays des enregistrements sources et des publications. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé.
 
 Usage :
     python -m interfaces.cli.oneshot.fill_signature_countries [--from-id N] [--batch 2000000]
@@ -26,7 +26,9 @@ log = setup_logger("fill_signature_countries", os.path.dirname(__file__))
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--from-id", type=int, help="premier identifiant de signature à traiter")
+    parser.add_argument(
+        "--from-id", type=int, help="premier identifiant de contribution source à traiter"
+    )
     parser.add_argument(
         "--batch", type=int, default=2_000_000, help="largeur d'un lot, en identifiants"
     )
@@ -45,7 +47,7 @@ def main() -> int:
             changed += refresh_source_contribution_countries(conn, id_range=(lo, hi))
             conn.commit()
             log.info(
-                "signatures %d à %d : %d modifiées au total, %.1f %%, %.0f s",
+                "contributions sources %d à %d : %d modifiées au total, %.1f %%, %.0f s",
                 lo,
                 hi,
                 changed,
@@ -53,7 +55,7 @@ def main() -> int:
                 time.monotonic() - started,
             )
             lo = hi + 1
-    log.info("signatures dont le pays change : %d", changed)
+    log.info("contributions sources dont le pays change : %d", changed)
     return 0
 
 

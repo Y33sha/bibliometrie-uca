@@ -35,7 +35,7 @@ async function parseError(res: Response): Promise<unknown> {
 /**
  * GET avec annulation automatique des requêtes précédentes. Si `key` est fourni, toute requête précédente avec la même clé est annulée. Une requête annulée ne résout ni ne rejette — elle disparaît silencieusement.
  *
- * Usage : api('/api/publications?...', { key: 'pub-list' })
+ * Usage : api('/api/publications?...', { key: 'publication-list' })
  */
 export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 	const key = opts?.key;

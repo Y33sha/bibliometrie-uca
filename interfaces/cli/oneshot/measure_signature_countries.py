@@ -1,13 +1,13 @@
 # STATUS: oneshot (2026-10-16)
-"""Pays des signatures, hors pipeline : contradictions entre leurs sources, et effet sur les pays des publications.
+"""Pays des contributions sources, hors pipeline : contradictions entre leurs sources, et effet sur les pays des publications.
 
-Le pays d'une signature réunit trois sources :
+Le pays d'une contribution source réunit trois sources :
 
 - `adresse` : pays retenu de ses adresses, composé par `retained_countries` à partir du fichier de `measure_address_country_candidates` ; il inclut les ROR de l'affiliation de l'adresse ;
-- `ror` : pays des organisations ROR de la signature sans texte d'affiliation ;
-- `hal` : pays des structures HAL de la signature (`ref.hal_structures.country_code`).
+- `ror` : pays des organisations ROR de la contribution source sans texte d'affiliation ;
+- `hal` : pays des structures HAL de la contribution source (`ref.hal_structures.country_code`).
 
-Le rapport donne, par source de notice, la couverture de chacune, leurs relations deux à deux, et les pays des publications qu'en tire chaque règle — adresses seules, ou les trois sources — comparés à `publications.countries`. Un échantillon de signatures dont l'adresse contredit le ROR ou la structure HAL s'écrit à part, pour une revue à la main. Lecture seule sur la base.
+Le rapport donne, par source d'enregistrement, la couverture de chacune, leurs relations deux à deux, et les pays des publications qu'en tire chaque règle — adresses seules, ou les trois sources — comparés à `publications.countries`. Un échantillon de contributions sources dont l'adresse contredit le ROR ou la structure HAL s'écrit à part, pour une revue à la main. Lecture seule sur la base.
 
 Usage :
     python -m interfaces.cli.oneshot.measure_signature_countries
@@ -188,22 +188,23 @@ def main() -> int:
         "--candidates", type=Path, default=_MEASURES / "address_country_candidates.csv.gz"
     )
     args = parser.parse_args()
-    sections: list[str] = ["# Pays des signatures\n"]
+    sections: list[str] = ["# Pays des contributions sources\n"]
     with get_sync_engine().connect() as conn:
         log.info("adresses à pays retenu : %d", load_retained(conn, args.candidates))
         conn.execute(text(_SOURCE_CONTRIBUTION_TABLES))
         log.info(
-            "signatures à pays : %d", conn.execute(text("SELECT count(*) FROM sig_all")).scalar()
+            "contributions sources à pays : %d",
+            conn.execute(text("SELECT count(*) FROM sig_all")).scalar(),
         )
 
         coverage = conn.execute(text(_COVERAGE)).all()
         sections.append(
-            "## Couverture par source de notice\n\n"
+            "## Couverture par source d'enregistrement\n\n"
             + _table(
                 [tuple(r) for r in coverage],
                 [
                     "Source",
-                    "Signatures à pays",
+                    "Contributions sources à pays",
                     "Adresse",
                     "ROR sans adresse",
                     "Structure HAL",

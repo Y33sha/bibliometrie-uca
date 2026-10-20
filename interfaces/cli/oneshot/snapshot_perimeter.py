@@ -3,12 +3,12 @@
 
 L'instantané garde, à chaque niveau, les indices d'entrée dans le périmètre et les structures atteintes :
 
-- signatures du périmètre ou rattachées à une structure : source, indices, couples (structure, indice) de `source_contribution_structures` ;
+- contributions sources du périmètre ou rattachées à une structure : source, indices, couples (structure, indice) de `source_contribution_structures` ;
 - contributions du périmètre, par couple (publication, personne) : indices ;
 - publications : type, indices, structures (`publication_structures`), pays, titre ;
-- adresses : nombre total, nombre sans signature.
+- adresses : nombre total, nombre sans contribution source.
 
-L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : entrées et sorties du périmètre, structures gagnées et perdues, pays gagnés, perdus et changés. Une signature absente du second instantané est cherchée en base, pour distinguer une signature supprimée d'une signature sortie du périmètre : la comparaison se lance donc sur la base dans l'état du second instantané.
+L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : entrées et sorties du périmètre, structures gagnées et perdues, pays gagnés, perdus et changés. Une contribution source absente du second instantané est cherchée en base, pour distinguer une contribution source supprimée d'une contribution source sortie du périmètre : la comparaison se lance donc sur la base dans l'état du second instantané.
 
 Usage :
     python -m interfaces.cli.oneshot.snapshot_perimeter
@@ -86,7 +86,7 @@ Snapshot = dict[str, Any]
 
 def snapshot() -> Snapshot:
     with get_sync_engine().connect() as conn:
-        log.info("Signatures…")
+        log.info("Contributions sources…")
         structures: defaultdict[int, list[list[object]]] = defaultdict(list)
         for r in conn.execute(_SOURCE_CONTRIBUTION_STRUCTURES):
             structures[r.source_contribution_id].append([r.structure_id, r.evidence])
@@ -149,7 +149,9 @@ def _compare_source_contributions(conn: Connection, before: Snapshot, after: Sna
     b, a = before["signatures"], after["signatures"]
     in_b = {k for k, v in b.items() if _in_perimeter(v[1])}
     in_a = {k for k, v in a.items() if _in_perimeter(v[1])}
-    log.info("─── Signatures du périmètre : %d avant, %d après ───", len(in_b), len(in_a))
+    log.info(
+        "─── Contributions sources du périmètre : %d avant, %d après ───", len(in_b), len(in_a)
+    )
 
     existing = _existing_source_contributions(conn, in_b - in_a)
     _log_tally("entrées, par source", Counter(a[k][0] for k in in_a - in_b))
@@ -169,7 +171,7 @@ def _compare_source_contributions(conn: Connection, before: Snapshot, after: Sna
             gained[f"{sa_[0]} {evidence}"] += 1
         for _, evidence in before_links - after_links:
             lost[f"{sb[0]} {evidence}"] += 1
-    _log_tally("signatures dont les indices changent", evidence_changes)
+    _log_tally("contributions sources dont les indices changent", evidence_changes)
     _log_tally("liens à une structure gagnés, par source et indice", gained)
     _log_tally("liens à une structure perdus, par source et indice", lost)
 
@@ -288,7 +290,7 @@ def main() -> int:
     path = _SNAPSHOTS / f"perimeter_{datetime.now(UTC):%Y%m%d_%H%M}.json.gz"
     path.write_bytes(gzip.compress(json.dumps(data, ensure_ascii=False).encode()))
     log.info(
-        "Instantané écrit : %s (%d signatures, %d contributions, %d publications)",
+        "Instantané écrit : %s (%d contributions sources, %d contributions, %d publications)",
         path,
         len(data["signatures"]),
         len(data["contributions"]),
