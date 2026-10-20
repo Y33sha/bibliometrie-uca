@@ -90,7 +90,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] `staging.py` scindé ; suppression des `source_publications` dans `source_publications.py`. 626c47b83
 - [x] `ror/dump.py` dans `complements/` ; téléchargement des dumps commun. 5ef6d1c7c
 - [x] `User-Agent` construit par `polite_pool.py`. ac9fdb98d
-- [ ] Indirections : `SourcePublicationQueries`, `Extracteur`, réexport de `scoped_logger`, fabriques de `BibliographicNormalizer`.
+- [x] Indirections : `Extracteur`, réexport de `scoped_logger`, fabriques de `BibliographicNormalizer`. d73ed7766
 - [ ] Code mort : `BatchInsertCounts`, délais inutilisés, `API_BASE_URLS["doaj"]`.
 
 ### Phase 3 — Sources
