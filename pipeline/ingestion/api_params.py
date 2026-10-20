@@ -24,8 +24,6 @@ API_BASE_URLS: dict[str, str] = {
     "openalex_publishers": "https://api.openalex.org/publishers",
     "openalex_institutions": "https://api.openalex.org/institutions",
     "unpaywall": "https://api.unpaywall.org/v2",
-    # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
-    "doaj": "https://doaj.org/api",
     # Sudoc : racine, l'adapter compose `/services/issn2ppn/<ISSN>` et `/<ppn>.xml`.
     "sudoc": "https://www.sudoc.fr",
     # Versions du dump ROR publiées sur Zenodo, communauté `ror-data`.
@@ -56,17 +54,8 @@ SCANR_PER_PAGE = 1000
 THESES_DELAY = 0.3
 THESES_PER_PAGE = 500  # max accepté par l'API
 
-# CrossRef — polite pool (avec mailto), pas de seuil documenté ; on reste raisonnable à ~10 req/s
-CROSSREF_DELAY = 0.1
-
 # doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent
 DOI_ORG_RA_BATCH = 100  # préfixes par requête
-
-# Unpaywall — ~8 req/s conservateur
-UNPAYWALL_DELAY = 0.12
-
-# DOAJ — courtoisie
-DOAJ_DELAY = 0.15
 
 # Sudoc — aucune limite documentée : 5 req/s au plus, toutes requêtes simultanées confondues
 SUDOC_MAX_PER_SECOND = 5
