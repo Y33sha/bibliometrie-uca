@@ -204,6 +204,7 @@ def build() -> Phase:
 def _run_resolve_crossref_publishers(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
+    from pipeline.http.polite_pool import polite_user_agent
     from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -211,7 +212,7 @@ def _run_resolve_crossref_publishers(
         run_resolve_crossref_publishers,
     )
 
-    user_agent = _prefixes_user_agent()
+    user_agent = polite_user_agent()
     with ctx.open_tx() as conn:
         return run_resolve_crossref_publishers(
             conn,
@@ -228,6 +229,7 @@ def _run_resolve_crossref_publishers(
 def _run_resolve_datacite_publishers(
     ctx: PhaseContext, breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
+    from pipeline.http.polite_pool import polite_user_agent
     from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
@@ -235,7 +237,7 @@ def _run_resolve_datacite_publishers(
         run_resolve_datacite_publishers,
     )
 
-    user_agent = _prefixes_user_agent()
+    user_agent = polite_user_agent()
     with ctx.open_tx() as conn:
         return run_resolve_datacite_publishers(
             conn,
@@ -247,12 +249,6 @@ def _run_resolve_datacite_publishers(
             ),
             breaker=breaker,
         )
-
-
-def _prefixes_user_agent() -> str:
-    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
-
-    return build_user_agent(get_polite_pool_email_optional() or "")
 
 
 def _run_enrich_journals_from_openalex(
@@ -405,7 +401,7 @@ def _run_learn_journal_doi_namespaces(
 def _run_enrich_journals_from_doaj(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
-    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
+    from pipeline.http.polite_pool import default_user_agent
     from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
     from pipeline.runtime.config import get_doaj_refresh_after_days
     from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
@@ -413,8 +409,7 @@ def _run_enrich_journals_from_doaj(
     )
     from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 
-    # Le dump du DOAJ est public : l'adresse du polite pool y est facultative.
-    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    user_agent = default_user_agent()
     with ctx.open_tx() as conn:
         return run_enrich_journals_from_doaj(
             conn,

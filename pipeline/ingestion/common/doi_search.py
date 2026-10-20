@@ -23,7 +23,7 @@ from domain.sources.registry import (
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.polite_pool import build_user_agent
+from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
     pending_failed_lookup_sql,
@@ -174,7 +174,7 @@ async def fetch_missing_doi(
         "not_found": 0,
         "unknown_to_doi_org": 0,
     }
-    user_agent = _doi_org_user_agent() if search.source_key in _TARGET_RA else None
+    user_agent = polite_user_agent() if search.source_key in _TARGET_RA else None
 
     async def _fetch(client: httpx2.AsyncClient, item: tuple[int, list[str]]) -> DoiBatchResult:
         batch_idx, batch = item
@@ -249,10 +249,3 @@ async def fetch_missing_doi(
             "unknown_to_doi_org": progress["unknown_to_doi_org"],
         },
     )
-
-
-def _doi_org_user_agent() -> str:
-    """User-Agent du polite pool pour doi.org."""
-    from pipeline.http.polite_pool import get_polite_pool_email
-
-    return build_user_agent(get_polite_pool_email())

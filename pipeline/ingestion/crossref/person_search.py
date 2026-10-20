@@ -11,7 +11,7 @@ from domain.persons.identifiers import PersonIdentifierType
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email
+from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchExtractor,
@@ -38,7 +38,7 @@ class CrossrefClient:
 
     def __init__(self, base_url: str) -> None:
         self._url = f"{base_url}/works"
-        self._headers = {"User-Agent": build_user_agent(get_polite_pool_email())}
+        self._headers = {"User-Agent": polite_user_agent()}
 
     def fetch_page(self, filters: str, cursor: str | None, label: str) -> PersonSearchPage:
         """Une page des œuvres que désigne `filters` : la première quand `cursor` est `None`. Une page vide clôt la pagination."""

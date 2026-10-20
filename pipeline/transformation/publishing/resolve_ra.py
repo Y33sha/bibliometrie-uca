@@ -114,12 +114,12 @@ def _resolve(
 
 
 def build() -> Phase:
-    from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
+    from pipeline.http.polite_pool import default_user_agent
     from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
-    user_agent = build_user_agent(get_polite_pool_email_optional() or "")
+    user_agent = default_user_agent()
     return SingleTaskPhase(
         "resolve_ra.resolve_prefixes",
         ResolveRaPhase(
