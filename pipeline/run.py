@@ -388,7 +388,7 @@ def _run_one_phase(
                 phase_context(
                     RunOptions(
                         mode=args.mode,
-                        sources=sources,
+                        sources=frozenset(sources),
                         year=args.year,
                         start_year=args.start_year,
                         include_wos=args.include_wos,

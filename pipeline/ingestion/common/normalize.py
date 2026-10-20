@@ -250,8 +250,8 @@ NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 
 
 def _retenue(source: str) -> Callable[[PhaseContext], bool]:
-    """Condition d'exécution du nœud de `source` : le run normalise toutes les sources, ou celles de ses options."""
-    return lambda ctx: ctx.options.sources is None or source in ctx.options.sources
+    """Condition d'exécution du nœud de `source` : la source fait partie des sources du run."""
+    return lambda ctx: source in ctx.options.sources
 
 
 @dataclass(frozen=True)

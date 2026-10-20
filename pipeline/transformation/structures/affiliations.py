@@ -19,7 +19,6 @@ from sqlalchemy import Connection
 
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
@@ -58,7 +57,7 @@ class AffiliationsPhase:
                 "affiliations.refresh_ror": NodeStep(lambda ctx, _breaker: self.refresh_ror(ctx)),
                 "affiliations.refresh_hal_structures": NodeStep(
                     lambda ctx, _breaker: self.refresh_hal_structures(
-                        ctx, MODES[ctx.options.mode].refresh_hal_structures
+                        ctx, ctx.options.policy.refresh_hal_structures
                     )
                 ),
                 "affiliations.resolve_addresses": NodeStep(

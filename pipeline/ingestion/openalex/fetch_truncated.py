@@ -16,7 +16,6 @@ import httpx2
 from sqlalchemy import Connection, bindparam, text
 
 from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
-from domain.sources.registry import ALL_SOURCES_SET
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
 from pipeline.http.fetch_pool import run_fetch_pool
@@ -66,8 +65,7 @@ class TruncatedWork:
 class FetchTruncatedPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Relit les works tronqués dans une transaction, dès qu'OpenAlex fait partie des sources du run. La phase tourne dans tous les modes."""
-        sources = ctx.options.sources if ctx.options.sources is not None else ALL_SOURCES_SET
-        if "openalex" not in sources:
+        if "openalex" not in ctx.options.sources:
             return PhaseMetrics()
         with ctx.open_tx() as conn:
             return asyncio.run(refetch_openalex(conn, ctx.logger))

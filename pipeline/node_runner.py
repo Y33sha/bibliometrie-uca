@@ -14,7 +14,6 @@ from pipeline.graph import NODES, Node
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -107,7 +106,7 @@ def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
     """Lance la maintenance du nœud et rend une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
     lignes = []
     for operation in node.maintenance:
-        if operation.startswith("VACUUM ") and MODES[ctx.options.mode].vacuum_full:
+        if operation.startswith("VACUUM ") and ctx.options.policy.vacuum_full:
             operation = operation.replace("VACUUM", "VACUUM FULL", 1)
         t0 = time.perf_counter()
         ctx.maintain(operation)

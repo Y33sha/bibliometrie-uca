@@ -21,7 +21,6 @@ from pipeline.ingestion.common.extract import Extracteur
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
@@ -45,13 +44,11 @@ class ExtractByPersonPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute en parallèle le nœud de chaque source retenue et assemble les métriques."""
         options = ctx.options
-        if not MODES[options.mode].extract_by_person:
+        if not options.policy.extract_by_person:
             etape(ctx.logger, _SECTION)
             ctx.logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return PhaseMetrics()
-        effective = set(PERSON_SEARCHED_SOURCES)
-        if options.sources:
-            effective &= options.sources
+        effective = set(PERSON_SEARCHED_SOURCES) & options.sources
 
         def node(source: str) -> NodeRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
