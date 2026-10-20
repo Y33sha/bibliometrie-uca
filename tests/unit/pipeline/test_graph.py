@@ -19,20 +19,20 @@ def test_noms_uniques():
 def test_les_noeuds_d_une_phase_se_suivent():
     """Le périmètre matérialisé d'abord, puis les nœuds de chaque phase d'un seul tenant : l'ordre des phases se lit sur leurs nœuds."""
     order = ["run", *PHASE_ORDER]
-    groups = [n.group for n in NODES]
-    assert groups[0] == "run"
-    assert groups == sorted(groups, key=order.index)
+    phases = [n.phase for n in NODES]
+    assert phases[0] == "run"
+    assert phases == sorted(phases, key=order.index)
 
 
 def test_un_noeud_d_extraction_par_source_moissonnee():
-    extract_nodes = [n.name for n in NODES if n.group == "extract"]
+    extract_nodes = [n.name for n in NODES if n.phase == "extract"]
     assert extract_nodes == [f"extract.{s}" for s in HARVESTED_SOURCES]
     assert set(extract._extractors()) == {s.value for s in HARVESTED_SOURCES}
 
 
 def test_un_noeud_de_relecture_par_source():
     """Crossref aussi : `fetch_stale` relit toutes les sources par identifiant natif."""
-    stale_nodes = [n.name for n in NODES if n.group == "fetch_stale"]
+    stale_nodes = [n.name for n in NODES if n.phase == "fetch_stale"]
     assert stale_nodes == [f"fetch_stale.{s}" for s in ALL_SOURCES]
 
 
@@ -46,7 +46,7 @@ def test_normalisation_dans_l_ordre_de_priorite_des_sources():
     normalize_nodes = [
         n.name.removeprefix("normalize.")
         for n in NODES
-        if n.group == "normalize" and n.name.removeprefix("normalize.") in set(SOURCE_PRIORITY)
+        if n.phase == "normalize" and n.name.removeprefix("normalize.") in set(SOURCE_PRIORITY)
     ]
     assert normalize_nodes == [s.value for s in SOURCE_PRIORITY]
     assert set(_normalize_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
@@ -112,7 +112,7 @@ def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publicatio
 
 def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     """Les lectures communes viennent du groupe ; seuls les canaux Crossref et DataCite lisent l'agence des préfixes."""
-    reads = {n.name: n.reads for n in NODES if n.group == "fetch_missing"}
+    reads = {n.name: n.reads for n in NODES if n.phase == "fetch_missing"}
     assert all("failed_lookups" in r for r in reads.values())
     lisent_l_agence = {name for name, r in reads.items() if "doi_prefixes.ra" in r}
     assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}
@@ -128,8 +128,8 @@ def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():
     deps = dependencies(NODES)
     lots: dict[str, list[int]] = {}
     for index, node in enumerate(NODES):
-        if node.lot is not None:
-            lots.setdefault(node.lot, []).append(index)
+        if node.parallel_group is not None:
+            lots.setdefault(node.parallel_group, []).append(index)
     assert lots
     for indices in lots.values():
         assert indices == list(range(indices[0], indices[-1] + 1))

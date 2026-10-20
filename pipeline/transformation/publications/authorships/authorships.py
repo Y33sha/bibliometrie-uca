@@ -101,15 +101,15 @@ class AuthorshipsPhase:
             {
                 "authorships.build": NodeStep(build),
                 "authorships.propagate": NodeStep(
-                    propagate, section=synchronisation, libelle="Attributs des liens"
+                    propagate, section=synchronisation, label="Attributs des liens"
                 ),
                 "authorships.publications_in_perimeter": NodeStep(
                     publications_in_perimeter,
                     section=synchronisation,
-                    libelle="Périmètre des publications",
+                    label="Périmètre des publications",
                 ),
                 "authorships.structures": NodeStep(
-                    structures, section=synchronisation, libelle="Structures des liens"
+                    structures, section=synchronisation, label="Structures des liens"
                 ),
                 "authorships.purge_orphan_publications": NodeStep(purge),
                 "authorships.delete_empty_containers": NodeStep(empty_containers),

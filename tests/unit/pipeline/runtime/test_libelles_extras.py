@@ -13,7 +13,7 @@ from pipeline.runtime.observability.metrics import LIBELLES_EXTRAS
 
 COUCHES = ("application", "domain", "infrastructure", "interfaces", "pipeline")
 
-COMPTEURS_NOMMES = {"new", "updated", "unchanged", "total", "errors"}
+COMPTEURS_NOMMES = {"new", "updated", "unchanged", "seen", "errors"}
 """Paramètres déclarés de `PhaseMetrics.add`, que `as_summary` traduit lui-même."""
 
 

@@ -95,7 +95,7 @@ async def _verifier(
     def _result() -> PhaseMetrics:
         # Indicateurs : verdicts du run (nouveaux, modifiés, inchangés, non trouvés), puis répartition des publications par statut OA avec le delta du run (avant → après).
         metrics.add(
-            total=total,
+            seen=total,
             new=progress["new"],
             updated=progress["updated"],
             unchanged=progress["unchanged"],

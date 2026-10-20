@@ -100,7 +100,7 @@ async def run_check_journals_in_sudoc(
     metrics = PhaseMetrics()
     if total == 0:
         return metrics
-    metrics.add(total=total)
+    metrics.add(seen=total)
 
     record_by_ppn: dict[str, SudocSerialRecord | None] = {}
     pace = RequestPace(max_per_second)

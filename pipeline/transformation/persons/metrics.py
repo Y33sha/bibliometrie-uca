@@ -61,7 +61,7 @@ def build_metrics(
     created = result.created
 
     metrics = PhaseMetrics()
-    metrics.add(total=result.in_perimeter_total, new=created, updated=linked_total)
+    metrics.add(seen=result.in_perimeter_total, new=created, updated=linked_total)
     # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend), ordre par fiabilité décroissante de la cascade.
     metrics.details["table"] = {
         "rows": [{"key": method, "count": matched.get(method, 0)} for method in _MATCHING_METHODS]

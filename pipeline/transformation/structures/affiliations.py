@@ -82,7 +82,7 @@ class AffiliationsPhase:
             perimeter_ids = set(self.perimeter_queries.get_persons_structure_ids_list(conn))
             stats = run_resolution(conn, self.address_queries, perimeter_ids, ctx.logger)
         metrics = PhaseMetrics()
-        metrics.add(total=stats.processed)
+        metrics.add(seen=stats.processed)
         metrics.details["summary"] = {
             "adresses": stats.processed,
             "in_perimeter": stats.in_perimeter,

@@ -45,7 +45,7 @@ def run_type_proceedings_volumes(
                 extra={"detail": True},
             )
     metrics.add(
-        total=changed,
+        seen=changed,
         monographs_to_proceedings=len(to_proceedings),
         monographs_to_books=len(to_books),
     )

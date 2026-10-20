@@ -83,9 +83,9 @@ def _resolve(
     for prefix, answer in resolve_ras_fn(prefixes):
         ra = answer or "unknown"
         if answer:
-            metrics.add(total=1, resolved=1)
+            metrics.add(seen=1, resolved=1)
         else:
-            metrics.add(total=1, unresolved=1)
+            metrics.add(seen=1, unresolved=1)
         if repo.insert_ra(prefix=prefix, ra=ra):
             metrics.add(new=1)
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1

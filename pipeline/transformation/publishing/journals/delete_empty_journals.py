@@ -25,6 +25,6 @@ def run_delete_empty_journals(
     for journal in deleted:
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Revue vide supprimée : %s", journal_label(journal), extra={"detail": True})
-    metrics.add(total=len(deleted), journals_deleted=len(deleted))
+    metrics.add(seen=len(deleted), journals_deleted=len(deleted))
     metrics.resume = accord(len(deleted), "revue supprimée", "revues supprimées")
     return metrics

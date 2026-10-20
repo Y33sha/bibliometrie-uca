@@ -9,7 +9,7 @@ from pipeline.transformation.publishing import publishers_journals
 from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
 
 _CHAMPS = tuple(
-    n.name.removeprefix("publishers_journals.") for n in NODES if n.group == "publishers_journals"
+    n.name.removeprefix("publishers_journals.") for n in NODES if n.phase == "publishers_journals"
 )
 
 
@@ -47,7 +47,7 @@ def test_les_noeuds_s_enchainent_dans_l_ordre_du_graphe(contexte):
 
 def test_chaque_noeud_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     fusion = PhaseMetrics()
-    fusion.add(total=2, journals_merged=2)
+    fusion.add(seen=2, journals_merged=2)
     fusion.resume = "2 revues fusionnées"
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, merge_duplicate_journals=fusion)
@@ -64,7 +64,7 @@ def test_chaque_noeud_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
 
 def test_les_compteurs_des_noeuds_remontent_a_la_phase(contexte):
     worked = PhaseMetrics()
-    worked.add(total=3)
+    worked.add(seen=3)
     metrics = _run(contexte, resolve_crossref_publishers=worked)
     assert metrics.total == 3
 

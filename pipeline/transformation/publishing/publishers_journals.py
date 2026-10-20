@@ -41,7 +41,7 @@ from pipeline.transformation.publishing.monographs import (
 )
 from pipeline.transformation.publishing.publishers import resolve_publishers
 
-_GROUP = "publishers_journals"
+_PHASE = "publishers_journals"
 
 
 @dataclass(frozen=True)
@@ -52,9 +52,9 @@ class PublishersJournalsPhase:
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les nœuds de la phase et assemble ses métriques."""
-        by_node = run_nodes(_GROUP, self.steps, ctx)
+        by_node = run_nodes(_PHASE, self.steps, ctx)
         metrics = PhaseMetrics()
-        _assemble(metrics, {name.removeprefix(f"{_GROUP}."): m for name, m in by_node.items()})
+        _assemble(metrics, {name.removeprefix(f"{_PHASE}."): m for name, m in by_node.items()})
         return metrics
 
 
@@ -147,7 +147,7 @@ def build() -> Phase:
 
     return PublishersJournalsPhase(
         {
-            f"{_GROUP}.{name}": step
+            f"{_PHASE}.{name}": step
             for name, step in {
                 "resolve_crossref_publishers": NodeStep(
                     _run_resolve_crossref_publishers,

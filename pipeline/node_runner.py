@@ -29,7 +29,7 @@ class NodeStep:
     run: NodeRun
     # Section et libellé de la ligne de bilan. `None` : le nœud écrit lui-même ses lignes.
     section: str | None = None
-    libelle: str | None = None
+    label: str | None = None
     # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
     threshold: int | None = None
     # Condition d'exécution, évaluée avant l'accès à la source. Un nœud écarté rend des métriques vides et n'écrit rien.
@@ -37,88 +37,90 @@ class NodeStep:
 
 
 def run_nodes(
-    group: str,
+    phase: str,
     steps: Mapping[str, NodeStep],
     ctx: PhaseContext,
     *,
     parallel: RunParallel = run_parallel,
 ) -> dict[str, PhaseMetrics]:
-    """Exécute les nœuds de `group` dans l'ordre du graphe et rend leurs métriques, par nom de nœud.
+    """Exécute les nœuds de `phase` dans l'ordre du graphe et rend leurs métriques, par nom de nœud.
 
-    Les nœuds consécutifs d'un même lot s'exécutent ensemble par `parallel` ; leurs lignes de bilan suivent, dans l'ordre du graphe. Lève `ValueError` si `steps` ne couvre pas exactement les nœuds du groupe.
+    Les nœuds consécutifs d'un même groupe parallèle s'exécutent ensemble par `parallel` ; leurs lignes de bilan suivent, dans l'ordre du graphe. Lève `ValueError` si `steps` ne couvre pas exactement les nœuds de la phase.
     """
-    nodes = [node for node in NODES if node.group == group]
+    nodes = [node for node in NODES if node.phase == phase]
     if set(steps) != {node.name for node in nodes}:
         raise ValueError(
-            f"Les étapes de {group} et ses nœuds divergent : "
+            f"Les étapes de {phase} et ses nœuds divergent : "
             f"{set(steps) ^ {node.name for node in nodes}}"
         )
     results: dict[str, PhaseMetrics] = {node.name: PhaseMetrics() for node in nodes}
-    retenus = [node for node in nodes if _retenu(steps[node.name], ctx)]
-    debut = 0
-    while debut < len(retenus):
-        fin = debut + 1
-        lot = retenus[debut].lot
-        while lot is not None and fin < len(retenus) and retenus[fin].lot == lot:
-            fin += 1
-        precedente = steps[retenus[debut - 1].name].section if debut else None
-        section = steps[retenus[debut].name].section
-        if section is not None and section != precedente:
+    selected = [node for node in nodes if _selected(steps[node.name], ctx)]
+    start = 0
+    while start < len(selected):
+        end = start + 1
+        group = selected[start].parallel_group
+        while group is not None and end < len(selected) and selected[end].parallel_group == group:
+            end += 1
+        previous_section = steps[selected[start - 1].name].section if start else None
+        section = steps[selected[start].name].section
+        if section is not None and section != previous_section:
             etape(ctx.logger, section)
-        tranche = retenus[debut:fin]
-        if len(tranche) == 1:
-            node = tranche[0]
-            results[node.name] = _execute(node, steps[node.name], group, ctx)
+        chunk = selected[start:end]
+        if len(chunk) == 1:
+            node = chunk[0]
+            results[node.name] = _execute(node, steps[node.name], phase, ctx)
         else:
             results.update(
                 parallel(
                     {
-                        node.name: partial(_execute, node, steps[node.name], group, ctx)
-                        for node in tranche
+                        node.name: partial(_execute, node, steps[node.name], phase, ctx)
+                        for node in chunk
                     }
                 )
             )
-        for index in range(debut, fin):
-            node = retenus[index]
-            suivante = steps[retenus[index + 1].name].section if index + 1 < len(retenus) else None
-            _write_lines(node, steps[node.name], results[node.name], suivante, ctx)
-        debut = fin
+        for index in range(start, end):
+            node = selected[index]
+            next_section = (
+                steps[selected[index + 1].name].section if index + 1 < len(selected) else None
+            )
+            _write_lines(node, steps[node.name], results[node.name], next_section, ctx)
+        start = end
     return results
 
 
 def _write_lines(
-    node: Node, step: NodeStep, metrics: PhaseMetrics, suivante: str | None, ctx: PhaseContext
+    node: Node, step: NodeStep, metrics: PhaseMetrics, next_section: str | None, ctx: PhaseContext
 ) -> None:
     """Écrit la ligne de bilan du nœud, lance sa maintenance et écrit une ligne par opération."""
-    lignes = [
-        *([(step.libelle, _bilan(metrics))] if step.libelle is not None else []),
+    lines = [
+        *([(step.label, _bilan(metrics))] if step.label is not None else []),
         *_maintain(node, ctx),
     ]
-    for rang, (libelle, bilan) in enumerate(lignes):
+    for rank, (label, outcome) in enumerate(lines):
         if step.section is None:
-            ctx.logger.info("%s : %s", libelle, bilan, extra={"detail": True})
+            ctx.logger.info("%s : %s", label, outcome, extra={"detail": True})
             continue
-        dernier = step.section != suivante and rang == len(lignes) - 1
-        ctx.logger.info("%s%s : %s", DERNIERE_BRANCHE if dernier else BRANCHE, libelle, bilan)
+        last = step.section != next_section and rank == len(lines) - 1
+        ctx.logger.info("%s%s : %s", DERNIERE_BRANCHE if last else BRANCHE, label, outcome)
 
 
 def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
     """Lance la maintenance du nœud et rend une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
-    lignes = []
+    lines = []
     for operation in node.maintenance:
         if operation.startswith("VACUUM ") and ctx.options.policy.vacuum_full:
             operation = operation.replace("VACUUM", "VACUUM FULL", 1)
         t0 = time.perf_counter()
         ctx.maintain(operation)
-        lignes.append((operation, f"{time.perf_counter() - t0:.1f}s"))
-    return lignes
+        lines.append((operation, f"{time.perf_counter() - t0:.1f}s"))
+    return lines
 
 
-def _retenu(step: NodeStep, ctx: PhaseContext) -> bool:
+def _selected(step: NodeStep, ctx: PhaseContext) -> bool:
     return step.when is None or step.when(ctx)
 
 
-def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> PhaseMetrics:
+def _execute(node: Node, step: NodeStep, phase: str, ctx: PhaseContext) -> PhaseMetrics:
     """Exécute le nœud et range sa durée dans `duration_s`."""
     t0 = time.perf_counter()
     if node.network is None:
@@ -127,7 +129,7 @@ def _execute(node: Node, step: NodeStep, group: str, ctx: PhaseContext) -> Phase
         metrics = access_source(
             node.network,
             lambda breaker: step.run(ctx, breaker),
-            phase=group,
+            phase=phase,
             logger=ctx.logger,
             credentials_missing=ctx.credentials_missing,
             threshold=step.threshold,
@@ -155,6 +157,5 @@ class NodePhase:
     phase: Phase
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        group = self.node.partition(".")[0]
         step = NodeStep(lambda ctx, _breaker: self.phase.run(ctx))
-        return run_nodes(group, {self.node: step}, ctx)[self.node]
+        return run_nodes(self.node.partition(".")[0], {self.node: step}, ctx)[self.node]

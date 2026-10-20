@@ -131,7 +131,7 @@ def _merge_groups(
     regle: str,
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
-    metrics.add(total=len(groups))
+    metrics.add(seen=len(groups))
     with progression(
         len(groups), f"{BRANCHE}{LIBELLE} ({regle})", logger, efface=True
     ) as avancement:
