@@ -5,7 +5,7 @@ Couvre `structures`, `structure_tutelles`, `structure_name_forms`. `delete_struc
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
@@ -73,7 +73,7 @@ def delete_structure(
     *,
     repo: StructureRepository,
     perimeter_repo: PerimeterRepository,
-    perimeter_queries: PerimeterStructuresQueries,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository,
 ) -> None:
     """Supprime une structure (cascade relations + formes de noms), la retire des racines de
@@ -81,7 +81,7 @@ def delete_structure(
     cascade sur ses tutelles en modifient la descente."""
     structures_service.delete_structure(structure_id, repo=repo, audit_repo=audit_repo)
     perimeter_repo.remove_structure_from_all_perimeters(structure_id)
-    perimeter_queries.refresh_perimeter_structures(conn)
+    perimeter_structures.refresh(conn)
     conn.commit()
 
 
@@ -94,7 +94,7 @@ def create_tutelle(
     parent_id: int,
     child_id: int,
     repo: StructureRepository,
-    perimeter_queries: PerimeterStructuresQueries,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository,
 ) -> StructureTutelleRow | None:
     """Crée une tutelle parent-enfant. Retourne la ligne insérée, ou None si
@@ -106,7 +106,7 @@ def create_tutelle(
         repo=repo,
         audit_repo=audit_repo,
     )
-    perimeter_queries.refresh_perimeter_structures(conn)
+    perimeter_structures.refresh(conn)
     conn.commit()
     return row
 
@@ -116,13 +116,13 @@ def delete_tutelle(
     tutelle_id: int,
     *,
     repo: StructureRepository,
-    perimeter_queries: PerimeterStructuresQueries,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository,
 ) -> None:
     """Supprime une tutelle. Rafraîchit la clôture matérialisée des périmètres,
     dont la descente peut changer."""
     structures_service.delete_tutelle(tutelle_id, repo=repo, audit_repo=audit_repo)
-    perimeter_queries.refresh_perimeter_structures(conn)
+    perimeter_structures.refresh(conn)
     conn.commit()
 
 

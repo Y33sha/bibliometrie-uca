@@ -17,6 +17,10 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
+from infrastructure.read_models.perimeters import (
+    get_extraction_structure_ids,
+    get_persons_structure_ids_list,
+)
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -27,10 +31,7 @@ from pipeline.transformation.structures.address_resolution import (
     run_resolution,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
-from pipeline.transformation.structures.perimeter import (
-    EmptyExtractionPerimeterError,
-    PerimeterQueries,
-)
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_authorship_structures,
     sync_perimeter_evidence,
@@ -40,7 +41,6 @@ from pipeline.transformation.structures.perimeter_evidence import (
 @dataclass(frozen=True)
 class AffiliationsPhase:
     address_queries: AddressResolutionQueries
-    perimeter_queries: PerimeterQueries
     refresh_ror: Callable[[PhaseContext], PhaseMetrics]
     refresh_hal_structures: Callable[[PhaseContext, bool], PhaseMetrics]
     resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
@@ -48,7 +48,7 @@ class AffiliationsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Contrôle le périmètre d'extraction, exécute ses tâches et assemble les métriques de la phase."""
         with ctx.open_tx() as conn:
-            if self.perimeter_queries.count_extraction_structures(conn) == 0:
+            if not get_extraction_structure_ids(conn):
                 raise EmptyExtractionPerimeterError()
 
         by_task = run_tasks(
@@ -78,7 +78,7 @@ class AffiliationsPhase:
 
     def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            perimeter_ids = set(self.perimeter_queries.get_persons_structure_ids_list(conn))
+            perimeter_ids = set(get_persons_structure_ids_list(conn))
             stats = run_resolution(conn, self.address_queries, perimeter_ids, ctx.logger)
         metrics = PhaseMetrics()
         metrics.add(seen=stats.processed)
@@ -96,7 +96,7 @@ class AffiliationsPhase:
 
     def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            perimeter_ids = set(self.perimeter_queries.get_persons_structure_ids_list(conn))
+            perimeter_ids = set(get_persons_structure_ids_list(conn))
             populate(conn, ctx.logger, perimeter_ids)
         return PhaseMetrics()
 
@@ -117,14 +117,8 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
 
 
 def build() -> Phase:
-    from pipeline.transformation.structures.address_resolution import (
-        AddressResolutionQueries,
-    )
-    from pipeline.transformation.structures.perimeter import PerimeterQueries
-
     return AffiliationsPhase(
         AddressResolutionQueries(),
-        PerimeterQueries(),
         refresh_ror=_run_refresh_ror,
         refresh_hal_structures=_run_refresh_hal_structures,
         resolve_thesis_partners=resolve_thesis_partners,

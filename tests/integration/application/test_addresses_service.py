@@ -18,7 +18,7 @@ from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories import address_repository, authorship_repository
 from pipeline.transformation.structures.countries.countries_queries import CountryQueries
-from pipeline.transformation.structures.perimeter import PerimeterQueries
+from pipeline.transformation.structures.perimeter import PerimeterStructures
 from tests.integration.helpers.addresses import (
     ensure_country,
     insert_address,
@@ -44,8 +44,8 @@ def repo(sa_sync_conn):
 
 
 @pytest.fixture
-def perimeter_queries():
-    return PerimeterQueries()
+def perimeter_structures():
+    return PerimeterStructures()
 
 
 @pytest.fixture

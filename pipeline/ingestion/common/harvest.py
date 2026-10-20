@@ -28,6 +28,7 @@ from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from infrastructure.read_models.perimeters import get_extraction_structure_ids
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
@@ -181,14 +182,12 @@ def build() -> Phase:
 
 def _extraction_structure_count(ctx: PhaseContext) -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
-    from pipeline.transformation.structures.perimeter import PerimeterQueries
-
     with ctx.open_tx() as conn:
-        return PerimeterQueries().count_extraction_structures(conn)
+        return len(get_extraction_structure_ids(conn))
 
 
 def _harvesters() -> dict[str, HarvesterFactory]:
-    """Constructeur de le moissonneur de chaque source : `(conn, source_log)` → moissonneur câblé.
+    """Constructeur du moissonneur de chaque source : `(conn, source_log)` → moissonneur câblé.
 
     `wos` et `scanr` lisent leurs identifiants d'API en configuration.
 

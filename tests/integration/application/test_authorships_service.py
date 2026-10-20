@@ -19,8 +19,10 @@ from domain.errors import NotFoundError
 from infrastructure.repositories import authorship_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
 from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
-from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
-from pipeline.transformation.structures.perimeter import PerimeterQueries
+from pipeline.transformation.structures.perimeter import PerimeterStructures
+from pipeline.transformation.structures.perimeter_evidence import (
+    SourceContributionPerimeterRecompute,
+)
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.authorships import insert_authorship, insert_confirmed_authorship
 from tests.integration.helpers.config import set_config
@@ -44,13 +46,13 @@ _publication = partial(
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
-_AFFILIATIONS = InPerimeterRecompute()
+_PERIMETER_RECOMPUTE = SourceContributionPerimeterRecompute()
 _BUILD = AuthorshipsBuild()
 
 
 @pytest.fixture
-def perimeter_queries():
-    return PerimeterQueries()
+def perimeter_structures():
+    return PerimeterStructures()
 
 
 @pytest.fixture
@@ -458,18 +460,18 @@ class TestPropagateUcaForAddresses:
         refresh_perimeter_structures(conn)
         return uca_id
 
-    def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_queries):
+    def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_structures):
         self._setup_uca(sa_sync_conn)
         propagate_in_perimeter_for_addresses(
             sa_sync_conn,
             [],
             repo=repo,
-            perimeter_queries=perimeter_queries,
-            affiliations_queries=_AFFILIATIONS,
+            perimeter_structures=perimeter_structures,
+            perimeter_recompute=_PERIMETER_RECOMPUTE,
         )
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
-    def test_noop_if_no_perimeter_configured(self, sa_sync_conn, repo, perimeter_queries):
+    def test_noop_if_no_perimeter_configured(self, sa_sync_conn, repo, perimeter_structures):
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         # Aucun set_config perimeter_persons
@@ -477,11 +479,13 @@ class TestPropagateUcaForAddresses:
             sa_sync_conn,
             [addr_id],
             repo=repo,
-            perimeter_queries=perimeter_queries,
-            affiliations_queries=_AFFILIATIONS,
+            perimeter_structures=perimeter_structures,
+            perimeter_recompute=_PERIMETER_RECOMPUTE,
         )
 
-    def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, repo, perimeter_queries):
+    def test_sets_in_perimeter_when_address_confirmed(
+        self, sa_sync_conn, repo, perimeter_structures
+    ):
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         pub_id = _publication(sa_sync_conn)
@@ -498,8 +502,8 @@ class TestPropagateUcaForAddresses:
             sa_sync_conn,
             [addr_id],
             repo=repo,
-            perimeter_queries=perimeter_queries,
-            affiliations_queries=_AFFILIATIONS,
+            perimeter_structures=perimeter_structures,
+            perimeter_recompute=_PERIMETER_RECOMPUTE,
         )
         refresh_structure_matviews(sa_sync_conn)
 
@@ -533,7 +537,9 @@ class TestPropagateUcaForAddresses:
             {"id": pub_id},
         ).scalar_one() == ["address"]
 
-    def test_unsets_in_perimeter_when_address_rejected(self, sa_sync_conn, repo, perimeter_queries):
+    def test_unsets_in_perimeter_when_address_rejected(
+        self, sa_sync_conn, repo, perimeter_structures
+    ):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -550,8 +556,8 @@ class TestPropagateUcaForAddresses:
             sa_sync_conn,
             [addr_id],
             repo=repo,
-            perimeter_queries=perimeter_queries,
-            affiliations_queries=_AFFILIATIONS,
+            perimeter_structures=perimeter_structures,
+            perimeter_recompute=_PERIMETER_RECOMPUTE,
         )
         refresh_structure_matviews(sa_sync_conn)
 

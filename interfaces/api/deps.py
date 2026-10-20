@@ -14,7 +14,9 @@ from sqlalchemy import Connection
 from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import (
+    PerimeterStructures as PerimeterStructuresPort,
+)
 from application.ports.pipeline.pub_count import PubCountRecompute as PubCountRecomputePort
 from application.ports.pipeline.publication_perimeter import (
     PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
@@ -85,11 +87,11 @@ from interfaces.api.session import read_session
 from pipeline.public import (
     AuthorshipsBuild,
     CountryQueries,
-    InPerimeterRecompute,
     JournalRecompute,
-    PerimeterQueries,
+    PerimeterStructures,
     PubCountRecompute,
     PublicationPerimeterRecompute,
+    SourceContributionPerimeterRecompute,
 )
 
 logger = logging.getLogger(__name__)
@@ -300,12 +302,12 @@ def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 
-# `PerimeterQueries` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_perimeter_queries_singleton: PerimeterStructuresQueries = PerimeterQueries()
+# `PerimeterStructures` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_perimeter_structures_singleton: PerimeterStructuresPort = PerimeterStructures()
 
 
-def get_perimeter_queries() -> PerimeterStructuresQueries:
-    return _perimeter_queries_singleton
+def get_perimeter_structures() -> PerimeterStructuresPort:
+    return _perimeter_structures_singleton
 
 
 # `JournalRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
@@ -390,7 +392,7 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
             conn,
             address_ids,
             repo=authorship_repository(conn),
-            perimeter_queries=get_perimeter_queries(),
-            affiliations_queries=InPerimeterRecompute(),
+            perimeter_structures=get_perimeter_structures(),
+            perimeter_recompute=SourceContributionPerimeterRecompute(),
         ),
     )

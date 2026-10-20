@@ -5,8 +5,10 @@ import datetime
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
-from pipeline.transformation.structures.perimeter_evidence import sync_perimeter_evidence
+from pipeline.transformation.structures.perimeter_evidence import (
+    SourceContributionPerimeterRecompute,
+    sync_perimeter_evidence,
+)
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -112,6 +114,6 @@ def test_identifiant_en_attente_ignore(sa_sync_conn):
 def test_le_recalcul_apres_edition_d_adresse_garde_l_identite(sa_sync_conn, rh_person):
     signature = _signature(sa_sync_conn, pub_year=2021)
 
-    InPerimeterRecompute().recompute_perimeter(sa_sync_conn, [signature], [])
+    SourceContributionPerimeterRecompute().recompute_perimeter(sa_sync_conn, [signature], [])
 
     assert _in_perimeter(sa_sync_conn, signature)

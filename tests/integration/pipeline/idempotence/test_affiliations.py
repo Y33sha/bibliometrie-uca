@@ -271,11 +271,15 @@ class TestEntreeDansLePerimetre:
         assert _keys_dirty(sa_sync_conn, 80002) is False
 
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
-        from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
+        from pipeline.transformation.structures.perimeter_evidence import (
+            SourceContributionPerimeterRecompute,
+        )
 
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)
 
-        InPerimeterRecompute().recompute_perimeter(sa_sync_conn, [80002], [80000, 80001])
+        SourceContributionPerimeterRecompute().recompute_perimeter(
+            sa_sync_conn, [80002], [80000, 80001]
+        )
 
         assert _keys_dirty(sa_sync_conn, 80002) is True

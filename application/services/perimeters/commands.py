@@ -5,7 +5,7 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
@@ -22,7 +22,7 @@ def create_perimeter(
     name: str,
     root_structure_ids: list[int],
     repo: PerimeterRepository,
-    perimeter_queries: PerimeterStructuresQueries,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> int:
     """Crée un périmètre avec ses structures racines. Retourne l'id créé."""
@@ -33,7 +33,7 @@ def create_perimeter(
         repo=repo,
         audit_repo=audit_repo,
     )
-    perimeter_queries.refresh_perimeter_structures(conn)
+    perimeter_structures.refresh(conn)
     conn.commit()
     return pid
 
@@ -44,14 +44,14 @@ def update_perimeter(
     *,
     update: PerimeterUpdate,
     repo: PerimeterRepository,
-    perimeter_queries: PerimeterStructuresQueries,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Met à jour un périmètre à partir des champs explicitement fournis."""
     perimeters_service.update_perimeter(
         perimeter_id, update=update, repo=repo, audit_repo=audit_repo
     )
-    perimeter_queries.refresh_perimeter_structures(conn)
+    perimeter_structures.refresh(conn)
     conn.commit()
 
 

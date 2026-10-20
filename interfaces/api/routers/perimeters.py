@@ -1,12 +1,12 @@
 """Router des ensembles de structures que les phases du pipeline consomment. Sert `/api/perimeters/*`.
 
-Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants dans `structure_tutelles`. Cet ensemble est matérialisé dans `perimeter_structures` par `refresh_perimeter_structures` ; les lectures le restituent sans le recalculer.
+Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants dans `structure_tutelles`. Cet ensemble est matérialisé dans `perimeter_structures` par `PerimeterStructures.refresh` ; les lectures le restituent sans le recalculer.
 """
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import Connection
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.perimeters_queries import PerimeterOut, PerimetersQueries
 from application.ports.repositories.audit_repository import AuditRepository
@@ -19,7 +19,7 @@ from interfaces.api.deps import (
     audit_repo,
     config_queries,
     db_conn,
-    get_perimeter_queries,
+    get_perimeter_structures,
     perimeter_repo,
     perimeters_queries,
 )
@@ -48,7 +48,7 @@ def create_perimeter(
     body: PerimeterCreate,
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
@@ -62,7 +62,7 @@ def create_perimeter(
         root_structure_ids=body.root_structure_ids,
         audit_repo=audit,
         repo=repo,
-        perimeter_queries=perimeter_queries,
+        perimeter_structures=perimeter_structures,
     )
     return CreatedIdResponse(id=pid)
 
@@ -73,7 +73,7 @@ def update_perimeter(
     body: PerimeterUpdate,
     conn: Connection = Depends(db_conn),
     repo: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
@@ -85,7 +85,7 @@ def update_perimeter(
         perimeter_id,
         update=body,
         repo=repo,
-        perimeter_queries=perimeter_queries,
+        perimeter_structures=perimeter_structures,
         audit_repo=audit,
     )
     return OkResponse()

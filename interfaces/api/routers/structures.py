@@ -8,7 +8,7 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.structures_queries import (
     NameFormOut,
     StructureAddressesResponse,
@@ -28,7 +28,7 @@ from domain.structures.structure import StructureType
 from interfaces.api.deps import (
     audit_repo,
     db_conn,
-    get_perimeter_queries,
+    get_perimeter_structures,
     perimeter_repo,
     structure_repo,
     structures_queries,
@@ -101,7 +101,7 @@ def create_tutelle(
     data: TutelleCreate,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureTutelleCreateResponse:
     """Crée une tutelle parent-enfant entre deux structures.
@@ -113,7 +113,7 @@ def create_tutelle(
         parent_id=data.parent_id,
         child_id=data.child_id,
         repo=repo,
-        perimeter_queries=perimeter_queries,
+        perimeter_structures=perimeter_structures,
         audit_repo=audit,
     )
     if row is None:
@@ -126,12 +126,12 @@ def delete_tutelle(
     tutelle_id: int,
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
-    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une tutelle. 404 si l'id n'existe pas."""
     structure_commands.delete_tutelle(
-        conn, tutelle_id, repo=repo, perimeter_queries=perimeter_queries, audit_repo=audit
+        conn, tutelle_id, repo=repo, perimeter_structures=perimeter_structures, audit_repo=audit
     )
     return DeletedResponse()
 
@@ -293,7 +293,7 @@ def delete_structure(
     conn: Connection = Depends(db_conn),
     repo: StructureRepository = Depends(structure_repo),
     perimeters: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_queries: PerimeterStructuresQueries = Depends(get_perimeter_queries),
+    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
@@ -302,7 +302,7 @@ def delete_structure(
         structure_id,
         repo=repo,
         perimeter_repo=perimeters,
-        perimeter_queries=perimeter_queries,
+        perimeter_structures=perimeter_structures,
         audit_repo=audit,
     )
     return DeletedResponse()
