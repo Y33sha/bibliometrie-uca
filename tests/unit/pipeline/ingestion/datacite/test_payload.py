@@ -1,4 +1,4 @@
-"""Tests des extracteurs purs `domain.sources.datacite` et du mapping
+"""Tests des fonctions de lecture pures `domain.sources.datacite` et du mapping
 doc_type DataCite."""
 
 from domain.source_records.doc_types import map_doc_type
@@ -197,7 +197,7 @@ class TestDocTypeToken:
 
 
 class TestContainerNamesAJournal:
-    """Cas réels de notices DataCite."""
+    """Cas réels d'enregistrements sources DataCite."""
 
     def test_publisher_records(self):
         assert container_names_a_journal(
@@ -405,7 +405,7 @@ class TestMeta:
 
 
 class TestEntreesAEcarterAvantLaBonne:
-    """Chaque extracteur passe les entrées inexploitables et lit la suivante.
+    """Chaque fonction de lecture passe les entrées inexploitables et lit la suivante.
 
     Une source place ce qu'elle veut dans ses listes : une entrée d'une autre forme, ou au texte vide, précède parfois celle qui porte la valeur.
     """

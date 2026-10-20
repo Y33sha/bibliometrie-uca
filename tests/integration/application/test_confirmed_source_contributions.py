@@ -76,7 +76,7 @@ def test_detach_unpins(sa_sync_conn):
 
 
 def test_name_form_rejection_spares_pinned_source_contributions(sa_sync_conn):
-    """Rejeter une forme de nom détache les signatures qui la portent, sauf celles que l'admin a épinglées sur la personne."""
+    """Rejeter une forme de nom détache les contributions sources sous cette forme, sauf celles que l'admin a épinglées sur la personne."""
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
     pinned, _ = _orphan_source_contribution(sa_sync_conn)
     matched, _ = _orphan_source_contribution(sa_sync_conn)
@@ -111,7 +111,7 @@ def test_enforce_restores_pinned_source_contribution(sa_sync_conn):
     sa, _publication = _orphan_source_contribution(sa_sync_conn)
     repo = contribution_repository(sa_sync_conn)
     repo.pin_contributions([sa], pid)
-    # Une opération quelconque détache la signature sans retirer l'épinglage.
+    # Une opération quelconque détache la contribution source sans retirer l'épinglage.
     sa_sync_conn.execute(
         text("UPDATE source_contributions SET person_id = NULL WHERE id = :s"), {"s": sa}
     )

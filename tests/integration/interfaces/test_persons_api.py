@@ -153,7 +153,7 @@ class TestPersonList:
         assert r.status_code == 200
 
     def test_public_directory_call(self, client):
-        """L'appel de l'annuaire public : personnes retenues, tri sur les signatures d'auteur."""
+        """L'appel de l'annuaire public : personnes retenues, tri sur les contributions sources d'auteur."""
         r = client.get(
             "/api/persons", params={"exclusion": "none", "sort": "source_contributions_desc"}
         )
@@ -611,7 +611,7 @@ def _audit_personne(event_type: str, aggregate_id: int) -> list[dict]:
 
 
 class TestTracabilite:
-    """Le nom d'une personne et ses identifiants sont ce par quoi les signatures lui reviennent.
+    """Le nom d'une personne et ses identifiants sont ce par quoi les contributions sources lui reviennent.
 
     Les changer déplace des publications d'une personne à une autre, sans que rien dans les données ne dise ensuite qui l'a décidé : le rejet et la réattribution d'un identifiant étaient consignés, l'attribution initiale et le changement de nom non.
     """

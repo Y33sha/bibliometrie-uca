@@ -250,10 +250,10 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 2, "Alice devrait avoir 2 contributions (article + chapitre)"
 
     def test_author_without_idref(self, sa_sync_conn):
-        """Un auteur sans idref : son identité ne porte pas de clé `idref`.
+        """Un auteur sans idref : ses informations du contributeur sont sans clé `idref`.
 
-        Charlie Noid et Diana Durand n'ont pas d'idref ; leur signature pointe
-        vers une identité (`contributor_information`) sans `idref` dans
+        Charlie Noid et Diana Durand n'ont pas d'idref ; leur contribution source pointe
+        vers des informations du contributeur (`contributor_information`) sans `idref` dans
         `identifiers`. La personne sera reconstruite au pipeline
         `personnes` via les name_forms.
         """

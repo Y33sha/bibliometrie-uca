@@ -25,14 +25,14 @@ _IDREF = "109964128"  # IdRef réel (valide au regard du value object)
 
 
 def _seed(conn, *, source_contribution_id, raw_name, name_norm, idref):
-    """Publication + signature in-périmètre non rattachée, portant l'identité
+    """Publication + contribution source in-périmètre non rattachée, avec les informations du contributeur
     `(name_norm, {idref})`. `source_contribution_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
-    insert_publication(conn, f"pub {source_contribution_id}", row_id=source_contribution_id)
+    insert_publication(conn, f"publication {source_contribution_id}", row_id=source_contribution_id)
     insert_source_record(
         conn,
         source_contribution_id,
         source_id=f"hal-{source_contribution_id}",
-        title=f"pub {source_contribution_id}",
+        title=f"publication {source_contribution_id}",
         row_id=source_contribution_id,
         publication_year=2024,
         doc_type="ART",

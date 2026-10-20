@@ -21,7 +21,7 @@ from tests.integration.helpers.subjects import insert_publication_subject, inser
 # Laboratoire « LAB ».
 _lab = partial(insert_structure, code="LAB")
 
-# Notice de titre « T ».
+# Enregistrement source de titre « T ».
 _source_record = partial(insert_source_record, title="T")
 
 
@@ -273,7 +273,7 @@ class TestThesesExport:
 
 
 class TestExcludedPersonLab:
-    """La signature d'une personne exclue ne rattache pas sa publication au laboratoire de cette signature."""
+    """La contribution source d'une personne exclue ne rattache pas sa publication au laboratoire de cette contribution source."""
 
     def test_lab_of_excluded_person_drops_the_publication(self, sa_sync_conn):
         lab_excluded, lab_kept = (

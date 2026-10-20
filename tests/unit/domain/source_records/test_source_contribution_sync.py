@@ -1,4 +1,4 @@
-"""Synchronisation des signatures d'une notice renormalisée (`domain.source_records.source_contribution_sync`)."""
+"""Synchronisation des contributions sources d'un enregistrement source renormalisé (`domain.source_records.source_contribution_sync`)."""
 
 from domain.source_records.source_contribution_sync import (
     IncomingSourceContribution,
@@ -10,7 +10,7 @@ from domain.source_records.source_contribution_sync import (
 
 
 def _plan(stored, incoming) -> SourceContributionSyncPlan:
-    """`incoming` : (position, identité, empreinte) ; la clé entrante vaut la position."""
+    """`incoming` : (position, informations du contributeur, empreinte) ; la clé entrante vaut la position."""
     return plan_source_contribution_sync(
         [StoredSourceContribution(*s) for s in stored],
         [IncomingSourceContribution(i[0], *i) for i in incoming],
@@ -27,7 +27,7 @@ class TestPlanSourceContributionSync:
         )
 
     def test_auteur_ajoute_en_tete_decale_les_autres(self):
-        """Identité unique : la signature garde son identifiant malgré le changement de position."""
+        """Informations du contributeur uniques : la contribution source garde son identifiant malgré le changement de position."""
         plan = _plan(
             [(10, 0, "dupont", "h1"), (11, 1, "xu", "h2")],
             [(0, "martin", "h0"), (1, "dupont", "h1-bis"), (2, "xu", "h2-bis")],
@@ -67,14 +67,14 @@ class TestPlanSourceContributionSync:
         )
 
     def test_identite_differente_ne_rapproche_rien(self):
-        """Le nom normalisé fait partie de l'identité : un nom corrigé donne une signature nouvelle."""
+        """Le nom normalisé fait partie des informations du contributeur : un nom corrigé donne une contribution source nouvelle."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0,), deletes=(10,), regroup=True
         )
 
     def test_contribution_source_sans_position_rapprochee_par_identifiant(self):
-        """Un directeur de thèse n'a pas de position d'auteur : son identité suffit."""
+        """Un directeur de thèse est sans position d'auteur : ses informations du contributeur suffisent."""
         plan = plan_source_contribution_sync(
             [
                 StoredSourceContribution(10, 0, "doctorant", "h0"),
@@ -105,7 +105,7 @@ class TestPlanSourceContributionSync:
         )
 
     def test_adresse_modifiee_reecrit_sans_regrouper(self):
-        """Seule l'empreinte change, par exemple une adresse : la signature est réécrite, son groupe reste valable."""
+        """Seule l'empreinte change, par exemple une adresse : la contribution source est réécrite, son groupe reste valable."""
         plan = _plan([(10, 0, "dupont", "h1")], [(0, "dupont", "h1-adresse")])
         assert plan.updates == ((10, 0),)
         assert not plan.regroup
@@ -125,7 +125,7 @@ class TestPlanSourceContributionSync:
         assert plan.regroup
 
     def test_empreinte_absente_en_base(self):
-        """Une signature écrite avant l'empreinte est réécrite à sa première synchronisation."""
+        """Une contribution source écrite avant l'empreinte est réécrite à sa première synchronisation."""
         plan = _plan([(10, 0, "dupont", None)], [(0, "dupont", "h1")])
         assert plan.updates == ((10, 0),)
 

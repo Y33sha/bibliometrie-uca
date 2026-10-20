@@ -1,4 +1,4 @@
-"""Oneshot `mark_collective_source_contributions` : signatures collectives d'après leur nom, décomptes et regroupement."""
+"""Oneshot `mark_collective_source_contributions` : contributions sources collectives d'après leur nom, décomptes et regroupement."""
 
 from sqlalchemy import text
 

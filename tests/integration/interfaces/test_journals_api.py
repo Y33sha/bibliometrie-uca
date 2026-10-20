@@ -35,7 +35,7 @@ from tests.integration.helpers.seeds import (
 # Publication sans titre normalisé.
 _publication = partial(seed_publication, normalize_title=False)
 
-# Notice de titre « Doc », sans année.
+# Enregistrement source de titre « Doc », sans année.
 _seed_record = partial(seed_source_record, title="Doc", publication_year=None)
 
 

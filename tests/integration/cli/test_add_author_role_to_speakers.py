@@ -1,4 +1,4 @@
-"""Oneshot `add_author_role_to_speakers` : le rôle `author` complète les signatures `speaker`."""
+"""Oneshot `add_author_role_to_speakers` : le rôle `author` complète les contributions sources `speaker`."""
 
 from sqlalchemy import text
 

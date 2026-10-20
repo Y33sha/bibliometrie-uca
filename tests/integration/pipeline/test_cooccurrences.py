@@ -68,7 +68,7 @@ class TestRefreshCooccurrences:
 
     def test_self_pairs_excluded(self, sa_sync_conn):
         # Un sujet ne co-occurre pas avec lui-même même s'il apparaît dans
-        # 2+ publications (deux pubs nécessaires pour que le seuil count >= 2
+        # 2+ publications (deux publications nécessaires pour que le seuil count >= 2
         # ne masque pas l'effet du filtre `subject_id < subject_id`).
         s = insert_subject(sa_sync_conn, "solo")
         p1 = insert_publication(sa_sync_conn, "p1")

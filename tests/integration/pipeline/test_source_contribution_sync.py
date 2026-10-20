@@ -1,4 +1,4 @@
-"""Synchronisation des signatures d'une notice renormalisée (`sync_source_contributions`, `write_source_contributions`)."""
+"""Synchronisation des contributions sources d'un enregistrement source renormalisé (`sync_source_contributions`, `write_source_contributions`)."""
 
 from functools import partial
 
@@ -22,7 +22,7 @@ from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record
 
-# Notice Crossref « 10.9999/sync », de titre « t ».
+# Enregistrement source Crossref « 10.9999/sync », de titre « t ».
 _source_record = partial(
     insert_source_record, source="crossref", source_id="10.9999/sync", title="t"
 )
@@ -39,7 +39,7 @@ def _write(conn, source_record: int, records: list[AuthorRecord]) -> None:
 
 
 def _source_contributions(conn, source_record: int) -> dict[int, tuple[int, str]]:
-    """Position → (identifiant, nom brut) des signatures de la notice."""
+    """Position → (identifiant, nom brut) des contributions sources de l'enregistrement source."""
     rows = conn.execute(
         text(
             "SELECT author_position, id, raw_author_name FROM source_contributions "
@@ -111,7 +111,7 @@ def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
 
 
 def test_permutation_de_positions(sa_sync_conn):
-    """Deux signatures échangent leur position en une instruction (contrainte différable)."""
+    """Deux contributions sources échangent leur position en une instruction (contrainte différable)."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     _write(conn, source_record, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
@@ -242,7 +242,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
 
 
 def test_decomptes_des_auteurs_de_l_enregistrement_source(sa_sync_conn):
-    """Seules les signatures au rôle author, non collectives, comptent ; un nom répété compte une fois parmi les noms distincts."""
+    """Seules les contributions sources au rôle author, non collectives, comptent ; un nom répété compte une fois parmi les noms distincts."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     author = ["author"]
@@ -361,7 +361,7 @@ def test_structures_hal_ecrites_a_l_insertion_et_reecrites_si_modifiees(sa_sync_
 
 
 def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
-    """Un ROR d'affiliation pointe sur son adresse ; un ROR sans texte d'affiliation sur la seule signature."""
+    """Un ROR d'affiliation pointe sur son adresse ; un ROR sans texte d'affiliation sur la seule contribution source."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     univ, labo = RorId("01a8ajp46"), RorId("03vgfxd91")
@@ -393,7 +393,7 @@ def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
 
 
 def test_contribution_source_inchangee_laissee_en_l_etat(sa_sync_conn):
-    """Une signature inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
+    """Une contribution source inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     records = [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
@@ -469,7 +469,7 @@ def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
 
 
 def test_contribution_source_sans_position_garde_sa_confirmation(sa_sync_conn):
-    """Thèse renormalisée avec un rapporteur de plus : le directeur, sans position d'auteur, garde son identifiant et sa confirmation ; les signatures insérées reçoivent leurs adresses."""
+    """Thèse renormalisée avec un rapporteur de plus : le directeur, sans position d'auteur, garde son identifiant et sa confirmation ; les contributions sources insérées reçoivent leurs adresses."""
     conn = sa_sync_conn
     source_record = insert_source_record(conn, source="theses", source_id="s123", title="t")
     lab = [AddressRecord(text="LIMOS")]

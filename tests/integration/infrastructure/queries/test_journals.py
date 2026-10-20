@@ -52,7 +52,7 @@ from tests.integration.helpers.sources import insert_source_record
 # Revue « J » par défaut.
 _journal = partial(insert_journal_with_issns, title="J")
 
-# Notice de titre « Article ».
+# Enregistrement source de titre « Article ».
 _article = partial(insert_source_record, title="Article")
 
 

@@ -156,7 +156,7 @@ class TestGetAddressPublications:
         assert r.status_code == 404
 
     def test_200_when_address_exists(self, client):
-        addr = seed_address("Addr pubs test")
+        addr = seed_address("Addr publications test")
         r = client.get(f"/api/addresses/{addr}/publications")
         assert r.status_code == 200
         assert r.json()["address_id"] == addr

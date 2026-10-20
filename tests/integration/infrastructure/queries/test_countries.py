@@ -326,7 +326,7 @@ class TestDirtyDrivenSourceCountries:
     def test_le_pays_d_une_contribution_source_sans_adresse_vient_de_sa_structure_hal(
         self, sa_sync_conn
     ):
-        """Régression : une signature HAL sans adresse donnait une notice sans pays."""
+        """Régression : une contribution source HAL sans adresse donnait un enregistrement source sans pays."""
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(
             sa_sync_conn, publication, source="hal", source_id="hal-s"

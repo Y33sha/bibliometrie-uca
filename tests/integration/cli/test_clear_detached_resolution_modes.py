@@ -1,4 +1,4 @@
-"""Oneshot `clear_detached_resolution_modes` : mode de résolution des signatures sans personne."""
+"""Oneshot `clear_detached_resolution_modes` : mode de résolution des contributions sources sans personne."""
 
 from sqlalchemy import text
 

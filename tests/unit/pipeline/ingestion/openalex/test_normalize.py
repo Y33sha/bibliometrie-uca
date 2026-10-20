@@ -494,7 +494,7 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records({"authorships": []}) == []
 
     def test_shared_orcid_kept_on_each_record(self):
-        """L'extracteur rend l'ORCID de chaque signature tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
+        """La lecture rend l'ORCID de chaque contribution source tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
         work = {
             "authorships": [
                 {
@@ -540,7 +540,7 @@ class TestBuildOpenalexAuthorRecords:
         assert [a.text for a in rec.addresses] == ["Univ Clermont"]
 
     def test_no_addr_without_affiliation_string(self):
-        """Sans texte d'affiliation, la signature n'a pas d'adresse, même avec des institutions."""
+        """Sans texte d'affiliation, la contribution source n'a pas d'adresse, même avec des institutions."""
         work = {
             "authorships": [
                 {
@@ -729,7 +729,7 @@ def _make_normalizer():
 
 class TestOpenalexNormalizerClass:
     def test_metadonnees_minimales_d_un_work_sans_annee(self):
-        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; la notice ne passe pas le filtre de la boucle."""
+        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; l'enregistrement source ne passe pas le filtre de la boucle."""
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
         assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
 

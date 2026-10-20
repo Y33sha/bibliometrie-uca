@@ -18,12 +18,12 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 # Personne « Dupont Jean » par défaut, normalisée par `lower`.
 _person = partial(insert_person, last_name="Dupont", first_name="Jean", normalizer="lower")
 
-# Signature de forme « jean dupont » par défaut.
+# Contribution source de forme « jean dupont » par défaut.
 _jean_dupont_source_contribution = partial(
     insert_source_contribution, author_name_normalized="jean dupont"
 )
 
-# Notice de titre « Test », d'identifiant « hal-1 » par défaut.
+# Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 

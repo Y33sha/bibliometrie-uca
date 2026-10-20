@@ -61,7 +61,7 @@ _journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
 # Date de vérification Sudoc des tests.
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
-# Notice OpenAlex de 2024, de titre « T ».
+# Enregistrement source OpenAlex de 2024, de titre « T ».
 _openalex_source_record = partial(
     insert_source_record, source="openalex", title="T", publication_year=2024
 )
@@ -259,7 +259,7 @@ class TestUpdateJournal:
         )
 
     def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(self, sa_sync_conn, repo, gateway):
-        """Des ISSN saisis à la main sortent de la vérification Sudoc et des ajouts par les notices ; un titre saisi reste."""
+        """Des ISSN saisis à la main sortent de la vérification Sudoc et des ajouts par les notices Sudoc ; un titre saisi reste."""
         j = _journal(sa_sync_conn, title="Old", issn="0028-0836")
         update_journal(
             j,
@@ -897,12 +897,12 @@ class TestMergeJournals:
         assert row.doc_type == "media"
 
 
-# ── requalify_publications_for_journal (persistance SP + auto-cicatrisation) ──
+# ── requalify_publications_for_journal (persistance enregistrement source + auto-cicatrisation) ──
 
 
 class TestRequalifyPublicationsForJournal:
     def _seed(self, conn):
-        """Journal 'journal' + une publication 'article' attestée par une SP 'article'."""
+        """Journal 'journal' + une publication 'article' attestée par un enregistrement source 'article'."""
         journal = _journal(conn, title="Revue X")
         conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
@@ -937,7 +937,7 @@ class TestRequalifyPublicationsForJournal:
             "SELECT doc_type, raw_metadata FROM source_records WHERE id = :id",
             id=source_record,
         )
-        # La colonne SP est persistée (ce que lira le matcher), avec le brut réversible.
+        # La colonne enregistrement source est persistée (ce que lira le matcher), avec le brut réversible.
         assert source_record_row.doc_type == "media"
         assert source_record_row.raw_metadata == {
             "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}

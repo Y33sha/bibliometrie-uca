@@ -345,7 +345,7 @@ class TestFirstDocTypeArbitration:
         assert arbitrate(sources) == "article"
 
     def test_hal_data_paper_first_source_alone_reads_article(self):
-        """Sans notice Crossref, HAL passe en tête : son `data_paper` non corroboré se lit encore `article`."""
+        """Sans enregistrement source Crossref, HAL passe en tête : son `data_paper` non corroboré se lit encore `article`."""
         arbitrate = self._arbitrate()
         assert arbitrate([self._src("hal", "data_paper"), self._src("openalex", "article")]) == (
             "article"

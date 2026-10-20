@@ -15,7 +15,7 @@ _OWNER, _CANDIDATE = 1, 2
 
 
 def _transferred(monkeypatch, consensus: str | None) -> int:
-    """Nombre de transferts pour un conflit : ORCID attribué en `pending` à Dupont, porté par une signature d'Aubert."""
+    """Nombre de transferts pour un conflit : ORCID attribué en `pending` à Dupont, présent sur une contribution source d'Aubert."""
     queries = MagicMock()
     queries.fetch_person_name_forms.return_value = {
         _OWNER: PersonNameForms("dupont", "jean", []),

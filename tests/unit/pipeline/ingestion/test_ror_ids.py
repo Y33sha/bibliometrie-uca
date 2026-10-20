@@ -1,4 +1,4 @@
-"""ROR attribués par chaque normaliseur : sur l'adresse de leur affiliation, ou sur la seule signature pour une affiliation sans adresse."""
+"""ROR attribués par chaque normaliseur : sur l'adresse de leur affiliation, ou sur la seule contribution source pour une affiliation sans adresse."""
 
 import logging
 
@@ -15,7 +15,7 @@ UNIV, LABO = RorId("01a8ajp46"), RorId("03vgfxd91")
 
 
 def _placement(record: AuthorRecord) -> dict[str | None, set[RorId]]:
-    """ROR par texte d'adresse ; la clé `None` porte ceux de la seule signature."""
+    """ROR par texte d'adresse ; la clé `None` regroupe ceux de la seule contribution source."""
     placement: dict[str | None, set[RorId]] = {a.text: set(a.ror_ids) for a in record.addresses}
     placement[None] = set(record.ror_ids)
     return placement
@@ -128,7 +128,7 @@ def test_scanr_structures_hal_des_affiliations_feuilles():
 
 
 def test_scanr_fiche_de_structure_hal_sans_adresse():
-    """Le nom d'une affiliation à `structId` est celui d'une fiche HAL : son ROR va sur la signature."""
+    """Le nom d'une affiliation à `structId` est celui d'une fiche HAL : son ROR va sur la contribution source."""
     doc = {
         "authors": [
             {

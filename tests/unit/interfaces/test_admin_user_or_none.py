@@ -29,6 +29,6 @@ class TestAdminUserOrNone:
         assert deps.admin_user_or_none(_request()) is None
 
     def test_rend_none_sur_un_jeton_invalide(self, monkeypatch):
-        """Un cookie présent dont la signature ne tient pas vaut un cookie absent."""
+        """Un cookie présent dont la contribution source ne tient pas vaut un cookie absent."""
         self._lecture_simulee(monkeypatch)
         assert deps.admin_user_or_none(_request("jeton-forge")) is None

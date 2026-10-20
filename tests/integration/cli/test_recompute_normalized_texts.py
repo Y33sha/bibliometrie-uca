@@ -1,4 +1,4 @@
-"""Rattachement des signatures à l'identité de leur nom recalculé."""
+"""Rattachement des contributions sources aux informations du contributeur de leur nom recalculé."""
 
 from sqlalchemy import text
 

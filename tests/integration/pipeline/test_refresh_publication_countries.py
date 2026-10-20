@@ -23,7 +23,7 @@ from tests.integration.helpers.sources import (
     insert_source_record,
 )
 
-# Notice de 2024, de titre « Test sp », OpenAlex par défaut.
+# Enregistrement source de 2024, de titre « Test sp », OpenAlex par défaut.
 _source_record = partial(
     insert_source_record, source="openalex", title="Test sp", publication_year=2024
 )
@@ -80,7 +80,7 @@ class TestCascade:
         assert _get_publication_countries(sa_sync_conn, publication) == ["fr"]
 
     def test_multi_country_union_propagates(self, sa_sync_conn, log):
-        # Deux adresses sur le même sa : union des pays remontée jusqu'à pub.
+        # Deux adresses sur le même sa : union des pays remontée jusqu'à publication.
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         sa = _insert_source_contribution(sa_sync_conn, source_record)

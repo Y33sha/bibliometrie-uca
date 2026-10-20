@@ -56,7 +56,7 @@ def _route(http_mock, doi: str, *, status: str | None = None, http_status: int =
 def _publication(
     publication_id: int, doi: str, current: str | None, *signals: tuple[str, str | None]
 ):
-    """Publication d'un DOI, de statut `current`, dont les notices donnent `signals` (par défaut, une notice OpenAlex au statut `current`)."""
+    """Publication d'un DOI, de statut `current`, dont les enregistrements sources donnent `signals` (par défaut, un enregistrement source OpenAlex au statut `current`)."""
     return PublicationOaInputs(
         publication_id,
         doi,
@@ -202,7 +202,7 @@ def test_unavailable_leaves_doi_unchecked(logger, http_mock):
 
 
 def test_le_statut_suit_les_enregistrements_sources_de_la_publication(logger, http_mock):
-    """Le dépôt HAL d'une notice tient face au closed d'Unpaywall (`publication_oa_status`)."""
+    """Le dépôt HAL d'un enregistrement source tient face au closed d'Unpaywall (`publication_oa_status`)."""
     publications = [
         _publication(1, "10.1/deposit", "green", ("hal", "green"), ("openalex", "closed"))
     ]

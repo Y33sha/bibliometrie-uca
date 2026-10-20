@@ -29,10 +29,10 @@ def setup_persons_test_data(conn):
         )
 
     # HAL contributions — les identifiants observés (orcid + hal_person_id) vivent
-    # sur l'identité. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
-    # sur les 2 pubs et partage donc une seule identité. Frank Moreau
-    # (hal_person_id=900002) sur la pub 90001. Grace Petit (sans identifiant) sur
-    # la pub 90002.
+    # sur les informations du contributeur. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
+    # sur les 2 publications et partage donc les mêmes informations du contributeur. Frank Moreau
+    # (hal_person_id=900002) sur la publication 90001. Grace Petit (sans identifiant) sur
+    # la publication 90002.
     eve = ("Eve Leroy", "eve leroy", {"orcid": "0000-0001-9999-0001", "hal_person_id": 900001})
     frank = ("Frank Moreau", "frank moreau", {"hal_person_id": 900002})
     grace = ("Grace Petit", "grace petit", None)

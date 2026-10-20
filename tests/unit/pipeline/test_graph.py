@@ -81,13 +81,13 @@ def test_la_fusion_des_revues_suit_le_typage_openalex():
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():
-    """Supprimer une notice emporte ses signatures, et donc des identités d'auteur deviennent orphelines."""
+    """Supprimer un enregistrement source emporte ses contributions sources, et donc des informations du contributeur deviennent orphelines."""
     deps = dependencies(TASKS)["normalize.cleanup_orphan_contributor_information"]
     assert "normalize.prune_disappeared" in deps
 
 
 def test_le_nettoyage_des_adresses_suit_la_normalisation_et_la_suppression_des_enregistrements_sources_disparus():
-    """Réécrire ou supprimer des signatures rend des adresses orphelines."""
+    """Réécrire ou supprimer des contributions sources rend des adresses orphelines."""
     deps = dependencies(TASKS)["normalize.cleanup_orphan_addresses"]
     assert {"normalize.hal", "normalize.prune_disappeared"} <= deps
 

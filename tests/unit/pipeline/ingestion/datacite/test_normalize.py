@@ -99,7 +99,7 @@ class TestAuthorRecords:
         assert build_datacite_author_records(attrs)[0].identifiers is None
 
     def test_shared_orcid_kept_on_each_record(self):
-        """L'extracteur rend l'ORCID de chaque creator tel que la source le donne ; le writer neutralise ceux que partagent plusieurs signatures."""
+        """La lecture rend l'ORCID de chaque creator tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
         attrs = {
             "creators": [
                 {
@@ -279,7 +279,7 @@ class TestChampsIgnores:
 
 class TestProcessContributions:
     def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
-        """Les creators deviennent les signatures du document versé."""
+        """Les creators deviennent les contributions sources du document versé."""
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_datacite,

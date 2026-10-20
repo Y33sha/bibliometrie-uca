@@ -23,8 +23,8 @@ def _publication(**overrides: object) -> Publication:
 
 
 def test_journal_type_media_decoupling_is_repaired():
-    # doc_type arbitré = preprint (d'une SP sans journal), journal_id arbitré = un journal média
-    # (d'une autre SP) : la re-correction applique JOURNAL_TYPE_MEDIA_TO_MEDIA au journal résolu.
+    # doc_type arbitré = preprint (d'un enregistrement source sans journal), journal_id arbitré = un journal média
+    # (d'une autre enregistrement source) : la re-correction applique JOURNAL_TYPE_MEDIA_TO_MEDIA au journal résolu.
     publication = _publication(doc_type="preprint", journal_id=7)
     _apply_canonical_doc_type_correction(publication, journal_type="media")
     assert publication.doc_type == "media"

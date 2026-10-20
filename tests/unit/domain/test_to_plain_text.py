@@ -61,7 +61,7 @@ class TestEntites:
         assert to_plain_text("a &amp; b") == "a & b"
 
     def test_decode_les_entites_reechappees(self):
-        # Relevé en base : des signatures arrivent doublement échappées (`&amp;amp;`), qu'une
+        # Relevé en base : des contributions sources arrivent doublement échappées (`&amp;amp;`), qu'une
         # passe unique laisserait à moitié décodées.
         assert to_plain_text("OVPF, OVSG &amp;amp; OVSM Teams") == "OVPF, OVSG & OVSM Teams"
         assert to_plain_text("a &amp;amp;amp; b") == "a & b"

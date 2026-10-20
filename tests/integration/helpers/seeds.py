@@ -247,7 +247,7 @@ def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str])
 
 
 def seed_rejected_contribution(publication_id: int, *, person_id: int) -> None:
-    """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par notice de la publication. Une publication sans notice en reçoit une."""
+    """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit une."""
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_records (source, source_id, title, publication_id) "
@@ -356,7 +356,7 @@ def seed_source_record(
     doi: str | None = None,
     raw_metadata: dict[str, object] | None = None,
 ) -> int:
-    """Notice d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma."""
+    """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma."""
     values = {
         "source": source,
         "source_id": source_id or uniq("sid"),
@@ -385,7 +385,7 @@ def seed_source_contribution(
     raw_author_name: str = "Test Author",
     author_position: int = 0,
 ) -> int:
-    """Signature de nom brut `raw_author_name`, sur une notice semée au besoin."""
+    """Contribution source de nom brut `raw_author_name`, sur un enregistrement source semé au besoin."""
     source_record = source_record_id or seed_source_record(source=source)
     with owner_pool() as cur:
         iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower())

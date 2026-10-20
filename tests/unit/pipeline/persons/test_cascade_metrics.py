@@ -1,6 +1,6 @@
 """Métriques de corroboration de la phase personnes.
 
-Une même signature revient sur chaque publication d'une collaboration : le nombre d'occurrences d'un refus dit sa fréquence, le nombre d'identifiants distincts en dit l'ampleur. Les deux sont rendus, le détail de chaque cas se relisant en base.
+Une même contribution source revient sur chaque publication d'une collaboration : le nombre d'occurrences d'un refus dit sa fréquence, le nombre d'identifiants distincts en dit l'ampleur. Les deux sont rendus, le détail de chaque cas se relisant en base.
 """
 
 import logging

@@ -306,7 +306,7 @@ class TestProcessWorkMinimalMetadata:
         staging.discard_source_record.assert_not_called()
 
     def test_enregistrement_source_sans_annee_ecarte_et_supprime(self):
-        """Régression : une notice qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement qu'elle avait produit disparaît."""
+        """Régression : un enregistrement qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement source qu'il avait produit disparaît."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
@@ -316,7 +316,7 @@ class TestProcessWorkMinimalMetadata:
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
-        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'une notice incomplète."""
+        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplète."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]

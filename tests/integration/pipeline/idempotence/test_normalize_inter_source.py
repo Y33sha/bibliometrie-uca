@@ -144,9 +144,9 @@ class TestNormalizeInterSourceIdempotence:
         ).scalar_one()
         assert cnt == 1, "L'article partagé ne doit exister qu'une fois"
 
-        # Le rapport HAL sans DOI + l'article OA-only = 2 pubs de plus
+        # Le rapport HAL sans DOI + l'article OA-only = 2 publications de plus
         assert publications_after_oa == publications_after_hal + 1, (
-            f"OA devrait ajouter 1 pub (OA-only), pas plus. "
+            f"OA devrait ajouter 1 publication (OA-only), pas plus. "
             f"HAL={publications_after_hal}, après OA={publications_after_oa}"
         )
 

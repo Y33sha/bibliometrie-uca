@@ -21,7 +21,7 @@ from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
-# Notice OpenAlex de 2024, de titre « T », article par défaut.
+# Enregistrement source OpenAlex de 2024, de titre « T », article par défaut.
 _source_record = partial(
     insert_source_record, source="openalex", title="T", publication_year=2024, doc_type="article"
 )
@@ -58,9 +58,9 @@ def _source_record_state(conn, source_record_id) -> tuple:
 
 class TestUniverse:
     def test_fetches_dirty_and_one_hop_neighbor(self, sa_sync_conn):
-        """Le voisinage = SP dirty + SP non-dirty partageant une clé ; ignore les non-liées.
+        """Le voisinage = enregistrement source dirty + enregistrement source non-dirty partageant une clé ; ignore les non-liées.
 
-        DOI porté par les SP, pas par les publications (`UNIQUE(lower(doi))` interdit deux pubs
+        DOI présent sur les enregistrements sources, pas sur les publications (`UNIQUE(lower(doi))` interdit deux publications
         au même DOI) ; le voisinage par DOI joint sur `source_records.doi`."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
@@ -92,7 +92,7 @@ class TestUniverse:
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
-        """La clé HAL d'une notice est le premier identifiant qu'elle liste : les suivants ne relient rien."""
+        """La clé HAL d'un enregistrement source est le premier identifiant qu'il liste : les suivants ne relient rien."""
         conn = sa_sync_conn
         dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
         _source_record(
@@ -101,7 +101,7 @@ class TestUniverse:
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
-        """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
+        """Voisinage par token bloc métadonnée : deux enregistrements sources de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -123,7 +123,7 @@ class TestUniverse:
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
-        """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
+        """Un enregistrement source orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
         orphan = _source_record(conn, source_id="orphan", doi="10.1/x")
@@ -132,8 +132,8 @@ class TestUniverse:
 
 class TestEndToEnd:
     def test_two_publications_sharing_doi_merged(self, sa_sync_conn):
-        """Deux pubs dont les SP partagent un DOI → fusion. Les pubs n'ont pas (encore) le DOI en
-        colonne (`UNIQUE(lower(doi))` interdit deux pubs au même DOI) : aucune ne le porte, donc
+        """Deux publications dont les enregistrements sources partagent un DOI → fusion. Les publications n'ont pas (encore) le DOI en
+        colonne (`UNIQUE(lower(doi))` interdit deux publications au même DOI) : aucune ne l'a, donc
         l'ancre tombe sur le `min(source_record_id)`."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
@@ -143,7 +143,7 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_record_id.
+        # Aucune publication n'a le DOI en colonne → ancre = publication du plus petit source_record_id.
         anchor, absorbed = (
             (publication_a, publication_b)
             if source_record_a < source_record_b
@@ -158,7 +158,7 @@ class TestEndToEnd:
     def test_publication_keeping_sources_outside_neighborhood_survives_without_redirect(
         self, sa_sync_conn
     ):
-        """La SP voisine rejoint l'ancre ; sa publication garde une autre SP, hors du voisinage. Elle survit, sans redirection."""
+        """L'enregistrement source voisin rejoint l'ancre ; sa publication garde un autre enregistrement source, hors du voisinage. Elle survit, sans redirection."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -179,7 +179,7 @@ class TestEndToEnd:
         assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
 
     def test_les_publications_touchees_regroupent_leurs_contributions_sources(self, sa_sync_conn):
-        """La publication qui reçoit une notice et celle qui en perd une sont à regrouper. Une publication dont la notice réexaminée reste en place ne l'est pas."""
+        """La publication qui reçoit un enregistrement source et celle qui en perd un sont à regrouper. Une publication dont l'enregistrement source réexaminé reste en place ne l'est pas."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -234,8 +234,8 @@ class TestEndToEnd:
         assert "nouveaux ou mis à jour" not in caplog.text
 
     def test_publication_with_two_dois_splits(self, sa_sync_conn):
-        """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
-        Y part sur un nouveau pub."""
+        """Une publication qui a doi=X héberge un enregistrement source doi=Y (reliées par hal_id) → X garde la publication,
+        Y part sur une nouvelle publication."""
         conn = sa_sync_conn
         publication = _seed_publication(conn, doi="10.1/x")
         source_record_x = _source_record(
@@ -247,7 +247,7 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
+        # X garde la publication d'origine ; Y est parti sur un autre publication (créé).
         assert _source_record_state(conn, source_record_x) == (publication, False)
         y_publication, y_dirty = _source_record_state(conn, source_record_y)
         assert y_publication != publication
@@ -288,7 +288,7 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_b) == (anchor, False)
 
     def test_distinct_dois_not_merged(self, sa_sync_conn):
-        """Deux pubs à DOI distincts partageant un hal_id : pas de fusion (cannot-link DOI)."""
+        """Deux publications à DOI distincts partageant un hal_id : pas de fusion (cannot-link DOI)."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn, doi="10.1/x")
         publication_b = _seed_publication(conn, doi="10.2/y")
@@ -303,7 +303,7 @@ class TestEndToEnd:
 
         assert _publication_exists(conn, publication_a)
         assert _publication_exists(conn, publication_b)
-        # Drapeaux nettoyés malgré l'absence de fusion (les SP ont été réconciliées).
+        # Drapeaux nettoyés malgré l'absence de fusion (les enregistrements sources ont été réconciliées).
         assert _source_record_state(conn, source_record_a)[1] is False
         assert _source_record_state(conn, source_record_b)[1] is False
 
@@ -422,11 +422,11 @@ class TestMarkKeysDirty:
 
 class TestUniverseMatchesPythonTokens:
     """Différentiel anti-divergence : le voisinage SQL (branches d'univers) relie exactement les
-    SP que les tokens Python (`project_confirmation_keys`) relient. Les deux encodages du même
+    enregistrement source que les tokens Python (`project_confirmation_keys`) relient. Les deux encodages du même
     critère d'égalité doivent s'accorder — surtout la garde de longueur `metadata_block`.
 
-    Pour chaque SP, on la marque seule dirty et on compare son voisinage 1-hop SQL à l'ensemble
-    des SP dont les tokens Python intersectent les siens.
+    Pour chaque enregistrement source, on le marque seul dirty et on compare son voisinage 1-hop SQL à l'ensemble
+    des enregistrements sources dont les tokens Python intersectent les siens.
     """
 
     def test_sql_universe_matches_python_token_linkage(self, sa_sync_conn):
@@ -521,22 +521,24 @@ class TestUniverseMatchesPythonTokens:
             sql_neighbors = {r.id for r in fetch_reconciliation_universe(conn)} & seeded - {i}
             py_neighbors = {j for j in ids if j != i and toks[i] & toks[j]}
             assert sql_neighbors == py_neighbors, (
-                f"divergence SP {i} : SQL={sql_neighbors} Python={py_neighbors}"
+                f"divergence enregistrement source {i} : SQL={sql_neighbors} Python={py_neighbors}"
             )
 
 
 class TestExternalDoiCarrier:
-    """Régression : une publication orpheline (sans SP) portant un DOI — état typique après un
-    TRUNCATE + réimport des sources — ne doit pas faire planter la réconciliation. Les SP fraîches
-    portant ce DOI s'y rattachent au lieu de créer une pub neuve (qui violerait l'unicité du DOI)."""
+    """Régression : une publication orpheline (sans enregistrement source) qui a un DOI — état typique après un
+    TRUNCATE + réimport des sources — ne doit pas faire planter la réconciliation. Les enregistrements sources fraîches
+    qui ont ce DOI s'y rattachent au lieu de créer une publication neuve (qui violerait l'unicité du DOI)."""
 
     def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
         conn = sa_sync_conn
-        orphan_publication = _seed_publication(conn, doi="10.70675/abc")  # porte le DOI, aucune SP
+        orphan_publication = _seed_publication(
+            conn, doi="10.70675/abc"
+        )  # a le DOI, aucun enregistrement source
         sp1 = _source_record(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
         sp2 = _source_record(conn, source_id="t2", doi="10.70675/abc")
         # in_perimeter → sans le correctif, ce groupe d'orphelins serait une CRÉATION et
-        # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
+        # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la publication existante.
         insert_source_contribution(
             conn, sp1, source="openalex", author_position=None, in_perimeter=True
         )
@@ -579,7 +581,7 @@ class TestStaleMembership:
     PUBLISHED_DOI = "10.1016/j.tcs.2026.116186"
 
     def _seed_drifted_pair(self, conn) -> tuple[int, int, int]:
-        """Une publication au DOI de préversion, ses deux SP, et plus aucune clé partagée entre
+        """Une publication au DOI de préversion, ses deux enregistrements sources, et plus aucune clé partagée entre
         elles : DOI distincts, aucun identifiant commun, titres absents (pas de token bloc)."""
         publication = _seed_publication(conn, doi=self.PREPRINT_DOI)
         preprint = _source_record(
@@ -594,7 +596,7 @@ class TestStaleMembership:
         return publication, preprint, published
 
     def test_siblings_of_a_dirty_source_record_are_marked(self, sa_sync_conn):
-        """La propagation marque les co-rattachées, et elles seules : ni les SP d'une autre
+        """La propagation marque les co-rattachées, et elles seules : ni les enregistrements sources d'une autre
         publication, ni les orphelines."""
         conn = sa_sync_conn
         _, preprint, _ = self._seed_drifted_pair(conn)
@@ -623,7 +625,7 @@ class TestStaleMembership:
 
 
 class TestFirstHalIdKey:
-    """Une notice qui liste deux dépôts HAL rejoint la publication du premier, et laisse les deux dépôts distincts."""
+    """Un enregistrement source qui liste deux dépôts HAL rejoint la publication du premier, et laisse les deux dépôts distincts."""
 
     def test_bridge_source_record_joins_first_listed_deposit_only(self, sa_sync_conn):
         conn = sa_sync_conn

@@ -36,7 +36,7 @@ from tests.integration.helpers.persons import (
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
-# Notice de 2024, de titre « Test ».
+# Enregistrement source de 2024, de titre « Test ».
 _source_record = partial(insert_source_record, title="Test", publication_year=2024)
 _logger = logging.getLogger("test")
 
@@ -68,7 +68,7 @@ def _insert_contribution(
 ):
     """Insère une source_contribution.
 
-    `identifiers` est un dict d'identifiants observés porté par l'identité
+    `identifiers` est un dict d'identifiants observés, dans les informations du contributeur
     (`contributor_information.identifiers`, JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
     """
@@ -110,7 +110,7 @@ def _run_cascade(conn):
 
 
 class TestPasseDeCreation:
-    """Ce que la seconde passe reprend : les signatures du périmètre restées sans personne."""
+    """Ce que la seconde passe reprend : les contributions sources du périmètre restées sans personne."""
 
     def test_une_contribution_source_hors_perimetre_ne_cree_pas_de_personne(self, sa_sync_conn):
         """Un nom inconnu hors périmètre reste sans personne, sans en introduire une."""
@@ -141,7 +141,7 @@ class TestPasseDeCreation:
 
 class TestIdentifierPromotion:
     def test_every_identifier_type_of_the_source_contribution_is_promoted(self, sa_sync_conn):
-        """Chaque type d'identifiant que porte la signature, idhal compris, passe sur la personne qu'elle crée."""
+        """Chaque type d'identifiant de la contribution source, idhal compris, passe sur la personne qu'elle crée."""
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="hal-promo")
         identifiers = {
@@ -248,7 +248,7 @@ class TestCascadeRun:
 
     def test_identifier_match_rejected_on_incompatible_name(self, sa_sync_conn):
         """Corroboration par le nom : un identifiant confirmé pointant une personne
-        au nom incompatible avec la signature ne rattache pas (corruption éparse —
+        au nom incompatible avec la contribution source ne rattache pas (corruption éparse —
         un identifiant recopié sur le mauvais co-auteur). La cascade retombe sur le
         name_form (ici inconnu → création), pas sur la personne ciblée par l'identifiant."""
         publication = insert_publication(sa_sync_conn)
@@ -314,7 +314,7 @@ class TestCascadeRun:
 
     def test_identifier_match_confirmed_name_form_overrides_token_incompat(self, sa_sync_conn):
         """Forme de nom `confirmed` pour la personne : le match identifiant est corroboré
-        sans test de tokens — utile au changement de nom, où la signature n'a aucun token
+        sans test de tokens — utile au changement de nom, où la contribution source n'a aucun token
         commun avec le nom de la personne."""
         publication = insert_publication(sa_sync_conn)
         person_a = create_person("Maneval", "Axelle", repo=person_repository(sa_sync_conn))
@@ -405,7 +405,7 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, wos_as) != person_id
 
     def test_datacite_orcid_links(self, sa_sync_conn):
-        """ORCID DataCite, déposé avec la notice → signal de matching. Hors périmètre, seul l'identifiant peut rattacher la signature."""
+        """ORCID DataCite, déposé avec l'enregistrement source → signal de matching. Hors périmètre, seul l'identifiant peut rattacher la contribution source."""
         publication = insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         insert_person_identifier(
@@ -458,7 +458,7 @@ class TestCascadeRun:
         assert ("orcid", "0000-0002-3456-7890") in ids
 
     def test_inverted_name_matches_by_name_form(self, sa_sync_conn):
-        """Signature au nom et prénom inversés (« Martin » en prénom, « Pierre » en nom) : sa forme « nom prénom » rejoint Pierre Martin."""
+        """Contribution source au nom et prénom inversés (« Martin » en prénom, « Pierre » en nom) : sa forme « nom prénom » rejoint Pierre Martin."""
         publication = insert_publication(sa_sync_conn)
         person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
         source_record = _source_record(
@@ -479,7 +479,7 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, inverted) == person_id
 
     def test_created_person_takes_split_given_by_source(self, sa_sync_conn):
-        """Une chaîne brute « Yannick Kitutila W. » et la même signature au nom séparé (HAL : « Kitutila W. », « Yannick ») : la personne créée prend le découpage de la source, quel que soit l'ordre des signatures."""
+        """Une chaîne brute « Yannick Kitutila W. » et la même contribution source au nom séparé (HAL : « Kitutila W. », « Yannick ») : la personne créée prend le découpage de la source, quel que soit l'ordre des contributions sources."""
         publication = insert_publication(sa_sync_conn)
         scanr_source_record = _source_record(
             sa_sync_conn, publication, source="scanr", source_id="scanr-kitutila"
@@ -534,7 +534,7 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, oa_as) is None
 
     def test_ambiguous_orphan_logged_with_competing_persons(self, sa_sync_conn, caplog):
-        """La signature restée orpheline est journalisée avec son motif et les personnes que désigne sa forme."""
+        """La contribution source restée orpheline est journalisée avec son motif et les personnes que désigne sa forme."""
         publication = insert_publication(sa_sync_conn)
         pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))

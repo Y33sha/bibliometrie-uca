@@ -1,4 +1,4 @@
-"""La cascade personnes ignore les identifiants qu'une signature neutralise, et la requalification réécrit les neutralisations `misplaced`."""
+"""La cascade personnes ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
 
 from sqlalchemy import text
 
@@ -26,7 +26,7 @@ def _source_contribution(
     person_id=None,
     resolution_mode=None,
 ):
-    """Signature crossref du périmètre portant un ORCID et la carte `neutralized`. Retourne `(signature, identité)`."""
+    """Contribution source crossref du périmètre avec un ORCID et la carte `neutralized`. Retourne `(contribution source, informations du contributeur)`."""
     source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
@@ -69,7 +69,7 @@ def test_orcid_non_neutralise_present_dans_la_projection(sa_sync_conn):
 
 
 def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_conn):
-    """Une signature qui partage la valeur dans son document ne vote pas ; une signature qui la porte par erreur vote."""
+    """Une contribution source qui partage la valeur dans son document ne vote pas ; une contribution source qui la contient par erreur vote."""
     _source_contribution(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
     _source_contribution(
         sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2"
@@ -82,7 +82,7 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
 
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
-    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand l'identité est désignée, effacée sinon. Une signature résolue par identifiant qui la gagne est rendue pour détachement."""
+    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand les informations du contributeur sont désignées, effacée sinon. Une contribution source résolue par identifiant qui la gagne est rendue pour détachement."""
     source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn,
         None,

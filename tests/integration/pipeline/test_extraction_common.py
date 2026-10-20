@@ -21,7 +21,7 @@ _publication = partial(
     insert_publication, normalize_title=False, publication_year=2020, doc_type=None
 )
 
-# Notice de titre « T ».
+# Enregistrement source de titre « T ».
 _source_record = partial(insert_source_record, title="T")
 
 # ── fingerprint ─────────────────────────────────────────────────
@@ -405,7 +405,7 @@ class TestGetPrefixesToResolve:
             source="crossref",
             target_doi="10.77777/rel",
         )
-        # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), SP in-périmètre.
+        # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), enregistrement source in-périmètre.
         _source_record(
             sa_sync_conn,
             1,

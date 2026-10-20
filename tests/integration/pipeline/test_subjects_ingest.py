@@ -1,4 +1,4 @@
-"""Tests des extracteurs de libellés par source (`extractors`, purs) et de
+"""Tests des fonctions de lecture des libellés par source (`extractors`, purs) et de
 l'orchestrateur d'ingestion des sujets (`ingestion.run`, intégration)."""
 
 import json
@@ -179,7 +179,7 @@ class TestRunOrchestrator:
         assert _publications_updated(run(sa_sync_conn, queries, logger)) == 0
 
     def test_reingests_all_sources_of_changed_publication(self, sa_sync_conn, queries):
-        # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
+        # Publication-centré : toutes les sources d'une publication changée sont ré-ingérées.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}

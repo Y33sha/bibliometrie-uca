@@ -16,7 +16,7 @@ def _fake_tx():
 
 
 def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
-    """Adresses, revues et éditeurs se comptent des mêmes publications et signatures.
+    """Adresses, revues et éditeurs se comptent des mêmes publications et contributions sources.
 
     La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
     """

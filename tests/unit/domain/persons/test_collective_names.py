@@ -1,4 +1,4 @@
-"""Reconnaissance d'un nom de signature collective."""
+"""Reconnaissance d'un nom de contribution source collective."""
 
 import pytest
 

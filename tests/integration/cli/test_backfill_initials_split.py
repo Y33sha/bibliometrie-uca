@@ -1,4 +1,4 @@
-"""Oneshot `backfill_initials_split` : une signature au nom réduit à des initiales rejoint l'identité de son découpage corrigé, et la synchronisation qui suit la garde."""
+"""Oneshot `backfill_initials_split` : une contribution source au nom réduit à des initiales rejoint les informations du contributeur de son découpage corrigé, et la synchronisation qui suit la garde."""
 
 from sqlalchemy import text
 
@@ -37,7 +37,7 @@ def _split(conn, source_contribution_id: int):
 
 
 def test_initiales_finales_passent_en_prenom(sa_sync_conn):
-    # Identité au découpage du parseur sans la règle des initiales : nom « l », prénom « del buono ».
+    # Informations du contributeur au découpage du parseur sans la règle des initiales : nom « l », prénom « del buono ».
     _, sa = _source_contribution(sa_sync_conn, "Del Buono L.", "del buono l")
 
     assert backfill(sa_sync_conn, apply=True) == 1

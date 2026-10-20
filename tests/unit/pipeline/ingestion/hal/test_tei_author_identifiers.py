@@ -125,7 +125,7 @@ def test_idhal_without_notation_is_ignored():
 
 
 class TestDocumentForge:
-    """Le TEI joint aux notices HAL est déposé par un tiers : sa lecture refuse les déclarations d'entités.
+    """Le TEI joint aux enregistrements sources HAL est déposé par un tiers : sa lecture refuse les déclarations d'entités.
 
     L'analyseur de la bibliothèque standard les développe, et quelques centaines d'octets suffisent à en produire des milliards — de quoi épuiser la mémoire du processus qui normalise.
     """

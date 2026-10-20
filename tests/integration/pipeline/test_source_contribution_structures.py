@@ -135,7 +135,7 @@ def test_structure_hal_rattachee_explicitement(sa_sync_conn):
 
 
 def test_structures_d_une_these(sa_sync_conn):
-    """L'établissement de soutenance rattache toutes les signatures ; le laboratoire partenaire, reconnu par son PPN et son nom, le seul doctorant."""
+    """L'établissement de soutenance rattache toutes les contributions sources ; le laboratoire partenaire, reconnu par son PPN et son nom, le seul doctorant."""
     univ, lab = _perimeter(sa_sync_conn)
     sa_sync_conn.execute(
         text("UPDATE structures SET api_ids = CAST(:ids AS jsonb) WHERE id = :id"),

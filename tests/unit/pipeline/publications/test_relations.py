@@ -90,7 +90,7 @@ class TestDeclaredPairs:
 
 
 def _source_record(doc_type, relation_type, cible, doi):
-    """Notice DataCite de la publication 1, déclarant une relation de même œuvre."""
+    """Enregistrement source DataCite de la publication 1, déclarant une relation de même œuvre."""
     return DeclaredRelationSource(
         publication_id=1,
         source="datacite",

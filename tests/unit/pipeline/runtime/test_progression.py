@@ -307,9 +307,9 @@ class TestAttente:
 
     def test_une_ligne_effacee_tait_sa_conclusion_au_journal(self, sans_terminal, caplog):
         with caplog.at_level(logging.INFO), module.attente("  ├─ ", _log()) as ligne:
-            ligne.conclut("  ├─ 0 signature")
+            ligne.conclut("  ├─ 0 contribution source")
             ligne.efface()
-        assert "0 signature" not in caplog.text
+        assert "0 contribution source" not in caplog.text
 
     def test_une_exception_arrete_les_points(self, avec_terminal, monkeypatch):
         flux = io.StringIO()

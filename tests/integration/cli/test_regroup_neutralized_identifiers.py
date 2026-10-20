@@ -8,7 +8,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _publication(conn, *, source_records, neutralized):
-    """Publication de `notices` notices, non marquée ; sa première notice a une signature d'ORCID neutralisé si `neutralized`."""
+    """Publication de `enregistrements sources` enregistrements sources, non marquée ; sa première enregistrement source a une contribution source d'ORCID neutralisé si `neutralized`."""
     publication = insert_publication(conn)
     conn.execute(
         text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),

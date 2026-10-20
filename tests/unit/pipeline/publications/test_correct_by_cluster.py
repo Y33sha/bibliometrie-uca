@@ -522,7 +522,7 @@ def test_self_heals_when_book_gone():
 
 
 def test_volume_perd_le_hal_id_de_ses_communications():
-    """Le dépôt HAL d'une communication, recopié par la notice OpenAlex du volume, quitte cette notice."""
+    """Le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume, quitte cet enregistrement source."""
     volume = _row(
         1,
         "proceedings",
@@ -587,7 +587,7 @@ def test_identifiants_restaures_quand_la_divergence_disparait():
 
 
 def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en_place():
-    """Le chapitre OpenAlex recopie le dépôt HAL de la notice qui garde le DOI : ce dépôt reste à elle."""
+    """Le chapitre OpenAlex recopie le dépôt HAL de l'enregistrement source qui garde le DOI : ce dépôt reste à lui."""
     book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
     hal = _row(
         2,

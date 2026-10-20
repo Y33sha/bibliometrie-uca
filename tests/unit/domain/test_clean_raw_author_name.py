@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.normalize.clean_raw_author_name`.
 
-Certaines signatures OpenAlex portent un identifiant de source recopié dans le nom (« Emmanuel Moreau (1278759) »). Le nettoyage doit retirer ce parasite sans toucher aux noms légitimes.
+Certaines contributions sources OpenAlex contiennent un identifiant de source recopié dans le nom (« Emmanuel Moreau (1278759) »). Le nettoyage doit retirer ce parasite sans toucher aux noms légitimes.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ class TestCleanRawAuthorName:
             # Parenthèses non numériques : préservées (ce n'est pas un identifiant).
             ("Smith (Jr.)", "Smith (Jr.)"),
             ("Durand (né Martin)", "Durand (né Martin)"),
-            # Balisage et entités déposés dans la signature : retirés.
+            # Balisage et entités déposés dans la contribution source : retirés.
             ("<i>Emmanuel Moreau</i>", "Emmanuel Moreau"),
             ("Fran&ccedil;ois Durand", "François Durand"),
             # Année de naissance d'une forme d'autorité, et la ponctuation qu'elle laisse isolée.

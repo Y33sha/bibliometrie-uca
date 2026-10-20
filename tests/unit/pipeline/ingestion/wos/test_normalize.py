@@ -1084,7 +1084,7 @@ class TestProcessRecord:
         )
 
         assert result is True
-        # Synchronisation des signatures (via le writer partagé).
+        # Synchronisation des contributions sources (via le writer partagé).
         contribution_queries.fetch_stored_source_contributions.assert_called_once()
         # `mark_done` appelée avec le bon staging_id.
         staging_queries.mark_done.assert_called_once_with(None, 1)

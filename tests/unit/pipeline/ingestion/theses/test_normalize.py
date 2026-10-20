@@ -250,7 +250,7 @@ class TestBuildThesesAuthorRecords:
         ]
 
     def test_aucune_adresse(self):
-        """Partenaires et établissement de soutenance restent dans `meta` : aucune signature ne reçoit d'adresse."""
+        """Partenaires et établissement de soutenance restent dans `meta` : aucune contribution source ne reçoit d'adresse."""
         these = _these(
             partenairesDeRecherche=[{"nom": "LIMOS"}],
             etabSoutenanceN="Université Clermont Auvergne (2021-...)",
@@ -267,7 +267,7 @@ class TestProcessContributions:
         assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
 
     def test_renormalisation_garde_les_contributions_sources(self):
-        """Une thèse modifiée garde l'identifiant des signatures dont l'identité ne change pas, directeur compris."""
+        """Une thèse modifiée garde l'identifiant des contributions sources dont les informations du contributeur restent les mêmes, directeur compris."""
         batch = FakeContributionsBatchQueries()
         process_contributions(MagicMock(), _these(), 10, batch_queries=batch)
         modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])

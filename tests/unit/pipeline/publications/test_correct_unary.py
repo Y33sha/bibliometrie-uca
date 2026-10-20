@@ -50,7 +50,7 @@ def test_tally_corrections_exclut_les_traductions_de_vocabulaire():
             {},
             {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
         ),
-        # deux champs corrigés sur une même SP → 1 SP, 2 déclenchements
+        # deux champs corrigés sur une même enregistrement source → 1 enregistrement source, 2 déclenchements
         CorrectionUpdate(
             3,
             "media",
@@ -64,7 +64,9 @@ def test_tally_corrections_exclut_les_traductions_de_vocabulaire():
         ),
     ]
     corrected, rule_counts = tally_corrections(updates)
-    assert corrected == 2  # SP 1 et 4 = traductions seules (exclues) ; SP 2 et 3 corrigées
+    assert (
+        corrected == 2
+    )  # enregistrement source 1 et 4 = traductions seules (exclues) ; enregistrement source 2 et 3 corrigées
     assert rule_counts == {
         "THESIS_WITH_JOURNAL_TO_ARTICLE": 1,
         "JOURNAL_TYPE_MEDIA_TO_MEDIA": 1,
@@ -175,7 +177,7 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
 
 
 def test_thesis_to_article_strips_dissertation_keys():
-    # Conflation : la SP corrigée thèse→article perd le NNT et les hal_id tel-/dumas-,
+    # Conflation : l'enregistrement source corrigé thèse→article perd le NNT et les hal_id tel-/dumas-,
     # garde les autres hal_id (article) et les autres clés. Brut stashé pour réversibilité.
     upd = _update(
         _source_record(
@@ -211,7 +213,7 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
 
 
 def test_journal_id_wins_over_theses_fr_url_conflation():
-    # Conflation thèse↔article : une SP theses.fr AVEC un journal_id ET un DOI d'éditeur → article
+    # Conflation thèse↔article : un enregistrement source theses.fr AVEC un journal_id ET un DOI d'éditeur → article
     # (`journal_id_present: False` garde la règle URL ; `doi_prefix_not_in` distingue l'article
     # publié — DOI éditeur — d'une vraie thèse à DOI ABES).
     upd = _update(
@@ -349,11 +351,11 @@ def test_language_already_mapped_is_idempotent_noop():
     assert _update(source_record) is None
 
 
-# ── Notices ScanR issues d'un dépôt HAL ─────────────────────────────
+# ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
 
 
 def test_scanr_from_hal_takes_corrected_hal_type():
-    """Une notice ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis la notice HAL."""
+    """Un enregistrement source ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis l'enregistrement source HAL."""
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 

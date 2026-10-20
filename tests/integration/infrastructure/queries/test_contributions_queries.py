@@ -118,7 +118,7 @@ class TestListOrphanContributions:
         assert source_contribution_match in [a.source_contribution_id for a in res.contributions]
 
     def _labs_setup(self, conn):
-        """Signature « Zzorph Avec » au labo LAB et à une équipe ; « Zzorph Autre » au labo AUTRE ; « Zzorph Sans » sans structure."""
+        """Contribution source « Zzorph Avec » au labo LAB et à une équipe ; « Zzorph Autre » au labo AUTRE ; « Zzorph Sans » sans structure."""
         lab, other_lab, team = (
             insert_structure(conn, code, acronym=acronym, structure_type=stype)
             for code, acronym, stype in (
@@ -172,7 +172,7 @@ class TestListOrphanContributions:
         assert facets.no_lab_count == 1
 
     def test_lists_labs_detected_in_the_source_contribution(self, sa_sync_conn):
-        """Seuls les laboratoires de la signature apparaissent, pas ceux des autres signatures de la publication ni les autres types de structure."""
+        """Seuls les laboratoires de la contribution source apparaissent, pas ceux des autres contributions sources de la publication ni les autres types de structure."""
         ids = self._labs_setup(sa_sync_conn)
 
         (row,) = _list(sa_sync_conn, search="Zzorph Avec").contributions

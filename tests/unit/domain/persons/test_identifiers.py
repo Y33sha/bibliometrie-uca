@@ -223,12 +223,12 @@ class TestSharedIdentifierNeutralizations:
         ]
 
     def test_shared_value_neutralized_on_every_carrier(self):
-        """Un ORCID porté par deux signatures est neutralisé sur les deux ; la troisième, distincte, reste intacte."""
+        """Un ORCID présent sur deux contributions sources est neutralisé sur les deux ; la troisième, distincte, reste intacte."""
         out = shared_identifier_neutralizations([{"orcid": "X"}, {"orcid": "X"}, {"orcid": "Y"}])
         assert out == [{"orcid": "shared"}, {"orcid": "shared"}, None]
 
     def test_every_identifier_of_a_carrier_neutralized(self):
-        """Une signature dont une valeur est partagée voit tous ses identifiants neutralisés, au-delà du type partagé."""
+        """Une contribution source dont une valeur est partagée voit tous ses identifiants neutralisés, au-delà du type partagé."""
         out = shared_identifier_neutralizations(
             [{"hal_person_id": 7, "idref": "r1"}, {"hal_person_id": 7}]
         )
