@@ -12,7 +12,7 @@ Phase à part, juste avant `publishers_journals`. Résout l'agence d'enregistrem
 
 Interroge `doi.org/ra` sur les préfixes absents de la table `doi_prefixes`, par lots de 100 préfixes, et enregistre leur agence. Un préfixe que doi.org ne connaît pas reçoit l'agence `unknown`. Un préfixe d'une requête en échec reste à résoudre.
 
-Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; les sous-étapes des [éditeurs](#éditeurs) la complètent ensuite (nom et `publisher_id` via les API `/prefixes`). La recherche des documents manquants ([fetch_missing](02-extract.md#documents-absents-dune-source-fetch_missing)), au run suivant, adresse chaque DOI à l'API de son agence.
+Une ligne `doi_prefixes` naît ici avec la seule agence d'enregistrement ; les sous-étapes des [éditeurs](#éditeurs) la complètent ensuite (nom et `publisher_id` via les API `/prefixes`). La recherche des documents manquants ([fetch_missing](02-harvest.md#documents-absents-dune-source-fetch_missing)), au run suivant, adresse chaque DOI à l'API de son agence.
 
 ## Éditeurs
 

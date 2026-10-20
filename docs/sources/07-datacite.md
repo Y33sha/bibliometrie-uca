@@ -11,9 +11,9 @@ Documentation API :
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
 Le pipeline interroge DataCite de trois façons :
-- [moissonnage](../pipeline/02-extract.md#moissonnage-par-affiliation-extract), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ « DataCite » de l'admin des structures) ;
-- [`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources ;
-- [moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : les DOI dont un créateur a l'ORCID d'une personne RH (`creators.nameIdentifiers.nameIdentifier`).
+- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ « DataCite » de l'admin des structures) ;
+- [`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources ;
+- [moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : les DOI dont un créateur a l'ORCID d'une personne RH (`creators.nameIdentifiers.nameIdentifier`).
 
 Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent par les deux dernières voies.
 

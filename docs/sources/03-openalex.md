@@ -11,7 +11,7 @@ https://developers.openalex.org/
 **Works API** (https://api.openalex.org/works) — moissonnage des publications.
 - Nécessite *mailto* ou clé API (création via un compte gratuit)
 - Requête par institution (filtre `lineage`) + année de publication
-- [Moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
+- [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
 - Pagination par cursor, 200 résultats/page, 0.2s de délai
 
 **Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency` et `journal_type`.
