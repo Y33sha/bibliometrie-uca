@@ -7,10 +7,10 @@ import logging
 
 from sqlalchemy import Connection
 
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.observability.libelles import BRANCHE, accord, etape
 from pipeline.runtime.observability.progression import attente
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
-from pipeline.transformation.persons.person_writes import PersonWrites
 from pipeline.transformation.persons.requalify_identifiers import (
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
@@ -26,7 +26,7 @@ def arbitrate_identifier_conflicts(
     queries: PersonsMatchingQueries,
     logger: logging.Logger,
     *,
-    writes: PersonWrites,
+    repo: PgPersonRepository,
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
 
@@ -47,7 +47,7 @@ def arbitrate_identifier_conflicts(
         conflicts = detect_identifier_conflicts(conn, queries)
         ligne.efface()
     transferred = resolve_identifier_transfers(
-        conn, conflicts, consensus=consensus, queries=queries, writes=writes, logger=logger
+        conn, conflicts, consensus=consensus, queries=queries, repo=repo, logger=logger
     )["transferred"]
 
     return {

@@ -61,15 +61,15 @@ def run_create_persons(conn):
 
     from sqlalchemy import text
 
+    from infrastructure.repositories.person_repository import PgPersonRepository
     from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
     from pipeline.transformation.persons.cascade import run_cascade
     from pipeline.transformation.persons.matching import PersonsMatchingQueries
-    from pipeline.transformation.persons.person_writes import PersonWrites
 
     queries = PersonsMatchingQueries()
     logger = logging.getLogger("test")
-    arbitrate_identifier_conflicts(conn, queries, logger, writes=PersonWrites(conn))
-    run_cascade(conn, queries, logger, writes=PersonWrites(conn))
+    arbitrate_identifier_conflicts(conn, queries, logger, repo=PgPersonRepository(conn))
+    run_cascade(conn, queries, logger, repo=PgPersonRepository(conn))
 
     return conn.execute(
         text(

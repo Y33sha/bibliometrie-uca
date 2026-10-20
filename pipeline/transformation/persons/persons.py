@@ -27,6 +27,7 @@ from sqlalchemy import Connection
 
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_file_logger
+from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -37,7 +38,6 @@ from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.metrics import build_metrics
 from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
-from pipeline.transformation.persons.person_writes import PersonWrites
 from pipeline.transformation.persons.populate_person_name_forms import populate
 from pipeline.transformation.persons.purge import purge
 
@@ -46,7 +46,7 @@ from pipeline.transformation.persons.purge import purge
 class PersonsPhase:
     persons_queries: PersonsMatchingQueries
     name_forms_queries: PersonNameFormsQueries
-    writes_factory: Callable[[Connection], PersonWrites]
+    repo_factory: Callable[[Connection], PgPersonRepository]
     orphans_log: logging.Logger | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -81,7 +81,7 @@ class PersonsPhase:
         """Épinglages, détachement des copies, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         persons_queries, logger = self.persons_queries, ctx.logger
         with ctx.open_tx() as conn:
-            writes = self.writes_factory(conn)
+            repo = self.repo_factory(conn)
 
             n_enforced = persons_queries.enforce_confirmed_authorships(conn)
             if n_enforced:
@@ -101,14 +101,12 @@ class PersonsPhase:
                     accord(n_copies, "doublon détaché", "doublons détachés"),
                 )
 
-            arbitration = arbitrate_identifier_conflicts(
-                conn, persons_queries, logger, writes=writes
-            )
+            arbitration = arbitrate_identifier_conflicts(conn, persons_queries, logger, repo=repo)
             cascade_result = run_cascade(
                 conn,
                 persons_queries,
                 logger,
-                writes=writes,
+                repo=repo,
                 orphans_log=self.orphans_log,
             )
 
@@ -150,6 +148,6 @@ def build() -> Phase:
     return PersonsPhase(
         PersonsMatchingQueries(),
         PersonNameFormsQueries(),
-        writes_factory=PersonWrites,
+        repo_factory=PgPersonRepository,
         orphans_log=setup_file_logger("persons_orphelines", str(PROJECT_ROOT / "logs")),
     )

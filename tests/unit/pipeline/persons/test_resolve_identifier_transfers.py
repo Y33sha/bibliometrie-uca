@@ -28,7 +28,7 @@ def _transferred(consensus: str | None) -> int:
         [IdentifierConflict("orcid", _ORCID, _CANDIDATE, _OWNER, "pending")],
         consensus={} if consensus is None else {("orcid", _ORCID): consensus},
         queries=queries,
-        writes=repo,
+        repo=repo,
         logger=logging.getLogger(__name__),
     )
     return result["transferred"]
@@ -54,7 +54,7 @@ def test_sans_conflit_a_arbitrer_l_etape_se_ferme(caplog):
             [IdentifierConflict("orcid", _ORCID, _CANDIDATE, _OWNER, "confirmed")],
             consensus={},
             queries=MagicMock(),
-            writes=MagicMock(),
+            repo=MagicMock(),
             logger=logging.getLogger(__name__),
         )
     assert caplog.messages == ["  └─ Rien à faire"]
