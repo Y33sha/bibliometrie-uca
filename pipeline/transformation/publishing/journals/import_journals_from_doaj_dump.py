@@ -140,7 +140,7 @@ def run_enrich_journals_from_doaj(
     delai = timedelta(days=refresh_after_days)
     if last is not None and last > datetime.now(UTC) - delai:
         metrics = PhaseMetrics(extras={"skipped": 1})
-        metrics.resume = (
+        metrics.report = (
             f"importé le {date_to_french(last.date())}, "
             f"prochain import le {date_to_french((last + delai).date())}"
         )
@@ -156,7 +156,7 @@ def run_enrich_journals_from_doaj(
         metrics = PhaseMetrics()
         logger.warning("Dump DOAJ inaccessible, référentiel inchangé : %s", e)
         signal_source_unavailable(metrics, "DOAJ", logger=logger, phase="publishers_journals")
-        metrics.resume = "dump inaccessible, import repris au prochain run"
+        metrics.report = "dump inaccessible, import repris au prochain run"
         return metrics
     metrics = PhaseMetrics(extras={"matched": stats.matched})
     if stats.matched == 0:
@@ -165,7 +165,7 @@ def run_enrich_journals_from_doaj(
         metrics.signals.append(
             {"level": "warning", "code": "dump_unrecognized", "message": message}
         )
-        metrics.resume = "aucune revue reconnue, revues inchangées"
+        metrics.report = "aucune revue reconnue, revues inchangées"
         return metrics
-    metrics.resume = accord(stats.matched, "revue mise à jour", "revues mises à jour")
+    metrics.report = accord(stats.matched, "revue mise à jour", "revues mises à jour")
     return metrics

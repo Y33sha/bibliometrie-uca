@@ -48,7 +48,7 @@ def test_les_noeuds_s_enchainent_dans_l_ordre_du_graphe(contexte):
 def test_chaque_noeud_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     fusion = PhaseMetrics()
     fusion.add(seen=2, journals_merged=2)
-    fusion.resume = "2 revues fusionnées"
+    fusion.report = "2 revues fusionnées"
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, merge_duplicate_journals=fusion)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]

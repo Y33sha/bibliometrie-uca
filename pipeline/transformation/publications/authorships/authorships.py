@@ -125,16 +125,13 @@ class AuthorshipsPhase:
             summary["publications_purged"] = by_node[
                 "authorships.purge_orphan_publications"
             ].details["purged"]
-        # Les nœuds affichés journalisent déjà leur décompte : une ligne de clôture les répéterait.
-        # La purge reste muette, son décompte va aux métriques.
-        metrics.resume = ""
         return metrics
 
 
 def _chronometre(t0: float) -> PhaseMetrics:
     """Métriques d'un nœud de synchronisation, dont le bilan est sa durée."""
     metrics = PhaseMetrics()
-    metrics.resume = f"{time.perf_counter() - t0:.1f}s"
+    metrics.report = f"{time.perf_counter() - t0:.1f}s"
     return metrics
 
 
@@ -166,7 +163,7 @@ def _delete_empty_containers(
         sub = run(ctx)
         metrics.merge(sub)
         branche = DERNIERE_BRANCHE if indice == len(steps) - 1 else BRANCHE
-        ctx.logger.info("%s%s : %s", branche, libelle, sub.resume or "rien à faire")
+        ctx.logger.info("%s%s : %s", branche, libelle, sub.report or "rien à faire")
 
 
 def _refresh_pub_counts(

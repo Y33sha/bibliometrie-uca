@@ -87,7 +87,7 @@ def run_merge_duplicate_journals(
         publication_et_titre,
     )
     if metrics.total:
-        metrics.resume = accord(
+        metrics.report = accord(
             metrics.extras.get("journals_merged", 0), "revue fusionnée", "revues fusionnées"
         )
     return metrics

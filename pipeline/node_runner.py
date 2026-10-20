@@ -30,6 +30,8 @@ class NodeStep:
     # Section et libellé de la ligne de bilan. `None` : le nœud écrit lui-même ses lignes.
     section: str | None = None
     label: str | None = None
+    # Le nœud affiche une barre d'avancement en terminal : sa ligne de bilan va au seul journal.
+    progress_bar: bool = False
     # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
     threshold: int | None = None
     # Condition d'exécution, évaluée avant l'accès à la source. Un nœud écarté rend des métriques vides et n'écrit rien.
@@ -93,7 +95,7 @@ def _write_lines(
 ) -> None:
     """Écrit la ligne de bilan du nœud, lance sa maintenance et écrit une ligne par opération."""
     lines = [
-        *([(step.label, _bilan(metrics))] if step.label is not None else []),
+        *([(step.label, _outcome(metrics))] if step.label is not None else []),
         *_maintain(node, ctx),
     ]
     for rank, (label, outcome) in enumerate(lines):
@@ -101,7 +103,13 @@ def _write_lines(
             ctx.logger.info("%s : %s", label, outcome, extra={"detail": True})
             continue
         last = step.section != next_section and rank == len(lines) - 1
-        ctx.logger.info("%s%s : %s", DERNIERE_BRANCHE if last else BRANCHE, label, outcome)
+        ctx.logger.info(
+            "%s%s : %s",
+            DERNIERE_BRANCHE if last else BRANCHE,
+            label,
+            outcome,
+            extra={"detail": step.progress_bar and rank == 0},
+        )
 
 
 def _maintain(node: Node, ctx: PhaseContext) -> list[tuple[str, str]]:
@@ -138,24 +146,25 @@ def _execute(node: Node, step: NodeStep, phase: str, ctx: PhaseContext) -> Phase
     return metrics
 
 
-def _bilan(metrics: PhaseMetrics) -> str:
-    """Bilan d'un nœud : son résumé, ou ce qui l'a empêché de travailler."""
-    if metrics.resume is not None:
-        return metrics.resume
+def _outcome(metrics: PhaseMetrics) -> str:
+    """Bilan d'un nœud : sa ligne de bilan, ce qui l'a empêché de travailler, ou ses compteurs."""
+    if metrics.report is not None:
+        return metrics.report
     if any(s["code"] == "source_unconfigured" for s in metrics.signals):
         return "sautée, accès non configuré"
     if metrics.signals:
         return "interrompue"
-    return "rien à faire"
+    return metrics.as_summary()
 
 
 @dataclass(frozen=True)
 class NodePhase:
-    """Phase d'un seul nœud, `node`, dont `phase` fait le travail."""
+    """Phase d'un seul nœud, `node`, dont `phase` fait le travail. `label` donne au nœud une ligne de bilan, écrite au seul journal."""
 
     node: str
     phase: Phase
+    label: str | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        step = NodeStep(lambda ctx, _breaker: self.phase.run(ctx))
+        step = NodeStep(lambda ctx, _breaker: self.phase.run(ctx), label=self.label)
         return run_nodes(self.node.partition(".")[0], {self.node: step}, ctx)[self.node]

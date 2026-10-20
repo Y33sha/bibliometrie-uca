@@ -86,7 +86,7 @@ def run_link_monographs_to_collections(
         monograph_collection_conflicts=len(conflicts),
         monograph_series=len(set(series.values())),
     )
-    metrics.resume = (
+    metrics.report = (
         f"{accord(len(set(series.values())), 'série sans ISSN', 'séries sans ISSN')}, "
         f"{accord(len(changes), 'monographie rattachée', 'monographies rattachées')}, "
         f"{accord(len(conflicts), 'conflit', 'conflits')}"

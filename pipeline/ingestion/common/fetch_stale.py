@@ -20,7 +20,7 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES
+from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES, source_label
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.fetch_pool import run_fetch_pool
@@ -35,6 +35,8 @@ from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
 
 COMMIT_EVERY = 50
+
+_SECTION = "Relecture des documents dans leur source"
 
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
@@ -55,8 +57,8 @@ class FetchStalePhase:
         """
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
-        etape(logger, "Relecture des documents dans leur source")
         if not options.policy.fetch_stale:
+            etape(logger, _SECTION)
             logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
@@ -79,7 +81,13 @@ class FetchStalePhase:
         by_node = run_nodes(
             "fetch_stale",
             {
-                f"fetch_stale.{source}": NodeStep(node(source), when=retenue(source))
+                f"fetch_stale.{source}": NodeStep(
+                    node(source),
+                    section=_SECTION,
+                    label=source_label(source),
+                    progress_bar=True,
+                    when=retenue(source),
+                )
                 for source in ALL_SOURCES
             },
             ctx,

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from domain.sources.registry import source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
@@ -73,6 +74,8 @@ class ExtractByPersonPhase:
                 f"extract_by_person.{source}": NodeStep(
                     node(source),
                     section=_SECTION,
+                    label=source_label(source),
+                    progress_bar=True,
                     threshold=5,
                     when=retenue(source),
                 )

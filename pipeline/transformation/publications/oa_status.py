@@ -127,8 +127,6 @@ async def _verifier(
                 for s in statuses
             ]
         }
-        # Chaque ligne de la sous-étape porte son décompte : une ligne de clôture les répéterait.
-        metrics.resume = ""
         return metrics
 
     etape(logger, "Vérification du statut open access sur Unpaywall")

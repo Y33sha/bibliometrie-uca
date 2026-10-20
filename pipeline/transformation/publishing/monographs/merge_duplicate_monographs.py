@@ -37,5 +37,5 @@ def run_merge_duplicate_monographs(
             extra={"detail": True},
         )
     metrics.add(seen=len(merges), monographs_merged=len(merges))
-    metrics.resume = accord(len(merges), "monographie fusionnée", "monographies fusionnées")
+    metrics.report = accord(len(merges), "monographie fusionnée", "monographies fusionnées")
     return metrics

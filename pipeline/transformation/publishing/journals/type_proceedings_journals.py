@@ -58,7 +58,7 @@ def run_type_proceedings_journals(
             extra={"detail": True},
         )
     metrics.add(seen=len(reasons), journals_typed_proceedings=len(reasons))
-    metrics.resume = accord(
+    metrics.report = accord(
         len(reasons), "revue typée recueil d'actes", "revues typées recueils d'actes"
     )
     return metrics

@@ -44,10 +44,7 @@ class SubjectsPhase:
             {"subjects.ingest": NodeStep(ingest), "subjects.usage": NodeStep(usage)},
             ctx,
         )
-        metrics = by_node["subjects.ingest"]
-        # Chaque nœud journalise son résultat : une ligne de clôture le répéterait.
-        metrics.resume = ""
-        return metrics
+        return by_node["subjects.ingest"]
 
 
 # ── Câblage ───────────────────────────────────────────────────

@@ -74,7 +74,6 @@ class AffiliationsPhase:
         metrics = by_node["affiliations.resolve_addresses"]
         metrics.details.update(by_node["affiliations.refresh_ror"].details)
         metrics.details.update(by_node["affiliations.refresh_hal_structures"].details)
-        metrics.resume = ""
         return metrics
 
     def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

@@ -157,8 +157,6 @@ class FetchMissingPhase:
             metrics.details["table"] = {
                 "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
             }
-        # Les compteurs des trois sous-étapes couvrent des ensembles différents : les rapprocher en une ligne induirait en erreur. Chaque barre affiche son résultat, et la table d'observabilité le détail.
-        metrics.resume = ""
         return metrics
 
 

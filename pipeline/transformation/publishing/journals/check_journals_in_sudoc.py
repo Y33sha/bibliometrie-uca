@@ -196,7 +196,7 @@ async def run_check_journals_in_sudoc(
             total,
         )
     found = metrics.extras.get("sudoc_found", 0)
-    metrics.resume = (
+    metrics.report = (
         f"{accord(total, 'revue vérifiée', 'revues vérifiées')}, "
         f"{accord(found, 'présente', 'présentes')} dans le Sudoc, "
         f"{metrics.updated} {forme(metrics.updated, 'modifiée')}"

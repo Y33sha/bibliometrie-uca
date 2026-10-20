@@ -264,7 +264,7 @@ def build_groups(
         "groups": group_count,
         **{str(method): count for method, count in methods.items()},
     }
-    metrics.resume = (
+    metrics.report = (
         f"{accord(len(publication_ids), 'publication')}, {accord(group_count, 'groupe')}"
     )
     return metrics
@@ -281,4 +281,6 @@ class AuthorGroupingPhase:
 
 def build() -> Phase:
     """Groupe les signatures d'un même auteur dans les publications marquées."""
-    return NodePhase("author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()))
+    return NodePhase(
+        "author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()), label="Bilan"
+    )

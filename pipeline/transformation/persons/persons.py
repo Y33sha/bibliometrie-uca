@@ -73,7 +73,6 @@ class PersonsPhase:
         summary["deleted_empty_persons"] = purge_counts.get("deleted_persons", 0)
         for key, count in name_form_counts.items():
             summary[f"name_forms_{key}"] = count
-        metrics.resume = ""
         return metrics
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

@@ -113,5 +113,5 @@ def run_enrich_journals_from_openalex(
 
 def _bilan(total: int, updated: int) -> PhaseMetrics:
     metrics = PhaseMetrics(seen=total, updated=updated)
-    metrics.resume = f"{updated}/{total} {forme(total, 'revue mise à jour', 'revues mises à jour')}"
+    metrics.report = f"{updated}/{total} {forme(total, 'revue mise à jour', 'revues mises à jour')}"
     return metrics

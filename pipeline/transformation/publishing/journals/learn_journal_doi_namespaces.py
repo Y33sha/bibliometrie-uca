@@ -25,7 +25,7 @@ def run_learn_journal_doi_namespaces(
     journals = len({ns.journal_id for ns in namespaces.values()})
     metrics = PhaseMetrics()
     metrics.add(seen=len(pairs), journal_doi_namespaces=len(namespaces))
-    metrics.resume = (
+    metrics.report = (
         f"{accord(len(namespaces), 'espace de noms', 'espaces de noms')} "
         f"pour {accord(journals, 'revue')}"
     )

@@ -25,5 +25,5 @@ def run_delete_empty_publishers(
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Éditeur vide supprimé : %d « %s »", publisher_id, name, extra={"detail": True})
     metrics.add(seen=len(deleted), publishers_deleted=len(deleted))
-    metrics.resume = accord(len(deleted), "éditeur supprimé", "éditeurs supprimés")
+    metrics.report = accord(len(deleted), "éditeur supprimé", "éditeurs supprimés")
     return metrics

@@ -182,14 +182,14 @@ def _resolve(
     if breaker is not None and breaker.tripped:
         log.warning("resolve_publishers : circuit-breaker %s coupé, arrêt", agency)
 
-    metrics.resume = (
+    metrics.report = (
         f"{accord(metrics.total, 'préfixe')} : "
         f"{accord(metrics.extras.get('publisher_matched', 0), 'éditeur reconnu', 'éditeurs reconnus')}, "
         f"{accord(metrics.extras.get('publisher_created', 0), 'créé', 'créés')}, "
         f"{accord(metrics.extras.get('no_publisher', 0), 'inconnu', 'inconnus')}"
     )
     if metrics.errors:
-        metrics.resume += f", {accord(metrics.errors, 'reporté', 'reportés')}"
+        metrics.report += f", {accord(metrics.errors, 'reporté', 'reportés')}"
     return metrics
 
 
