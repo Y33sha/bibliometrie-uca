@@ -29,7 +29,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_name
+from domain.normalize import normalize_text
 from domain.persons.identifiers import (
     AttributionStatus,
     PersonIdentifierType,
@@ -402,7 +402,7 @@ class _Cascade:
         Les formes fusionnent dans les listes existantes : une forme déjà portée reste ambiguë (donc non matchée en aveugle), au lieu d'être détournée vers la dernière personne indexée.
         """
         previous = self._namesake_of.get(namesake.person_id)
-        same_last_name = self._namesakes[normalize_name(namesake.last_name)]
+        same_last_name = self._namesakes[normalize_text(namesake.last_name)]
         if previous is not None:
             same_last_name.remove(previous)
         same_last_name.append(namesake)

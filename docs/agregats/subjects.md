@@ -4,7 +4,7 @@
 
 Un sujet est un concept thématique attaché à une publication par une source : domaine HAL, discipline de thèse, vedette-matière RAMEAU, concept OpenAlex. Seuls les concepts venus d'une ontologie deviennent des sujets — les mots-clés libres, c'est tout ce que Crossref propose, restent sur l'enregistrement source et s'affichent avec le détail de la publication. Le pipeline en est la seule autorité d'écriture ; l'API ne fait que les lire.
 
-Aucun objet de domaine ne lui correspond : un sujet vit comme libellé et lignes SQL. La seule règle venue de `domain/` est `normalize_label`, qui réduit les espaces sans toucher à la casse ni aux accents.
+Aucun objet de domaine ne lui correspond : un sujet vit comme libellé et lignes SQL. Le libellé passe par `to_plain_text`, qui retire le balisage et réduit les espaces sans toucher à la casse ni aux accents ; sa forme de recherche passe par `normalize_text`.
 
 ## Tables
 

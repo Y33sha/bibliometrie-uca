@@ -1,8 +1,6 @@
 """Registre des sources bibliographiques : liste et ordres de priorité.
 
-Référentiel Python de la liste des sources et les ordres de priorité entre sources.
-
-Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestSourcesEnum` vérifie la cohérence.
+Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestPgEnumsMatchDb` vérifie la cohérence.
 """
 
 from enum import StrEnum
@@ -64,7 +62,7 @@ SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
     f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
 )
 
-# Sources moissonnées par la phase `extract`, sur les critères d'affiliation du périmètre.
+# Sources moissonnées par la phase `harvest`, sur les critères d'affiliation du périmètre.
 # Crossref absent : il est seulement interrogé par DOI.
 HARVESTED_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
@@ -95,9 +93,6 @@ REGISTRY_LOOKUPS: frozenset[tuple[str, str]] = frozenset(
     {(Source.HAL, "hal_id"), (Source.THESES, "nnt"), (DOI_ORG, "doi")}
 )
 
-
-# Sources avec des auteurs exploitables (noms, identifiants, affiliations)
-AUTHOR_SOURCES = ALL_SOURCES
 
 # ── Ordres de priorité entre sources ─────────────────────────────
 
@@ -137,7 +132,6 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.THESES,
     Source.DATACITE,
 )
-STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
 
 
 # ── Contrôle d'appartenance ──────────────────────────────────────

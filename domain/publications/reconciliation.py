@@ -1,6 +1,6 @@
 """Décision pure de réconciliation des composantes — assignation, merge et split unifiés.
 
-À partir des `source_records` d'un voisinage (les enregistrements sources *dirty* et leurs voisins directs, cf. `pipeline/transformation/publications/reconciliation/reconcile_components.py`), calcule **où chaque enregistrement source doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
+À partir des `source_records` d'un voisinage (les enregistrements sources *dirty* et leurs voisins directs, cf. `pipeline/transformation/publications/reconciliation.py`), calcule **où chaque enregistrement source doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
 
 **Opération unique.** Chaque enregistrement source est assigné à la **publication ancre** de sa partition. Un enregistrement source est soit **matérialisé** (`publication_id` posé), soit **orphelin** (`publication_id = None`) — la passe ne fait aucune différence, c'est le clustering qui décide. Les quatre cas du matcher en sont des facettes :
 

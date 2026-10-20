@@ -2,7 +2,7 @@
 
 Un `SourceRecord` représente un document tel que remonté par une source (HAL, OpenAlex, WoS, theses.fr, ScanR, …), avant agrégation dans la `Publication` du référentiel. Clés : `id` (surrogate), `(source, source_id)` (naturelle) ; un réimport met à jour la même entité.
 
-Immuable (frozen), utilisée en lecture seule : jamais persistée via cet objet — les écritures passent par le SQL. Consommée par `refresh_from_sources` / `_refresh_aggregate` (agrégation canonique des métadonnées). La correction de métadonnées, elle, opère sur son propre contrat d'entrée (`MetadataForCorrection`, cf. `correction.py`), pas sur cette entité.
+Immuable (frozen), utilisée en lecture seule : jamais persistée via cet objet — les écritures passent par le SQL. Consommée par `refresh_from_sources`, l'agrégation des métadonnées. La correction des métadonnées lit son propre contrat d'entrée, `MetadataForCorrection`.
 """
 
 from dataclasses import dataclass

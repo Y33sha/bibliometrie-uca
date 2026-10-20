@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import normalize_label, normalize_text
+from domain.normalize import normalize_text, to_plain_text
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
@@ -49,7 +49,7 @@ class SubjectsIngestionQueries:
         """UPSERT d'un sujet (clé d'unicité = lower(label)). Retourne l'id.
 
         Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
-        label = normalize_label(label)
+        label = to_plain_text(label)
         return scalar_int(
             conn.execute(
                 _UPSERT_SUBJECT_SQL,

@@ -27,7 +27,6 @@ from domain.errors import (
     NotFoundError,
     PublisherMergeBlockedError,
     RejectedPairError,
-    UnauthorizedError,
     ValidationError,
 )
 from infrastructure.db.engine import build_sync_engine, set_sync_engine
@@ -156,11 +155,6 @@ async def rejected_pair_handler(request: Request, exc: RejectedPairError) -> JSO
 @app.exception_handler(ConflictError)
 async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-
-@app.exception_handler(UnauthorizedError)
-async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSONResponse:
-    return JSONResponse(status_code=401, content={"detail": str(exc)})
 
 
 @app.exception_handler(DomainError)

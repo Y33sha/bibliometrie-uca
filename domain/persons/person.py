@@ -7,8 +7,6 @@ Composition / associations :
 - `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues (VOs).
 
 `hal_person_id` est un `IdentifierAttribution` d'`id_type` = `"hal_person_id"`.
-
-La logique métier touchant à une personne (fusion, matching cross-source, création contrôlée, normalisation des noms) vit ici.
 """
 
 from dataclasses import dataclass, field

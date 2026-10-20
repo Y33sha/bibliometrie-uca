@@ -1,6 +1,6 @@
 """Les gestionnaires d'erreur de l'API rendent le code attendu, et rien d'autre.
 
-Ils décident de ce qu'un appelant apprend d'un échec : un refus d'autorisation doit se lire 401 et non 500, et une erreur imprévue ne doit rendre qu'un message générique — la trace part au journal, jamais dans la réponse.
+Ils décident de ce qu'un appelant apprend d'un échec : un conflit se lit 409, et une erreur imprévue ne doit rendre qu'un message générique — la trace part au journal, jamais dans la réponse.
 
 Les gestionnaires sont éprouvés directement plutôt qu'à travers un point d'entrée : ils reçoivent une exception et une requête, et rien de ce qu'ils font ne dépend du chemin par lequel l'exception est arrivée.
 """
@@ -15,13 +15,11 @@ from domain.errors import (
     ConflictError,
     DomainError,
     PublisherMergeBlockedError,
-    UnauthorizedError,
 )
 from interfaces.api.app import (
     conflict_handler,
     domain_error_handler,
     publisher_merge_blocked_handler,
-    unauthorized_handler,
     unhandled_exception_handler,
 )
 
@@ -32,13 +30,6 @@ def _requete() -> Request:
 
 def _corps(reponse) -> dict:
     return json.loads(reponse.body)
-
-
-@pytest.mark.asyncio
-async def test_acces_refuse_donne_401():
-    reponse = await unauthorized_handler(_requete(), UnauthorizedError("session invalide"))
-    assert reponse.status_code == 401
-    assert _corps(reponse) == {"detail": "session invalide"}
 
 
 @pytest.mark.asyncio

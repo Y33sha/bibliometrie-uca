@@ -53,10 +53,10 @@ class TestStructureApiIds:
 
     def test_fields_match_domain_whitelist(self):
         """Les champs déclarés du modèle doivent correspondre exactement
-        à la whitelist `domain.sources.STRUCTURE_API_SOURCES_SET`."""
-        from domain.sources.registry import STRUCTURE_API_SOURCES_SET
+        à la whitelist `domain.sources.registry.STRUCTURE_API_SOURCES`."""
+        from domain.sources.registry import STRUCTURE_API_SOURCES
 
-        assert set(StructureApiIds.model_fields.keys()) == STRUCTURE_API_SOURCES_SET
+        assert set(StructureApiIds.model_fields.keys()) == set(STRUCTURE_API_SOURCES)
 
     def test_rejects_non_string_in_list(self):
         """Les valeurs d'une liste doivent être des strings."""

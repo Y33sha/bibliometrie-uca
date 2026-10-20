@@ -22,7 +22,7 @@ from enum import StrEnum
 from sqlalchemy import Connection, text
 
 from application.services.persons.core import create_person
-from domain.normalize import normalize_name, sanitize_optional_text
+from domain.normalize import normalize_text, sanitize_optional_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
@@ -73,8 +73,8 @@ def import_rh_person(
     duplicate = conn.execute(
         _RH_DUPLICATE,
         {
-            "ln": normalize_name(last_name),
-            "fn": normalize_name(first_name),
+            "ln": normalize_text(last_name),
+            "fn": normalize_text(first_name),
             "dept": department,
             "role": role,
         },

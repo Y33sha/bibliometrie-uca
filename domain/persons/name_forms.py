@@ -10,7 +10,7 @@ Note storage : la table `person_name_forms (name_form, person_id, sources[])` es
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
-from domain.normalize import clean_raw_author_name, normalize_name
+from domain.normalize import clean_raw_author_name, normalize_text
 from domain.persons.name_matching import normalize_first_name
 
 
@@ -48,7 +48,7 @@ def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     Le prénom est normalisé comme celui des contributions sources (`normalize_first_name`).
     """
     # Même nettoyage que les contributions sources : une fiche créée d'après une forme d'autorité contient l'année de naissance (« Philippe 1973- »).
-    ln = normalize_name(clean_raw_author_name(last_name))
+    ln = normalize_text(clean_raw_author_name(last_name))
     fn = normalize_first_name(clean_raw_author_name(first_name))
     if not ln:
         return set()

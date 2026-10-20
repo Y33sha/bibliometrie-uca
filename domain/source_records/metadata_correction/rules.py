@@ -1,12 +1,12 @@
 """Correction unaire des métadonnées d'un enregistrement, par table de règles.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. Couvre les règles intrinsèques à un enregistrement (URL, titre) comme les règles journal-dépendantes, sans threader de repo. Sert les deux niveaux : la `source_record` entrante (dédup) comme la publication canonique (refresh, via `effective_doc_type_for_publication`).
+Expose `effective_metadata`, fonction pure qui applique des règles de correction à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. Couvre les règles intrinsèques à un enregistrement (URL, titre) comme les règles journal-dépendantes, sans threader de repo. Sert les deux niveaux : la `source_record` comme la publication canonique (refresh, via `effective_doc_type_for_publication`).
 
 Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
 - `applies_to` est un dict de prédicats AND-és sur la `source_record` (clés typées par `_AppliesTo`).
-- `applies_correction` est un dict champ → valeur cible (une seule entrée par règle aujourd'hui).
+- `applies_correction` est un dict champ → valeur cible.
 
-Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
+Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(source_record, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
 
 Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant et la correction du DOI de groupe vivent dans les modules frères `journal_by_doi` et `shared_doi`).
 """
@@ -189,9 +189,8 @@ _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
 # thèse, pas celui d'une version publiée. `10.70675` = ABES (Agence Bibliographique de
 # l'Enseignement Supérieur), résolu via `doi_prefixes` (publisher « agence bibliographique de l
 # enseignement superieur »). Ensemble volontairement incomplet : les thèses déposées en repository
-# institutionnel (Wageningen, Karlsruhe…) ont des préfixes variés non listés — elles n'apparaissent
-# pas avec un journal_id aujourd'hui (conflations → relations-publications). Les généraliser suppose
-# une nature de registrant (éditeur vs repository vs registre) dans `doi_prefixes`, absente à ce jour.
+# institutionnel (Wageningen, Karlsruhe…) ont des préfixes variés non listés. Les généraliser suppose
+# une nature de registrant (éditeur, repository ou registre) dans `doi_prefixes`.
 _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 
 
@@ -204,24 +203,24 @@ class _AppliesTo(TypedDict, total=False):
     Toutes les clés présentes sont AND-ées. Les clés absentes sont ignorées (pas de prédicat sur ce champ).
 
     - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
-    - `journal_type` : `str` — équivalence sur `sp.journal_type` (champ joint depuis `journals`).
-    - `oa_model` : `str` — équivalence sur `sp.oa_model` (champ joint depuis `journals`).
-    - `url_contains` : `str` — substring présente dans au moins une des `sp.urls`.
-    - `doi_contains` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
-    - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
-    - `title_regex` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
-    - `journal_id_present` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la `source_record` est rattachée à un journal », marqueur d'article.
+    - `journal_type` : `str` — équivalence sur `source_record.journal_type` (champ joint depuis `journals`).
+    - `oa_model` : `str` — équivalence sur `source_record.oa_model` (champ joint depuis `journals`).
+    - `url_contains` : `str` — substring présente dans au moins une des `source_record.urls`.
+    - `doi_contains` : `str` — substring présente dans `source_record.doi` (DOIs stockés en minuscules).
+    - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(source_record.title)` commence par au moins un préfixe du tuple.
+    - `title_regex` : `re.Pattern[str]` — `pattern.search(source_record.title)` matche.
+    - `journal_id_present` : `bool` — `(source_record.journal_id is not None)` vaut la valeur attendue. Signal « la `source_record` est rattachée à un journal », marqueur d'article.
     - `doi_prefix_not_in` : `tuple[str, ...]` — la `source_record` porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
-    - `oa_status` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
-    - `embargo_expired` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
-    - `self_declared_preprint` : `bool` — `sp.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
-    - `declares_conference` : `bool` — `sp.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
-    - `registrant_publisher_type` : `str` — équivalence sur `sp.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
-    - `in_proceedings_volume` : `bool` — `sp.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
-    - `group_title` : `frozenset[str]` — `sp.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
-    - `journal_diamond` : `bool` — `sp.journal_diamond` (joint à la lecture : la revue rattachée est diamant) vaut la valeur attendue.
-    - `source` : `str` — équivalence sur `sp.source`.
-    - `author_count_max` : `int` — `sp.author_count` est connu et au plus égal à la valeur.
+    - `oa_status` : `str` — équivalence sur `source_record.oa_status` (le statut d'entrée, ex. `embargoed`).
+    - `embargo_expired` : `bool` — `source_record.embargo_expired` (calculé à la lecture : `embargo_until <= current_date`) vaut la valeur attendue.
+    - `self_declared_preprint` : `bool` — `source_record.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
+    - `declares_conference` : `bool` — `source_record.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
+    - `registrant_publisher_type` : `str` — équivalence sur `source_record.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
+    - `in_proceedings_volume` : `bool` — `source_record.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
+    - `group_title` : `frozenset[str]` — `source_record.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
+    - `journal_diamond` : `bool` — `source_record.journal_diamond` (joint à la lecture : la revue rattachée est diamant) vaut la valeur attendue.
+    - `source` : `str` — équivalence sur `source_record.source`.
+    - `author_count_max` : `int` — `source_record.author_count` est connu et au plus égal à la valeur.
 
     Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -248,7 +247,7 @@ class _AppliesTo(TypedDict, total=False):
 
 
 class _AppliesCorrection(TypedDict, total=False):
-    """Champ corrigé et sa valeur cible. Une seule entrée par règle aujourd'hui."""
+    """Champ corrigé et sa valeur cible."""
 
     doc_type: str
     oa_status: str
@@ -481,8 +480,8 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
     # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
-    # (`embargo_expired`, calculé au fetch) devient `green`. Promotion à l'échéance sans
-    # ré-import HAL — seule règle date-dépendante (la date vit dans le fetch, pas dans la
+    # (`embargo_expired`, calculé à la lecture) devient `green`. Promotion à l'échéance sans
+    # ré-import HAL — seule règle date-dépendante (la date est lue en SQL, hors de la
     # fonction pure). Trace dans `raw_metadata.oa_status` ; corrige un champ orthogonal au
     # `doc_type`, donc aucun chaînage avec les règles ci-dessus.
     MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {

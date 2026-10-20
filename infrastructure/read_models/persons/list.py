@@ -10,7 +10,6 @@ from application.ports.read_models.persons_queries import (
     PersonOut,
     PersonSearchResult,
 )
-from domain.sources.registry import AUTHOR_SOURCES
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -28,7 +27,7 @@ from infrastructure.read_models.filters import (
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.sql_fragments import other_name_form_holders
-from infrastructure.sql_fragments import has_author_role, in_clause
+from infrastructure.sql_fragments import has_author_role
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux contributions sources de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_SOURCE_CONTRIBUTIONS = (
@@ -177,7 +176,6 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
                     JOIN source_records sr ON sr.id = sc.source_record_id
                     WHERE sc.person_id = pnf.person_id
                       AND ci.author_name_normalized = pnf.name_form
-                      AND sc.source IN {in_clause(AUTHOR_SOURCES)}
                    ) AS publication_count
             FROM person_name_forms pnf
             WHERE pnf.person_id = :pid

@@ -6,7 +6,7 @@ Utilisées par le pipeline (matching cross-source dans `domain/persons/matching.
 import re
 from enum import Enum
 
-from domain.normalize import clean_raw_author_name, normalize_name
+from domain.normalize import clean_raw_author_name, normalize_text
 
 # Particules qui ouvrent un nom de famille (« da Silva », « van der Berg », « d'Incan »).
 _PARTICLES = frozenset(
@@ -20,12 +20,12 @@ _PARTICLES = frozenset(
 
 def _opens_family_name(word: str) -> bool:
     """Vrai si le mot est une particule, élidée comprise (« d'Incan »)."""
-    return normalize_name(word) in _PARTICLES or re.match(r"d['’ʼ]", word.lower()) is not None
+    return normalize_text(word) in _PARTICLES or re.match(r"d['’ʼ]", word.lower()) is not None
 
 
 def is_initials(text: str) -> bool:
     """Vrai si chaque mot normalisé de `text` tient en une lettre (« M. », « O. V. », « J.-P. »)."""
-    words = normalize_name(text).split()
+    words = normalize_text(text).split()
     return bool(words) and all(len(word) == 1 for word in words)
 
 
@@ -92,27 +92,27 @@ def first_name_initials(first_name: str) -> tuple[str, ...] | None:
 
     Un prénom est réduit quand chacun de ses mots normalisés tient en une lettre (« A. », « J.-P. »), ou quand il s'écrit en deux ou trois capitales accolées (« JP »).
     """
-    words = normalize_name(first_name).split()
+    words = normalize_text(first_name).split()
     if not words:
         return None
     if all(len(word) == 1 for word in words):
         return tuple(words)
     compact = re.sub(r"[\s.\-]", "", first_name)
     if 2 <= len(compact) <= 3 and compact.isalpha() and compact.isupper():
-        return tuple(normalize_name(compact))
+        return tuple(normalize_text(compact))
     return None
 
 
 def normalize_first_name(first_name: str) -> str:
     """Prénom normalisé. Un prénom réduit à des initiales (`first_name_initials`) donne ses initiales séparées : « JP » et « J.-P. » donnent « j p »."""
     initials = first_name_initials(first_name)
-    return " ".join(initials) if initials is not None else normalize_name(first_name)
+    return " ".join(initials) if initials is not None else normalize_text(first_name)
 
 
 def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
     """Vrai si `initials` commencent la suite des initiales de `first_name`, dans l'ordre : (« a »,) s'étend à « Abdul-Majeed », (« d »,) à « Denis M. », mais (« h »,) pas à « Bo-Hyung »."""
     own = first_name_initials(first_name) or tuple(
-        word[0] for word in normalize_name(first_name).split()
+        word[0] for word in normalize_text(first_name).split()
     )
     return bool(initials) and own[: len(initials)] == initials
 
@@ -120,9 +120,9 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
 def _name_words(*parts: str) -> list[str]:
     """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 
-    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux noms en forme d'autorité (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
+    `normalize_text` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux noms en forme d'autorité (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
     """
-    text = re.sub(r"\d+", " ", normalize_name(" ".join(part for part in parts if part)))
+    text = re.sub(r"\d+", " ", normalize_text(" ".join(part for part in parts if part)))
     return text.split()
 
 

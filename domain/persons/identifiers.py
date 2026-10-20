@@ -5,7 +5,7 @@ ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs immuables e
 - `X("...")` strict : lève `ValidationError` si malformé
 - `X.try_parse(...)` tolérant : renvoie None si malformé
 
-Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui veulent juste normaliser sans construire un VO (typiquement les normalizers de pipeline qui stockent la forme texte en base).
+`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de VO.
 """
 
 import re

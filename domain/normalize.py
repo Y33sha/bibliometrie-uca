@@ -106,7 +106,7 @@ def strip_markup(text: str) -> str:
 
     Le retrait se répète jusqu'à stabilisation, au plus `_MAX_MARKUP_PASSES` fois : le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre.
 
-    Sert à l'export CSV (titre brut) et à `normalize_text` (dédoublonnage).
+    Sert à `to_plain_text` et à `normalize_text`.
     """
     for _ in range(_MAX_MARKUP_PASSES):
         stripped = _MARKUP_RE.sub(_markup_replacement, text)
@@ -236,7 +236,7 @@ def sanitize_raw_text(text: str) -> str:
 
     Le balisage et les entités HTML sont retirés en amont (`to_plain_text`) : une adresse d'affiliation enveloppée dans un paragraphe ou portant `&eacute;` converge sur le même texte que la même adresse déposée en clair.
 
-    Remplace `str.strip()` au point d'insertion des adresses : deux textes ne différant que par un espace insécable convergent ainsi sur la même `raw_text`.
+    Deux adresses qui diffèrent seulement par un espace insécable convergent sur la même `raw_text`.
     """
     if not text:
         return ""
@@ -300,19 +300,6 @@ def normalize_text(text: str) -> str:
         base = ch
         out.append(ch if _is_word_character(ch) else " ")
     return " ".join(unicodedata.normalize("NFC", "".join(out)).split())
-
-
-def normalize_label(label: str) -> str:
-    """Assainit un libellé de sujet avant insertion : trim + collapse des espaces internes.
-
-    Préserve casse et accents ; la déduplication se fait en SQL via `lower(label)` (index unique), et `subjects.label` garde la forme du premier insert. Le balisage qu'une source dépose autour d'un nom d'espèce (`<italic>`) est retiré : un libellé s'affiche en texte.
-    """
-    return to_plain_text(label)
-
-
-# Alias — normalize_name est identique à normalize_text.
-# Les deux noms sont conservés pour la lisibilité du code appelant.
-normalize_name = normalize_text
 
 
 _DIGITS_RE = re.compile(r"\d+")
