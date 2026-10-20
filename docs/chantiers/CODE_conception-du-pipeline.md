@@ -117,7 +117,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 6 — `publications`
 
-- [ ] Modules de `reconciliation/` renommés ; `run` et `ReconcileStats | None` simplifiés.
+- [x] Modules de `reconciliation/` renommés ; `run` et `ReconcileStats | None` simplifiés. dc67c5e86
 - [ ] `store.update_sources` vers `consolidation.py`.
 - [ ] Rattachement d'orphelines (`assign_orphan_source_authorships_to_person`) vers `PgAuthorshipRepository`.
 - [ ] Imports paresseux répétés dans les `build()`.
