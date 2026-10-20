@@ -32,7 +32,7 @@ class RejectedPairItem(BaseModel):
 
 
 class RejectedPairsResponse(BaseModel):
-    """409 des attributions de signatures orphelines : `rejected_pairs` énumère les paires rejetées, à confirmer avec `force`."""
+    """409 des attributions de contributions sources orphelines : `rejected_pairs` énumère les paires rejetées, à confirmer avec `force`."""
 
     detail: str
     rejected_pairs: list[RejectedPairItem]

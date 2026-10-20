@@ -30,7 +30,7 @@ def hal_duplicate_accounts(
     return queries.hal_duplicate_accounts(page=page, per_page=per_page)
 
 
-@router.get("/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
+@router.get("/duplicate-publications-doi", response_model=HalDoiDuplicatesResponse)
 def hal_duplicate_publications_by_doi(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
@@ -40,7 +40,7 @@ def hal_duplicate_publications_by_doi(
     return queries.hal_duplicate_publications_by_doi(page=page, per_page=per_page)
 
 
-@router.get("/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
+@router.get("/duplicate-publications-meta", response_model=HalMetaDuplicatesResponse)
 def hal_duplicate_publications_by_metadata(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),

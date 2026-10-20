@@ -35,9 +35,9 @@
 </script>
 
 <p class="intro">
-  Publications dont <strong>moins de la moitié des auteurs</strong> se retrouvent d'une notice à
+  Publications dont <strong>moins de la moitié des auteurs</strong> se retrouvent d'un enregistrement source à
   l'autre&nbsp;: leurs listes d'auteurs ne se recouvrent pas, signe probable de deux œuvres réunies à
-  tort. Pour chaque notice, le nombre de ses auteurs retrouvés dans une autre notice.
+  tort. Pour chaque enregistrement source, le nombre de ses auteurs retrouvés dans un autre enregistrement source.
 </p>
 
 {#if !list.loaded}
@@ -63,11 +63,11 @@
           <span class="share">
             {percent(item.matched_source_contributions, item.source_contributions)}&nbsp;% d'auteurs retrouvés
           </span>
-          <span>{item.matched_source_contributions} / {item.source_contributions} signatures</span>
+          <span>{item.matched_source_contributions} / {item.source_contributions} contributions sources</span>
         </div>
         <div class="source-records">
           {#each item.source_records as n (n.source + n.source_id)}
-            <span class="notice">
+            <span class="source-record">
               <SourceTag source={n.source} id={n.source_id} href={sourceExternalUrl(n.source, n.source_id) ?? undefined} />
               {n.matched_source_contributions} / {n.source_contributions}
             </span>
@@ -146,7 +146,7 @@
     margin-top: 6px;
     font-size: 0.8rem;
   }
-  .notice {
+  .source-record {
     display: inline-flex;
     align-items: center;
     gap: 5px;

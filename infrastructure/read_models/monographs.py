@@ -41,8 +41,8 @@ _SORT_MAP: dict[MonographSort, str] = {
     "title_desc": "m.title_normalized DESC, m.id",
     "year_asc": "m.year ASC NULLS LAST, m.title_normalized",
     "year_desc": "m.year DESC NULLS LAST, m.title_normalized",
-    "pubs_asc": "publication_count ASC, m.title_normalized",
-    "pubs_desc": "publication_count DESC, m.title_normalized",
+    "publications_asc": "publication_count ASC, m.title_normalized",
+    "publications_desc": "publication_count DESC, m.title_normalized",
 }
 
 

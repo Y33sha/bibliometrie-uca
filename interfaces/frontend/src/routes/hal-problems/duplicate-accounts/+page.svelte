@@ -49,7 +49,7 @@
 {:else if list.items.length === 0}
   <div class="no-results">Aucun doublon détecté</div>
 {:else}
-  <table class="pub-table">
+  <table class="publication-table">
     <thead>
       <tr>
         <th>Personne</th>
@@ -73,7 +73,7 @@
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-pubs">{ha.publication_count} publi{ha.publication_count > 1 ? "s" : ""}</span>
+                <span class="hal-publications">{ha.publication_count} publi{ha.publication_count > 1 ? "s" : ""}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}
@@ -105,7 +105,7 @@
   .count {
     font-size: 0.9rem;
   }
-  .pub-table {
+  .publication-table {
     width: 100%;
     border-collapse: collapse;
     background: var(--card);
@@ -113,7 +113,7 @@
     border-radius: 6px;
     overflow: hidden;
   }
-  .pub-table thead th {
+  .publication-table thead th {
     background: var(--surface);
     padding: 8px 12px;
     text-align: left;
@@ -122,13 +122,13 @@
     color: var(--muted);
     border-bottom: 2px solid var(--border);
   }
-  .pub-table tbody tr {
+  .publication-table tbody tr {
     border-bottom: 1px solid var(--border-subtle);
   }
-  .pub-table tbody tr:hover {
+  .publication-table tbody tr:hover {
     background: var(--surface-hover);
   }
-  .pub-table td {
+  .publication-table td {
     padding: 8px 12px;
     font-size: 0.9rem;
     vertical-align: top;
@@ -160,7 +160,7 @@
   .hal-name {
     font-weight: 500;
   }
-  .hal-pubs {
+  .hal-publications {
     font-size: 0.8rem;
     color: var(--muted);
     background: var(--border-subtle);

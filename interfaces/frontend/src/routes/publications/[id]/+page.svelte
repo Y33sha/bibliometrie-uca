@@ -12,7 +12,7 @@
   import PersonsBlock from "./PersonsBlock.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
 
-  const pubId = $derived($page.params.id);
+  const publicationId = $derived($page.params.id);
   let canGoBack = $state(false);
 
   let data = $state<PubResponse | null>(null);
@@ -20,7 +20,7 @@
 
   const pub = $derived(data?.publication);
   const hasTruthTable = $derived((data?.contributions.length ?? 0) > 0);
-  // Structures liées : union des structures des signatures consolidées, ordre d'apparition.
+  // Structures liées : union des structures des contributions, ordre d'apparition.
   const structureIds = $derived.by(() => {
     const seen = new Set<number>();
     const out: number[] = [];
@@ -46,7 +46,7 @@
 
   // Charge la publication de l'identifiant de la page.
   $effect(() => {
-    const id = pubId;
+    const id = publicationId;
     if (!id) return;
     data = null;
     error = false;
@@ -79,9 +79,9 @@
 {/if}
 
 {#if error}
-  <div class="pub-header"><div class="no-results">Publication introuvable</div></div>
+  <div class="publication-header"><div class="no-results">Publication introuvable</div></div>
 {:else if !pub}
-  <div class="pub-header"><div class="loading">Chargement…</div></div>
+  <div class="publication-header"><div class="loading">Chargement…</div></div>
 {:else}
   <PublicationHeader {pub} relations={data!.relations} />
 
@@ -119,14 +119,14 @@
 {/if}
 
 <style>
-  .pub-header {
+  .publication-header {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 20px 24px;
     margin-bottom: 16px;
   }
-  /* Deux colonnes : contenu à gauche, accès & identité à droite. Replie en une colonne (sidebar sous le contenu) en dessous de 860px. */
+  /* Deux colonnes : contenu à gauche, accès et identifiants à droite. Replie en une colonne (sidebar sous le contenu) en dessous de 860px. */
   .detail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;

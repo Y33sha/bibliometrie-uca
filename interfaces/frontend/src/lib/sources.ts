@@ -6,7 +6,7 @@ interface SourceMeta {
 	label: string;
 	/** Logo local — l'appli doit tourner hors ligne (pas de logo distant). */
 	icon?: string;
-	/** Lien vers la notice d'origine sur le portail de la source. */
+	/** Lien vers l'enregistrement d'origine sur le portail de la source. */
 	externalUrl: (sourceId: string, oaStatus?: string | null) => string;
 }
 
@@ -60,7 +60,7 @@ export function sourceIcon(source: string): string | undefined {
 	return SOURCES[source]?.icon;
 }
 
-/** Lien externe vers la notice d'origine (`#` si source inconnue). */
+/** Lien externe vers l'enregistrement d'origine (`#` si source inconnue). */
 export function sourceExternalUrl(
 	source: string,
 	sourceId: string,
@@ -69,7 +69,7 @@ export function sourceExternalUrl(
 	return SOURCES[source]?.externalUrl(sourceId, oaStatus) ?? '#';
 }
 
-/** Rapport de participation d'un membre Crossref : l'identité sous laquelle un éditeur dépose ses DOI. */
+/** Rapport de participation d'un membre Crossref : le compte sous lequel un éditeur dépose ses DOI. */
 export function crossrefMemberUrl(memberId: number): string {
 	return `https://www.crossref.org/members/prep/${memberId}`;
 }

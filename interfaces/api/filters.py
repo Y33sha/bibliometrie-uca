@@ -53,7 +53,7 @@ def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
 TOGGLE_VALUES: frozenset[str] = frozenset({"yes", "no"})
 """Vocabulaire d'une facette à deux états, telle que la query string la porte.
 
-Les deux valeurs se combinent en OU : les cocher toutes deux ne contraint rien, et n'en cocher aucune non plus. Convention de transport, partagée par les filtres qui répondent par oui ou par non — signature correspondante, présence dans le périmètre.
+Les deux valeurs se combinent en OU : les cocher toutes deux ne contraint rien, et n'en cocher aucune non plus. Convention de transport, partagée par les filtres qui répondent par oui ou par non — contribution source correspondante, présence dans le périmètre.
 """
 
 

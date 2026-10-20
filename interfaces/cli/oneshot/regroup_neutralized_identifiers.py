@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
 """Marque à regrouper les publications dont les groupes d'auteurs ont pu s'appuyer sur un identifiant neutralisé.
 
-Visées : les publications à plusieurs notices dont une signature neutralise son ORCID ou son IdRef. Elles reçoivent `contributions_dirty`, et la phase `author_grouping` recalcule leurs groupes au run suivant.
+Visées : les publications à plusieurs enregistrements sources dont une contribution source neutralise son ORCID ou son IdRef. Elles reçoivent `contributions_dirty`, et la phase `author_grouping` recalcule leurs groupes au run suivant.
 
 Usage :
     python -m interfaces.cli.oneshot.regroup_neutralized_identifiers [--dry-run]

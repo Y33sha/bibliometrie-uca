@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-18)
 """Marque `source_contributions.collective` sur le stock d'après la règle du nom (`is_collective_name`), par lots d'identifiants validés un à un.
 
-Les décomptes d'auteurs des notices touchées sont recalculés et leurs publications sont à regrouper. La phase `persons` suivante détache les signatures marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé. `--contains` restreint l'examen aux noms bruts qui contiennent un texte.
+Les décomptes d'auteurs des enregistrements sources touchés sont recalculés et leurs publications sont à regrouper. La phase `persons` suivante détache les contributions sources marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé. `--contains` restreint l'examen aux noms bruts qui contiennent un texte.
 
 Usage :
     python -m interfaces.cli.oneshot.mark_collective_source_contributions [--dry-run] [--contains "et al"] [--from-id N] [--batch 1000000]
@@ -25,7 +25,7 @@ log = setup_logger("mark_collective_source_contributions", os.path.dirname(__fil
 
 
 def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = None) -> list[int]:
-    """Signatures non marquées du lot `[lo, hi]` dont le nom désigne un collectif. `contains` restreint le lot aux noms bruts qui contiennent ce texte, sans tenir compte de la casse."""
+    """Contributions sources non marquées du lot `[lo, hi]` dont le nom désigne un collectif. `contains` restreint le lot aux noms bruts qui contiennent ce texte, sans tenir compte de la casse."""
     rows = conn.execute(
         text("""
             SELECT id, raw_author_name, raw_last_name, raw_first_name
@@ -48,7 +48,7 @@ def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = N
 
 
 def mark_collective(conn: Connection, ids: list[int]) -> None:
-    """Marque collectives les signatures `ids`, recalcule les décomptes d'auteurs de leurs notices et met leurs publications à regrouper."""
+    """Marque collectives les contributions sources `ids`, recalcule les décomptes d'auteurs de leurs enregistrements sources et met leurs publications à regrouper."""
     source_record_ids = list(
         conn.execute(
             text("""
@@ -72,7 +72,9 @@ def mark_collective(conn: Connection, ids: list[int]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="compte sans écrire")
-    parser.add_argument("--from-id", type=int, help="premier identifiant de signature à traiter")
+    parser.add_argument(
+        "--from-id", type=int, help="premier identifiant de contribution source à traiter"
+    )
     parser.add_argument("--contains", help="texte que le nom brut doit contenir")
     parser.add_argument(
         "--batch", type=int, default=1_000_000, help="largeur d'un lot, en identifiants"
@@ -95,7 +97,7 @@ def main() -> int:
             conn.commit()
             marked += len(ids)
             log.info(
-                "signatures %d à %d : %d collectives au total, %.1f %%, %.0f s",
+                "contributions sources %d à %d : %d collectives au total, %.1f %%, %.0f s",
                 lo,
                 hi,
                 marked,
@@ -103,7 +105,11 @@ def main() -> int:
                 time.monotonic() - started,
             )
             lo = hi + 1
-    log.info("signatures collectives %s : %d", "trouvées" if args.dry_run else "marquées", marked)
+    log.info(
+        "contributions sources collectives %s : %d",
+        "trouvées" if args.dry_run else "marquées",
+        marked,
+    )
     return 0
 
 

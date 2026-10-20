@@ -1,6 +1,6 @@
 """Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
 
-Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les signatures elles-mêmes vivent dans `contributions.py`.
+Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
 
 L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
@@ -481,7 +481,7 @@ def detach_contributions(
     contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DetachContributionsResponse:
-    """Rejette durablement les paires (publication, personne) des signatures sources choisies, et nettoie les formes de nom devenues sans objet."""
+    """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
     return DetachContributionsResponse.model_validate(
         person_commands.detach_contributions(
             conn,
@@ -508,7 +508,7 @@ def update_name_form_status(
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable et détache les signatures qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les signatures consolidées devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
     row = person_commands.update_name_form_status(
         conn,

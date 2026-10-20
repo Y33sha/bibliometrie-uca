@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-19)
 """Répare l'encodage des noms d'auteur du stock (« TÃ©lesphore » → Télesphore, « Fran鏾is » → François), comme le fait la normalisation (`clean_raw_author_name`).
 
-Il retire aussi les accolades LaTeX restées sans commande (« Geß{}ner »). Les signatures dont le nom présente un défaut d'encodage (`ENCODING_ERROR_PATTERN`) ou des accolades suivent le traitement de `decode_latex_author_names` : nom réparé, identité qui en découle, personne détachée sauf épinglage, décomptes d'auteurs recalculés, publications à regrouper, identités orphelines supprimées.
+Il retire aussi les accolades LaTeX restées sans commande (« Geß{}ner »). Les contributions sources dont le nom présente un défaut d'encodage (`ENCODING_ERROR_PATTERN`) ou des accolades suivent le traitement de `decode_latex_author_names` : nom réparé, informations du contributeur qui en découlent, personne détachée sauf épinglage, décomptes d'auteurs recalculés, publications à regrouper, lignes de `contributor_information` orphelines supprimées.
 
 Usage :
     python -m interfaces.cli.oneshot.repair_author_name_encoding [--dry-run]
@@ -30,7 +30,11 @@ def main() -> int:
 
     with get_sync_engine().connect() as conn:
         rows, source_records = decoded_names(conn, CANDIDATES_SQL, PARAMS)
-        log.info("signatures à réparer : %d, dans %d notices", len(rows), len(source_records))
+        log.info(
+            "contributions sources à réparer : %d, dans %d enregistrements sources",
+            len(rows),
+            len(source_records),
+        )
         for row in rows[:5]:
             log.info(
                 "  %s / %s / %s",
@@ -44,7 +48,9 @@ def main() -> int:
         orphans = decode(conn, rows, source_records)
         conn.commit()
         log.info(
-            "signatures réparées : %d ; identités orphelines supprimées : %d", len(rows), orphans
+            "contributions sources réparées : %d ; informations du contributeur orphelines supprimées : %d",
+            len(rows),
+            orphans,
         )
     return 0
 

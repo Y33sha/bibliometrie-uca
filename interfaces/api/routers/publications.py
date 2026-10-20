@@ -250,7 +250,7 @@ def suspect_merges(
     per_page: int = Query(50, ge=1, le=200),
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> SuspectMergesResponse:
-    """Publications dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice, paginées."""
+    """Publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source, paginées."""
     return queries.suspect_merges(page=page, per_page=per_page)
 
 

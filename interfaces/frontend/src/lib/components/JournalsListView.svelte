@@ -52,7 +52,7 @@
 
 	// --- Filter state ---
 	let search = $state('');
-	let currentSort = $state('pubs_desc');
+	let currentSort = $state('publications_desc');
 	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
 	let selectedJournalTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
@@ -108,7 +108,7 @@
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
 			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
 			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
 		},
 	});
@@ -152,7 +152,7 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'title' | 'publisher' | 'pubs'): string {
+	function sortArrow(col: 'title' | 'publisher' | 'publications'): string {
 		if (currentSort === col) return '▲';
 		if (currentSort === '-' + col) return '▼';
 		return '';
@@ -238,8 +238,8 @@
 				</th>
 			{/if}
 			<th>Type</th>
-			<th class="num sortable" onclick={() => setSort('pubs')}>
-				Publis {sortArrow('pubs')}
+			<th class="num sortable" onclick={() => setSort('publications')}>
+				Publis {sortArrow('publications')}
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

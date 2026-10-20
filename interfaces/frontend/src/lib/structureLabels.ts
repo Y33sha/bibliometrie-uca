@@ -2,7 +2,7 @@ import type { components } from './api/schema';
 
 export type StructInfo = components['schemas']['StructureInfo'];
 
-/** Ce qu'une signature dit de son affiliation : adresses brutes et structures identifiées. */
+/** Ce qu'une contribution source dit de son affiliation : adresses brutes et structures identifiées. */
 export interface Affiliation {
 	raw_affiliation?: string | null;
 	structure_ids?: number[] | null;

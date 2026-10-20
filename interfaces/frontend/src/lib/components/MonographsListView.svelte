@@ -48,7 +48,7 @@
 	let selectedYears: string[] = $state([]);
 	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
 	let selectedJournal: string[] = $state([]); // 0 ou 1 identifiant de collection
-	let currentSort = $state('pubs_desc');
+	let currentSort = $state('publications_desc');
 
 	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
 	function buildFilterParams(): URLSearchParams {
@@ -94,7 +94,7 @@
 			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
 			selectedJournal: { type: 'string_array', urlKey: 'journal_id' },
 			search: { type: 'single', urlKey: 'search' },
-			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'pubs_desc' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
 		},
 	});
@@ -121,14 +121,14 @@
 
 	const onSearchInput = url.debouncedSearch(onFilterChange);
 
-	function setSort(column: 'title' | 'year' | 'pubs') {
+	function setSort(column: 'title' | 'year' | 'publications') {
 		currentSort = currentSort === `${column}_desc` ? `${column}_asc` : `${column}_desc`;
 		monographs.page = 1;
 		syncUrl();
 		monographs.load();
 	}
 
-	function sortArrow(column: 'title' | 'year' | 'pubs'): string {
+	function sortArrow(column: 'title' | 'year' | 'publications'): string {
 		if (currentSort === `${column}_asc`) return '▲';
 		if (currentSort === `${column}_desc`) return '▼';
 		return '';
@@ -195,7 +195,7 @@
 				<th>ISBN</th>
 				{#if !publisherFixed}<th>Éditeur</th>{/if}
 				{#if !journalFixed}<th>Collection</th>{/if}
-				<th class="num sortable" onclick={() => setSort('pubs')}>Publis {sortArrow('pubs')}</th>
+				<th class="num sortable" onclick={() => setSort('publications')}>Publis {sortArrow('publications')}</th>
 			</tr>
 		</thead>
 		<tbody>

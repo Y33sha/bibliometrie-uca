@@ -64,8 +64,8 @@
 	}
 
 	async function loadTypeLabels() {
-		const pubOpts = await api<EnumOption[]>('/api/publishers/types');
-		publisherTypeLabels = Object.fromEntries(pubOpts.map((o) => [o.value, o.label_fr]));
+		const publicationOptions = await api<EnumOption[]>('/api/publishers/types');
+		publisherTypeLabels = Object.fromEntries(publicationOptions.map((o) => [o.value, o.label_fr]));
 	}
 
 	async function loadDashboard() {
@@ -214,7 +214,7 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`publisher-${publisherId}-pubs`}
+				apiKey={`publisher-${publisherId}-publications`}
 				externalFilters={{ publisherId }}
 				basePath={`/publishers/${publisherId}`}
 				showFilterBanner={false}

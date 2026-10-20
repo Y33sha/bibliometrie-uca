@@ -60,7 +60,7 @@
 		return params;
 	}
 
-	const pubs = usePaginatedFetch<ThesisRow>({
+	const listing = usePaginatedFetch<ThesisRow>({
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
 		// svelte-ignore state_referenced_locally
@@ -119,14 +119,14 @@
 			sourceStates,
 			search,
 			currentSort,
-			currentPage: pubs.page
+			currentPage: listing.page
 		}));
 	}
 
 	function onFilterChange() {
-		pubs.page = 1;
+		listing.page = 1;
 		syncUrl();
-		pubs.load();
+		listing.load();
 		facets.load();
 	}
 
@@ -141,9 +141,9 @@
 	}
 
 	const onSearchInput = url.debouncedSearch(() => {
-		pubs.page = 1;
+		listing.page = 1;
 		syncUrl();
-		pubs.load();
+		listing.load();
 		facets.load();
 	});
 
@@ -167,10 +167,10 @@
 				sourceStates = restored.sourceStates as Record<string, 'all' | 'yes' | 'no'>;
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as PublicationSort;
-			if (restored.currentPage) pubs.page = restored.currentPage as number;
+			if (restored.currentPage) listing.page = restored.currentPage as number;
 		}
 		await facets.load();
-		pubs.load();
+		listing.load();
 	});
 </script>
 
@@ -210,18 +210,18 @@
 		counts={facets.sourceCounts}
 		onchange={() => onFilterChange()}
 	/>
-	<span class="count">{pubs.total} thèse{pubs.total > 1 ? 's' : ''}</span>
+	<span class="count">{listing.total} thèse{listing.total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
-<ThesesTable items={pubs.items} loading={pubs.loading} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
+<ThesesTable items={listing.items} loading={listing.loading} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
 <Pagination
-	page={pubs.page}
-	pages={pubs.pages}
+	page={listing.page}
+	pages={listing.pages}
 	onchange={(p: number) => {
-		pubs.page = p;
+		listing.page = p;
 		syncUrl();
-		pubs.load();
+		listing.load();
 	}}
 />
 

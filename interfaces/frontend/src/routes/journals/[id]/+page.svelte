@@ -260,7 +260,7 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`journal-${journalId}-pubs`}
+				apiKey={`journal-${journalId}-publications`}
 				externalFilters={{ journalId }}
 				basePath={`/journals/${journalId}`}
 				showFilterBanner={false}

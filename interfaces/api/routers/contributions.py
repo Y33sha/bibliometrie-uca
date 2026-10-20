@@ -1,4 +1,4 @@
-"""Router des signatures : exclusion d'une contribution, et revue des signatures orphelines. Sert `/api/contributions/*`.
+"""Router des contributions sources : exclusion d'une contribution, et revue des contributions sources orphelines. Sert `/api/contributions/*`.
 
 L'exclusion rejette une contribution au niveau consolidé, et son `contribution_id` désigne une ligne d'`contributions`. Les orphelines vivent un cran en dessous : ce sont les lignes de `source_contributions` du périmètre qu'aucune personne ne porte (`person_id` nul), que le router liste et attribue sous `/orphans`, par leur `source_contribution_id`.
 
@@ -47,12 +47,12 @@ router = APIRouter(prefix="/api/contributions", tags=["contributions"])
 def orphan_contributions_count(
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanCountResponse:
-    """Nombre de signatures du périmètre qu'aucune personne ne porte."""
+    """Nombre de contributions sources du périmètre rattachées à aucune personne."""
     return queries.orphan_contributions_count()
 
 
 def orphan_filters(search: SearchTerm = "", lab_id: str = Query("")) -> OrphanFilters:
-    """Filtres communs à la liste des signatures orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les signatures sans laboratoire."""
+    """Filtres communs à la liste des contributions sources orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les contributions sources sans laboratoire."""
     lab_ids, lab_none = parse_lab_id(lab_id)
     return OrphanFilters(search=search, lab_ids=lab_ids, lab_none=lab_none)
 
@@ -64,7 +64,7 @@ def list_orphan_contributions(
     filters: OrphanFilters = Depends(orphan_filters),
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanContributionsResponse:
-    """Liste les signatures du périmètre qu'aucune personne ne porte."""
+    """Liste les contributions sources du périmètre rattachées à aucune personne."""
     return queries.list_orphan_contributions(filters=filters, page=page, per_page=per_page)
 
 
@@ -73,7 +73,7 @@ def orphan_contributions_facets(
     filters: OrphanFilters = Depends(orphan_filters),
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanContributionsFacetsResponse:
-    """Facette laboratoires des signatures orphelines."""
+    """Facette laboratoires des contributions sources orphelines."""
     return queries.orphan_contributions_facets(filters=filters)
 
 
@@ -89,9 +89,9 @@ def assign_orphan_contribution(
     contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
-    """Attribue une signature orpheline à une personne, que la requête désigne ou fait créer.
+    """Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une signature introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une signature qui porte déjà une personne (`ContributionAlreadyAssignedError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source déjà rattachée à une personne (`ContributionAlreadyAssignedError`).
     """
     new_person: tuple[str, str] | None = None
     if body.create_person:
@@ -122,9 +122,9 @@ def batch_assign_orphan_contributions(
     contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs signatures orphelines à une personne existante.
+    """Attribue plusieurs contributions sources orphelines à une personne existante.
 
-    Les signatures absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les signatures rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+    Les contributions sources absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions sources rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
     if not body.source_contribution_ids:
         return OrphanBatchAssignResponse(assigned=0)
@@ -154,7 +154,7 @@ def exclude_contribution(
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
-    Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les signatures sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+    Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     contribution_commands.exclude_contribution(
         conn, contribution_id, repo=repo, person_repo=persons, audit_repo=audit

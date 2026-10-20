@@ -280,7 +280,7 @@ export function issnLabel(issn: { support: string | null; linking: boolean }): s
 	return support ?? 'ISSN';
 }
 
-/** Rôles d'une signature dans leur ordre d'affichage. Valeurs de `ContributionRole` côté backend. */
+/** Rôles d'une contribution source dans leur ordre d'affichage. Valeurs de `ContributionRole` côté backend. */
 export const CONTRIBUTION_ROLE_ORDER = [
 	'author',
 	'speaker',
@@ -295,7 +295,7 @@ export const CONTRIBUTION_ROLE_ORDER = [
 	'other',
 ];
 
-/** Libellés FR des rôles d'une signature. */
+/** Libellés FR des rôles d'une contribution source. */
 export const contributionRoleLabels: Record<string, string> = {
 	author: 'Auteur',
 	speaker: 'Orateur',

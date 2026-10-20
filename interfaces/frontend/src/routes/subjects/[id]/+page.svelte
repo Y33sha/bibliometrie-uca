@@ -95,7 +95,7 @@
     {:else}
       {#key data.subject.id}
         <PublicationsListView
-          apiKey={`subject-${data.subject.id}-pubs`}
+          apiKey={`subject-${data.subject.id}-publications`}
           externalFilters={{
             subjectId: data.subject.id,
             subjectLabel: data.subject.label,

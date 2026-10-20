@@ -17,17 +17,17 @@
 	let activeTab: 'doi' | 'meta' = $state('doi');
 
 	const doi = usePaginatedFetch<DoiPair>({
-		endpoint: '/api/hal-problems/duplicate-pubs-doi',
+		endpoint: '/api/hal-problems/duplicate-publications-doi',
 		itemsKey: 'pairs',
-		apiKey: 'hal-duplicate-pubs-doi',
+		apiKey: 'hal-duplicate-publications-doi',
 		pageParam: 'doi_page',
 		buildParams: () => new URLSearchParams(),
 	});
 
 	const meta = usePaginatedFetch<MetaPair>({
-		endpoint: '/api/hal-problems/duplicate-pubs-meta',
+		endpoint: '/api/hal-problems/duplicate-publications-meta',
 		itemsKey: 'pairs',
-		apiKey: 'hal-duplicate-pubs-meta',
+		apiKey: 'hal-duplicate-publications-meta',
 		pageParam: 'meta_page',
 		buildParams: () => new URLSearchParams(),
 	});
@@ -38,7 +38,7 @@
 		if (doi.page > 1) p.set('doi_page', String(doi.page));
 		if (meta.page > 1) p.set('meta_page', String(meta.page));
 		const qs = p.toString();
-		replaceState(`${base}/hal-problems/duplicate-pubs` + (qs ? '?' + qs : ''), {});
+		replaceState(`${base}/hal-problems/duplicate-publications` + (qs ? '?' + qs : ''), {});
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {
@@ -92,10 +92,10 @@
 		<div class="doi-list">
 			{#each doi.items as pair}
 				<div class="doi-card">
-					<div class="pub-meta-line">
+					<div class="publication-meta-line">
 						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
-						<a href="{base}/publications/{pair.publication.id}" class="pub-link"><PublicationTitle titre={pair.publication.title} /></a>
+						<a href="{base}/publications/{pair.publication.id}" class="publication-link"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
@@ -120,7 +120,7 @@
 	{:else if meta.items.length === 0}
 		<div class="no-results">Aucun doublon par métadonnées</div>
 	{:else}
-		<table class="pub-table meta-table">
+		<table class="publication-table meta-table">
 			<thead>
 				<tr>
 					<th>Publication A</th>
@@ -132,8 +132,8 @@
 					<tr>
 						{#each [pair.publication_a, pair.publication_b] as pub}
 							<td>
-								<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>
-								<div class="pub-meta-line">
+								<a href="{base}/publications/{pub.id}" class="publication-link"><PublicationTitle titre={pub.title} /></a>
+								<div class="publication-meta-line">
 									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
@@ -180,7 +180,7 @@
 	}
 	.tab.active { box-shadow: none; border-bottom-color: var(--accent); }
 
-	.pub-table {
+	.publication-table {
 		width: 100%;
 		border-collapse: collapse;
 		background: var(--card);
@@ -188,14 +188,14 @@
 		border-radius: 6px;
 		overflow: hidden;
 	}
-	.pub-table thead th {
+	.publication-table thead th {
 		background: var(--surface); padding: 8px 12px; text-align: left;
 		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
-	.pub-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.pub-table tbody tr:hover { background: var(--surface-hover); }
-	.pub-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
+	.publication-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+	.publication-table tbody tr:hover { background: var(--surface-hover); }
+	.publication-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
 	.meta-table td { width: 50%; }
 
 	.doi-list { display: flex; flex-direction: column; gap: 8px; }
@@ -208,9 +208,9 @@
 	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }
 	.hal-row { display: flex; gap: 6px; align-items: center; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); margin-left: 8px; }
-	.pub-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.pub-link:hover { text-decoration: underline; }
-	.pub-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
+	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
+	.publication-link:hover { text-decoration: underline; }
+	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
 	.hal-badge {
 		display: inline-block; padding: 2px 8px; background: #1a6fb5;
 		border-radius: 4px; font-size: 0.82rem; color: #fff;

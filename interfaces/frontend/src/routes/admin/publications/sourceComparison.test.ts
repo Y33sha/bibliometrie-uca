@@ -7,7 +7,7 @@ import {
 	otherRoles,
 	type ComparisonRow,
 	type SourceRecord,
-	type SourceSignature,
+	type SourceContribution,
 } from './sourceComparison';
 
 function record(overrides: Partial<SourceRecord>): SourceRecord {
@@ -122,7 +122,7 @@ describe('comparisonRows', () => {
 	});
 });
 
-function signature(overrides: Partial<SourceSignature>): SourceSignature {
+function contribution(overrides: Partial<SourceContribution>): SourceContribution {
 	return {
 		id: 1,
 		source_record_id: 1,
@@ -147,11 +147,11 @@ function signature(overrides: Partial<SourceSignature>): SourceSignature {
 describe('authorRows', () => {
 	const records = [record({ id: 1, source: 'hal' }), record({ id: 2, source: 'openalex' })];
 
-	it("réunit les signatures d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
+	it("réunit les contributions sources d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
 		const rows = authorRows(records, [
-			signature({ id: 11, source_record_id: 1, position: 1, group_id: 7, group_position: 1 }),
-			signature({ id: 21, source_record_id: 2, position: 0, group_id: 7, group_position: 1 }),
-			signature({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			contribution({ id: 11, source_record_id: 1, position: 1, group_id: 7, group_position: 1 }),
+			contribution({ id: 21, source_record_id: 2, position: 0, group_id: 7, group_position: 1 }),
+			contribution({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells.map((c) => c?.id ?? null))).toEqual([
 			[10, null],
@@ -160,11 +160,11 @@ describe('authorRows', () => {
 		expect(rows.map((r) => r.divergent)).toEqual([true, false]);
 	});
 
-	it('place une signature hors des groupes à sa position, et les signatures sans position en dernier', () => {
+	it('place une contribution source hors des groupes à sa position, et les contributions sources sans position en dernier', () => {
 		const rows = authorRows(records, [
-			signature({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
-			signature({ id: 12, source_record_id: 1, position: 2, collective: true }),
-			signature({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			contribution({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
+			contribution({ id: 12, source_record_id: 1, position: 2, collective: true }),
+			contribution({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);
 	});
@@ -172,10 +172,10 @@ describe('authorRows', () => {
 
 describe('otherRoles', () => {
 	it("rend les rôles autres qu'auteur dans l'ordre d'affichage", () => {
-		expect(otherRoles(signature({ roles: ['contributor', 'author', 'editor'] }))).toEqual([
+		expect(otherRoles(contribution({ roles: ['contributor', 'author', 'editor'] }))).toEqual([
 			'editor',
 			'contributor',
 		]);
-		expect(otherRoles(signature({ roles: ['author'] }))).toEqual([]);
+		expect(otherRoles(contribution({ roles: ['author'] }))).toEqual([]);
 	});
 });

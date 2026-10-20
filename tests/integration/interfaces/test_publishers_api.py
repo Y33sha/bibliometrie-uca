@@ -93,11 +93,11 @@ class TestListPublishers:
         assert r.status_code == 200
 
     def test_sort_publications(self, client):
-        r = client.get("/api/publishers", params={"sort": "pubs_asc"})
+        r = client.get("/api/publishers", params={"sort": "publications_asc"})
         assert r.status_code == 200
 
     def test_sort_publications_desc(self, client):
-        r = client.get("/api/publishers", params={"sort": "pubs_desc"})
+        r = client.get("/api/publishers", params={"sort": "publications_desc"})
         assert r.status_code == 200
 
     def test_sort_outside_the_vocabulary_is_refused(self, client):

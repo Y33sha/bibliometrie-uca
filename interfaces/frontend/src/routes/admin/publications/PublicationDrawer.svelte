@@ -35,7 +35,7 @@
       });
   });
 
-  // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de signatures d'un même auteur.
+  // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de contributions sources d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_records) : []);
   const rows = $derived(comparisonRows(records));
   const authors = $derived(data ? authorRows(records, data.source_contributions) : []);
@@ -119,7 +119,7 @@
                 <th
                   class="field"
                   scope="row"
-                  title={row.divergent ? "Signature absente d'un enregistrement" : undefined}
+                  title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
                 >
 </th>
                 {#each row.cells as s}

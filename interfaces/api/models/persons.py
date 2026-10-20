@@ -96,7 +96,7 @@ class IdentifierReassignResponse(BaseModel):
 
 
 class DetachContributionsResponse(BaseModel):
-    """Décompte d'un détachement de signatures : signatures détachées, contributions supprimées, formes de nom nettoyées."""
+    """Décompte d'un détachement de contributions sources : contributions sources détachées, contributions supprimées, formes de nom nettoyées."""
 
     detached: int
     deleted_contributions: int

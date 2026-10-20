@@ -57,8 +57,8 @@ _SORT_MAP = {
     "name_desc": "p.name DESC",
     "journals_asc": "journal_count ASC, p.name ASC",
     "journals_desc": "journal_count DESC, p.name ASC",
-    "pubs_asc": "publication_count ASC, p.name ASC",
-    "pubs_desc": "publication_count DESC, p.name ASC",
+    "publications_asc": "publication_count ASC, p.name ASC",
+    "publications_desc": "publication_count DESC, p.name ASC",
 }
 
 

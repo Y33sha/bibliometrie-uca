@@ -5,15 +5,15 @@ import { dropPageParam, isPageOutOfRange } from '$lib/pagination';
  * Composable pour le chargement paginé de données.
  *
  * Usage :
- *   const pubs = usePaginatedFetch<Publication>({
+ *   const listing = usePaginatedFetch<Publication>({
  *     endpoint: '/api/publications',
  *     itemsKey: 'publications',
  *     perPage: 100,
- *     apiKey: 'pub-list',
+ *     apiKey: 'publication-list',
  *     buildParams: () => buildFilterParams(),
  *   });
- *   await pubs.load();          // charge la page courante
- *   pubs.goToPage(3);           // change de page + recharge + scroll top
+ *   await listing.load();          // charge la page courante
+ *   listing.goToPage(3);           // change de page + recharge + scroll top
  *
  * `data` expose la dernière réponse entière, pour les champs portés à côté de la liste (facettes, drapeaux).
  */

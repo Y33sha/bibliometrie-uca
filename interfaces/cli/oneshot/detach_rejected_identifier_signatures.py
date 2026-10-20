@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-20)
-"""Détache les signatures rattachées à leur personne par un identifiant rejeté pour cette personne.
+"""Détache les contributions sources rattachées à leur personne par un identifiant rejeté pour cette personne.
 
-Visées : les signatures non épinglées résolues par identifiant (`resolution_mode = 'identifier'`), dont l'identité contient un identifiant rejeté pour leur personne, et aucun identifiant non rejeté de cette personne. Leur `person_id` et leur `resolution_mode` passent à NULL. Au run suivant, la phase `persons` les re-résout sans l'identifiant rejeté, et détache les signatures cross-source restées sans ancre.
+Visées : les contributions sources non épinglées résolues par identifiant (`resolution_mode = 'identifier'`), dont les informations du contributeur contiennent un identifiant rejeté pour leur personne, et aucun identifiant non rejeté de cette personne. Leur `person_id` et leur `resolution_mode` passent à NULL. Au run suivant, la phase `persons` les re-résout sans l'identifiant rejeté, et détache les contributions sources cross-source restées sans ancre.
 
 Usage :
     python -m interfaces.cli.oneshot.detach_rejected_identifier_signatures [--dry-run]
@@ -28,7 +28,7 @@ log = setup_logger("detach_rejected_identifier_signatures", os.path.dirname(__fi
 
 _REJECTED = AttributionStatus.REJECTED.value
 
-# Signature `sa` dont l'identité `aik` contient un identifiant de sa personne, au statut rejeté (`=`) ou non rejeté (`<>`).
+# Contribution source `sc` dont les informations du contributeur `ci` contiennent un identifiant de sa personne, au statut rejeté (`=`) ou non rejeté (`<>`).
 _CARRIES_IDENTIFIER = """
     EXISTS (
         SELECT 1 FROM person_identifiers pi
@@ -66,7 +66,7 @@ _DETACH_SQL = text(f"""
 
 
 def detach(conn: Connection) -> int:
-    """Détache les signatures visées. Rend le nombre de signatures détachées."""
+    """Détache les contributions sources visées. Rend le nombre de contributions sources détachées."""
     return conn.execute(_DETACH_SQL).rowcount
 
 
@@ -78,14 +78,16 @@ def main() -> int:
     with get_sync_engine().connect() as conn:
         counts = conn.execute(_COUNT_SQL).one()
         log.info(
-            "signatures visées : %d, de %d personnes", counts.source_contributions, counts.personnes
+            "contributions sources visées : %d, de %d personnes",
+            counts.source_contributions,
+            counts.personnes,
         )
         if args.dry_run or not counts.source_contributions:
             conn.rollback()
             return 0
         detached = detach(conn)
         conn.commit()
-        log.info("signatures détachées : %d", detached)
+        log.info("contributions sources détachées : %d", detached)
     return 0
 
 

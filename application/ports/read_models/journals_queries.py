@@ -20,7 +20,12 @@ from domain.journals.journal import JournalType, OaModel
 
 # Vocabulaire de tri de la liste des revues : le champ, puis le sens.
 JournalSort = Literal[
-    "title_asc", "title_desc", "publisher_asc", "publisher_desc", "pubs_asc", "pubs_desc"
+    "title_asc",
+    "title_desc",
+    "publisher_asc",
+    "publisher_desc",
+    "publications_asc",
+    "publications_desc",
 ]
 
 

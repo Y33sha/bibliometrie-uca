@@ -1,7 +1,7 @@
 # STATUS: maintenance
-"""Supprime les notices parues avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Les notices de theses.fr restent : ce moissonnage couvre tout l'historique des établissements.
+"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Les enregistrements sources de theses.fr restent : ce moissonnage couvre tout l'historique des établissements.
 
-Les notices sœurs sont marquées à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
+Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
 Usage :
     python -m interfaces.cli.maintenance.delete_source_records_out_of_window [--dry-run]
@@ -34,7 +34,7 @@ def fetch_cutoff(conn: Connection) -> int:
 
 
 def count_targets(conn: Connection, cutoff: int) -> dict[str, int]:
-    """Notices parues avant `cutoff`, par source, hors `EXEMPT_SOURCES`."""
+    """Enregistrements sources parus avant `cutoff`, par source, hors `EXEMPT_SOURCES`."""
     rows = conn.execute(
         text("""
             SELECT source::text, count(*) FROM source_records
@@ -51,7 +51,7 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="N'écrit rien : affiche les notices visées par source et sort.",
+        help="N'écrit rien : affiche les enregistrements sources visés par source et sort.",
     )
     args = parser.parse_args()
 
@@ -59,7 +59,7 @@ def main() -> int:
     with engine.connect() as conn:
         cutoff = fetch_cutoff(conn)
         targets = count_targets(conn, cutoff)
-    log.info("Notices parues avant %d : %d", cutoff, sum(targets.values()))
+    log.info("Enregistrements sources parus avant %d : %d", cutoff, sum(targets.values()))
     for source, n in targets.items():
         log.info("  %s : %d", source, n)
     if not targets or args.dry_run:
@@ -67,7 +67,7 @@ def main() -> int:
 
     with engine.begin() as conn:
         deleted, staged = delete_source_records_before(conn, cutoff, exempt_sources=EXEMPT_SOURCES)
-    log.info("Supprimées : %d notices, %d lignes de staging", deleted, staged)
+    log.info("Supprimés : %d enregistrements sources, %d lignes de staging", deleted, staged)
     return 0
 
 

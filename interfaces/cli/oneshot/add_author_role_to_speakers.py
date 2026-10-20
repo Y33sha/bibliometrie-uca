@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-18)
-"""Ajoute le rôle `author` aux signatures du stock qui ont le rôle `speaker` sans lui, comme le fait la normalisation (`map_role`).
+"""Ajoute le rôle `author` aux contributions sources du stock qui ont le rôle `speaker` sans lui, comme le fait la normalisation (`map_role`).
 
-Les publications de ces signatures reçoivent `contributions_dirty` : la phase `author_grouping` les regroupe. L'empreinte des signatures reste celle de leur dernière normalisation ; une notice normalisée à nouveau réécrit ses signatures en place.
+Les publications de ces contributions sources reçoivent `contributions_dirty` : la phase `author_grouping` les regroupe. L'empreinte des contributions sources reste celle de leur dernière normalisation ; un enregistrement source normalisé à nouveau réécrit ses contributions sources en place.
 
 Usage :
     python -m interfaces.cli.oneshot.add_author_role_to_speakers [--dry-run]
@@ -26,7 +26,7 @@ _SPEAKERS_WITHOUT_AUTHOR = f"""
 
 
 def add_author_role(conn: Connection) -> tuple[int, int]:
-    """Complète les signatures et marque leurs publications. Rend (signatures complétées, publications marquées)."""
+    """Complète les contributions sources et marque leurs publications. Rend (contributions sources complétées, publications marquées)."""
     marked = conn.execute(
         text(f"""
             UPDATE publications p SET contributions_dirty = true
@@ -58,10 +58,12 @@ def main() -> int:
                     f"SELECT count(*) FROM source_contributions sc WHERE {_SPEAKERS_WITHOUT_AUTHOR}"
                 )  # noqa: S608
             ).scalar_one()
-            log.info("signatures à compléter : %d", count)
+            log.info("contributions sources à compléter : %d", count)
             return 0
         updated, marked = add_author_role(conn)
-    log.info("signatures complétées : %d ; publications à regrouper : %d", updated, marked)
+    log.info(
+        "contributions sources complétées : %d ; publications à regrouper : %d", updated, marked
+    )
     return 0
 
 

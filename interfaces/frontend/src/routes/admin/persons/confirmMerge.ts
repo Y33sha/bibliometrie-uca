@@ -11,13 +11,13 @@ export async function confirmMerge(sourceId: number): Promise<boolean> {
   );
   const name = `${titleCase(p.last_name)} ${titleCase(p.first_name)}`.trim();
   const n = p.source_contribution_count ?? 0;
-  const pubs =
+  const reassigned =
     n === 1
       ? "1 publication en tant qu'auteur sera réattribuée"
       : `${n} publications en tant qu'auteur seront réattribuées`;
   return confirmDialog({
     title: "Fusionner les personnes",
-    message: `La personne « ${name} » sera absorbée puis supprimée — ${pubs} à la personne conservée. Cette action est irréversible.`,
+    message: `La personne « ${name} » sera absorbée puis supprimée — ${reassigned} à la personne conservée. Cette action est irréversible.`,
     confirmLabel: "Fusionner",
     danger: true,
   });

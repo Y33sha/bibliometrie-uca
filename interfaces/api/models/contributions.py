@@ -18,7 +18,7 @@ class SourceContributionRef(BaseModel):
 class AssignOrphanContribution(BaseModel):
     """Attribution unitaire, seule à savoir créer la personne au passage.
 
-    `source_contributions.id` est une clé primaire : l'id désigne la signature à lui seul.
+    `source_contributions.id` est une clé primaire : l'id désigne la contribution source à lui seul.
     """
 
     source_contribution_id: int
@@ -39,14 +39,14 @@ class BatchAssignOrphanContributions(BaseModel):
 
 
 class OrphanAssignResponse(BaseModel):
-    """Acquittement de l'attribution d'une signature orpheline : la personne rattachée."""
+    """Acquittement de l'attribution d'une contribution source orpheline : la personne rattachée."""
 
     ok: bool = True
     person_id: int
 
 
 class OrphanBatchAssignResponse(BaseModel):
-    """Acquittement de l'attribution en lot : le nombre de signatures rattachées."""
+    """Acquittement de l'attribution en lot : le nombre de contributions sources rattachées."""
 
     ok: bool = True
     assigned: int

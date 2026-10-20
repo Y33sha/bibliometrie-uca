@@ -102,7 +102,7 @@
         <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
         <div class="nav-dropdown-menu">
           <a href="{base}/hal-problems/duplicate-accounts" class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
-          <a href="{base}/hal-problems/duplicate-pubs" class:active={isActive("/hal-problems/duplicate-pubs")}>Doublons publis</a>
+          <a href="{base}/hal-problems/duplicate-publications" class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
           <a href="{base}/hal-problems/missing-collections" class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
           <a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
         </div>

@@ -50,7 +50,7 @@ def monograph_filters(
 def list_monographs(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
-    sort: MonographSort = "pubs_desc",
+    sort: MonographSort = "publications_desc",
     filters: MonographFilters = Depends(monograph_filters),
     queries: MonographQueries = Depends(monograph_queries),
 ) -> MonographListResponse:

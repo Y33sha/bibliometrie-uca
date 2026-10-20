@@ -4,7 +4,7 @@
 Usage :
     python -m interfaces.cli.dev.seed_from_ror 04vfs2w97 --code lorraine --output instances/lorraine/seed.sql
 
-La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Le nom d'une structure est le nom affiché par ROR, ou son premier libellé de plusieurs mots quand le nom affiché tient en un mot. Les formes de noms viennent des libellés, alias et acronymes ROR. Une forme d'un seul mot exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des notices HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
+La racine est une université. Une fille ROR devient un laboratoire (`facility`), une école (`education`) ou un CHU (`healthcare`). Les filles d'un autre type sont écartées et listées. Le nom d'une structure est le nom affiché par ROR, ou son premier libellé de plusieurs mots quand le nom affiché tient en un mot. Les formes de noms viennent des libellés, alias et acronymes ROR. Une forme d'un seul mot exige une frontière de mot et, pour une fille, la présence de la racine dans l'adresse. L'identifiant OpenAlex de la racine est lu dans OpenAlex d'après son ROR. La collection HAL de chaque structure est déduite des dépôts HAL (`fetch_hal_collection`). Les RNSR et les identifiants WoS, ScanR et theses.fr restent à renseigner.
 """
 
 import argparse
@@ -46,10 +46,10 @@ MIN_FORM_LENGTH = 3
 # Code d'unité de recherche (« UMR 7039 », « EA4432 »), écarté comme nom de structure.
 _UNIT_CODE = re.compile(r"^(?:UMR|UMRS|UR|EA|UPR|FRE|UMS|USR|UAR|IRL)(?:\s|\d)", re.IGNORECASE)
 
-# Collection HAL d'une structure : part minimale de ses notices que la collection contient, et indice de Jaccard minimal entre les notices de la structure et celles de la collection.
+# Collection HAL d'une structure : part minimale de ses dépôts que la collection contient, et indice de Jaccard minimal entre les dépôts de la structure et ceux de la collection.
 MIN_COLLECTION_COVERAGE = 0.5
 MIN_COLLECTION_JACCARD = 0.15
-# Collections examinées : les plus fréquentes parmi les notices de la structure.
+# Collections examinées : les plus fréquentes parmi les dépôts de la structure.
 HAL_COLLECTION_CANDIDATES = 25
 
 # Le périmètre de l'établissement sert à l'extraction et à la création des personnes.
@@ -284,9 +284,9 @@ def fetch_openalex_ids(ror_id: str) -> list[str]:
 def choose_collection(
     structure_docs: int, candidates: Sequence[tuple[str, int]], size_of: Callable[[str], int]
 ) -> str | None:
-    """Collection HAL dont les notices sont les plus proches de celles d'une structure, au sens de l'indice de Jaccard.
+    """Collection HAL dont les dépôts sont les plus proches de ceux d'une structure, au sens de l'indice de Jaccard.
 
-    `candidates` : `(code, notices de la structure dans la collection)`. `size_of` : nombre de notices d'une collection, appelé pour les seules collections qui couvrent assez la structure.
+    `candidates` : `(code, dépôts de la structure dans la collection)`. `size_of` : nombre de dépôts d'une collection, appelé pour les seules collections qui couvrent assez la structure.
     """
     best: tuple[float, str] | None = None
     for code, shared in candidates:
@@ -299,7 +299,7 @@ def choose_collection(
 
 
 def acronym_collection_accepted(collection_docs: int, institution_docs: int) -> bool:
-    """Vrai quand la collection existe et que la plupart de ses notices appartiennent à l'établissement."""
+    """Vrai quand la collection existe et que la plupart de ses dépôts appartiennent à l'établissement."""
     return collection_docs > 0 and institution_docs >= MIN_COLLECTION_COVERAGE * collection_docs
 
 
@@ -327,12 +327,12 @@ def fetch_hal_structure_ids(ror_id: str) -> list[str]:
 
 
 def structures_query(structure_ids: Collection[str]) -> str:
-    """Requête HAL des notices signées par une des structures `structure_ids`."""
+    """Requête HAL des dépôts d'une des structures `structure_ids`."""
     return f"structId_i:({' OR '.join(structure_ids)})"
 
 
 def collection_of_structures(structure_ids: Collection[str]) -> str | None:
-    """Collection HAL choisie par `choose_collection` parmi les plus fréquentes des notices des structures HAL `structure_ids`."""
+    """Collection HAL choisie par `choose_collection` parmi les plus fréquentes des dépôts des structures HAL `structure_ids`."""
     query = structures_query(structure_ids)
     data = _hal_get(
         API_BASE_URLS["hal"],
@@ -362,7 +362,7 @@ def collection_of_structures(structure_ids: Collection[str]) -> str | None:
 def fetch_hal_collection(org: RorOrganization, institution_query: str | None) -> str | None:
     """Collection HAL d'une fille de l'établissement.
 
-    Les notices des structures HAL de même ROR désignent la collection (`collection_of_structures`). Sans structure HAL de ce ROR, le sigle de `org` sert de code de collection, à condition que `acronym_collection_accepted` le valide d'après les notices de l'établissement (`institution_query`).
+    Les dépôts des structures HAL de même ROR désignent la collection (`collection_of_structures`). Sans structure HAL de ce ROR, le sigle de `org` sert de code de collection, à condition que `acronym_collection_accepted` le valide d'après les dépôts de l'établissement (`institution_query`).
     """
     structure_ids = fetch_hal_structure_ids(org.ror_id)
     if structure_ids:

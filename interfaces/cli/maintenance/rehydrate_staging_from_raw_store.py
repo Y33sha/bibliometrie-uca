@@ -119,7 +119,7 @@ def rehydrate_or_create_staging_row(
 
 
 # DOI ré-extrait du payload par la logique propre à chaque source (réutilise les
-# extracteurs des phases d'extraction, pas de réimplémentation). crossref et
+# fonctions de lecture des phases de moissonnage, sans réimplémentation). crossref et
 # datacite sont absents : ce sont des sources DOI-natives dont le `source_id`
 # (clé du store) est déjà le DOI — cf. `_doi_for`.
 _DOI_EXTRACTORS: dict[str, Callable[[Mapping[str, JsonValue]], str | None]] = {

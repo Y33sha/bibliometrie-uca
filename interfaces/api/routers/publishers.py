@@ -102,7 +102,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 

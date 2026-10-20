@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-06)
-"""Rattache à leur identité corrigée les signatures dont le nom de famille se réduit à des initiales.
+"""Rattache à leurs informations du contributeur corrigées les contributions sources dont le nom de famille se réduit à des initiales.
 
-Le découpage retenu d'une signature (`ContributorName.split`) place en prénom des initiales que la source donne comme nom de famille : « Del Buono L. », « C., Küll », surname « M. » et forename « Brigante ». Ce script recalcule le découpage des signatures dont l'identité a un nom fait d'initiales, et rattache chacune à l'identité de son découpage. Il précède toute normalisation de leurs notices : la synchronisation des signatures rapproche par identité. Les identités devenues orphelines sont purgées. Idempotent.
+Le découpage retenu d'une contribution source (`ContributorName.split`) place en prénom des initiales que la source donne comme nom de famille : « Del Buono L. », « C., Küll », surname « M. » et forename « Brigante ». Ce script recalcule le découpage des contributions sources dont les informations du contributeur ont un nom fait d'initiales, et rattache chacune aux informations du contributeur de son découpage. Il précède toute normalisation de leurs enregistrements sources : la synchronisation des contributions sources rapproche par informations du contributeur. Les lignes de `contributor_information` devenues orphelines sont purgées. Idempotent.
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_initials_split            # exécution
@@ -59,7 +59,7 @@ _REPOINT_SQL = text(
 
 
 def backfill(conn: Connection, *, apply: bool) -> int:
-    """Rattache les signatures dont le découpage change. Retourne leur nombre."""
+    """Rattache les contributions sources dont le découpage change. Retourne leur nombre."""
     payload = []
     for row in conn.execute(_CANDIDATES_SQL):
         name = ContributorName.from_columns(
@@ -91,10 +91,11 @@ def main() -> int:
     apply = not parser.parse_args().dry_run
     with get_sync_engine().connect() as conn:
         changed = backfill(conn, apply=apply)
-        log.info("signatures au découpage corrigé : %d", changed)
+        log.info("contributions sources au découpage corrigé : %d", changed)
         if apply:
             log.info(
-                "identités orphelines purgées : %d", delete_orphan_contributor_information(conn)
+                "informations du contributeur orphelines purgées : %d",
+                delete_orphan_contributor_information(conn),
             )
             conn.commit()
             log.info("✓ backfill appliqué")

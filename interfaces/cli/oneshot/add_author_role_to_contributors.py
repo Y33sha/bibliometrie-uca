@@ -1,9 +1,9 @@
 # STATUS: oneshot (2026-10-18)
-"""Ajoute le rôle `author` aux signatures HAL et scanR du stock dont la qualité source est `ctb`, comme le fait la normalisation (`map_role`).
+"""Ajoute le rôle `author` aux contributions sources HAL et scanR du stock dont la qualité source est `ctb`, comme le fait la normalisation (`map_role`).
 
-Le stock garde le seul rôle canonique `contributor`, commun à plusieurs qualités source (`ctb`, `sad`, `ill`…). Le oneshot relit donc le payload de chaque notice concernée dans le raw store et recalcule les rôles de ses signatures avec les fonctions de la normalisation. Une signature `[contributor]` reçoit les rôles recalculés à sa position quand ils comprennent `author`.
+Le stock garde le seul rôle canonique `contributor`, commun à plusieurs qualités source (`ctb`, `sad`, `ill`…). Le oneshot relit donc le payload de chaque enregistrement source concerné dans le raw store et recalcule les rôles de ses contributions sources avec les fonctions de la normalisation. Une contribution source `[contributor]` reçoit les rôles recalculés à sa position quand ils comprennent `author`.
 
-Les décomptes d'auteurs des notices touchées sont recalculés et leurs publications sont à regrouper. Un commit par lot de notices.
+Les décomptes d'auteurs des enregistrements sources touchés sont recalculés et leurs publications sont à regrouper. Un commit par lot d'enregistrements sources.
 
 Usage :
     python -m interfaces.cli.oneshot.add_author_role_to_contributors [--dry-run] [--batch 500]
@@ -36,7 +36,7 @@ _BUILDERS: dict[str, Callable[[Mapping[str, JsonValue]], list[AuthorRecord]]] = 
     "scanr": build_scanr_author_records,
 }
 
-# (signature, position) des signatures `[contributor]`, par notice (identifiant, source, identifiant source).
+# (contribution source, position) des contributions sources `[contributor]`, par enregistrement source (identifiant, source, identifiant source).
 _CANDIDATES = f"""
     SELECT sr.id AS source_record, sr.source, sr.source_id, sc.id AS source_contribution, sc.author_position AS position
     FROM source_contributions sc JOIN source_records sr ON sr.id = sc.source_record_id
@@ -48,7 +48,7 @@ PayloadLoader = Callable[[str, str], Mapping[str, JsonValue] | None]
 
 
 def raw_store_loader() -> PayloadLoader:
-    """Lecture du payload d'une notice dans le raw store ; None s'il manque ou est illisible."""
+    """Lecture du payload d'un enregistrement source dans le raw store ; None s'il manque ou est illisible."""
     store = get_raw_store()
 
     def load(source: str, source_id: str) -> Mapping[str, JsonValue] | None:
@@ -75,7 +75,7 @@ def author_roles(
 def complete_source_records(
     conn: Connection, candidates: list[Mapping[str, object]], load: PayloadLoader
 ) -> tuple[int, int]:
-    """Complète les rôles des signatures de ces notices. Rend (signatures complétées, payloads manquants)."""
+    """Complète les rôles des contributions sources de ces enregistrements sources. Rend (contributions sources complétées, payloads manquants)."""
     by_source_record: dict[tuple[int, str, str], list[tuple[int, int | None]]] = defaultdict(list)
     for c in candidates:
         by_source_record[(c["source_record"], c["source"], c["source_id"])].append(
@@ -112,7 +112,9 @@ def complete_source_records(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="compte sans écrire")
-    parser.add_argument("--batch", type=int, default=500, help="nombre de notices par lot")
+    parser.add_argument(
+        "--batch", type=int, default=500, help="nombre d'enregistrements sources par lot"
+    )
     args = parser.parse_args()
 
     completed = missing = 0
@@ -120,7 +122,7 @@ def main() -> int:
     with get_sync_engine().connect() as conn:
         candidates = [dict(r) for r in conn.execute(text(_CANDIDATES)).mappings()]
         source_records = sorted({c["source_record"] for c in candidates})
-        log.info("notices à examiner : %d", len(source_records))
+        log.info("enregistrements sources à examiner : %d", len(source_records))
         for i in range(0, len(source_records), args.batch):
             batch = set(source_records[i : i + args.batch])
             done, lost = complete_source_records(
@@ -133,7 +135,7 @@ def main() -> int:
             completed += done
             missing += lost
         log.info(
-            "signatures %s : %d ; payloads manquants : %d",
+            "contributions sources %s : %d ; payloads manquants : %d",
             "à compléter" if args.dry_run else "complétées",
             completed,
             missing,

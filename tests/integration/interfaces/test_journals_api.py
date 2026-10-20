@@ -173,8 +173,8 @@ class TestListJournals:
             "title_desc",
             "publisher_asc",
             "publisher_desc",
-            "pubs_asc",
-            "pubs_desc",
+            "publications_asc",
+            "publications_desc",
         ],
     )
     def test_sort_variants(self, client, sort):
