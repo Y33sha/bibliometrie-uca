@@ -98,7 +98,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Un `api.py` par source : client, en-têtes, lecture d'un document par identifiant. 94309e621…da94de3f2
 - [x] Collecte des sources nommée *harvest* : phases, modules, classes ; fenêtre de moissonnage typée. fc7b3df3c, 44be23e83
 - [x] Règle de placement de la lecture du payload entre `domain/sources/` et `ingestion/<source>/`. 28937a229, b9ae81c73
-- [ ] Paramètre `logger` mort des `process_work`.
+- [x] Paramètre `logger` mort des `process_work`. 4ecfb0f90
 
 ### Phase 4 — `persons`
 
