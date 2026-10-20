@@ -110,7 +110,7 @@ def build() -> Phase:
 
 
 def _harvesters() -> dict[str, HarvesterFactory]:
-    """Constructeur de le moissonneur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
+    """Constructeur du moissonneur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
     from pipeline.ingestion.api_params import API_BASE_URLS
 
     def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
