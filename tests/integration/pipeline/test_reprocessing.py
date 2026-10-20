@@ -8,6 +8,7 @@ la mise à jour des métadonnées lors d'un re-traitement.
 """
 
 import copy
+import logging
 
 from sqlalchemy import text
 
@@ -110,14 +111,11 @@ def _fetch_stale_publications(conn):
 
     Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
-    from pipeline.transformation.publications.reconciliation.reconcile_components import reconcile
-    from pipeline.transformation.publications.reconciliation.reconciliation import (
-        PublicationsReconciliationQueries,
-    )
+    from pipeline.transformation.publications.reconciliation import reconcile
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PublicationsReconciliationQueries())
+    reconcile(conn, logging.getLogger("test_reprocessing"))
 
 
 # ── Tests ───────────────────────────────────────────────────────

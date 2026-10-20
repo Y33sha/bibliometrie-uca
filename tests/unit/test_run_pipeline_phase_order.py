@@ -23,17 +23,18 @@ def test_les_decomptes_de_publications_se_recalculent_dans_authorships():
     address_pub_count = MagicMock()
     address_pub_count.recompute_pub_count.return_value = 0
     build_queries = MagicMock()
-    purge_queries = MagicMock()
-    purge_queries.purge_orphan_publications.return_value = 0
     pub_counts = MagicMock()
     pub_counts.refresh_journal_pub_counts.return_value = 0
     pub_counts.refresh_publisher_pub_counts.return_value = 0
-    with patch.object(
-        authorships_phase, "build_authorships", return_value=PhaseMetrics(details={"summary": {}})
+    with (
+        patch.object(
+            authorships_phase,
+            "build_authorships",
+            return_value=PhaseMetrics(details={"summary": {}}),
+        ),
+        patch.object(authorships_phase, "purge_orphan_publications", return_value=0),
     ):
-        authorships_phase.AuthorshipsPhase(
-            build_queries, purge_queries, pub_counts, address_pub_count
-        ).run(
+        authorships_phase.AuthorshipsPhase(build_queries, pub_counts, address_pub_count).run(
             PhaseContext(
                 open_tx=_fake_tx,
                 logger=logging.getLogger("test"),

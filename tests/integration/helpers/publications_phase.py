@@ -5,6 +5,8 @@ créer/rattacher les publications de leurs source_publications orphelins sans
 réimplémenter l'assignation.
 """
 
+import logging
+
 from sqlalchemy import Connection, text
 
 from pipeline.transformation.publications.correction.correct_by_cluster import (
@@ -16,10 +18,7 @@ from pipeline.transformation.publications.correction.correct_unary import (
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     PgMetadataCorrectionQueries,
 )
-from pipeline.transformation.publications.reconciliation.reconcile_components import reconcile
-from pipeline.transformation.publications.reconciliation.reconciliation import (
-    PublicationsReconciliationQueries,
-)
+from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
@@ -69,7 +68,7 @@ def create_all_publications(conn: Connection) -> None:
 
     apply_metadata_corrections(conn)
 
-    reconcile(conn, PublicationsReconciliationQueries())
+    reconcile(conn, logging.getLogger("create_all_publications"))
 
 
 __all__ = ["apply_metadata_corrections", "create_all_publications"]

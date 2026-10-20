@@ -2,11 +2,11 @@
 
 Tâches (`pipeline.graph`), chacune dans sa transaction :
 
-1. **build** — consolide les `source_authorships` en authorships canoniques (une entrée par couple publication × personne). Sa maintenance `ANALYZE authorships` précède la propagation.
+1. **build** — consolide les `source_authorships` en authorships (une entrée par couple publication × personne). Sa maintenance `ANALYZE authorships` précède la propagation.
 2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des authorships (indices de l'entrée dans le périmètre compris), le périmètre des publications et les matviews `authorship_structures`, `publication_structures`.
 3. **purge des orphelines** — supprime les publications rétrogradées à zéro authorship (défense en profondeur).
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
-5. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
+5. **refresh des `pub_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
 La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une signature change aussi par d'autres voies que sa normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
 
@@ -20,6 +20,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from sqlalchemy import Connection, text
+
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -32,18 +34,37 @@ from pipeline.transformation.publications.authorships.authorships_queries import
 from pipeline.transformation.publications.authorships.build_authorships import (
     build as build_authorships,
 )
-from pipeline.transformation.publications.reconciliation.purge_orphan_publications import (
-    PurgeOrphanPublicationsQueries,
-)
 from pipeline.transformation.publishing.pub_counts import PgPubCountsQueries
 
 _PURGE_BATCH_SIZE = 5000
 
 
+def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> int:
+    """Supprime les publications sans aucun authorship, un lot de `limit` au plus. Retourne le nombre supprimé.
+
+    La réconciliation crée une publication pour une partition d'orphelins du périmètre seulement : une publication naît avec au moins un authorship attendu. Elle tombe à zéro authorship quand sa dernière contribution source du périmètre disparaît (personne détachée, structure sortie du périmètre, forme de nom rejetée). `publication_subjects` suit par `ON DELETE CASCADE`.
+    """
+    limit_clause = "LIMIT :lim" if limit is not None else ""
+    return conn.execute(
+        text(
+            f"""
+            DELETE FROM publications
+            WHERE id IN (
+                SELECT p.id FROM publications p
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM authorships a WHERE a.publication_id = p.id
+                )
+                {limit_clause}
+            )
+            """
+        ),
+        {"lim": limit} if limit is not None else {},
+    ).rowcount
+
+
 @dataclass(frozen=True)
 class AuthorshipsPhase:
     build_queries: AuthorshipsBuild
-    purge_queries: PurgeOrphanPublicationsQueries
     pub_counts_queries: PgPubCountsQueries
     address_pub_count_queries: AddressPubCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
@@ -81,9 +102,7 @@ class AuthorshipsPhase:
 
         def purge(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             metrics = PhaseMetrics()
-            metrics.details["purged"] = _purge_orphan_publications(
-                ctx.open_tx, self.purge_queries, ctx.logger
-            )
+            metrics.details["purged"] = _purge_orphan_publications(ctx.open_tx)
             return metrics
 
         def empty_containers(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -137,14 +156,12 @@ def _chronometre(t0: float) -> PhaseMetrics:
     return metrics
 
 
-def _purge_orphan_publications(
-    open_tx: OpenTransaction, purge_queries: PurgeOrphanPublicationsQueries, logger: logging.Logger
-) -> int:
+def _purge_orphan_publications(open_tx: OpenTransaction) -> int:
     """Purge par lots (commit par chunk). Retourne le nombre de publications supprimées."""
     n = 0
     with open_tx() as conn:
         while True:
-            deleted = purge_queries.purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
+            deleted = purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
             if deleted == 0:
                 break
             conn.commit()
@@ -174,7 +191,7 @@ def _refresh_pub_counts(
     address_pub_count_queries: AddressPubCountQueries,
     logger: logging.Logger,
 ) -> None:
-    """Recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
+    """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
     Les trois se lisent des mêmes publications et signatures, stabilisées à ce point du pipeline. Le décompte des éditeurs somme celui des revues, donc le suit.
 
@@ -213,16 +230,12 @@ def build() -> Phase:
     from pipeline.transformation.publications.authorships.authorships_queries import (
         AuthorshipsBuild,
     )
-    from pipeline.transformation.publications.reconciliation.purge_orphan_publications import (
-        PurgeOrphanPublicationsQueries,
-    )
     from pipeline.transformation.publishing.journals import delete_empty_journals
     from pipeline.transformation.publishing.monographs import delete_empty_monographs
     from pipeline.transformation.publishing.publishers import delete_empty_publishers
 
     return AuthorshipsPhase(
         AuthorshipsBuild(),
-        PurgeOrphanPublicationsQueries(),
         PgPubCountsQueries(),
         AddressPubCountQueries(),
         empty_containers=(

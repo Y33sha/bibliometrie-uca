@@ -6,24 +6,12 @@ Le propos testé ici est l'enchaînement. La réconciliation a ses propres tests
 import logging
 from unittest.mock import patch
 
-from pipeline.transformation.publications.reconciliation import publications as phase
-
-
-class _FakeQueries:
-    """Enregistre l'ordre des appels ; rend les volumes fixés à la construction."""
-
-    def __init__(self, appels: list[str], *, total: int) -> None:
-        self._appels = appels
-        self._total = total
-
-    def count_publications(self, conn) -> int:
-        self._appels.append("décompte")
-        return self._total
+from pipeline.transformation.publications import publications as phase
+from pipeline.transformation.publications.reconciliation import ReconcileStats
 
 
 def _run(contexte, *, supprimees: int, total: int = 40):
     appels: list[str] = []
-    queries = _FakeQueries(appels, total=total)
 
     def supprimer(conn) -> int:
         appels.append("suppression")
@@ -32,12 +20,17 @@ def _run(contexte, *, supprimees: int, total: int = 40):
     with (
         patch.object(
             phase,
-            "reconcile_run",
-            side_effect=lambda *args, **kwargs: appels.append("réconciliation"),
+            "reconcile",
+            side_effect=lambda *args, **kwargs: appels.append("réconciliation") or ReconcileStats(),
         ),
         patch.object(phase, "delete_publications_without_sources", side_effect=supprimer),
+        patch.object(
+            phase,
+            "count_publications",
+            side_effect=lambda conn: appels.append("décompte") or total,
+        ),
     ):
-        rendu = phase.PublicationsPhase(queries).run(contexte())
+        rendu = phase.PublicationsPhase().run(contexte())
     return rendu, appels
 
 

@@ -56,11 +56,10 @@ from pipeline.runtime.observability.progression import ecrire_hors_barre, set_fl
 from pipeline.runtime.observability.signals import select_targets
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
-from pipeline.transformation.publications import oa_status, relations
+from pipeline.transformation.publications import oa_status, publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.authorships import authorships
 from pipeline.transformation.publications.correction import metadata_correction
-from pipeline.transformation.publications.reconciliation import publications
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
