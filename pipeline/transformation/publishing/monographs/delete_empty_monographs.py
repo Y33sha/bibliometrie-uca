@@ -5,19 +5,30 @@ Une monographie vide n'est portée par aucun enregistrement ni aucune publicatio
 
 import logging
 
+from sqlalchemy import Connection, text
+
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 
 LIBELLE = "Monographies vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
+_DELETE_EMPTY = text("""
+    DELETE FROM monographs m
+    WHERE NOT EXISTS (SELECT 1 FROM source_publications s WHERE s.monograph_id = m.id)
+      AND NOT EXISTS (SELECT 1 FROM publications p WHERE p.monograph_id = m.id)
+    RETURNING m.id, m.title
+""")
 
-def run_delete_empty_monographs(
-    logger: logging.Logger, *, monograph_repo: MonographGatewayQueries
-) -> PhaseMetrics:
+
+def delete_empty_monographs(conn: Connection) -> list[tuple[int, str]]:
+    """Supprime les monographies sans enregistrement ni publication, et rend `(id, titre)` de chacune."""
+    return sorted((r.id, r.title) for r in conn.execute(_DELETE_EMPTY))
+
+
+def run_delete_empty_monographs(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Supprime les monographies vides et journalise chacune."""
-    deleted = monograph_repo.delete_empty_monographs()
+    deleted = delete_empty_monographs(conn)
     metrics = PhaseMetrics()
     if not deleted:
         return metrics

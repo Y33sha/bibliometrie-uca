@@ -46,7 +46,7 @@ def test_serie_creee_puis_retrouvee(sa_sync_conn, repo):
     second = _volume(sa_sync_conn, repo, "Test Symposium on Series 2023", "series-2")
     logger = logging.getLogger("test_series")
 
-    run_link_monographs_to_collections(logger, monograph_repo=repo)
+    run_link_monographs_to_collections(sa_sync_conn, logger)
 
     rows = sa_sync_conn.execute(
         text(
@@ -61,7 +61,7 @@ def test_serie_creee_puis_retrouvee(sa_sync_conn, repo):
     }
     assert rows[0].series_id == rows[1].series_id
 
-    second_run = run_link_monographs_to_collections(logger, monograph_repo=repo)
+    second_run = run_link_monographs_to_collections(sa_sync_conn, logger)
     assert second_run.extras.get("monographs_linked", 0) == 0
 
     deleted = {j.id for j in repo.delete_empty_journals()}

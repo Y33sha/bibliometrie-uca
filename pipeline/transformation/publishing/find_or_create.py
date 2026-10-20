@@ -20,7 +20,7 @@ from domain.publications.identifiers import ISBN, issn_rejection_reason
 from domain.publishers.names import publisher_name_key
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
-from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
+from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 logger = logging.getLogger(__name__)
@@ -189,7 +189,7 @@ def find_or_create_monograph(
     year: int | None = None,
     publisher_id: int | None = None,
     journal_id: int | None = None,
-    repo: MonographGatewayQueries,
+    repo: MonographStore,
 ) -> int | None:
     """Trouve ou crée une monographie. Retourne son id, ou `None` sans ISBN connu ni titre.
 

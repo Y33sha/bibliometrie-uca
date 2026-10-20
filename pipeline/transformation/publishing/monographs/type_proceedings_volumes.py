@@ -4,24 +4,87 @@ La nature se recalcule à chaque run d'après les enregistrements, la collection
 """
 
 import logging
+from typing import NamedTuple
 
-from domain.monographs.proceedings import is_proceedings_volume
+from sqlalchemy import Connection, bindparam, text
+
+from domain.monographs.proceedings import MonographRecord, is_proceedings_volume
+from infrastructure.sql_fragments import raw_column
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 
 LIBELLE = "Nature des monographies"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 
-def run_type_proceedings_volumes(
-    logger: logging.Logger, *, monograph_repo: MonographGatewayQueries
-) -> PhaseMetrics:
+class MonographProceedingsFacts(NamedTuple):
+    """Une monographie, sa nature en base, le type de sa collection et ses enregistrements."""
+
+    monograph_id: int
+    title: str
+    proceedings: bool
+    collection_type: str | None
+    records: tuple[MonographRecord, ...]
+
+
+_PROCEEDINGS_FACTS = text(f"""
+    SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
+           coalesce(
+               array_agg(sp.source::text ORDER BY sp.id) FILTER (WHERE sp.id IS NOT NULL), '{{}}'
+           ) AS sources,
+           coalesce(
+               array_agg({raw_column("doc_type")} ORDER BY sp.id)
+                   FILTER (WHERE sp.id IS NOT NULL),
+               '{{}}'
+           ) AS raw_doc_types,
+           coalesce(
+               array_agg(coalesce(sp.meta ? 'conference', false) ORDER BY sp.id)
+                   FILTER (WHERE sp.id IS NOT NULL),
+               '{{}}'
+           ) AS declares
+    FROM monographs m
+    LEFT JOIN journals j ON j.id = m.journal_id
+    LEFT JOIN source_publications sp ON sp.monograph_id = m.id
+    GROUP BY m.id, j.journal_type
+    ORDER BY m.id
+""")
+
+_SET_PROCEEDINGS = text(
+    "UPDATE monographs SET proceedings = :proceedings WHERE id = ANY(:ids)"
+).bindparams(bindparam("ids"))
+
+
+def find_monograph_proceedings_facts(conn: Connection) -> list[MonographProceedingsFacts]:
+    """Chaque monographie, avec le type de sa collection et ses enregistrements."""
+    return [
+        MonographProceedingsFacts(
+            r.id,
+            r.title,
+            r.proceedings,
+            r.collection_type,
+            tuple(
+                MonographRecord(*fields)
+                for fields in zip(r.sources, r.raw_doc_types, r.declares, strict=True)
+            ),
+        )
+        for r in conn.execute(_PROCEEDINGS_FACTS)
+    ]
+
+
+def set_monographs_proceedings(
+    conn: Connection, monograph_ids: list[int], proceedings: bool
+) -> None:
+    """Pose la nature d'un ensemble de monographies."""
+    if monograph_ids:
+        conn.execute(_SET_PROCEEDINGS, {"ids": monograph_ids, "proceedings": proceedings})
+
+
+def run_type_proceedings_volumes(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Pose la nature recalculée des monographies qui en changent, et journalise chacune."""
     to_proceedings: list[int] = []
     to_books: list[int] = []
     titles: dict[int, str] = {}
-    for m in monograph_repo.find_monograph_proceedings_facts():
+    for m in find_monograph_proceedings_facts(conn):
         proceedings = is_proceedings_volume(
             m.records, collection_type=m.collection_type, title=m.title
         )
@@ -32,8 +95,8 @@ def run_type_proceedings_volumes(
     changed = len(to_proceedings) + len(to_books)
     if not changed:
         return metrics
-    monograph_repo.set_monographs_proceedings(to_proceedings, True)
-    monograph_repo.set_monographs_proceedings(to_books, False)
+    set_monographs_proceedings(conn, to_proceedings, True)
+    set_monographs_proceedings(conn, to_books, False)
     for label, ids in (("volume d'actes", to_proceedings), ("livre", to_books)):
         for monograph_id in ids:
             # Ligne de détail : le terminal la masque, le journal la garde.
