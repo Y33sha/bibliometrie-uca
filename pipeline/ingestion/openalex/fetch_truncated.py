@@ -15,12 +15,12 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection, bindparam, text
 
-from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from domain.types import JsonValue, as_sequence
 from infrastructure.db.jsonb import Jsonb
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
+from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics

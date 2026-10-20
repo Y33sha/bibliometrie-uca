@@ -3,8 +3,8 @@
 from collections.abc import Mapping
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.hal import hal_text_field
 from domain.types import JsonValue
+from pipeline.ingestion.hal.payload import hal_text_field
 
 
 def extract_id(doc: Mapping[str, JsonValue]) -> str:

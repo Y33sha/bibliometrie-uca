@@ -21,7 +21,6 @@ from typing import NamedTuple, NotRequired, TypedDict, cast
 
 from sqlalchemy import Connection, text
 
-from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.savepoint import rollback_unless_invalidated
@@ -31,6 +30,7 @@ from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex.api import credential_params
+from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.observability.metrics import PhaseMetrics
 

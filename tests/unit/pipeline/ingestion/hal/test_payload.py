@@ -1,6 +1,6 @@
 from datetime import date
 
-from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
+from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
 
 
 class TestHalTextField:

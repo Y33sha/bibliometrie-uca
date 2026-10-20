@@ -1,7 +1,7 @@
 """Tests unitaires de domain.sources.crossref (helpers purs)."""
 
 from domain.dates import today
-from domain.sources.crossref import (
+from pipeline.ingestion.crossref.payload import (
     crossref_raw_doc_type,
     extract_crossref_conference,
     extract_crossref_meta,

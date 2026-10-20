@@ -3,7 +3,7 @@
 Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des signatures collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
-- `doc_type` : token brut issu de `types` (cf. `domain.sources.datacite.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
+- `doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
 - `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
@@ -28,22 +28,6 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.datacite import (
-    container_names_a_journal,
-    extract_datacite_doc_type_token,
-    extract_datacite_meta,
-    extract_datacite_pub_year,
-    extract_related_dois,
-    get_abstract,
-    get_cited_by_count,
-    get_container,
-    get_container_pages,
-    get_isbns,
-    get_keywords,
-    get_language,
-    get_publisher_name,
-    get_title,
-)
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
@@ -60,6 +44,22 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.datacite.payload import (
+    container_names_a_journal,
+    extract_datacite_doc_type_token,
+    extract_datacite_meta,
+    extract_datacite_pub_year,
+    extract_related_dois,
+    get_abstract,
+    get_cited_by_count,
+    get_container,
+    get_container_pages,
+    get_isbns,
+    get_keywords,
+    get_language,
+    get_publisher_name,
+    get_title,
+)
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

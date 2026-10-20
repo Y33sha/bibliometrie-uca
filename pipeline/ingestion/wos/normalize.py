@@ -15,14 +15,6 @@ from domain.publications.authorship_roles import AuthorshipRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.wos import (
-    derive_wos_api_oa_status,
-    is_wos_author_exploitable,
-    parse_export_addresses,
-    parse_export_corresponding,
-    parse_export_researcher_ids,
-    split_export_list,
-)
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
@@ -39,6 +31,14 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.wos.payload import (
+    derive_wos_api_oa_status,
+    is_wos_author_exploitable,
+    parse_export_addresses,
+    parse_export_corresponding,
+    parse_export_researcher_ids,
+    split_export_list,
+)
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

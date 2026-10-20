@@ -8,10 +8,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-from domain.sources.openalex import full_openalex_id, short_openalex_id
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.openalex.api import credential_params
+from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
 
 logger = logging.getLogger(__name__)
 

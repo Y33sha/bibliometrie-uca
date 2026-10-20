@@ -16,10 +16,6 @@ from domain.dates import french_date_to_iso
 from domain.publications.authorship_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_publications.external_ids import ExternalIdType
-from domain.sources.theses import (
-    aggregate_thesis_persons,
-    derive_theses_doc_type,
-)
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
@@ -34,6 +30,7 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
 
 # =============================================================
 # PUBLICATIONS

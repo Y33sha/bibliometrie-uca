@@ -30,7 +30,6 @@ from domain.publications.identifiers import (
 )
 from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
-from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
@@ -46,6 +45,7 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

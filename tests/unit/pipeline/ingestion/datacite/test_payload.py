@@ -2,7 +2,7 @@
 doc_type DataCite."""
 
 from domain.source_publications.doc_types import map_doc_type
-from domain.sources.datacite import (
+from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
     extract_datacite_meta,

@@ -42,13 +42,16 @@ _URL = re.compile(r"https?://([A-Za-z0-9._-]+)")
 _ESPACES_DE_NOMS_XML = frozenset({"www.tei-c.org", "www.w3.org"})
 """Hôtes des espaces de noms XML du TEI de HAL : des identifiants, jamais appelés."""
 
+_IDENTIFIANTS = frozenset({"openalex.org"})
+"""Hôtes des identifiants en forme d'URL (`https://openalex.org/W…`) que lit la normalisation : jamais appelés."""
+
 
 def _hotes_ecrits_dans(racine: Path) -> set[str]:
-    """Hôtes de toutes les URL littérales des modules Python d'une arborescence, hors espaces de noms XML."""
+    """Hôtes de toutes les URL littérales des modules Python d'une arborescence, hors espaces de noms XML et identifiants."""
     hotes: set[str] = set()
     for fichier in racine.rglob("*.py"):
         hotes |= set(_URL.findall(fichier.read_text(encoding="utf-8")))
-    return hotes - _ESPACES_DE_NOMS_XML
+    return hotes - _ESPACES_DE_NOMS_XML - _IDENTIFIANTS
 
 
 class TestListeDeclaree:

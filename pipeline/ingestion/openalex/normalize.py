@@ -20,16 +20,6 @@ from domain.publications.identifiers import clean_doi, extract_doi_from_url, ext
 from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.openalex import (
-    OpenalexLocation,
-    extract_external_ids_from_urls,
-    extract_nnt_from_location,
-    is_theses_fr_location,
-    map_openalex_oa_status,
-    parse_primary_location,
-    short_openalex_id,
-    should_skip_publisher_journal,
-)
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import (
     JsonValue,
@@ -55,6 +45,16 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.openalex.payload import (
+    OpenalexLocation,
+    extract_external_ids_from_urls,
+    extract_nnt_from_location,
+    is_theses_fr_location,
+    map_openalex_oa_status,
+    parse_primary_location,
+    short_openalex_id,
+    should_skip_publisher_journal,
+)
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

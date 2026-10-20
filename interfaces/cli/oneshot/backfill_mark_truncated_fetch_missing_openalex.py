@@ -17,9 +17,9 @@ import os
 
 from sqlalchemy import text
 
-from domain.sources.openalex import BULK_AUTHORSHIPS_CAP
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 
 log = setup_logger("backfill_mark_truncated_fetch_missing_openalex", os.path.dirname(__file__))
 

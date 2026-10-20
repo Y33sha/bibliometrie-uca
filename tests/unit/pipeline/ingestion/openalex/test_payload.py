@@ -1,4 +1,4 @@
-from domain.sources.openalex import (
+from pipeline.ingestion.openalex.payload import (
     BULK_AUTHORSHIPS_CAP,
     OpenalexLocation,
     authors_may_be_truncated,

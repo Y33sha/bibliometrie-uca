@@ -1,0 +1,86 @@
+"""Lecture des notices ScanR par la normalisation : affiliations feuilles, NNT, concepts, statut open access.
+
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé)."""
+
+import re
+from collections.abc import Mapping
+
+from domain.publications.identifiers import NNT
+from domain.types import JsonValue, as_mapping, as_sequence, as_str
+
+# Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, que ScanR détecte dans le texte, et les mots-clés sont des mots-clés libres.
+_SUBJECT_CONCEPT_TYPES = frozenset({"sudoc"})
+
+_KEYWORD_CONCEPT_TYPES = frozenset({"wikidata", "keyword"})
+
+
+def select_leaf_affiliations(
+    affiliations: list[Mapping[str, JsonValue]],
+) -> list[Mapping[str, JsonValue]]:
+    """Filtre les affiliations ScanR aux entrées marquées labo.
+
+    ScanR renvoie côte à côte l'affiliation labo (champ `id_name_author_labo` rempli, c'est la seule affichée publiquement côté ScanR) et les pures tutelles, déjà dérivables via `structures_parents`. Ne garder que la labo évite la double-comptabilisation des tutelles parentes en aval.
+
+    Fallback sur la liste complète si aucune entrée n'est marquée labo (auteur non rattaché à un labo identifié côté ScanR) — sinon on perdrait toute affiliation pour cet auteur.
+    """
+    labo = [a for a in affiliations if a.get("id_name_author_labo")]
+    return labo or affiliations
+
+
+# Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) n'a pas de NNT.
+_THESIS_ID_RE = re.compile(r"^(?:nnt|these)(\d{4}[A-Za-z0-9]+)$")
+
+
+def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
+    """Extrait le NNT d'un `scanr_id` de thèse soutenue (`nnt2019clfad020` → `2019CLFAD020`). `None` pour tout autre identifiant."""
+    match = _THESIS_ID_RE.match(scanr_id or "")
+    nnt = NNT.try_parse(match.group(1)) if match else None
+    return str(nnt) if nnt else None
+
+
+def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:
+    """Répartit les concepts ScanR (`domains`) en mots-clés libres et en sujets.
+
+    Renvoie d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
+    """
+    keywords: list[str] = []
+    seen: set[str] = set()
+    subjects: list[JsonValue] = []
+    for entry in as_sequence(domains):
+        concept = as_mapping(entry)
+        kind = as_str(concept.get("type"))
+        if kind in _SUBJECT_CONCEPT_TYPES:
+            subjects.append(entry)
+        elif kind in _KEYWORD_CONCEPT_TYPES:
+            label = (as_str(as_mapping(concept.get("label")).get("default")) or "").strip()
+            if label and label.lower() not in seen:
+                seen.add(label.lower())
+                keywords.append(label)
+    return keywords, subjects
+
+
+def derive_scanr_oa_status(
+    is_oa: bool | None, oa_evidence: Mapping[str, JsonValue] | None
+) -> str | None:
+    """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
+
+    ScanR n'expose pas de statut OA nuancé ; il faut l'inférer de `isOa` (bool) et de `oaEvidence.hostType` / `oaEvidence.license` :
+      - is_oa=None → None (pas d'assertion ; délégation aux autres sources via `best_oa_status`)
+      - is_oa=False → 'closed' (assertion explicite : aucun accès ouvert trouvé)
+      - is_oa=True + hostType='repository' → 'green' (dépôt en archive ouverte)
+      - is_oa=True + hostType='publisher' + license cc-* → 'hybrid' (défaut conservatif, arbitré vers 'gold' en aval par `best_oa_status` si une autre source le confirme)
+      - is_oa=True + hostType='publisher' sans license cc-* → 'bronze' (accès libre chez l'éditeur, licence ouverte non déclarée)
+      - is_oa=True + hostType absent / inconnu → None (délégation)
+    """
+    if is_oa is None:
+        return None
+    if not is_oa:
+        return "closed"
+    ev = as_mapping(oa_evidence)
+    host_type = as_str(ev.get("hostType"))
+    license_ = (as_str(ev.get("license")) or "").lower()
+    if host_type == "repository":
+        return "green"
+    if host_type == "publisher":
+        return "hybrid" if license_.startswith("cc-") else "bronze"
+    return None
