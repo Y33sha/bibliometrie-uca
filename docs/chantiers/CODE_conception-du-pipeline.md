@@ -148,7 +148,7 @@ D'autres modules réunissent des connaissances sans rapport :
   - `confirmed_authorships` → `confirmed_source_contributions`, `rejected_authorships` → `rejected_contributions`, `publication_author_alignment.matched_signatures` → `matched_source_contributions` ;
   - `pub_count` → `publication_count`, `pub_year` → `publication_year`, `persons_rh` → `hr_records`, `structure_tutelles` → `structure_parents`, valeur `perimeter_evidence = 'rh_identity'` → `'hr_record'`.
 - [x] Identifiants Python renommés vers les mots du vocabulaire, abréviations comprises (`pub`, `sp`, `sa`, `sd`, `nf`). Un test sur l'AST refuse `pub`, `sp`, `sd` et `nf` ; `sa` reste l'alias de SQLAlchemy. 45f167d1d, abda4adf4, 137f915ad
-- [ ] Alias de table du SQL aux initiales des noms cibles (`sr`, `sc`, `ci`), fragments de `sql_fragments.py` compris.
+- [x] Alias de table du SQL aux initiales des noms cibles (`sr`, `sc`, `ci`), fragments de `sql_fragments.py` compris. 7bf39771a
 - [ ] Textes alignés : « signature », « notice », « identité » et « authorship » remplacés.
 
 ### Phase 9 — Documentation
