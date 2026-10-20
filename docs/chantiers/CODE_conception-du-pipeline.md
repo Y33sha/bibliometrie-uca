@@ -96,6 +96,7 @@ D'autres modules réunissent des connaissances sans rapport :
 ### Phase 3 — Sources
 
 - [x] Un `api.py` par source : client, en-têtes, lecture d'un document par identifiant. 94309e621…da94de3f2
+- [x] Collecte des sources nommée *harvest* : phases, modules, classes ; fenêtre de moissonnage typée. fc7b3df3c, 44be23e83
 - [ ] Règle de placement de la lecture du payload entre `domain/sources/` et `ingestion/<source>/`.
 - [ ] Lecture de l'identifiant et du DOI unique par source, même contrat de retour.
 - [ ] Paramètre `logger` mort des `process_work`.
