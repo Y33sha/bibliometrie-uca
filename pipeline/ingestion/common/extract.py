@@ -211,7 +211,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return HalExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
     def openalex(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.openalex.harvest import OpenalexClient, OpenalexExtractor
+        from pipeline.ingestion.openalex.api import OpenalexClient
+        from pipeline.ingestion.openalex.harvest import OpenalexExtractor
 
         return OpenalexExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
