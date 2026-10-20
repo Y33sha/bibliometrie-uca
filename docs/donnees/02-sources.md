@@ -12,14 +12,14 @@ Tables sources : les *records* non dédupliqués, normalisés à partir des payl
 - **`source_contribution_addresses`** : table de liaison `source_contributions ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs contributions, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 - **`source_contribution_rors`** : ROR attribués par la source à une contribution source, rattachés à l'adresse de leur affiliation, ou à la seule contribution source quand l'affiliation est sans texte.
 - **`candidate_dois`** : vue des DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement.
-- **`staging`** : une ligne par document moissonné. Contient le payload brut de la source, vidé après normalisation, et `disappeared_at` quand la source cesse de rendre le document. Son cycle de vie relève du [moissonnage](../pipeline/02-extract.md).
+- **`staging`** : une ligne par document moissonné. Contient le payload brut de la source, vidé après normalisation, et `disappeared_at` quand la source cesse de rendre le document. Son cycle de vie relève du [moissonnage](../pipeline/02-harvest.md).
 - **`failed_lookups`** : identifiants (DOI, hal-id, NNT) cherchés en vain dans une source, et DOI que doi.org ne connaît pas (source `doi_org`), avec la date de l'échec.
 
 ## Propriété des tables
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `staging` | pipeline | phases `extract`, `fetch_missing` et `fetch_stale` (`pipeline/ingestion/common/staging.py`) |
+| `staging` | pipeline | phases `harvest`, `fetch_missing` et `fetch_stale` (`pipeline/ingestion/common/staging.py`) |
 | `failed_lookups` | pipeline | phase `fetch_missing` (`pipeline/ingestion/<source>/fetch_missing.py`) |
 | `source_records` | pipeline | `pipeline/ingestion/<source>/normalize.py` |
 | `contributor_information` | pipeline | `pipeline/ingestion/<source>/normalize.py` (via `pipeline/ingestion/common/source_contributions.py`) |

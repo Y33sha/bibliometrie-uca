@@ -8,7 +8,7 @@
 
 `/admin/config`
 
-Configuration du [moissonnage](../pipeline/02-extract.md) :
+Configuration du [moissonnage](../pipeline/02-harvest.md) :
 - années interrogées (modes *weekly* et *full*);
 - délais de réinterrogation des sources ;
 - définition et CRUD des périmètres (`uca`, `alliance_uca`);

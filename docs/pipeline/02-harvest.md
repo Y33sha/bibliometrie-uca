@@ -4,7 +4,7 @@
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
-## Moissonnage par affiliation (`extract`)
+## Moissonnage par affiliation (`harvest`)
 
 **Critères de requête**:
 - **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
@@ -16,7 +16,7 @@ En mode `daily`, seul HAL est moissonné : les dépôts de la même plage d'ann�
 - Chaque *payload* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
 - Même sans changement, `last_seen_at` est repoussée chaque fois qu'un document est revu.
 
-## Moissonnage par personne (`extract_by_person`)
+## Moissonnage par personne (`harvest_by_person`)
 
 Une publication dont les auteurs signent sans affiliation au périmètre échappe au moissonnage par affiliation. Cette phase, jouée en mode `full`, interroge chaque source sur les identifiants des personnes RH, confirmés ou authentifiés, sur la même plage d'années.
 

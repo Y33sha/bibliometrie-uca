@@ -8,7 +8,7 @@ Documentation API:
 - https://www.crossref.org/documentation/retrieve-metadata/rest-api/
 - https://api.crossref.org/swagger-ui/index.html
 
-Le pipeline interroge CrossRef par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-extract.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-extract.md#moissonnage-par-personne-extract_by_person)). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
+Le pipeline interroge CrossRef par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person)). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
 
 ## API utilisée
 
