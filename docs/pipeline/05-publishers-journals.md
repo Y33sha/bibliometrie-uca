@@ -8,7 +8,7 @@ Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : 
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
-Phase à part, juste avant `publishers_journals`. Résout l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) des préfixes de tous les DOI connus : DOI des notices, DOI liés, cibles des relations, DOI arXiv. Le nombre de préfixes reste petit : aucun filtre de périmètre. Elle suit la normalisation, donc les DOI moissonnés dans le run sont résolus dans le run.
+Phase à part, juste avant `publishers_journals`. Résout l'agence d'enregistrement (Crossref ou DataCite, colonne `ra`) des préfixes de tous les DOI connus : DOI des enregistrements sources, DOI liés, cibles des relations, DOI arXiv. Le nombre de préfixes reste petit : aucun filtre de périmètre. Elle suit la normalisation, donc les DOI moissonnés dans le run sont résolus dans le run.
 
 Interroge `doi.org/ra` sur les préfixes absents de la table `doi_prefixes`, par lots de 100 préfixes, et enregistre leur agence. Un préfixe que doi.org ne connaît pas reçoit l'agence `unknown`. Un préfixe d'une requête en échec reste à résoudre.
 

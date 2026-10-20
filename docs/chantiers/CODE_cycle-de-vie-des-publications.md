@@ -4,8 +4,8 @@
 
 Trois modules, dans deux phases, suppriment des publications :
 
-- `lifecycle.refresh` supprime, après recalcul, une publication sans notice ou de type non admissible ;
-- le nœud `publications.delete_without_sources` supprime les publications sans notice ;
+- `lifecycle.refresh` supprime, après recalcul, une publication sans enregistrement source ou de type non admissible ;
+- le nœud `publications.delete_without_sources` supprime les publications sans enregistrement source ;
 - le nœud `contributions.purge_orphan_publications` supprime les publications sans contribution.
 
 La phase `contributions` supprime aussi les monographies, revues et éditeurs vides, et recalcule les `publication_count`. Ces nœuds la suivent, après la dernière suppression de publications. Dans `pipeline/graph.py`, cinq nœuds déclarent une lecture du run précédent de `publications.id`, à cause de `purge_orphan_publications`.
@@ -24,7 +24,7 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 ## Décisions
 
 - Un module détient le cycle de vie d'une publication. `refresh_from_sources` rend un verdict, et ce module supprime.
-- Une publication existe si elle a au moins une notice, un type admissible et au moins une contribution. Le module du cycle de vie définit ces conditions. Un nœud les applique toutes après la phase `contributions`. `refresh_from_sources` vérifie la notice et le type, et le module supprime immédiatement une publication qui y manque.
+- Une publication existe si elle a au moins un enregistrement source, un type admissible et au moins une contribution. Le module du cycle de vie définit ces conditions. Un nœud les applique toutes après la phase `contributions`. `refresh_from_sources` vérifie l'enregistrement source et le type, et le module supprime immédiatement une publication qui y manque.
 - La suppression des référentiels vides et le recalcul des `publication_count` relèvent de `publishing/`.
 - Chaque drapeau de recalcul a une fonction de marquage, détenue par la phase qui le lit.
 - Une opération `dissolve(publication, successeur)` du module du cycle de vie fait le report des dépendances, la redirection et la suppression.

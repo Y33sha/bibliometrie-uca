@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-06.*
 
-Un périmètre nomme un ensemble de structures en ne désignant que ses **racines** : tout ce qui descend d'une racine par une relation de tutelle en fait partie. C'est ce qui permet de dire « l'UCA » sans énumérer ses laboratoires, et de suivre automatiquement une réorganisation. L'ensemble ainsi obtenu détermine ce que le pipeline interroge aux sources, quelles adresses il considère comme internes, et pour quelles signatures il crée des personnes.
+Un périmètre nomme un ensemble de structures en ne désignant que ses **racines** : tout ce qui descend d'une racine par une relation de tutelle en fait partie. C'est ce qui permet de dire « l'UCA » sans énumérer ses laboratoires, et de suivre automatiquement une réorganisation. L'ensemble ainsi obtenu détermine ce que le pipeline interroge aux sources, quelles adresses il considère comme internes, et pour quelles contributions sources il crée des personnes.
 
 `domain/perimeters/perimeter.py` garantit qu'un périmètre a un code et un nom non vides. La descente récursive, elle, vit dans le SQL.
 

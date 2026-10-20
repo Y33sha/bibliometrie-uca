@@ -20,7 +20,7 @@ Les périmètres, dont les racines sont des structures, ont leur propre fiche : 
 
 Routeur `interfaces/api/routers/structures.py`, commandes dans `application/services/structures/commands.py`, adaptateur `PgStructureRepository`. C'est le seul chemin d'écriture.
 
-**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le repository valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux signatures et aux contributions.
+**Structures** (`POST`, `PUT`, `DELETE /api/structures/{id}`). Le domaine valide le type, l'identifiant ROR et la collection HAL ; le repository valide `api_ids` contre son modèle. La suppression entraîne en base celle des lignes qui rattachent la structure aux contributions sources et aux contributions.
 
 **Rattachements** (`POST /api/structures/relations`, `DELETE`). La création charge d'abord les ancêtres du parent, puis le domaine refuse l'auto-rattachement et tout rattachement qui refermerait un cycle. Créer un rattachement qui existe déjà ne produit rien.
 
@@ -38,7 +38,7 @@ Créer ou modifier un rattachement, comme supprimer une structure, recalcule les
 
 **Reconnaissance des adresses** (phase `affiliations`). `pipeline/transformation/structures/address_resolution.py` charge les formes de nom dans un automate Aho-Corasick qui balaie le texte normalisé des adresses. Trois options règlent la reconnaissance : `is_word_boundary` exige que la forme soit délimitée par des frontières de mot ; `is_excluding` fait de la forme un motif de rejet ; `requires_context_of` subordonne la reconnaissance à la présence, dans la même adresse, des structures citées.
 
-**Composition des périmètres.** Les tutelles fournissent la descente récursive qui remplit `perimeter_structures` à partir des racines déclarées. C'est par là que les structures décident, au bout de la chaîne, de l'appartenance d'une signature au périmètre.
+**Composition des périmètres.** Les tutelles fournissent la descente récursive qui remplit `perimeter_structures` à partir des racines déclarées. C'est par là que les structures décident, au bout de la chaîne, de l'appartenance d'une contribution source au périmètre.
 
 ## Lecture par l'API
 

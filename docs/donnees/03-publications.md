@@ -45,12 +45,12 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 
 Colonnes notables :
 
-- `in_perimeter` : TRUE si une signature de la personne sur cette publication entre dans le périmètre (`perimeter_evidence` non vide)
+- `in_perimeter` : TRUE si une contribution source de la personne sur cette publication entre dans le périmètre (`perimeter_evidence` non vide)
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_contribution_structures` des signatures qui attestent la contribution (même publication par leur notice, même personne), rafraîchie par le pipeline en fin de phase `contributions`.
+`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_contribution_structures` des contributions sources qui attestent la contribution (même publication par leur enregistrement source, même personne), rafraîchie par le pipeline en fin de phase `contributions`.
 
-**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une signature orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
+**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une contribution source orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
 
 **Cohérence avec les sources** : la table est **entièrement dérivée** des `source_contributions`. `in_perimeter`, les liens via `contribution_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
 

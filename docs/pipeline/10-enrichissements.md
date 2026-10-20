@@ -32,13 +32,13 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 ## Pays des adresses (`countries`)
 
-Associe des pays aux adresses, aux signatures et aux publications, pour l'analyse des collaborations internationales.
+Associe des pays aux adresses, aux contributions sources et aux publications, pour l'analyse des collaborations internationales.
 
 - **Pays trouvés.** Chaque moyen de détection propose des pays pour une adresse (`address_country_candidates`) : pays donnés par OpenAlex et ScanR, organisations ROR de l'affiliation, nom de pays en fin d'adresse, noms d'institutions et de villes (`place_name_forms`), saisie manuelle.
 - **Pays retenus.** Une fonction de préséance du domaine (`domain/country_detection.py`) compose `addresses.countries` à partir des pays trouvés.
-- **Report.** Le pays d'une signature réunit les pays retenus de ses adresses, ceux de ses organisations ROR sans adresse et ceux de ses structures HAL. `source_records.countries` réunit les pays de ses signatures, `publications.countries` ceux de ses notices.
+- **Report.** Le pays d'une contribution source réunit les pays retenus de ses adresses, ceux de ses organisations ROR sans adresse et ceux de ses structures HAL. `source_records.countries` réunit les pays de ses contributions sources, `publications.countries` ceux de ses enregistrements sources.
 
-Seules les adresses et les signatures marquées sont retraitées.
+Seules les adresses et les contributions sources marquées sont retraitées.
 
 Code : `pipeline/transformation/structures/countries/`.
 

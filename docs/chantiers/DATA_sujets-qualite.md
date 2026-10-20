@@ -12,9 +12,9 @@ Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage
 
 4. **Sujets aberrants pour une revue** : signal de cohérence éditoriale non exploité (importé de [METIER_publishers-journals 4d](archived/2026-05-29_METIER_publishers-journals.md)).
 
-5. **Domaines HAL réduits à leurs codes** : 28 186 notices HAL sur 52 500 (base locale) portent seulement des codes de domaine (`0.shs`, `1.shs.hist`). Elles ont été normalisées avant le passage au champ `fr_domainAllCodeLabel_fs`, qui porte les libellés, et jamais renormalisées depuis. L'extracteur n'en tire aucun sujet. Leurs données brutes portent seulement `domain_s` : une renormalisation effacerait leurs domaines. Le référentiel des domaines de l'API HAL (`ref/domain`, 393 codes, chemin complet des libellés) couvre 388 des 400 codes présents ; les 12 autres sont des codes retirés.
+5. **Domaines HAL réduits à leurs codes** : 28 186 enregistrements sources HAL sur 52 500 (base locale) portent seulement des codes de domaine (`0.shs`, `1.shs.hist`). Ils ont été normalisés avant le passage au champ `fr_domainAllCodeLabel_fs`, qui porte les libellés, et jamais renormalisés depuis. L'extracteur n'en tire aucun sujet. Leurs données brutes portent seulement `domain_s` : une renormalisation effacerait leurs domaines. Le référentiel des domaines de l'API HAL (`ref/domain`, 393 codes, chemin complet des libellés) couvre 388 des 400 codes présents ; les 12 autres sont des codes retirés.
 
-6. **Libellés stockés dans chaque notice** : chaque `source_record` porte le texte de ses sujets. Plusieurs sources donnent pourtant un code : domaines HAL, topics OpenAlex (`T11930`), vedettes sudoc de ScanR (PPN). Changer un libellé demande de renormaliser toutes les notices qui le portent.
+6. **Libellés stockés dans chaque enregistrement source** : chaque `source_record` porte le texte de ses sujets. Plusieurs sources donnent pourtant un code : domaines HAL, topics OpenAlex (`T11930`), vedettes sudoc de ScanR (PPN). Changer un libellé demande de renormaliser tous les enregistrements sources qui le portent.
 
 7. **Hiérarchie aplatie** : `subjects` contient un libellé par sujet, sans vocabulaire ni parent. Les libellés identiques de deux vocabulaires fusionnent. La chaîne domain → field → subfield → topic d'OpenAlex existe seulement dans `source_records.topics`.
 
@@ -67,7 +67,7 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 - **Ordre** : bootstrap d'abord, Specter2 ensuite. Justification : le bootstrap retire les aberrations grossières grain domain avant calcul des centroïdes → centroïdes plus propres pour le grain topic. Les deux couches sont complémentaires (grains différents), pas redondantes.
 - **Cible long terme** : Specter2 autonome remplace le bootstrap.
 
-**Codes plutôt que libellés.** La refonte du traitement des sujets s'appuie sur une table de correspondance code → sujet, commune aux sources qui donnent un code. Les notices stockent les codes ; la table donne les libellés. Les notices HAL réduites à leurs codes redeviennent exploitables sans nouvel import.
+**Codes plutôt que libellés.** La refonte du traitement des sujets s'appuie sur une table de correspondance code → sujet, commune aux sources qui donnent un code. Les enregistrements sources stockent les codes ; la table donne les libellés. Les enregistrements sources HAL réduits à leurs codes redeviennent exploitables sans nouvel import.
 
 **Contraintes UI** : tous les sujets `rejected = TRUE` doivent être exclus des décomptes et des listings — pages `/subjects`, `/subjects/[id]`, dashboards `/persons/[id]` et `/laboratories/[id]`. Seule la page `/publications/[id]` continue à les afficher (temporairement), avec un style barré + grisé pour permettre un contrôle visuel des rejets au fil de l'eau.
 
@@ -75,7 +75,7 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 
 ## Phasage
 
-- [ ] **Phase 0 — Correspondance code → sujet** : schéma de la table (source, code, sujet) ; normalisation des codes par source (domaines HAL depuis `domain_s`, topics OpenAlex, vedettes sudoc ScanR) ; remplissage depuis les référentiels des sources (API HAL `ref/domain`…) ; ingestion par la table. Les 28 186 notices HAL réduites à leurs codes retrouvent leurs sujets.
+- [ ] **Phase 0 — Correspondance code → sujet** : schéma de la table (source, code, sujet) ; normalisation des codes par source (domaines HAL depuis `domain_s`, topics OpenAlex, vedettes sudoc ScanR) ; remplissage depuis les référentiels des sources (API HAL `ref/domain`…) ; ingestion par la table. Les 28 186 enregistrements sources HAL réduits à leurs codes retrouvent leurs sujets.
 - [ ] **Phase 1 — One-shot `cleanup_oa_subjects`** : `interfaces/cli/oneshot/cleanup_oa_subjects.py`. Mapping arbitre en data du script (dict Python). SQL set-based : détection des rejets candidats + cascade descendants via la hiérarchie de `source_records.topics`. UPDATE `publication_subjects SET rejected = TRUE`. Tests sur cas tirés du prototype SQL. `--dry-run` pour itération.
 - [ ] **Phase 2 — Ajustements UI** : filtrer `rejected = TRUE` partout sauf `/publications/[id]`. Style barré + grisé sur `/publications/[id]`. Vérifier que `recompute_usage_counts` et `recompute_cooccurrences` filtrent bien (déjà OK côté SQL au moment de la rédaction).
 - [ ] **Phase 3 — Évaluation des classifieurs ISTEX** : appeler halClass et openAlexClass sur un échantillon de publications dont les sujets HAL, WoS ou theses.fr sont connus. Mesurer l'accord avec ces sujets et avec les domains OpenAlex. Mesurer la couverture : part des publications pourvues d'un résumé, et d'un résumé anglais. Trancher l'usage : arbitre du bootstrap, source de sujets pour les publications sans sujet, ou rien.
