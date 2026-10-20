@@ -91,7 +91,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] `ror/dump.py` dans `complements/` ; téléchargement des dumps commun. 5ef6d1c7c
 - [x] `User-Agent` construit par `polite_pool.py`. ac9fdb98d
 - [x] Indirections : `Extracteur`, réexport de `scoped_logger`, fabriques de `BibliographicNormalizer`. d73ed7766
-- [ ] Code mort : `BatchInsertCounts`, délais inutilisés, `API_BASE_URLS["doaj"]`.
+- [x] Code mort : `BatchInsertCounts`, délais inutilisés, `API_BASE_URLS["doaj"]`. 626c47b83, e0caa95b8
 
 ### Phase 3 — Sources
 
