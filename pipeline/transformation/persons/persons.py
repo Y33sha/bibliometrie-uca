@@ -33,8 +33,8 @@ from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, et
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from pipeline.transformation.persons.metrics import build_metrics
 from pipeline.transformation.persons.name_forms import PersonNameFormsQueries

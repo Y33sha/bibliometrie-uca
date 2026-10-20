@@ -1,28 +1,88 @@
-"""Passe de résolution : arbitrage par consensus des conflits d'attribution d'identifiant.
+"""Arbitrage des identifiants de personne, avant la cascade : identifiants mal placés et conflits d'attribution.
 
-Avant la cascade personnes, les conflits détectés sur le snapshot (`IdentifierConflict` : une valeur qu'une signature du candidat porte, déjà attribuée à un autre propriétaire) sont arbitrés par le **consensus** des porteurs — le nom normalisé qui porte strictement plus de voix que chacun des autres (`consensus_name`). La valeur est transférée au candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire actuel (`form_matches_person`). Seules les attributions `pending` sont transférables ; les `confirmed` (verrou admin) sont laissées.
+Le consensus d'une valeur d'identifiant est le nom que contiennent strictement plus de signatures que chacun des autres (`consensus_name`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`).
 
-Ordre-indépendant : le consensus est un agrégat de tous les porteurs, insensible à la séquence d'ingestion. Conservateur : un consensus qui désigne le propriétaire — ou ni l'un ni l'autre, ou plusieurs candidats à la fois — ne déclenche aucun transfert, pas plus qu'une égalité en tête.
+Une identité dont le nom désigne une autre personne que celle du consensus contient la valeur par erreur. Ses signatures la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`).
+
+Un conflit (`IdentifierConflict`) est une valeur qu'une signature du candidat contient et qu'une autre personne détient. Le même consensus le tranche (`resolve_identifier_transfers`) : la valeur va au candidat quand le consensus désigne le candidat seul. Seules les attributions `pending` sont transférables. Les signatures affectées repassent à NULL, et la cascade les re-résout.
+
+L'arbitrage est ordre-indépendant : le consensus agrège tous les porteurs, et le calcul repart des données à chaque exécution.
 """
 
 import logging
 from collections import defaultdict
+from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from domain.persons.identifiers import IdentifierOrigin
-from domain.persons.matching import STRONG_PERSON_IDENTIFIER_TYPES, form_matches_person
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierOrigin
+from domain.persons.matching import (
+    STRONG_PERSON_IDENTIFIER_TYPES,
+    consensus_name,
+    form_matches_person,
+    identifier_misplaced,
+)
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
     DERNIERE_BRANCHE,
     accord,
+    etape,
     forme,
     rien_a_faire,
 )
+from pipeline.runtime.observability.progression import attente
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
-from pipeline.transformation.persons.person_writes import IdentifierConflict
-from pipeline.transformation.persons.requalify_identifiers import IdentifierConsensus
+
+IdentifierConsensus = dict[tuple[str, str], str]
+"""`{(id_type, id_value): nom du consensus}` pour les valeurs dont le consensus désigne un nom."""
+
+
+def compute_identifier_consensus(
+    conn: Connection, queries: PersonsMatchingQueries
+) -> IdentifierConsensus:
+    """Consensus de chaque valeur d'identifiant, tous types confondus."""
+    consensus: IdentifierConsensus = {}
+    for id_type in PERSON_IDENTIFIER_TYPES:
+        for value, votes in queries.fetch_identifier_votes(conn, id_type).items():
+            if (name := consensus_name(votes)) is not None:
+                consensus[(id_type, value)] = name
+    return consensus
+
+
+def requalify_misplaced_identifiers(
+    conn: Connection,
+    consensus: IdentifierConsensus,
+    queries: PersonsMatchingQueries,
+) -> dict[str, int]:
+    """Neutralise les identifiants mal placés et détache les signatures qu'ils ont pu rattacher.
+
+    Retourne `{neutralized, detached}` : le nombre de signatures qui gagnent un identifiant neutralisé, et de celles qui sont détachées pour que la cascade les re-résolve.
+    """
+    misplaced: dict[int, list[str]] = defaultdict(list)
+    for id_type in PERSON_IDENTIFIER_TYPES:
+        for identity in queries.fetch_identity_identifiers(conn, id_type):
+            if identifier_misplaced(identity.name, consensus.get((id_type, identity.value))):
+                misplaced[identity.identity_id].append(id_type)
+
+    written = queries.write_misplaced_neutralizations(conn, misplaced)
+    detached = (
+        queries.detach_source_authorships(conn, written.to_detach) if written.to_detach else 0
+    )
+    return {"neutralized": written.neutralized, "detached": detached}
+
+
+class IdentifierConflict(NamedTuple):
+    """Une valeur d'identifiant qu'une signature du candidat contient est déjà attribuée à une autre personne.
+
+    L'arbitrage par consensus des porteurs la transfère au candidat si le consensus le désigne. Une attribution `confirmed` n'est jamais transférée.
+    """
+
+    id_type: str
+    id_value: str
+    candidate_person_id: int
+    owner_person_id: int
+    owner_status: str
 
 
 def detect_identifier_conflicts(
@@ -124,3 +184,39 @@ def resolve_identifier_transfers(
         forme(transferred, "transféré"),
     )
     return {"conflicts": len(conflicts), "pending": len(pending), "transferred": transferred}
+
+
+def arbitrate_identifier_conflicts(
+    conn: Connection,
+    queries: PersonsMatchingQueries,
+    logger: logging.Logger,
+    *,
+    repo: PgPersonRepository,
+) -> dict[str, int]:
+    """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
+
+    Retourne `{neutralized, detached, transferred}`. Le commit est laissé au caller.
+    """
+    etape(logger, "Identifiants mal placés et conflits d'attribution")
+    with attente(BRANCHE, logger) as ligne:
+        consensus = compute_identifier_consensus(conn, queries)
+        requalified = requalify_misplaced_identifiers(conn, consensus, queries)
+        if requalified["neutralized"]:
+            ligne.conclut(
+                f"{BRANCHE}Identifiants mal placés neutralisés sur "
+                f"{accord(requalified['neutralized'], 'signature')}"
+            )
+        else:
+            ligne.efface()
+    with attente(BRANCHE, logger) as ligne:
+        conflicts = detect_identifier_conflicts(conn, queries)
+        ligne.efface()
+    transferred = resolve_identifier_transfers(
+        conn, conflicts, consensus=consensus, queries=queries, repo=repo, logger=logger
+    )["transferred"]
+
+    return {
+        "neutralized": requalified["neutralized"],
+        "detached": requalified["detached"],
+        "transferred": transferred,
+    }

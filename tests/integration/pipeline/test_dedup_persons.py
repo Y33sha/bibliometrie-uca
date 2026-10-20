@@ -25,8 +25,8 @@ from application.services.persons.core import add_name_form, create_person
 from domain.normalize import normalize_text
 from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.arbitrate_identifiers import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.matching import PersonsMatchingQueries
 from tests.integration.helpers.authorships import upsert_split_identity
 from tests.integration.helpers.persons import (
