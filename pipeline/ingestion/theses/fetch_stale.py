@@ -11,7 +11,7 @@ from domain.types import as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, THESES_DELAY
-from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.ingestion.theses.fields import extract_doi
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.

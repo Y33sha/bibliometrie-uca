@@ -6,7 +6,7 @@ Chaque document est relu **par son identifiant natif** (`staging.source_id`), av
 - absence confirmée (réponse valide, zéro document) → `disappeared_at` ;
 - source indisponible (réseau, 429, réponse illisible) → rien, nouvelle tentative au run suivant.
 
-Le délai étale la charge sans `LIMIT` : chaque passe ramasse seulement les documents qui viennent de le franchir. Seule la requête par identifiant natif est propre à chaque source (`StaleRefetch.fetch_by_native_id`).
+Le délai étale la charge sans `LIMIT` : chaque passe ramasse seulement les documents qui viennent de le franchir.
 
 Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`, `year`) borne la relecture aux années que le run moissonne. `theses` relit tout son historique, sauf sous `--year`. WoS est opt-in (`--include-wos`).
 """
@@ -14,29 +14,20 @@ Le mode `daily` saute la phase. La fenêtre d'années du run (`start_year`, `yea
 from __future__ import annotations
 
 import asyncio
-import logging
-from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 
-import httpx2
-from sqlalchemy import Connection, text
-
-from domain.sources.registry import ALL_SOURCES, ALL_SOURCES_SET as VALID_SOURCES, source_label
-from domain.types import JsonValue
+from domain.sources.registry import ALL_SOURCES, source_label
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.stale_refetch import (
+    StaleRefetch,
+    refresh,
+)
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-
-COMMIT_EVERY = 50
 
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
@@ -110,157 +101,6 @@ class FetchStalePhase:
                 "rows": [{"key": source, **summary} for source, summary in by_source.items()]
             }
         return metrics
-
-
-@dataclass(frozen=True, slots=True)
-class FetchedRecord:
-    """Document relu dans la source : payload brut et DOI."""
-
-    doi: str | None
-    raw_data: Mapping[str, JsonValue]
-
-
-type FetchOutcome = LookupOutcome[FetchedRecord]
-
-
-class StaleRefetch(ABC):
-    """Nouvelle lecture d'un document d'une source par son identifiant natif.
-
-    Les sous-classes fixent `source_key`, `max_concurrent`, `request_delay_s` et implémentent `fetch_by_native_id`.
-    """
-
-    source_key: str
-    max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
-    request_delay_s: float = 0.0  # pause par worker après chaque requête
-
-    @abstractmethod
-    async def fetch_by_native_id(
-        self, client: httpx2.AsyncClient, source_id: str
-    ) -> FetchOutcome: ...
-
-
-# Filtre année (`{year_clause}`) : `pub_year` vient de `source_publications` (LEFT JOIN ; NULL si absent, conservé).
-_STALE_ROWS_SQL_TEMPLATE = """
-    SELECT s.source_id
-    FROM staging s
-    LEFT JOIN source_publications sp
-      ON sp.source = s.source AND sp.source_id = s.source_id
-    WHERE s.source = CAST(:source AS source_type)
-      AND s.disappeared_at IS NULL
-      AND s.last_seen_at < now() - make_interval(days => :days)
-      {year_clause}
-    ORDER BY s.id
-"""
-
-_SET_DISAPPEARED_SQL = text(
-    """
-    UPDATE staging SET disappeared_at = now()
-    WHERE source = CAST(:source AS source_type) AND source_id = :source_id
-      AND disappeared_at IS NULL
-    """
-)
-
-
-def get_stale_source_ids(
-    conn: Connection, source: str, years: list[int] | None = None, *, after_days: int
-) -> list[str]:
-    """Identifiants natifs des documents de `source` dont `last_seen_at` date de plus de `after_days` jours, hors documents disparus.
-
-    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_publications.pub_year` : un run sur une période glissante relit seulement les documents de ses propres années. `None` = aucune borne.
-    """
-    if source not in VALID_SOURCES:
-        raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
-    params: dict[str, object] = {"source": source, "days": after_days}
-    year_clause = ""
-    if years is not None:
-        year_clause = "AND (sp.pub_year IS NULL OR sp.pub_year = ANY(:years))"
-        params["years"] = list(years)
-    sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
-    return list(conn.execute(sql, params).scalars())
-
-
-def set_disappeared(conn: Connection, source: str, source_id: str) -> None:
-    """Pose `disappeared_at` sur le document `(source, source_id)` confirmé absent. Ne commite pas."""
-    conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "source_id": source_id})
-
-
-async def refresh(
-    conn: Connection,
-    refetch: StaleRefetch,
-    log: logging.Logger,
-    *,
-    after_days: int,
-    years: list[int] | None = None,
-    breaker: SourceCircuitBreaker | None = None,
-) -> PhaseMetrics:
-    """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
-
-    `years` borne la sélection à la fenêtre d'années du run (via `source_publications.pub_year`) ; `None` = tous les documents anciens de la source.
-
-    `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
-    """
-    source = refetch.source_key
-    slog = scoped_logger(log, source)
-    stale = get_stale_source_ids(conn, source, years, after_days=after_days)
-    total = len(stale)
-
-    metrics = PhaseMetrics(seen=total)
-    if total == 0:
-        return metrics
-
-    processed = 0
-
-    async def _fetch(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            outcome = await refetch.fetch_by_native_id(client, source_id)
-        except Exception as e:
-            # Breaker déclenché pendant la requête : abandon silencieux, le journal le signale une fois après le pool.
-            if not (breaker is not None and breaker.tripped):
-                slog.error("erreur sur %s : %s", source_id, e)
-            outcome = UNAVAILABLE
-        if refetch.request_delay_s:
-            await asyncio.sleep(refetch.request_delay_s)
-        return outcome
-
-    with progression(total, branche_de_source(source), slog, compte_retenus=True) as avancement:
-
-        def _write(conn: Connection, source_id: str, outcome: FetchOutcome) -> None:
-            nonlocal processed
-            if outcome is UNAVAILABLE:
-                metrics.add(errors=1)
-            elif outcome is NOT_FOUND:
-                set_disappeared(conn, source, source_id)
-                metrics.add(disappeared=1)
-            else:
-                assert isinstance(outcome, FetchedRecord)
-                _, changed = upsert_staging(
-                    conn,
-                    source=source,
-                    source_id=source_id,
-                    doi=outcome.doi,
-                    raw_data=outcome.raw_data,
-                )
-                metrics.add(updated=1) if changed else metrics.add(unchanged=1)
-                avancement.retient()
-            processed += 1
-            avancement.avance()
-
-        await run_fetch_pool(
-            stale,
-            conn,
-            max_concurrent=refetch.max_concurrent,
-            commit_every=COMMIT_EVERY,
-            fetch=_fetch,
-            write=_write,
-        )
-
-    if breaker is not None and breaker.tripped:
-        slog.warning(
-            "indisponible (429/5xx répétés) — abandon, %d/%d documents traités, reste au prochain run",
-            processed,
-            total,
-        )
-    return metrics
 
 
 # ── Câblage ───────────────────────────────────────────────────

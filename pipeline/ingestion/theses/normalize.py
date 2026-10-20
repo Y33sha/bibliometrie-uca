@@ -21,7 +21,7 @@ from domain.sources.theses import (
     derive_theses_doc_type,
 )
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.ingestion.common.normalize import SourceNormalizer
+from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (

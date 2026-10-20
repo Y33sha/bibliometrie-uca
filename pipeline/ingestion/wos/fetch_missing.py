@@ -19,8 +19,8 @@ from domain.types import JsonValue, as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
+from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
-from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.credentials import get_wos_api_key
 from pipeline.ingestion.wos.fields import (

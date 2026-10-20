@@ -1,4 +1,4 @@
-"""Nouvelle lecture des documents anciens (`pipeline.ingestion.common.fetch_stale.refresh`).
+"""Nouvelle lecture des documents anciens (`pipeline.ingestion.common.stale_refetch.refresh`).
 
 Les trois issues d'une lecture par identifiant natif sont routées correctement :
 - document trouvé (empreinte changée / inchangée) → écriture dans `staging` (updated / unchanged) ;
@@ -15,8 +15,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.ingestion.common import fetch_stale
-from pipeline.ingestion.common.fetch_stale import FetchedRecord, StaleRefetch, refresh
+from pipeline.ingestion.common import stale_refetch
+from pipeline.ingestion.common.stale_refetch import FetchedRecord, StaleRefetch, refresh
 
 
 class _Lecture(StaleRefetch):
@@ -52,13 +52,13 @@ def lancer(monkeypatch):
             return False, bool(raw_data["changed"])
 
         monkeypatch.setattr(
-            fetch_stale,
+            stale_refetch,
             "get_stale_source_ids",
             lambda conn, source, years, *, after_days: list(outcomes),
         )
-        monkeypatch.setattr(fetch_stale, "upsert_staging", _upsert)
+        monkeypatch.setattr(stale_refetch, "upsert_staging", _upsert)
         monkeypatch.setattr(
-            fetch_stale,
+            stale_refetch,
             "set_disappeared",
             lambda conn, source, source_id: base.disparus.append(source_id),
         )
@@ -120,7 +120,7 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lanc
         options.update(kwargs)
         yield spy
 
-    monkeypatch.setattr(fetch_stale, "progression", _progression)
+    monkeypatch.setattr(stale_refetch, "progression", _progression)
     lancer(_QUATRE_ISSUES)
 
     assert options.get("compte_retenus") is True

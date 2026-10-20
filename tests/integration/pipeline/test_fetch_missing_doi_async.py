@@ -1,4 +1,4 @@
-"""Recherche par DOI de la phase `fetch_missing` (`pipeline.ingestion.common.fetch_missing.fetch_missing_doi`).
+"""Recherche par DOI de la phase `fetch_missing` (`pipeline.ingestion.common.doi_search.fetch_missing_doi`).
 
 Deux angles :
 1. **Boucle** : via une fausse recherche, vérifie le pool de workers, l'inscription des DOI absents et les métriques.
@@ -15,8 +15,8 @@ import httpx2
 import pytest
 
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common import fetch_missing
-from pipeline.ingestion.common.fetch_missing import DoiBatchResult, fetch_missing_doi
+from pipeline.ingestion.common import doi_search
+from pipeline.ingestion.common.doi_search import DoiBatchResult, fetch_missing_doi
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
@@ -80,9 +80,9 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
 
     with (
         patch.object(
-            fetch_missing, "get_missing_dois", lambda conn, target, *, retry_after_days: dois
+            doi_search, "get_missing_dois", lambda conn, target, *, retry_after_days: dois
         ),
-        patch.object(fetch_missing, "record_failed_lookup", _record),
+        patch.object(doi_search, "record_failed_lookup", _record),
     ):
         return await fetch_missing_doi(
             MagicMock(), adapter, logging.getLogger("test"), retry_after_days=30, **kw
@@ -123,8 +123,8 @@ class TestRunAsyncOrchestrator:
             return [d for d in dois if d == "10.1/connu"], [d for d in dois if d == "10.1/inconnu"]
 
         with (
-            patch.object(fetch_missing, "doi_existence", _existence),
-            patch.object(fetch_missing, "_doi_org_user_agent", lambda: "test"),
+            patch.object(doi_search, "doi_existence", _existence),
+            patch.object(doi_search, "_doi_org_user_agent", lambda: "test"),
         ):
             result = await _run(adapter, ["10.1/connu", "10.1/inconnu"], recorded=recorded)
 

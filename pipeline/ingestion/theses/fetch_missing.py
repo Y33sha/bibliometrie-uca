@@ -17,8 +17,8 @@ from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import NotFound
 from pipeline.ingestion.api_params import THESES_DELAY
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
-from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome
 from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome
 from pipeline.ingestion.theses.fetch_stale import fetch_thesis
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics

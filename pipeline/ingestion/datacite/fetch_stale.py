@@ -13,7 +13,7 @@ from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
 
 
