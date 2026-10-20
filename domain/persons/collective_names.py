@@ -1,4 +1,4 @@
-"""Reconnaissance d'un nom de signature collective : collaboration, consortium, groupe d'étude, réseau, investigateurs, rédaction, ou organisme déposé à la place d'un auteur (université, laboratoire, institut…).
+"""Reconnaissance d'un nom de contribution source collective : collaboration, consortium, groupe d'étude, réseau, investigateurs, rédaction, ou organisme déposé à la place d'un auteur (université, laboratoire, institut…).
 
 Sert aux sources qui ne distinguent pas un collectif d'une personne. La règle porte sur le nom normalisé (`normalize_text`) : un mot ou une locution de collectif suffit.
 """

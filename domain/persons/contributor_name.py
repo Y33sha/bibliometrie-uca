@@ -1,4 +1,4 @@
-"""Nom d'un auteur tel qu'une source le donne sur une signature."""
+"""Nom d'un auteur tel qu'une source le donne sur une contribution source."""
 
 import re
 from dataclasses import dataclass
@@ -26,7 +26,7 @@ def is_placeholder_name(name: str) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class ContributorName:
-    """Nom d'auteur d'une signature (VO) : nom et prénom séparés, ou chaîne brute.
+    """Nom d'auteur d'une contribution source (VO) : nom et prénom séparés, ou chaîne brute.
 
     La forme suit la source : Crossref, DataCite, WoS, HAL et theses.fr séparent nom et prénom, OpenAlex et ScanR donnent une chaîne. Les fabriques `from_parts` et `from_raw` nettoient les valeurs (`clean_raw_author_name`).
     """
@@ -67,7 +67,7 @@ class ContributorName:
     def from_columns(
         cls, raw: str | None, last_name: str | None, first_name: str | None
     ) -> "ContributorName":
-        """Nom stocké d'une signature (`raw_author_name`, `raw_last_name`, `raw_first_name`), déjà nettoyé."""
+        """Nom stocké d'une contribution source (`raw_author_name`, `raw_last_name`, `raw_first_name`), déjà nettoyé."""
         if last_name is not None:
             return cls(last_name=last_name, first_name=first_name)
         return cls(raw=raw)

@@ -313,20 +313,20 @@ def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
 
 
 class IdentifierNeutralization(StrEnum):
-    """Motif pour lequel une signature neutralise un identifiant de son identité : l'identifiant reste enregistré, et la résolution des personnes l'ignore pour cette signature."""
+    """Motif pour lequel une contribution source neutralise un identifiant de ses informations du contributeur : l'identifiant reste enregistré, et la résolution des personnes l'ignore pour cette contribution source."""
 
     SHARED = "shared"
-    """Valeur portée par plusieurs signatures d'un même document."""
+    """Valeur portée par plusieurs contributions sources d'un même enregistrement source."""
     MISPLACED = "misplaced"
-    """Valeur dont le consensus désigne une autre personne que le nom de la signature."""
+    """Valeur dont le consensus désigne une autre personne que le nom de la contribution source."""
 
 
 def shared_identifier_neutralizations(
     ids_by_source_contribution: Sequence[Mapping[str, JsonValue] | None],
 ) -> list[dict[str, IdentifierNeutralization] | None]:
-    """Identifiants neutralisés de chaque signature d'un document, pour cause de partage.
+    """Identifiants neutralisés de chaque contribution source d'un enregistrement source, pour cause de partage.
 
-    Une valeur d'identifiant, quel que soit son type, portée par plusieurs signatures d'un même document est une corruption : un identifiant désigne une seule signature par document. Toute signature portant une valeur partagée voit tous ses identifiants neutralisés, y compris celle du vrai propriétaire, que rien ne distingue des autres. `None` pour une signature sans identifiant neutralisé.
+    Une valeur d'identifiant, quel que soit son type, présente sur plusieurs contributions sources d'un même enregistrement source est une corruption : un identifiant désigne une seule contribution source par enregistrement source. Toute contribution source qui contient une valeur partagée voit tous ses identifiants neutralisés, y compris celle du vrai propriétaire, que rien ne distingue des autres. `None` pour une contribution source sans identifiant neutralisé.
     """
     counts: Counter[tuple[str, JsonValue]] = Counter()
     for ids in ids_by_source_contribution:

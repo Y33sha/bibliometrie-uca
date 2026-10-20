@@ -1,6 +1,6 @@
 """Entité `Perimeter` — un périmètre d'établissement, l'ensemble de structures considérées « in perimeter » pour la bibliométrie.
 
-Identité = `id` (clé surrogate). Identifiant naturel : `code` (unique). `root_structure_ids` référence les structures racines par leur id, sans charger les entités complètes (potentiellement plusieurs centaines par périmètre).
+Clé surrogate : `id`. Identifiant naturel : `code` (unique). `root_structure_ids` référence les structures racines par leur id, sans charger les entités complètes (potentiellement plusieurs centaines par périmètre).
 """
 
 from dataclasses import dataclass, field

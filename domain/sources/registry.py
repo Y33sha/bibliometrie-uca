@@ -86,7 +86,7 @@ DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
 )
 
-# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans être une source de notices.
+# Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
 DOI_ORG = "doi_org"
 LOOKUP_SOURCES: tuple[str, ...] = (*ALL_SOURCES, DOI_ORG)
 

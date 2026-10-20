@@ -1,6 +1,6 @@
 """Règles sur les pays des publications.
 
-Les pays d'une publication se lisent dans `publications.countries`, alimenté depuis les adresses de ses signatures. Les codes sont ceux de l'ISO 3166-1, en minuscules. Deux codes y portent une sémantique propre, que ce module nomme.
+Les pays d'une publication se lisent dans `publications.countries`, alimenté depuis les adresses de ses contributions sources. Les codes sont ceux de l'ISO 3166-1, en minuscules. Deux codes y ont une sémantique propre, que ce module nomme.
 """
 
 import re

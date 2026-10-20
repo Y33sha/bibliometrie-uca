@@ -106,7 +106,7 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     "has-preprint": RelationType.HAS_PREPRINT,
     "is-supplement-to": RelationType.IS_SUPPLEMENT_TO,
     "is-supplemented-by": RelationType.HAS_SUPPLEMENT,
-    # Famille correction : la clé est portée par l'article, pointant vers sa notice
+    # Famille correction : la clé est portée par l'article, pointant vers son erratum
     # (erratum/corrigendum/addendum). Sens : l'article « a une correction ».
     "erratum": RelationType.HAS_CORRECTION,
     "correction": RelationType.HAS_CORRECTION,
@@ -114,11 +114,11 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     "addendum": RelationType.HAS_CORRECTION,
     "clarification": RelationType.HAS_CORRECTION,
     "corrected": RelationType.IS_CORRECTION_OF,
-    # Rétractation : l'article pointe vers sa notice de rétractation/retrait.
+    # Rétractation : l'article pointe vers l'avis de rétractation ou de retrait.
     "retraction": RelationType.HAS_RETRACTION,
     "withdrawal": RelationType.HAS_RETRACTION,
     # Expression of concern : avis éditorial de doute post-publication (un cran sous
-    # la rétractation), porté par l'article vers la notice.
+    # la rétractation), déclaré par l'article vers l'avis.
     "expression_of_concern": RelationType.HAS_CONCERN,
     "is-translation-of": RelationType.IS_TRANSLATION_OF,
     "has-translation": RelationType.HAS_TRANSLATION,
@@ -186,7 +186,7 @@ def extract_datacite_distinct_works(
 ) -> list[str]:
     """DOI qu'un payload DataCite déclare comme autre forme de son œuvre, quand la relation relie deux œuvres.
 
-    `own_doi` et `doc_type` sont ceux de la notice déclarante, que lit `meme_oeuvre_declaree`.
+    `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, que lit `meme_oeuvre_declaree`.
     """
     related = (meta or {}).get("related_identifiers")
     if not isinstance(related, list):

@@ -193,7 +193,7 @@ def normalize_license(raw: str | None) -> License | None:
 
 
 def crossref_license(entries: JsonValue) -> License | None:
-    """Licence de la version éditeur d'une notice Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
+    """Licence de la version éditeur d'un enregistrement source Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
     for version in ("vor", "unspecified"):
         for entry in as_sequence(entries):
             item = as_mapping(entry)
@@ -204,7 +204,7 @@ def crossref_license(entries: JsonValue) -> License | None:
 
 
 def datacite_license(rights: JsonValue) -> License | None:
-    """Licence d'une notice DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
+    """Licence d'un enregistrement source DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
     declared = False
     for entry in as_sequence(rights):
         item = as_mapping(entry)

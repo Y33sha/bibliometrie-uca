@@ -56,7 +56,7 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     """
     if not raw_name:
         return "", ""
-    # Filet générique : une signature non passée par le writer (nom brut jamais assaini) ne doit pas transformer un identifiant parenthésé en nom de famille.
+    # Filet générique : une contribution source non passée par le writer (nom brut jamais assaini) ne doit pas transformer un identifiant parenthésé en nom de famille.
     raw = clean_raw_author_name(raw_name).strip()
     if "," in raw:
         parts = raw.split(",", 1)
@@ -74,7 +74,7 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
 
 
 def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
-    """Découpages (nom de famille, prénom) possibles d'une signature.
+    """Découpages (nom de famille, prénom) possibles d'une contribution source.
 
     Au format « Nom, Prénom » ou « Nom I. », le seul découpage de `parse_raw_author_name`. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
     """
@@ -120,7 +120,7 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
 def _name_words(*parts: str) -> list[str]:
     """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 
-    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux signatures de type SUDOC (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
+    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux noms en forme d'autorité (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
     """
     text = re.sub(r"\d+", " ", normalize_name(" ".join(part for part in parts if part)))
     return text.split()

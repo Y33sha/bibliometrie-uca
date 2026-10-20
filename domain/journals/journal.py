@@ -1,6 +1,6 @@
 """Aggregate root `Journal` — un journal, une conférence ou un autre support de publication.
 
-Identité = `id` (clé surrogate). Identifiant naturel : `title`, via la normalisation de `journal_name_forms`. Les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id.
+Clé surrogate : `id`. Identifiant naturel : `title`, via la normalisation de `journal_name_forms`. Les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id.
 
 `JOURNAL_TYPES` reste synchronisé avec l'enum SQL `journal_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """

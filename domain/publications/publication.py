@@ -1,10 +1,10 @@
 """Aggregate root `Publication` — référence biblio canonique.
 
-Une `Publication` unifie les images qu'une ou plusieurs `SourceRecord` donnent d'un même document scientifique. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_records.external_ids`).
+Une `Publication` unifie les images qu'une ou plusieurs `SourceRecord` donnent d'un même document scientifique. Clé surrogate : `id`. Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_records.external_ids`).
 
 Les `source_records` attachées sont lues en projection (`SourceRecord`), jamais comme un agrégat mutable.
 
-L'entité porte la forme et l'identité de la référence canonique. Les règles qui la calculent vivent dans les modules voisins du domaine : agrégation cross-sources (`aggregation`), arbitrage des statuts et canonicalisation des titres (`metadata`), assignation et réconciliation (`reconciliation`).
+L'entité contient les métadonnées retenues pour la publication. Les règles qui la calculent vivent dans les modules voisins du domaine : agrégation cross-sources (`aggregation`), arbitrage des statuts et canonicalisation des titres (`metadata`), assignation et réconciliation (`reconciliation`).
 """
 
 from dataclasses import dataclass, field

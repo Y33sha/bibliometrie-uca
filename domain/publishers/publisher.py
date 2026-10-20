@@ -1,6 +1,6 @@
 """Aggregate root `Publisher` — un éditeur.
 
-Identité = `id` (clé surrogate). Identifiant naturel : `name`, via la normalisation de `publisher_name_forms`.
+Clé surrogate : `id`. Identifiant naturel : `name`, via la normalisation de `publisher_name_forms`.
 
 `PUBLISHER_TYPES` reste synchronisé avec l'enum SQL `publisher_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """

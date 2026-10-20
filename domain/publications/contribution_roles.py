@@ -12,7 +12,7 @@ from enum import StrEnum
 
 
 class ContributionRole(StrEnum):
-    """Rôle canonique d'une signature, valeur de `source_contributions.roles`."""
+    """Rôle d'une contribution source, valeur de `source_contributions.roles`."""
 
     AUTHOR = "author"  # auteur
     TRANSLATOR = "translator"  # traducteur
@@ -225,5 +225,5 @@ def merge_roles(role_lists: list[list[ContributionRole]]) -> list[ContributionRo
 
 
 def is_individual_author(roles: Sequence[str] | None, collective: bool) -> bool:
-    """La signature compte dans la liste d'auteurs de sa notice : elle a le rôle `AUTHOR` et n'est pas collective."""
+    """La contribution source compte dans la liste d'auteurs de son enregistrement source : elle a le rôle `AUTHOR` et n'est pas collective."""
     return not collective and ContributionRole.AUTHOR in (roles or ())

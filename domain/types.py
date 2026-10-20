@@ -4,7 +4,7 @@
 
 Les accesseurs qui suivent ramènent une valeur JSON à la forme que le code attend, ou à rien. Une donnée reçue de l'extérieur n'a en effet pas la forme annoncée par contrat mais celle qu'elle a : un champ documenté comme texte arrive parfois en liste, en nombre, ou absent. Y accéder sans vérifier marche jusqu'au payload qui déroge, et lève alors au milieu d'un moissonnage. Ces fonctions rendent le contrôle explicite et uniforme, là où chaque lecture le refaisait à sa façon — ou l'omettait.
 
-Le repli est la valeur vide plutôt qu'une erreur : une notice mal formée sur un champ ne doit pas interrompre la lecture des autres. C'est au niveau du document que l'appelant décide si ce qui manque le rend inexploitable.
+Le repli est la valeur vide plutôt qu'une erreur : un enregistrement source mal formé sur un champ ne doit pas interrompre la lecture des autres. C'est au niveau de l'enregistrement source que l'appelant décide si ce qui manque le rend inexploitable.
 
 Alias récursif en syntaxe PEP 695 (`type X = ...`, évaluation paresseuse).
 """

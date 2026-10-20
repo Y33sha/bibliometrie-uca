@@ -1,6 +1,6 @@
-"""Synchronisation des signatures d'une notice renormalisée avec celles en base.
+"""Synchronisation des contributions sources d'un enregistrement source renormalisé avec celles en base.
 
-La renormalisation d'une notice rapproche ses signatures entrantes de ses signatures en base. Une signature rapprochée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées.
+La renormalisation d'un enregistrement source rapproche ses contributions sources entrantes de ses contributions sources en base. Une contribution source rapprochée garde son identifiant, et donc sa personne et son épinglage ; elle est réécrite seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées.
 """
 
 from collections import defaultdict
@@ -12,7 +12,7 @@ from domain.types import JsonValue
 
 
 class StoredSourceContribution(NamedTuple):
-    """Signature en base : identifiant, position, identité (nom normalisé et identifiants), empreinte et rôles."""
+    """Contribution source en base : identifiant, position, informations du contributeur (nom normalisé et identifiants), empreinte et rôles."""
 
     id: int
     position: int | None
@@ -22,7 +22,7 @@ class StoredSourceContribution(NamedTuple):
 
 
 class IncomingSourceContribution(NamedTuple):
-    """Signature issue de la notice renormalisée : clé (rang dans la notice), position d'auteur, identité, empreinte et rôles. Une signature sans rôle d'auteur n'a pas de position."""
+    """Contribution source issue de l'enregistrement source renormalisé : clé (rang dans l'enregistrement source), position d'auteur, informations du contributeur, empreinte et rôles. Une contribution source sans rôle d'auteur est sans position."""
 
     key: int
     position: int | None
@@ -33,9 +33,9 @@ class IncomingSourceContribution(NamedTuple):
 
 @dataclass(frozen=True, slots=True)
 class SourceContributionSyncPlan:
-    """Ce que la renormalisation fait des signatures d'une notice.
+    """Ce que la renormalisation fait des contributions sources d'un enregistrement source.
 
-    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une signature est insérée ou supprimée, ou change de position ou de rôles. Les signatures de la publication sont alors à regrouper.
+    `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une contribution source est insérée ou supprimée, ou change de position ou de rôles. Les contributions sources de la publication sont alors à regrouper.
     """
 
     updates: tuple[tuple[int, int], ...]
@@ -48,9 +48,9 @@ class SourceContributionSyncPlan:
 def plan_source_contribution_sync(
     stored: Sequence[StoredSourceContribution], incoming: Sequence[IncomingSourceContribution]
 ) -> SourceContributionSyncPlan:
-    """Rapproche les signatures entrantes de celles en base.
+    """Rapproche les contributions sources entrantes de celles en base.
 
-    Une identité portée par une seule signature de chaque côté rapproche les deux. Une identité répétée rapproche les signatures de même position d'auteur. Une identité absente d'un côté, ou répétée sans position commune, ne rapproche rien.
+    Des informations du contributeur portées par une seule contribution source de chaque côté rapprochent les deux. Répétées, elles rapprochent les contributions sources de même position d'auteur. Absentes d'un côté, ou répétées sans position commune, elles ne rapprochent rien.
     """
     stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
         list
@@ -102,7 +102,7 @@ def source_contribution_content(
     hal_structure_ids: Iterable[int] = (),
     collective: bool = False,
 ) -> JsonValue:
-    """Champs qu'écrit la normalisation d'une signature, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la signature sans texte d'affiliation. `hal_structure_ids` : structures HAL directes de la signature. Les ROR, les structures HAL et la marque collective sont présents dans le contenu seulement s'il y en a."""
+    """Champs qu'écrit la normalisation d'une contribution source, dont l'empreinte détecte un changement. `name` : chaîne brute, nom et prénom de la source. `addresses` : (texte, pays, ROR) de chaque adresse, dans l'ordre de la source. `ror_ids` : ROR attribués à la contribution source sans texte d'affiliation. `hal_structure_ids` : structures HAL directes de la contribution source. Les ROR, les structures HAL et la marque collective sont présents dans le contenu seulement s'il y en a."""
     content: dict[str, JsonValue] = {
         "position": position,
         "name": list(name),

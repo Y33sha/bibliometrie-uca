@@ -26,7 +26,7 @@ _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 
 
 def _hal_titles(source: SourceRecord) -> list[str]:
-    """Titre de la source et collections qu'une notice HAL associe à une communication."""
+    """Titre de la source et collections qu'un enregistrement source HAL associe à une communication."""
     meta = source.meta or {}
     titles = as_strs(meta.get("series"))
     if source_title := as_str(meta.get("source_title")):
@@ -35,14 +35,14 @@ def _hal_titles(source: SourceRecord) -> list[str]:
 
 
 def names_abstracts(source: SourceRecord) -> bool:
-    """La notice HAL range la communication dans un recueil de résumés."""
+    """L'enregistrement source HAL range la communication dans un recueil de résumés."""
     return source.source == "hal" and any(
         _ABSTRACTS.search(normalize_text(t)) for t in _hal_titles(source)
     )
 
 
 def _hal_editorial_fields(source: SourceRecord) -> bool:
-    """La notice HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
+    """L'enregistrement source HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
     meta = source.meta or {}
     biblio = source.biblio or {}
     if meta.get("proceedings") is True:
@@ -57,7 +57,7 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
 
 
 def attests_publication(source: SourceRecord) -> bool:
-    """L'enregistrement atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'une notice HAL."""
+    """L'enregistrement source atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
     if source.doi or source.journal_id or source.monograph_id:
         return True
     if (source.meta or {}).get("conference"):
