@@ -45,7 +45,7 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_containers,
     find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # UTILITAIRES
@@ -450,11 +450,9 @@ def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dic
 # =============================================================
 
 
-def upsert_publisher(
-    publisher_name: str | None, *, publisher_repo: PublisherGatewayQueries
-) -> int | None:
+def upsert_publisher(publisher_name: str | None, *, publisher_store: PublisherStore) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(publisher_name, repo=publisher_repo)
+    return find_or_create_publisher(publisher_name, repo=publisher_store)
 
 
 def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -667,7 +665,7 @@ def process_record(
     staging_row: StagingRow,
     *,
     container_repo: ContainerGatewayQueries,
-    publisher_repo: PublisherGatewayQueries,
+    publisher_store: PublisherStore,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool:
@@ -683,7 +681,7 @@ def process_record(
         rec["ut"] = ut
 
     publisher_id = upsert_publisher(
-        as_str(rec.get("publisher_name")), publisher_repo=publisher_repo
+        as_str(rec.get("publisher_name")), publisher_store=publisher_store
     )
     containers = upsert_containers(rec, publisher_id, container_repo=container_repo)
     pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
@@ -703,14 +701,14 @@ class WosNormalizer(BibliographicNormalizer):
         return as_str(rec.get("title")), as_int(rec.get("pub_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._container_repo, self._publisher_repo
+        container_repo, publisher_store = self._container_repo, self._publisher_repo
         return process_record(
             conn,
             self._queries,
             self.logger,
             row,
             container_repo=container_repo,
-            publisher_repo=publisher_repo,
+            publisher_store=publisher_store,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )

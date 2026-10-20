@@ -25,7 +25,7 @@ from pipeline.runtime.observability.libelles import (
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progression import progression
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 
 class NormalizeStats(NamedTuple):
@@ -203,11 +203,11 @@ class BibliographicNormalizer(SourceNormalizer):
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
         container_repo: ContainerGatewayQueries,
-        publisher_repo: PublisherGatewayQueries,
+        publisher_store: PublisherStore,
         authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._container_repo = container_repo
-        self._publisher_repo = publisher_repo
+        self._publisher_repo = publisher_store
         self._authorship_queries = authorship_queries

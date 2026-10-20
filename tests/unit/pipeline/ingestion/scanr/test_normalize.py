@@ -308,7 +308,7 @@ class TestGetTitle:
 
 class TestUpsertPublisherEtJournal:
     def test_sans_editeur_nomme_rien_n_est_cree(self):
-        assert upsert_publisher({}, publisher_repo=MagicMock()) is None
+        assert upsert_publisher({}, publisher_store=MagicMock()) is None
 
     def test_editeur_nomme_est_cree(self, monkeypatch):
         vus: list[str] = []
@@ -319,7 +319,7 @@ class TestUpsertPublisherEtJournal:
         )
         doc = {"source": {"publisher": "Elsevier"}}
 
-        assert upsert_publisher(doc, publisher_repo=MagicMock()) == 7
+        assert upsert_publisher(doc, publisher_store=MagicMock()) == 7
         assert vus == ["Elsevier"]
 
     def test_sans_titre_de_revue_aucune_revue(self):
@@ -535,7 +535,7 @@ class TestProcessWork:
             queries,
             staging_row(staging_id=42, source_id="sc-1", raw=raw),
             container_repo=MagicMock(),
-            publisher_repo=MagicMock(),
+            publisher_store=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
         )
@@ -564,7 +564,7 @@ class TestProcessWork:
             staging_queries=MagicMock(),
             queries=MagicMock(),
             container_repo=MagicMock(),
-            publisher_repo=MagicMock(),
+            publisher_store=MagicMock(),
             authorship_queries=MagicMock(),
         )
         assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
@@ -584,7 +584,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         staging_queries=MagicMock(),
         queries=MagicMock(),
         container_repo=MagicMock(),
-        publisher_repo=MagicMock(),
+        publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
     row = staging_row()

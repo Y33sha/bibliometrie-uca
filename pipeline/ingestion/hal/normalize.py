@@ -51,7 +51,7 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_containers,
     find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # UTILITAIRES
@@ -68,9 +68,9 @@ def get_title(doc: Mapping[str, JsonValue]) -> str:
 # =============================================================
 
 
-def upsert_publisher(publisher_name: str, *, publisher_repo: PublisherGatewayQueries) -> int | None:
+def upsert_publisher(publisher_name: str, *, publisher_store: PublisherStore) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(publisher_name, repo=publisher_repo)
+    return find_or_create_publisher(publisher_name, repo=publisher_store)
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -615,7 +615,7 @@ def process_work(
     staging_row: StagingRow,
     *,
     container_repo: ContainerGatewayQueries,
-    publisher_repo: PublisherGatewayQueries,
+    publisher_store: PublisherStore,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
@@ -631,7 +631,9 @@ def process_work(
         doc.get("publisher_s")
     )
     publisher_id = (
-        upsert_publisher(publisher_name, publisher_repo=publisher_repo) if publisher_name else None
+        upsert_publisher(publisher_name, publisher_store=publisher_store)
+        if publisher_name
+        else None
     )
     containers = upsert_containers(doc, publisher_id, container_repo=container_repo)
     pub_meta = extract_pub_metadata(doc, containers.journal_id, containers.monograph_id)
@@ -658,13 +660,13 @@ class HalNormalizer(BibliographicNormalizer):
         return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._container_repo, self._publisher_repo
+        container_repo, publisher_store = self._container_repo, self._publisher_repo
         return process_work(
             conn,
             self._queries,
             row,
             container_repo=container_repo,
-            publisher_repo=publisher_repo,
+            publisher_store=publisher_store,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )

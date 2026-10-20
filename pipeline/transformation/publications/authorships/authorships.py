@@ -49,7 +49,6 @@ from pipeline.transformation.publishing.publishers import delete_empty_publisher
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
 )
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
 _PURGE_BATCH_SIZE = 5000
 
@@ -263,4 +262,4 @@ def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
 
 def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_delete_empty_publishers(ctx.logger, publisher_repo=PublisherGatewayQueries(conn))
+        return run_delete_empty_publishers(conn, ctx.logger)

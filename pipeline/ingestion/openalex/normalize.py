@@ -60,7 +60,7 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_containers,
     find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
+from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # UTILITAIRES
@@ -162,7 +162,7 @@ def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
 
 
 def upsert_publisher(
-    work: Mapping[str, JsonValue], *, publisher_repo: PublisherGatewayQueries
+    work: Mapping[str, JsonValue], *, publisher_store: PublisherStore
 ) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
@@ -171,7 +171,7 @@ def upsert_publisher(
         return None
     openalex_id = short_openalex_id(as_str(source.get("host_organization")) or "")
     return find_or_create_publisher(
-        publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
+        publisher_name, openalex_id=openalex_id or None, repo=publisher_store
     )
 
 
@@ -516,7 +516,7 @@ def process_work(
     staging_row: StagingRow,
     *,
     container_repo: ContainerGatewayQueries,
-    publisher_repo: PublisherGatewayQueries,
+    publisher_store: PublisherStore,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
@@ -529,7 +529,7 @@ def process_work(
     if should_skip_publisher_journal(primary):
         containers = Containers(None, None)
     else:
-        publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
+        publisher_id = upsert_publisher(work, publisher_store=publisher_store)
         containers = upsert_containers(work, publisher_id, container_repo=container_repo)
     pub_meta = extract_pub_metadata(
         work, containers.journal_id, primary, monograph_id=containers.monograph_id
@@ -553,13 +553,13 @@ class OpenalexNormalizer(BibliographicNormalizer):
         return title, as_int(work.get("publication_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._container_repo, self._publisher_repo
+        container_repo, publisher_store = self._container_repo, self._publisher_repo
         return process_work(
             conn,
             self._queries,
             row,
             container_repo=container_repo,
-            publisher_repo=publisher_repo,
+            publisher_store=publisher_store,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )

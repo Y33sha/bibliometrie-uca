@@ -842,7 +842,7 @@ class TestUpsertWrappers:
             normalize_wos, "find_or_create_publisher", fake_find_or_create_publisher
         )
         repo = MagicMock()
-        assert upsert_publisher("Springer", publisher_repo=repo) == 99
+        assert upsert_publisher("Springer", publisher_store=repo) == 99
         assert calls == [("Springer", repo)]
 
     def test_sans_titre_de_source_aucun_conteneur(self):
@@ -1076,7 +1076,7 @@ class TestProcessRecord:
             logger,
             row,
             container_repo=MagicMock(),
-            publisher_repo=MagicMock(),
+            publisher_store=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         )
@@ -1128,7 +1128,7 @@ class TestProcessRecord:
             logger,
             row,
             container_repo=MagicMock(),
-            publisher_repo=MagicMock(),
+            publisher_store=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
         )
@@ -1151,7 +1151,7 @@ class TestProcessRecord:
                 logger,
                 row,
                 container_repo=MagicMock(),
-                publisher_repo=MagicMock(),
+                publisher_store=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
             )
@@ -1168,7 +1168,7 @@ class TestWosNormalizer:
             staging_queries=MagicMock(),
             queries=MagicMock(),
             container_repo=MagicMock(),
-            publisher_repo=MagicMock(),
+            publisher_store=MagicMock(),
             authorship_queries=MagicMock(),
         )
 
@@ -1189,7 +1189,7 @@ class TestWosNormalizer:
         # Les dépendances injectées sont propagées.
         assert set(captured["kwargs"].keys()) == {
             "container_repo",
-            "publisher_repo",
+            "publisher_store",
             "staging_queries",
             "authorship_queries",
         }

@@ -191,14 +191,14 @@ def _run_pub(repo, pubrepo, cr=None, dc=None):
         MagicMock(),
         _LOG,
         repo=repo,
-        publisher_repo=pubrepo,
+        publisher_store=pubrepo,
         fetch_prefix_fn=cr if cr is not None else StubCrossref(),
     )
     datacite = run_resolve_datacite_publishers(
         MagicMock(),
         _LOG,
         repo=repo,
-        publisher_repo=pubrepo,
+        publisher_store=pubrepo,
         fetch_prefix_fn=dc if dc is not None else StubDataCite(),
     )
     crossref.merge(datacite)

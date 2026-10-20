@@ -303,7 +303,7 @@ class TestProcessAuthorships:
 
 class TestUpsertPublisher:
     def test_sans_editeur_nomme_rien_n_est_cree(self):
-        assert upsert_publisher({}, publisher_repo=MagicMock()) is None
+        assert upsert_publisher({}, publisher_store=MagicMock()) is None
 
     def test_editeur_nomme_est_cree(self, monkeypatch):
         vus: list[str] = []
@@ -313,7 +313,7 @@ class TestUpsertPublisher:
             lambda name, *, repo: vus.append(name) or 7,
         )
 
-        assert upsert_publisher({"publisher": "Zenodo"}, publisher_repo=MagicMock()) == 7
+        assert upsert_publisher({"publisher": "Zenodo"}, publisher_store=MagicMock()) == 7
         assert vus == ["Zenodo"]
 
 
@@ -398,7 +398,7 @@ class TestProcessWork:
     def _kwargs(self, queries, staging_queries):
         return {
             "container_repo": MagicMock(),
-            "publisher_repo": MagicMock(),
+            "publisher_store": MagicMock(),
             "staging_queries": staging_queries,
             "authorship_queries": MagicMock(),
         }
@@ -492,7 +492,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         staging_queries=MagicMock(),
         queries=MagicMock(),
         container_repo=MagicMock(),
-        publisher_repo=MagicMock(),
+        publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
     row = staging_row()
@@ -508,7 +508,7 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         staging_queries=MagicMock(),
         queries=MagicMock(),
         container_repo=MagicMock(),
-        publisher_repo=MagicMock(),
+        publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
