@@ -92,7 +92,7 @@ def extract_theses(
         if total is None:
             total = as_int(data.get("totalHits")) or 0
             avancement.fixer_total(total)
-            metrics.add(total=total)
+            metrics.add(seen=total)
         theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]
         if not theses:
             break

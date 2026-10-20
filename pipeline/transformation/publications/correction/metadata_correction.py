@@ -21,7 +21,7 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
     PgMetadataCorrectionQueries,
 )
 
-_GROUP = "metadata_correction"
+_PHASE = "metadata_correction"
 
 
 @dataclass(frozen=True)
@@ -30,14 +30,14 @@ class MetadataCorrectionPhase:
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les trois nœuds, chacun dans sa transaction, et assemble les métriques de la phase."""
-        by_node = run_nodes(_GROUP, self._steps(), ctx)
+        by_node = run_nodes(_PHASE, self._steps(), ctx)
         journal_by_doi, unary, cluster = (
-            by_node[f"{_GROUP}.{name}"] for name in ("journal_by_doi", "unary", "cluster")
+            by_node[f"{_PHASE}.{name}"] for name in ("journal_by_doi", "unary", "cluster")
         )
 
         metrics = PhaseMetrics()
         for node_metrics in (journal_by_doi, unary, cluster):
-            metrics.add(total=node_metrics.total, updated=node_metrics.updated)
+            metrics.add(seen=node_metrics.total, updated=node_metrics.updated)
         # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
         metrics.details["summary"] = {
             "journal_by_doi_examined": journal_by_doi.total,
@@ -78,9 +78,9 @@ class MetadataCorrectionPhase:
             )
 
         return {
-            f"{_GROUP}.journal_by_doi": NodeStep(journal_by_doi),
-            f"{_GROUP}.unary": NodeStep(unary),
-            f"{_GROUP}.cluster": NodeStep(cluster),
+            f"{_PHASE}.journal_by_doi": NodeStep(journal_by_doi),
+            f"{_PHASE}.unary": NodeStep(unary),
+            f"{_PHASE}.cluster": NodeStep(cluster),
         }
 
 

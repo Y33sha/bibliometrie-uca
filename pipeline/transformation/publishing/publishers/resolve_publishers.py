@@ -157,7 +157,7 @@ def _resolve(
             answer: _PrefixAnswer | Unavailable,
         ) -> None:
             if isinstance(answer, Unavailable):
-                metrics.add(total=1, errors=1)
+                metrics.add(seen=1, errors=1)
                 log.info(
                     "%s → API indisponible, repris au prochain run",
                     row.prefix,
@@ -242,7 +242,7 @@ def _attach(
     publisher_repo: PublisherGatewayQueries,
 ) -> None:
     """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vu par l'agence."""
-    metrics.add(total=1)
+    metrics.add(seen=1)
     matched = (
         match_or_create_publisher(name_raw, repo=publisher_repo)
         if name_raw and name_normalized is not None

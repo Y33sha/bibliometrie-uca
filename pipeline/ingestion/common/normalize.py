@@ -274,10 +274,10 @@ class NormalizePhase:
         }
         steps["normalize.prune_disappeared"] = NodeStep(self._prune, section="Normalisation")
         steps["normalize.cleanup_orphan_identities"] = NodeStep(
-            self._cleanup, section="Maintenance des tables", libelle="Identités d'auteur orphelines"
+            self._cleanup, section="Maintenance des tables", label="Identités d'auteur orphelines"
         )
         steps["normalize.cleanup_orphan_addresses"] = NodeStep(
-            self._cleanup_addresses, section="Maintenance des tables", libelle="Adresses orphelines"
+            self._cleanup_addresses, section="Maintenance des tables", label="Adresses orphelines"
         )
         by_node = run_nodes("normalize", steps, ctx)
 
@@ -291,7 +291,7 @@ class NormalizePhase:
         ]
         metrics = PhaseMetrics()
         normalises = sum(cast("int", row["processed"]) for row in rows)
-        metrics.add(total=normalises)
+        metrics.add(seen=normalises)
         metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
         metrics.details["table"] = {"rows": rows}
         metrics.details["disappeared_pruned"] = by_node["normalize.prune_disappeared"].extras.get(

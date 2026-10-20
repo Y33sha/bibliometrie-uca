@@ -274,7 +274,7 @@ def run_refresh_hal_structures(
         return metrics
     queries.rebuild_relations()
     conn.commit()
-    metrics.add(total=len(ids), updated=load.structures)
+    metrics.add(seen=len(ids), updated=load.structures)
     metrics.details["hal_structures"] = {
         "requested": load.requested,
         "loaded": load.structures,

@@ -91,7 +91,7 @@ def _reconcile(
         )
 
     metrics = PhaseMetrics()
-    metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
+    metrics.add(seen=stats.processed if stats else 0, new=stats.created if stats else 0)
     # Chiffres du run ; `run` y ajoute `pub_total`, compté après la suppression des publications sans source.
     metrics.details["summary"] = {
         "processed": stats.processed if stats else 0,

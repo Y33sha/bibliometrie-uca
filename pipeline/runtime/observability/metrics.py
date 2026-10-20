@@ -79,7 +79,7 @@ class PhaseMetrics:
 
     `total` (items traités) est **dérivé** : `max(seen, new+updated+unchanged)`.
     Il vaut le dénominateur explicite `seen` (items interrogés/vus, alimenté par
-    `add(total=…)`) dès qu'il dépasse les catégorisés, sinon la somme catégorisée.
+    `add(seen=…)`) dès qu'il dépasse les catégorisés, sinon la somme catégorisée.
     Garanti `≥ new+updated+unchanged` par construction — impossible de le
     désynchroniser comme le faisait un compteur saisi à la main (un extracteur qui
     catégorise sans incrémenter le total fausserait l'affichage).
@@ -118,15 +118,15 @@ class PhaseMetrics:
         new: int = 0,
         updated: int = 0,
         unchanged: int = 0,
-        total: int = 0,
+        seen: int = 0,
         errors: int = 0,
         **extras: int,
     ) -> None:
-        """Incrémente les compteurs en place. `total=` alimente le dénominateur `seen`."""
+        """Incrémente les compteurs en place."""
         self.new += new
         self.updated += updated
         self.unchanged += unchanged
-        self.seen += total
+        self.seen += seen
         self.errors += errors
         for k, v in extras.items():
             self.extras[k] = self.extras.get(k, 0) + v

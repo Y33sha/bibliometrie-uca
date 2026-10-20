@@ -26,6 +26,6 @@ def run_delete_empty_monographs(
         logger.info(
             "Monographie vide supprimée : %d « %s »", monograph_id, title, extra={"detail": True}
         )
-    metrics.add(total=len(deleted), monographs_deleted=len(deleted))
+    metrics.add(seen=len(deleted), monographs_deleted=len(deleted))
     metrics.resume = accord(len(deleted), "monographie supprimée", "monographies supprimées")
     return metrics

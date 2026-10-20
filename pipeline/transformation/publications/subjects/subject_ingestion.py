@@ -100,7 +100,7 @@ def run(
     subjects_after = queries.count_all_subjects(conn)
 
     metrics = PhaseMetrics()
-    metrics.add(new=n_links, total=len(rows))
+    metrics.add(new=n_links, seen=len(rows))
     metrics.details["summary"] = {
         "subjects_added": subjects_after - subjects_before,
         "subjects_total": subjects_after,

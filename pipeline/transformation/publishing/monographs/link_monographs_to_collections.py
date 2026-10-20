@@ -81,7 +81,7 @@ def run_link_monographs_to_collections(
             extra={"detail": True},
         )
     metrics.add(
-        total=len(changes) + len(conflicts),
+        seen=len(changes) + len(conflicts),
         monographs_linked=len(changes),
         monograph_collection_conflicts=len(conflicts),
         monograph_series=len(set(series.values())),

@@ -17,7 +17,7 @@ def test_total_derives_from_breakdown_without_explicit_denominator():
 def test_total_uses_explicit_denominator_when_larger():
     # fetch_missing : `total=` (DOI interrogés) dépasse les catégorisés (insérés).
     m = PhaseMetrics()
-    m.add(new=10, total=100)
+    m.add(new=10, seen=100)
     assert m.total == 100
 
 
@@ -30,9 +30,9 @@ def test_total_never_below_breakdown():
 
 def test_merge_sums_denominator_and_breakdown():
     a = PhaseMetrics()
-    a.add(new=1, total=3)
+    a.add(new=1, seen=3)
     b = PhaseMetrics()
-    b.add(updated=2, total=4)
+    b.add(updated=2, seen=4)
     a.merge(b)
     assert (a.new, a.updated) == (1, 2)
     assert a.total == 7  # seen 3+4, ≥ catégorisés 3

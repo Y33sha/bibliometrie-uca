@@ -4,7 +4,7 @@ Une donnée se désigne par sa table (`"journals"`) ou par une colonne (`"journa
 
 Un nœud dépend des nœuds placés avant lui qui écrivent ce qu'il lit. Une lecture déclarée `previous_run` lit aussi ce qu'un nœud placé après lui, ou lui-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucun nœud une donnée écrite après lui, sauf lecture du run précédent déclarée.
 
-La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des nœuds consécutifs du même `lot` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucun ne dépend d'un autre du lot.
+La maintenance d'un nœud (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des nœuds consécutifs du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucun ne dépend d'un autre nœud du groupe.
 """
 
 from collections.abc import Iterable, Sequence
@@ -22,8 +22,8 @@ from domain.sources.registry import (
 @dataclass(frozen=True, slots=True)
 class Node:
     name: str
-    # Phase qui exécute le nœud : groupe d'affichage et de sélection.
-    group: str
+    # Phase qui exécute le nœud : regroupement d'affichage et de sélection.
+    phase: str
     reads: frozenset[str] = frozenset()
     writes: frozenset[str] = frozenset()
     # Lectures de données écrites au run précédent, par un nœud plus loin dans l'ordre ou par le nœud lui-même.
@@ -32,12 +32,12 @@ class Node:
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE authorships`.
     maintenance: tuple[str, ...] = ()
-    # Lot de nœuds consécutifs exécutés en parallèle.
-    lot: str | None = None
+    # Groupe de nœuds consécutifs exécutés en parallèle.
+    parallel_group: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class _GroupIo:
+class _PhaseIo:
     """Lectures et écritures communes à tous les nœuds d'une phase."""
 
     reads: tuple[str, ...] = ()
@@ -45,9 +45,9 @@ class _GroupIo:
     previous_run: tuple[str, ...] = ()
 
 
-_GROUP_IO: dict[str, _GroupIo] = {
+_PHASE_IO: dict[str, _PhaseIo] = {
     # Identifiants des publications du périmètre, cherchés dans les autres sources ; échecs retenus dans `failed_lookups`.
-    "fetch_missing": _GroupIo(
+    "fetch_missing": _PhaseIo(
         reads=(
             "config",
             "staging",
@@ -70,26 +70,26 @@ _GROUP_IO: dict[str, _GroupIo] = {
 
 def _node(
     name: str,
-    group: str,
+    phase: str,
     *,
     reads: Iterable[str] = (),
     writes: Iterable[str] = (),
     previous_run: Iterable[str] = (),
     network: str | None = None,
     maintenance: tuple[str, ...] = (),
-    lot: str | None = None,
+    parallel_group: str | None = None,
 ) -> Node:
-    """Nœud de `group`, avec les lectures et écritures communes à la phase (`_GROUP_IO`)."""
-    shared = _GROUP_IO.get(group, _GroupIo())
+    """Nœud de `phase`, avec les lectures et écritures communes à la phase (`_PHASE_IO`)."""
+    shared = _PHASE_IO.get(phase, _PhaseIo())
     return Node(
         name,
-        group,
+        phase,
         frozenset((*shared.reads, *reads)),
         frozenset((*shared.writes, *writes)),
         frozenset((*shared.previous_run, *previous_run)),
         network,
         maintenance,
-        lot,
+        parallel_group,
     )
 
 
@@ -116,12 +116,13 @@ def _writes_read(reader: Node, writer: Node) -> list[str]:
 
 
 def dependencies(nodes: Sequence[Node]) -> dict[str, set[str]]:
-    """Pour chaque nœud, les nœuds placés avant lui, hors de son lot, qui écrivent ce qu'il lit."""
+    """Pour chaque nœud, les nœuds placés avant lui, hors de son groupe parallèle, qui écrivent ce qu'il lit."""
     return {
         reader.name: {
             writer.name
             for writer in nodes[:i]
-            if (reader.lot is None or writer.lot != reader.lot) and _writes_read(reader, writer)
+            if (reader.parallel_group is None or writer.parallel_group != reader.parallel_group)
+            and _writes_read(reader, writer)
         }
         for i, reader in enumerate(nodes)
     }
@@ -187,7 +188,7 @@ NODES: tuple[Node, ...] = (
             writes=("staging",),
             previous_run=("staging", "pipeline_phase_executions"),
             network=source,
-            lot="extract",
+            parallel_group="extract",
         )
         for source in HARVESTED_SOURCES
     ),
@@ -200,7 +201,7 @@ NODES: tuple[Node, ...] = (
             writes=("staging",),
             previous_run=("staging", "person_identifiers"),
             network=source,
-            lot="extract_by_person",
+            parallel_group="extract_by_person",
         )
         for source in PERSON_SEARCHED_SOURCES
     ),
@@ -225,7 +226,7 @@ NODES: tuple[Node, ...] = (
             ),
             previous_run=("doi_prefixes", "publication_relations"),
             network=source,
-            lot="fetch_missing.doi",
+            parallel_group="fetch_missing.doi",
         )
         for source in DOI_SEARCHABLE_SOURCES
     ),
@@ -1169,11 +1170,11 @@ NODES: tuple[Node, ...] = (
 
 # ── Phases ────────────────────────────────────────────────────
 
-_RUN_GROUP = "run"
+_RUN_PHASE = "run"
 """Groupe des nœuds que l'orchestrateur exécute avant toute phase."""
 
 PHASE_ORDER: tuple[str, ...] = tuple(
-    dict.fromkeys(node.group for node in NODES if node.group != _RUN_GROUP)
+    dict.fromkeys(node.phase for node in NODES if node.phase != _RUN_PHASE)
 )
 """Ordre d'exécution des phases : celui de leurs nœuds dans `NODES`."""
 
