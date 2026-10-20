@@ -53,6 +53,7 @@ L'identité d'une notice (identifiant, DOI, troncature des auteurs OpenAlex) se 
 
 - [ ] Identité d'une notice fournie par l'adaptateur à tous les points d'entrée.
 - [ ] Écriture commune dans `staging`, effacement des échecs compris.
+- [ ] `upsert_staging` et `StagingQueries` en store : la connexion reçue à la construction.
 
 ### Phase 5 — Documentation
 
