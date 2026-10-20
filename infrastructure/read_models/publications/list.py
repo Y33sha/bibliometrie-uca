@@ -67,7 +67,7 @@ _SOURCE_URL = {
 # par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
 # thèses n'en expose que quatre (pas `wos`) et garde son pivot en clair.
 _SOURCE_ID_COLUMNS = ",\n                    ".join(
-    f"max(CASE WHEN sd.source = '{source.value}' THEN sd.source_id END) AS {source.value}_id"
+    f"max(CASE WHEN sr.source = '{source.value}' THEN sr.source_id END) AS {source.value}_id"
     for source in (Source.HAL, Source.OPENALEX, Source.SCANR, Source.WOS, Source.THESES)
 )
 
@@ -267,10 +267,10 @@ def list_publications(
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS},
-                    (SELECT array_agg(DISTINCT col) FROM source_records sd2,
-                            unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
-                     WHERE sd2.publication_id = p.id AND sd2.source = '{Source.HAL.value}') AS hal_collections
-                FROM source_records sd WHERE sd.publication_id = p.id
+                    (SELECT array_agg(DISTINCT col) FROM source_records sr2,
+                            unnest(COALESCE(sr2.hal_collections, '{{}}'::text[])) AS col
+                     WHERE sr2.publication_id = p.id AND sr2.source = '{Source.HAL.value}') AS hal_collections
+                FROM source_records sr WHERE sr.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -491,7 +491,7 @@ def export_publications_csv(
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS}
-                FROM source_records sd WHERE sd.publication_id = p.id
+                FROM source_records sr WHERE sr.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -621,11 +621,11 @@ def export_theses_csv(
             FROM publications p
             LEFT JOIN LATERAL (
                 SELECT
-                    max(CASE WHEN sd.source = '{Source.HAL.value}' THEN sd.source_id END) AS hal_id,
-                    max(CASE WHEN sd.source = '{Source.OPENALEX.value}' THEN sd.source_id END) AS openalex_id,
-                    max(CASE WHEN sd.source = '{Source.SCANR.value}' THEN sd.source_id END) AS scanr_id,
-                    max(CASE WHEN sd.source = '{Source.THESES.value}' THEN sd.source_id END) AS theses_id
-                FROM source_records sd WHERE sd.publication_id = p.id
+                    max(CASE WHEN sr.source = '{Source.HAL.value}' THEN sr.source_id END) AS hal_id,
+                    max(CASE WHEN sr.source = '{Source.OPENALEX.value}' THEN sr.source_id END) AS openalex_id,
+                    max(CASE WHEN sr.source = '{Source.SCANR.value}' THEN sr.source_id END) AS scanr_id,
+                    max(CASE WHEN sr.source = '{Source.THESES.value}' THEN sr.source_id END) AS theses_id
+                FROM source_records sr WHERE sr.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}

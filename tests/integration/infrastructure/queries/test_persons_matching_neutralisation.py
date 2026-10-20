@@ -110,8 +110,8 @@ def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
     )
     publication_id = sa_sync_conn.execute(
         text(
-            "SELECT sp.publication_id FROM source_contributions sa "
-            "JOIN source_records sp ON sp.id = sa.source_record_id WHERE sa.id = :id"
+            "SELECT sr.publication_id FROM source_contributions sc "
+            "JOIN source_records sr ON sr.id = sc.source_record_id WHERE sc.id = :id"
         ),
         {"id": source_contribution_id},
     ).scalar_one()

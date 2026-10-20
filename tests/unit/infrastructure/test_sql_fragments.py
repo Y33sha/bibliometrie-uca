@@ -13,8 +13,8 @@ class TestInClause:
 
 class TestCasePriority:
     def test_builds_case_fragment(self):
-        sql = case_priority(("hal", "openalex"), "sa.source")
-        assert sql == "CASE sa.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 END"
+        sql = case_priority(("hal", "openalex"), "sc.source")
+        assert sql == "CASE sc.source WHEN 'hal' THEN 1 WHEN 'openalex' THEN 2 END"
 
     def test_custom_column(self):
         assert case_priority(("wos",), "s.source") == "CASE s.source WHEN 'wos' THEN 1 END"

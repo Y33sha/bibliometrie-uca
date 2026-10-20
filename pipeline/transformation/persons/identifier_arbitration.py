@@ -83,16 +83,16 @@ def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str
     Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
     rows = conn.execute(
         text(f"""
-            SELECT aik.identifiers->>:id_type AS id_value,
-                   aik.author_name_normalized AS name,
+            SELECT ci.identifiers->>:id_type AS id_value,
+                   ci.author_name_normalized AS name,
                    count(*) AS votes
-            FROM contributor_information aik
-            JOIN source_contributions sa ON sa.contributor_information_id = aik.id
-            WHERE aik.identifiers ? :id_type
-              AND aik.author_name_normalized IS NOT NULL
-              AND {person_source_contribution("sa")}
+            FROM contributor_information ci
+            JOIN source_contributions sc ON sc.contributor_information_id = ci.id
+            WHERE ci.identifiers ? :id_type
+              AND ci.author_name_normalized IS NOT NULL
+              AND {person_source_contribution("sc")}
               AND NOT {_ID_TYPE_SHARED}
-              AND {trusted_identifier_sql(id_type, "sa")}
+              AND {trusted_identifier_sql(id_type, "sc")}
             GROUP BY 1, 2
         """),
         {"id_type": id_type},
@@ -136,38 +136,38 @@ def write_misplaced_neutralizations(
                 FROM jsonb_to_recordset(:payload) AS m(contributor_information_id integer, carte jsonb)
             ),
             cibles AS (
-                SELECT sa.id,
-                       sa.neutralized_identifiers AS avant,
+                SELECT sc.id,
+                       sc.neutralized_identifiers AS avant,
                        NULLIF(
                            coalesce(m.carte, '{{}}'::jsonb)
                            || coalesce(
                                (SELECT jsonb_object_agg(e.k, e.v)
-                                  FROM jsonb_each(sa.neutralized_identifiers) AS e(k, v)
+                                  FROM jsonb_each(sc.neutralized_identifiers) AS e(k, v)
                                  WHERE e.v <> to_jsonb('{_MISPLACED}'::text)),
                                '{{}}'::jsonb),
                            '{{}}'::jsonb
                        ) AS apres
-                FROM source_contributions sa
-                LEFT JOIN marques m ON m.contributor_information_id = sa.contributor_information_id
+                FROM source_contributions sc
+                LEFT JOIN marques m ON m.contributor_information_id = sc.contributor_information_id
                 WHERE m.contributor_information_id IS NOT NULL
-                   OR (sa.neutralized_identifiers IS NOT NULL
+                   OR (sc.neutralized_identifiers IS NOT NULL
                        AND EXISTS (
-                           SELECT 1 FROM jsonb_each_text(sa.neutralized_identifiers) AS e(k, v)
+                           SELECT 1 FROM jsonb_each_text(sc.neutralized_identifiers) AS e(k, v)
                            WHERE e.v = '{_MISPLACED}'
                        ))
             ),
             modifiees AS (
-                UPDATE source_contributions sa
+                UPDATE source_contributions sc
                 SET neutralized_identifiers = c.apres
                 FROM cibles c
-                WHERE sa.id = c.id AND c.apres IS DISTINCT FROM c.avant
-                RETURNING sa.id, sa.source_record_id, sa.resolution_mode, c.avant, c.apres
+                WHERE sc.id = c.id AND c.apres IS DISTINCT FROM c.avant
+                RETURNING sc.id, sc.source_record_id, sc.resolution_mode, c.avant, c.apres
             ),
             regroupees AS (
                 UPDATE publications p SET contributions_dirty = true
-                FROM source_records sp
-                WHERE sp.id IN (SELECT source_record_id FROM modifiees)
-                  AND p.id = sp.publication_id AND NOT p.contributions_dirty
+                FROM source_records sr
+                WHERE sr.id IN (SELECT source_record_id FROM modifiees)
+                  AND p.id = sr.publication_id AND NOT p.contributions_dirty
             )
             SELECT id,
                    coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
@@ -227,13 +227,13 @@ def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tupl
     """Agrégat sur les signatures rattachées dont l'identité contient l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
     rows = conn.execute(
         text(f"""
-            SELECT aik.identifiers->>:id_type AS id_value, sa.person_id
-            FROM source_contributions sa
-            JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-            WHERE aik.identifiers ? :id_type
+            SELECT ci.identifiers->>:id_type AS id_value, sc.person_id
+            FROM source_contributions sc
+            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            WHERE ci.identifiers ? :id_type
               AND NOT {_ID_TYPE_NEUTRALIZED}
-              AND sa.person_id IS NOT NULL
-              AND {trusted_identifier_sql(id_type, "sa")}
+              AND sc.person_id IS NOT NULL
+              AND {trusted_identifier_sql(id_type, "sc")}
             GROUP BY 1, 2
         """),
         {"id_type": id_type},
@@ -247,15 +247,15 @@ def null_identifier_source_contributions(
     """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
     return conn.execute(
         text(f"""
-            UPDATE source_contributions sa
+            UPDATE source_contributions sc
             SET {DETACHED_SOURCE_CONTRIBUTION}
-            FROM contributor_information aik
-            WHERE sa.contributor_information_id = aik.id
-              AND sa.person_id = :old_owner
-              AND sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
-              AND aik.identifiers->>:id_type = :id_value
+            FROM contributor_information ci
+            WHERE sc.contributor_information_id = ci.id
+              AND sc.person_id = :old_owner
+              AND sc.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
+              AND ci.identifiers->>:id_type = :id_value
               AND NOT {_ID_TYPE_NEUTRALIZED}
-              AND NOT {pinned("sa.id")}
+              AND NOT {pinned("sc.id")}
         """),
         {"old_owner": old_owner_person_id, "id_type": id_type, "id_value": id_value},
     ).rowcount

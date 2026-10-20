@@ -22,11 +22,11 @@ def _refresh_sql(scope: str) -> str:
                 CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
                 WHERE a.publication_id {scope} AND {has_author_role("a")}
                 UNION
-                SELECT sp.publication_id, '{PerimeterEvidence.THESIS_INSTITUTION}'::perimeter_evidence
-                FROM source_records sp
-                WHERE sp.publication_id {scope}
-                  AND sp.source = 'theses'
-                  AND sp.meta ->> 'etablissement_ppn' = ANY(:thesis_ppns)
+                SELECT sr.publication_id, '{PerimeterEvidence.THESIS_INSTITUTION}'::perimeter_evidence
+                FROM source_records sr
+                WHERE sr.publication_id {scope}
+                  AND sr.source = 'theses'
+                  AND sr.meta ->> 'etablissement_ppn' = ANY(:thesis_ppns)
             ) by_publication
             GROUP BY id
         ), target AS (

@@ -104,15 +104,15 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
     )
     query = f"""
         WITH deja_connus AS (
-            SELECT sp.doi
-            FROM source_records sp
-            WHERE sp.source = CAST(:target AS source_type) AND sp.doi IS NOT NULL
+            SELECT sr.doi
+            FROM source_records sr
+            WHERE sr.source = CAST(:target AS source_type) AND sr.doi IS NOT NULL
             UNION
             SELECT d.value
-            FROM source_records sp
-            CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') d(value)
-            WHERE sp.source = CAST(:target AS source_type)
-              AND jsonb_typeof(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') = 'array'
+            FROM source_records sr
+            CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids -> '{ExternalIdType.RELATED_DOIS}') d(value)
+            WHERE sr.source = CAST(:target AS source_type)
+              AND jsonb_typeof(sr.external_ids -> '{ExternalIdType.RELATED_DOIS}') = 'array'
         )
         SELECT DISTINCT c.doi
         FROM candidate_dois c

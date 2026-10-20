@@ -149,12 +149,12 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
 
 
 _SOURCE_CONTRIBUTIONS_SQL = text("""
-    SELECT sa.id, sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
-           aik.last_name_normalized, aik.first_name_normalized, aik.identifiers
-    FROM source_contributions sa
-    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-    WHERE sa.raw_author_name ~ :pattern OR sa.raw_last_name ~ :pattern
-       OR sa.raw_first_name ~ :pattern
+    SELECT sc.id, sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+           ci.last_name_normalized, ci.first_name_normalized, ci.identifiers
+    FROM source_contributions sc
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    WHERE sc.raw_author_name ~ :pattern OR sc.raw_last_name ~ :pattern
+       OR sc.raw_first_name ~ :pattern
 """)
 
 _UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
@@ -167,14 +167,14 @@ _UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
 
 _REPOINT_SQL = text(
     """
-    UPDATE source_contributions sa SET contributor_information_id = aik.id
+    UPDATE source_contributions sc SET contributor_information_id = ci.id
     FROM jsonb_to_recordset(:payload) AS t(
         source_contribution_id integer, last_name_normalized text, first_name_normalized text,
         identifiers jsonb)
-    JOIN contributor_information aik ON aik.key_hash = """
+    JOIN contributor_information ci ON ci.key_hash = """
     + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
     + """
-    WHERE sa.id = t.source_contribution_id
+    WHERE sc.id = t.source_contribution_id
 """
 ).bindparams(bindparam("payload", type_=Jsonb))
 

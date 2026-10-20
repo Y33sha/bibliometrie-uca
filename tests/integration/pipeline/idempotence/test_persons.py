@@ -131,11 +131,11 @@ class TestCreatePersonsIdempotence:
         # Eve Leroy (hal_person_id=900001) apparaît sur 2 documents
         rows = sa_sync_conn.execute(
             text("""
-                SELECT DISTINCT sa.person_id FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.source = 'hal'
-                  AND aik.identifiers->>'hal_person_id' = '900001'
-                  AND sa.person_id IS NOT NULL
+                SELECT DISTINCT sc.person_id FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.source = 'hal'
+                  AND ci.identifiers->>'hal_person_id' = '900001'
+                  AND sc.person_id IS NOT NULL
             """)
         ).all()
         assert len(rows) == 1, "Eve Leroy devrait être une seule personne"

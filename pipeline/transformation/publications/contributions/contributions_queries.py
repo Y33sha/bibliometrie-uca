@@ -27,10 +27,10 @@ class ContributionsBuild:
                 DELETE FROM contributions a
                 WHERE NOT EXISTS (
                     SELECT 1
-                    FROM source_contributions sa
-                    JOIN source_records sd ON sd.id = sa.source_record_id
-                    WHERE sa.person_id = a.person_id
-                      AND sd.publication_id = a.publication_id
+                    FROM source_contributions sc
+                    JOIN source_records sr ON sr.id = sc.source_record_id
+                    WHERE sc.person_id = a.person_id
+                      AND sr.publication_id = a.publication_id
                 )
             """)
         ).rowcount

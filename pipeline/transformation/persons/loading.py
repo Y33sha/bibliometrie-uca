@@ -61,7 +61,7 @@ class LinkedContributionRow(NamedTuple):
 
 def _usable(id_type: str) -> str:
     """Valeur de l'identifiant `id_type` de la signature `sa_auth`, NULL quand elle le neutralise."""
-    return usable_identifier(f"'{id_type}'", source_contribution="sa_auth")
+    return usable_identifier(f"'{id_type}'", source_contribution="sc_auth")
 
 
 def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedContribution:
@@ -86,17 +86,17 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedContribution:
 _IDENTIFIERS_OBJECT = ", ".join(f"'{t.value}', {_usable(t.value)}" for t in PersonIdentifierType)
 
 _BARE_PROJECTION_HEAD = f"""
-    sa_auth.id AS source_contribution_id,
-    sa_auth.source::text AS source,
-    sa_auth.raw_author_name,
-    sa_auth.raw_last_name,
-    sa_auth.raw_first_name,
-    aik.author_name_normalized,
+    sc_auth.id AS source_contribution_id,
+    sc_auth.source::text AS source,
+    sc_auth.raw_author_name,
+    sc_auth.raw_last_name,
+    sc_auth.raw_first_name,
+    ci.author_name_normalized,
     jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
-    sa_auth.roles,
-    sd.publication_id,
+    sc_auth.roles,
+    sr.publication_id,
     (SELECT gs.group_id FROM source_contribution_group_members gs
-     WHERE gs.source_contribution_id = sa_auth.id) AS group_id"""
+     WHERE gs.source_contribution_id = sc_auth.id) AS group_id"""
 
 _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
     FALSE AS in_perimeter,
@@ -105,10 +105,10 @@ _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
 # Conditions communes à toutes les branches : SA orpheline hors-périmètre, d'une personne,
 # rattachée à une publication active (les hors périmètre ne sont pas matérialisées).
 _OOP_COMMON_WHERE = f"""
-    sa_auth.person_id IS NULL
-    AND sa_auth.in_perimeter = FALSE
-    AND {person_source_contribution("sa_auth")}
-    AND sd.publication_id IS NOT NULL
+    sc_auth.person_id IS NULL
+    AND sc_auth.in_perimeter = FALSE
+    AND {person_source_contribution("sc_auth")}
+    AND sr.publication_id IS NOT NULL
 """
 
 
@@ -119,8 +119,8 @@ def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
         identifiers="person_identifiers",
         select=_OOP_PROJECTION,
         joins="""
-            JOIN source_records sd ON sd.id = sa_auth.source_record_id
-            JOIN publications pub ON pub.id = sd.publication_id
+            JOIN source_records sr ON sr.id = sc_auth.source_record_id
+            JOIN publications pub ON pub.id = sr.publication_id
         """,
         where=f"pi.status <> '{AttributionStatus.REJECTED.value}' AND {_OOP_COMMON_WHERE}",
     )
@@ -133,10 +133,10 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
     JOIN source_contribution_group_members gl ON gl.source_contribution_id = linked.id
     JOIN source_contribution_group_members ga
         ON ga.group_id = gl.group_id AND ga.source_contribution_id <> gl.source_contribution_id
-    JOIN source_contributions sa_auth ON sa_auth.id = ga.source_contribution_id
-    JOIN source_records sd ON sd.id = sa_auth.source_record_id
-    JOIN contributor_information aik ON aik.id = sa_auth.contributor_information_id
-    JOIN publications pub ON pub.id = sd.publication_id
+    JOIN source_contributions sc_auth ON sc_auth.id = ga.source_contribution_id
+    JOIN source_records sr ON sr.id = sc_auth.source_record_id
+    JOIN contributor_information ci ON ci.id = sc_auth.contributor_information_id
+    JOIN publications pub ON pub.id = sr.publication_id
     WHERE linked.person_id IS NOT NULL
       AND {person_source_contribution("linked")}
       AND {_OOP_COMMON_WHERE}
@@ -157,15 +157,15 @@ def fetch_unlinked_contributions(conn: Connection) -> list[BareUnlinkedContribut
             SELECT {_BARE_PROJECTION_HEAD},
                    TRUE AS in_perimeter,
                    NULL::integer AS current_person_id
-            FROM source_contributions sa_auth
-            JOIN contributor_information aik ON aik.id = sa_auth.contributor_information_id
-            JOIN source_records sd ON sd.id = sa_auth.source_record_id
-            JOIN publications pub ON pub.id = sd.publication_id
-            WHERE sa_auth.person_id IS NULL
-              AND sa_auth.in_perimeter = TRUE
-              AND {person_source_contribution("sa_auth")}
-              AND sd.publication_id IS NOT NULL
-            ORDER BY sa_auth.id
+            FROM source_contributions sc_auth
+            JOIN contributor_information ci ON ci.id = sc_auth.contributor_information_id
+            JOIN source_records sr ON sr.id = sc_auth.source_record_id
+            JOIN publications pub ON pub.id = sr.publication_id
+            WHERE sc_auth.person_id IS NULL
+              AND sc_auth.in_perimeter = TRUE
+              AND {person_source_contribution("sc_auth")}
+              AND sr.publication_id IS NOT NULL
+            ORDER BY sc_auth.id
         """)
     ).all()
     return [_to_bare(r) for r in rows]
@@ -184,14 +184,14 @@ def fetch_linked_contributions(conn: Connection) -> list[LinkedContributionRow]:
     """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective ou un doublon d'auteur n'ancre rien."""
     rows = conn.execute(
         text(f"""
-            SELECT sa_auth.person_id, gs.group_id,
-                   sa_auth.raw_author_name, sa_auth.raw_last_name, sa_auth.raw_first_name,
-                   sa_auth.source::text AS source
-            FROM source_contributions sa_auth
-            JOIN source_contribution_group_members gs ON gs.source_contribution_id = sa_auth.id
-            WHERE sa_auth.person_id IS NOT NULL
-              AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
-              AND {person_source_contribution("sa_auth")}
+            SELECT sc_auth.person_id, gs.group_id,
+                   sc_auth.raw_author_name, sc_auth.raw_last_name, sc_auth.raw_first_name,
+                   sc_auth.source::text AS source
+            FROM source_contributions sc_auth
+            JOIN source_contribution_group_members gs ON gs.source_contribution_id = sc_auth.id
+            WHERE sc_auth.person_id IS NOT NULL
+              AND sc_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
+              AND {person_source_contribution("sc_auth")}
         """)
     ).all()
     return [
@@ -210,16 +210,16 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedContribution
     rows = conn.execute(
         text(f"""
             SELECT {_BARE_PROJECTION_HEAD},
-                   sa_auth.in_perimeter,
-                   sa_auth.person_id AS current_person_id
-            FROM source_contributions sa_auth
-            JOIN contributor_information aik ON aik.id = sa_auth.contributor_information_id
-            JOIN source_records sd ON sd.id = sa_auth.source_record_id
-            WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
-              AND {person_source_contribution("sa_auth")}
-              AND sd.publication_id IS NOT NULL
-              AND NOT {pinned("sa_auth.id")}
-            ORDER BY sa_auth.id
+                   sc_auth.in_perimeter,
+                   sc_auth.person_id AS current_person_id
+            FROM source_contributions sc_auth
+            JOIN contributor_information ci ON ci.id = sc_auth.contributor_information_id
+            JOIN source_records sr ON sr.id = sc_auth.source_record_id
+            WHERE sc_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
+              AND {person_source_contribution("sc_auth")}
+              AND sr.publication_id IS NOT NULL
+              AND NOT {pinned("sc_auth.id")}
+            ORDER BY sc_auth.id
         """)
     ).all()
     return [_to_bare(r) for r in rows]

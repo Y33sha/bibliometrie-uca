@@ -51,11 +51,11 @@ def enforce_confirmed_source_contributions(conn: Connection) -> int:
     """Réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : pose `source_contributions.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
     return conn.execute(
         text("""
-            UPDATE source_contributions sa
+            UPDATE source_contributions sc
             SET person_id = ca.person_id
             FROM confirmed_source_contributions ca
-            WHERE ca.source_contribution_id = sa.id
-              AND sa.person_id IS DISTINCT FROM ca.person_id
+            WHERE ca.source_contribution_id = sc.id
+              AND sc.person_id IS DISTINCT FROM ca.person_id
         """)
     ).rowcount
 
@@ -64,10 +64,10 @@ def detach_copies(conn: Connection) -> int:
     """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
     return conn.execute(
         text(f"""
-            UPDATE source_contributions sa
+            UPDATE source_contributions sc
             SET {DETACHED_SOURCE_CONTRIBUTION}
-            WHERE sa.duplicate_of IS NOT NULL AND sa.person_id IS NOT NULL
-              AND NOT {pinned("sa.id")}
+            WHERE sc.duplicate_of IS NOT NULL AND sc.person_id IS NOT NULL
+              AND NOT {pinned("sc.id")}
         """)
     ).rowcount
 

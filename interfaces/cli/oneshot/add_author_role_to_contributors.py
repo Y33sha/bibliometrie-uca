@@ -38,10 +38,10 @@ _BUILDERS: dict[str, Callable[[Mapping[str, JsonValue]], list[AuthorRecord]]] = 
 
 # (signature, position) des signatures `[contributor]`, par notice (identifiant, source, identifiant source).
 _CANDIDATES = f"""
-    SELECT sp.id AS source_record, sp.source, sp.source_id, sa.id AS source_contribution, sa.author_position AS position
-    FROM source_contributions sa JOIN source_records sp ON sp.id = sa.source_record_id
-    WHERE sp.source IN ('hal', 'scanr') AND sa.roles = ARRAY['{ContributionRole.CONTRIBUTOR.value}']
-    ORDER BY sp.id
+    SELECT sr.id AS source_record, sr.source, sr.source_id, sc.id AS source_contribution, sc.author_position AS position
+    FROM source_contributions sc JOIN source_records sr ON sr.id = sc.source_record_id
+    WHERE sr.source IN ('hal', 'scanr') AND sc.roles = ARRAY['{ContributionRole.CONTRIBUTOR.value}']
+    ORDER BY sr.id
 """  # noqa: S608
 
 PayloadLoader = Callable[[str, str], Mapping[str, JsonValue] | None]
@@ -101,8 +101,8 @@ def complete_source_records(
         conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
-                FROM source_records sp
-                WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+                FROM source_records sr
+                WHERE sr.id = ANY(:source_records) AND p.id = sr.publication_id AND NOT p.contributions_dirty
             """),
             {"source_records": touched},
         )

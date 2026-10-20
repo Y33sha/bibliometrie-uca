@@ -19,9 +19,9 @@ from pipeline.transformation.structures.name_recognition import StructureNameMat
 
 _PARTNERS = text("""
     SELECT DISTINCT partner ->> 'ppn' AS ppn, partner ->> 'nom' AS name
-    FROM source_records sp
-    CROSS JOIN LATERAL jsonb_array_elements(sp.meta -> 'partenaires') partner
-    WHERE sp.source = 'theses' AND partner ->> 'ppn' IS NOT NULL AND partner ->> 'nom' IS NOT NULL
+    FROM source_records sr
+    CROSS JOIN LATERAL jsonb_array_elements(sr.meta -> 'partenaires') partner
+    WHERE sr.source = 'theses' AND partner ->> 'ppn' IS NOT NULL AND partner ->> 'nom' IS NOT NULL
 """)
 
 

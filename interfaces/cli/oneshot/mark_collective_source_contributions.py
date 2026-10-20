@@ -62,8 +62,8 @@ def mark_collective(conn: Connection, ids: list[int]) -> None:
     conn.execute(
         text("""
             UPDATE publications p SET contributions_dirty = true
-            FROM source_records sp
-            WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+            FROM source_records sr
+            WHERE sr.id = ANY(:source_records) AND p.id = sr.publication_id AND NOT p.contributions_dirty
         """),
         {"source_records": source_record_ids},
     )

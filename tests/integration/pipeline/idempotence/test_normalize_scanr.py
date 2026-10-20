@@ -242,9 +242,9 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text(
-                "SELECT count(*) AS cnt FROM source_contributions sa "
-                "JOIN contributor_information aik ON aik.id = sa.contributor_information_id "
-                "WHERE sa.source = 'scanr' AND aik.identifiers->>'idref' = '000000001'"
+                "SELECT count(*) AS cnt FROM source_contributions sc "
+                "JOIN contributor_information ci ON ci.id = sc.contributor_information_id "
+                "WHERE sc.source = 'scanr' AND ci.identifiers->>'idref' = '000000001'"
             )
         ).scalar_one()
         assert cnt == 2, "Alice devrait avoir 2 contributions (article + chapitre)"
@@ -264,11 +264,11 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text("""
-                SELECT count(*) AS cnt FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.source = 'scanr'
-                  AND (aik.identifiers->>'idref') IS NULL
-                  AND sa.raw_author_name IN ('Charlie Noid', 'Diana Durand')
+                SELECT count(*) AS cnt FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.source = 'scanr'
+                  AND (ci.identifiers->>'idref') IS NULL
+                  AND sc.raw_author_name IN ('Charlie Noid', 'Diana Durand')
             """)
         ).scalar_one()
         assert cnt == 2

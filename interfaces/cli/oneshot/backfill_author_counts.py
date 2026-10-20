@@ -21,27 +21,27 @@ from infrastructure.observability.log import setup_logger
 log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 
 # Signature d'auteur individuelle, comme `is_individual_author`.
-_AUTHOR = f"NOT sa.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sa.roles)"
+_AUTHOR = f"NOT sc.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sc.roles)"
 
 
 def _update_counts(conn: Connection, source_records: str, params: dict[str, object]) -> int:
     """Écrit les décomptes des notices filtrées par la condition SQL `notices` (sur `sp`) qui changent. Rend le nombre de notices modifiées."""
     return conn.execute(
         text(f"""
-            UPDATE source_records sp
+            UPDATE source_records sr
             SET author_count = c.n, distinct_author_count = c.d
             FROM (
-                SELECT sp.id,
-                       count(sa.id) FILTER (WHERE {_AUTHOR}) AS n,
+                SELECT sr.id,
+                       count(sc.id) FILTER (WHERE {_AUTHOR}) AS n,
                        count(DISTINCT (k.last_name_normalized, coalesce(k.first_name_normalized, '')))
                            FILTER (WHERE {_AUTHOR}) AS d
-                FROM source_records sp
-                LEFT JOIN source_contributions sa ON sa.source_record_id = sp.id
-                LEFT JOIN contributor_information k ON k.id = sa.contributor_information_id
+                FROM source_records sr
+                LEFT JOIN source_contributions sc ON sc.source_record_id = sr.id
+                LEFT JOIN contributor_information k ON k.id = sc.contributor_information_id
                 WHERE {source_records}
-                GROUP BY sp.id
+                GROUP BY sr.id
             ) c
-            WHERE sp.id = c.id AND (sp.author_count, sp.distinct_author_count) IS DISTINCT FROM (c.n, c.d)
+            WHERE sr.id = c.id AND (sr.author_count, sr.distinct_author_count) IS DISTINCT FROM (c.n, c.d)
         """),  # noqa: S608
         params,
     ).rowcount
@@ -49,12 +49,12 @@ def _update_counts(conn: Connection, source_records: str, params: dict[str, obje
 
 def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
     """Écrit les décomptes des notices `[lo, hi]` qui changent. Rend le nombre de notices modifiées."""
-    return _update_counts(conn, "sp.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
+    return _update_counts(conn, "sr.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
 
 
 def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> int:
     """Écrit les décomptes des notices `source_record_ids` qui changent. Rend le nombre de notices modifiées."""
-    return _update_counts(conn, "sp.id = ANY(:ids)", {"ids": source_record_ids})
+    return _update_counts(conn, "sr.id = ANY(:ids)", {"ids": source_record_ids})
 
 
 def main() -> int:

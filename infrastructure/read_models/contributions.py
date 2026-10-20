@@ -21,15 +21,15 @@ from infrastructure.sql_fragments import has_author_role, in_clause
 
 # Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
-    sa.person_id IS NULL AND sa.in_perimeter = TRUE
-    AND sa.source IN {in_clause(AUTHOR_SOURCES)}
-    AND {has_author_role("sa")}
+    sc.person_id IS NULL AND sc.in_perimeter = TRUE
+    AND sc.source IN {in_clause(AUTHOR_SOURCES)}
+    AND {has_author_role("sc")}
 """
 
 _ORPHANS_FROM = """
-    FROM source_contributions sa
-    JOIN source_records sd ON sd.id = sa.source_record_id
-    JOIN publications p ON p.id = sd.publication_id
+    FROM source_contributions sc
+    JOIN source_records sr ON sr.id = sc.source_record_id
+    JOIN publications p ON p.id = sr.publication_id
 """
 
 # Laboratoires du périmètre détectés dans les adresses d'une signature.
@@ -38,7 +38,7 @@ _LABS = f"""
      JOIN structures s ON s.id = sas.structure_id
       AND s.structure_type = '{StructureType.LABO.value}')
 """
-_SOURCE_CONTRIBUTION_LABS = f"{_LABS} WHERE sas.source_contribution_id = sa.id"
+_SOURCE_CONTRIBUTION_LABS = f"{_LABS} WHERE sas.source_contribution_id = sc.id"
 
 
 def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dict[str, object]]:
@@ -86,9 +86,9 @@ class PgContributionsQueries(ContributionsQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT sa.source, sa.id AS source_contribution_id,
-                       sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
-                       sd.publication_id,
+                SELECT sc.source, sc.id AS source_contribution_id,
+                       sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+                       sr.publication_id,
                        p.title AS publication_title, p.publication_year,
                        COALESCE((
                            SELECT json_agg(lab ORDER BY lab.label)
@@ -134,9 +134,9 @@ class PgContributionsQueries(ContributionsQueries):
         # Une ligne par laboratoire, plus une ligne `id` NULL pour les signatures sans laboratoire.
         rows = self._conn.execute(
             text(f"""
-                WITH orphan AS MATERIALIZED (SELECT sa.id {_ORPHANS_FROM} WHERE {where})
+                WITH orphan AS MATERIALIZED (SELECT sc.id {_ORPHANS_FROM} WHERE {where})
                 SELECT lab.id, lab.label, COUNT(*) AS n
-                FROM orphan sa
+                FROM orphan sc
                 LEFT JOIN LATERAL (
                     SELECT s.id, COALESCE(s.acronym, s.name) AS label FROM {_SOURCE_CONTRIBUTION_LABS}
                 ) lab ON TRUE

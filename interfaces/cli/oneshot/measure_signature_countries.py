@@ -61,11 +61,11 @@ _SOURCE_CONTRIBUTION_TABLES = """
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_all AS
-    SELECT s.source_contribution_id, sp.source::text AS source, sp.publication_id,
+    SELECT s.source_contribution_id, sr.source::text AS source, sr.publication_id,
            a.countries AS addr, r.countries AS ror, h.countries AS hal
     FROM (SELECT source_contribution_id FROM sig_addr UNION SELECT source_contribution_id FROM sig_ror UNION SELECT source_contribution_id FROM sig_hal) s
-    JOIN source_contributions sa ON sa.id = s.source_contribution_id
-    JOIN source_records sp ON sp.id = sa.source_record_id
+    JOIN source_contributions sc ON sc.id = s.source_contribution_id
+    JOIN source_records sr ON sr.id = sc.source_record_id
     LEFT JOIN sig_addr a ON a.source_contribution_id = s.source_contribution_id
     LEFT JOIN sig_ror r ON r.source_contribution_id = s.source_contribution_id
     LEFT JOIN sig_hal h ON h.source_contribution_id = s.source_contribution_id;

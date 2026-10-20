@@ -106,9 +106,9 @@ LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}
 # Texte intégral déposé dans HAL, ou lien HAL vers une archive ouverte, pour la publication `p`.
 HAL_FULL_TEXT = f"""
     EXISTS (
-        SELECT 1 FROM source_records sp
-        WHERE sp.publication_id = p.id AND sp.source = 'hal'
-          AND sp.oa_status IN ('{OaStatus.GREEN.value}', '{OaStatus.EMBARGOED.value}')
+        SELECT 1 FROM source_records sr
+        WHERE sr.publication_id = p.id AND sr.source = 'hal'
+          AND sr.oa_status IN ('{OaStatus.GREEN.value}', '{OaStatus.EMBARGOED.value}')
     )
 """
 
@@ -435,8 +435,8 @@ class OpenScienceReport:
             hal_accounts AS (
                 SELECT la.person_id, bool_or(k.identifiers ? 'orcid') AS has_orcid
                 FROM lab_authors la
-                JOIN source_contributions sa ON sa.person_id = la.person_id AND sa.source = 'hal'
-                JOIN contributor_information k ON k.id = sa.contributor_information_id
+                JOIN source_contributions sc ON sc.person_id = la.person_id AND sc.source = 'hal'
+                JOIN contributor_information k ON k.id = sc.contributor_information_id
                 WHERE k.identifiers ? 'hal_person_id'
                 GROUP BY la.person_id
             )
@@ -521,12 +521,12 @@ class OpenScienceReport:
             f"""
             SELECT p.publication_year AS year, p.license::text AS license,
                    ARRAY(
-                       SELECT DISTINCT split_part(sp.doi, '/', 1) FROM source_records sp
-                       WHERE sp.publication_id = p.id AND sp.doi IS NOT NULL
+                       SELECT DISTINCT split_part(sr.doi, '/', 1) FROM source_records sr
+                       WHERE sr.publication_id = p.id AND sr.doi IS NOT NULL
                    ) AS prefixes,
                    ARRAY(
-                       SELECT DISTINCT regexp_replace(sp.container_title, '\\s*\\(.*\\)$', '') FROM source_records sp
-                       WHERE sp.publication_id = p.id AND sp.source = 'openalex' AND sp.container_title IS NOT NULL
+                       SELECT DISTINCT regexp_replace(sr.container_title, '\\s*\\(.*\\)$', '') FROM source_records sr
+                       WHERE sr.publication_id = p.id AND sr.source = 'openalex' AND sr.container_title IS NOT NULL
                    ) AS openalex_sources
             FROM ({LAB_PUBLICATIONS}) p
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'

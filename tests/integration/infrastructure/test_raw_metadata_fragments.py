@@ -15,7 +15,7 @@ _RAW_METADATA = {
 
 def _read(conn, expression, source_record):
     return conn.execute(
-        text(f"SELECT {expression} FROM source_records sp WHERE sp.id = :id"), {"id": source_record}
+        text(f"SELECT {expression} FROM source_records sr WHERE sr.id = :id"), {"id": source_record}
     ).scalar_one()
 
 

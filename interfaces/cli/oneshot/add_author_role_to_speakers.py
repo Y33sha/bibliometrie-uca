@@ -21,7 +21,7 @@ from infrastructure.observability.log import setup_logger
 log = setup_logger("add_author_role_to_speakers", os.path.dirname(__file__))
 
 _SPEAKERS_WITHOUT_AUTHOR = f"""
-    '{ContributionRole.SPEAKER.value}' = ANY(sa.roles) AND NOT '{ContributionRole.AUTHOR.value}' = ANY(sa.roles)
+    '{ContributionRole.SPEAKER.value}' = ANY(sc.roles) AND NOT '{ContributionRole.AUTHOR.value}' = ANY(sc.roles)
 """
 
 
@@ -30,16 +30,16 @@ def add_author_role(conn: Connection) -> tuple[int, int]:
     marked = conn.execute(
         text(f"""
             UPDATE publications p SET contributions_dirty = true
-            FROM source_contributions sa
-            JOIN source_records sp ON sp.id = sa.source_record_id
-            WHERE p.id = sp.publication_id AND NOT p.contributions_dirty
+            FROM source_contributions sc
+            JOIN source_records sr ON sr.id = sc.source_record_id
+            WHERE p.id = sr.publication_id AND NOT p.contributions_dirty
               AND {_SPEAKERS_WITHOUT_AUTHOR}
         """)  # noqa: S608
     ).rowcount
     updated = conn.execute(
         text(f"""
-            UPDATE source_contributions sa
-            SET roles = ARRAY['{ContributionRole.AUTHOR.value}'] || sa.roles
+            UPDATE source_contributions sc
+            SET roles = ARRAY['{ContributionRole.AUTHOR.value}'] || sc.roles
             WHERE {_SPEAKERS_WITHOUT_AUTHOR}
         """)  # noqa: S608
     ).rowcount
@@ -55,7 +55,7 @@ def main() -> int:
         if args.dry_run:
             count = conn.execute(
                 text(
-                    f"SELECT count(*) FROM source_contributions sa WHERE {_SPEAKERS_WITHOUT_AUTHOR}"
+                    f"SELECT count(*) FROM source_contributions sc WHERE {_SPEAKERS_WITHOUT_AUTHOR}"
                 )  # noqa: S608
             ).scalar_one()
             log.info("signatures à compléter : %d", count)

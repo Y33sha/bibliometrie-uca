@@ -50,12 +50,12 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     theses_count_row = conn.execute(
         text(f"""
             SELECT COUNT(*) AS n
-            FROM source_contributions sa
-            JOIN source_records sd ON sd.id = sa.source_record_id
-            WHERE sa.person_id = :pid
-              AND sa.source = '{Source.THESES.value}'
-              AND NOT ({has_author_role("sa")})
-              AND sd.publication_id IS NOT NULL
+            FROM source_contributions sc
+            JOIN source_records sr ON sr.id = sc.source_record_id
+            WHERE sc.person_id = :pid
+              AND sc.source = '{Source.THESES.value}'
+              AND NOT ({has_author_role("sc")})
+              AND sr.publication_id IS NOT NULL
         """),
         {"pid": person_id},
     ).one()
@@ -181,8 +181,8 @@ def person_addresses(
     base_where = """a.id IN (
             SELECT DISTINCT saa.address_id
             FROM source_contribution_addresses saa
-            JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-            WHERE sa.person_id = :pid
+            JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+            WHERE sc.person_id = :pid
         )"""
     count_row = conn.execute(
         text(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}"),

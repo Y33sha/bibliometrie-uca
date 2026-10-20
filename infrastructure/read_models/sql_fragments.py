@@ -3,7 +3,7 @@
 from domain.persons.identifiers import AttributionStatus
 
 
-def contributor_display_name(source_contribution: str = "sa") -> str:
+def contributor_display_name(source_contribution: str = "sc") -> str:
     """Nom de la signature aliasée `signature` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`ContributorName.display`)."""
     return (
         f"coalesce({source_contribution}.raw_author_name,"
@@ -14,10 +14,10 @@ def contributor_display_name(source_contribution: str = "sa") -> str:
 def contribution_has_source(source: str, contribution: str = "a") -> str:
     """Condition vraie quand la contribution aliasée `contribution` est attestée par une signature de `source` : même publication par sa notice, même personne."""
     return (
-        "EXISTS (SELECT 1 FROM source_contributions sa_src"
-        " JOIN source_records sp_src ON sp_src.id = sa_src.source_record_id"
-        f" WHERE sp_src.publication_id = {contribution}.publication_id"
-        f" AND sa_src.person_id = {contribution}.person_id AND sa_src.source = '{source}')"
+        "EXISTS (SELECT 1 FROM source_contributions sc_src"
+        " JOIN source_records sr_src ON sr_src.id = sc_src.source_record_id"
+        f" WHERE sr_src.publication_id = {contribution}.publication_id"
+        f" AND sc_src.person_id = {contribution}.person_id AND sc_src.source = '{source}')"
     )
 
 

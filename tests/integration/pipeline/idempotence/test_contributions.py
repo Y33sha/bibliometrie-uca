@@ -28,10 +28,10 @@ def _count_contributions_tables(conn) -> dict:
     ).scalar_one()
     counts["hal_fk"] = conn.execute(
         text(
-            "SELECT COUNT(*) AS cnt FROM source_contributions sa "
-            "JOIN source_records sp ON sp.id = sa.source_record_id "
-            "JOIN contributions a ON a.publication_id = sp.publication_id "
-            "AND a.person_id = sa.person_id WHERE sa.source = 'hal'"
+            "SELECT COUNT(*) AS cnt FROM source_contributions sc "
+            "JOIN source_records sr ON sr.id = sc.source_record_id "
+            "JOIN contributions a ON a.publication_id = sr.publication_id "
+            "AND a.person_id = sc.person_id WHERE sc.source = 'hal'"
         )
     ).scalar_one()
     counts["with_structs"] = conn.execute(

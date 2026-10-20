@@ -316,13 +316,13 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
 
 
 _SQL_HAS_HAL_SOURCE_CONTRIBUTION = (
-    "EXISTS (SELECT 1 FROM source_records sd "
-    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}')"
+    "EXISTS (SELECT 1 FROM source_records sr "
+    f"WHERE sr.publication_id = p.id AND sr.source = '{Source.HAL.value}')"
 )
 _SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
-    "EXISTS (SELECT 1 FROM source_records sd "
-    f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
-    "AND sd.hal_collections @> ARRAY[:flt_hal_collection])"
+    "EXISTS (SELECT 1 FROM source_records sr "
+    f"WHERE sr.publication_id = p.id AND sr.source = '{Source.HAL.value}' "
+    "AND sr.hal_collections @> ARRAY[:flt_hal_collection])"
 )
 
 

@@ -539,11 +539,11 @@ class TestPropagateUcaForAddresses:
 
         sa = sa_sync_conn.execute(
             text(
-                "SELECT sa.in_perimeter, "
+                "SELECT sc.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
                 "        FROM source_contribution_structures "
-                "        WHERE source_contribution_id = sa.id) AS structure_ids "
-                "FROM source_contributions sa WHERE sa.id = :id"
+                "        WHERE source_contribution_id = sc.id) AS structure_ids "
+                "FROM source_contributions sc WHERE sc.id = :id"
             ),
             {"id": source_contribution_id},
         ).one()
@@ -595,11 +595,11 @@ class TestPropagateUcaForAddresses:
 
         sa = sa_sync_conn.execute(
             text(
-                "SELECT sa.in_perimeter, "
+                "SELECT sc.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
                 "        FROM source_contribution_structures "
-                "        WHERE source_contribution_id = sa.id) AS structure_ids "
-                "FROM source_contributions sa WHERE sa.id = :id"
+                "        WHERE source_contribution_id = sc.id) AS structure_ids "
+                "FROM source_contributions sc WHERE sc.id = :id"
             ),
             {"id": source_contribution_id},
         ).one()

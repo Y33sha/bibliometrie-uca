@@ -86,20 +86,20 @@ _TITLE_MATCH_YEAR_WINDOW = 2
 _SCALAR_KEY_ROWS = "".join(
     f"""
         UNION
-        SELECT sp.publication_id, '{k}', sp.external_ids->>'{k}'
-        FROM source_records sp
-        WHERE sp.publication_id IS NOT NULL AND sp.external_ids->>'{k}' IS NOT NULL"""
+        SELECT sr.publication_id, '{k}', sr.external_ids->>'{k}'
+        FROM source_records sr
+        WHERE sr.publication_id IS NOT NULL AND sr.external_ids->>'{k}' IS NOT NULL"""
     for k in SCALAR_CONFIRMATION_ID_TYPES
 )
 
 # Paires de publications distinctes partageant une clé de confirmation (`source_records.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
-        SELECT sp.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
-        FROM source_records sp
-        CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'{ExternalIdType.HAL_ID}') h
-        WHERE sp.publication_id IS NOT NULL
-          AND jsonb_typeof(sp.external_ids->'{ExternalIdType.HAL_ID}') = 'array'
+        SELECT sr.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
+        FROM source_records sr
+        CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids->'{ExternalIdType.HAL_ID}') h
+        WHERE sr.publication_id IS NOT NULL
+          AND jsonb_typeof(sr.external_ids->'{ExternalIdType.HAL_ID}') = 'array'
         {_SCALAR_KEY_ROWS}
     )
     SELECT DISTINCT
@@ -179,13 +179,13 @@ class PublicationRelationsQueries:
         # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
             text(f"""
-                SELECT sp.publication_id, sp.source::text AS source, sp.meta,
+                SELECT sr.publication_id, sr.source::text AS source, sr.meta,
                        lower({raw_column("doi")}) AS doi,
-                       p.doc_type::text AS doc_type, sp.doc_type AS source_record_doc_type
-                FROM source_records sp
-                JOIN publications p ON p.id = sp.publication_id
-                WHERE (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
-                   OR (sp.source = '{Source.CROSSREF.value}' AND sp.meta ? 'relation')
+                       p.doc_type::text AS doc_type, sr.doc_type AS source_record_doc_type
+                FROM source_records sr
+                JOIN publications p ON p.id = sr.publication_id
+                WHERE (sr.source = '{Source.DATACITE.value}' AND sr.meta ? 'related_identifiers')
+                   OR (sr.source = '{Source.CROSSREF.value}' AND sr.meta ? 'relation')
             """)
         ).all()
         return [

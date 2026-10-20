@@ -59,8 +59,8 @@ class StaleRefetch(ABC):
 _STALE_ROWS_SQL_TEMPLATE = """
     SELECT s.source_id
     FROM staging s
-    LEFT JOIN source_records sp
-      ON sp.source = s.source AND sp.source_id = s.source_id
+    LEFT JOIN source_records sr
+      ON sr.source = s.source AND sr.source_id = s.source_id
     WHERE s.source = CAST(:source AS source_type)
       AND s.disappeared_at IS NULL
       AND s.last_seen_at < now() - make_interval(days => :days)
@@ -89,7 +89,7 @@ def get_stale_source_ids(
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        year_clause = "AND (sp.publication_year IS NULL OR sp.publication_year = ANY(:years))"
+        year_clause = "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years))"
         params["years"] = list(years)
     sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
     return list(conn.execute(sql, params).scalars())

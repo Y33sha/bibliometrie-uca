@@ -19,11 +19,11 @@ class AddressPublicationCountQueries:
                     SELECT a2.id AS address_id, agg.cnt
                     FROM addresses a2
                     LEFT JOIN (
-                        SELECT saa.address_id, COUNT(DISTINCT sd.publication_id) AS cnt
+                        SELECT saa.address_id, COUNT(DISTINCT sr.publication_id) AS cnt
                         FROM source_contribution_addresses saa
-                        JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-                        JOIN source_records sd ON sd.id = sa.source_record_id
-                        WHERE sd.publication_id IS NOT NULL
+                        JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+                        JOIN source_records sr ON sr.id = sc.source_record_id
+                        WHERE sr.publication_id IS NOT NULL
                         GROUP BY saa.address_id
                     ) agg ON agg.address_id = a2.id
                 ) sub

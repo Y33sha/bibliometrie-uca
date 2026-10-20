@@ -108,9 +108,9 @@ def _count_affiliations(conn) -> dict:
         ).scalar_one()
         counts[f"{src}_with_structs"] = conn.execute(
             text(
-                "SELECT COUNT(DISTINCT sa.id) AS cnt FROM source_contributions sa "
-                "JOIN source_contribution_structures sas ON sas.source_contribution_id = sa.id "
-                "WHERE sa.source = :src"
+                "SELECT COUNT(DISTINCT sc.id) AS cnt FROM source_contributions sc "
+                "JOIN source_contribution_structures sas ON sas.source_contribution_id = sc.id "
+                "WHERE sc.source = :src"
             ),
             {"src": src},
         ).scalar_one()
@@ -167,11 +167,11 @@ class TestPopulateAffiliationsIdempotence:
 
         row = sa_sync_conn.execute(
             text(
-                "SELECT sa.in_perimeter, "
+                "SELECT sc.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
                 "        FROM source_contribution_structures "
-                "        WHERE source_contribution_id = sa.id) AS structure_ids "
-                "FROM source_contributions sa WHERE sa.id = 80002"
+                "        WHERE source_contribution_id = sc.id) AS structure_ids "
+                "FROM source_contributions sc WHERE sc.id = 80002"
             )
         ).one()
         assert row.in_perimeter is True
@@ -219,11 +219,11 @@ class TestPopulateAffiliationsTheses:
 
         row = sa_sync_conn.execute(
             text(
-                "SELECT sa.in_perimeter, "
+                "SELECT sc.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
                 "        FROM source_contribution_structures "
-                "        WHERE source_contribution_id = sa.id) AS structure_ids "
-                "FROM source_contributions sa WHERE sa.id = 80003"
+                "        WHERE source_contribution_id = sc.id) AS structure_ids "
+                "FROM source_contributions sc WHERE sc.id = 80003"
             )
         ).one()
         assert row.in_perimeter is True

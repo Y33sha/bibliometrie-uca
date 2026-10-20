@@ -159,26 +159,26 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue, `author_count` le nombre de signatures. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = f"""
-    SELECT sp.id, sp.source::text AS source, sp.source_id,
-           sp.title, sp.doc_type, sp.doi,
-           sp.journal_id, sp.oa_status, sp.language,
-           sp.urls, sp.external_ids,
+    SELECT sr.id, sr.source::text AS source, sr.source_id,
+           sr.title, sr.doc_type, sr.doi,
+           sr.journal_id, sr.oa_status, sr.language,
+           sr.urls, sr.external_ids,
            j.journal_type::text AS journal_type, j.oa_model,
-           sp.raw_metadata,
-           (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired,
-           COALESCE(jsonb_exists(sp.meta->'relation', 'is-preprint-of'), false)
+           sr.raw_metadata,
+           (sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date) AS embargo_expired,
+           COALESCE(jsonb_exists(sr.meta->'relation', 'is-preprint-of'), false)
                AS self_declared_preprint,
-           COALESCE(sp.meta ? 'conference', false) AS declares_conference,
+           COALESCE(sr.meta ? 'conference', false) AS declares_conference,
            rp.publisher_type::text AS registrant_publisher_type,
            COALESCE(m.proceedings, false) AS in_proceedings_volume,
-           sp.meta->>'group_title' AS group_title,
+           sr.meta->>'group_title' AS group_title,
            COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond,
-           (SELECT count(*) FROM source_contributions sa
-            WHERE sa.source_record_id = sp.id) AS author_count
-    FROM source_records sp
-    LEFT JOIN journals j ON j.id = sp.journal_id
-    LEFT JOIN monographs m ON m.id = sp.monograph_id
-    LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sp.doi, '/', 1)
+           (SELECT count(*) FROM source_contributions sc
+            WHERE sc.source_record_id = sr.id) AS author_count
+    FROM source_records sr
+    LEFT JOIN journals j ON j.id = sr.journal_id
+    LEFT JOIN monographs m ON m.id = sr.monograph_id
+    LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sr.doi, '/', 1)
     LEFT JOIN publishers rp ON rp.id = dp.publisher_id
 """
 
@@ -253,7 +253,7 @@ class PgMetadataCorrectionQueries:
         """Les `source_records` rattachées à un journal (`journal_id = :jid`).
 
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
-        rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
+        rows = conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_for_unary_correction_by_hal_ids(
@@ -263,7 +263,7 @@ class PgMetadataCorrectionQueries:
         if not hal_ids:
             return []
         rows = conn.execute(
-            text(_SELECT + " WHERE sp.source = 'hal' AND sp.source_id = ANY(:ids)"),
+            text(_SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)"),
             {"ids": hal_ids},
         )
         return rows_as(UnaryCorrectionRow, rows)
@@ -318,7 +318,7 @@ class PgMetadataCorrectionQueries:
         """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref, et `source_records` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
-                WITH sp_eff AS (
+                WITH sr_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, raw_metadata,
                            meta, external_ids,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
@@ -326,7 +326,7 @@ class PgMetadataCorrectionQueries:
                 ),
                 dataset_dois AS (
                     SELECT DISTINCT eff_doi AS d
-                    FROM sp_eff
+                    FROM sr_eff
                     WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
                 ),
                 -- La cible reste attachée à la notice DataCite dont les `related_identifiers`
@@ -338,16 +338,16 @@ class PgMetadataCorrectionQueries:
                            declarant_id, secondary_doi, canonical_doi, same_work_case
                     FROM (
                         SELECT
-                            sp.id AS declarant_id,
-                            sp.eff_doi AS secondary_doi,
+                            sr.id AS declarant_id,
+                            sr.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
-                        FROM sp_eff sp
-                        CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
-                        WHERE sp.source = '{Source.DATACITE.value}'
+                        FROM sr_eff sr
+                        CROSS JOIN LATERAL jsonb_array_elements(sr.meta->'related_identifiers') rel
+                        WHERE sr.source = '{Source.DATACITE.value}'
                           AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> sp.eff_doi
+                          AND lower(rel->>'doi') <> sr.eff_doi
                         UNION ALL
                         -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
                         -- comme dataset pour absorber ses pièces (`IN dataset_dois`). Ça exclut le
@@ -355,17 +355,17 @@ class PgMetadataCorrectionQueries:
                         -- le parent absent (les pièces attendent son moissonnage). La forme du DOI
                         -- n'intervient pas : les pièces portent souvent un DOI frère, pas suffixé.
                         SELECT
-                            sp.id AS declarant_id,
-                            sp.eff_doi AS secondary_doi,
+                            sr.id AS declarant_id,
+                            sr.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
-                        FROM sp_eff sp
-                        CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
-                        WHERE sp.source = '{Source.DATACITE.value}'
-                          AND sp.doc_type = '{DocType.DATASET.value}'
+                        FROM sr_eff sr
+                        CROSS JOIN LATERAL jsonb_array_elements(sr.meta->'related_identifiers') rel
+                        WHERE sr.source = '{Source.DATACITE.value}'
+                          AND sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> sp.eff_doi
+                          AND lower(rel->>'doi') <> sr.eff_doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
                     ) s
                     ORDER BY declarant_id,
@@ -380,8 +380,8 @@ class PgMetadataCorrectionQueries:
                 -- les deux ayant des signatures individuelles.
                 hal_crossref AS MATERIALIZED (
                     SELECT h.eff_doi AS d, h.id AS hal_id, c.id AS crossref_id
-                    FROM sp_eff h
-                    JOIN sp_eff c ON c.eff_doi = h.eff_doi AND c.source = '{Source.CROSSREF.value}'
+                    FROM sr_eff h
+                    JOIN sr_eff c ON c.eff_doi = h.eff_doi AND c.source = '{Source.CROSSREF.value}'
                     WHERE h.source = '{Source.HAL.value}' AND h.eff_doi IS NOT NULL
                 ),
                 foreign_hal_dois AS (
@@ -403,33 +403,33 @@ class PgMetadataCorrectionQueries:
                 candidate_dois AS (
                     SELECT secondary_doi AS d FROM same_work
                     UNION
-                    SELECT eff_doi AS d FROM sp_eff
+                    SELECT eff_doi AS d FROM sr_eff
                     WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
                       AND eff_doi IS NOT NULL
                     UNION
-                    SELECT eff_doi AS d FROM sp_eff
-                    WHERE {corrected("doi", "sp_eff")}
-                       OR {corrected(REMOVED_EXTERNAL_IDS, "sp_eff")}
+                    SELECT eff_doi AS d FROM sr_eff
+                    WHERE {corrected("doi", "sr_eff")}
+                       OR {corrected(REMOVED_EXTERNAL_IDS, "sr_eff")}
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
                     SELECT d FROM foreign_hal_dois
                 )
-                SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
-                       sp.external_ids, sp.source::text AS source, sp.source_id,
-                       sp.eff_doi AS raw_doi,
+                SELECT sr.id, sr.doc_type, sr.doi, sr.title_normalized, sr.raw_metadata,
+                       sr.external_ids, sr.source::text AS source, sr.source_id,
+                       sr.eff_doi AS raw_doi,
                        sw.canonical_doi, sw.same_work_case,
-                       sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
-                       CASE WHEN sp.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
-                           SELECT DISTINCT aik.last_name_normalized
-                           FROM source_contributions sa
-                           JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                           WHERE sa.source_record_id = sp.id AND NOT sa.collective
-                             AND aik.last_name_normalized <> ''
+                       sr.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
+                       CASE WHEN sr.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
+                           SELECT DISTINCT ci.last_name_normalized
+                           FROM source_contributions sc
+                           JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                           WHERE sc.source_record_id = sr.id AND NOT sc.collective
+                             AND ci.last_name_normalized <> ''
                        ) ELSE ARRAY[]::text[] END AS author_names
-                FROM sp_eff sp
-                JOIN candidate_dois c ON c.d = sp.eff_doi
-                LEFT JOIN same_work sw ON sw.declarant_id = sp.id
+                FROM sr_eff sr
+                JOIN candidate_dois c ON c.d = sr.eff_doi
+                LEFT JOIN same_work sw ON sw.declarant_id = sr.id
             """)
         ).all()
         return [
@@ -459,8 +459,8 @@ class PgMetadataCorrectionQueries:
         conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
-                FROM source_records sp
-                WHERE sp.id = ANY(:ids) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+                FROM source_records sr
+                WHERE sr.id = ANY(:ids) AND p.id = sr.publication_id AND NOT p.contributions_dirty
             """),
             {"ids": [u.id for u in updates]},
         )

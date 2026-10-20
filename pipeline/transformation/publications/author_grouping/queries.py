@@ -32,10 +32,10 @@ def _known_first_name(id_type: str) -> str:
 # Contributions sources à grouper, hors collectifs, hors enregistrements sources convergés ou recopiés d'un dépôt HAL présent.
 _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     WITH records AS (
-        SELECT sp.id, sp.publication_id, sp.source::text AS source, sp.source_id,
+        SELECT sr.id, sr.publication_id, sr.source::text AS source, sr.source_id,
                ({corrected_by("doi")}) = ANY(:converged) IS TRUE AS converged
-        FROM source_records sp
-        WHERE sp.publication_id = ANY(:publications)
+        FROM source_records sr
+        WHERE sr.publication_id = ANY(:publications)
     ), kept AS (
         SELECT n.* FROM records n
         WHERE NOT (n.converged AND EXISTS (
@@ -43,16 +43,16 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
           AND NOT (n.source = 'scanr' AND n.source_id LIKE 'hal%' AND EXISTS (
                 SELECT 1 FROM records h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
     )
-    SELECT k.publication_id, k.id AS source_record, k.source, sa.id, sa.author_position AS position,
-           aik.last_name_normalized AS last_name,
-           coalesce(aik.first_name_normalized, '') AS first_name,
+    SELECT k.publication_id, k.id AS source_record, k.source, sc.id, sc.author_position AS position,
+           ci.last_name_normalized AS last_name,
+           coalesce(ci.first_name_normalized, '') AS first_name,
            coalesce({usable_identifier("'orcid'")}, '') AS orcid,
            coalesce({usable_identifier("'idref'")}, '') AS idref,
            coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
     FROM kept k
-    JOIN source_contributions sa ON sa.source_record_id = k.id
-    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-    WHERE NOT sa.collective
+    JOIN source_contributions sc ON sc.source_record_id = k.id
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    WHERE NOT sc.collective
 """)
 
 _GROUPS_SQL = text("""
@@ -70,16 +70,16 @@ _DELETE_MEMBERSHIPS_SQL = text(
 _DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
 
 _CLEAR_COPIES_SQL = text("""
-    UPDATE source_contributions sa SET duplicate_of = NULL
-    FROM source_records sp
-    WHERE sa.source_record_id = sp.id AND sp.publication_id = ANY(:publications)
-      AND sa.duplicate_of IS NOT NULL AND sa.id <> ALL(CAST(:copies AS integer[]))
+    UPDATE source_contributions sc SET duplicate_of = NULL
+    FROM source_records sr
+    WHERE sc.source_record_id = sr.id AND sr.publication_id = ANY(:publications)
+      AND sc.duplicate_of IS NOT NULL AND sc.id <> ALL(CAST(:copies AS integer[]))
 """)
 
 _SET_COPIES_SQL = text("""
-    UPDATE source_contributions sa SET duplicate_of = u.original
+    UPDATE source_contributions sc SET duplicate_of = u.original
     FROM unnest(CAST(:copies AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
-    WHERE sa.id = u.id AND sa.duplicate_of IS DISTINCT FROM u.original
+    WHERE sc.id = u.id AND sc.duplicate_of IS DISTINCT FROM u.original
 """)
 
 _UPDATE_POSITIONS_SQL = text("""
@@ -173,9 +173,9 @@ class AuthorGroupingQueries:
         """Publications marquées `contributions_dirty`, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         rows = conn.execute(
             text("""
-                SELECT p.id, coalesce(sum(sp.author_count), 0)::integer AS source_contributions
+                SELECT p.id, coalesce(sum(sr.author_count), 0)::integer AS source_contributions
                 FROM publications p
-                LEFT JOIN source_records sp ON sp.publication_id = p.id
+                LEFT JOIN source_records sr ON sr.publication_id = p.id
                 WHERE p.contributions_dirty
                 GROUP BY p.id
                 ORDER BY p.id

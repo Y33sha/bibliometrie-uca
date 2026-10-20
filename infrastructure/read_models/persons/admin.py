@@ -37,14 +37,14 @@ def name_form_contributions(
     """Contributions sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
         text(f"""
-            SELECT sa.source, sa.id AS source_contribution_id,
-                   sd.publication_id, sd.title, sd.publication_year, sd.doi
-            FROM source_contributions sa
-            JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-            JOIN source_records sd ON sd.id = sa.source_record_id
-            WHERE sa.person_id = :pid AND aik.author_name_normalized = :nf
-              AND sa.source IN {in_clause(AUTHOR_SOURCES)}
-            ORDER BY sd.publication_year DESC, sd.title
+            SELECT sc.source, sc.id AS source_contribution_id,
+                   sr.publication_id, sr.title, sr.publication_year, sr.doi
+            FROM source_contributions sc
+            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            JOIN source_records sr ON sr.id = sc.source_record_id
+            WHERE sc.person_id = :pid AND ci.author_name_normalized = :nf
+              AND sc.source IN {in_clause(AUTHOR_SOURCES)}
+            ORDER BY sr.publication_year DESC, sr.title
         """),
         {"pid": person_id, "nf": name_form},
     ).all()
@@ -172,17 +172,17 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         WHERE status = '{AttributionStatus.PENDING.value}'
     ),
     pending_identities AS MATERIALIZED (
-        SELECT aik.id, k.k, p.id_type, p.id_value
-        FROM contributor_information aik
+        SELECT ci.id, k.k, p.id_type, p.id_value
+        FROM contributor_information ci
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
-        JOIN pending p ON p.id_type = k.k AND p.id_value = aik.identifiers ->> k.k
+        JOIN pending p ON p.id_type = k.k AND p.id_value = ci.identifiers ->> k.k
     ),
     -- Couples (personne, identité) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
     person_identities AS MATERIALIZED (
-        SELECT DISTINCT sa.person_id, sa.contributor_information_id
-        FROM source_contributions sa
-        WHERE sa.person_id IS NOT NULL
-          AND sa.contributor_information_id IN (SELECT id FROM pending_identities)
+        SELECT DISTINCT sc.person_id, sc.contributor_information_id
+        FROM source_contributions sc
+        WHERE sc.person_id IS NOT NULL
+          AND sc.contributor_information_id IN (SELECT id FROM pending_identities)
     ),
     bearers AS (
         SELECT DISTINCT pi.person_id, p.id_type, p.id_value
@@ -190,8 +190,8 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         JOIN pending_identities p ON p.id = pi.contributor_information_id
         -- Une signature du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
         CROSS JOIN LATERAL (
-            SELECT 1 FROM source_contributions sa
-            WHERE sa.person_id = pi.person_id AND sa.contributor_information_id = pi.contributor_information_id
+            SELECT 1 FROM source_contributions sc
+            WHERE sc.person_id = pi.person_id AND sc.contributor_information_id = pi.contributor_information_id
               AND NOT {identifier_neutralized("p.k")}
             LIMIT 1
         ) kept
@@ -241,8 +241,8 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
                        FROM structures s
                        WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
                            SELECT sas.structure_id FROM source_contribution_structures sas
-                           JOIN source_contributions sa ON sa.id = sas.source_contribution_id
-                           WHERE sa.person_id = p.id
+                           JOIN source_contributions sc ON sc.id = sas.source_contribution_id
+                           WHERE sc.person_id = p.id
                        )
                    ), ARRAY[]::text[]) AS labs
             FROM persons p WHERE p.id = ANY(:ids)

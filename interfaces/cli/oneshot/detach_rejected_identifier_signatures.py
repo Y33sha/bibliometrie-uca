@@ -32,9 +32,9 @@ _REJECTED = AttributionStatus.REJECTED.value
 _CARRIES_IDENTIFIER = """
     EXISTS (
         SELECT 1 FROM person_identifiers pi
-        WHERE pi.person_id = sa.person_id
+        WHERE pi.person_id = sc.person_id
           AND pi.status {op} '{rejected}'
-          AND aik.identifiers ->> pi.id_type::text = pi.id_value
+          AND ci.identifiers ->> pi.id_type::text = pi.id_value
           {extra}
     )
 """
@@ -45,23 +45,23 @@ _CARRIES_VALID = _CARRIES_IDENTIFIER.format(
 )
 
 _TARGETS = f"""
-    SELECT sa.id
-    FROM source_contributions sa
-    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-    WHERE sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
+    SELECT sc.id
+    FROM source_contributions sc
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    WHERE sc.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
       AND {_CARRIES_REJECTED}
       AND NOT {_CARRIES_VALID}
-      AND NOT {pinned("sa.id")}
+      AND NOT {pinned("sc.id")}
 """
 
 _COUNT_SQL = text(f"""
-    SELECT count(*) AS source_contributions, count(DISTINCT sa.person_id) AS personnes
-    FROM source_contributions sa WHERE sa.id IN ({_TARGETS})
+    SELECT count(*) AS source_contributions, count(DISTINCT sc.person_id) AS personnes
+    FROM source_contributions sc WHERE sc.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 
 _DETACH_SQL = text(f"""
-    UPDATE source_contributions sa SET {DETACHED_SOURCE_CONTRIBUTION}
-    WHERE sa.id IN ({_TARGETS})
+    UPDATE source_contributions sc SET {DETACHED_SOURCE_CONTRIBUTION}
+    WHERE sc.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 
 

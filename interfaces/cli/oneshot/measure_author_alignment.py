@@ -76,13 +76,13 @@ def _publication_ids(conn: Connection, full_max: int, sample_large: int, seed: i
                 WHERE publication_id IS NOT NULL AND source <> 'theses'
                 GROUP BY 1 HAVING count(DISTINCT source) >= 2
             )
-            SELECT sp.publication_id, max(n.n) AS size
-            FROM source_records sp
+            SELECT sr.publication_id, max(n.n) AS size
+            FROM source_records sr
             JOIN multi m USING (publication_id)
             JOIN LATERAL (
-                SELECT count(*) AS n FROM source_contributions sa WHERE sa.source_record_id = sp.id
+                SELECT count(*) AS n FROM source_contributions sc WHERE sc.source_record_id = sr.id
             ) n ON true
-            WHERE sp.source <> 'theses'
+            WHERE sr.source <> 'theses'
             GROUP BY 1
         """)
     ).all()
@@ -114,20 +114,20 @@ def _source_records(
         ids = list(publication_ids[start : start + _BATCH])
         rows = conn.execute(
             text(r"""
-                SELECT sp.publication_id, sp.id AS source_record_id, sp.source::text AS source,
-                       (sp.source = 'scanr' AND sp.source_id LIKE 'hal%')
-                       OR (sp.source = 'openalex' AND coalesce(sp.urls[1], '') ~ '(hal\.science|archives-ouvertes\.fr)')
+                SELECT sr.publication_id, sr.id AS source_record_id, sr.source::text AS source,
+                       (sr.source = 'scanr' AND sr.source_id LIKE 'hal%')
+                       OR (sr.source = 'openalex' AND coalesce(sr.urls[1], '') ~ '(hal\.science|archives-ouvertes\.fr)')
                            AS from_hal,
-                       sa.author_position, aik.last_name_normalized AS ln,
-                       coalesce(aik.first_name_normalized, '') AS fn,
-                       coalesce(sa.raw_author_name, concat_ws(' ', sa.raw_first_name, sa.raw_last_name)) AS raw_name,
-                       aik.identifiers, sa.neutralized_identifiers
-                FROM source_records sp
-                JOIN source_contributions sa ON sa.source_record_id = sp.id
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sp.publication_id = ANY(:ids) AND sp.source <> 'theses'
-                  AND 'author' = ANY(sa.roles) AND sa.author_position IS NOT NULL
-                  AND NOT sa.collective
+                       sc.author_position, ci.last_name_normalized AS ln,
+                       coalesce(ci.first_name_normalized, '') AS fn,
+                       coalesce(sc.raw_author_name, concat_ws(' ', sc.raw_first_name, sc.raw_last_name)) AS raw_name,
+                       ci.identifiers, sc.neutralized_identifiers
+                FROM source_records sr
+                JOIN source_contributions sc ON sc.source_record_id = sr.id
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sr.publication_id = ANY(:ids) AND sr.source <> 'theses'
+                  AND 'author' = ANY(sc.roles) AND sc.author_position IS NOT NULL
+                  AND NOT sc.collective
             """),
             {"ids": ids},
         )

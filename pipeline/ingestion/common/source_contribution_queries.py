@@ -137,9 +137,9 @@ def delete_orphan_contributor_information(conn: Connection) -> int:
     """
     return conn.execute(
         text("""
-            DELETE FROM contributor_information aik
+            DELETE FROM contributor_information ci
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_contributions sa WHERE sa.contributor_information_id = aik.id
+                SELECT 1 FROM source_contributions sc WHERE sc.contributor_information_id = ci.id
             )
         """)
     ).rowcount
@@ -216,14 +216,14 @@ class ContributionsBatchQueries:
                  raw_first_name, contributor_information_id, neutralized_identifiers, content_hash)
             SELECT :source, :spid, t.author_position,
                    t.is_corresponding, t.collective, t.roles, t.raw_author_name, t.raw_last_name,
-                   t.raw_first_name, aik.id, t.neutralized_identifiers, t.content_hash
+                   t.raw_first_name, ci.id, t.neutralized_identifiers, t.content_hash
             FROM jsonb_to_recordset(:payload) AS t(
                 author_position smallint, last_name_normalized text, first_name_normalized text,
                 is_corresponding boolean, collective boolean, roles text[],
                 raw_author_name text, raw_last_name text, raw_first_name text,
                 identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
-            JOIN contributor_information aik
-              ON aik.key_hash = """
+            JOIN contributor_information ci
+              ON ci.key_hash = """
             + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
         ).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(
@@ -240,12 +240,12 @@ class ContributionsBatchQueries:
     ) -> list[StoredSourceContributionRow]:
         rows = conn.execute(
             text("""
-                SELECT sa.id, sa.author_position, aik.last_name_normalized,
-                       aik.first_name_normalized, aik.identifiers, sa.content_hash,
-                       sa.collective, sa.roles
-                FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.source_record_id = :spid
+                SELECT sc.id, sc.author_position, ci.last_name_normalized,
+                       ci.first_name_normalized, ci.identifiers, sc.content_hash,
+                       sc.collective, sc.roles
+                FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.source_record_id = :spid
             """),
             {"spid": source_record_id},
         ).all()
@@ -256,8 +256,8 @@ class ContributionsBatchQueries:
         conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
-                FROM source_records sp
-                WHERE sp.id = :spid AND p.id = sp.publication_id AND NOT p.contributions_dirty
+                FROM source_records sr
+                WHERE sr.id = :spid AND p.id = sr.publication_id AND NOT p.contributions_dirty
             """),
             {"spid": source_record_id},
         )
@@ -291,7 +291,7 @@ class ContributionsBatchQueries:
         ]
         conn.execute(
             text("""
-                UPDATE source_contributions sa
+                UPDATE source_contributions sc
                 SET author_position = t.author_position,
                     is_corresponding = t.is_corresponding,
                     collective = t.collective,
@@ -306,7 +306,7 @@ class ContributionsBatchQueries:
                     id integer, author_position smallint, is_corresponding boolean,
                     collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
-                WHERE sa.id = t.id
+                WHERE sc.id = t.id
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )

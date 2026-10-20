@@ -146,8 +146,8 @@ def _count_crossref(conn) -> dict[str, int]:
         text("""
             SELECT COUNT(*) AS n
             FROM source_contribution_addresses saa
-            JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-            WHERE sa.source = 'crossref'
+            JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+            WHERE sc.source = 'crossref'
         """)
     ).scalar_one()
     counts["publications"] = conn.execute(
@@ -191,12 +191,12 @@ class TestNormalizeCrossrefIdempotence:
 
         rows = sa_sync_conn.execute(
             text("""
-                SELECT sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
-                       aik.last_name_normalized, aik.identifiers
-                FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.source = 'crossref'
-                ORDER BY sa.author_position
+                SELECT sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
+                       ci.last_name_normalized, ci.identifiers
+                FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.source = 'crossref'
+                ORDER BY sc.author_position
             """)
         ).all()
         assert len(rows) == 2
@@ -220,9 +220,9 @@ class TestNormalizeCrossrefIdempotence:
             text("""
                 SELECT a.raw_text
                 FROM source_contribution_addresses saa
-                JOIN source_contributions sa ON sa.id = saa.source_contribution_id
+                JOIN source_contributions sc ON sc.id = saa.source_contribution_id
                 JOIN addresses a ON a.id = saa.address_id
-                WHERE sa.source = 'crossref'
+                WHERE sc.source = 'crossref'
                 ORDER BY a.raw_text
             """)
         ).all()

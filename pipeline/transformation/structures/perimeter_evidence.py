@@ -27,23 +27,23 @@ def _sync_sql(scoped: bool) -> str:
 
     Seules les signatures dont les indices changent sont écrites. Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
     """
-    scope = "AND sa.id = ANY(:source_contribution_ids)" if scoped else ""
+    scope = "AND sc.id = ANY(:source_contribution_ids)" if scoped else ""
     return f"""
         WITH computed AS (
             {source_contribution_perimeter_evidence("source_contribution_ids" if scoped else None)}
         ), target AS (
             SELECT id, evidence FROM computed
             UNION ALL
-            SELECT sa.id, {NO_PERIMETER_EVIDENCE}
-            FROM source_contributions sa
-            LEFT JOIN computed c ON c.id = sa.id
-            WHERE sa.in_perimeter AND c.id IS NULL {scope}
+            SELECT sc.id, {NO_PERIMETER_EVIDENCE}
+            FROM source_contributions sc
+            LEFT JOIN computed c ON c.id = sc.id
+            WHERE sc.in_perimeter AND c.id IS NULL {scope}
         ), changed AS (
-            UPDATE source_contributions sa
+            UPDATE source_contributions sc
             SET perimeter_evidence = t.evidence
             FROM target t
-            WHERE sa.id = t.id AND sa.perimeter_evidence IS DISTINCT FROM t.evidence
-            RETURNING sa.source_record_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
+            WHERE sc.id = t.id AND sc.perimeter_evidence IS DISTINCT FROM t.evidence
+            RETURNING sc.source_record_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
         ), marked AS (
             UPDATE source_records
             SET keys_dirty = TRUE
@@ -105,10 +105,10 @@ class SourceContributionPerimeterRecompute:
         )
         publication_ids = conn.execute(
             text("""
-                SELECT DISTINCT sp.publication_id
-                FROM source_contributions sa
-                JOIN source_records sp ON sp.id = sa.source_record_id
-                WHERE sa.id = ANY(:ids) AND sp.publication_id IS NOT NULL
+                SELECT DISTINCT sr.publication_id
+                FROM source_contributions sc
+                JOIN source_records sr ON sr.id = sc.source_record_id
+                WHERE sc.id = ANY(:ids) AND sr.publication_id IS NOT NULL
                 ORDER BY 1
             """),
             {"ids": source_contribution_ids},
