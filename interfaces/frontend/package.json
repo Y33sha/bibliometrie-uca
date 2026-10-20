@@ -16,7 +16,7 @@
     "types:gen": "cd ../.. && python -m interfaces.cli.dev.dump_openapi && cd interfaces/frontend && openapi-typescript openapi.json -o src/lib/api/schema.ts && rm openapi.json"
   },
   "devDependencies": {
-    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/adapter-static": "^4.0.0",
     "@sveltejs/kit": "^2.50.2",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/d3-cloud": "^1.2.9",
