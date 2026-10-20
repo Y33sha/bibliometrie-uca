@@ -315,7 +315,7 @@ export interface paths {
         };
         /**
          * Suspect Merges
-         * @description Publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans une autre notice, paginées.
+         * @description Publications dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source, paginées.
          */
         get: operations["suspect_merges_api_publications_suspect_merges_get"];
         put?: never;
@@ -1447,7 +1447,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les contributions sources qui portent la forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1461,7 +1461,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Count
-         * @description Nombre de contributions sources du périmètre qu'aucune personne ne porte.
+         * @description Nombre de contributions sources du périmètre rattachées à aucune personne.
          */
         get: operations["orphan_contributions_count_api_contributions_orphans_count_get"];
         put?: never;
@@ -1481,7 +1481,7 @@ export interface paths {
         };
         /**
          * List Orphan Contributions
-         * @description Liste les contributions sources du périmètre qu'aucune personne ne porte.
+         * @description Liste les contributions sources du périmètre rattachées à aucune personne.
          */
         get: operations["list_orphan_contributions_api_contributions_orphans_get"];
         put?: never;
@@ -1525,7 +1525,7 @@ export interface paths {
          * Assign Orphan Contribution
          * @description Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source qui porte déjà une personne (`ContributionAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source déjà rattachée à une personne (`ContributionAlreadyAssignedError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1875,7 +1875,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2085,7 +2085,7 @@ export interface paths {
          * List Journals
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
-         *     `with_publications` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_publications` restreint aux revues qui ont au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_journals_api_journals_get"];
         put?: never;
@@ -7238,7 +7238,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "signatures_asc" | "signatures_desc" | "in_perimeter_signatures_asc" | "in_perimeter_signatures_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "source_contributions_asc" | "source_contributions_desc" | "in_perimeter_source_contributions_asc" | "in_perimeter_source_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
                 search?: string;
                 department?: string;
                 role?: string;
