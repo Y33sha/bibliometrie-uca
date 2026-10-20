@@ -17,8 +17,8 @@ from pipeline.ingestion.common.person_search import (
     PersonSearchExtractor,
     PersonSearchPage,
 )
+from pipeline.ingestion.scanr.api import ScanrClient
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
-from pipeline.ingestion.scanr.harvest import ScanrClient
 
 
 def build_identifiers_query(

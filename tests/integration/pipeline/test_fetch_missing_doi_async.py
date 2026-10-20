@@ -310,11 +310,11 @@ def _scanr_hit(scanr_id: str, doi: str) -> dict:
 class TestScanrFetchAsync:
     @staticmethod
     def _adapter() -> ScanrDoiSearch:
-        return _sans_config(ScanrDoiSearch, url="https://scanr.example/_search", auth=("u", "p"))
+        return ScanrDoiSearch()
 
     @pytest.mark.asyncio
     async def test_fetch_async_returns_hits_sources(self, http_mock):
-        http_mock.post("https://scanr.example/_search").mock(
+        http_mock.post(API_BASE_URLS["scanr"]).mock(
             return_value=httpx2.Response(
                 200, json={"hits": {"hits": [_scanr_hit("scanr-1", "10.1/a")]}}
             )
@@ -327,7 +327,7 @@ class TestScanrFetchAsync:
     @pytest.mark.asyncio
     async def test_fetch_async_batch_marks_unmatched_dois(self, http_mock):
         """Lot de 2 DOI, un seul hit : le DOI sans correspondance est confirmé absent (diff requêtés / trouvés)."""
-        http_mock.post("https://scanr.example/_search").mock(
+        http_mock.post(API_BASE_URLS["scanr"]).mock(
             return_value=httpx2.Response(
                 200, json={"hits": {"hits": [_scanr_hit("scanr-1", "10.1/a")]}}
             )
@@ -340,7 +340,7 @@ class TestScanrFetchAsync:
     @pytest.mark.asyncio
     async def test_fetch_async_auth_failure_concludes_nothing(self, http_mock):
         """Erreur HTTP (401/403/500...) → ni notice ni absence, sans propager l'exception."""
-        http_mock.post("https://scanr.example/_search").mock(return_value=httpx2.Response(401))
+        http_mock.post(API_BASE_URLS["scanr"]).mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
         assert result == DoiBatchResult()

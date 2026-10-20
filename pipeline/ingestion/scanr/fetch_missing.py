@@ -15,13 +15,11 @@ from sqlalchemy import Connection
 from domain.publications.identifiers import clean_doi
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.credentials import get_scanr_credentials
+from pipeline.ingestion.scanr.api import search
 from pipeline.ingestion.scanr.fields import extract_id
 
 
@@ -34,31 +32,14 @@ class ScanrDoiSearch:
     max_concurrent = 5
     request_delay_s = 0.0
 
-    def __init__(self) -> None:
-        self.url = API_BASE_URLS["scanr"]
-        self.auth = get_scanr_credentials()
-
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         query: dict[str, JsonValue] = {
             "size": len(dois),
             "query": {"terms": {"externalIds.id.keyword": dois}},
         }
-        outcome = await lookup_json_async(
-            client,
-            "POST",
-            self.url,
-            json_body=query,
-            auth=self.auth,
-            timeout=30,
-            not_found_statuses=frozenset(),
-            label=f"batch {len(dois)} DOI",
-        )
-        if isinstance(outcome, NotFound | Unavailable):
+        records = await search(client, query, label=f"batch {len(dois)} DOI")
+        if isinstance(records, NotFound | Unavailable):
             return DoiBatchResult()
-        records = [
-            as_mapping(as_mapping(hit).get("_source"))
-            for hit in as_sequence(as_mapping(as_mapping(outcome).get("hits")).get("hits"))
-        ]
         # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_missing_dois`.
         found = {
             clean_doi(as_str(champs.get("id")))
