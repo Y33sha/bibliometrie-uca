@@ -7,19 +7,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Mapping
 
 import httpx2
 from sqlalchemy import Connection, text
 
 from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
+from domain.types import JsonValue
 from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import NotFound
+from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import THESES_DELAY
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome
-from pipeline.ingestion.theses.fetch_stale import fetch_thesis
+from pipeline.ingestion.theses.api import fetch_thesis
+from pipeline.ingestion.theses.fields import extract_doi
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
@@ -65,7 +67,9 @@ async def fetch_missing_theses_by_nnt(
         rien_a_faire(log)
         return metrics
 
-    async def _fetch(client: httpx2.AsyncClient, nnt: str) -> FetchOutcome:
+    async def _fetch(
+        client: httpx2.AsyncClient, nnt: str
+    ) -> LookupOutcome[Mapping[str, JsonValue]]:
         fetched = await fetch_thesis(client, nnt)
         await asyncio.sleep(THESES_DELAY)
         return fetched
@@ -74,17 +78,19 @@ async def fetch_missing_theses_by_nnt(
         len(nnts), f"{DERNIERE_BRANCHE}theses.fr", log, compte_retenus=True
     ) as avancement:
 
-        def _write(conn: Connection, nnt: str, result: FetchOutcome) -> None:
+        def _write(
+            conn: Connection, nnt: str, result: LookupOutcome[Mapping[str, JsonValue]]
+        ) -> None:
             if isinstance(result, NotFound):
                 record_failed_lookup(conn, "theses", "nnt", nnt)
                 metrics.add(not_found=1)
-            elif isinstance(result, FetchedRecord):
+            elif not isinstance(result, Unavailable):
                 inserted, _ = upsert_staging(
                     conn,
                     source="theses",
                     source_id=nnt,
-                    doi=result.doi,
-                    raw_data=result.raw_data,
+                    doi=extract_doi(result),
+                    raw_data=result,
                     entry_mode=StagingEntryMode.FETCH_MISSING_THESES,
                 )
                 if inserted:
