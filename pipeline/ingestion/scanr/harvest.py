@@ -11,16 +11,15 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
+from domain.types import JsonValue, as_mapping, as_sequence, at_path
 from infrastructure.read_models.perimeters import get_extraction_api_ids
-from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import SCANR_DELAY, SCANR_PER_PAGE
+from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
     stage_document,
 )
+from pipeline.ingestion.scanr.api import ScanrClient
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
@@ -66,35 +65,6 @@ def build_query(
     if search_after:
         query["search_after"] = list(search_after)
     return query
-
-
-class ScanrClient:
-    """Client de l'index ScanR (`_search`, authentification basique), limité à un appel toutes les `SCANR_DELAY` secondes."""
-
-    def __init__(self, base_url: str, credentials: tuple[str, str]) -> None:
-        self._url = base_url
-        self._auth = credentials
-        self._throttle = Throttle(SCANR_DELAY)
-
-    def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
-        """Exécute une requête Elasticsearch."""
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "POST",
-                    self._url,
-                    json_body=query,
-                    auth=self._auth,
-                    # Une page de SCANR_PER_PAGE documents peut dépasser 30 s quand le cache du cluster est vide.
-                    timeout=60,
-                    label="ScanR search",
-                )
-            )
-
-    def count(self, year: int, affiliation_ids: list[str]) -> int:
-        """Nombre de documents d'une année, lu sur un comptage exact sans document (`size=0`)."""
-        query = {**build_query(year, affiliation_ids, track_total=True), "size": 0}
-        return as_int(at_path(self.fetch_page(query), "hits", "total").get("value")) or 0
 
 
 def extract_year(
@@ -158,6 +128,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrClient]):
         years = self._years(args)
         return self._extrait_par_annee(
             years,
-            lambda annee: client.count(annee, ids),
+            lambda annee: client.count(build_query(annee, ids)),
             lambda annee, avancement: extract_year(client, self.conn, annee, ids, avancement),
         )

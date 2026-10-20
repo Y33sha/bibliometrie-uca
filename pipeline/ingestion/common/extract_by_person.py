@@ -141,7 +141,7 @@ def _extractors() -> dict[str, ExtractorFactory]:
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.credentials import get_scanr_credentials
-        from pipeline.ingestion.scanr.harvest import ScanrClient
+        from pipeline.ingestion.scanr.api import ScanrClient
         from pipeline.ingestion.scanr.person_search import ScanrPersonExtractor
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())

@@ -109,7 +109,11 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2023, 2024])
     client = _client([_page([_hit("a")]), _page([]), _page([_hit("b")]), _page([])])
     assert extracteur(ScanrExtractor, client).run(arguments_du_run()).new == 2
-    assert [appel.args[0] for appel in client.count.call_args_list] == [2023, 2024]
+    annees = [
+        appel.args[0]["query"]["bool"]["filter"][0]["term"]["year"]
+        for appel in client.count.call_args_list
+    ]
+    assert annees == [2023, 2024]
 
 
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
