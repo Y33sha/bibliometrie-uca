@@ -37,7 +37,7 @@ class TestGetTitle:
         assert get_title({"titles": []}) is None
 
 
-class TestPubYear:
+class TestPublicationYear:
     def test_valid(self):
         assert extract_datacite_publication_year({"publicationYear": 2020}, max_year=2027) == 2020
 

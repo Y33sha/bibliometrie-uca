@@ -49,7 +49,7 @@ class TestPublisherMergeBlockedError:
 
 
 class TestContributionAlreadyAssignedError:
-    def test_nomme_la_signature_et_sa_detentrice(self):
+    def test_nomme_la_contribution_source_et_sa_detentrice(self):
         exc = ContributionAlreadyAssignedError(7, 42)
         assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
         assert str(exc) == (

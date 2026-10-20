@@ -31,23 +31,23 @@ def hal_duplicate_accounts(
 
 
 @router.get("/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
-def hal_duplicate_pubs_by_doi(
+def hal_duplicate_publications_by_doi(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDoiDuplicatesResponse:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
-    return queries.hal_duplicate_pubs_by_doi(page=page, per_page=per_page)
+    return queries.hal_duplicate_publications_by_doi(page=page, per_page=per_page)
 
 
 @router.get("/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
-def hal_duplicate_pubs_by_metadata(
+def hal_duplicate_publications_by_metadata(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalMetaDuplicatesResponse:
     """Doublons possibles : dépôts HAL avec métadonnées identiques."""
-    return queries.hal_duplicate_pubs_by_metadata(page=page, per_page=per_page)
+    return queries.hal_duplicate_publications_by_metadata(page=page, per_page=per_page)
 
 
 @router.get("/missing-collections", response_model=HalMissingCollectionsResponse)

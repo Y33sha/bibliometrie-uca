@@ -24,7 +24,7 @@ log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 _AUTHOR = f"NOT sa.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sa.roles)"
 
 
-def _update_counts(conn: Connection, notices: str, params: dict[str, object]) -> int:
+def _update_counts(conn: Connection, source_records: str, params: dict[str, object]) -> int:
     """Écrit les décomptes des notices filtrées par la condition SQL `notices` (sur `sp`) qui changent. Rend le nombre de notices modifiées."""
     return conn.execute(
         text(f"""
@@ -38,7 +38,7 @@ def _update_counts(conn: Connection, notices: str, params: dict[str, object]) ->
                 FROM source_records sp
                 LEFT JOIN source_contributions sa ON sa.source_record_id = sp.id
                 LEFT JOIN contributor_information k ON k.id = sa.contributor_information_id
-                WHERE {notices}
+                WHERE {source_records}
                 GROUP BY sp.id
             ) c
             WHERE sp.id = c.id AND (sp.author_count, sp.distinct_author_count) IS DISTINCT FROM (c.n, c.d)
@@ -52,9 +52,9 @@ def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
     return _update_counts(conn, "sp.id BETWEEN :lo AND :hi", {"lo": lo, "hi": hi})
 
 
-def backfill_notices(conn: Connection, notice_ids: list[int]) -> int:
-    """Écrit les décomptes des notices `notice_ids` qui changent. Rend le nombre de notices modifiées."""
-    return _update_counts(conn, "sp.id = ANY(:ids)", {"ids": notice_ids})
+def backfill_source_records(conn: Connection, source_record_ids: list[int]) -> int:
+    """Écrit les décomptes des notices `source_record_ids` qui changent. Rend le nombre de notices modifiées."""
+    return _update_counts(conn, "sp.id = ANY(:ids)", {"ids": source_record_ids})
 
 
 def main() -> int:

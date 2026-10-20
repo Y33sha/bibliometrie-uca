@@ -10,7 +10,11 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from application.ports.read_models._common import DashboardOa, PaginatedResponse, PubYearCount
+from application.ports.read_models._common import (
+    DashboardOa,
+    PaginatedResponse,
+    PublicationYearCount,
+)
 from application.ports.read_models.subjects_queries import SubjectFrequency
 
 
@@ -102,7 +106,7 @@ class StructureTopCountry(BaseModel):
 
 
 class StructureDashboardResponse(BaseModel):
-    pubs_by_year: list[PubYearCount]
+    publications_by_year: list[PublicationYearCount]
     oa: DashboardOa
     collab: StructureCollaborations
     top_countries: list[StructureTopCountry]

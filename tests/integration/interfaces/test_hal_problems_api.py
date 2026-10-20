@@ -56,7 +56,7 @@ class TestDuplicateAccounts:
         assert r.status_code == 422
 
 
-class TestDuplicatePubsDoi:
+class TestDuplicatePublicationsDoi:
     def test_returns_200(self, client):
         r = client.get("/api/hal-problems/duplicate-pubs-doi")
         assert r.status_code == 200
@@ -66,7 +66,7 @@ class TestDuplicatePubsDoi:
         assert r.status_code == 200
 
 
-class TestDuplicatePubsMeta:
+class TestDuplicatePublicationsMeta:
     def test_returns_200(self, client):
         r = client.get("/api/hal-problems/duplicate-pubs-meta")
         assert r.status_code == 200

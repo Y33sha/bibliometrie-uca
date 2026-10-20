@@ -207,7 +207,7 @@
 					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>
 					{#if !publisherFixed}
 						<td>
-							{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.pub_name}</a>{/if}
+							{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.publisher_name}</a>{/if}
 						</td>
 					{/if}
 					{#if !journalFixed}

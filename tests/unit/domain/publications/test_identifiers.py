@@ -356,7 +356,7 @@ class TestExtractDoiFromUrl:
 # ── Value objects PMID / PMCID / ArxivId ───────────────────────────
 
 
-class TestPubMedArxivVOs:
+class TestPublicationMedArxivVOs:
     def test_pmid(self):
         assert PMID("https://pubmed.ncbi.nlm.nih.gov/28973220").value == "28973220"
         assert PMID.try_parse("not-a-pmid") is None

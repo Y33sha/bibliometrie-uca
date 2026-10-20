@@ -50,6 +50,6 @@ class DatacitePersonHarvester(PersonSearchHarvester[DataciteClient]):
         )
         return PersonSearchPage(records=page.records, next_token=page.next_url)
 
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         doi = record_doi(record)
         return (doi, doi) if doi else None

@@ -1,6 +1,6 @@
 """Tests purs de `plan_reconciliation` : assignation SP → pub-ancre (match/create/skip + merge/split unifiés).
 
-`pub_id=None` = SP orpheline (pas encore matérialisée). La matrice match/create/skip est dans `TestAssignmentOfOrphans`.
+`publication_id=None` = SP orpheline (pas encore matérialisée). La matrice match/create/skip est dans `TestAssignmentOfOrphans`.
 """
 
 from domain.publications.reconciliation import (
@@ -12,10 +12,10 @@ from domain.publications.reconciliation import (
 
 
 def _m(
-    sp_id,
-    pub_id,
+    source_record_id,
+    publication_id,
     *,
-    pub_doi=None,
+    publication_doi=None,
     doi=None,
     tokens=(),
     in_perimeter=False,
@@ -24,9 +24,9 @@ def _m(
     doc_type=None,
 ):
     return ReconcileMember(
-        source_record_id=sp_id,
-        publication_id=pub_id,
-        publication_doi=pub_doi,
+        source_record_id=source_record_id,
+        publication_id=publication_id,
+        publication_doi=publication_doi,
         effective_doi=doi,
         tokens=frozenset(tokens),
         in_perimeter=in_perimeter,
@@ -41,18 +41,18 @@ def _groups(plan):
 
 
 class TestMerge:
-    def test_two_pubs_same_doi_merge_to_carrier(self):
+    def test_two_publications_same_doi_merge_to_carrier(self):
         """Deux pubs portant le même DOI, SP reliées par le token DOI → fusion vers le min des porteurs."""
         plan = plan_reconciliation(
             [
-                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 20, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 20, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
         assert _groups(plan) == {10: (1, 2)}
         assert plan.dissolved == (DissolvedPublication(20, 10),)
 
-    def test_pub_with_sources_outside_neighborhood_is_not_dissolved(self):
+    def test_publication_with_sources_outside_neighborhood_is_not_dissolved(self):
         """Seule une SP de la pub 20 est dans le voisinage : la pub garde ses autres SP, elle n'est pas dissoute."""
         plan = plan_reconciliation(
             [
@@ -64,7 +64,7 @@ class TestMerge:
         assert _groups(plan) == {10: (1, 2)}
         assert plan.dissolved == ()
 
-    def test_no_doi_component_merges_by_min_sp(self):
+    def test_no_doi_component_merges_by_min_source_record(self):
         """Composante sans DOI (reliée par hal_id), deux pubs → ancre = pub du plus petit SP."""
         plan = plan_reconciliation(
             [
@@ -75,12 +75,12 @@ class TestMerge:
         assert _groups(plan) == {30: (3, 5)}  # min SP = 3 → pub 30
         assert plan.dissolved == (DissolvedPublication(50, 30),)
 
-    def test_single_pub_stable(self):
+    def test_single_publication_stable(self):
         """Une seule pub, rien à faire : un groupe sur elle-même, aucune dissolution."""
         plan = plan_reconciliation(
             [
-                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
         assert _groups(plan) == {10: (1, 2)}
@@ -88,12 +88,14 @@ class TestMerge:
 
 
 class TestDoiAnchor:
-    def test_doi_carrier_beats_smaller_min_sp(self):
+    def test_doi_carrier_beats_smaller_min_source_record(self):
         """L'ancre est le pub qui PORTE le DOI, même si un autre pub a un plus petit SP."""
         plan = plan_reconciliation(
             [
                 _m(1, 50, doi="10.1/x", tokens=[("doi", "10.1/x")]),  # pub 50 ne porte pas X
-                _m(9, 90, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),  # porteur
+                _m(
+                    9, 90, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]
+                ),  # porteur
             ]
         )
         # min SP = 1 (pub 50), mais l'ancre est 90 (porteur du DOI).
@@ -102,21 +104,21 @@ class TestDoiAnchor:
 
 
 class TestSplit:
-    def test_pub_with_two_dois_splits(self):
+    def test_publication_with_two_dois_splits(self):
         """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub, Y → nouveau pub."""
         plan = plan_reconciliation(
             [
                 _m(
                     1,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
                 _m(
                     2,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
@@ -125,21 +127,21 @@ class TestSplit:
         assert _groups(plan) == {10: (1,), None: (2,)}  # X garde pub 10, Y → nouveau pub
         assert plan.dissolved == ()  # pub 10 survit (ancre de X)
 
-    def test_residual_no_doi_sp_stays(self):
+    def test_residual_no_doi_source_record_stays(self):
         """Composante multi-DOI : la SP sans DOI est résiduelle, laissée sur son pub, non dissoute."""
         plan = plan_reconciliation(
             [
                 _m(
                     1,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
                 _m(
                     2,
                     20,
-                    pub_doi="10.2/y",
+                    publication_doi="10.2/y",
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
@@ -152,23 +154,23 @@ class TestSplit:
 
 
 class TestDetachment:
-    def test_sp_sans_cle_ni_annee_est_detachee(self):
+    def test_enregistrement_source_sans_cle_ni_annee_est_detache(self):
         """Régression : une SP OpenAlex renvoyée sans DOI ni année perd toutes ses clés ; elle ne peut fonder aucune publication et devient orpheline."""
         plan = plan_reconciliation(
             [
-                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 10, pub_doi="10.1/x", tokens=(), year=None),
+                _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, publication_doi="10.1/x", tokens=(), year=None),
             ]
         )
         assert _groups(plan) == {10: (1,)}
         assert plan.detached == (2,)
         assert plan.dissolved == ()
 
-    def test_sp_sans_cle_avec_annee_fonde_une_publication(self):
+    def test_enregistrement_source_sans_cle_avec_annee_fonde_une_publication(self):
         plan = plan_reconciliation(
             [
-                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 10, pub_doi="10.1/x", tokens=()),
+                _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, publication_doi="10.1/x", tokens=()),
             ]
         )
         assert _groups(plan) == {10: (1,), None: (2,)}
@@ -176,14 +178,14 @@ class TestDetachment:
 
 
 class TestAssignmentOfOrphans:
-    """Matrice match / create / skip : les orphelins (`pub_id=None`) traités par le même primitif."""
+    """Matrice match / create / skip : les orphelins (`publication_id=None`) traités par le même primitif."""
 
-    def test_match_orphan_joins_existing_pub(self):
+    def test_match_orphan_joins_existing_publication(self):
         """Orphelin + pub existante portant le même DOI → l'orphelin rejoint la pub (match)."""
         plan = plan_reconciliation(
             [
                 _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 50, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 50, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
         assert _groups(plan) == {50: (1, 2)}
@@ -267,7 +269,7 @@ class TestAssignmentOfOrphans:
         plan = plan_reconciliation(
             [
                 _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
-                _m(2, 50, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 50, publication_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
                 _m(3, None, doi="10.2/y", tokens=[("doi", "10.2/y")]),
             ]
         )
@@ -286,7 +288,7 @@ class TestExternalDoiCarrier:
                 _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True),
                 _m(2, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ],
-            existing_pub_by_doi={"10.1/x": 132},
+            existing_publication_by_doi={"10.1/x": 132},
         )
         assert _groups(plan) == {132: (1, 2)}
         assert plan.dissolved == ()
@@ -295,7 +297,7 @@ class TestExternalDoiCarrier:
         """Sans porteur connu, comportement inchangé : création (target=None)."""
         plan = plan_reconciliation(
             [_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True)],
-            existing_pub_by_doi={},
+            existing_publication_by_doi={},
         )
         assert _groups(plan) == {None: (1,)}
 
@@ -304,21 +306,21 @@ class TestExternalDoiCarrier:
         la pub dérivée est dissoute vers lui."""
         plan = plan_reconciliation(
             [_m(1, 50, doi="10.1/x", tokens=[("doi", "10.1/x")])],  # pub 50 ne porte pas X
-            existing_pub_by_doi={"10.1/x": 90},
+            existing_publication_by_doi={"10.1/x": 90},
         )
         assert _groups(plan) == {90: (1,)}
         assert plan.dissolved == (DissolvedPublication(50, 90),)
 
 
 class TestSingleDoiComponent:
-    def test_sp_without_doi_joins_the_partition(self):
+    def test_source_record_without_doi_joins_the_partition(self):
         """Composante à un seul DOI : la SP sans DOI fait partie de la partition, sa pub est absorbée."""
         plan = plan_reconciliation(
             [
                 _m(
                     1,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
@@ -332,20 +334,20 @@ class TestSingleDoiComponent:
 class TestCompetingClaims:
     """Deux partitions revendiquent la même publication : une seule la garde."""
 
-    def test_doi_carrier_beats_a_weak_claim_with_a_smaller_sp(self):
+    def test_doi_carrier_beats_a_weak_claim_with_a_smaller_source_record(self):
         plan = plan_reconciliation(
             [
                 _m(
                     1,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
                 _m(
                     5,
                     10,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
@@ -353,7 +355,7 @@ class TestCompetingClaims:
         )
         assert _groups(plan) == {10: (5,), None: (1,)}
 
-    def test_between_weak_claims_the_smallest_sp_wins(self):
+    def test_between_weak_claims_the_smallest_source_record_wins(self):
         plan = plan_reconciliation(
             [
                 _m(5, 10, doi="10.1/x", tokens=[("hal_id", "h"), ("doi", "10.1/x")]),
@@ -362,29 +364,29 @@ class TestCompetingClaims:
         )
         assert _groups(plan) == {10: (2,), None: (5,)}
 
-    def test_external_carrier_beats_a_weak_claim_with_a_smaller_sp(self):
+    def test_external_carrier_beats_a_weak_claim_with_a_smaller_source_record(self):
         plan = plan_reconciliation(
             [
-                _m(1, 90, pub_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
+                _m(1, 90, publication_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
                 _m(5, 50, doi="10.1/x", tokens=[("hal_id", "b")]),
             ],
-            existing_pub_by_doi={"10.1/x": 90},
+            existing_publication_by_doi={"10.1/x": 90},
         )
         assert _groups(plan) == {90: (5,), None: (1,)}
 
-    def test_external_carrier_of_orphans_beats_a_weak_claim_with_a_smaller_sp(self):
+    def test_external_carrier_of_orphans_beats_a_weak_claim_with_a_smaller_source_record(self):
         plan = plan_reconciliation(
             [
-                _m(1, 90, pub_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
+                _m(1, 90, publication_doi="10.1/x", doi="10.2/y", tokens=[("hal_id", "a")]),
                 _m(5, None, doi="10.1/x", tokens=[("hal_id", "b")]),
             ],
-            existing_pub_by_doi={"10.1/x": 90},
+            existing_publication_by_doi={"10.1/x": 90},
         )
         assert _groups(plan) == {90: (5,), None: (1,)}
 
 
 class TestDissolution:
-    def test_pub_retaining_a_residual_sp_is_kept(self):
+    def test_publication_retaining_a_residual_source_record_is_kept(self):
         """La pub 30 perd la SP 1 mais garde la SP résiduelle 3 : elle n'est pas dissoute."""
         plan = plan_reconciliation(
             [
@@ -392,14 +394,14 @@ class TestDissolution:
                 _m(
                     4,
                     40,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
                 _m(
                     2,
                     20,
-                    pub_doi="10.2/y",
+                    publication_doi="10.2/y",
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
@@ -409,7 +411,7 @@ class TestDissolution:
         assert _groups(plan) == {40: (1, 4), 20: (2,)}
         assert plan.dissolved == ()
 
-    def test_successor_follows_the_smallest_sp_of_the_dissolved_pub(self):
+    def test_successor_follows_the_smallest_source_record_of_the_dissolved_publication(self):
         """La pub 50 éclate entre les pubs 70 et 30 : son successeur est celui de sa SP 3."""
         plan = plan_reconciliation(
             [
@@ -418,14 +420,14 @@ class TestDissolution:
                 _m(
                     8,
                     70,
-                    pub_doi="10.1/x",
+                    publication_doi="10.1/x",
                     doi="10.1/x",
                     tokens=[("hal_id", "h"), ("doi", "10.1/x")],
                 ),
                 _m(
                     4,
                     30,
-                    pub_doi="10.2/y",
+                    publication_doi="10.2/y",
                     doi="10.2/y",
                     tokens=[("hal_id", "h"), ("doi", "10.2/y")],
                 ),
@@ -436,7 +438,7 @@ class TestDissolution:
 
 
 class TestWorkGroupShape:
-    def test_group_sp_ids_sorted(self):
+    def test_group_source_record_ids_sorted(self):
         plan = plan_reconciliation(
             [
                 _m(7, 10, doi="10.1/x", tokens=[("doi", "10.1/x")]),

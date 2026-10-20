@@ -78,7 +78,7 @@ class TestFindById:
         s = repo.find_by_id(row["id"])
         assert s is not None
         assert len(s.name_forms) == 2
-        forms = {nf.form_text for nf in s.name_forms}
+        forms = {name_form.form_text for name_form in s.name_forms}
         assert forms == {"lab x", "autre forme"}
 
 

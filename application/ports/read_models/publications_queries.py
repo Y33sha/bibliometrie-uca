@@ -103,12 +103,12 @@ class PublicationFilters:
 # ---------------------------------------------------------------------------
 
 
-class PubLabItem(BaseModel):
+class PublicationLabItem(BaseModel):
     id: int
     label: str
 
 
-class PubApcPayment(BaseModel):
+class PublicationApcPayment(BaseModel):
     """Détail d'un paiement APC (une ligne d'`apc` dans la liste)."""
 
     amount: float
@@ -143,8 +143,8 @@ class PublicationListItem(BaseModel):
     date_inscription: str | None
     thesis_author_name: str | None
     thesis_author_person_id: int | None
-    lab_items: list[PubLabItem] | None
-    apc: list[PubApcPayment] | None
+    lab_items: list[PublicationLabItem] | None
+    apc: list[PublicationApcPayment] | None
     is_corresponding: bool | None
     contribution_id: int | None
     hal_collections: list[str] | None
@@ -359,7 +359,7 @@ class SourceRecordMetadataOut(BaseModel):
     article_number: str | None
 
 
-class SourceSignatureOut(BaseModel):
+class SourceContributionOut(BaseModel):
     """Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
 
     `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
@@ -388,16 +388,16 @@ class PublicationSourcesResponse(BaseModel):
 
     title: str
     source_records: list[SourceRecordMetadataOut]
-    signatures: list[SourceSignatureOut]
+    source_contributions: list[SourceContributionOut]
     structures: dict[str, StructureInfo]
 
 
-class SuspectMergeNoticeOut(BaseModel):
+class SuspectMergeSourceRecordOut(BaseModel):
     """Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur."""
 
     source: str
     source_id: str
-    signatures: int
+    source_contributions: int
     matched_source_contributions: int
 
 
@@ -408,9 +408,9 @@ class SuspectMergeOut(BaseModel):
     title: str
     publication_year: int | None
     doc_type: str
-    signatures: int
+    source_contributions: int
     matched_source_contributions: int
-    notices: list[SuspectMergeNoticeOut]
+    source_records: list[SuspectMergeSourceRecordOut]
 
 
 class SuspectMergesResponse(PaginatedResponse):
@@ -450,9 +450,9 @@ class PublicationsQueries(Protocol):
         self, *, filters: PublicationFilters, sort: PublicationSort
     ) -> Iterator[str]: ...
 
-    def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None: ...
+    def get_publication_detail(self, publication_id: int) -> PublicationDetailResponse | None: ...
 
-    def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
+    def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
         """Métadonnées de chaque enregistrement source de la publication ; `None` si la publication n'existe pas."""
         ...
 

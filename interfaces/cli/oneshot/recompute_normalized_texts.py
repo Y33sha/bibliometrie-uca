@@ -24,18 +24,18 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, bindparam, text
 
 from domain.normalize import normalize_name, normalize_text, to_plain_text
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from domain.publications.metadata import normalized_title
 from domain.publishers.names import publisher_name_key
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.common.signature_queries import (
-    IDENTITY_KEY_COLUMNS,
-    delete_orphan_identities,
+from pipeline.ingestion.common.source_contribution_queries import (
+    CONTRIBUTOR_INFORMATION_KEY_COLUMNS,
+    delete_orphan_contributor_information,
     key_hash_sql,
 )
-from pipeline.ingestion.common.signatures import signature_name_fields
+from pipeline.ingestion.common.source_contributions import contributor_name_fields
 from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
@@ -148,7 +148,7 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
     return empty, len(journals), len(publishers)
 
 
-_SIGNATURES_SQL = text("""
+_SOURCE_CONTRIBUTIONS_SQL = text("""
     SELECT sa.id, sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
            aik.last_name_normalized, aik.first_name_normalized, aik.identifiers
     FROM source_contributions sa
@@ -157,40 +157,40 @@ _SIGNATURES_SQL = text("""
        OR sa.raw_first_name ~ :pattern
 """)
 
-_UPSERT_IDENTITIES_SQL = text(f"""
-    INSERT INTO contributor_information ({", ".join(IDENTITY_KEY_COLUMNS)})
+_UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
+    INSERT INTO contributor_information ({", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)})
     SELECT DISTINCT t.last_name_normalized, t.first_name_normalized, t.identifiers
     FROM jsonb_to_recordset(:payload) AS t(
         last_name_normalized text, first_name_normalized text, identifiers jsonb)
-    ON CONFLICT ({", ".join(IDENTITY_KEY_COLUMNS)}) DO NOTHING
+    ON CONFLICT ({", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)}) DO NOTHING
 """).bindparams(bindparam("payload", type_=Jsonb))
 
 _REPOINT_SQL = text(
     """
     UPDATE source_contributions sa SET contributor_information_id = aik.id
     FROM jsonb_to_recordset(:payload) AS t(
-        sa_id integer, last_name_normalized text, first_name_normalized text,
+        source_contribution_id integer, last_name_normalized text, first_name_normalized text,
         identifiers jsonb)
     JOIN contributor_information aik ON aik.key_hash = """
-    + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
+    + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
     + """
-    WHERE sa.id = t.sa_id
+    WHERE sa.id = t.source_contribution_id
 """
 ).bindparams(bindparam("payload", type_=Jsonb))
 
 
-def _repoint_signatures(conn: Connection, *, apply: bool) -> int:
+def _repoint_source_contributions(conn: Connection, *, apply: bool) -> int:
     """Rattache chaque signature dont le nom normalisé change à l'identité de ce nom. Retourne leur nombre."""
     payload = []
     # Curseur serveur pour cette seule lecture : posé sur la connexion, il s'étendrait aux écritures qui suivent.
     result = conn.execute(
-        _SIGNATURES_SQL.execution_options(yield_per=_STREAM), {"pattern": _NON_ASCII}
+        _SOURCE_CONTRIBUTIONS_SQL.execution_options(yield_per=_STREAM), {"pattern": _NON_ASCII}
     )
     for row in result:
-        name = SignatureName.from_columns(
+        name = ContributorName.from_columns(
             row.raw_author_name, row.raw_last_name, row.raw_first_name
         )
-        fields = signature_name_fields(name)
+        fields = contributor_name_fields(name)
         split = (fields["last_name_normalized"], fields["first_name_normalized"])
         if split == (row.last_name_normalized, row.first_name_normalized):
             continue
@@ -198,14 +198,14 @@ def _repoint_signatures(conn: Connection, *, apply: bool) -> int:
             log.info("    · %r → %r", (row.last_name_normalized, row.first_name_normalized), split)
         payload.append(
             {
-                "sa_id": row.id,
+                "source_contribution_id": row.id,
                 "last_name_normalized": split[0],
                 "first_name_normalized": split[1],
                 "identifiers": row.identifiers,
             }
         )
     if apply and payload:
-        conn.execute(_UPSERT_IDENTITIES_SQL, {"payload": payload})
+        conn.execute(_UPSERT_CONTRIBUTOR_INFORMATION_SQL, {"payload": payload})
         conn.execute(_REPOINT_SQL, {"payload": payload})
     return len(payload)
 
@@ -228,9 +228,13 @@ def main() -> int:
             publishers,
         )
         log.info("signatures…")
-        log.info("  %d signatures changent d'identité", _repoint_signatures(conn, apply=apply))
+        log.info(
+            "  %d signatures changent d'identité", _repoint_source_contributions(conn, apply=apply)
+        )
         if apply:
-            log.info("identités orphelines purgées : %d", delete_orphan_identities(conn))
+            log.info(
+                "identités orphelines purgées : %d", delete_orphan_contributor_information(conn)
+            )
             conn.commit()
             log.info("✓ recalcul appliqué")
         else:

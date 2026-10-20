@@ -126,14 +126,14 @@ class TestNormalizeInterSourceIdempotence:
         # Passe 1 : HAL
         run_normalize_hal(sa_sync_conn)
         create_all_publications(sa_sync_conn)
-        pubs_after_hal = sa_sync_conn.execute(
+        publications_after_hal = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS cnt FROM publications")
         ).scalar_one()
 
         # Passe 2 : OA
         run_normalize_oa(sa_sync_conn)
         create_all_publications(sa_sync_conn)
-        pubs_after_oa = sa_sync_conn.execute(
+        publications_after_oa = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS cnt FROM publications")
         ).scalar_one()
 
@@ -145,20 +145,20 @@ class TestNormalizeInterSourceIdempotence:
         assert cnt == 1, "L'article partagé ne doit exister qu'une fois"
 
         # Le rapport HAL sans DOI + l'article OA-only = 2 pubs de plus
-        assert pubs_after_oa == pubs_after_hal + 1, (
+        assert publications_after_oa == publications_after_hal + 1, (
             f"OA devrait ajouter 1 pub (OA-only), pas plus. "
-            f"HAL={pubs_after_hal}, après OA={pubs_after_oa}"
+            f"HAL={publications_after_hal}, après OA={publications_after_oa}"
         )
 
         # Passe 3 : relancer HAL
         insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)
         run_normalize_hal(sa_sync_conn)
-        pubs_after_hal2 = sa_sync_conn.execute(
+        publications_after_hal2 = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS cnt FROM publications")
         ).scalar_one()
 
-        assert pubs_after_hal2 == pubs_after_oa, (
-            f"Relancer HAL ne devrait rien créer. Avant={pubs_after_oa}, après={pubs_after_hal2}"
+        assert publications_after_hal2 == publications_after_oa, (
+            f"Relancer HAL ne devrait rien créer. Avant={publications_after_oa}, après={publications_after_hal2}"
         )
 
     def test_shared_doi_same_journal(self, sa_sync_conn):

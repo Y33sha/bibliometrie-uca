@@ -45,7 +45,7 @@ class _FakePurgeQueries:
         return self._lots.pop(0)
 
 
-class _FakePubCountsQueries:
+class _FakePublicationCountsQueries:
     def __init__(self) -> None:
         self.appels = 0
 
@@ -58,7 +58,7 @@ class _FakePubCountsQueries:
         return 2
 
 
-class _FakeAddressPubCountQueries:
+class _FakeAddressPublicationCountQueries:
     def __init__(self) -> None:
         self.appels = 0
 
@@ -69,8 +69,8 @@ class _FakeAddressPubCountQueries:
 
 def _run(contexte, lots, *, build_metrics=None):
     purge = _FakePurgeQueries(lots)
-    publication_counts = _FakePubCountsQueries()
-    adresses = _FakeAddressPubCountQueries()
+    publication_counts = _FakePublicationCountsQueries()
+    adresses = _FakeAddressPublicationCountQueries()
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
     with (
@@ -162,8 +162,8 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     ):
         rendu = phase.ContributionsPhase(
             _FakeBuildQueries(),
-            _FakePubCountsQueries(),
-            _FakeAddressPubCountQueries(),
+            _FakePublicationCountsQueries(),
+            _FakeAddressPublicationCountQueries(),
             empty_containers=(
                 ("Monographies vides", suppression("monographies", 0)),
                 ("Revues vides", suppression("revues", 2)),

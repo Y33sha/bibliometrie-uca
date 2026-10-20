@@ -49,21 +49,26 @@ def _resolve_rejection(
       événement d'audit), ce qui laisse la réassignation recréer le lien.
     """
     rejected = [
-        (pub_id, at)
-        for pub_id in publication_ids
-        if (at := contribution_repo.find_rejected_contribution(pub_id, person_id)) is not None
+        (publication_id, at)
+        for publication_id in publication_ids
+        if (at := contribution_repo.find_rejected_contribution(publication_id, person_id))
+        is not None
     ]
     if not rejected:
         return
     if not force:
         raise RejectedPairError(
             [
-                {"publication_id": pub_id, "person_id": person_id, "rejected_at": at.isoformat()}
-                for pub_id, at in rejected
+                {
+                    "publication_id": publication_id,
+                    "person_id": person_id,
+                    "rejected_at": at.isoformat(),
+                }
+                for publication_id, at in rejected
             ]
         )
-    for pub_id, _ in rejected:
-        contribution_repo.delete_rejected_contribution(pub_id, person_id)
+    for publication_id, _ in rejected:
+        contribution_repo.delete_rejected_contribution(publication_id, person_id)
     # La levée procède d'une confirmation unique : un événement, portant les publications dont
     # le rejet tombe, plutôt qu'un par paire.
     emit_event(
@@ -71,7 +76,7 @@ def _resolve_rejection(
         "contribution.unrejected",
         "person",
         person_id,
-        {"publication_ids": [pub_id for pub_id, _ in rejected]},
+        {"publication_ids": [publication_id for publication_id, _ in rejected]},
     )
 
 
@@ -143,7 +148,7 @@ def assign_orphan_contribution(
 
 def batch_assign_orphan_contributions(
     person_id: int,
-    sa_ids: list[int],
+    source_contribution_ids: list[int],
     *,
     conn: Connection,
     repo: PersonRepository,
@@ -161,12 +166,14 @@ def batch_assign_orphan_contributions(
 
     Retourne le nombre de signatures rattachées. Lève `NotFoundError` si la personne n'existe pas.
     """
-    if not sa_ids:
+    if not source_contribution_ids:
         return 0
 
     _require_person(person_id, repo=repo)
 
-    publication_ids = contribution_repo.find_publication_ids_for_source_contributions(sa_ids)
+    publication_ids = contribution_repo.find_publication_ids_for_source_contributions(
+        source_contribution_ids
+    )
     _resolve_rejection(
         person_id,
         publication_ids,
@@ -175,8 +182,10 @@ def batch_assign_orphan_contributions(
         force=force,
     )
 
-    assigned = contribution_repo.assign_orphan_source_contributions(person_id, sa_ids)
-    skipped = sorted(set(sa_ids) - set(assigned))
+    assigned = contribution_repo.assign_orphan_source_contributions(
+        person_id, source_contribution_ids
+    )
+    skipped = sorted(set(source_contribution_ids) - set(assigned))
     if skipped:
         logger.warning(
             "Rattachement à la personne %d : signatures absentes ou déjà rattachées, écartées : %s",

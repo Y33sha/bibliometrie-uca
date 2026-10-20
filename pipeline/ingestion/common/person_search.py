@@ -104,7 +104,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         """Une page des documents d'un des `identifiers`, parus entre les deux années de `years` : la première quand `next_token` est `None`."""
 
     @abstractmethod
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         """Identifiant de la ligne de `staging` et DOI normalisé d'un document, ou `None` pour un document sans identifiant."""
 
     def authors_truncated(self, record: Mapping[str, JsonValue]) -> bool:  # noqa: ARG002
@@ -164,9 +164,9 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         while True:
             page = self.fetch_page(identifiers, years, next_token, label)
             for record in page.records:
-                identity = self.record_identity(record)
-                if identity and identity[0] not in seen:
-                    source_id, doi = identity
+                key = self.record_key(record)
+                if key and key[0] not in seen:
+                    source_id, doi = key
                     seen.add(source_id)
                     stage_document(
                         self.conn,

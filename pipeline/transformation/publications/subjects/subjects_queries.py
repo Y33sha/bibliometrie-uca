@@ -68,7 +68,7 @@ class SubjectsIngestionQueries:
         source: str,
         rows: list[PublicationSubjectLink],
     ) -> int:
-        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(pub_id, subject_id)` côté client."""
+        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(publication_id, subject_id)` côté client."""
         if not rows:
             return 0
         payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
@@ -84,7 +84,7 @@ class SubjectsIngestionQueries:
             {"payload": payload, "source": source},
         ).rowcount
 
-    def clear_publication_subjects_for_pubs(
+    def clear_publication_subjects_for_publications(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> int:
         """`DELETE` des liens (non rejetés) des publications données, toutes sources. Préserve les liens rejetés. Retourne le rowcount."""
@@ -124,7 +124,7 @@ class SubjectsIngestionQueries:
             )
         ).rowcount
 
-    def select_source_records_for_pubs(
+    def select_source_records_for_publications(
         self, conn: Connection, *, publication_ids: list[int]
     ) -> list[SourceRecordTopics]:
         """Le `topics` de chaque `source_record` des publications données, avec sa source."""

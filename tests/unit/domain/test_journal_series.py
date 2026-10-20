@@ -100,7 +100,7 @@ class TestReferenceSeriesTitle:
             == "Operations research and enterprise systems"
         )
 
-    def test_sans_notice_titre_sans_marques(self):
+    def test_sans_enregistrement_source_titre_sans_marques(self):
         assert reference_series_title("8th CoDIT", None) == "CoDIT"
 
     def test_titre_sudoc_de_volume_ignore(self):

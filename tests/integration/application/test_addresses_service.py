@@ -27,8 +27,8 @@ from tests.integration.helpers.addresses import (
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
-    insert_signature,
-    insert_signature_address,
+    insert_source_contribution,
+    insert_source_contribution_address,
     insert_source_record,
 )
 from tests.integration.helpers.structures import (
@@ -367,30 +367,34 @@ class TestPropagateCountriesToPublications:
             sa_sync_conn, [], country_recompute=_GATEWAY
         )  # pas d'exception
 
-    def test_propagates_to_source_pub_and_publication(self, sa_sync_conn, repo):
+    def test_propagates_to_source_record_and_publication(self, sa_sync_conn, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
         une source_contribution, le pays doit remonter jusqu'à publications.countries."""
         ensure_country(sa_sync_conn, "FR")
-        pub_id = insert_publication(sa_sync_conn, "Test", normalize_title=False, doc_type=None)
-        sp_id = insert_source_record(sa_sync_conn, pub_id, source_id="h-1", title="Test")
-        sa_id = insert_signature(sa_sync_conn, sp_id)
+        publication_id = insert_publication(
+            sa_sync_conn, "Test", normalize_title=False, doc_type=None
+        )
+        source_record_id = insert_source_record(
+            sa_sync_conn, publication_id, source_id="h-1", title="Test"
+        )
+        source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         sa_sync_conn.execute(
             text("UPDATE addresses SET countries = :c WHERE id = :id"),
             {"c": ["FR"], "id": addr},
         )
-        insert_signature_address(sa_sync_conn, sa_id, address_id=addr)
+        insert_source_contribution_address(sa_sync_conn, source_contribution_id, address_id=addr)
 
         propagate_countries_to_publications(sa_sync_conn, [addr], country_recompute=_GATEWAY)
 
         # source_records.countries mis à jour
-        sp_countries = sa_sync_conn.execute(
-            text("SELECT countries FROM source_records WHERE id = :id"), {"id": sp_id}
+        source_record_countries = sa_sync_conn.execute(
+            text("SELECT countries FROM source_records WHERE id = :id"), {"id": source_record_id}
         ).scalar_one()
-        assert sp_countries == ["FR"]
+        assert source_record_countries == ["FR"]
         # publications.countries mis à jour
         p_countries = sa_sync_conn.execute(
-            text("SELECT countries FROM publications WHERE id = :id"), {"id": pub_id}
+            text("SELECT countries FROM publications WHERE id = :id"), {"id": publication_id}
         ).scalar_one()
         assert p_countries == ["FR"]
 

@@ -3,40 +3,46 @@
 from sqlalchemy import text
 
 from pipeline.transformation.publications.contributions.address_publication_count import (
-    AddressPubCountQueries,
+    AddressPublicationCountQueries,
 )
 
-_Q = AddressPubCountQueries()
+_Q = AddressPublicationCountQueries()
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
-    insert_signature,
-    insert_signature_address,
+    insert_source_contribution,
+    insert_source_contribution_address,
     insert_source_record,
 )
 
 
-def _sa_for_pub(conn, pub_id, source_id):
-    """source_contribution rattachée à la publication `pub_id`."""
-    sd_id = insert_source_record(conn, pub_id, source_id=source_id, publication_year=2024)
-    return insert_signature(conn, sd_id)
+def _source_contribution_for_publication(conn, publication_id, source_id):
+    """source_contribution rattachée à la publication `publication_id`."""
+    source_record_id = insert_source_record(
+        conn, publication_id, source_id=source_id, publication_year=2024
+    )
+    return insert_source_contribution(conn, source_record_id)
 
 
-def _link_address(conn, sa_id, raw_text):
+def _link_address(conn, source_contribution_id, raw_text):
     """Rattache une adresse (créée à la volée, dédupliquée par md5) à une signature via `source_contribution_addresses`."""
     addr_id = insert_address(conn, raw_text, reuse=True)
-    insert_signature_address(conn, sa_id, address_id=addr_id)
+    insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     return addr_id
 
 
-class TestRecomputePubCount:
+class TestRecomputePublicationCount:
     def test_counts_distinct_publications(self, sa_sync_conn):
         """publication_count = nb de publications canoniques distinctes, pas de signatures."""
         p1 = insert_publication(sa_sync_conn, "P1")
         p2 = insert_publication(sa_sync_conn, "P2")
         # 3 signatures sur la même adresse : 2 sur p1 (1 distinct), 1 sur p2.
-        for sid, pub in (("h1", p1), ("h2", p1), ("h3", p2)):
-            _link_address(sa_sync_conn, _sa_for_pub(sa_sync_conn, pub, sid), "Shared Address")
+        for sid, publication in (("h1", p1), ("h2", p1), ("h3", p2)):
+            _link_address(
+                sa_sync_conn,
+                _source_contribution_for_publication(sa_sync_conn, publication, sid),
+                "Shared Address",
+            )
 
         _Q.recompute_publication_count(sa_sync_conn)
 
@@ -64,7 +70,11 @@ class TestRecomputePubCount:
 
     def test_ignores_source_record_without_publication_id(self, sa_sync_conn):
         """Un document non rattaché (publication_id NULL) ne compte pas."""
-        _link_address(sa_sync_conn, _sa_for_pub(sa_sync_conn, None, "orphan"), "Orphan Address")
+        _link_address(
+            sa_sync_conn,
+            _source_contribution_for_publication(sa_sync_conn, None, "orphan"),
+            "Orphan Address",
+        )
 
         _Q.recompute_publication_count(sa_sync_conn)
 

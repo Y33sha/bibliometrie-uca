@@ -1,27 +1,28 @@
-"""Synchronisation des signatures d'une notice renormalisée (`domain.source_records.signature_sync`)."""
+"""Synchronisation des signatures d'une notice renormalisée (`domain.source_records.source_contribution_sync`)."""
 
-from domain.source_records.signature_sync import (
-    IncomingSignature,
-    SignatureSyncPlan,
-    StoredSignature,
-    plan_signature_sync,
-    signature_content,
+from domain.source_records.source_contribution_sync import (
+    IncomingSourceContribution,
+    SourceContributionSyncPlan,
+    StoredSourceContribution,
+    plan_source_contribution_sync,
+    source_contribution_content,
 )
 
 
-def _plan(stored, incoming) -> SignatureSyncPlan:
+def _plan(stored, incoming) -> SourceContributionSyncPlan:
     """`incoming` : (position, identité, empreinte) ; la clé entrante vaut la position."""
-    return plan_signature_sync(
-        [StoredSignature(*s) for s in stored], [IncomingSignature(i[0], *i) for i in incoming]
+    return plan_source_contribution_sync(
+        [StoredSourceContribution(*s) for s in stored],
+        [IncomingSourceContribution(i[0], *i) for i in incoming],
     )
 
 
-class TestPlanSignatureSync:
-    def test_signatures_inchangees_conservees(self):
+class TestPlanSourceContributionSync:
+    def test_contributions_sources_inchangees_conservees(self):
         plan = _plan(
             [(10, 0, "dupont", "h1"), (11, 1, "xu", "h2")], [(0, "dupont", "h1"), (1, "xu", "h2")]
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10, 11), inserts=(), deletes=(), regroup=False
         )
 
@@ -31,13 +32,13 @@ class TestPlanSignatureSync:
             [(10, 0, "dupont", "h1"), (11, 1, "xu", "h2")],
             [(0, "martin", "h0"), (1, "dupont", "h1-bis"), (2, "xu", "h2-bis")],
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=((10, 1), (11, 2)), kept=(), inserts=(0,), deletes=(), regroup=True
         )
 
     def test_auteur_disparu_supprime(self):
         plan = _plan([(10, 0, "dupont", "h1"), (11, 1, "xu", "h2")], [(0, "xu", "h2-bis")])
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=((11, 0),), kept=(), inserts=(), deletes=(10,), regroup=True
         )
 
@@ -47,7 +48,7 @@ class TestPlanSignatureSync:
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")],
             [(2, "xu z", "h2"), (5, "xu z", "h5"), (7, "dupont", "h7")],
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10, 11), inserts=(7,), deletes=(), regroup=True
         )
 
@@ -55,48 +56,51 @@ class TestPlanSignatureSync:
         plan = _plan(
             [(10, 2, "xu z", "h2"), (11, 5, "xu z", "h5")], [(3, "xu z", "h3"), (6, "xu z", "h6")]
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(3, 6), deletes=(10, 11), regroup=True
         )
 
     def test_identite_unique_en_base_repetee_a_l_arrivee(self):
         plan = _plan([(10, 2, "xu z", "h2")], [(2, "xu z", "h2"), (4, "xu z", "h4")])
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10,), inserts=(4,), deletes=(), regroup=True
         )
 
     def test_identite_differente_ne_rapproche_rien(self):
         """Le nom normalisé fait partie de l'identité : un nom corrigé donne une signature nouvelle."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0,), deletes=(10,), regroup=True
         )
 
-    def test_signature_sans_position_rapprochee_par_identite(self):
+    def test_contribution_source_sans_position_rapprochee_par_identifiant(self):
         """Un directeur de thèse n'a pas de position d'auteur : son identité suffit."""
-        plan = plan_signature_sync(
+        plan = plan_source_contribution_sync(
             [
-                StoredSignature(10, 0, "doctorant", "h0"),
-                StoredSignature(11, None, "directeur", "h1"),
+                StoredSourceContribution(10, 0, "doctorant", "h0"),
+                StoredSourceContribution(11, None, "directeur", "h1"),
             ],
             [
-                IncomingSignature(0, 0, "doctorant", "h0"),
-                IncomingSignature(1, None, "directeur", "h1"),
+                IncomingSourceContribution(0, 0, "doctorant", "h0"),
+                IncomingSourceContribution(1, None, "directeur", "h1"),
             ],
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(10, 11), inserts=(), deletes=(), regroup=False
         )
 
     def test_identite_repetee_sans_position_ne_rapproche_rien(self):
-        plan = plan_signature_sync(
-            [StoredSignature(10, None, "dupont", "h1"), StoredSignature(11, None, "dupont", "h2")],
+        plan = plan_source_contribution_sync(
             [
-                IncomingSignature(0, None, "dupont", "h1"),
-                IncomingSignature(1, None, "dupont", "h2"),
+                StoredSourceContribution(10, None, "dupont", "h1"),
+                StoredSourceContribution(11, None, "dupont", "h2"),
+            ],
+            [
+                IncomingSourceContribution(0, None, "dupont", "h1"),
+                IncomingSourceContribution(1, None, "dupont", "h2"),
             ],
         )
-        assert plan == SignatureSyncPlan(
+        assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0, 1), deletes=(10, 11), regroup=True
         )
 
@@ -113,9 +117,9 @@ class TestPlanSignatureSync:
         assert plan.regroup
 
     def test_roles_modifies_regroupent(self):
-        plan = plan_signature_sync(
-            [StoredSignature(10, None, "dupont", "h1", ("thesis_reviewer",))],
-            [IncomingSignature(0, None, "dupont", "h2", ("jury_president",))],
+        plan = plan_source_contribution_sync(
+            [StoredSourceContribution(10, None, "dupont", "h1", ("thesis_reviewer",))],
+            [IncomingSourceContribution(0, None, "dupont", "h2", ("jury_president",))],
         )
         assert plan.updates == ((10, 0),)
         assert plan.regroup
@@ -126,7 +130,7 @@ class TestPlanSignatureSync:
         assert plan.updates == ((10, 0),)
 
 
-class TestSignatureContent:
+class TestSourceContributionContent:
     _BASE = {
         "position": 0,
         "name": (None, "Dupont", "Jean"),
@@ -137,7 +141,9 @@ class TestSignatureContent:
     }
 
     def test_stable(self):
-        assert signature_content(**self._BASE) == signature_content(**self._BASE)
+        assert source_contribution_content(**self._BASE) == source_contribution_content(
+            **self._BASE
+        )
 
     def test_change_avec_chaque_champ_ecrit(self):
         variantes = [
@@ -152,20 +158,20 @@ class TestSignatureContent:
             {"addresses": []},
             {"ror_ids": ["01a8ajp46"]},
         ]
-        base = signature_content(**self._BASE)
+        base = source_contribution_content(**self._BASE)
         for variante in variantes:
-            assert signature_content(**{**self._BASE, **variante}) != base, variante
+            assert source_contribution_content(**{**self._BASE, **variante}) != base, variante
 
     def test_sans_ror_le_contenu_omet_la_cle(self):
-        assert "ror_ids" not in signature_content(**self._BASE)
+        assert "ror_ids" not in source_contribution_content(**self._BASE)
 
     def test_adresse_sans_ror_garde_le_contenu_sans_ror(self):
         """Une adresse sans ROR omet la liste de ses ROR."""
-        assert signature_content(**self._BASE)["addresses"] == [
+        assert source_contribution_content(**self._BASE)["addresses"] == [
             ["Université Clermont Auvergne", ["FR"]]
         ]
 
     def test_ror_independants_de_l_ordre(self):
-        assert signature_content(**self._BASE, ror_ids=["b", "a"]) == signature_content(
-            **self._BASE, ror_ids=["a", "b"]
-        )
+        assert source_contribution_content(
+            **self._BASE, ror_ids=["b", "a"]
+        ) == source_contribution_content(**self._BASE, ror_ids=["a", "b"])

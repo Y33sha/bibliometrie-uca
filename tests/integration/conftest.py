@@ -137,7 +137,7 @@ def _alembic_config() -> Config:
     `configure_logger` à faux vaut pour tout usage d'Alembic dans une session de test. `env.py` appellerait sinon `fileConfig`, qui reconfigure le logging du processus et désactive tous les loggers déjà créés que `alembic.ini` ne nomme pas — c'est-à-dire ceux de l'application. Un test qui observe le journal ne verrait alors plus rien, et le silence passerait pour un succès partout où il vaut assertion.
     """
     cfg = Config(str(ALEMBIC_INI))
-    url = _sa_url(identity="owner").render_as_string(hide_password=False)
+    url = _source_contribution_url(identity="owner").render_as_string(hide_password=False)
     cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     cfg.attributes["configure_logger"] = False
     return cfg
@@ -171,7 +171,7 @@ def db():
     conn.close()
 
 
-def _sa_url(*, identity: str = "pipeline"):
+def _source_contribution_url(*, identity: str = "pipeline"):
     """URL SQLAlchemy sur la base de test, sous le rôle nommé.
 
     Le propriétaire du schéma est réservé aux migrations ; les fixtures de données passent par le rôle du pipeline, et celles qui exercent une opération de l'API par le sien.
@@ -209,7 +209,7 @@ def sa_sync_conn_owner():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_sa_url(identity="owner"))
+    engine = create_engine(_source_contribution_url(identity="owner"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -227,7 +227,7 @@ def sa_sync_conn_app():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_sa_url(identity="app"))
+    engine = create_engine(_source_contribution_url(identity="app"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -247,7 +247,7 @@ def sa_engine_app():
 
     from infrastructure.db.engine import install_engine_guards
 
-    engine = create_engine(_sa_url(identity="app"))
+    engine = create_engine(_source_contribution_url(identity="app"))
     install_engine_guards(engine)
     yield engine
     engine.dispose()
@@ -263,7 +263,7 @@ def sa_engine_pipeline():
 
     from infrastructure.db.engine import set_sync_engine
 
-    engine = create_engine(_sa_url())
+    engine = create_engine(_source_contribution_url())
     set_sync_engine(engine)
     yield engine
     set_sync_engine(None)
@@ -279,7 +279,7 @@ def sa_sync_conn():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_sa_url())
+    engine = create_engine(_source_contribution_url())
     with engine.connect() as conn:
         trans = conn.begin()
         try:

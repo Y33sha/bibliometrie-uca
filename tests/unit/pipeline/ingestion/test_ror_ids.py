@@ -3,7 +3,7 @@
 import logging
 
 from domain.structures.identifiers import RorId
-from pipeline.ingestion.common.signatures import AuthorRecord
+from pipeline.ingestion.common.source_contributions import AuthorRecord
 from pipeline.ingestion.crossref.normalize import build_crossref_author_records
 from pipeline.ingestion.datacite.normalize import build_datacite_author_records
 from pipeline.ingestion.hal.normalize import build_hal_author_records
@@ -154,7 +154,7 @@ def test_scanr_fiche_de_structure_hal_sans_adresse():
     }
 
 
-def test_hal_ror_des_structures_sur_la_signature():
+def test_hal_ror_des_structures_sur_la_contribution_source():
     block = {
         "authFullNameFormIDPersonIDIDHal_fs": ["Jane Doe_FacetSep_1-0_FacetSep_"],
         "tei_author_rors": [["https://ror.org/03vgfxd91", "https://ror.org/01a8ajp46"]],

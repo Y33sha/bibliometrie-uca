@@ -26,8 +26,8 @@ from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterMember,
     confirmation_id_removals,
     confirmation_ids,
-    notice_own_ids,
     resolve_cluster_doi_corrections,
+    source_record_own_ids,
 )
 from domain.source_records.raw_metadata import (
     CORRECTED_BY,
@@ -105,7 +105,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
                 m.canonical_doi,
                 m.same_work_case,
                 confirmation_ids(_base_external_ids(m)),
-                notice_own_ids(m.source, m.source_id),
+                source_record_own_ids(m.source, m.source_id),
                 m.source,
                 frozenset(m.author_names),
             )

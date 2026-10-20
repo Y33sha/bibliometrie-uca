@@ -6,7 +6,7 @@ from domain.persons.matching import (
     Namesake,
 )
 from infrastructure.sql_fragments import (
-    DETACHED_SIGNATURE,
+    DETACHED_SOURCE_CONTRIBUTION,
     pinned,
 )
 
@@ -29,14 +29,14 @@ class PersonsStore:
         ).all()
         return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
 
-    def detach_signatures(self, source_contribution_ids: list[int]) -> int:
+    def detach_source_contributions(self, source_contribution_ids: list[int]) -> int:
         """Sert aux liens cross-source devenus sans appui : une signature dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
         if not source_contribution_ids:
             return 0
         return self._conn.execute(
             text(f"""
                 UPDATE source_contributions sa
-                SET {DETACHED_SIGNATURE}
+                SET {DETACHED_SOURCE_CONTRIBUTION}
                 WHERE sa.id = ANY(:ids) AND NOT {pinned("sa.id")}
             """),
             {"ids": source_contribution_ids},

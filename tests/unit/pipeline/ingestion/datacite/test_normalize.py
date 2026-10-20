@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import JournalIssn
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.datacite import normalize as normalize_datacite
 from pipeline.ingestion.datacite.normalize import (
     DataciteNormalizer,
@@ -137,18 +137,18 @@ class TestAuthorRecords:
 
     def test_given_family_prioritaires(self):
         attrs = {"creators": [{"name": "Doe, Jane", "givenName": "Jane", "familyName": "Doe"}]}
-        assert build_datacite_author_records(attrs)[0].name == SignatureName(
+        assert build_datacite_author_records(attrs)[0].name == ContributorName(
             last_name="Doe", first_name="Jane"
         )
 
     def test_name_fallback_to_name_field(self):
         attrs = {"creators": [{"name": "Cher"}]}
-        assert build_datacite_author_records(attrs)[0].name == SignatureName(raw="Cher")
+        assert build_datacite_author_records(attrs)[0].name == ContributorName(raw="Cher")
 
     def test_family_name_sans_given_name_reste_chaine_brute(self):
         # `familyName` seul porte souvent le nom complet.
         attrs = {"creators": [{"familyName": "Mathieu Durand"}]}
-        assert build_datacite_author_records(attrs)[0].name == SignatureName(raw="Mathieu Durand")
+        assert build_datacite_author_records(attrs)[0].name == ContributorName(raw="Mathieu Durand")
 
     def test_affiliation_string_and_object(self):
         attrs = {
@@ -278,7 +278,7 @@ class TestChampsIgnores:
 
 
 class TestProcessContributions:
-    def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
+    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
         """Les creators deviennent les signatures du document versé."""
         vus: dict[str, object] = {}
         monkeypatch.setattr(

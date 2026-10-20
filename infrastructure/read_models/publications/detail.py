@@ -20,16 +20,16 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import Source
 from infrastructure.read_models.sql_fragments import (
-    contribution_has_signature_from,
-    signature_display_name,
+    contribution_has_source,
+    contributor_display_name,
 )
 from infrastructure.sql_fragments import active_issns, corrected_by
 
 
-def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPublicationOut]:
-    """Publications apparentées, des deux sens, vues depuis `pub_id`.
+def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
+    """Publications apparentées, des deux sens, vues depuis `publication_id`.
 
-    Les arêtes sortantes (`from_publication_id = pub_id`) gardent leur type ; les entrantes (`target_publication_id = pub_id`) sont inversées pour se lire depuis la publication courante. La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
+    Les arêtes sortantes (`from_publication_id = publication_id`) gardent leur type ; les entrantes (`target_publication_id = publication_id`) sont inversées pour se lire depuis la publication courante. La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
     """
     rows = conn.execute(
         text("""
@@ -51,7 +51,7 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[RelatedPubl
             LEFT JOIN publications p ON p.id = rel.other_id
             ORDER BY rel.rtype, p.publication_year DESC NULLS LAST
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     out: list[RelatedPublicationOut] = []
     seen: set[tuple[str, str]] = set()
@@ -93,12 +93,14 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
     return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
 
 
-def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailResponse | None:
+def get_publication_detail(
+    conn: Connection, publication_id: int
+) -> PublicationDetailResponse | None:
     """Détail complet d'une publication : métadonnées, sources, contributions.
 
     Retourne None si la publication n'existe pas (caller = 404).
     """
-    pub_row = conn.execute(
+    publication_row = conn.execute(
         text(f"""
             SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                    p.oa_status::text AS oa_status,
@@ -119,12 +121,12 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
             WHERE p.id = :pid
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).one_or_none()
-    if not pub_row:
+    if not publication_row:
         return None
     # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
-    keywords = pub_row.keywords or []
+    keywords = publication_row.keywords or []
 
     sources_rows = conn.execute(
         text(f"""
@@ -135,7 +137,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             WHERE sd.publication_id = :pid
             ORDER BY sd.created_at DESC
         """),
-        {"pid": pub_id, "convergence_cases": list(CONVERGENCE_CASES)},
+        {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
     ).all()
     sources = [
         SourceRecordOut(
@@ -155,10 +157,10 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
                    (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
                     FROM contribution_structures aus
                     WHERE aus.contribution_id = a.id) AS structure_ids,
-                   {contribution_has_signature_from(Source.HAL.value)} AS source_hal,
-                   {contribution_has_signature_from(Source.OPENALEX.value)} AS source_openalex,
-                   {contribution_has_signature_from(Source.WOS.value)} AS source_wos,
-                   {contribution_has_signature_from(Source.SCANR.value)} AS source_scanr,
+                   {contribution_has_source(Source.HAL.value)} AS source_hal,
+                   {contribution_has_source(Source.OPENALEX.value)} AS source_openalex,
+                   {contribution_has_source(Source.WOS.value)} AS source_wos,
+                   {contribution_has_source(Source.SCANR.value)} AS source_scanr,
                    pe.id AS person_id, pe.last_name, pe.first_name,
                    EXISTS (SELECT 1 FROM hr_records pr WHERE pr.person_id = pe.id) AS has_rh
             FROM contributions a
@@ -166,7 +168,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             WHERE a.publication_id = :pid
             ORDER BY a.author_position
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     contributions = [
         ConsolidatedContributionOut(
@@ -188,7 +190,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
 
     theses_rows = conn.execute(
         text(f"""
-            SELECT sa.id, sa.author_position, {signature_display_name()} AS full_name, sa.person_id,
+            SELECT sa.id, sa.author_position, {contributor_display_name()} AS full_name, sa.person_id,
                    sa.roles, sa.in_perimeter
             FROM source_contributions sa
             WHERE sa.source_record_id = (
@@ -199,7 +201,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
             )
             ORDER BY sa.author_position NULLS LAST, full_name
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     theses_contributions = [
         ThesesContributionOut(
@@ -214,33 +216,34 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
     ]
 
     thesis_meta: ThesisMeta | None = None
-    if pub_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
+    if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
         meta_row = conn.execute(
             text(f"""
-                SELECT sd.meta AS sd_meta, p.meta AS pub_meta
+                SELECT sd.meta AS source_record_meta, p.meta AS publication_meta
                 FROM publications p
                 LEFT JOIN source_records sd
                        ON sd.publication_id = p.id AND sd.source = '{Source.THESES.value}'
                 WHERE p.id = :pid
                 LIMIT 1
             """),
-            {"pid": pub_id},
+            {"pid": publication_id},
         ).one_or_none()
         if meta_row:
-            sd_meta = meta_row.sd_meta or {}
-            pub_meta = meta_row.pub_meta or {}
+            source_record_meta = meta_row.source_record_meta or {}
+            publication_meta = meta_row.publication_meta or {}
             thesis_meta = ThesisMeta(
-                discipline=sd_meta.get("discipline"),
-                ecoles_doctorales=sd_meta.get("ecoles_doctorales"),
-                partenaires=sd_meta.get("partenaires"),
-                date_soutenance=sd_meta.get("date_soutenance") or pub_meta.get("date_soutenance"),
-                date_inscription=sd_meta.get("date_inscription")
-                or pub_meta.get("date_inscription"),
+                discipline=source_record_meta.get("discipline"),
+                ecoles_doctorales=source_record_meta.get("ecoles_doctorales"),
+                partenaires=source_record_meta.get("partenaires"),
+                date_soutenance=source_record_meta.get("date_soutenance")
+                or publication_meta.get("date_soutenance"),
+                date_inscription=source_record_meta.get("date_inscription")
+                or publication_meta.get("date_inscription"),
             )
 
-    subjects = get_publication_subjects(conn, pub_id)
-    relations = get_publication_relations(conn, pub_id)
-    external_identifiers = get_publication_external_identifiers(conn, pub_id)
+    subjects = get_publication_subjects(conn, publication_id)
+    relations = get_publication_relations(conn, publication_id)
+    external_identifiers = get_publication_external_identifiers(conn, publication_id)
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -248,28 +251,28 @@ def get_publication_detail(conn: Connection, pub_id: int) -> PublicationDetailRe
 
     return PublicationDetailResponse(
         publication=PublicationDetailCore(
-            id=pub_row.id,
-            title=pub_row.title,
-            publication_year=pub_row.publication_year,
-            doi=pub_row.doi,
-            doi_ra=pub_row.doi_ra,
-            doc_type=pub_row.doc_type,
-            oa_status=pub_row.oa_status,
-            license=pub_row.license,
-            deposit_license=pub_row.deposit_license,
-            language=pub_row.language,
-            container_title=pub_row.container_title,
-            abstract=pub_row.abstract,
-            journal_id=pub_row.journal_id,
-            journal_title=pub_row.journal_title,
-            journal_issns=list(pub_row.journal_issns or []),
-            apc_amount=pub_row.apc_amount,
-            apc_currency=pub_row.apc_currency,
-            oa_model=pub_row.oa_model,
-            monograph_id=pub_row.monograph_id,
-            monograph_title=pub_row.monograph_title,
-            publisher_id=pub_row.publisher_id,
-            publisher_name=pub_row.publisher_name,
+            id=publication_row.id,
+            title=publication_row.title,
+            publication_year=publication_row.publication_year,
+            doi=publication_row.doi,
+            doi_ra=publication_row.doi_ra,
+            doc_type=publication_row.doc_type,
+            oa_status=publication_row.oa_status,
+            license=publication_row.license,
+            deposit_license=publication_row.deposit_license,
+            language=publication_row.language,
+            container_title=publication_row.container_title,
+            abstract=publication_row.abstract,
+            journal_id=publication_row.journal_id,
+            journal_title=publication_row.journal_title,
+            journal_issns=list(publication_row.journal_issns or []),
+            apc_amount=publication_row.apc_amount,
+            apc_currency=publication_row.apc_currency,
+            oa_model=publication_row.oa_model,
+            monograph_id=publication_row.monograph_id,
+            monograph_title=publication_row.monograph_title,
+            publisher_id=publication_row.publisher_id,
+            publisher_name=publication_row.publisher_name,
         ),
         sources=sources,
         contributions=contributions,
@@ -293,7 +296,7 @@ _EXTERNAL_IDENTIFIER_KEYS = (
 
 
 def get_publication_external_identifiers(
-    conn: Connection, pub_id: int
+    conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
     """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des `source_records` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
 
@@ -303,7 +306,7 @@ def get_publication_external_identifiers(
             SELECT sp.source::text, sp.source_id, sp.external_ids FROM source_records sp
             WHERE sp.publication_id = :pid AND sp.external_ids IS NOT NULL
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     nnt_covered_by_theses = {source_id for source, source_id, _ in rows if source == "theses"}
     out: list[ExternalIdentifierOut] = []
@@ -320,7 +323,7 @@ def get_publication_external_identifiers(
     return out
 
 
-def get_publication_subjects(conn: Connection, pub_id: int) -> list[SubjectOut]:
+def get_publication_subjects(conn: Connection, publication_id: int) -> list[SubjectOut]:
     """Sujets (concepts) attachés à une publication, dédupliqués par `subject_id`.
 
     Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par label, insensible à la casse.
@@ -335,7 +338,7 @@ def get_publication_subjects(conn: Connection, pub_id: int) -> list[SubjectOut]:
             GROUP BY s.id
             ORDER BY lower(s.label)
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     return [
         SubjectOut(id=r.id, label=r.label, language=r.language, sources=r.sources) for r in rows

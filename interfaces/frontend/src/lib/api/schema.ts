@@ -326,7 +326,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publications/{pub_id}": {
+    "/api/publications/{publication_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -337,7 +337,7 @@ export interface paths {
          * Get Publication
          * @description Détail complet d'une publication.
          */
-        get: operations["get_publication_api_publications__pub_id__get"];
+        get: operations["get_publication_api_publications__publication_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -346,7 +346,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publications/{pub_id}/sources": {
+    "/api/publications/{publication_id}/sources": {
         parameters: {
             query?: never;
             header?: never;
@@ -357,7 +357,7 @@ export interface paths {
          * Get Publication Sources
          * @description Métadonnées de chaque enregistrement source de la publication, toutes sources confondues.
          */
-        get: operations["get_publication_sources_api_publications__pub_id__sources_get"];
+        get: operations["get_publication_sources_api_publications__publication_id__sources_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1606,10 +1606,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Hal Duplicate Pubs By Doi
+         * Hal Duplicate Publications By Doi
          * @description Dépôts HAL avec DOI identique rattachés à la même publication.
          */
-        get: operations["hal_duplicate_pubs_by_doi_api_hal_problems_duplicate_pubs_doi_get"];
+        get: operations["hal_duplicate_publications_by_doi_api_hal_problems_duplicate_pubs_doi_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1626,10 +1626,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Hal Duplicate Pubs By Metadata
+         * Hal Duplicate Publications By Metadata
          * @description Doublons possibles : dépôts HAL avec métadonnées identiques.
          */
-        get: operations["hal_duplicate_pubs_by_metadata_api_hal_problems_duplicate_pubs_meta_get"];
+        get: operations["hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_pubs_meta_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1875,7 +1875,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     `with_pubs` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2085,7 +2085,7 @@ export interface paths {
          * List Journals
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
-         *     `with_pubs` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_publications` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_journals_api_journals_get"];
         put?: never;
@@ -2603,7 +2603,7 @@ export interface components {
             countries: string[] | null;
             /** Found Countries */
             found_countries: components["schemas"]["FoundCountry"][];
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
         };
         /**
@@ -2644,7 +2644,7 @@ export interface components {
             is_detected: boolean;
             /** Structures */
             structures: components["schemas"]["AddressStructureSummary"][];
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
         };
         /** AddressPublicationItem */
@@ -2653,7 +2653,7 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doi */
             doi: string | null;
@@ -3021,8 +3021,8 @@ export interface components {
             last_name: string;
             /** Has Rh */
             has_rh: boolean;
-            /** Signature Count */
-            signature_count: number;
+            /** Source Contribution Count */
+            source_contribution_count: number;
             /** Labs */
             labs: string[];
         };
@@ -3199,7 +3199,7 @@ export interface components {
             id: number;
             /** Raw Text */
             raw_text: string;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
             /** Structures */
             structures: components["schemas"]["AddressStructureSummary"][];
@@ -3277,16 +3277,16 @@ export interface components {
             orcid: string | null;
             /** Idref */
             idref: string | null;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
         };
-        /** HalAffiliationConflictPub */
-        HalAffiliationConflictPub: {
+        /** HalAffiliationConflictPublication */
+        HalAffiliationConflictPublication: {
             /** Id */
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doc Type */
             doc_type: string;
@@ -3306,7 +3306,7 @@ export interface components {
             /** Per Page */
             per_page: number;
             /** Publications */
-            publications: components["schemas"]["HalAffiliationConflictPub"][];
+            publications: components["schemas"]["HalAffiliationConflictPublication"][];
             /** Pages */
             readonly pages: number;
         };
@@ -3335,7 +3335,7 @@ export interface components {
             hal_collections: string[] | null;
             /** Hal Doc Type */
             hal_doc_type: string | null;
-            /** Hal Pub Year */
+            /** Hal Publication Year */
             hal_publication_year: number | null;
             /** Hal Title */
             hal_title: string | null;
@@ -3348,7 +3348,7 @@ export interface components {
             doi: string;
             /** Halids */
             halids: string[];
-            publication: components["schemas"]["HalPubDetail"];
+            publication: components["schemas"]["HalPublicationDetail"];
         };
         /** HalDoiDuplicatesResponse */
         HalDoiDuplicatesResponse: {
@@ -3391,8 +3391,8 @@ export interface components {
         };
         /** HalMetaDuplicatePair */
         HalMetaDuplicatePair: {
-            pub_a: components["schemas"]["HalPubDetail"];
-            pub_b: components["schemas"]["HalPubDetail"];
+            publication_a: components["schemas"]["HalPublicationDetail"];
+            publication_b: components["schemas"]["HalPublicationDetail"];
         };
         /** HalMetaDuplicatesResponse */
         HalMetaDuplicatesResponse: {
@@ -3407,13 +3407,13 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** HalMissingCollectionPub */
-        HalMissingCollectionPub: {
+        /** HalMissingCollectionPublication */
+        HalMissingCollectionPublication: {
             /** Id */
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doc Type */
             doc_type: string;
@@ -3437,20 +3437,20 @@ export interface components {
             /** Hal Collection */
             hal_collection: string;
             /** Publications */
-            publications: components["schemas"]["HalMissingCollectionPub"][];
+            publications: components["schemas"]["HalMissingCollectionPublication"][];
             /** Pages */
             readonly pages: number;
         };
         /**
-         * HalPubDetail
+         * HalPublicationDetail
          * @description Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL).
          */
-        HalPubDetail: {
+        HalPublicationDetail: {
             /** Id */
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doc Type */
             doc_type: string;
@@ -3572,12 +3572,12 @@ export interface components {
             issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
-            /** Pub Name */
-            pub_name: string | null;
+            /** Publisher Name */
+            publisher_name: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
             journal_type: components["schemas"]["JournalType"] | null;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
             /** Doaj Url */
             doaj_url: string | null;
@@ -3655,7 +3655,7 @@ export interface components {
          * JournalListItem
          * @description Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
          *
-         *     `pub_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
+         *     `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
          */
         JournalListItem: {
             /** Id */
@@ -3666,12 +3666,12 @@ export interface components {
             issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
-            /** Pub Name */
-            pub_name: string | null;
+            /** Publisher Name */
+            publisher_name: string | null;
             /** Is In Doaj */
             is_in_doaj: boolean;
             journal_type: components["schemas"]["JournalType"] | null;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
             /** Doaj Url */
             doaj_url: string | null;
@@ -3826,13 +3826,13 @@ export interface components {
             eisbn: string | null;
             /** Publisher Id */
             publisher_id: number | null;
-            /** Pub Name */
-            pub_name: string | null;
+            /** Publisher Name */
+            publisher_name: string | null;
             /** Journal Id */
             journal_id: number | null;
             /** Journal Title */
             journal_title: string | null;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
         };
         /** MonographListResponse */
@@ -3890,7 +3890,7 @@ export interface components {
             publication_id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doi */
             doi: string | null;
@@ -3971,7 +3971,7 @@ export interface components {
             status: "pending" | "confirmed" | "rejected";
             /** Shared Count */
             shared_count: number;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
         };
         /** NameFormUpdate */
@@ -4015,6 +4015,19 @@ export interface components {
             /** Person Id */
             person_id: number;
         };
+        /**
+         * OrphanBatchAssignResponse
+         * @description Acquittement de l'attribution en lot : le nombre de signatures rattachées.
+         */
+        OrphanBatchAssignResponse: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /** Assigned */
+            assigned: number;
+        };
         /** OrphanContributionOut */
         OrphanContributionOut: {
             /** Source */
@@ -4029,12 +4042,12 @@ export interface components {
             first_name: string;
             /** Publication Id */
             publication_id: number;
-            /** Pub Title */
-            pub_title: string;
-            /** Pub Year */
+            /** Publication Title */
+            publication_title: string;
+            /** Publication Year */
             publication_year: number | null;
             /** Labs */
-            labs: components["schemas"]["PubLabItem"][];
+            labs: components["schemas"]["PublicationLabItem"][];
         };
         /**
          * OrphanContributionsFacetsResponse
@@ -4058,19 +4071,6 @@ export interface components {
             contributions: components["schemas"]["OrphanContributionOut"][];
             /** Pages */
             readonly pages: number;
-        };
-        /**
-         * OrphanBatchAssignResponse
-         * @description Acquittement de l'attribution en lot : le nombre de signatures rattachées.
-         */
-        OrphanBatchAssignResponse: {
-            /**
-             * Ok
-             * @default true
-             */
-            ok: boolean;
-            /** Assigned */
-            assigned: number;
         };
         /** OrphanCountResponse */
         OrphanCountResponse: {
@@ -4097,8 +4097,8 @@ export interface components {
         OverlapCountsOut: {
             /** Coauthors */
             coauthors: number;
-            /** Shared Pubs */
-            shared_pubs: number;
+            /** Shared Publications */
+            shared_publications: number;
             /** Labs */
             labs: number;
             /** Journals */
@@ -4201,8 +4201,8 @@ export interface components {
         };
         /** PersonDashboardResponse */
         PersonDashboardResponse: {
-            /** Pubs By Year */
-            pubs_by_year: components["schemas"]["PubYearCount"][];
+            /** Publications By Year */
+            publications_by_year: components["schemas"]["PublicationYearCount"][];
             oa: components["schemas"]["DashboardOa"];
         };
         /**
@@ -4269,10 +4269,10 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
-            /** Signature Count */
-            signature_count: number;
-            /** In Perimeter Signature Count */
-            in_perimeter_signature_count: number;
+            /** Source Contribution Count */
+            source_contribution_count: number;
+            /** In Perimeter Source Contribution Count */
+            in_perimeter_source_contribution_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
@@ -4346,7 +4346,7 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doi */
             doi: string | null;
@@ -4501,10 +4501,10 @@ export interface components {
             measures: components["schemas"]["PivotMeasureOut"][];
         };
         /**
-         * PubApcPayment
+         * PublicationApcPayment
          * @description Détail d'un paiement APC (une ligne d'`apc` dans la liste).
          */
-        PubApcPayment: {
+        PublicationApcPayment: {
             /** Amount */
             amount: number;
             /** Institution */
@@ -4518,20 +4518,6 @@ export interface components {
             /** In Perimeter */
             in_perimeter: boolean;
         };
-        /** PubLabItem */
-        PubLabItem: {
-            /** Id */
-            id: number;
-            /** Label */
-            label: string;
-        };
-        /** PubYearCount */
-        PubYearCount: {
-            /** Year */
-            year: number;
-            /** Count */
-            count: number;
-        };
         /**
          * PublicationDetailCore
          * @description Métadonnées de la publication (bloc `publication` du détail).
@@ -4541,7 +4527,7 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doi */
             doi: string | null;
@@ -4608,6 +4594,13 @@ export interface components {
             /** External Identifiers */
             external_identifiers: components["schemas"]["ExternalIdentifierOut"][];
         };
+        /** PublicationLabItem */
+        PublicationLabItem: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+        };
         /**
          * PublicationListItem
          * @description Ligne de `/api/publications` (liste + recherche).
@@ -4617,7 +4610,7 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doi */
             doi: string | null;
@@ -4654,9 +4647,9 @@ export interface components {
             /** Thesis Author Person Id */
             thesis_author_person_id: number | null;
             /** Lab Items */
-            lab_items: components["schemas"]["PubLabItem"][] | null;
+            lab_items: components["schemas"]["PublicationLabItem"][] | null;
             /** Apc */
-            apc: components["schemas"]["PubApcPayment"][] | null;
+            apc: components["schemas"]["PublicationApcPayment"][] | null;
             /** Is Corresponding */
             is_corresponding: boolean | null;
             /** Contribution Id */
@@ -4684,14 +4677,21 @@ export interface components {
         PublicationSourcesResponse: {
             /** Title */
             title: string;
-            /** Source Publications */
+            /** Source Records */
             source_records: components["schemas"]["SourceRecordMetadataOut"][];
-            /** Signatures */
-            signatures: components["schemas"]["SourceSignatureOut"][];
+            /** Source Contributions */
+            source_contributions: components["schemas"]["SourceContributionOut"][];
             /** Structures */
             structures: {
                 [key: string]: components["schemas"]["StructureInfo"];
             };
+        };
+        /** PublicationYearCount */
+        PublicationYearCount: {
+            /** Year */
+            year: number;
+            /** Count */
+            count: number;
         };
         /**
          * PublicationsFacetsResponse
@@ -4748,7 +4748,7 @@ export interface components {
             publisher_type: string;
             /** Journal Count */
             journal_count: number;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
@@ -4788,7 +4788,7 @@ export interface components {
             publisher_type: string;
             /** Journal Count */
             journal_count: number;
-            /** Pub Count */
+            /** Publication Count */
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
@@ -4889,7 +4889,7 @@ export interface components {
             publication_id?: number | null;
             /** Title */
             title?: string | null;
-            /** Pub Year */
+            /** Publication Year */
             publication_year?: number | null;
             /** Doc Type */
             doc_type?: string | null;
@@ -5027,6 +5027,46 @@ export interface components {
             /** Message */
             message: string;
         };
+        /**
+         * SourceContributionOut
+         * @description Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
+         *
+         *     `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
+         */
+        SourceContributionOut: {
+            /** Id */
+            id: number;
+            /** Source Record Id */
+            source_record_id: number;
+            /** Position */
+            position: number | null;
+            /** Full Name */
+            full_name: string | null;
+            /** Roles */
+            roles: string[] | null;
+            /** Person Id */
+            person_id: number | null;
+            /** In Perimeter */
+            in_perimeter: boolean;
+            /** Collective */
+            collective: boolean;
+            /** Structure Ids */
+            structure_ids: number[] | null;
+            /** Raw Affiliation */
+            raw_affiliation: string | null;
+            /** Countries */
+            countries: string[] | null;
+            /** Group Id */
+            group_id: number | null;
+            /** Group Position */
+            group_position: number | null;
+            /** Method */
+            method: string | null;
+            /** Score */
+            score: number | null;
+            /** Margin */
+            margin: number | null;
+        };
         /** SourceContributionRef */
         SourceContributionRef: {
             /** Source */
@@ -5059,7 +5099,7 @@ export interface components {
             title_normalized: string | null;
             /** Doc Type */
             doc_type: string | null;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Language */
             language: string | null;
@@ -5110,46 +5150,6 @@ export interface components {
             countries: string[] | null;
             /** Is Secondary */
             is_secondary: boolean;
-        };
-        /**
-         * SourceSignatureOut
-         * @description Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
-         *
-         *     `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
-         */
-        SourceSignatureOut: {
-            /** Id */
-            id: number;
-            /** Source Publication Id */
-            source_record_id: number;
-            /** Position */
-            position: number | null;
-            /** Full Name */
-            full_name: string | null;
-            /** Roles */
-            roles: string[] | null;
-            /** Person Id */
-            person_id: number | null;
-            /** In Perimeter */
-            in_perimeter: boolean;
-            /** Collective */
-            collective: boolean;
-            /** Structure Ids */
-            structure_ids: number[] | null;
-            /** Raw Affiliation */
-            raw_affiliation: string | null;
-            /** Countries */
-            countries: string[] | null;
-            /** Group Id */
-            group_id: number | null;
-            /** Group Position */
-            group_position: number | null;
-            /** Method */
-            method: string | null;
-            /** Score */
-            score: number | null;
-            /** Margin */
-            margin: number | null;
         };
         /** StatsFacetsResponse */
         StatsFacetsResponse: {
@@ -5222,8 +5222,8 @@ export interface components {
         };
         /** StructureDashboardResponse */
         StructureDashboardResponse: {
-            /** Pubs By Year */
-            pubs_by_year: components["schemas"]["PubYearCount"][];
+            /** Publications By Year */
+            publications_by_year: components["schemas"]["PublicationYearCount"][];
             oa: components["schemas"]["DashboardOa"];
             collab: components["schemas"]["StructureCollaborations"];
             /** Top Countries */
@@ -5455,20 +5455,6 @@ export interface components {
             sources: string[];
         };
         /**
-         * SuspectMergeNoticeOut
-         * @description Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur.
-         */
-        SuspectMergeNoticeOut: {
-            /** Source */
-            source: string;
-            /** Source Id */
-            source_id: string;
-            /** Signatures */
-            signatures: number;
-            /** Matched Signatures */
-            matched_source_contributions: number;
-        };
-        /**
          * SuspectMergeOut
          * @description Publication dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice : ses notices ont des listes d'auteurs qui ne se recouvrent pas.
          */
@@ -5477,16 +5463,30 @@ export interface components {
             publication_id: number;
             /** Title */
             title: string;
-            /** Pub Year */
+            /** Publication Year */
             publication_year: number | null;
             /** Doc Type */
             doc_type: string;
-            /** Signatures */
-            signatures: number;
-            /** Matched Signatures */
+            /** Source Contributions */
+            source_contributions: number;
+            /** Matched Source Contributions */
             matched_source_contributions: number;
-            /** Notices */
-            notices: components["schemas"]["SuspectMergeNoticeOut"][];
+            /** Source Records */
+            source_records: components["schemas"]["SuspectMergeSourceRecordOut"][];
+        };
+        /**
+         * SuspectMergeSourceRecordOut
+         * @description Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur.
+         */
+        SuspectMergeSourceRecordOut: {
+            /** Source */
+            source: string;
+            /** Source Id */
+            source_id: string;
+            /** Source Contributions */
+            source_contributions: number;
+            /** Matched Source Contributions */
+            matched_source_contributions: number;
         };
         /** SuspectMergesResponse */
         SuspectMergesResponse: {
@@ -6176,12 +6176,12 @@ export interface operations {
             };
         };
     };
-    get_publication_api_publications__pub_id__get: {
+    get_publication_api_publications__publication_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                pub_id: number;
+                publication_id: number;
             };
             cookie?: never;
         };
@@ -6207,12 +6207,12 @@ export interface operations {
             };
         };
     };
-    get_publication_sources_api_publications__pub_id__sources_get: {
+    get_publication_sources_api_publications__publication_id__sources_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                pub_id: number;
+                publication_id: number;
             };
             cookie?: never;
         };
@@ -8308,7 +8308,7 @@ export interface operations {
             };
         };
     };
-    hal_duplicate_pubs_by_doi_api_hal_problems_duplicate_pubs_doi_get: {
+    hal_duplicate_publications_by_doi_api_hal_problems_duplicate_pubs_doi_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8340,7 +8340,7 @@ export interface operations {
             };
         };
     };
-    hal_duplicate_pubs_by_metadata_api_hal_problems_duplicate_pubs_meta_get: {
+    hal_duplicate_publications_by_metadata_api_hal_problems_duplicate_pubs_meta_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8677,7 +8677,7 @@ export interface operations {
                 search?: string;
                 publisher_type?: string;
                 country?: string;
-                with_pubs?: boolean;
+                with_publications?: boolean;
             };
             header?: never;
             path?: never;
@@ -8714,7 +8714,7 @@ export interface operations {
                 search?: string;
                 publisher_type?: string;
                 country?: string;
-                with_pubs?: boolean;
+                with_publications?: boolean;
             };
             header?: never;
             path?: never;
@@ -8964,7 +8964,7 @@ export interface operations {
                 journal_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_pubs?: boolean;
+                with_publications?: boolean;
             };
             header?: never;
             path?: never;
@@ -9002,7 +9002,7 @@ export interface operations {
                 journal_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_pubs?: boolean;
+                with_publications?: boolean;
             };
             header?: never;
             path?: never;
@@ -9041,7 +9041,7 @@ export interface operations {
                 journal_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_pubs?: boolean;
+                with_publications?: boolean;
             };
             header?: never;
             path?: never;

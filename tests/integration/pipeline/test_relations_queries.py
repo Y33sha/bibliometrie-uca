@@ -27,13 +27,13 @@ from tests.integration.helpers.sources import insert_source_record
 _Q = PublicationRelationsQueries()
 
 # Notice de titre « t ».
-_notice = partial(insert_source_record, title="t")
+_source_record = partial(insert_source_record, title="t")
 
 # Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
 
 
-def _pub(conn, *, doc_type, title_normalized, doi, publication_year=2024) -> int:
+def _publication(conn, *, doc_type, title_normalized, doi, publication_year=2024) -> int:
     return insert_publication(
         conn,
         title_normalized,
@@ -46,10 +46,10 @@ def _pub(conn, *, doc_type, title_normalized, doi, publication_year=2024) -> int
 
 class TestFetchErratumTitleMatches:
     def test_unique_substantive_parent_matched(self, sa_sync_conn):
-        parent = _pub(
+        parent = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/parent"
         )
-        err = _pub(
+        err = _publication(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
@@ -62,8 +62,10 @@ class TestFetchErratumTitleMatches:
 
     def test_doiless_parent_still_matched(self, sa_sync_conn):
         # Le parent au corpus n'a pas de DOI : rapproché quand même, parent_doi None.
-        parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None)
-        err = _pub(
+        parent = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None
+        )
+        err = _publication(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
@@ -74,9 +76,9 @@ class TestFetchErratumTitleMatches:
 
     def test_two_substantive_same_title_blocked(self, sa_sync_conn):
         # Deux articles distincts au même titre = collision → abstention.
-        _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p1")
-        _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p2")
-        _pub(
+        _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p1")
+        _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p2")
+        _publication(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
@@ -86,11 +88,13 @@ class TestFetchErratumTitleMatches:
 
     def test_preprint_does_not_block_and_article_chosen(self, sa_sync_conn):
         # Le preprint partage le titre mais n'est pas un parent substantiel : on relie l'article.
-        article = _pub(
+        article = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/article"
         )
-        _pub(sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/preprint")
-        err = _pub(
+        _publication(
+            sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/preprint"
+        )
+        err = _publication(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
@@ -100,14 +104,14 @@ class TestFetchErratumTitleMatches:
         assert [(m.child_id, m.parent_id) for m in matches] == [(err, article)]
 
     def test_parent_outside_year_window_not_matched(self, sa_sync_conn):
-        _pub(
+        _publication(
             sa_sync_conn,
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/parent",
             publication_year=2020,
         )
-        _pub(
+        _publication(
             sa_sync_conn,
             doc_type="erratum",
             title_normalized=f"erratum to {PARENT_TITLE}",
@@ -118,8 +122,8 @@ class TestFetchErratumTitleMatches:
 
     def test_short_title_not_matched(self, sa_sync_conn):
         short = "short title"  # <= 30 caractères → sous la garde de longueur
-        _pub(sa_sync_conn, doc_type="article", title_normalized=short, doi="10.1/parent")
-        _pub(
+        _publication(sa_sync_conn, doc_type="article", title_normalized=short, doi="10.1/parent")
+        _publication(
             sa_sync_conn, doc_type="erratum", title_normalized=f"erratum to {short}", doi="10.1/err"
         )
         assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
@@ -128,14 +132,14 @@ class TestFetchErratumTitleMatches:
 class TestFetchPreprintTitleMatches:
     def test_unique_published_parent_matched(self, sa_sync_conn):
         # La version publiée suit le preprint (année + 1), titre identique.
-        parent = _pub(
+        parent = _publication(
             sa_sync_conn,
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/pub",
             publication_year=2025,
         )
-        pre = _pub(
+        pre = _publication(
             sa_sync_conn,
             doc_type="preprint",
             title_normalized=PARENT_TITLE,
@@ -148,35 +152,41 @@ class TestFetchPreprintTitleMatches:
         ]
 
     def test_two_published_versions_blocked(self, sa_sync_conn):
-        _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a")
-        _pub(
+        _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a")
+        _publication(
             sa_sync_conn,
             doc_type="conference_paper",
             title_normalized=PARENT_TITLE,
             doi="10.1/b",
         )
-        _pub(sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre")
+        _publication(
+            sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
+        )
         assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
 
     def test_dataset_does_not_block(self, sa_sync_conn):
-        article = _pub(
+        article = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/article"
         )
-        _pub(sa_sync_conn, doc_type="dataset", title_normalized=PARENT_TITLE, doi="10.1/data")
-        pre = _pub(sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre")
+        _publication(
+            sa_sync_conn, doc_type="dataset", title_normalized=PARENT_TITLE, doi="10.1/data"
+        )
+        pre = _publication(
+            sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
+        )
         matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(pre, article)]
 
     def test_parent_before_preprint_not_matched(self, sa_sync_conn):
         # Une publication antérieure au preprint n'est pas sa version publiée.
-        _pub(
+        _publication(
             sa_sync_conn,
             doc_type="article",
             title_normalized=PARENT_TITLE,
             doi="10.1/old",
             publication_year=2022,
         )
-        _pub(
+        _publication(
             sa_sync_conn,
             doc_type="preprint",
             title_normalized=PARENT_TITLE,
@@ -193,8 +203,10 @@ class TestRelationTargetDeletionCascades:
     d'orphelins et le merge."""
 
     def test_repo_delete_of_target_removes_relation(self, sa_sync_conn):
-        parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None)
-        child = _pub(
+        parent = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None
+        )
+        child = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/child"
         )
         insert_publication_relation(
@@ -215,7 +227,7 @@ class TestRelationTargetDeletionCascades:
         assert remaining == 0
 
 
-def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
+def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
     """Notice DataCite dont l'étape de correction a substitué le DOI."""
     insert_source_record(
         conn,
@@ -231,47 +243,55 @@ def _notice_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_typ
 
 
 class TestRelationsDeMemeOeuvre:
-    def test_la_notice_expose_son_doi_d_origine_et_le_type_de_sa_publication(self, sa_sync_conn):
+    def test_l_enregistrement_source_expose_son_doi_d_origine_et_le_type_de_sa_publication(
+        self, sa_sync_conn
+    ):
         """Le préfixe se juge sur le DOI que la notice déclare, pas sur le DOI substitué."""
-        pub = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized="preprint", doi="10.48550/arxiv.1"
         )
-        _notice_datacite(
+        _source_record_datacite(
             sa_sync_conn,
-            pub,
+            publication,
             doi="10.1007/article",
             doi_d_origine="10.48550/arxiv.1",
             cible="10.1007/article",
         )
         sources = [
-            s for s in _Q.fetch_declared_relation_sources(sa_sync_conn) if s.publication_id == pub
+            s
+            for s in _Q.fetch_declared_relation_sources(sa_sync_conn)
+            if s.publication_id == publication
         ]
         assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
 
-    def test_la_notice_expose_aussi_son_propre_type(self, sa_sync_conn):
+    def test_l_enregistrement_source_expose_aussi_son_propre_type(self, sa_sync_conn):
         """La règle de même œuvre lit le type de la notice, la relation celui de sa publication."""
-        pub = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized="article", doi="10.3204/pubdb-1"
         )
-        _notice_datacite(
+        _source_record_datacite(
             sa_sync_conn,
-            pub,
+            publication,
             doi="10.3204/pubdb-1",
             doi_d_origine="10.3204/pubdb-1",
             cible="10.1140/article",
             doc_type="preprint",
         )
         sources = [
-            s for s in _Q.fetch_declared_relation_sources(sa_sync_conn) if s.publication_id == pub
+            s
+            for s in _Q.fetch_declared_relation_sources(sa_sync_conn)
+            if s.publication_id == publication
         ]
-        assert [(s.doc_type, s.notice_doc_type) for s in sources] == [("article", "preprint")]
+        assert [(s.doc_type, s.source_record_doc_type) for s in sources] == [
+            ("article", "preprint")
+        ]
 
     def test_publications_retrouvees_par_doi_quelle_que_soit_la_casse(self, sa_sync_conn):
-        pub = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/JHEP.A1"
         )
         assert _Q.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
-            "10.1007/jhep.a1": DoiPublication(pub, "article")
+            "10.1007/jhep.a1": DoiPublication(publication, "article")
         }
 
     def test_aucun_doi_aucune_requete(self, sa_sync_conn):
@@ -289,7 +309,9 @@ class TestCountByRelationType:
     """
 
     def test_returns_json_serializable_str_int_pairs(self, sa_sync_conn):
-        parent = _pub(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a")
+        parent = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a"
+        )
         for relation_type, target_doi, source in (
             ("is_preprint_of", "10.9/x", "crossref"),
             ("is_preprint_of", "10.9/y", "crossref"),
@@ -323,7 +345,7 @@ class TestRebuildRelations:
         return RelationEdge(from_id, relation_type, target_doi, "crossref")
 
     def test_une_reconstruction_a_l_identique_ne_change_rien(self, sa_sync_conn):
-        publication = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a"
         )
         edges = [self._edge(publication, "is_preprint_of", "10.9/x")]
@@ -336,7 +358,7 @@ class TestRebuildRelations:
         assert seconde.removed == 0
 
     def test_les_aretes_ajoutees_se_comptent_par_type(self, sa_sync_conn):
-        publication = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/b"
         )
         _Q.rebuild_relations(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
@@ -354,7 +376,7 @@ class TestRebuildRelations:
         assert rebuild.removed == 0
 
     def test_les_aretes_disparues_se_comptent(self, sa_sync_conn):
-        publication = _pub(
+        publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/c"
         )
         _Q.rebuild_relations(
@@ -376,11 +398,17 @@ class TestRebuildRelations:
 class TestFetchSharedKeyPairs:
     def test_publications_sans_doi_partageant_un_identifiant_hal(self, sa_sync_conn):
         """Deux publications distinctes qui partagent une clé forment une paire, avec ou sans DOI."""
-        a = _pub(sa_sync_conn, doc_type="conference_paper", title_normalized="t-a", doi=None)
-        b = _pub(sa_sync_conn, doc_type="poster", title_normalized="t-b", doi=None)
-        _notice(sa_sync_conn, a, source_id="hal-skp-1", external_ids={"hal_id": ["hal-skp-1"]})
-        _notice(sa_sync_conn, b, source_id="hal-skp-2", external_ids={"hal_id": ["hal-skp-2"]})
-        _notice(
+        a = _publication(
+            sa_sync_conn, doc_type="conference_paper", title_normalized="t-a", doi=None
+        )
+        b = _publication(sa_sync_conn, doc_type="poster", title_normalized="t-b", doi=None)
+        _source_record(
+            sa_sync_conn, a, source_id="hal-skp-1", external_ids={"hal_id": ["hal-skp-1"]}
+        )
+        _source_record(
+            sa_sync_conn, b, source_id="hal-skp-2", external_ids={"hal_id": ["hal-skp-2"]}
+        )
+        _source_record(
             sa_sync_conn,
             a,
             source="openalex",
@@ -396,10 +424,14 @@ class TestFetchSharedKeyPairs:
 class TestPhaseRelations:
     def test_relation_declaree_ecarte_le_lien_vague_des_le_premier_run(self, sa_sync_conn):
         """Sur une table vide, une relation déclarée écarte le `is_related_to` d'une clé partagée par la même paire."""
-        a = _pub(sa_sync_conn, doc_type="article", title_normalized="t-pr-a", doi="10.1/pr-a")
-        b = _pub(sa_sync_conn, doc_type="article", title_normalized="t-pr-b", doi="10.1/pr-b")
-        _notice(sa_sync_conn, a, source_id="hal-pr-1", external_ids={"hal_id": ["hal-pr-1"]})
-        _notice(sa_sync_conn, b, source_id="hal-pr-2", external_ids={"hal_id": ["hal-pr-1"]})
+        a = _publication(
+            sa_sync_conn, doc_type="article", title_normalized="t-pr-a", doi="10.1/pr-a"
+        )
+        b = _publication(
+            sa_sync_conn, doc_type="article", title_normalized="t-pr-b", doi="10.1/pr-b"
+        )
+        _source_record(sa_sync_conn, a, source_id="hal-pr-1", external_ids={"hal_id": ["hal-pr-1"]})
+        _source_record(sa_sync_conn, b, source_id="hal-pr-2", external_ids={"hal_id": ["hal-pr-1"]})
         insert_source_record(
             sa_sync_conn,
             a,

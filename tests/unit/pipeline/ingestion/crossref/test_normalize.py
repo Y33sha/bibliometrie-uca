@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.crossref import normalize as normalize_crossref
 from pipeline.ingestion.crossref.normalize import (
     CrossrefNormalizer,
@@ -94,7 +94,7 @@ class TestGetTitle:
         assert get_title({"title": [12345]}) is None
 
 
-class TestGetPubYear:
+class TestGetPublicationYear:
     def test_delegates_to_domain(self):
         # Délégation : on s'assure que la borne max est bien appliquée.
         # Plus de cas détaillés dans test_crossref.py côté domain.
@@ -325,19 +325,19 @@ class TestGetMeta:
 
 class TestAuthorName:
     def test_given_and_family(self):
-        assert _author_name({"given": "Jean", "family": "Dupont"}) == SignatureName(
+        assert _author_name({"given": "Jean", "family": "Dupont"}) == ContributorName(
             last_name="Dupont", first_name="Jean"
         )
 
     def test_family_only(self):
-        assert _author_name({"family": "Dupont"}) == SignatureName(last_name="Dupont")
+        assert _author_name({"family": "Dupont"}) == ContributorName(last_name="Dupont")
 
     def test_given_only(self):
         # Rare : auteur avec un prénom mais pas de nom de famille (mononymie, ou erreur d'ingestion).
-        assert _author_name({"given": "Jean"}) == SignatureName(raw="Jean")
+        assert _author_name({"given": "Jean"}) == ContributorName(raw="Jean")
 
     def test_strips_whitespace(self):
-        assert _author_name({"given": "  Jean  ", "family": "  Dupont  "}) == SignatureName(
+        assert _author_name({"given": "  Jean  ", "family": "  Dupont  "}) == ContributorName(
             last_name="Dupont", first_name="Jean"
         )
 
@@ -392,7 +392,7 @@ class TestBuildCrossrefAuthorRecords:
             ]
         }
         rec = build_crossref_author_records(msg)[0]
-        assert rec.name == SignatureName(last_name="Dupont", first_name="Jean")
+        assert rec.name == ContributorName(last_name="Dupont", first_name="Jean")
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]
         assert rec.identifiers == {"orcid": "0000-0001-2345-6789"}
@@ -570,7 +570,7 @@ class TestAuteursIllisibles:
 
 
 class TestProcessContributions:
-    def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
+    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_crossref,

@@ -165,5 +165,5 @@ def test_initiales_qui_commencent_un_prenom(initials, first_name, extend):
         ("", []),
     ],
 )
-def test_decoupages_d_une_signature(raw, splits):
+def test_decoupages_d_un_nom_de_contributeur(raw, splits):
     assert family_name_splits(raw) == splits

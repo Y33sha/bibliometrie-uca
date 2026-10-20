@@ -37,7 +37,7 @@ log = setup_logger("snapshot_perimeter", os.path.dirname(__file__))
 _SNAPSHOTS = Path("data/snapshots")
 _EXAMPLES = 5
 
-_SIGNATURES = text("""
+_SOURCE_CONTRIBUTIONS = text("""
     WITH ids AS (
         SELECT id FROM source_contributions WHERE in_perimeter = true
         UNION
@@ -49,7 +49,7 @@ _SIGNATURES = text("""
     JOIN source_records sp ON sp.id = sa.source_record_id
 """)
 
-_SIGNATURE_STRUCTURES = text("""
+_SOURCE_CONTRIBUTION_STRUCTURES = text("""
     SELECT source_contribution_id, structure_id, evidence::text AS evidence
     FROM source_contribution_structures
 """)
@@ -88,11 +88,11 @@ def snapshot() -> Snapshot:
     with get_sync_engine().connect() as conn:
         log.info("Signatures…")
         structures: defaultdict[int, list[list[object]]] = defaultdict(list)
-        for r in conn.execute(_SIGNATURE_STRUCTURES):
+        for r in conn.execute(_SOURCE_CONTRIBUTION_STRUCTURES):
             structures[r.source_contribution_id].append([r.structure_id, r.evidence])
-        signatures = {
+        source_contributions = {
             str(r.id): [r.source, sorted(r.evidence), sorted(structures.get(r.id, []))]
-            for r in conn.execute(_SIGNATURES)
+            for r in conn.execute(_SOURCE_CONTRIBUTIONS)
         }
         log.info("Contributions…")
         contributions = {
@@ -112,7 +112,7 @@ def snapshot() -> Snapshot:
         }
         addresses = conn.execute(_ADDRESSES).one()._asdict()
     return {
-        "signatures": signatures,
+        "signatures": source_contributions,
         "contributions": contributions,
         "publications": publications,
         "addresses": addresses,
@@ -137,7 +137,7 @@ def _structure_labels(conn: Connection, ids: Iterable[int]) -> dict[int, str]:
     return {r.id: r.label for r in rows}
 
 
-def _existing_signatures(conn: Connection, ids: Iterable[str]) -> set[str]:
+def _existing_source_contributions(conn: Connection, ids: Iterable[str]) -> set[str]:
     rows = conn.execute(
         text("SELECT id FROM source_contributions WHERE id = ANY(CAST(:ids AS int[]))"),
         {"ids": sorted(int(i) for i in ids)},
@@ -145,13 +145,13 @@ def _existing_signatures(conn: Connection, ids: Iterable[str]) -> set[str]:
     return {str(r.id) for r in rows}
 
 
-def _compare_signatures(conn: Connection, before: Snapshot, after: Snapshot) -> None:
+def _compare_source_contributions(conn: Connection, before: Snapshot, after: Snapshot) -> None:
     b, a = before["signatures"], after["signatures"]
     in_b = {k for k, v in b.items() if _in_perimeter(v[1])}
     in_a = {k for k, v in a.items() if _in_perimeter(v[1])}
     log.info("─── Signatures du périmètre : %d avant, %d après ───", len(in_b), len(in_a))
 
-    existing = _existing_signatures(conn, in_b - in_a)
+    existing = _existing_source_contributions(conn, in_b - in_a)
     _log_tally("entrées, par source", Counter(a[k][0] for k in in_a - in_b))
     _log_tally("supprimées, par source", Counter(b[k][0] for k in in_b - in_a - existing))
     _log_tally("sorties, par source", Counter(b[k][0] for k in (in_b - in_a) & existing))
@@ -266,7 +266,7 @@ def _compare_countries(before: Snapshot, after: Snapshot) -> None:
 def _compare(before: Snapshot, after: Snapshot) -> None:
     log.info("─── Adresses : %s avant, %s après ───", before["addresses"], after["addresses"])
     with get_sync_engine().connect() as conn:
-        _compare_signatures(conn, before, after)
+        _compare_source_contributions(conn, before, after)
         _compare_contributions(before, after)
         _compare_publications(conn, before, after)
     _compare_countries(before, after)

@@ -4,8 +4,8 @@ from tests.integration.helpers.addresses import insert_address, insert_address_s
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
-    insert_signature,
-    insert_signature_address,
+    insert_source_contribution,
+    insert_source_contribution_address,
     insert_source_record,
 )
 from tests.integration.helpers.structures import insert_perimeter, insert_structure, insert_tutelle
@@ -54,7 +54,7 @@ def _setup_affiliations_test_data(conn):
             publication_year=2024,
             doc_type=doc_type,
         )
-        insert_signature(
+        insert_source_contribution(
             conn,
             row_id,
             source=source,
@@ -71,7 +71,7 @@ def _setup_affiliations_test_data(conn):
         normalized_text="laboratoire test uca clermont ferrand",
     )
     insert_address_structure(conn, 80001, structure_id=80001, is_confirmed=True)
-    insert_signature_address(conn, 80002, address_id=80001)
+    insert_source_contribution_address(conn, 80002, address_id=80001)
 
     # `source_contribution_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.
@@ -203,7 +203,7 @@ class TestPopulateAffiliationsTheses:
             publication_year=2024,
             doc_type="thesis",
         )
-        insert_signature(
+        insert_source_contribution(
             sa_sync_conn,
             80003,
             source="theses",
@@ -213,7 +213,7 @@ class TestPopulateAffiliationsTheses:
             in_perimeter=False,
             roles=["author"],
         )
-        insert_signature_address(sa_sync_conn, 80003, address_id=80001)
+        insert_source_contribution_address(sa_sync_conn, 80003, address_id=80001)
 
         _run_populate_affiliations(sa_sync_conn)
 

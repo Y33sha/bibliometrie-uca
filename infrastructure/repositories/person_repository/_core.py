@@ -44,14 +44,14 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
         for r in id_rows
     )
 
-    nf_rows = conn.execute(
+    name_form_rows = conn.execute(
         text(
             "SELECT DISTINCT name_form FROM person_name_forms "
             "WHERE person_id = :pid ORDER BY name_form"
         ),
         {"pid": person_id},
     ).all()
-    name_forms = tuple(PersonNameForm(value=r.name_form) for r in nf_rows)
+    name_forms = tuple(PersonNameForm(value=r.name_form) for r in name_form_rows)
 
     return Person(
         id=row.id,

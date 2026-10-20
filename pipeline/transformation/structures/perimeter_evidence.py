@@ -6,9 +6,9 @@ from sqlalchemy import Connection, text
 
 from infrastructure.sql_fragments import (
     NO_PERIMETER_EVIDENCE,
-    SIGNATURES_SCOPE,
+    SOURCE_CONTRIBUTIONS_SCOPE,
     propagate_contribution_attributes_sql,
-    signature_perimeter_evidence,
+    source_contribution_perimeter_evidence,
 )
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
@@ -23,14 +23,14 @@ class InPerimeterSyncCounts(NamedTuple):
 
 
 def _sync_sql(scoped: bool) -> str:
-    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux signatures `:signature_ids` quand `scoped` est vrai.
+    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux signatures `:source_contribution_ids` quand `scoped` est vrai.
 
     Seules les signatures dont les indices changent sont écrites. Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
     """
-    scope = "AND sa.id = ANY(:signature_ids)" if scoped else ""
+    scope = "AND sa.id = ANY(:source_contribution_ids)" if scoped else ""
     return f"""
         WITH computed AS (
-            {signature_perimeter_evidence("signature_ids" if scoped else None)}
+            {source_contribution_perimeter_evidence("source_contribution_ids" if scoped else None)}
         ), target AS (
             SELECT id, evidence FROM computed
             UNION ALL
@@ -70,14 +70,15 @@ def refresh_source_contribution_structures(conn: Connection) -> None:
 
 
 def sync_perimeter_evidence(
-    conn: Connection, *, perimeter_ids: list[int], signature_ids: list[int] | None = None
+    conn: Connection, *, perimeter_ids: list[int], source_contribution_ids: list[int] | None = None
 ) -> InPerimeterSyncCounts:
-    """Aligne `source_contributions.perimeter_evidence` sur les indices calculés (`signature_perimeter_evidence`), pour toutes les signatures ou pour `signature_ids`."""
-    if signature_ids is None:
+    """Aligne `source_contributions.perimeter_evidence` sur les indices calculés (`source_contribution_perimeter_evidence`), pour toutes les signatures ou pour `source_contribution_ids`."""
+    if source_contribution_ids is None:
         row = conn.execute(_SYNC_ALL, {"perimeter_ids": perimeter_ids}).one()
     else:
         row = conn.execute(
-            _SYNC_SCOPED, {"perimeter_ids": perimeter_ids, "signature_ids": signature_ids}
+            _SYNC_SCOPED,
+            {"perimeter_ids": perimeter_ids, "source_contribution_ids": source_contribution_ids},
         ).one()
     return InPerimeterSyncCounts(added=row.added, removed=row.removed)
 
@@ -94,11 +95,13 @@ class SourceContributionPerimeterRecompute:
         """Rafraîchit la matview `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs contributions et de leurs publications, par les mêmes requêtes que le pipeline."""
         refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(
-            conn, perimeter_ids=perimeter_structure_ids, signature_ids=source_contribution_ids
+            conn,
+            perimeter_ids=perimeter_structure_ids,
+            source_contribution_ids=source_contribution_ids,
         )
         conn.execute(
-            text(propagate_contribution_attributes_sql(scope=SIGNATURES_SCOPE)),
-            {"signature_ids": source_contribution_ids},
+            text(propagate_contribution_attributes_sql(scope=SOURCE_CONTRIBUTIONS_SCOPE)),
+            {"source_contribution_ids": source_contribution_ids},
         )
         publication_ids = conn.execute(
             text("""

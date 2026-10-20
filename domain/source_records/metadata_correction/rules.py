@@ -536,10 +536,10 @@ _SOURCE_ONLY_PREDICATES = frozenset(
 # ── Moteur ──────────────────────────────────────────────────────────────
 
 
-def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool:
+def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
     """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la `source_record`. Voir `_AppliesTo` pour la sémantique de chaque clé."""
     if key == "doc_type":
-        doc_type = (sp.doc_type or "").lower()
+        doc_type = (source_record.doc_type or "").lower()
         if isinstance(value, frozenset):
             return doc_type in value
         return doc_type == value
@@ -556,46 +556,46 @@ def _check_predicate(sp: MetadataForCorrection, key: str, value: object) -> bool
         "journal_diamond",
         "source",
     ):
-        return bool(getattr(sp, key) == value)
+        return bool(getattr(source_record, key) == value)
     if key == "author_count_max":
         assert isinstance(value, int)
-        return sp.author_count is not None and sp.author_count <= value
+        return source_record.author_count is not None and source_record.author_count <= value
     if key == "group_title":
         assert isinstance(value, frozenset)
-        return (sp.group_title or "").lower() in value
+        return (source_record.group_title or "").lower() in value
     if key == "url_contains":
         assert isinstance(value, str)
-        return any(value in (u or "") for u in (sp.urls or ()))
+        return any(value in (u or "") for u in (source_record.urls or ()))
     if key == "doi_contains":
         assert isinstance(value, str)
-        return value in (sp.doi or "")
+        return value in (source_record.doi or "")
     if key == "title_prefix_normalized":
         assert isinstance(value, tuple)
-        if not sp.title:
+        if not source_record.title:
             return False
-        normalized = normalize_text(sp.title)
+        normalized = normalize_text(source_record.title)
         return any(normalized.startswith(p) for p in value)
     if key == "title_regex":
         assert isinstance(value, re.Pattern)
-        return bool(sp.title and value.search(sp.title))
+        return bool(source_record.title and value.search(source_record.title))
     if key == "journal_id_present":
         assert isinstance(value, bool)
-        return (sp.journal_id is not None) == value
+        return (source_record.journal_id is not None) == value
     if key == "doi_prefix_not_in":
         assert isinstance(value, tuple)
-        if not sp.doi:
+        if not source_record.doi:
             return False
-        return sp.doi.split("/", 1)[0] not in value
+        return source_record.doi.split("/", 1)[0] not in value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
-def _rule_applies(sp: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
+def _rule_applies(source_record: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
     """True si tous les prédicats `applies_to` de la règle sont vérifiés (AND)."""
-    return all(_check_predicate(sp, k, v) for k, v in rule_def["applies_to"].items())
+    return all(_check_predicate(source_record, k, v) for k, v in rule_def["applies_to"].items())
 
 
 def _correct_field(
-    sp: MetadataForCorrection,
+    source_record: MetadataForCorrection,
     field: str,
     *,
     skip_predicates: frozenset[str] = frozenset(),
@@ -609,12 +609,12 @@ def _correct_field(
             continue
         if rule_def["applies_to"].keys() & skip_predicates:
             continue
-        if _rule_applies(sp, rule_def):
+        if _rule_applies(source_record, rule_def):
             return Correction(rule_def["applies_correction"][field], rule_id)  # type: ignore[literal-required]
     return None
 
 
-def effective_metadata(sp: MetadataForCorrection) -> CorrectedFields:
+def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
     """Applique les corrections sur les champs d'un `MetadataForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
     Fonction pure : aucune I/O, aucun effet de bord. Les données journal consommées par les règles arrivent par le contrat (champs joints à la lecture), pas via des entités passées en paramètre — ce qui permet à la fonction de servir aussi bien la dédup (sur la `source_record` entrante) que le refresh (sur la publication canonique).
@@ -622,8 +622,8 @@ def effective_metadata(sp: MetadataForCorrection) -> CorrectedFields:
     `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `journal_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
     """
     return CorrectedFields(
-        doc_type=_correct_field(sp, "doc_type"),
-        oa_status=_correct_field(sp, "oa_status"),
+        doc_type=_correct_field(source_record, "doc_type"),
+        oa_status=_correct_field(source_record, "oa_status"),
     )
 
 

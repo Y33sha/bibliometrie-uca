@@ -10,7 +10,7 @@ from sqlalchemy import Connection, bindparam, text
 from application.ports.read_models._common import StructureRef
 from application.ports.read_models.hal_problems_queries import (
     HalAccountSummary,
-    HalAffiliationConflictPub,
+    HalAffiliationConflictPublication,
     HalAffiliationConflictsResponse,
     HalCollectionLab,
     HalDocSummary,
@@ -20,10 +20,10 @@ from application.ports.read_models.hal_problems_queries import (
     HalDuplicateAccountsResponse,
     HalMetaDuplicatePair,
     HalMetaDuplicatesResponse,
-    HalMissingCollectionPub,
+    HalMissingCollectionPublication,
     HalMissingCollectionsResponse,
     HalProblemsQueries,
-    HalPubDetail,
+    HalPublicationDetail,
     NoMissingCollections,
 )
 from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
@@ -31,7 +31,7 @@ from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
 )
-from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import usable_identifier
 
 # Identifiants d'une signature `sa`, hors ceux qu'elle neutralise.
@@ -41,7 +41,7 @@ _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
-_HAL_ACCOUNT_SIGNATURES = f"""
+_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
     FROM source_contributions sa
     JOIN contributor_information aik ON aik.id = sa.contributor_information_id
     WHERE sa.source = 'hal'
@@ -52,7 +52,7 @@ _HAL_ACCOUNT_SIGNATURES = f"""
 # Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     SELECT sa.person_id
-    {_HAL_ACCOUNT_SIGNATURES}
+    {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
     GROUP BY sa.person_id
     HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
 """
@@ -64,20 +64,22 @@ class PgHalProblemsQueries(HalProblemsQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def _hal_pub_details(self, pub_ids: list[int]) -> dict[int, HalPubDetail]:
+    def _hal_publication_details(
+        self, publication_ids: list[int]
+    ) -> dict[int, HalPublicationDetail]:
         """Détail des publications d'une page et de leurs dépôts HAL, indexé par identifiant.
 
         Deux requêtes pour la page entière : les paires de doublons se comptent par centaines, et une lecture par publication en ferait autant d'allers-retours.
         """
-        if not pub_ids:
+        if not publication_ids:
             return {}
-        pub_rows = self._conn.execute(
+        publication_rows = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
                        p.doi, p.container_title
                 FROM publications p WHERE p.id = ANY(:pids)
             """).bindparams(bindparam("pids")),
-            {"pids": pub_ids},
+            {"pids": publication_ids},
         ).all()
         hal_rows = self._conn.execute(
             text("""
@@ -90,12 +92,12 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 WHERE sd.publication_id = ANY(:pids) AND sd.source = 'hal'
                 ORDER BY sd.source_id
             """).bindparams(bindparam("pids")),
-            {"pids": pub_ids},
+            {"pids": publication_ids},
         ).all()
 
-        docs_by_pub: dict[int, list[HalDocSummary]] = defaultdict(list)
+        docs_by_publication: dict[int, list[HalDocSummary]] = defaultdict(list)
         for r in hal_rows:
-            docs_by_pub[r.publication_id].append(
+            docs_by_publication[r.publication_id].append(
                 HalDocSummary(
                     halid=r.halid,
                     hal_collections=list(r.hal_collections) if r.hal_collections else None,
@@ -106,16 +108,16 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 )
             )
         return {
-            r.id: HalPubDetail(
+            r.id: HalPublicationDetail(
                 id=r.id,
                 title=r.title,
                 publication_year=r.publication_year,
                 doc_type=r.doc_type,
                 doi=r.doi,
                 container_title=r.container_title,
-                hal_docs=docs_by_pub[r.id],
+                hal_docs=docs_by_publication[r.id],
             )
-            for r in pub_rows
+            for r in publication_rows
         }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
@@ -132,12 +134,12 @@ class PgHalProblemsQueries(HalProblemsQueries):
                     SELECT
                         sa.person_id,
                         ({_HAL_PERSON_ID})::int AS hal_person_id,
-                        MIN({signature_display_name()}) AS full_name,
+                        MIN({contributor_display_name()}) AS full_name,
                         MIN({_ORCID}) AS orcid,
                         MIN({_IDHAL}) AS idhal,
                         MIN({_IDREF}) AS idref,
                         COUNT(*) AS publication_count
-                    {_HAL_ACCOUNT_SIGNATURES}
+                    {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
                     GROUP BY sa.person_id, {_HAL_PERSON_ID}
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
@@ -178,7 +180,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
             persons=persons,
         )
 
-    def hal_duplicate_pubs_by_doi(self, *, page: int, per_page: int) -> HalDoiDuplicatesResponse:
+    def hal_duplicate_publications_by_doi(
+        self, *, page: int, per_page: int
+    ) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
         # Un même DOI (insensible à la casse) déposé sur au moins deux notices HAL de la même publication.
         dup_query = """
@@ -196,7 +200,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         rows = self._conn.execute(
             text(f"""
                 SELECT LOWER(sd.doi) AS doi,
-                       sd.publication_id AS pub_id,
+                       sd.publication_id AS publication_id,
                        array_agg(sd.source_id ORDER BY sd.source_id) AS halids
                 {dup_query}
                 ORDER BY LOWER(sd.doi)
@@ -204,9 +208,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        details = self._hal_pub_details([r.pub_id for r in rows])
+        details = self._hal_publication_details([r.publication_id for r in rows])
         pairs = [
-            HalDoiDuplicatePair(doi=r.doi, halids=list(r.halids), publication=details[r.pub_id])
+            HalDoiDuplicatePair(
+                doi=r.doi, halids=list(r.halids), publication=details[r.publication_id]
+            )
             for r in rows
         ]
 
@@ -217,7 +223,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             pairs=pairs,
         )
 
-    def hal_duplicate_pubs_by_metadata(
+    def hal_duplicate_publications_by_metadata(
         self, *, page: int, per_page: int
     ) -> HalMetaDuplicatesResponse:
         offset = (page - 1) * per_page
@@ -254,8 +260,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        details = self._hal_pub_details([r.id_a for r in rows] + [r.id_b for r in rows])
-        pairs = [HalMetaDuplicatePair(pub_a=details[r.id_a], pub_b=details[r.id_b]) for r in rows]
+        details = self._hal_publication_details([r.id_a for r in rows] + [r.id_b for r in rows])
+        pairs = [
+            HalMetaDuplicatePair(publication_a=details[r.id_a], publication_b=details[r.id_b])
+            for r in rows
+        ]
 
         return HalMetaDuplicatesResponse(
             total=total,
@@ -356,8 +365,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             binds,
         ).all()
-        pubs = [
-            HalMissingCollectionPub(
+        publications = [
+            HalMissingCollectionPublication(
                 id=r.id,
                 title=r.title,
                 publication_year=r.publication_year,
@@ -375,7 +384,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             per_page=per_page,
             lab_acronym=lab_row.acronym,
             hal_collection=col,
-            publications=pubs,
+            publications=publications,
         )
 
     def hal_affiliation_conflicts(
@@ -455,8 +464,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 "perimeter_ids": get_persons_structure_ids_list(self._conn),
             },
         ).all()
-        pubs = [
-            HalAffiliationConflictPub(
+        publications = [
+            HalAffiliationConflictPublication(
                 id=r.id,
                 title=r.title,
                 publication_year=r.publication_year,
@@ -472,5 +481,5 @@ class PgHalProblemsQueries(HalProblemsQueries):
             total=total,
             page=page,
             per_page=per_page,
-            publications=pubs,
+            publications=publications,
         )

@@ -136,7 +136,7 @@ class HalStructuresQueries:
                 """),
                 [{"alias_id": a, "hal_structure_id": s} for a, s in aliases.items()],
             )
-        self._mark_signatures(
+        self._mark_source_contributions(
             [
                 s.hal_structure_id
                 for s in structures
@@ -145,7 +145,7 @@ class HalStructuresQueries:
             [a for a, s in aliases.items() if previous_aliases.get(a) != s],
         )
 
-    def _mark_signatures(self, structure_ids: list[int], alias_ids: list[int]) -> None:
+    def _mark_source_contributions(self, structure_ids: list[int], alias_ids: list[int]) -> None:
         """Marque `countries_dirty` les signatures qui citent une structure de `structure_ids`, directement ou par un alias, ou qui citent un alias de `alias_ids`."""
         if not structure_ids and not alias_ids:
             return

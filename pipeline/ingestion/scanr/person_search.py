@@ -69,6 +69,6 @@ class ScanrPersonHarvester(PersonSearchHarvester[ScanrClient]):
         following = json.dumps(hits[-1].get("sort")) if hits else None
         return PersonSearchPage(records=records, next_token=following)
 
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         scanr_id = extract_id(record)
         return (scanr_id, extract_doi(record)) if scanr_id else None

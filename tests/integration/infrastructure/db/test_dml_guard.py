@@ -118,18 +118,18 @@ class TestDmlFlag:
     def test_savepoint_rollback_undoes_dirty(self, probe_conn):
         # Preview (cas get_type_change_impact) : rien de dirty avant, on écrit dans un
         # savepoint puis on le rollback → le flag retombe, pas de faux warning au teardown.
-        sp = probe_conn.begin_nested()
+        source_record = probe_conn.begin_nested()
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (7)"))
         assert has_uncommitted_dml(probe_conn)
-        sp.rollback()
+        source_record.rollback()
         assert not has_uncommitted_dml(probe_conn)
 
     def test_savepoint_rollback_preserves_prior_dml(self, probe_conn):
         # Un DML hors savepoint reste dirty même si un savepoint ultérieur est rollbacké.
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (8)"))
-        sp = probe_conn.begin_nested()
+        source_record = probe_conn.begin_nested()
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (9)"))
-        sp.rollback()
+        source_record.rollback()
         assert has_uncommitted_dml(probe_conn)
 
     @pytest.mark.parametrize("sortie", [_on_rollback_savepoint, _on_release_savepoint])
@@ -142,9 +142,9 @@ class TestDmlFlag:
 
     def test_savepoint_release_keeps_dirty(self, probe_conn):
         # Savepoint relâché (commit) : ses écritures sont conservées → reste dirty.
-        sp = probe_conn.begin_nested()
+        source_record = probe_conn.begin_nested()
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (10)"))
-        sp.commit()
+        source_record.commit()
         assert has_uncommitted_dml(probe_conn)
 
 

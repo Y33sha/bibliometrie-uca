@@ -16,7 +16,7 @@ def test_licence_ecrite_puis_reecrite(sa_sync_conn):
     staging_id = insert_staging(sa_sync_conn, "openalex", source_id="W_license")
 
     def upsert(found: License | None) -> str | None:
-        sp_id = _Q.upsert_source_record(
+        source_record_id = _Q.upsert_source_record(
             sa_sync_conn,
             SourceRecordUpsert(
                 source="openalex",
@@ -28,7 +28,8 @@ def test_licence_ecrite_puis_reecrite(sa_sync_conn):
             ),
         )
         return sa_sync_conn.execute(
-            text("SELECT license::text FROM source_records WHERE id = :id"), {"id": sp_id}
+            text("SELECT license::text FROM source_records WHERE id = :id"),
+            {"id": source_record_id},
         ).scalar_one()
 
     assert upsert(License.CC_BY_NC_ND) == "cc-by-nc-nd"

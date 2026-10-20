@@ -318,16 +318,18 @@ def detach_contributions(
     publication_ids: set[int] = set()
     for a in contributions:
         require_known_source(a["source"])
-        pub_id = contribution_repo.find_publication_id_for_source_contribution(
+        publication_id = contribution_repo.find_publication_id_for_source_contribution(
             a["source_contribution_id"]
         )
-        if pub_id is not None:
-            publication_ids.add(pub_id)
+        if publication_id is not None:
+            publication_ids.add(publication_id)
 
     detached = 0
     deleted = 0
-    for pub_id in publication_ids:
-        result = reject_pair(pub_id, person_id, repo=contribution_repo, audit_repo=audit_repo)
+    for publication_id in publication_ids:
+        result = reject_pair(
+            publication_id, person_id, repo=contribution_repo, audit_repo=audit_repo
+        )
         detached += result["detached"]
         deleted += result["deleted_contributions"]
 

@@ -110,9 +110,9 @@ class TestListJournals:
         assert [j["id"] for j in r.json()["journals"]] == [journal_id]
 
     def test_filter_by_publisher(self, client):
-        pub = seed_publisher()
-        j = seed_journal(publisher_id=pub)
-        r = client.get("/api/journals", params={"publisher_id": pub})
+        publication = seed_publisher()
+        j = seed_journal(publisher_id=publication)
+        r = client.get("/api/journals", params={"publisher_id": publication})
         assert r.status_code == 200
         ids = [item["id"] for item in r.json()["journals"]]
         assert j in ids
@@ -135,19 +135,19 @@ class TestListJournals:
         flags = {j["is_in_doaj"] for j in r.json()["journals"]}
         assert flags == {True}
 
-    def test_with_pubs_excludes_orphan_journals(self, client):
-        # Revue sans publi rattachée → exclue si with_pubs=true.
+    def test_with_publications_excludes_orphan_journals(self, client):
+        # Revue sans publi rattachée → exclue si with_publications=true.
         seed_journal("OrphanJournal")
         with_data = seed_journal("WithPubsJournal")
         _publication("p1", journal_id=with_data)
         seed_in_perimeter_contributions(with_data)
-        r = client.get("/api/journals", params={"with_pubs": "true", "per_page": 200})
+        r = client.get("/api/journals", params={"with_publications": "true", "per_page": 200})
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
         assert "WithPubsJournal" in titles
         assert "OrphanJournal" not in titles
 
-    def test_with_pubs_default_false_includes_orphans(self, client):
+    def test_with_publications_default_false_includes_orphans(self, client):
         seed_journal("OrphanDefaultJournal")
         r = client.get("/api/journals", params={"per_page": 200})
         assert r.status_code == 200
@@ -432,7 +432,7 @@ class TestJournalDashboard:
         r = client.get("/api/journals/999999999/dashboard")
         assert r.status_code == 404
 
-    def test_returns_distributions_for_journal_without_pubs(self, client):
+    def test_returns_distributions_for_journal_without_publications(self, client):
         jid = seed_journal()
         # Type explicite : le défaut DB est désormais 'unknown' (pas de mapping
         # doc_types) ; on teste ici le mapping d'un 'journal'.
@@ -510,7 +510,7 @@ class TestJournalDashboard:
 
 
 class TestJournalSubjects:
-    def test_returns_empty_for_journal_without_pubs(self, client):
+    def test_returns_empty_for_journal_without_publications(self, client):
         jid = seed_journal()
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200
@@ -518,7 +518,7 @@ class TestJournalSubjects:
 
     def test_returns_top_subjects_excluding_generic(self, client):
         jid = seed_journal()
-        pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
+        publication_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
         # Sujet spécifique (sous le seuil 5000) attaché aux 2 publis.
         specific_label = uniq("specific_subject")
         spec_id = seed_subject(specific_label, usage_count=100)
@@ -526,12 +526,12 @@ class TestJournalSubjects:
         # doit être exclu du top.
         generic_label = uniq("generic_subject")
         gen_id = seed_subject(generic_label, usage_count=9999)
-        for pub_id, subject_id in (
-            (pub_ids[0], spec_id),
-            (pub_ids[1], spec_id),
-            (pub_ids[0], gen_id),
+        for publication_id, subject_id in (
+            (publication_ids[0], spec_id),
+            (publication_ids[1], spec_id),
+            (publication_ids[0], gen_id),
         ):
-            seed_publication_subject(pub_id, subject_id=subject_id)
+            seed_publication_subject(publication_id, subject_id=subject_id)
         seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200
@@ -679,7 +679,7 @@ class TestJournalsFacets:
                 "journal_type": "journal,proceedings",
                 "oa_model": "full_oa",
                 "is_in_doaj": "true",
-                "with_pubs": "true",
+                "with_publications": "true",
             },
         )
         assert r.status_code == 200

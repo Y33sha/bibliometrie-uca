@@ -234,7 +234,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh,
                    (SELECT count(*) FROM contributions a
-                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS signature_count,
+                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS source_contribution_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
@@ -255,7 +255,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
             first_name=r.first_name,
             last_name=r.last_name,
             has_rh=r.has_rh,
-            signature_count=r.signature_count,
+            source_contribution_count=r.source_contribution_count,
             labs=list(r.labs or []),
         )
         for r in rows
@@ -384,7 +384,7 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         JOIN contributions a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
         WHERE a1.person_id = ANY(:ids) AND a2.person_id IS NOT NULL
     """,
-    "shared_pubs": """
+    "shared_publications": """
         SELECT a.person_id AS person, a.publication_id AS val
         FROM contributions a WHERE a.person_id = ANY(:ids)
     """,
@@ -444,7 +444,11 @@ def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, in
         pairs.append((id_a, id_b, overlaps))
 
     pairs.sort(
-        key=lambda t: (t[2]["coauthors"] + t[2]["shared_pubs"], t[2]["labs"], t[2]["journals"]),
+        key=lambda t: (
+            t[2]["coauthors"] + t[2]["shared_publications"],
+            t[2]["labs"],
+            t[2]["journals"],
+        ),
         reverse=True,
     )
     return pairs
@@ -471,7 +475,7 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplic
             person_b=persons[id_b],
             overlaps=OverlapCountsOut(
                 coauthors=overlaps["coauthors"],
-                shared_pubs=overlaps["shared_pubs"],
+                shared_publications=overlaps["shared_publications"],
                 labs=overlaps["labs"],
                 journals=overlaps["journals"],
             ),

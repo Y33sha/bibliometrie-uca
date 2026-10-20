@@ -22,7 +22,7 @@ _publication = partial(
 )
 
 # Notice de titre « T ».
-_notice = partial(insert_source_record, title="T")
+_source_record = partial(insert_source_record, title="T")
 
 # ── fingerprint ─────────────────────────────────────────────────
 
@@ -145,12 +145,14 @@ class TestCleanDoi:
         assert clean_doi("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
 
 
-def _add_inperim_sp(conn, source, sid, *, doi=None, external_ids=None):
+def _add_inperim_source_record(conn, source, sid, *, doi=None, external_ids=None):
     """Publication `in_perimeter` + source_record `source` rattaché.
 
     Le pool de la recherche par DOI ne part que des `source_records` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
-    pub_id = _publication(conn, "T", in_perimeter=True)
-    _notice(conn, pub_id, source=source, source_id=sid, doi=doi, external_ids=external_ids)
+    publication_id = _publication(conn, "T", in_perimeter=True)
+    _source_record(
+        conn, publication_id, source=source, source_id=sid, doi=doi, external_ids=external_ids
+    )
 
 
 class TestGetMissingDois:
@@ -160,15 +162,15 @@ class TestGetMissingDois:
 
     def test_exclut_un_doi_que_la_cible_porte_deja(self, sa_sync_conn):
         """Interroger la cible sur ce DOI rendrait un document déjà présent."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
-        _add_inperim_sp(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/partage")
+        _add_inperim_source_record(sa_sync_conn, "hal", "hal-1", doi="10.1234/partage")
 
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
         """La cible rend le même document pour son DOI principal comme pour ses DOI secondaires."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/preprint")
-        _add_inperim_sp(
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/preprint")
+        _add_inperim_source_record(
             sa_sync_conn,
             "hal",
             "hal-1",
@@ -180,8 +182,8 @@ class TestGetMissingDois:
 
     def test_un_doi_secondaire_nul_n_empeche_pas_la_selection(self, sa_sync_conn):
         """Un `null` parmi les DOI secondaires de la cible n'écarte pas les autres candidats."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/manquant")
-        _add_inperim_sp(
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/manquant")
+        _add_inperim_source_record(
             sa_sync_conn,
             "hal",
             "hal-1",
@@ -193,8 +195,10 @@ class TestGetMissingDois:
 
     def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
-        pub_id = _publication(sa_sync_conn, "T", in_perimeter=False)
-        _notice(sa_sync_conn, pub_id, source="openalex", source_id="W1", doi="10.1234/out")
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=False)
+        _source_record(
+            sa_sync_conn, publication_id, source="openalex", source_id="W1", doi="10.1234/out"
+        )
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
@@ -202,9 +206,9 @@ class TestGetMissingDois:
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         insert_doi_prefix(sa_sync_conn, "10.1038", ra="Crossref")
         # Trois DOIs non-crossref in-périmètre : DataCite, Crossref, préfixe inconnu.
-        _add_inperim_sp(sa_sync_conn, "hal", "h1", doi="10.5281/zenodo.1")
-        _add_inperim_sp(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
-        _add_inperim_sp(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
+        _add_inperim_source_record(sa_sync_conn, "hal", "h1", doi="10.5281/zenodo.1")
+        _add_inperim_source_record(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
+        _add_inperim_source_record(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
 
         result = get_missing_dois(sa_sync_conn, "crossref", retry_after_days=30)
 
@@ -215,7 +219,7 @@ class TestGetMissingDois:
 
     def test_includes_related_dois_from_source_records(self, sa_sync_conn):
         """Les related_dois d'un source_record in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
-        _add_inperim_sp(
+        _add_inperim_source_record(
             sa_sync_conn,
             "openalex",
             "W1",
@@ -228,13 +232,17 @@ class TestGetMissingDois:
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """Un arxiv_id d'un source_record in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"})
+        _add_inperim_source_record(
+            sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"}
+        )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" in result
 
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
         """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
-        _add_inperim_sp(sa_sync_conn, "hal", "H1", external_ids={"arxiv_id": "2605.02321"})
+        _add_inperim_source_record(
+            sa_sync_conn, "hal", "H1", external_ids={"arxiv_id": "2605.02321"}
+        )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" not in result
 
@@ -266,7 +274,7 @@ class TestGetMissingDois:
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
 
@@ -274,8 +282,8 @@ class TestGetMissingDois:
 
     def test_excludes_dois_in_backoff(self, sa_sync_conn):
         """Un DOI cherché en vain depuis moins que le délai sort du pool."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
         )
@@ -284,7 +292,7 @@ class TestGetMissingDois:
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
         """Délai échu → le DOI repasse dans le pool."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=60
         )
@@ -293,8 +301,8 @@ class TestGetMissingDois:
 
     def test_exclut_les_doi_inconnus_de_doi_org(self, sa_sync_conn):
         """Un DOI que doi.org ne connaît pas sort du pool de toutes les cibles, quelle que soit la date de l'échec."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
-        _add_inperim_sp(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         insert_failed_lookup(
             sa_sync_conn, "doi_org", id_type="doi", id_value="10.1234/a", not_found_days_ago=365
         )
@@ -302,7 +310,7 @@ class TestGetMissingDois:
 
     def test_le_delai_configure_s_applique_aux_echecs_deja_inscrits(self, sa_sync_conn):
         """Le délai se lit à la sélection : le raccourcir libère les échecs déjà inscrits."""
-        _add_inperim_sp(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
+        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=10
         )
@@ -311,7 +319,7 @@ class TestGetMissingDois:
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
         """L'échec d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
-        _add_inperim_sp(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
+        _add_inperim_source_record(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
         insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a")
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
         assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30) == ["10.1234/a"]
@@ -350,14 +358,14 @@ class TestGetStaleSourceIds:
         # source_records → publication_year NULL, conservée (LEFT JOIN conservateur).
         for sid in ("W1", "W2", "W3"):
             insert_staging(sa_sync_conn, "openalex", source_id=sid, seen_days_ago=100)
-        _notice(sa_sync_conn, source="openalex", source_id="W1", publication_year=2020)
-        _notice(sa_sync_conn, source="openalex", source_id="W2", publication_year=2023)
+        _source_record(sa_sync_conn, source="openalex", source_id="W1", publication_year=2020)
+        _source_record(sa_sync_conn, source="openalex", source_id="W2", publication_year=2023)
         rows = get_stale_source_ids(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(rows) == ["W2", "W3"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
-        _notice(sa_sync_conn, source="openalex", source_id="W1", publication_year=2010)
+        _source_record(sa_sync_conn, source="openalex", source_id="W1", publication_year=2010)
         assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == ["W1"]
 
     def test_the_threshold_comes_from_the_argument(self, sa_sync_conn):
@@ -398,7 +406,7 @@ class TestGetPrefixesToResolve:
             target_doi="10.77777/rel",
         )
         # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), SP in-périmètre.
-        _notice(
+        _source_record(
             sa_sync_conn,
             1,
             source="openalex",

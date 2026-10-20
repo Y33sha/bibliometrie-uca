@@ -18,7 +18,7 @@ def _date_field(year: int) -> dict:
 _NEXT_YEAR = today().year + 1
 
 
-class TestExtractCrossrefPubYearOrder:
+class TestExtractCrossrefPublicationYearOrder:
     def test_prefers_published_over_issued(self):
         msg = {
             "published": _date_field(2024),
@@ -46,7 +46,7 @@ class TestExtractCrossrefPubYearOrder:
         assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2023
 
 
-class TestExtractCrossrefPubYearFutureBound:
+class TestExtractCrossrefPublicationYearFutureBound:
     """Garde-fou : les éditeurs déposent parfois des dates de "futur numéro"
     (2030+, parfois 2080, 2200…). Au-dessus de max_year, on retourne None
     — process_work skippe la normalisation et laisse les autres sources
@@ -77,7 +77,7 @@ class TestExtractCrossrefPubYearFutureBound:
         assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2024
 
 
-class TestExtractCrossrefPubYearMalformed:
+class TestExtractCrossrefPublicationYearMalformed:
     def test_missing_all_fields(self):
         assert extract_crossref_publication_year({}, max_year=_NEXT_YEAR) is None
 

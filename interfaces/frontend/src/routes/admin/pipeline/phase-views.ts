@@ -131,7 +131,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       "{processed} source_records examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
       "{created} nouvelles publications, dont {splits} par scission",
       "{merges} doublons fusionnés",
-      "nouveau total : {pub_total} publications",
+      "nouveau total : {publication_total} publications",
     ],
   },
   resolve_ra: {

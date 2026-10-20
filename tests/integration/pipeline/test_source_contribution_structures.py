@@ -11,7 +11,7 @@ from pipeline.transformation.structures.idref_resolution import resolve_thesis_p
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import (
     insert_persons_perimeter,
     insert_structure,
@@ -61,23 +61,23 @@ def _perimeter(conn) -> tuple[int, int]:
     return univ, lab
 
 
-def _signature(
+def _source_contribution(
     conn, record: int, position: int, *, hal_structures=(), ror=None, address_id=None
 ) -> int:
-    signature = insert_signature(conn, record, author_position=position)
+    source_contribution = insert_source_contribution(conn, record, author_position=position)
     for hal_structure_id in hal_structures:
         conn.execute(
             text("INSERT INTO source_contribution_hal_structures VALUES (:s, :h)"),
-            {"s": signature, "h": hal_structure_id},
+            {"s": source_contribution, "h": hal_structure_id},
         )
     if ror:
         conn.execute(
             text(
                 "INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id) VALUES (:s, :r, :a)"
             ),
-            {"s": signature, "r": ror, "a": address_id},
+            {"s": source_contribution, "r": ror, "a": address_id},
         )
-    return signature
+    return source_contribution
 
 
 def _reached(conn) -> set[tuple[int, int, str]]:
@@ -96,9 +96,9 @@ def test_structure_hal_remonte_jusqu_a_la_premiere_correspondance(sa_sync_conn):
     _, lab = _perimeter(sa_sync_conn)
     # L'équipe 3, sans correspondance, remonte au laboratoire ; l'université, tutelle de l'équipe, est écartée.
     record = insert_source_record(sa_sync_conn)
-    equipe = _signature(sa_sync_conn, record, 0, hal_structures=[3, 1])
+    equipe = _source_contribution(sa_sync_conn, record, 0, hal_structures=[3, 1])
     # L'alias 9 se ramène au laboratoire 2.
-    alias = _signature(sa_sync_conn, record, 1, hal_structures=[9])
+    alias = _source_contribution(sa_sync_conn, record, 1, hal_structures=[9])
 
     assert _reached(sa_sync_conn) == {
         (equipe, lab, "hal_structure"),
@@ -106,18 +106,18 @@ def test_structure_hal_remonte_jusqu_a_la_premiere_correspondance(sa_sync_conn):
     }
 
 
-def test_ror_de_la_signature_et_ror_d_une_adresse_hors_perimetre(sa_sync_conn):
+def test_ror_de_la_contribution_source_et_ror_d_une_adresse_hors_perimetre(sa_sync_conn):
     _, lab = _perimeter(sa_sync_conn)
     record = insert_source_record(sa_sync_conn)
-    seul = _signature(sa_sync_conn, record, 0, ror=_LAB_ROR)
-    hors = _signature(
+    seul = _source_contribution(sa_sync_conn, record, 0, ror=_LAB_ROR)
+    hors = _source_contribution(
         sa_sync_conn, record, 1, ror=_LAB_ROR, address_id=insert_address(sa_sync_conn, "Ailleurs")
     )
 
     reached = _reached(sa_sync_conn)
 
     assert (seul, lab, "ror") in reached
-    assert not any(signature == hors for signature, _, _ in reached)
+    assert not any(source_contribution == hors for source_contribution, _, _ in reached)
 
 
 def test_structure_hal_rattachee_explicitement(sa_sync_conn):
@@ -129,7 +129,7 @@ def test_structure_hal_rattachee_explicitement(sa_sync_conn):
         {"lab": lab},
     )
     record = insert_source_record(sa_sync_conn)
-    ancienne = _signature(sa_sync_conn, record, 0, hal_structures=[5])
+    ancienne = _source_contribution(sa_sync_conn, record, 0, hal_structures=[5])
 
     assert _reached(sa_sync_conn) == {(ancienne, lab, "hal_structure")}
 
@@ -155,10 +155,10 @@ def test_structures_d_une_these(sa_sync_conn):
             "id": record,
         },
     )
-    doctorant = insert_signature(
+    doctorant = insert_source_contribution(
         sa_sync_conn, record, source="theses", author_position=0, roles=["author"]
     )
-    jury = insert_signature(
+    jury = insert_source_contribution(
         sa_sync_conn, record, source="theses", author_position=None, roles=["jury_member"]
     )
 

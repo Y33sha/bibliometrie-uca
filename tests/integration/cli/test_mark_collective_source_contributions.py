@@ -1,11 +1,14 @@
-"""Oneshot `mark_collective_signatures` : signatures collectives d'après leur nom, décomptes et regroupement."""
+"""Oneshot `mark_collective_source_contributions` : signatures collectives d'après leur nom, décomptes et regroupement."""
 
 from sqlalchemy import text
 
-from interfaces.cli.oneshot.mark_collective_signatures import _collective_ids, mark_collective
-from tests.integration.helpers.contributions import upsert_split_identity
+from interfaces.cli.oneshot.mark_collective_source_contributions import (
+    _collective_ids,
+    mark_collective,
+)
+from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def _seed(conn):
@@ -14,24 +17,24 @@ def _seed(conn):
         text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
         {"p": publication},
     )
-    notice = insert_source_record(conn, publication, source="openalex", source_id="W1")
-    person = insert_signature(
+    source_record = insert_source_record(conn, publication, source="openalex", source_id="W1")
+    person = insert_source_contribution(
         conn,
-        notice,
-        contributor_information_id=upsert_split_identity(conn, "rousseau", "b"),
+        source_record,
+        contributor_information_id=upsert_split_contributor_information(conn, "rousseau", "b"),
         author_position=0,
         roles=["author"],
         raw_author_name="ROUSSEAU, B.",
     )
-    et_al = insert_signature(
+    et_al = insert_source_contribution(
         conn,
-        notice,
-        contributor_information_id=upsert_split_identity(conn, "al", "et"),
+        source_record,
+        contributor_information_id=upsert_split_contributor_information(conn, "al", "et"),
         author_position=1,
         roles=["author"],
         raw_author_name="Et Al.",
     )
-    return publication, notice, person, et_al
+    return publication, source_record, person, et_al
 
 
 def test_contains_restreint_l_examen_aux_noms_qui_contiennent_le_texte(sa_sync_conn):
@@ -41,11 +44,11 @@ def test_contains_restreint_l_examen_aux_noms_qui_contiennent_le_texte(sa_sync_c
     assert _collective_ids(sa_sync_conn, person, et_al, "consortium") == []
 
 
-def test_une_signature_marquee_change_les_decomptes_et_sa_publication_est_a_regrouper(
+def test_une_contribution_source_marquee_change_les_decomptes_et_sa_publication_est_a_regrouper(
     sa_sync_conn,
 ):
     conn = sa_sync_conn
-    publication, notice, _, et_al = _seed(conn)
+    publication, source_record, _, et_al = _seed(conn)
 
     mark_collective(conn, [et_al])
 
@@ -54,7 +57,7 @@ def test_une_signature_marquee_change_les_decomptes_et_sa_publication_est_a_regr
     ).scalar_one()
     counts = conn.execute(
         text("SELECT author_count, distinct_author_count FROM source_records WHERE id = :n"),
-        {"n": notice},
+        {"n": source_record},
     ).one()
     assert tuple(counts) == (1, 1)
     assert conn.execute(

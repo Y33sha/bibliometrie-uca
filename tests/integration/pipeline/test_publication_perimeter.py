@@ -50,10 +50,12 @@ def test_these_soutenue_dans_l_etablissement(sa_sync_conn):
     )
     refresh_perimeter_structures(sa_sync_conn)
     these = insert_publication(sa_sync_conn, "Thèse soutenue ici", doc_type="thesis")
-    notice = insert_source_record(sa_sync_conn, these, source="theses", source_id="2021CLFAC001")
+    source_record = insert_source_record(
+        sa_sync_conn, these, source="theses", source_id="2021CLFAC001"
+    )
     sa_sync_conn.execute(
         text("UPDATE source_records SET meta = CAST(:meta AS jsonb) WHERE id = :id"),
-        {"meta": json.dumps({"etablissement_ppn": _PPN}), "id": notice},
+        {"meta": json.dumps({"etablissement_ppn": _PPN}), "id": source_record},
     )
 
     refresh_publications_perimeter_evidence(sa_sync_conn)

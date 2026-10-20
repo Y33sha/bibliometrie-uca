@@ -315,11 +315,11 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
     )
 
 
-_SQL_HAS_HAL_SA = (
+_SQL_HAS_HAL_SOURCE_CONTRIBUTION = (
     "EXISTS (SELECT 1 FROM source_records sd "
     f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}')"
 )
-_SQL_IN_COLLECTION_SA = (
+_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
     "EXISTS (SELECT 1 FROM source_records sd "
     f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
     "AND sd.hal_collections @> ARRAY[:flt_hal_collection])"
@@ -333,12 +333,13 @@ def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
     """
     if lab_hal_col is None:
         return WhereClause(
-            f"(CASE WHEN {_SQL_HAS_HAL_SA} THEN 'hors_collection' ELSE 'hors_hal' END)", {}
+            f"(CASE WHEN {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_collection' ELSE 'hors_hal' END)",
+            {},
         )
     return WhereClause(
         f"""(CASE
-            WHEN NOT {_SQL_HAS_HAL_SA} THEN 'hors_hal'
-            WHEN NOT {_SQL_IN_COLLECTION_SA} THEN 'hors_collection'
+            WHEN NOT {_SQL_HAS_HAL_SOURCE_CONTRIBUTION} THEN 'hors_hal'
+            WHEN NOT {_SQL_IN_COLLECTION_SOURCE_CONTRIBUTION} THEN 'hors_collection'
             WHEN p.oa_status IS NULL OR p.oa_status::text IN {OA_CLOSED_SQL} THEN 'notice'
             ELSE 'ok'
         END)""",
@@ -569,10 +570,10 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
 _PERSONS_SORT_MAP = {
     "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
     "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-    "signatures_asc": "signature_count ASC, LOWER(p.last_name) ASC",
-    "signatures_desc": "signature_count DESC, LOWER(p.last_name) ASC",
-    "in_perimeter_signatures_asc": "in_perimeter_signature_count ASC, LOWER(p.last_name) ASC",
-    "in_perimeter_signatures_desc": "in_perimeter_signature_count DESC, LOWER(p.last_name) ASC",
+    "signatures_asc": "source_contribution_count ASC, LOWER(p.last_name) ASC",
+    "signatures_desc": "source_contribution_count DESC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_asc": "in_perimeter_source_contribution_count ASC, LOWER(p.last_name) ASC",
+    "in_perimeter_signatures_desc": "in_perimeter_source_contribution_count DESC, LOWER(p.last_name) ASC",
     "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
     "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
     "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",

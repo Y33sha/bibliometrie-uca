@@ -69,7 +69,7 @@ class TestDoiCaseInsensitive:
 # ── Service publications ──
 
 
-def _seed_pub(
+def _seed_publication(
     repo,
     title: str,
     *,
@@ -93,10 +93,10 @@ class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_records."""
         journal_id = insert_journal(sa_sync_conn, "Science")
-        pub_id = _seed_pub(publication_repo, "Pub", doi="10.5555/enrich-test")
+        publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
         insert_source_record(
             sa_sync_conn,
-            pub_id,
+            publication_id,
             source="openalex",
             source_id="W999enrich",
             title="Pub",
@@ -104,10 +104,10 @@ class TestRefreshFromSources:
             journal_id=journal_id,
             oa_status="gold",
         )
-        refresh_from_sources(sa_sync_conn, pub_id)
+        refresh_from_sources(sa_sync_conn, publication_id)
         row = sa_sync_conn.execute(
             text("SELECT oa_status, journal_id FROM publications WHERE id = :id"),
-            {"id": pub_id},
+            {"id": publication_id},
         ).one()
         assert row.journal_id == journal_id
         assert row.oa_status == "gold"
@@ -188,7 +188,9 @@ class TestMergePersons:
             is None
         )
 
-    def test_merge_transfers_signature_groups_one_per_publication(self, sa_sync_conn, person_repo):
+    def test_merge_transfers_source_contribution_groups_one_per_publication(
+        self, sa_sync_conn, person_repo
+    ):
         """Régression : les groupes de signatures référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses signatures."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")

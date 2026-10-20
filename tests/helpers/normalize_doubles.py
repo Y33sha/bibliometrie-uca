@@ -3,7 +3,7 @@
 Un normalizer verse ses documents dans `source_records`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
-from pipeline.ingestion.common.signature_queries import StoredSourceContribution
+from pipeline.ingestion.common.source_contribution_queries import StoredSourceContributionRow
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
 
@@ -48,7 +48,7 @@ class FakeContributionsBatchQueries:
     def __init__(self) -> None:
         self.synced_for: list[int] = []
         self.upserted_batches: list[list] = []
-        self._rows: list[StoredSourceContribution] = []
+        self._rows: list[StoredSourceContributionRow] = []
 
     def fetch_stored_source_contributions(self, conn, source_record_id: int) -> list:
         return list(self._rows)
@@ -73,7 +73,7 @@ class FakeContributionsBatchQueries:
         self.upserted_batches.append(list(values))
         for v in values:
             self._rows.append(
-                StoredSourceContribution(
+                StoredSourceContributionRow(
                     100 + len(self._rows),
                     v["author_position"],
                     v["last_name_normalized"],

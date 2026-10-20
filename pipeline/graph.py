@@ -319,7 +319,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=("source_records",),
     ),
     _task(
-        "normalize.cleanup_orphan_identities",
+        "normalize.cleanup_orphan_contributor_information",
         "normalize",
         reads=("source_contributions.contributor_information_id", "contributor_information.id"),
         writes=("contributor_information.id",),
@@ -410,7 +410,7 @@ TASKS: tuple[Task, ...] = (
             "idref_structures",
             "source_contributions.source_record_id",
             "source_records.publication_id",
-            # Identité des personnes RH : `hr_record_signatures`.
+            # Identité des personnes RH : `hr_record_source_contributions`.
             "hr_records",
             "person_identifiers",
             "rejected_contributions",

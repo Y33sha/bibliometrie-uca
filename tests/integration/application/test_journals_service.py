@@ -41,7 +41,7 @@ from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.journals.type_proceedings_journals import (
     find_titles_of_non_proceedings_journals,
 )
-from pipeline.transformation.publishing.publication_counts import PubCountRecompute
+from pipeline.transformation.publishing.publication_counts import PublicationCountRecompute
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
@@ -62,7 +62,7 @@ _journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 # Notice OpenAlex de 2024, de titre « T ».
-_openalex_notice = partial(
+_openalex_source_record = partial(
     insert_source_record, source="openalex", title="T", publication_year=2024
 )
 
@@ -108,10 +108,10 @@ class TestPublisherFindById:
         assert publisher_repo.find_by_id(999999) is None
 
     def test_hydrates(self, sa_sync_conn, publisher_repo):
-        pub_id = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
-        p = publisher_repo.find_by_id(pub_id)
+        publication_id = insert_publisher(sa_sync_conn, "Elsevier", openalex_id="P123")
+        p = publisher_repo.find_by_id(publication_id)
         assert p is not None
-        assert p.id == pub_id
+        assert p.id == publication_id
         assert p.name == "Elsevier"
         assert p.openalex_id == "P123"
 
@@ -131,11 +131,11 @@ class TestJournalFindById:
         assert j.is_in_doaj is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
-        pub_id = insert_publisher(sa_sync_conn, "PLOS")
+        publication_id = insert_publisher(sa_sync_conn, "PLOS")
         jid = _journal(
             sa_sync_conn,
             title="PLOS ONE",
-            publisher_id=pub_id,
+            publisher_id=publication_id,
             openalex_id="S202381698",
             is_in_doaj=True,
             oa_model="full_oa",
@@ -148,7 +148,7 @@ class TestJournalFindById:
         j = repo.find_by_id(jid)
         assert j is not None
         assert j.title == "PLOS ONE"
-        assert j.publisher_id == pub_id
+        assert j.publisher_id == publication_id
         assert j.issns == [
             JournalIssn(issn="1932-6203", support=IssnSupport.PRINT, linking=True),
         ]
@@ -349,7 +349,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn,
@@ -369,7 +369,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
     def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -382,7 +382,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
     def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -395,7 +395,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
     def test_transfers_journals_and_deletes_source(
@@ -412,7 +412,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
 
         assert (
@@ -434,7 +434,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
 
         row = _fetch_one(
@@ -457,7 +457,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
 
         row = _fetch_one(
@@ -480,7 +480,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -505,7 +505,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -528,7 +528,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
         blockers = exc_info.value.blocking_journals
@@ -560,7 +560,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
         blockers = exc_info.value.blocking_journals
@@ -585,7 +585,7 @@ class TestMergePublishers:
                 publisher_repo=publisher_repo,
                 journal_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PubCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(),
             )
 
         assert len(exc_info.value.blocking_journals) == 2
@@ -603,7 +603,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -623,7 +623,7 @@ class TestMergePublishers:
             publisher_repo=publisher_repo,
             journal_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PubCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -671,10 +671,12 @@ class TestMergeJournals:
     def test_transfers_publications(self, sa_sync_conn, repo, recompute):
         target = _journal(sa_sync_conn, title="Target")
         source = _journal(sa_sync_conn, title="Source")
-        pub_id = insert_publication(sa_sync_conn, journal_id=source)
+        publication_id = insert_publication(sa_sync_conn, journal_id=source)
         # ≥1 source_record : sinon `refresh_from_sources` (déclenché par la
         # requalification post-merge) supprimerait la publication comme orpheline.
-        _openalex_notice(sa_sync_conn, pub_id, source_id="W-transfer", journal_id=source)
+        _openalex_source_record(
+            sa_sync_conn, publication_id, source_id="W-transfer", journal_id=source
+        )
 
         merge_journals(
             target,
@@ -685,7 +687,7 @@ class TestMergeJournals:
         )
 
         row = _fetch_one(
-            sa_sync_conn, "SELECT journal_id FROM publications WHERE id = :id", id=pub_id
+            sa_sync_conn, "SELECT journal_id FROM publications WHERE id = :id", id=publication_id
         )
         assert row.journal_id == target
         assert (
@@ -866,12 +868,16 @@ class TestMergeJournals:
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": revue}
         )
-        pub = insert_publication(sa_sync_conn, journal_id=revue)
+        publication = insert_publication(sa_sync_conn, journal_id=revue)
         sa_sync_conn.execute(
-            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
+            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": publication}
         )
-        _openalex_notice(
-            sa_sync_conn, pub, source_id="W-merge-requalif", doc_type="article", journal_id=revue
+        _openalex_source_record(
+            sa_sync_conn,
+            publication,
+            source_id="W-merge-requalif",
+            doc_type="article",
+            journal_id=revue,
         )
 
         merge_journals(
@@ -883,7 +889,9 @@ class TestMergeJournals:
         )
 
         row = _fetch_one(
-            sa_sync_conn, "SELECT doc_type, journal_id FROM publications WHERE id = :id", id=pub
+            sa_sync_conn,
+            "SELECT doc_type, journal_id FROM publications WHERE id = :id",
+            id=publication,
         )
         assert row.journal_id == media
         assert row.doc_type == "media"
@@ -899,17 +907,19 @@ class TestRequalifyPublicationsForJournal:
         conn.execute(
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
         )
-        pub = insert_publication(conn, journal_id=journal)
+        publication = insert_publication(conn, journal_id=journal)
         conn.execute(
-            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
+            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": publication}
         )
-        sp = _openalex_notice(
-            conn, pub, source_id="W-requalif", doc_type="article", journal_id=journal
+        source_record = _openalex_source_record(
+            conn, publication, source_id="W-requalif", doc_type="article", journal_id=journal
         )
-        return journal, pub, sp
+        return journal, publication, source_record
 
-    def test_persists_sp_correction_and_retypes_publication(self, sa_sync_conn, recompute):
-        journal, pub, sp = self._seed(sa_sync_conn)
+    def test_persists_source_record_correction_and_retypes_publication(
+        self, sa_sync_conn, recompute
+    ):
+        journal, publication, source_record = self._seed(sa_sync_conn)
         # Le caller a déjà basculé le type (comme update_journal).
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": journal}
@@ -922,23 +932,23 @@ class TestRequalifyPublicationsForJournal:
         )
         assert count == 1
 
-        sp_row = _fetch_one(
+        source_record_row = _fetch_one(
             sa_sync_conn,
             "SELECT doc_type, raw_metadata FROM source_records WHERE id = :id",
-            id=sp,
+            id=source_record,
         )
         # La colonne SP est persistée (ce que lira le matcher), avec le brut réversible.
-        assert sp_row.doc_type == "media"
-        assert sp_row.raw_metadata == {
+        assert source_record_row.doc_type == "media"
+        assert source_record_row.raw_metadata == {
             "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
         }
-        pub_row = _fetch_one(
-            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=pub
+        publication_row = _fetch_one(
+            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=publication
         )
-        assert pub_row.doc_type == "media"
+        assert publication_row.doc_type == "media"
 
     def test_self_heals_when_type_reverts(self, sa_sync_conn, recompute):
-        journal, pub, sp = self._seed(sa_sync_conn)
+        journal, publication, source_record = self._seed(sa_sync_conn)
         sa_sync_conn.execute(
             text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": journal}
         )
@@ -959,14 +969,14 @@ class TestRequalifyPublicationsForJournal:
         )
         assert count == 1
 
-        sp_row = _fetch_one(
+        source_record_row = _fetch_one(
             sa_sync_conn,
             "SELECT doc_type, raw_metadata FROM source_records WHERE id = :id",
-            id=sp,
+            id=source_record,
         )
-        assert sp_row.doc_type == "article"
-        assert sp_row.raw_metadata == {}
-        pub_row = _fetch_one(
-            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=pub
+        assert source_record_row.doc_type == "article"
+        assert source_record_row.raw_metadata == {}
+        publication_row = _fetch_one(
+            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=publication
         )
-        assert pub_row.doc_type == "article"
+        assert publication_row.doc_type == "article"

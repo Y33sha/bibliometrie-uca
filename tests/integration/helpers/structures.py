@@ -18,8 +18,8 @@ from tests.integration.helpers.addresses import insert_address, insert_address_s
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.rows import insert_row
 from tests.integration.helpers.sources import (
-    insert_signature,
-    insert_signature_address,
+    insert_source_contribution,
+    insert_source_contribution_address,
     insert_source_record,
 )
 
@@ -162,21 +162,21 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
         text("SELECT publication_id, person_id FROM contributions WHERE id = :id"),
         {"id": contribution_id},
     ).one()
-    sp_id = insert_source_record(
+    source_record_id = insert_source_record(
         conn,
         source_id=f"as-test-{next(_seq)}",
         publication_year=2024,
         publication_id=publication_id,
     )
-    sa_id = insert_signature(conn, sp_id, person_id=person_id)
-    add_source_contribution_structure(conn, sa_id, structure_id)
+    source_contribution_id = insert_source_contribution(conn, source_record_id, person_id=person_id)
+    add_source_contribution_structure(conn, source_contribution_id, structure_id)
 
 
-def add_source_contribution_structure(conn, sa_id: int, structure_id: int) -> None:
-    """Lie la signature `sa_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
+def add_source_contribution_structure(conn, source_contribution_id: int, structure_id: int) -> None:
+    """Lie la signature `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
     raw_text = f"as-test-addr-{next(_seq)}"
     addr_id = insert_address(conn, raw_text, normalized_text=raw_text)
-    insert_signature_address(conn, sa_id, address_id=addr_id)
+    insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     insert_address_structure(conn, addr_id, structure_id=structure_id)
     # La matview SAS filtre sur le périmètre d'extraction : garantir qu'un
     # périmètre d'extraction existe (config + ligne perimeters) et y rattacher

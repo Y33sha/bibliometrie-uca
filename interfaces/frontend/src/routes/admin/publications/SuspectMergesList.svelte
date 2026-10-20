@@ -61,15 +61,15 @@
         </div>
         <div class="stats">
           <span class="share">
-            {percent(item.matched_source_contributions, item.signatures)}&nbsp;% d'auteurs retrouvés
+            {percent(item.matched_source_contributions, item.source_contributions)}&nbsp;% d'auteurs retrouvés
           </span>
-          <span>{item.matched_source_contributions} / {item.signatures} signatures</span>
+          <span>{item.matched_source_contributions} / {item.source_contributions} signatures</span>
         </div>
-        <div class="notices">
-          {#each item.notices as n (n.source + n.source_id)}
+        <div class="source-records">
+          {#each item.source_records as n (n.source + n.source_id)}
             <span class="notice">
               <SourceTag source={n.source} id={n.source_id} href={sourceExternalUrl(n.source, n.source_id) ?? undefined} />
-              {n.matched_source_contributions} / {n.signatures}
+              {n.matched_source_contributions} / {n.source_contributions}
             </span>
           {/each}
         </div>
@@ -139,7 +139,7 @@
     font-weight: 600;
     color: var(--danger, #c0392b);
   }
-  .notices {
+  .source-records {
     display: flex;
     flex-wrap: wrap;
     gap: 6px 12px;

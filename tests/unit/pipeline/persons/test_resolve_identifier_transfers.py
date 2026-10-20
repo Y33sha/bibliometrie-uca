@@ -21,8 +21,8 @@ def _transferred(monkeypatch, consensus: str | None) -> int:
         _OWNER: PersonNameForms("dupont", "jean", []),
         _CANDIDATE: PersonNameForms("aubert", "pierre", []),
     }
-    queries.null_identifier_signatures.return_value = 0
-    for name in ("fetch_person_name_forms", "null_identifier_signatures"):
+    queries.null_identifier_source_contributions.return_value = 0
+    for name in ("fetch_person_name_forms", "null_identifier_source_contributions"):
         monkeypatch.setattr(identifier_arbitration, name, getattr(queries, name))
     repo = MagicMock()
     repo.find_identifier.return_value.person_id = _OWNER

@@ -9,18 +9,18 @@ from infrastructure.read_models.publications.source_records import get_publicati
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 # Notice de titre « Titre ».
-_notice = partial(insert_source_record, title="Titre")
+_source_record = partial(insert_source_record, title="Titre")
 
 
 def _create_journal(conn, title, publisher_name):
     return insert_journal(conn, title, publisher_id=insert_publisher(conn, publisher_name))
 
 
-def _records(conn, pub_id):
-    result = get_publication_sources(conn, pub_id)
+def _records(conn, publication_id):
+    result = get_publication_sources(conn, publication_id)
     assert result is not None
     return result.source_records
 
@@ -30,18 +30,18 @@ class TestGetPublicationSources:
         assert get_publication_sources(sa_sync_conn, 999_999) is None
 
     def test_publication_without_source_record(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn, title="Seule")
-        result = get_publication_sources(sa_sync_conn, pub)
+        publication = insert_publication(sa_sync_conn, title="Seule")
+        result = get_publication_sources(sa_sync_conn, publication)
         assert result is not None
         assert result.title == "Seule"
         assert result.source_records == []
 
     def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         journal = _create_journal(sa_sync_conn, "Nature", "Springer Nature")
-        _notice(
+        _source_record(
             sa_sync_conn,
-            pub,
+            publication,
             source_id="hal-1",
             journal_id=journal,
             biblio={
@@ -49,7 +49,7 @@ class TestGetPublicationSources:
                 "publisher": "Nature Publishing Group",
             },
         )
-        [record] = _records(sa_sync_conn, pub)
+        [record] = _records(sa_sync_conn, publication)
         assert (record.journal_id, record.journal_title, record.journal_raw_title) == (
             journal,
             "Nature",
@@ -62,10 +62,10 @@ class TestGetPublicationSources:
         )
 
     def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
-        _notice(
+        publication = insert_publication(sa_sync_conn)
+        _source_record(
             sa_sync_conn,
-            pub,
+            publication,
             source="crossref",
             source_id="10.1/x",
             external_ids={
@@ -74,20 +74,20 @@ class TestGetPublicationSources:
                 "arxiv_id": "",
             },
         )
-        [record] = _records(sa_sync_conn, pub)
+        [record] = _records(sa_sync_conn, publication)
         assert record.identifiers == {"pmid": ["123"], "isbn": ["978-2", "978-3"]}
 
     def test_bibliographic_fields(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
-        _notice(
+        publication = insert_publication(sa_sync_conn)
+        _source_record(
             sa_sync_conn,
-            pub,
+            publication,
             source="openalex",
             source_id="W1",
             container_title="Actes du colloque",
             biblio={"volume": "12", "issue": "3", "first_page": "100", "last_page": "120"},
         )
-        [record] = _records(sa_sync_conn, pub)
+        [record] = _records(sa_sync_conn, publication)
         assert (record.container_title, record.volume, record.issue, record.pages) == (
             "Actes du colloque",
             "12",
@@ -96,20 +96,20 @@ class TestGetPublicationSources:
         )
 
     def test_pages_as_given_by_source(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
-        _notice(
+        publication = insert_publication(sa_sync_conn)
+        _source_record(
             sa_sync_conn,
-            pub,
+            publication,
             source="crossref",
             source_id="10.1/y",
             biblio={"page": "e1234", "article_number": "e1234"},
         )
-        [record] = _records(sa_sync_conn, pub)
+        [record] = _records(sa_sync_conn, publication)
         assert (record.pages, record.article_number) == ("e1234", "e1234")
 
     def test_language_name_and_source_value(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
-        _notice(sa_sync_conn, pub, source="wos", source_id="WOS:1")
+        publication = insert_publication(sa_sync_conn)
+        _source_record(sa_sync_conn, publication, source="wos", source_id="WOS:1")
         sa_sync_conn.execute(
             text(
                 "UPDATE source_records SET language = 'en', "
@@ -117,10 +117,10 @@ class TestGetPublicationSources:
             ),
             {
                 "rm": json.dumps({"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}),
-                "pid": pub,
+                "pid": publication,
             },
         )
-        [record] = _records(sa_sync_conn, pub)
+        [record] = _records(sa_sync_conn, publication)
         assert (record.language, record.language_name, record.language_raw) == (
             "en",
             "Anglais",
@@ -128,19 +128,21 @@ class TestGetPublicationSources:
         )
 
 
-class TestSignatures:
-    def test_signatures_de_chaque_notice_avec_leur_groupe(self, sa_sync_conn):
+class TestSourceContributions:
+    def test_contributions_sources_de_chaque_enregistrement_source_avec_leur_groupe(
+        self, sa_sync_conn
+    ):
         conn = sa_sync_conn
-        pub = insert_publication(conn)
-        hal = _notice(conn, pub, source="hal", source_id="hal-1")
-        openalex = _notice(conn, pub, source="openalex", source_id="W1")
-        hal_martin = insert_signature(
+        publication = insert_publication(conn)
+        hal = _source_record(conn, publication, source="hal", source_id="hal-1")
+        openalex = _source_record(conn, publication, source="openalex", source_id="W1")
+        hal_martin = insert_source_contribution(
             conn, hal, source="hal", raw_author_name="Anne Martin", author_position=0
         )
-        openalex_martin = insert_signature(
+        openalex_martin = insert_source_contribution(
             conn, openalex, source="openalex", raw_author_name="A. Martin", author_position=0
         )
-        collective = insert_signature(
+        collective = insert_source_contribution(
             conn,
             openalex,
             source="openalex",
@@ -148,12 +150,12 @@ class TestSignatures:
             author_position=1,
             collective=True,
         )
-        group = insert_group(conn, pub, [(hal_martin, hal), (openalex_martin, openalex)])
+        group = insert_group(conn, publication, [(hal_martin, hal), (openalex_martin, openalex)])
 
-        result = get_publication_sources(conn, pub)
+        result = get_publication_sources(conn, publication)
 
         assert result is not None
-        by_id = {s.id: s for s in result.signatures}
+        by_id = {s.id: s for s in result.source_contributions}
         assert set(by_id) == {hal_martin, openalex_martin, collective}
         assert (by_id[hal_martin].group_id, by_id[hal_martin].method) == (group, "reference")
         assert (by_id[openalex_martin].group_id, by_id[openalex_martin].method) == (group, "name")

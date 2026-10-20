@@ -16,7 +16,9 @@ from application.ports.pipeline.journal_recompute import JournalRecompute as Jou
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
 )
-from application.ports.pipeline.publication_count import PubCountRecompute as PubCountRecomputePort
+from application.ports.pipeline.publication_count import (
+    PublicationCountRecompute as PublicationCountRecomputePort,
+)
 from application.ports.pipeline.publication_perimeter import (
     PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
 )
@@ -87,7 +89,7 @@ from pipeline.public import (
     CountryRecompute,
     JournalRecompute,
     PerimeterStructures,
-    PubCountRecompute,
+    PublicationCountRecompute,
     PublicationPerimeterRecompute,
     SourceContributionPerimeterRecompute,
 )
@@ -321,7 +323,7 @@ def journal_recompute() -> JournalRecomputePort:
 _publication_perimeter_recompute_singleton: PublicationPerimeterRecomputePort = (
     PublicationPerimeterRecompute()
 )
-_publication_count_recompute_singleton: PubCountRecomputePort = PubCountRecompute()
+_publication_count_recompute_singleton: PublicationCountRecomputePort = PublicationCountRecompute()
 
 
 def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
@@ -329,7 +331,7 @@ def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
     return _publication_perimeter_recompute_singleton
 
 
-def publication_count_recompute() -> PubCountRecomputePort:
+def publication_count_recompute() -> PublicationCountRecomputePort:
     """`publication_count` d'un éditeur, après une fusion d'éditeurs."""
     return _publication_count_recompute_singleton
 

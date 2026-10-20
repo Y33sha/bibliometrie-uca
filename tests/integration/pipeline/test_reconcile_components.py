@@ -19,17 +19,17 @@ from pipeline.transformation.publications.reconciliation import (
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.redirects import redirect_of
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 # Notice OpenAlex de 2024, de titre « T », article par défaut.
-_notice = partial(
+_source_record = partial(
     insert_source_record, source="openalex", title="T", publication_year=2024, doc_type="article"
 )
 
 logger = logging.getLogger("test_reconcile_components")
 
 
-def _seed_pub(conn, doi=None) -> int:
+def _seed_publication(conn, doi=None) -> int:
     return PublicationStore(conn).create(
         title="T",
         title_normalized="t",
@@ -40,17 +40,19 @@ def _seed_pub(conn, doi=None) -> int:
     )
 
 
-def _pub_exists(conn, pub_id) -> bool:
+def _publication_exists(conn, publication_id) -> bool:
     return (
-        conn.execute(text("SELECT 1 FROM publications WHERE id = :id"), {"id": pub_id}).first()
+        conn.execute(
+            text("SELECT 1 FROM publications WHERE id = :id"), {"id": publication_id}
+        ).first()
         is not None
     )
 
 
-def _sp_state(conn, sp_id) -> tuple:
+def _source_record_state(conn, source_record_id) -> tuple:
     return conn.execute(
         text("SELECT publication_id, keys_dirty FROM source_records WHERE id = :id"),
-        {"id": sp_id},
+        {"id": source_record_id},
     ).one()
 
 
@@ -61,24 +63,28 @@ class TestUniverse:
         DOI porté par les SP, pas par les publications (`UNIQUE(lower(doi))` interdit deux pubs
         au même DOI) ; le voisinage par DOI joint sur `source_records.doi`."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        unrelated_pub = _seed_pub(conn)
-        dirty = _notice(conn, pub_a, source_id="a", doi="10.1/x")
-        neighbor = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
-        _notice(conn, unrelated_pub, source_id="c", doi="10.9/z", keys_dirty=False)
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        unrelated_publication = _seed_publication(conn)
+        dirty = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        neighbor = _source_record(
+            conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False
+        )
+        _source_record(conn, unrelated_publication, source_id="c", doi="10.9/z", keys_dirty=False)
 
         universe = {r.id for r in fetch_reconciliation_universe(conn)}
         assert universe == {dirty, neighbor}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        dirty = _notice(conn, pub_a, source_id="a", external_ids={"hal_id": ["hal-1"]})
-        neighbor = _notice(
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        dirty = _source_record(
+            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-1"]}
+        )
+        neighbor = _source_record(
             conn,
-            pub_b,
+            publication_b,
             source_id="b",
             keys_dirty=False,
             external_ids={"hal_id": ["hal-1", "hal-2"]},
@@ -88,25 +94,27 @@ class TestUniverse:
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'une notice est le premier identifiant qu'elle liste : les suivants ne relient rien."""
         conn = sa_sync_conn
-        dirty = _notice(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
-        _notice(conn, source_id="b", keys_dirty=False, external_ids={"hal_id": ["hal-1", "hal-2"]})
+        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
+        _source_record(
+            conn, source_id="b", keys_dirty=False, external_ids={"hal_id": ["hal-1", "hal-2"]}
+        )
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
         """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        dirty = _notice(
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        dirty = _source_record(
             conn,
-            pub_a,
+            publication_a,
             source_id="a",
             title_normalized="ma these de doctorat au titre suffisamment long",
             doc_type="thesis",
         )
-        neighbor = _notice(
+        neighbor = _source_record(
             conn,
-            pub_b,
+            publication_b,
             source_id="b",
             title_normalized="ma these de doctorat au titre suffisamment long",
             doc_type="thesis",
@@ -118,64 +126,74 @@ class TestUniverse:
         """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
-        orphan = _notice(conn, source_id="orphan", doi="10.1/x")
+        orphan = _source_record(conn, source_id="orphan", doi="10.1/x")
         assert fetch_dirty_source_record_ids(conn) == [orphan]
 
 
 class TestEndToEnd:
-    def test_two_pubs_sharing_doi_merged(self, sa_sync_conn):
+    def test_two_publications_sharing_doi_merged(self, sa_sync_conn):
         """Deux pubs dont les SP partagent un DOI → fusion. Les pubs n'ont pas (encore) le DOI en
         colonne (`UNIQUE(lower(doi))` interdit deux pubs au même DOI) : aucune ne le porte, donc
         l'ancre tombe sur le `min(source_record_id)`."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
-        sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x")
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        source_record_b = _source_record(conn, publication_b, source_id="b", doi="10.1/x")
 
         reconcile(conn, logger)
 
         # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_record_id.
-        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
-        assert _pub_exists(conn, anchor)
-        assert not _pub_exists(conn, absorbed)
+        anchor, absorbed = (
+            (publication_a, publication_b)
+            if source_record_a < source_record_b
+            else (publication_b, publication_a)
+        )
+        assert _publication_exists(conn, anchor)
+        assert not _publication_exists(conn, absorbed)
         assert redirect_of(conn, MergedEntity.PUBLICATION, absorbed) == anchor
-        assert _sp_state(conn, sp_a) == (anchor, False)
-        assert _sp_state(conn, sp_b) == (anchor, False)
+        assert _source_record_state(conn, source_record_a) == (anchor, False)
+        assert _source_record_state(conn, source_record_b) == (anchor, False)
 
-    def test_pub_keeping_sources_outside_neighborhood_survives_without_redirect(self, sa_sync_conn):
+    def test_publication_keeping_sources_outside_neighborhood_survives_without_redirect(
+        self, sa_sync_conn
+    ):
         """La SP voisine rejoint l'ancre ; sa publication garde une autre SP, hors du voisinage. Elle survit, sans redirection."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x")
-        sp_b = _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
-        sp_other = _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        source_record_b = _source_record(
+            conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False
+        )
+        source_record_other = _source_record(
+            conn, publication_b, source_id="c", doi="10.1/y", keys_dirty=False
+        )
 
         reconcile(conn, logger)
 
-        assert _sp_state(conn, sp_a)[0] == pub_a
-        assert _sp_state(conn, sp_b)[0] == pub_a
-        assert _sp_state(conn, sp_other)[0] == pub_b
-        assert _pub_exists(conn, pub_b)
-        assert redirect_of(conn, MergedEntity.PUBLICATION, pub_b) is None
+        assert _source_record_state(conn, source_record_a)[0] == publication_a
+        assert _source_record_state(conn, source_record_b)[0] == publication_a
+        assert _source_record_state(conn, source_record_other)[0] == publication_b
+        assert _publication_exists(conn, publication_b)
+        assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
 
-    def test_les_publications_touchees_regroupent_leurs_signatures(self, sa_sync_conn):
+    def test_les_publications_touchees_regroupent_leurs_contributions_sources(self, sa_sync_conn):
         """La publication qui reçoit une notice et celle qui en perd une sont à regrouper. Une publication dont la notice réexaminée reste en place ne l'est pas."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        untouched = _seed_pub(conn)
-        _notice(conn, pub_a, source_id="a", doi="10.1/x")
-        _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
-        _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
-        _notice(conn, untouched, source_id="d", doi="10.9/z")
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        untouched = _seed_publication(conn)
+        _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        _source_record(conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False)
+        _source_record(conn, publication_b, source_id="c", doi="10.1/y", keys_dirty=False)
+        _source_record(conn, untouched, source_id="d", doi="10.9/z")
         conn.execute(text("UPDATE publications SET contributions_dirty = false"))
 
         reconcile(conn, logger)
 
         dirty = dict(conn.execute(text("SELECT id, contributions_dirty FROM publications")).all())
-        assert dirty[pub_a] and dirty[pub_b]
+        assert dirty[publication_a] and dirty[publication_b]
         assert not dirty[untouched]
 
     def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(self, sa_sync_conn, caplog):
@@ -190,10 +208,10 @@ class TestEndToEnd:
 
     def test_le_journal_accorde_les_publications_resolues(self, sa_sync_conn, caplog):
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        _notice(conn, pub_a, source_id="a", doi="10.1/x")
-        _notice(conn, pub_b, source_id="b", doi="10.1/x")
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        _source_record(conn, publication_b, source_id="b", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             reconcile(conn, logger)
@@ -203,7 +221,7 @@ class TestEndToEnd:
     def test_la_reconstruction_complete_s_annonce(self, sa_sync_conn, caplog):
         """Sous `rebuild`, l'étape annonce une reconstruction complète."""
         conn = sa_sync_conn
-        _notice(conn, _seed_pub(conn), source_id="a", doi="10.1/x")
+        _source_record(conn, _seed_publication(conn), source_id="a", doi="10.1/x")
 
         with caplog.at_level(logging.INFO, logger=logger.name):
             reconcile(
@@ -215,39 +233,43 @@ class TestEndToEnd:
         assert "(reconstruction complète)" in caplog.text
         assert "nouveaux ou mis à jour" not in caplog.text
 
-    def test_pub_with_two_dois_splits(self, sa_sync_conn):
+    def test_publication_with_two_dois_splits(self, sa_sync_conn):
         """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
         Y part sur un nouveau pub."""
         conn = sa_sync_conn
-        pub = _seed_pub(conn, doi="10.1/x")
-        sp_x = _notice(conn, pub, source_id="x", doi="10.1/x", external_ids={"hal_id": ["h"]})
-        sp_y = _notice(conn, pub, source_id="y", doi="10.2/y", external_ids={"hal_id": ["h"]})
+        publication = _seed_publication(conn, doi="10.1/x")
+        source_record_x = _source_record(
+            conn, publication, source_id="x", doi="10.1/x", external_ids={"hal_id": ["h"]}
+        )
+        source_record_y = _source_record(
+            conn, publication, source_id="y", doi="10.2/y", external_ids={"hal_id": ["h"]}
+        )
 
         reconcile(conn, logger)
 
         # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
-        assert _sp_state(conn, sp_x) == (pub, False)
-        y_pub, y_dirty = _sp_state(conn, sp_y)
-        assert y_pub != pub
+        assert _source_record_state(conn, source_record_x) == (publication, False)
+        y_publication, y_dirty = _source_record_state(conn, source_record_y)
+        assert y_publication != publication
         assert y_dirty is False
-        assert _pub_exists(conn, pub)
-        assert _pub_exists(conn, y_pub)
+        assert _publication_exists(conn, publication)
+        assert _publication_exists(conn, y_publication)
 
     def test_two_theses_sharing_title_year_merged(self, sa_sync_conn):
         """Deux thèses cross-source, même titre (long) + année, sans DOI/NNT/hal partagé → fusion par token bloc métadonnée."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(
             conn,
-            pub_a,
+            publication_a,
             source_id="a",
             title_normalized="ma these de doctorat au titre suffisamment long",
             doc_type="thesis",
         )
-        sp_b = _notice(
+        source_record_b = _source_record(
             conn,
-            pub_b,
+            publication_b,
             source_id="b",
             title_normalized="ma these de doctorat au titre suffisamment long",
             doc_type="thesis",
@@ -255,27 +277,35 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
-        assert _pub_exists(conn, anchor)
-        assert not _pub_exists(conn, absorbed)
-        assert _sp_state(conn, sp_a) == (anchor, False)
-        assert _sp_state(conn, sp_b) == (anchor, False)
+        anchor, absorbed = (
+            (publication_a, publication_b)
+            if source_record_a < source_record_b
+            else (publication_b, publication_a)
+        )
+        assert _publication_exists(conn, anchor)
+        assert not _publication_exists(conn, absorbed)
+        assert _source_record_state(conn, source_record_a) == (anchor, False)
+        assert _source_record_state(conn, source_record_b) == (anchor, False)
 
     def test_distinct_dois_not_merged(self, sa_sync_conn):
         """Deux pubs à DOI distincts partageant un hal_id : pas de fusion (cannot-link DOI)."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn, doi="10.1/x")
-        pub_b = _seed_pub(conn, doi="10.2/y")
-        sp_a = _notice(conn, pub_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]})
-        sp_b = _notice(conn, pub_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]})
+        publication_a = _seed_publication(conn, doi="10.1/x")
+        publication_b = _seed_publication(conn, doi="10.2/y")
+        source_record_a = _source_record(
+            conn, publication_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]}
+        )
+        source_record_b = _source_record(
+            conn, publication_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]}
+        )
 
         reconcile(conn, logger)
 
-        assert _pub_exists(conn, pub_a)
-        assert _pub_exists(conn, pub_b)
+        assert _publication_exists(conn, publication_a)
+        assert _publication_exists(conn, publication_b)
         # Drapeaux nettoyés malgré l'absence de fusion (les SP ont été réconciliées).
-        assert _sp_state(conn, sp_a)[1] is False
-        assert _sp_state(conn, sp_b)[1] is False
+        assert _source_record_state(conn, source_record_a)[1] is False
+        assert _source_record_state(conn, source_record_b)[1] is False
 
 
 class TestMetadataBlock:
@@ -284,60 +314,84 @@ class TestMetadataBlock:
     def test_two_conference_papers_merged(self, sa_sync_conn):
         """Deux conference_paper cross-source, même titre (long) + année, sans DOI → fusion par token bloc."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(
-            conn, pub_a, source_id="a", title_normalized=self.LONG, doc_type="conference_paper"
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(
+            conn,
+            publication_a,
+            source_id="a",
+            title_normalized=self.LONG,
+            doc_type="conference_paper",
         )
-        sp_b = _notice(
-            conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="conference_paper"
+        source_record_b = _source_record(
+            conn,
+            publication_b,
+            source_id="b",
+            title_normalized=self.LONG,
+            doc_type="conference_paper",
         )
 
         reconcile(conn, logger)
 
-        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
-        assert _pub_exists(conn, anchor)
-        assert not _pub_exists(conn, absorbed)
-        assert _sp_state(conn, sp_a) == (anchor, False)
-        assert _sp_state(conn, sp_b) == (anchor, False)
+        anchor, absorbed = (
+            (publication_a, publication_b)
+            if source_record_a < source_record_b
+            else (publication_b, publication_a)
+        )
+        assert _publication_exists(conn, anchor)
+        assert not _publication_exists(conn, absorbed)
+        assert _source_record_state(conn, source_record_a) == (anchor, False)
+        assert _source_record_state(conn, source_record_b) == (anchor, False)
 
     def test_short_title_not_merged(self, sa_sync_conn):
         """Titre court (≤ seuil) → pas de token bloc, pas de fusion (garde de longueur)."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(
-            conn, pub_a, source_id="a", title_normalized="court titre", doc_type="conference_paper"
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(
+            conn,
+            publication_a,
+            source_id="a",
+            title_normalized="court titre",
+            doc_type="conference_paper",
         )
-        sp_b = _notice(
-            conn, pub_b, source_id="b", title_normalized="court titre", doc_type="conference_paper"
+        source_record_b = _source_record(
+            conn,
+            publication_b,
+            source_id="b",
+            title_normalized="court titre",
+            doc_type="conference_paper",
         )
 
         reconcile(conn, logger)
 
-        assert _pub_exists(conn, pub_a)
-        assert _pub_exists(conn, pub_b)
-        assert _sp_state(conn, sp_a)[1] is False
-        assert _sp_state(conn, sp_b)[1] is False
+        assert _publication_exists(conn, publication_a)
+        assert _publication_exists(conn, publication_b)
+        assert _source_record_state(conn, source_record_a)[1] is False
+        assert _source_record_state(conn, source_record_b)[1] is False
 
     def test_different_doc_type_not_merged(self, sa_sync_conn):
         """Même titre long + année mais doc_type différents → pas de fusion (doc_type dans la clé)."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn)
-        pub_b = _seed_pub(conn)
-        sp_a = _notice(
-            conn, pub_a, source_id="a", title_normalized=self.LONG, doc_type="conference_paper"
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        source_record_a = _source_record(
+            conn,
+            publication_a,
+            source_id="a",
+            title_normalized=self.LONG,
+            doc_type="conference_paper",
         )
-        sp_b = _notice(
-            conn, pub_b, source_id="b", title_normalized=self.LONG, doc_type="book_chapter"
+        source_record_b = _source_record(
+            conn, publication_b, source_id="b", title_normalized=self.LONG, doc_type="book_chapter"
         )
 
         reconcile(conn, logger)
 
-        assert _pub_exists(conn, pub_a)
-        assert _pub_exists(conn, pub_b)
-        assert _sp_state(conn, sp_a)[1] is False
-        assert _sp_state(conn, sp_b)[1] is False
+        assert _publication_exists(conn, publication_a)
+        assert _publication_exists(conn, publication_b)
+        assert _source_record_state(conn, source_record_a)[1] is False
+        assert _source_record_state(conn, source_record_b)[1] is False
 
 
 class TestMarkKeysDirty:
@@ -345,25 +399,25 @@ class TestMarkKeysDirty:
 
     def test_mark_all(self, sa_sync_conn):
         conn = sa_sync_conn
-        a = _notice(conn, source_id="a", keys_dirty=False)
-        b = _notice(conn, source_id="b", doc_type="book_chapter", keys_dirty=False)
+        a = _source_record(conn, source_id="a", keys_dirty=False)
+        b = _source_record(conn, source_id="b", doc_type="book_chapter", keys_dirty=False)
         assert mark_keys_dirty(conn) >= 2
-        assert _sp_state(conn, a)[1] is True
-        assert _sp_state(conn, b)[1] is True
+        assert _source_record_state(conn, a)[1] is True
+        assert _source_record_state(conn, b)[1] is True
 
     def test_mark_where_targets_subset(self, sa_sync_conn):
         conn = sa_sync_conn
-        art = _notice(conn, source_id="art", keys_dirty=False)
-        chap = _notice(conn, source_id="chap", doc_type="book_chapter", keys_dirty=False)
+        art = _source_record(conn, source_id="art", keys_dirty=False)
+        chap = _source_record(conn, source_id="chap", doc_type="book_chapter", keys_dirty=False)
         mark_keys_dirty(conn, "doc_type = 'book_chapter'")
-        assert _sp_state(conn, chap)[1] is True
-        assert _sp_state(conn, art)[1] is False
+        assert _source_record_state(conn, chap)[1] is True
+        assert _source_record_state(conn, art)[1] is False
 
     def test_dry_run_counts_without_writing(self, sa_sync_conn):
         conn = sa_sync_conn
-        sp = _notice(conn, source_id="d", doc_type="poster", keys_dirty=False)
+        source_record = _source_record(conn, source_id="d", doc_type="poster", keys_dirty=False)
         assert mark_keys_dirty(conn, "doc_type = 'poster'", dry_run=True) >= 1
-        assert _sp_state(conn, sp)[1] is False  # dry-run n'écrit pas
+        assert _source_record_state(conn, source_record)[1] is False  # dry-run n'écrit pas
 
 
 class TestUniverseMatchesPythonTokens:
@@ -380,15 +434,15 @@ class TestUniverseMatchesPythonTokens:
         long_a, long_b = "a" * 40, "b" * 40
         len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
         ids = [
-            _notice(conn, source_id="doi1", doi="10.1/x", keys_dirty=False),
-            _notice(conn, source_id="doi2", doi="10.1/x", keys_dirty=False),
-            _notice(
+            _source_record(conn, source_id="doi1", doi="10.1/x", keys_dirty=False),
+            _source_record(conn, source_id="doi2", doi="10.1/x", keys_dirty=False),
+            _source_record(
                 conn,
                 source_id="hal1",
                 keys_dirty=False,
                 external_ids={"hal_id": ["hal-00000001", "hal-00000002"]},
             ),
-            _notice(
+            _source_record(
                 conn,
                 source_id="hal2",
                 keys_dirty=False,
@@ -397,44 +451,48 @@ class TestUniverseMatchesPythonTokens:
             # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
             # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
             # Le numéro fait 8 chiffres (docid CCSD), exigence du VO.
-            _notice(
+            _source_record(
                 conn,
                 source_id="emse1",
                 keys_dirty=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
-            _notice(
+            _source_record(
                 conn,
                 source_id="emse2",
                 keys_dirty=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
-            _notice(conn, source_id="nnt1", keys_dirty=False, external_ids={"nnt": "2024UCA01"}),
-            _notice(conn, source_id="nnt2", keys_dirty=False, external_ids={"nnt": "2024UCA01"}),
-            _notice(
+            _source_record(
+                conn, source_id="nnt1", keys_dirty=False, external_ids={"nnt": "2024UCA01"}
+            ),
+            _source_record(
+                conn, source_id="nnt2", keys_dirty=False, external_ids={"nnt": "2024UCA01"}
+            ),
+            _source_record(
                 conn,
                 source_id="mb1",
                 title_normalized=long_a,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            _notice(
+            _source_record(
                 conn,
                 source_id="mb2",
                 title_normalized=long_a,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            _notice(
+            _source_record(
                 conn,
                 source_id="mbo",
                 title_normalized=long_b,
                 doc_type="conference_paper",
                 keys_dirty=False,
             ),
-            _notice(conn, source_id="s1", title_normalized=len30, keys_dirty=False),
-            _notice(conn, source_id="s2", title_normalized=len30, keys_dirty=False),
-            _notice(conn, source_id="lone", title_normalized="zz", keys_dirty=False),
+            _source_record(conn, source_id="s1", title_normalized=len30, keys_dirty=False),
+            _source_record(conn, source_id="s2", title_normalized=len30, keys_dirty=False),
+            _source_record(conn, source_id="lone", title_normalized="zz", keys_dirty=False),
         ]
         rows = {
             r.id: r
@@ -474,32 +532,34 @@ class TestExternalDoiCarrier:
 
     def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
         conn = sa_sync_conn
-        orphan_pub = _seed_pub(conn, doi="10.70675/abc")  # porte le DOI, aucune SP
-        sp1 = _notice(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
-        sp2 = _notice(conn, source_id="t2", doi="10.70675/abc")
+        orphan_publication = _seed_publication(conn, doi="10.70675/abc")  # porte le DOI, aucune SP
+        sp1 = _source_record(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
+        sp2 = _source_record(conn, source_id="t2", doi="10.70675/abc")
         # in_perimeter → sans le correctif, ce groupe d'orphelins serait une CRÉATION et
         # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
-        insert_signature(conn, sp1, source="openalex", author_position=None, in_perimeter=True)
+        insert_source_contribution(
+            conn, sp1, source="openalex", author_position=None, in_perimeter=True
+        )
 
         reconcile(conn, logger)
 
-        assert _pub_exists(conn, orphan_pub)
-        assert _sp_state(conn, sp1)[0] == orphan_pub
-        assert _sp_state(conn, sp2)[0] == orphan_pub
+        assert _publication_exists(conn, orphan_publication)
+        assert _source_record_state(conn, sp1)[0] == orphan_publication
+        assert _source_record_state(conn, sp2)[0] == orphan_publication
         n = conn.execute(
             text("SELECT count(*) FROM publications WHERE lower(doi) = '10.70675/abc'")
         ).scalar_one()
         assert n == 1
 
 
-def _distinct_dois(conn, pub_id) -> set[str]:
+def _distinct_dois(conn, publication_id) -> set[str]:
     return set(
         conn.execute(
             text(
                 "SELECT DISTINCT doi FROM source_records "
                 "WHERE publication_id = :id AND doi IS NOT NULL"
             ),
-            {"id": pub_id},
+            {"id": publication_id},
         ).scalars()
     )
 
@@ -521,72 +581,75 @@ class TestStaleMembership:
     def _seed_drifted_pair(self, conn) -> tuple[int, int, int]:
         """Une publication au DOI de préversion, ses deux SP, et plus aucune clé partagée entre
         elles : DOI distincts, aucun identifiant commun, titres absents (pas de token bloc)."""
-        pub = _seed_pub(conn, doi=self.PREPRINT_DOI)
-        preprint = _notice(
+        publication = _seed_publication(conn, doi=self.PREPRINT_DOI)
+        preprint = _source_record(
             conn,
-            pub,
+            publication,
             source_id="preprint",
             doi=self.PREPRINT_DOI,
             doc_type="preprint",
             keys_dirty=False,
         )
-        published = _notice(conn, pub, source_id="published", doi=self.PUBLISHED_DOI)
-        return pub, preprint, published
+        published = _source_record(conn, publication, source_id="published", doi=self.PUBLISHED_DOI)
+        return publication, preprint, published
 
     def test_siblings_of_a_dirty_source_record_are_marked(self, sa_sync_conn):
         """La propagation marque les co-rattachées, et elles seules : ni les SP d'une autre
         publication, ni les orphelines."""
         conn = sa_sync_conn
         _, preprint, _ = self._seed_drifted_pair(conn)
-        other = _notice(conn, _seed_pub(conn), source_id="other", keys_dirty=False)
-        orphan = _notice(conn, source_id="orphan", keys_dirty=False)
+        other = _source_record(conn, _seed_publication(conn), source_id="other", keys_dirty=False)
+        orphan = _source_record(conn, source_id="orphan", keys_dirty=False)
 
         assert mark_publication_siblings_dirty(conn) == 1
-        assert _sp_state(conn, preprint)[1] is True
-        assert _sp_state(conn, other)[1] is False
-        assert _sp_state(conn, orphan)[1] is False
+        assert _source_record_state(conn, preprint)[1] is True
+        assert _source_record_state(conn, other)[1] is False
+        assert _source_record_state(conn, orphan)[1] is False
 
     def test_source_record_without_shared_key_is_split_off(self, sa_sync_conn):
         conn = sa_sync_conn
-        pub, preprint, published = self._seed_drifted_pair(conn)
+        publication, preprint, published = self._seed_drifted_pair(conn)
 
         reconcile(conn, logger)
 
-        preprint_pub, preprint_dirty = _sp_state(conn, preprint)
-        published_pub, published_dirty = _sp_state(conn, published)
-        assert preprint_pub != published_pub
+        preprint_publication, preprint_dirty = _source_record_state(conn, preprint)
+        published_publication, published_dirty = _source_record_state(conn, published)
+        assert preprint_publication != published_publication
         # Ancre = porteur du DOI : la publication reste à la préversion, dont elle porte le DOI.
-        assert preprint_pub == pub
+        assert preprint_publication == publication
         assert (preprint_dirty, published_dirty) == (False, False)
-        assert _distinct_dois(conn, preprint_pub) == {self.PREPRINT_DOI}
-        assert _distinct_dois(conn, published_pub) == {self.PUBLISHED_DOI}
+        assert _distinct_dois(conn, preprint_publication) == {self.PREPRINT_DOI}
+        assert _distinct_dois(conn, published_publication) == {self.PUBLISHED_DOI}
 
 
 class TestFirstHalIdKey:
     """Une notice qui liste deux dépôts HAL rejoint la publication du premier, et laisse les deux dépôts distincts."""
 
-    def test_bridge_notice_joins_first_listed_deposit_only(self, sa_sync_conn):
+    def test_bridge_source_record_joins_first_listed_deposit_only(self, sa_sync_conn):
         conn = sa_sync_conn
-        pub = _seed_pub(conn)
-        first = _notice(
+        publication = _seed_publication(conn)
+        first = _source_record(
             conn,
-            pub,
+            publication,
             source_id="hal-01234567",
             doc_type="conference_paper",
             external_ids={"hal_id": ["hal-01234567"]},
         )
-        second = _notice(
+        second = _source_record(
             conn,
-            pub,
+            publication,
             source_id="hal-07654321",
             doc_type="book_chapter",
             external_ids={"hal_id": ["hal-07654321"]},
         )
-        bridge = _notice(
-            conn, pub, source_id="W1", external_ids={"hal_id": ["hal-01234567", "hal-07654321"]}
+        bridge = _source_record(
+            conn,
+            publication,
+            source_id="W1",
+            external_ids={"hal_id": ["hal-01234567", "hal-07654321"]},
         )
 
         reconcile(conn, logger)
 
-        assert _sp_state(conn, bridge)[0] == _sp_state(conn, first)[0]
-        assert _sp_state(conn, second)[0] != _sp_state(conn, first)[0]
+        assert _source_record_state(conn, bridge)[0] == _source_record_state(conn, first)[0]
+        assert _source_record_state(conn, second)[0] != _source_record_state(conn, first)[0]

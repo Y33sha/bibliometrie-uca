@@ -22,7 +22,7 @@ type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];
  * Publication regroupant toutes ses sources observées sous une même forme de nom. Le rejet porte sur la publication entière (toutes ses sources) : la modale affiche une ligne par publication, pas par source.
  */
 export interface DetachPublication {
-  pub_id: number;
+  publication_id: number;
   title: string;
   publication_year: number | null;
   sources: Pick<NameFormContributionRef, "source" | "source_contribution_id">[];

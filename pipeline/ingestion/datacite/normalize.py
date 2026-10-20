@@ -17,11 +17,11 @@ from sqlalchemy import Connection
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
@@ -31,8 +31,8 @@ from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from domain.urls import is_host
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
@@ -150,13 +150,13 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
 # =============================================================
 
 
-def _creator_name(creator: Mapping[str, JsonValue]) -> SignatureName | None:
+def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
     """Nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés. Sinon la chaîne brute : `familyName` seul porte souvent le nom complet."""
     given = (as_str(creator.get("givenName")) or "").strip()
     family = (as_str(creator.get("familyName")) or "").strip()
     if given and family:
-        return SignatureName.from_parts(family, given)
-    return SignatureName.from_raw(as_str(creator.get("name")) or family or given)
+        return ContributorName.from_parts(family, given)
+    return ContributorName.from_raw(as_str(creator.get("name")) or family or given)
 
 
 def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
@@ -218,7 +218,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
         if name is None:
             continue
         ids = ids_by_position[position]
-        addresses, signature_rors = _creator_affiliations(creator)
+        addresses, source_contribution_rors = _creator_affiliations(creator)
         records.append(
             AuthorRecord(
                 position=position,
@@ -227,7 +227,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
                 roles=[ContributionRole.AUTHOR],
                 identifiers=ids if ids else None,
                 addresses=addresses,
-                ror_ids=signature_rors,
+                ror_ids=source_contribution_rors,
             )
         )
     return records

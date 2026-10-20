@@ -127,7 +127,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
     return {(r.name_form, r.person_id): r.status for r in rows}
 
 
-def fetch_rejected_person_ids_by_pub(conn: Connection) -> dict[int, frozenset[int]]:
+def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
     """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'une de ses notices l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
     rows = conn.execute(
         text(f"""
@@ -195,7 +195,7 @@ class _Cascade:
         self._hal_account_map = fetch_identifier_to_person_map(conn, "hal_person_id")
         self._name_form_map = fetch_name_form_map(conn)
         self._name_form_status = fetch_name_form_status_map(conn)
-        self._rejected_by_pub = fetch_rejected_person_ids_by_pub(conn)
+        self._rejected_by_publication = fetch_rejected_person_ids_by_publication(conn)
         # Personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
         self._namesakes: dict[str, list[Namesake]] = defaultdict(list)
         self._namesake_of: dict[int, Namesake] = {}
@@ -229,22 +229,22 @@ class _Cascade:
                     first_norm=a.first_norm,
                     candidates=candidates,
                 )
-        rejected_for_pub = self._rejected_for(a)
+        rejected_for_publication = self._rejected_for(a)
         # Barreau name_form réservé au périmètre : hors-périmètre, un nom seul ne peut ni attacher ni créer (les candidats sont ancrés sur un identifiant ou un groupe).
         if a.in_perimeter:
-            name_form_outcome = self._name_form_outcome(a, rejected_for_pub)
+            name_form_outcome = self._name_form_outcome(a, rejected_for_publication)
         else:
             name_form_outcome = NameFormDecision(action="skip", reason=MatchReason.OUT_OF_PERIMETER)
-        return cross_source_match, name_form_outcome, rejected_for_pub
+        return cross_source_match, name_form_outcome, rejected_for_publication
 
     def _rejected_for(self, a: EnrichedContribution) -> frozenset[int]:
         """Personnes rejetées pour la publication de la signature."""
         if a.publication_id is None:
             return frozenset()
-        return self._rejected_by_pub.get(a.publication_id, frozenset())
+        return self._rejected_by_publication.get(a.publication_id, frozenset())
 
     def _name_form_outcome(
-        self, a: EnrichedContribution, rejected_for_pub: frozenset[int]
+        self, a: EnrichedContribution, rejected_for_publication: frozenset[int]
     ) -> NameFormDecision:
         """Décision par la forme du nom, contre l'index vivant des formes ; à forme inconnue, par les initiales compatibles."""
         person_ids = next(
@@ -254,7 +254,7 @@ class _Cascade:
         return decide_name_form_outcome(
             person_ids,
             a.allow_create,
-            rejected_person_ids=rejected_for_pub,
+            rejected_person_ids=rejected_for_publication,
             compatible_person_ids=compatible,
         )
 
@@ -267,7 +267,7 @@ class _Cascade:
 
     def decide_full(self, a: EnrichedContribution) -> PersonMatchDecision:
         """Décision complète, identifiants compris ; compte les refus de corroboration. Pour `match`."""
-        cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
+        cross_source_match, name_form_outcome, rejected_for_publication = self._cross_and_name(a)
         idref = a.identifiers.get(PersonIdentifierType.IDREF)
         hal_person_id = a.identifiers.get(PersonIdentifierType.HAL_PERSON_ID)
         idref_decision = decide_match_by_identifier(
@@ -300,19 +300,19 @@ class _Cascade:
             idref_match=idref_decision.person_id,
             cross_source_match=cross_source_match,
             name_form_outcome=name_form_outcome,
-            rejected_person_ids=rejected_for_pub,
+            rejected_person_ids=rejected_for_publication,
         )
 
     def decide_cross_and_name(self, a: EnrichedContribution) -> PersonMatchDecision:
         """Décision cross-source + nom seulement (sans identifiant). Pour `create` : les restantes n'ont aucun match identifiant, sinon `match` les aurait prises."""
-        cross_source_match, name_form_outcome, rejected_for_pub = self._cross_and_name(a)
+        cross_source_match, name_form_outcome, rejected_for_publication = self._cross_and_name(a)
         return decide_person_match(
             orcid_match=None,
             hal_match=None,
             idref_match=None,
             cross_source_match=cross_source_match,
             name_form_outcome=name_form_outcome,
-            rejected_person_ids=rejected_for_pub,
+            rejected_person_ids=rejected_for_publication,
         )
 
     def resolve_or_create(self, a: EnrichedContribution) -> bool:

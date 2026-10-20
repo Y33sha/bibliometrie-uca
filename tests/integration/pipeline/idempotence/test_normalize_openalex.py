@@ -104,7 +104,7 @@ def run_normalize_oa(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
     from pipeline.ingestion.common.source_records import (
         SourceRecordQueries,
     )

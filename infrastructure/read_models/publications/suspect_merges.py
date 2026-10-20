@@ -3,16 +3,16 @@
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.publications_queries import (
-    SuspectMergeNoticeOut,
     SuspectMergeOut,
+    SuspectMergeSourceRecordOut,
     SuspectMergesResponse,
 )
 from domain.publications.contribution_roles import ContributionRole
 
 # Moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice.
-_SUSPECT = "2 * pa.matched_source_contributions < pa.signatures"
+_SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
 
-_NOTICES_SQL = text(f"""
+_SOURCE_RECORDS_SQL = text(f"""
     WITH members AS (
         SELECT g.publication_id, gs.source_record_id,
                count(*) OVER (PARTITION BY gs.group_id) AS group_size
@@ -23,7 +23,7 @@ _NOTICES_SQL = text(f"""
           AND (sa.roles IS NULL OR '{ContributionRole.AUTHOR.value}' = ANY(sa.roles))
     )
     SELECT m.publication_id, sp.source::text AS source, sp.source_id,
-           count(*) AS signatures, count(*) FILTER (WHERE m.group_size >= 2) AS matched_source_contributions
+           count(*) AS source_contributions, count(*) FILTER (WHERE m.group_size >= 2) AS matched_source_contributions
     FROM members m
     JOIN source_records sp ON sp.id = m.source_record_id
     GROUP BY m.publication_id, sp.source, sp.source_id
@@ -46,22 +46,22 @@ def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMerg
     rows = conn.execute(
         text(f"""
             SELECT pa.publication_id, p.title, p.publication_year, p.doc_type::text AS doc_type,
-                   pa.signatures, pa.matched_source_contributions
+                   pa.source_contributions, pa.matched_source_contributions
             FROM publication_author_alignment pa
             JOIN publications p ON p.id = pa.publication_id
             WHERE {_SUSPECT}
-            ORDER BY pa.matched_source_contributions::float / pa.signatures, pa.signatures DESC, pa.publication_id
+            ORDER BY pa.matched_source_contributions::float / pa.source_contributions, pa.source_contributions DESC, pa.publication_id
             LIMIT :limit OFFSET :offset
         """),  # noqa: S608
         {"limit": per_page, "offset": (page - 1) * per_page},
     ).all()
-    notices: dict[int, list[SuspectMergeNoticeOut]] = {}
-    for n in conn.execute(_NOTICES_SQL, {"publications": [r.publication_id for r in rows]}):
-        notices.setdefault(n.publication_id, []).append(
-            SuspectMergeNoticeOut(
+    source_records: dict[int, list[SuspectMergeSourceRecordOut]] = {}
+    for n in conn.execute(_SOURCE_RECORDS_SQL, {"publications": [r.publication_id for r in rows]}):
+        source_records.setdefault(n.publication_id, []).append(
+            SuspectMergeSourceRecordOut(
                 source=n.source,
                 source_id=n.source_id,
-                signatures=n.signatures,
+                source_contributions=n.source_contributions,
                 matched_source_contributions=n.matched_source_contributions,
             )
         )
@@ -75,9 +75,9 @@ def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMerg
                 title=r.title,
                 publication_year=r.publication_year,
                 doc_type=r.doc_type,
-                signatures=r.signatures,
+                source_contributions=r.source_contributions,
                 matched_source_contributions=r.matched_source_contributions,
-                notices=notices.get(r.publication_id, []),
+                source_records=source_records.get(r.publication_id, []),
             )
             for r in rows
         ],

@@ -33,9 +33,9 @@ from domain.persons.matching import (
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
-    DETACHED_SIGNATURE,
+    DETACHED_SOURCE_CONTRIBUTION,
     identifier_neutralized,
-    person_signature,
+    person_source_contribution,
     pinned,
     trusted_identifier_sql,
 )
@@ -51,7 +51,7 @@ from pipeline.runtime.observability.progression import attente
 from pipeline.transformation.persons.store import PersonsStore
 
 
-class IdentityIdentifier(NamedTuple):
+class ContributorInformationIdentifier(NamedTuple):
     """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
 
     contributor_information_id: int
@@ -90,7 +90,7 @@ def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str
             JOIN source_contributions sa ON sa.contributor_information_id = aik.id
             WHERE aik.identifiers ? :id_type
               AND aik.author_name_normalized IS NOT NULL
-              AND {person_signature("sa")}
+              AND {person_source_contribution("sa")}
               AND NOT {_ID_TYPE_SHARED}
               AND {trusted_identifier_sql(id_type, "sa")}
             GROUP BY 1, 2
@@ -105,7 +105,7 @@ def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str
 
 def fetch_contributor_information_identifiers(
     conn: Connection, id_type: str
-) -> list[IdentityIdentifier]:
+) -> list[ContributorInformationIdentifier]:
     """Identités portant un identifiant du type, avec leur nom normalisé."""
     rows = conn.execute(
         text("""
@@ -115,7 +115,7 @@ def fetch_contributor_information_identifiers(
         """),
         {"id_type": id_type},
     ).all()
-    return [IdentityIdentifier(r.id, r.name, r.value) for r in rows]
+    return [ContributorInformationIdentifier(r.id, r.name, r.value) for r in rows]
 
 
 def write_misplaced_neutralizations(
@@ -241,14 +241,14 @@ def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tupl
     return [(r.id_value, r.person_id) for r in rows]
 
 
-def null_identifier_signatures(
+def null_identifier_source_contributions(
     conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
 ) -> int:
     """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
     return conn.execute(
         text(f"""
             UPDATE source_contributions sa
-            SET {DETACHED_SIGNATURE}
+            SET {DETACHED_SOURCE_CONTRIBUTION}
             FROM contributor_information aik
             WHERE sa.contributor_information_id = aik.id
               AND sa.person_id = :old_owner
@@ -285,12 +285,16 @@ def requalify_misplaced_identifiers(
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
-        for identity in fetch_contributor_information_identifiers(conn, id_type):
-            if identifier_misplaced(identity.name, consensus.get((id_type, identity.value))):
-                misplaced[identity.contributor_information_id].append(id_type)
+        for information in fetch_contributor_information_identifiers(conn, id_type):
+            if identifier_misplaced(information.name, consensus.get((id_type, information.value))):
+                misplaced[information.contributor_information_id].append(id_type)
 
     written = write_misplaced_neutralizations(conn, misplaced)
-    detached = PersonsStore(conn).detach_signatures(written.to_detach) if written.to_detach else 0
+    detached = (
+        PersonsStore(conn).detach_source_contributions(written.to_detach)
+        if written.to_detach
+        else 0
+    )
     return {"neutralized": written.neutralized, "detached": detached}
 
 
@@ -380,7 +384,7 @@ def resolve_identifier_transfers(
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
         # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
-        detached = null_identifier_signatures(conn, id_type, id_value, owner_id)
+        detached = null_identifier_source_contributions(conn, id_type, id_value, owner_id)
         logger.info(
             "%sTransfert %s=%s : personne %d → %d (consensus %r), %s %s",
             BRANCHE,

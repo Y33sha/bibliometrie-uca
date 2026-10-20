@@ -17,9 +17,9 @@ import random
 
 random.seed(11)
 
-SP = "#dfe8f7"
-SP_EDGE = "#8aa0c8"
-PUB = "#7ea2e8"
+SOURCE_RECORD = "#dfe8f7"
+SOURCE_RECORD_EDGE = "#8aa0c8"
+PUBLICATION = "#7ea2e8"
 KEY = "#9aa0a8"
 ATTACH = "#b9c6de"
 CUT = "#c0392b"
@@ -29,16 +29,16 @@ _n = [0]
 L = []
 
 
-def sp(orphan: bool = False) -> str:
+def source_record(orphan: bool = False) -> str:
     _n[0] += 1
     name = f"S{_n[0]}"
-    fill, col = ("#f0d9d5", CUT) if orphan else (SP, SP_EDGE)
+    fill, col = ("#f0d9d5", CUT) if orphan else (SOURCE_RECORD, SOURCE_RECORD_EDGE)
     L.append(f'  {name} [fillcolor="{fill}", color="{col}"];')
     return name
 
 
 def cluster(size: int) -> list[str]:
-    nodes = [sp() for _ in range(size)]
+    nodes = [source_record() for _ in range(size)]
     L.extend(f"  {nodes[i]} -- {nodes[random.randint(0, i - 1)]};" for i in range(1, len(nodes)))
     for _ in range(max(0, size - 3)):
         a, b = random.sample(nodes, 2)
@@ -48,7 +48,7 @@ def cluster(size: int) -> list[str]:
 
 def publication(name: str) -> None:
     L.append(
-        f'  {name} [shape=box, style="filled,rounded", fillcolor="{PUB}", color="#4f74c4", '
+        f'  {name} [shape=box, style="filled,rounded", fillcolor="{PUBLICATION}", color="#4f74c4", '
         f'width=0.85, height=0.4, fixedsize=false, fontname="Helvetica", fontsize=11, '
         f'label="publication"];'
     )
@@ -89,7 +89,12 @@ L.append(
 L.append("  Pf1 -- Pf2 [style=invis, len=1.0];")
 
 # ── sans suite : losange orphelin (incomplet) hors-périmètre, aucune publication ──
-o_t, o_l, o_r, o_b = sp(True), sp(True), sp(True), sp(True)
+o_t, o_l, o_r, o_b = (
+    source_record(True),
+    source_record(True),
+    source_record(True),
+    source_record(True),
+)
 # Losange volontairement incomplet (arête o_b–o_r en moins) pour éviter l'effet trop régulier.
 for a, b in [(o_t, o_l), (o_t, o_r), (o_b, o_l)]:
     L.append(f'  {a} -- {b} [color="{KEY}"];')

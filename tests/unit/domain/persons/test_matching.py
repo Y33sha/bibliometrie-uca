@@ -1,5 +1,6 @@
 """Tests des règles pures de matching de contributions à des personnes."""
 
+from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import (
     IdentifiedPerson,
     NameFormDecision,
@@ -18,15 +19,14 @@ from domain.persons.matching import (
     identifier_misplaced,
     trusted_identifier,
 )
-from domain.persons.signature_name import SignatureName
 
 
-def _sig(raw: str) -> SignatureName:
-    return SignatureName(raw=raw)
+def _contribution(raw: str) -> ContributorName:
+    return ContributorName(raw=raw)
 
 
-def _sigs(*raws: str) -> list[SignatureName]:
-    return [_sig(raw) for raw in raws]
+def _contributions(*raws: str) -> list[ContributorName]:
+    return [_contribution(raw) for raw in raws]
 
 
 class TestTrustedIdentifier:
@@ -64,7 +64,7 @@ class TestIdentifierMisplaced:
     def test_consensus_names_another_person(self):
         assert identifier_misplaced("t dado", "s dahbi")
 
-    def test_consensus_names_the_signature(self):
+    def test_consensus_names_the_source_contribution(self):
         assert not identifier_misplaced("dahbi s", "s dahbi")
 
     def test_spelling_variant_is_not_misplaced(self):
@@ -301,14 +301,14 @@ class TestDecideNameFormOutcome:
 
 
 class TestCompatibleNamesakes:
-    def test_full_signature_finds_the_reduced_person(self):
+    def test_full_name_finds_the_reduced_person(self):
         assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "A.")]) == [1]
 
-    def test_reduced_signature_finds_the_compound_first_name(self):
+    def test_reduced_name_finds_the_compound_first_name(self):
         """« A. » prolonge « Abdul-Majeed », dont les formes à initiales ne donnent que « a m »."""
         assert compatible_namesakes("A.", [Namesake(1, "Al-Izeri", "Abdul-Majeed")]) == [1]
 
-    def test_reduced_signature_finds_every_compatible_person(self):
+    def test_reduced_name_finds_every_compatible_person(self):
         namesakes = [
             Namesake(1, "Martin", "Julie"),
             Namesake(2, "Martin", "Joseph"),
@@ -329,11 +329,11 @@ class TestCompatibleNamesakes:
     def test_conflicting_reduced_person_is_not_a_candidate(self):
         assert compatible_namesakes("Julien", [Namesake(1, "Martin", "J.", conflicting=True)]) == []
 
-    def test_full_signature_ignores_full_namesakes(self):
+    def test_full_name_ignores_full_namesakes(self):
         """Deux prénoms pleins distincts désignent deux personnes, même à initiales communes."""
         assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "Abdelkader")]) == []
 
-    def test_signature_without_first_name(self):
+    def test_source_contribution_without_first_name(self):
         assert compatible_namesakes("", [Namesake(1, "Martin", "J.")]) == []
 
 
@@ -341,22 +341,22 @@ class TestCompatiblePersons:
     def test_double_family_name_without_particle(self):
         """« Florence Caldefie Chezet » : le découpage au dernier mot donne « Chezet », celui aux deux derniers mots trouve « Caldefie-Chezet F. »."""
         index = {"caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")]}
-        assert compatible_persons(_sig("Florence Caldefie Chezet"), index) == [1]
+        assert compatible_persons(_contribution("Florence Caldefie Chezet"), index) == [1]
 
     def test_candidates_of_every_split_add_up(self):
         index = {
             "caldefie chezet": [Namesake(1, "Caldefie-Chezet", "F.")],
             "chezet": [Namesake(2, "Chezet", "F.")],
         }
-        assert compatible_persons(_sig("Florence Caldefie Chezet"), index) == [1, 2]
+        assert compatible_persons(_contribution("Florence Caldefie Chezet"), index) == [1, 2]
 
     def test_comma_format_keeps_its_single_split(self):
         index = {"chezet": [Namesake(2, "Chezet", "F.")]}
-        assert compatible_persons(_sig("Caldefie Chezet, Florence"), index) == []
+        assert compatible_persons(_contribution("Caldefie Chezet, Florence"), index) == []
 
     def test_source_split_keeps_its_single_split(self):
         index = {"chezet": [Namesake(2, "Chezet", "F.")]}
-        name = SignatureName(last_name="Caldefie Chezet", first_name="Florence")
+        name = ContributorName(last_name="Caldefie Chezet", first_name="Florence")
         assert compatible_persons(name, index) == []
 
 
@@ -375,24 +375,26 @@ class TestFullNamesakes:
 
 class TestAttestedFullFirstNames:
     def test_keeps_compatible_full_first_names_of_the_same_family_name(self):
-        names = _sigs("Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont")
+        names = _contributions(
+            "Abdellah Tnourji", "Tnourji, A.", "Tnourji, Abdellah", "Abdellah Dupont"
+        )
         assert attested_full_first_names("Tnourji", ("a",), names) == {"abdellah": "Abdellah"}
 
     def test_double_family_name_without_comma(self):
-        names = _sigs("Florence Caldefie Chezet")
+        names = _contributions("Florence Caldefie Chezet")
         assert attested_full_first_names("Caldefie-Chezet", ("f",), names) == {
             "florence": "Florence"
         }
 
     def test_incompatible_first_name_is_ignored(self):
-        assert attested_full_first_names("Tnourji", ("a",), _sigs("Karim Tnourji")) == {}
+        assert attested_full_first_names("Tnourji", ("a",), _contributions("Karim Tnourji")) == {}
 
     def test_most_frequent_spelling_wins(self):
-        names = _sigs("Stephane Monteil", "Stéphane Monteil", "Stéphane Monteil")
+        names = _contributions("Stephane Monteil", "Stéphane Monteil", "Stéphane Monteil")
         assert attested_full_first_names("Monteil", ("s",), names) == {"stephane": "Stéphane"}
 
     def test_several_distinct_first_names(self):
-        names = _sigs("Jean Martin", "Julien Martin")
+        names = _contributions("Jean Martin", "Julien Martin")
         assert attested_full_first_names("Martin", ("j",), names).keys() == {"jean", "julien"}
 
 
@@ -400,7 +402,7 @@ class TestDecideMatchByIdentifier:
     def test_compatible_name_returns_person_id(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, _sig("Jean Dupont"), ("jean dupont",), {}
+            "252404955", idref_map, _contribution("Jean Dupont"), ("jean dupont",), {}
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -409,7 +411,7 @@ class TestDecideMatchByIdentifier:
         """Sans verdict, nom incompatible → match refusé (test de tokens), rejet journalisé."""
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
-            "252404955", idref_map, _sig("Paul Martin"), ("paul martin",), {}
+            "252404955", idref_map, _contribution("Paul Martin"), ("paul martin",), {}
         )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
@@ -420,7 +422,7 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "maneval", "axelle")}
         status = {("van lander axelle", 42): "confirmed"}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Van Lander Axelle"), ("van lander axelle",), status
+            "x", idref_map, _contribution("Van Lander Axelle"), ("van lander axelle",), status
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -430,31 +432,36 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Jean Dupont"), ("jean dupont",), status
+            "x", idref_map, _contribution("Jean Dupont"), ("jean dupont",), status
         )
         assert result.person_id is None
         assert result.rejection == (42, "jean dupont")
 
     def test_value_absent_returns_empty(self):
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("999999999", idref_map, _sig("X"), ("x",), {})
+        result = decide_match_by_identifier("999999999", idref_map, _contribution("X"), ("x",), {})
         assert result.person_id is None
         assert result.rejection is None
 
     def test_falsy_value_returns_empty(self):
         """Pas de tentative de lookup si la valeur est vide/None."""
         m = {"foo": IdentifiedPerson(1, "a", "b")}
-        assert decide_match_by_identifier(None, m, _sig("X"), ("x",), {}).person_id is None
-        assert decide_match_by_identifier("", m, _sig("X"), ("x",), {}).person_id is None
+        assert decide_match_by_identifier(None, m, _contribution("X"), ("x",), {}).person_id is None
+        assert decide_match_by_identifier("", m, _contribution("X"), ("x",), {}).person_id is None
 
     def test_empty_map(self):
-        assert decide_match_by_identifier("anything", {}, _sig("X"), ("x",), {}).person_id is None
+        assert (
+            decide_match_by_identifier("anything", {}, _contribution("X"), ("x",), {}).person_id
+            is None
+        )
 
-    def test_surname_only_signature_not_rejected(self):
+    def test_surname_only_source_contribution_not_rejected(self):
         """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
         donc pas de refus — on s'abstient plutôt que de rejeter."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
-        result = decide_match_by_identifier("x", idref_map, _sig("Dupont"), ("dupont",), {})
+        result = decide_match_by_identifier(
+            "x", idref_map, _contribution("Dupont"), ("dupont",), {}
+        )
         assert result.person_id == 42
         assert result.rejection is None
 
@@ -462,7 +469,7 @@ class TestDecideMatchByIdentifier:
         """La fonction est générique : même contrat pour IdRef et ORCID."""
         orcid_map = {"0000-0001-2345-6789": IdentifiedPerson(7, "curie", "marie")}
         result = decide_match_by_identifier(
-            "0000-0001-2345-6789", orcid_map, _sig("Marie Curie"), ("marie curie",), {}
+            "0000-0001-2345-6789", orcid_map, _contribution("Marie Curie"), ("marie curie",), {}
         )
         assert result.person_id == 7
 
@@ -471,7 +478,7 @@ class TestDecideMatchByIdentifier:
         rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
         idref_map = {"x": IdentifiedPerson(42, "khalil", "toufik")}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Toufic Khalil"), ("toufic khalil",), {}
+            "x", idref_map, _contribution("Toufic Khalil"), ("toufic khalil",), {}
         )
         assert result.person_id == 42
         assert result.rejection is None
@@ -481,7 +488,7 @@ class TestDecideMatchByIdentifier:
         corroboration par graphie)."""
         idref_map = {"x": IdentifiedPerson(42, "chanal", "helene")}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Herve Chanal"), ("herve chanal",), {}
+            "x", idref_map, _contribution("Herve Chanal"), ("herve chanal",), {}
         )
         assert result.person_id is None
         assert result.rejection == (42, "helene chanal")
@@ -491,7 +498,7 @@ class TestDecideMatchByIdentifier:
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier(
-            "x", idref_map, _sig("Dupont Jean"), ("dupont jean", "jean dupont"), status
+            "x", idref_map, _contribution("Dupont Jean"), ("dupont jean", "jean dupont"), status
         )
         assert result.person_id is None
 

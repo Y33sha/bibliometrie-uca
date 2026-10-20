@@ -127,7 +127,7 @@
 - 2026-05-30 — [Exploitation de l'API CrossRef](archived/2026-05-30_METIER_crossref.md)
 - 2026-05-30 — [Cascade unifiée de matching personnes (`decide_person_match`)](archived/2026-05-30_METIER_decide-person-match.md)
 - 2026-05-29 — [Publishers & Journals : typage, pipeline, cohérence, UI](archived/2026-05-29_METIER_publishers-journals.md)
-- 2026-05-29 — [Dérive `pub_meta` des normalizers](archived/2026-05-29_CODE_normalizers-pub-meta-drift.md)
+- 2026-05-29 — [Dérive `publication_meta` des normalizers](archived/2026-05-29_CODE_normalizers-pub-meta-drift.md)
 - 2026-05-28 — [Correction des métadonnées canoniques](archived/2026-05-28_METIER_metadata-correction.md)
 - 2026-05-28 — [Déduplication des publications par métadonnées](archived/2026-05-28_METIER_metadata-deduplication.md)
 - 2026-05-26 — [Pipeline : phase `publishers_journals` (référentiels enrichis)](archived/2026-05-26_METIER_pipeline-publishers-journals.md)

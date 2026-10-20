@@ -10,7 +10,7 @@ from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
-def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
+def _insert_source_record(conn, source, source_id, external_ids, *, publication_id) -> None:
     """Crée un source_record `source` rattaché à `publication_id`, avec sa ligne staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_record(
@@ -34,7 +34,7 @@ class TestFindMissingHalIds:
     def _carry(conn, source, source_id, hal_ids, *, in_perimeter=True):
         external_ids = {"hal_id": hal_ids} if hal_ids is not None else {}
         publication_id = insert_publication(conn, in_perimeter=in_perimeter)
-        _insert_sp(conn, source, source_id, external_ids, publication_id=publication_id)
+        _insert_source_record(conn, source, source_id, external_ids, publication_id=publication_id)
 
     @staticmethod
     def _missing(conn) -> list[str]:
@@ -88,7 +88,7 @@ class TestFindMissingNnts:
     @staticmethod
     def _thesis(conn, nnt) -> int:
         publication_id = insert_publication(conn, doc_type="thesis", in_perimeter=True)
-        _insert_sp(conn, "theses", nnt, {"nnt": nnt}, publication_id=publication_id)
+        _insert_source_record(conn, "theses", nnt, {"nnt": nnt}, publication_id=publication_id)
         return publication_id
 
     @staticmethod
@@ -101,14 +101,16 @@ class TestFindMissingNnts:
 
     def test_excludes_thesis_with_hal_record(self, sa_sync_conn):
         publication_id = self._thesis(sa_sync_conn, "2024UCA0001")
-        _insert_sp(sa_sync_conn, "hal", "tel-01", {}, publication_id=publication_id)
+        _insert_source_record(sa_sync_conn, "hal", "tel-01", {}, publication_id=publication_id)
         assert self._missing(sa_sync_conn) == []
 
     def test_excludes_nnt_carried_by_a_hal_record(self, sa_sync_conn):
         """Un document HAL porte le NNT sans être rattaché à la thèse : HAL le connaît déjà."""
         self._thesis(sa_sync_conn, "2024UCA0001")
         autre = insert_publication(sa_sync_conn, doc_type="thesis", in_perimeter=True)
-        _insert_sp(sa_sync_conn, "hal", "tel-01", {"nnt": "2024UCA0001"}, publication_id=autre)
+        _insert_source_record(
+            sa_sync_conn, "hal", "tel-01", {"nnt": "2024UCA0001"}, publication_id=autre
+        )
         assert self._missing(sa_sync_conn) == []
 
     def test_excludes_nnt_waiting_for_retry(self, sa_sync_conn):

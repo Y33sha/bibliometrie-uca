@@ -6,11 +6,11 @@ from sqlalchemy import Connection, Row, text
 
 from application.ports.read_models.publications_queries import (
     PublicationSourcesResponse,
+    SourceContributionOut,
     SourceRecordMetadataOut,
-    SourceSignatureOut,
 )
 from infrastructure.read_models.publications.detail import structures_by_id
-from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import stashed_raw
 
 
@@ -74,12 +74,12 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
     )
 
 
-def _signatures(conn: Connection, pub_id: int) -> list[SourceSignatureOut]:
+def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
     """Signatures des enregistrements de la publication, avec leur groupe et leur entrée dans le groupe."""
     rows = conn.execute(
         text(f"""
             SELECT sa.id, sa.source_record_id, sa.author_position AS position,
-                   {signature_display_name()} AS full_name, sa.roles, sa.person_id,
+                   {contributor_display_name()} AS full_name, sa.roles, sa.person_id,
                    sa.in_perimeter, sa.collective, sa.countries,
                    (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
                     FROM source_contribution_structures sas
@@ -97,10 +97,10 @@ def _signatures(conn: Connection, pub_id: int) -> list[SourceSignatureOut]:
             WHERE sp.publication_id = :pid
             ORDER BY sa.source_record_id, sa.author_position NULLS LAST, sa.id
         """),  # noqa: S608
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
     return [
-        SourceSignatureOut(
+        SourceContributionOut(
             id=r.id,
             source_record_id=r.source_record_id,
             position=r.position,
@@ -122,10 +122,12 @@ def _signatures(conn: Connection, pub_id: int) -> list[SourceSignatureOut]:
     ]
 
 
-def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSourcesResponse | None:
-    """Métadonnées et signatures de chaque enregistrement source de la publication `pub_id`, ou `None` si la publication n'existe pas."""
+def get_publication_sources(
+    conn: Connection, publication_id: int
+) -> PublicationSourcesResponse | None:
+    """Métadonnées et signatures de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
     title = conn.execute(
-        text("SELECT title FROM publications WHERE id = :pid"), {"pid": pub_id}
+        text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
     ).scalar_one_or_none()
     if title is None:
         return None
@@ -145,14 +147,14 @@ def get_publication_sources(conn: Connection, pub_id: int) -> PublicationSources
             WHERE sp.publication_id = :pid
             ORDER BY sp.source, sp.source_id
         """),
-        {"pid": pub_id},
+        {"pid": publication_id},
     ).all()
-    signatures = _signatures(conn, pub_id)
+    source_contributions = _source_contributions(conn, publication_id)
     return PublicationSourcesResponse(
         title=title,
         source_records=[_record(r) for r in rows],
-        signatures=signatures,
+        source_contributions=source_contributions,
         structures=structures_by_id(
-            conn, {sid for s in signatures for sid in s.structure_ids or []}
+            conn, {sid for s in source_contributions for sid in s.structure_ids or []}
         ),
     )

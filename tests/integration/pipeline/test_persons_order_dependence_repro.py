@@ -21,64 +21,66 @@ from pipeline.transformation.persons.purge import purge
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _LOG = logging.getLogger("test")
 
 
-def _seed_signature(conn, *, pub_id, raw_name, name_norm):
+def _seed_source_contribution(conn, *, publication_id, raw_name, name_norm):
     """Publication + source_record + signature in-périmètre non rattachée, portant
-    l'identité `name_norm` (sans identifiant). L'id de la signature = `pub_id`, ce qui
+    l'identité `name_norm` (sans identifiant). L'id de la signature = `publication_id`, ce qui
     fixe l'ordre de traitement."""
-    insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
+    insert_publication(conn, f"pub {publication_id}", row_id=publication_id)
     insert_source_record(
         conn,
-        pub_id,
-        source_id=f"hal-{pub_id}",
-        title=f"pub {pub_id}",
-        row_id=pub_id,
+        publication_id,
+        source_id=f"hal-{publication_id}",
+        title=f"pub {publication_id}",
+        row_id=publication_id,
         publication_year=2024,
         doc_type="ART",
     )
-    insert_signature(
+    insert_source_contribution(
         conn,
-        pub_id,
-        row_id=pub_id,
+        publication_id,
+        row_id=publication_id,
         raw_author_name=raw_name,
         author_name_normalized=name_norm,
         in_perimeter=True,
     )
 
 
-def _seed_two_notices(conn, *, pub_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2, grouped=True):
+def _seed_two_source_records(
+    conn, *, publication_id, sa1_id, raw1, norm1, sa2_id, raw2, norm2, grouped=True
+):
     """Une publication vue par HAL (notice `sa1_id`) et OpenAlex (notice `sa2_id`), une signature non rattachée chacune, en position 0. `grouped` : les deux signatures forment un groupe, celui d'un même auteur."""
-    insert_publication(conn, f"pub {pub_id}", row_id=pub_id)
-    for sp_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
+    insert_publication(conn, f"pub {publication_id}", row_id=publication_id)
+    for source_record_id, source in ((sa1_id, "hal"), (sa2_id, "openalex")):
         insert_source_record(
             conn,
-            pub_id,
+            publication_id,
             source=source,
-            source_id=f"{source}-{sp_id}",
-            title=f"pub {pub_id}",
-            row_id=sp_id,
+            source_id=f"{source}-{source_record_id}",
+            title=f"pub {publication_id}",
+            row_id=source_record_id,
             publication_year=2024,
             doc_type="ART",
         )
-    for sa_id, source, raw, norm in (
+    for source_contribution_id, source, raw, norm in (
         (sa1_id, "hal", raw1, norm1),
         (sa2_id, "openalex", raw2, norm2),
     ):
-        insert_signature(
+        insert_source_contribution(
             conn,
-            sa_id,
+            source_contribution_id,
             source=source,
-            row_id=sa_id,
+            row_id=source_contribution_id,
             raw_author_name=raw,
             author_name_normalized=norm,
             in_perimeter=True,
         )
     if grouped:
-        insert_group(conn, pub_id, [(sa1_id, sa1_id), (sa2_id, sa2_id)])
+        insert_group(conn, publication_id, [(sa1_id, sa1_id), (sa2_id, sa2_id)])
 
 
 def _run_create(conn):
@@ -114,9 +116,10 @@ def _martin_count(conn) -> int:
     ).scalar_one()
 
 
-def _person_of(conn, sa_id):
+def _person_of(conn, source_contribution_id):
     return conn.execute(
-        text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": sa_id}
+        text("SELECT person_id FROM source_contributions WHERE id = :i"),
+        {"i": source_contribution_id},
     ).scalar_one()
 
 
@@ -124,8 +127,12 @@ def test_full_then_initial_merges(sa_sync_conn):
     """Forme pleine (id bas, traitée d'abord) puis initiale dans le même run : la personne
     créée en « Jean Martin » sème « j martin », la signature « J Martin » s'y rattache —
     une seule personne."""
-    _seed_signature(sa_sync_conn, pub_id=95001, raw_name="Jean Martin", name_norm="jean martin")
-    _seed_signature(sa_sync_conn, pub_id=95002, raw_name="J Martin", name_norm="j martin")
+    _seed_source_contribution(
+        sa_sync_conn, publication_id=95001, raw_name="Jean Martin", name_norm="jean martin"
+    )
+    _seed_source_contribution(
+        sa_sync_conn, publication_id=95002, raw_name="J Martin", name_norm="j martin"
+    )
     _run_create(sa_sync_conn)
     assert _martin_count(sa_sync_conn) == 1
 
@@ -143,24 +150,28 @@ def _martin_first_names(conn) -> list[str]:
     )
 
 
-def _seed_person(conn, last_name, first_name, *, signatures=()):
+def _seed_person(conn, last_name, first_name, *, source_contributions=()):
     """Personne existante, rattachée par son nom aux signatures `signatures` (ids)."""
     pid = create_person(last_name, first_name, repo=person_repository(conn))
-    for sa_id in signatures:
+    for source_contribution_id in source_contributions:
         conn.execute(
             text(
                 "UPDATE source_contributions SET person_id = :p, resolution_mode = 'name' "
                 "WHERE id = :s"
             ),
-            {"p": pid, "s": sa_id},
+            {"p": pid, "s": source_contribution_id},
         )
     return pid
 
 
 def test_initial_then_full_joins_in_a_single_run(sa_sync_conn):
     """Forme initiale (id bas) puis pleine : « J Martin » crée « Martin J » ; « Jean Martin », de forme inconnue, la rejoint par ses initiales compatibles, et la personne prend le prénom « Jean »."""
-    _seed_signature(sa_sync_conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
-    _seed_signature(sa_sync_conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
+    _seed_source_contribution(
+        sa_sync_conn, publication_id=95003, raw_name="J Martin", name_norm="j martin"
+    )
+    _seed_source_contribution(
+        sa_sync_conn, publication_id=95004, raw_name="Jean Martin", name_norm="jean martin"
+    )
     _run_create(sa_sync_conn)
     assert _martin_first_names(sa_sync_conn) == ["jean"]
     assert _person_of(sa_sync_conn, 95003) == _person_of(sa_sync_conn, 95004)
@@ -169,8 +180,10 @@ def test_initial_then_full_joins_in_a_single_run(sa_sync_conn):
 def test_initial_then_full_stays_joined_over_runs(sa_sync_conn):
     """Le peuplement des formes et la purge ne défont pas le regroupement : « j martin » reste univoque, portée par « Jean Martin » seule."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95003, raw_name="J Martin", name_norm="j martin")
-    _seed_signature(conn, pub_id=95004, raw_name="Jean Martin", name_norm="jean martin")
+    _seed_source_contribution(conn, publication_id=95003, raw_name="J Martin", name_norm="j martin")
+    _seed_source_contribution(
+        conn, publication_id=95004, raw_name="Jean Martin", name_norm="jean martin"
+    )
     _run_phase(conn)
     _run_phase(conn)
     assert _martin_first_names(conn) == ["jean"]
@@ -178,13 +191,18 @@ def test_initial_then_full_stays_joined_over_runs(sa_sync_conn):
     assert _person_of(conn, 95003) == _person_of(conn, 95004)
 
 
-def test_reduced_signature_joins_a_compound_first_name(sa_sync_conn):
+def test_reduced_name_joins_a_compound_first_name(sa_sync_conn):
     """« Al-Izeri, A. » rejoint « Abdul-Majeed Al-Izeri » : les formes à initiales d'un prénom composé ne donnent que « a m al izeri », les initiales compatibles couvrent « a »."""
     conn = sa_sync_conn
-    _seed_signature(
-        conn, pub_id=95070, raw_name="Abdul-Majeed Al-Izeri", name_norm="abdul majeed al izeri"
+    _seed_source_contribution(
+        conn,
+        publication_id=95070,
+        raw_name="Abdul-Majeed Al-Izeri",
+        name_norm="abdul majeed al izeri",
     )
-    _seed_signature(conn, pub_id=95071, raw_name="Al-Izeri, A.", name_norm="al izeri a")
+    _seed_source_contribution(
+        conn, publication_id=95071, raw_name="Al-Izeri, A.", name_norm="al izeri a"
+    )
     _run_create(conn)
     count = conn.execute(
         text("SELECT COUNT(*) FROM persons WHERE last_name_normalized = 'al izeri'")
@@ -196,11 +214,15 @@ def test_reduced_signature_joins_a_compound_first_name(sa_sync_conn):
 def test_a_completed_first_name_turns_away_another_first_name(sa_sync_conn):
     """« Martin J » complétée en « Jean » : « Julie Martin » crée sa propre personne, et « J Martin », devenue ambiguë entre Jean et Julie, est re-orphelinée par la purge."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95080, raw_name="J Martin", name_norm="j martin")
-    _seed_signature(conn, pub_id=95081, raw_name="Jean Martin", name_norm="jean martin")
+    _seed_source_contribution(conn, publication_id=95080, raw_name="J Martin", name_norm="j martin")
+    _seed_source_contribution(
+        conn, publication_id=95081, raw_name="Jean Martin", name_norm="jean martin"
+    )
     _run_phase(conn)
 
-    _seed_signature(conn, pub_id=95082, raw_name="Julie Martin", name_norm="julie martin")
+    _seed_source_contribution(
+        conn, publication_id=95082, raw_name="Julie Martin", name_norm="julie martin"
+    )
     _run_phase(conn)
 
     assert _martin_first_names(conn) == ["jean", "julie"]
@@ -211,11 +233,15 @@ def test_a_completed_first_name_turns_away_another_first_name(sa_sync_conn):
 def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
     """Une personne « Tnourji A. » que ses signatures nomment « Abdellah » prend ce prénom avant la cascade ; « Abdelkader Tnourji » crée alors sa propre personne."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95090, raw_name="Tnourji, A.", name_norm="tnourji a")
-    _seed_signature(conn, pub_id=95091, raw_name="Abdellah Tnourji", name_norm="abdellah tnourji")
-    reduced = _seed_person(conn, "Tnourji", "A.", signatures=(95090, 95091))
-    _seed_signature(
-        conn, pub_id=95092, raw_name="Abdelkader Tnourji", name_norm="abdelkader tnourji"
+    _seed_source_contribution(
+        conn, publication_id=95090, raw_name="Tnourji, A.", name_norm="tnourji a"
+    )
+    _seed_source_contribution(
+        conn, publication_id=95091, raw_name="Abdellah Tnourji", name_norm="abdellah tnourji"
+    )
+    reduced = _seed_person(conn, "Tnourji", "A.", source_contributions=(95090, 95091))
+    _seed_source_contribution(
+        conn, publication_id=95092, raw_name="Abdelkader Tnourji", name_norm="abdelkader tnourji"
     )
     _run_create(conn)
 
@@ -226,16 +252,16 @@ def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
     assert _person_of(conn, 95092) not in (None, reduced)
 
 
-def test_full_signature_with_a_double_family_name_joins_the_reduced_person(sa_sync_conn):
+def test_full_name_with_a_double_family_name_joins_the_reduced_person(sa_sync_conn):
     """« Florence Caldefie Chezet », sans virgule, rejoint « Caldefie-Chezet F. » par le découpage aux deux derniers mots, et la personne prend le prénom « Florence »."""
     conn = sa_sync_conn
-    _seed_signature(
-        conn, pub_id=95110, raw_name="Caldefie-Chezet, F.", name_norm="caldefie chezet f"
+    _seed_source_contribution(
+        conn, publication_id=95110, raw_name="Caldefie-Chezet, F.", name_norm="caldefie chezet f"
     )
-    reduced = _seed_person(conn, "Caldefie-Chezet", "F.", signatures=(95110,))
-    _seed_signature(
+    reduced = _seed_person(conn, "Caldefie-Chezet", "F.", source_contributions=(95110,))
+    _seed_source_contribution(
         conn,
-        pub_id=95111,
+        publication_id=95111,
         raw_name="Florence Caldefie Chezet",
         name_norm="florence caldefie chezet",
     )
@@ -251,10 +277,16 @@ def test_full_signature_with_a_double_family_name_joins_the_reduced_person(sa_sy
 def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_conn):
     """Les signatures de « Martin J » la nomment « Jean » et « Julien » : elle garde ses initiales, et « Jacques Martin » ne s'y rattache pas."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95100, raw_name="Jean Martin", name_norm="jean martin")
-    _seed_signature(conn, pub_id=95101, raw_name="Julien Martin", name_norm="julien martin")
-    reduced = _seed_person(conn, "Martin", "J", signatures=(95100, 95101))
-    _seed_signature(conn, pub_id=95102, raw_name="Jacques Martin", name_norm="jacques martin")
+    _seed_source_contribution(
+        conn, publication_id=95100, raw_name="Jean Martin", name_norm="jean martin"
+    )
+    _seed_source_contribution(
+        conn, publication_id=95101, raw_name="Julien Martin", name_norm="julien martin"
+    )
+    reduced = _seed_person(conn, "Martin", "J", source_contributions=(95100, 95101))
+    _seed_source_contribution(
+        conn, publication_id=95102, raw_name="Jacques Martin", name_norm="jacques martin"
+    )
     _run_create(conn)
 
     first_name = conn.execute(
@@ -269,12 +301,16 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     dès que « Hélène Chanal » coexiste et rend « h chanal » ambiguë, la signature réduite est
     re-orphelinée — elle ne reste pas collée au premier arrivé, quel que soit l'ordre."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95010, raw_name="Hervé Chanal", name_norm="herve chanal")
-    _seed_signature(conn, pub_id=95011, raw_name="H Chanal", name_norm="h chanal")
+    _seed_source_contribution(
+        conn, publication_id=95010, raw_name="Hervé Chanal", name_norm="herve chanal"
+    )
+    _seed_source_contribution(conn, publication_id=95011, raw_name="H Chanal", name_norm="h chanal")
     _run_phase(conn)
     assert _person_of(conn, 95011) is not None  # rattachée à l'unique candidat
 
-    _seed_signature(conn, pub_id=95012, raw_name="Hélène Chanal", name_norm="helene chanal")
+    _seed_source_contribution(
+        conn, publication_id=95012, raw_name="Hélène Chanal", name_norm="helene chanal"
+    )
     _run_phase(conn)  # crée « Hélène Chanal » ; « h chanal » devient ambiguë → re-orphelinage
 
     assert _person_of(conn, 95011) is None  # orpheline, plus collée à Hervé
@@ -283,13 +319,19 @@ def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
 def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
     """« H Chanal » désigne Hervé et Hélène : sa signature est comptée parmi celles qui peuvent créer une personne, et parmi elles comme indécidable. « Paul Durand », inconnu, crée sa personne."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95040, raw_name="Hervé Chanal", name_norm="herve chanal")
-    _seed_signature(conn, pub_id=95041, raw_name="Hélène Chanal", name_norm="helene chanal")
+    _seed_source_contribution(
+        conn, publication_id=95040, raw_name="Hervé Chanal", name_norm="herve chanal"
+    )
+    _seed_source_contribution(
+        conn, publication_id=95041, raw_name="Hélène Chanal", name_norm="helene chanal"
+    )
     _run_create(conn)
     _populate_canonical_forms(conn)  # « h chanal » désigne les deux personnes
 
-    _seed_signature(conn, pub_id=95042, raw_name="H Chanal", name_norm="h chanal")
-    _seed_signature(conn, pub_id=95043, raw_name="Paul Durand", name_norm="paul durand")
+    _seed_source_contribution(conn, publication_id=95042, raw_name="H Chanal", name_norm="h chanal")
+    _seed_source_contribution(
+        conn, publication_id=95043, raw_name="Paul Durand", name_norm="paul durand"
+    )
     with caplog.at_level(logging.INFO, logger="test"):
         _run_create(conn)
 
@@ -301,14 +343,18 @@ def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):
 def test_une_forme_ambigue_rejoint_la_personne_de_son_groupe(sa_sync_conn):
     """« J Martin » (OpenAlex) désigne Julie et Joseph, et passe avant « Jacques Martin » (HAL) dans l'ordre des signatures. Les deux forment un groupe. Traitée après les créations, « J Martin » rejoint en cross-source la personne que crée l'autre signature du groupe."""
     conn = sa_sync_conn
-    _seed_signature(conn, pub_id=95050, raw_name="Julie Martin", name_norm="julie martin")
-    _seed_signature(conn, pub_id=95051, raw_name="Joseph Martin", name_norm="joseph martin")
+    _seed_source_contribution(
+        conn, publication_id=95050, raw_name="Julie Martin", name_norm="julie martin"
+    )
+    _seed_source_contribution(
+        conn, publication_id=95051, raw_name="Joseph Martin", name_norm="joseph martin"
+    )
     _run_create(conn)
     _populate_canonical_forms(conn)  # « j martin » désigne les deux personnes
 
-    _seed_two_notices(
+    _seed_two_source_records(
         conn,
-        pub_id=95060,
+        publication_id=95060,
         sa1_id=95062,
         raw1="Jacques Martin",
         norm1="jacques martin",
@@ -325,9 +371,9 @@ def test_une_forme_ambigue_rejoint_la_personne_de_son_groupe(sa_sync_conn):
 def test_un_groupe_reunit_deux_formes_disjointes_sur_une_personne(sa_sync_conn):
     """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex) forment un groupe, et leurs noms sont compatibles (`names_compatible`). Leurs formes de nom sont disjointes. Traitée en premier, « Jean Martin » est différée puis créée. « J-P Martin » rejoint sa personne par cross-source."""
     conn = sa_sync_conn
-    _seed_two_notices(
+    _seed_two_source_records(
         conn,
-        pub_id=95020,
+        publication_id=95020,
         sa1_id=95021,
         raw1="Jean Martin",
         norm1="jean martin",
@@ -342,12 +388,12 @@ def test_un_groupe_reunit_deux_formes_disjointes_sur_une_personne(sa_sync_conn):
     assert _person_of(conn, 95021) == _person_of(conn, 95022)
 
 
-def test_deux_signatures_hors_groupe_creent_deux_personnes(sa_sync_conn):
+def test_deux_contributions_sources_hors_groupe_creent_deux_personnes(sa_sync_conn):
     """« Jean Martin » (HAL) et « J-P Martin » (OpenAlex) occupent la même position, hors de tout groupe. Chacune crée sa personne."""
     conn = sa_sync_conn
-    _seed_two_notices(
+    _seed_two_source_records(
         conn,
-        pub_id=95030,
+        publication_id=95030,
         sa1_id=95031,
         raw1="Jean Martin",
         norm1="jean martin",

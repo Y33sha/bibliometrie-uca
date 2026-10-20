@@ -26,7 +26,7 @@ class HalDocSummary(BaseModel):
     author_count: int
 
 
-class HalPubDetail(BaseModel):
+class HalPublicationDetail(BaseModel):
     """Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL)."""
 
     id: int
@@ -41,7 +41,7 @@ class HalPubDetail(BaseModel):
 class HalDoiDuplicatePair(BaseModel):
     doi: str
     halids: list[str]
-    publication: HalPubDetail
+    publication: HalPublicationDetail
 
 
 class HalDoiDuplicatesResponse(PaginatedResponse):
@@ -49,8 +49,8 @@ class HalDoiDuplicatesResponse(PaginatedResponse):
 
 
 class HalMetaDuplicatePair(BaseModel):
-    pub_a: HalPubDetail
-    pub_b: HalPubDetail
+    publication_a: HalPublicationDetail
+    publication_b: HalPublicationDetail
 
 
 class HalMetaDuplicatesResponse(PaginatedResponse):
@@ -66,7 +66,7 @@ class HalCollectionLab(BaseModel):
     hal_collection: str
 
 
-class HalMissingCollectionPub(BaseModel):
+class HalMissingCollectionPublication(BaseModel):
     id: int
     title: str
     publication_year: int | None
@@ -80,7 +80,7 @@ class HalMissingCollectionPub(BaseModel):
 class HalMissingCollectionsResponse(PaginatedResponse):
     lab_acronym: str | None
     hal_collection: str
-    publications: list[HalMissingCollectionPub]
+    publications: list[HalMissingCollectionPublication]
 
 
 class NoMissingCollections(StrEnum):
@@ -93,7 +93,7 @@ class NoMissingCollections(StrEnum):
     NO_COLLECTION = "no_collection"
 
 
-class HalAffiliationConflictPub(BaseModel):
+class HalAffiliationConflictPublication(BaseModel):
     id: int
     title: str
     publication_year: int | None
@@ -105,7 +105,7 @@ class HalAffiliationConflictPub(BaseModel):
 
 
 class HalAffiliationConflictsResponse(PaginatedResponse):
-    publications: list[HalAffiliationConflictPub]
+    publications: list[HalAffiliationConflictPublication]
 
 
 class HalAccountSummary(BaseModel):
@@ -136,11 +136,11 @@ class HalProblemsQueries(Protocol):
         self, *, page: int, per_page: int
     ) -> HalDuplicateAccountsResponse: ...
 
-    def hal_duplicate_pubs_by_doi(
+    def hal_duplicate_publications_by_doi(
         self, *, page: int, per_page: int
     ) -> HalDoiDuplicatesResponse: ...
 
-    def hal_duplicate_pubs_by_metadata(
+    def hal_duplicate_publications_by_metadata(
         self, *, page: int, per_page: int
     ) -> HalMetaDuplicatesResponse: ...
 

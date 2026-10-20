@@ -9,7 +9,7 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from application.ports.read_models._common import FacetOption, PaginatedResponse
-from application.ports.read_models.publications_queries import PubLabItem
+from application.ports.read_models.publications_queries import PublicationLabItem
 
 
 class OrphanCountResponse(BaseModel):
@@ -23,9 +23,9 @@ class OrphanContributionOut(BaseModel):
     last_name: str
     first_name: str
     publication_id: int
-    pub_title: str
+    publication_title: str
     publication_year: int | None
-    labs: list[PubLabItem]
+    labs: list[PublicationLabItem]
     """Laboratoires du périmètre détectés dans les adresses de la signature."""
 
 

@@ -36,7 +36,7 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
     )
 
 
-class PgPubCountsQueries:
+class PgPublicationCountsQueries:
     """Recalcul en masse des `publication_count` sur `journals` puis `publishers`, en fin de phase `contributions`."""
 
     def refresh_journal_publication_counts(self, conn: Connection) -> int:
@@ -83,7 +83,7 @@ class PgPubCountsQueries:
         ).rowcount
 
 
-class PubCountRecompute:
+class PublicationCountRecompute:
     """Recalcul ciblé du `publication_count` d'un éditeur, exposé à l'API par `pipeline/public.py`."""
 
     def refresh_publisher_publication_count(self, conn: Connection, publisher_id: int) -> None:

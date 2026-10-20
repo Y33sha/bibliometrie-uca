@@ -7,7 +7,7 @@ import json
 import uuid
 
 from domain.normalize import normalize_text
-from tests.integration.helpers.contributions import upsert_identity_on_cursor
+from tests.integration.helpers.contributions import upsert_contributor_information_on_cursor
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.persons import NORMALIZERS
 from tests.integration.helpers.rows import perimeter_evidence
@@ -312,8 +312,8 @@ def seed_in_perimeter_contributions(journal_id: int) -> None:
     """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
     with owner_pool() as cur:
         cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
-        pub_ids = [r["id"] for r in cur.fetchall()]
-        for pid in pub_ids:
+        publication_ids = [r["id"] for r in cur.fetchall()]
+        for pid in publication_ids:
             person_id = seed_person(
                 uniq("Author"),
                 "Jane",
@@ -379,23 +379,23 @@ def seed_source_record(
 
 def seed_source_contribution(
     source: str = "hal",
-    source_pub_id: int | None = None,
+    source_record_id: int | None = None,
     person_id: int | None = None,
     in_perimeter: bool = True,
     raw_author_name: str = "Test Author",
     author_position: int = 0,
 ) -> int:
     """Signature de nom brut `raw_author_name`, sur une notice semée au besoin."""
-    sp = source_pub_id or seed_source_record(source=source)
+    source_record = source_record_id or seed_source_record(source=source)
     with owner_pool() as cur:
-        iid = upsert_identity_on_cursor(cur, raw_author_name.lower())
+        iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower())
         cur.execute(
             "INSERT INTO source_contributions (source, source_record_id, author_position, "
             "person_id, perimeter_evidence, raw_author_name, contributor_information_id) "
             "VALUES (%s, %s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
             (
                 source,
-                sp,
+                source_record,
                 author_position,
                 person_id,
                 perimeter_evidence(in_perimeter) or [],

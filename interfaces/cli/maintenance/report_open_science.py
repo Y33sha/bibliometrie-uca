@@ -22,7 +22,7 @@ from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.structures import AUTHOR_SIGNATURE, AUTHORED_PUBLICATION
+from infrastructure.read_models.structures import AUTHOR_SOURCE_CONTRIBUTION, AUTHORED_PUBLICATION
 from infrastructure.sql_fragments import diamond_journal_sql
 
 EVOLUTION_YEARS = 5
@@ -273,7 +273,7 @@ class OpenScienceReport:
             SELECT j.apc_amount, j.apc_currency,
                    EXISTS (
                        SELECT 1 FROM contributions a
-                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
+                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.journals j ON j.id = p.journal_id
@@ -430,7 +430,7 @@ class OpenScienceReport:
             WITH lab_authors AS (
                 SELECT DISTINCT a.person_id
                 FROM publications p JOIN contributions a ON a.publication_id = p.id
-                WHERE p.publication_year = :year AND a.person_id IS NOT NULL AND {AUTHOR_SIGNATURE}
+                WHERE p.publication_year = :year AND a.person_id IS NOT NULL AND {AUTHOR_SOURCE_CONTRIBUTION}
             ),
             hal_accounts AS (
                 SELECT la.person_id, bool_or(k.identifiers ? 'orcid') AS has_orcid
@@ -571,7 +571,7 @@ class OpenScienceReport:
                    COUNT(*) FILTER (WHERE {INTERNATIONAL}) AS international,
                    COUNT(*) FILTER (WHERE EXISTS (
                        SELECT 1 FROM contributions a
-                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
+                       WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    )) AS corresponding
             FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
             """,

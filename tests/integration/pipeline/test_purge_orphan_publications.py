@@ -18,7 +18,7 @@ from tests.integration.helpers.subjects import insert_publication_subject, inser
 
 
 class TestPurgeOrphanPublications:
-    def test_deletes_pub_without_contribution(self, sa_sync_conn):
+    def test_deletes_publication_without_contribution(self, sa_sync_conn):
         orphan = insert_publication(sa_sync_conn, "orphan")
         purge_orphan_publications(sa_sync_conn)
         still_there = sa_sync_conn.execute(
@@ -26,7 +26,7 @@ class TestPurgeOrphanPublications:
         ).scalar_one_or_none()
         assert still_there is None
 
-    def test_keeps_pub_with_contribution(self, sa_sync_conn):
+    def test_keeps_publication_with_contribution(self, sa_sync_conn):
         kept = insert_publication(sa_sync_conn, "kept")
         person = insert_person(sa_sync_conn, "Doe", first_name="Jane")
         insert_contribution(sa_sync_conn, kept, person_id=person)

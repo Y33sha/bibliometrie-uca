@@ -8,7 +8,7 @@ from pipeline.ingestion.complements import sudoc as client
 
 _BASE = "https://www.sudoc.fr"
 
-_NOTICE = """<?xml version="1.0" encoding="UTF-8"?>
+_SOURCE_RECORD = """<?xml version="1.0" encoding="UTF-8"?>
 <record>
   <controlfield tag="001">068267983</controlfield>
   <datafield tag="011" ind1="#" ind2="#">
@@ -92,19 +92,19 @@ class TestFetchPpns:
 
 class TestMarcFields:
     def test_reads_datafields_in_order(self):
-        fields = client.marc_fields(_NOTICE)
+        fields = client.marc_fields(_SOURCE_RECORD)
         assert [f.tag for f in fields] == ["011", "182", "183", "200"]
         assert fields[0].subfields == (("a", "1476-4687"), ("f", "0028-0836"))
 
     def test_reads_namespaced_record(self):
-        xml = _NOTICE.replace("<record>", '<record xmlns="http://www.loc.gov/MARC21/slim">')
+        xml = _SOURCE_RECORD.replace("<record>", '<record xmlns="http://www.loc.gov/MARC21/slim">')
         assert [f.tag for f in client.marc_fields(xml)] == ["011", "182", "183", "200"]
 
 
 class TestFetchSerialRecord:
     @pytest.mark.asyncio
     async def test_parses_the_record(self, monkeypatch):
-        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(_NOTICE))
+        monkeypatch.setattr(client, "http_get_text_with_retry_async", _answer(_SOURCE_RECORD))
         record = await client.fetch_serial_record(None, "068267983", base_url=_BASE)
         assert record is not None
         assert record.issn == "1476-4687"

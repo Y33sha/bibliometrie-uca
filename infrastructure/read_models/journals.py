@@ -50,10 +50,10 @@ from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.sql_fragments import active_issns, corrected, has_active_issn, raw_column
 
-# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `pub_name`.
+# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `publisher_name`.
 _JOURNAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
-    j.publisher_id, p.name AS pub_name,
+    j.publisher_id, p.name AS publisher_name,
     j.is_in_doaj, j.journal_type, j.publication_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
@@ -74,7 +74,7 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
         title=row.title,
         issns=list(row.issns),
         publisher_id=row.publisher_id,
-        pub_name=row.pub_name,
+        publisher_name=row.publisher_name,
         is_in_doaj=row.is_in_doaj,
         journal_type=row.journal_type,
         publication_count=row.publication_count,
@@ -131,7 +131,7 @@ def _build_journal_where(
     if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = filters.oa_models
-    if filters.with_pubs:
+    if filters.with_publications:
         parts.append("j.publication_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
@@ -139,8 +139,8 @@ def _build_journal_where(
 _SORT_MAP = {
     "title_asc": "j.title ASC",
     "title_desc": "j.title DESC",
-    "publisher_asc": "pub_name ASC NULLS LAST, j.title ASC",
-    "publisher_desc": "pub_name DESC NULLS LAST, j.title ASC",
+    "publisher_asc": "publisher_name ASC NULLS LAST, j.title ASC",
+    "publisher_desc": "publisher_name DESC NULLS LAST, j.title ASC",
     "pubs_asc": "publication_count ASC, j.title ASC",
     "pubs_desc": "publication_count DESC, j.title ASC",
 }
@@ -459,7 +459,7 @@ class PgJournalQueries(JournalQueries):
             doaj_imported_at=row.doaj_imported_at,
         )
 
-    def _journal_pub_distribution(
+    def _journal_publication_distribution(
         self, journal_id: int, column: str
     ) -> list[tuple[str | None, int]]:
         """Répartition des publications du périmètre de la revue par une colonne.
@@ -490,8 +490,8 @@ class PgJournalQueries(JournalQueries):
         j_type = journal_row.journal_type
         oa_model = journal_row.oa_model
 
-        doc_type_rows = self._journal_pub_distribution(journal_id, "doc_type")
-        oa_rows = self._journal_pub_distribution(journal_id, "oa_status")
+        doc_type_rows = self._journal_publication_distribution(journal_id, "doc_type")
+        oa_rows = self._journal_publication_distribution(journal_id, "oa_status")
         total = sum(count for _, count in doc_type_rows)
 
         expected_doc_types = sorted(EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE.get(j_type, frozenset()))

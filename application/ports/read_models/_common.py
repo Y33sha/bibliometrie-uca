@@ -71,7 +71,7 @@ class StructureRef(BaseModel):
     name: str
 
 
-class PubYearCount(BaseModel):
+class PublicationYearCount(BaseModel):
     year: int
     count: int
 
@@ -91,7 +91,7 @@ __all__ = [
     "EntityKind",
     "FacetOption",
     "PaginatedResponse",
-    "PubYearCount",
+    "PublicationYearCount",
     "page_count",
     "StructureRef",
     "YesNoCount",

@@ -7,7 +7,7 @@ def setup_persons_test_data(conn):
     """
 
     from tests.integration.helpers.publications import insert_publication
-    from tests.integration.helpers.sources import insert_signature, insert_source_record
+    from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
     # Publications
     insert_publication(conn, "Test Pub Alpha", row_id=90001)
@@ -42,7 +42,7 @@ def setup_persons_test_data(conn):
         (90003, 90002, 0, eve),
         (90004, 90002, 1, grace),
     ):
-        insert_signature(
+        insert_source_contribution(
             conn,
             source_record_id,
             row_id=row_id,

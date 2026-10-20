@@ -386,7 +386,7 @@ class TestProceedingsVolumeRule:
 
 
 class TestCrossrefVolumeRules:
-    def test_notice_sans_auteur_au_titre_de_congres_devient_volume(self):
+    def test_enregistrement_source_sans_auteur_au_titre_de_congres_devient_volume(self):
         view = _view(
             source="crossref",
             author_count=0,

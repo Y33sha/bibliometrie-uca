@@ -280,13 +280,17 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 
 
 def _create_new_publication(
-    conn: Connection, group: WorkGroup, rows_by_sp: dict[int, ReconcileRow]
+    conn: Connection, group: WorkGroup, rows_by_source_record: dict[int, ReconcileRow]
 ) -> int:
     """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP qui a une année. Les métadonnées définitives sont posées juste après par `lifecycle.refresh`.
 
     Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split perdante (membres matérialisés, qui avaient déjà une année) — dans les deux cas ≥1 membre a une année."""
     seed = min(
-        (rows_by_sp[sp] for sp in group.source_record_ids if rows_by_sp[sp].publication_year),
+        (
+            rows_by_source_record[source_record]
+            for source_record in group.source_record_ids
+            if rows_by_source_record[source_record].publication_year
+        ),
         key=lambda r: r.id,
     )
     assert seed.publication_year is not None
@@ -336,14 +340,14 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     )
     with attente(BRANCHE, logger) as ligne:
         rows = fetch_reconciliation_universe(conn)
-        rows_by_sp = {row.id: row for row in rows}
-        existing_pub_by_doi = fetch_publication_ids_by_doi(conn)
+        rows_by_source_record = {row.id: row for row in rows}
+        existing_publication_by_doi = fetch_publication_ids_by_doi(conn)
         publication_sizes = fetch_publication_sizes(
             conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
         )
         plan = plan_reconciliation(
             (_member(row) for row in rows),
-            existing_pub_by_doi=existing_pub_by_doi,
+            existing_publication_by_doi=existing_publication_by_doi,
             publication_sizes=publication_sizes,
         )
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
@@ -369,16 +373,17 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
             target = group.target_publication_id
             if target is None:
                 from_existing = any(
-                    rows_by_sp[sp].publication_id is not None for sp in group.source_record_ids
+                    rows_by_source_record[source_record].publication_id is not None
+                    for source_record in group.source_record_ids
                 )
-                target = _create_new_publication(conn, group, rows_by_sp)
+                target = _create_new_publication(conn, group, rows_by_source_record)
                 created += 1
                 if from_existing:
                     splits += 1
             repoint_source_records(conn, list(group.source_record_ids), target)
             survivors.add(target)
-            for sp in group.source_record_ids:
-                if (previous := rows_by_sp[sp].publication_id) != target:
+            for source_record in group.source_record_ids:
+                if (previous := rows_by_source_record[source_record].publication_id) != target:
                     membership_changed.update(p for p in (previous, target) if p is not None)
 
         # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
@@ -387,14 +392,20 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         if plan.detached:
             detach_source_records(conn, list(plan.detached))
             membership_changed.update(
-                p for sp in plan.detached if (p := rows_by_sp[sp].publication_id) is not None
+                p
+                for source_record in plan.detached
+                if (p := rows_by_source_record[source_record].publication_id) is not None
             )
-            for pub_id in sorted(
-                {p for sp in plan.detached if (p := rows_by_sp[sp].publication_id) is not None}
+            for publication_id in sorted(
+                {
+                    p
+                    for source_record in plan.detached
+                    if (p := rows_by_source_record[source_record].publication_id) is not None
+                }
                 - survivors
             ):
                 with savepoint(conn):
-                    lifecycle.refresh(conn, pub_id)
+                    lifecycle.refresh(conn, publication_id)
 
         # 3. Dissolutions, avant les survivants : la suppression libère le DOI qu'un survivant
         # reprend, que la contrainte unique refuserait sinon.
@@ -407,10 +418,10 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     survivor_ids = sorted(survivors)
     etape(logger, "Recalcul des métadonnées consolidées")
     with progression(len(survivor_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
-        for pub_id in survivor_ids:
+        for publication_id in survivor_ids:
             avancement.avance()
             with savepoint(conn):
-                lifecycle.refresh(conn, pub_id)
+                lifecycle.refresh(conn, publication_id)
 
     # 5. Les publications qui gagnent ou perdent une notice regroupent leurs signatures.
     mark_contributions_dirty(conn, sorted(membership_changed - dissolved_ids))

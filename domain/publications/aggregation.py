@@ -33,7 +33,7 @@ from domain.types import JsonValue, as_int, as_str
 
 
 def refresh_from_sources(
-    pub: Publication,
+    publication: Publication,
     sources: list[SourceRecord],
     *,
     source_priority: tuple[str, ...],
@@ -62,36 +62,43 @@ def refresh_from_sources(
     sorted_sources = sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
-    pub.title = new_title if new_title is not None else pub.title
-    pub.title_normalized = normalize_text(pub.title) if pub.title else None
-    pub.doc_type = arbitrate_conference(
+    publication.title = new_title if new_title is not None else publication.title
+    publication.title_normalized = normalize_text(publication.title) if publication.title else None
+    publication.doc_type = arbitrate_conference(
         arbitrate_doc_type_with_article_subtype(sorted_sources), sorted_sources
     )
-    pub.publication_year = (
-        as_int(first_non_null(sorted_sources, "publication_year")) or pub.publication_year
+    publication.publication_year = (
+        as_int(first_non_null(sorted_sources, "publication_year")) or publication.publication_year
     )
 
     new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
-    pub.doi = DOI(new_doi_str) if new_doi_str else None
+    publication.doi = DOI(new_doi_str) if new_doi_str else None
 
-    pub.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
-    pub.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
-    if pub.journal_id is None and pub.monograph_id is not None and monograph_journals:
-        pub.journal_id = monograph_journals.get(pub.monograph_id)
-    pub.oa_status = publication_oa_status(
-        sorted_sources, unpaywall.get(pub.doi.value) if pub.doi and unpaywall else None
+    publication.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
+    publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
+    if (
+        publication.journal_id is None
+        and publication.monograph_id is not None
+        and monograph_journals
+    ):
+        publication.journal_id = monograph_journals.get(publication.monograph_id)
+    publication.oa_status = publication_oa_status(
+        sorted_sources,
+        unpaywall.get(publication.doi.value) if publication.doi and unpaywall else None,
     )
-    pub.license = license_by_source(sorted_sources, publisher_license_sources(pub.doc_type))
-    pub.deposit_license = license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
-    pub.container_title = as_str(first_non_null(sorted_sources, "container_title"))
-    pub.language = as_str(first_non_null(sorted_sources, "language"))
-    pub.abstract = as_str(first_non_null(sorted_sources, "abstract"))
-    pub.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
-    pub.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
-    pub.topics = topics_by_source(sorted_sources)
-    pub.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
-    pub.meta = shallow_merge_jsonb(sorted_sources, "meta")
-    pub.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
+    publication.license = license_by_source(
+        sorted_sources, publisher_license_sources(publication.doc_type)
+    )
+    publication.deposit_license = license_by_source(sorted_sources, (DEPOSIT_LICENSE_SOURCE,))
+    publication.container_title = as_str(first_non_null(sorted_sources, "container_title"))
+    publication.language = as_str(first_non_null(sorted_sources, "language"))
+    publication.abstract = as_str(first_non_null(sorted_sources, "abstract"))
+    publication.keywords = _textes(merge_lists_dedup_ci(sorted_sources, "keywords"))
+    publication.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
+    publication.topics = topics_by_source(sorted_sources)
+    publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
+    publication.meta = shallow_merge_jsonb(sorted_sources, "meta")
+    publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
 
 
 # ── Helpers publics ────────────────────────────────────────────────

@@ -20,7 +20,7 @@ from application.ports.read_models.addresses_queries import (
 )
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.types import JsonValue
-from infrastructure.read_models.sql_fragments import signature_display_name
+from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import address_country_conditions
 
 # « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
@@ -97,18 +97,18 @@ class PgAddressesQueries(AddressesQueries):
             parts.append(f"unaccent(a.raw_text) {op} unaccent(:{bind})")
             binds[bind] = f"%{tp.term}%"
 
-        for i, sp in enumerate(filters.structure_predicates):
-            if not sp.structure_ids:
+        for i, source_record in enumerate(filters.structure_predicates):
+            if not source_record.structure_ids:
                 continue
             bind = f"sids{i}"
-            binds[bind] = list(sp.structure_ids)
+            binds[bind] = list(source_record.structure_ids)
             exists = (
                 "EXISTS (SELECT 1 FROM address_structures asx "
                 f"WHERE asx.address_id = a.id AND asx.structure_id = ANY(:{bind}) "
                 f"AND {_RECOGNIZED_LINK})"
             )
             # recognized = reconnue comme au moins une des structures (OR) ; not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
-            parts.append(exists if sp.operator == "recognized" else f"NOT {exists}")
+            parts.append(exists if source_record.operator == "recognized" else f"NOT {exists}")
 
         where_clause = (" AND " + " AND ".join(parts)) if parts else ""
         join_type = "JOIN" if use_inner_join else "LEFT JOIN"
@@ -177,7 +177,7 @@ class PgAddressesQueries(AddressesQueries):
                     p.id, p.title, p.publication_year, p.doi,
                     p.doc_type::text AS doc_type,
                     j.title AS journal_title,
-                    {signature_display_name()} AS author_name,
+                    {contributor_display_name()} AS author_name,
                     sd.source_id
                 FROM source_contribution_addresses saa
                 JOIN source_contributions sa ON sa.id = saa.source_contribution_id

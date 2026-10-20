@@ -23,9 +23,11 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
     a, b = sorted([subject_a_id, subject_b_id])
     with owner_pool() as cur:
         for _ in range(count):
-            pub_id = seed_publication("cooc-seed", normalize_title=False, doc_type="article")
+            publication_id = seed_publication(
+                "cooc-seed", normalize_title=False, doc_type="article"
+            )
             for s in (a, b):
-                seed_publication_subject(pub_id, subject_id=s)
+                seed_publication_subject(publication_id, subject_id=s)
         cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
 
 

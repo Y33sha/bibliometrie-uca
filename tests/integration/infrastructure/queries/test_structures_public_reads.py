@@ -136,7 +136,7 @@ class TestGetLaboratoryDashboard:
     def test_returns_structure_even_when_empty(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB")
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
-        assert res.pubs_by_year == []
+        assert res.publications_by_year == []
         assert res.oa.total == 0
         assert res.collab.total_articles == 0
         assert res.top_countries == []
@@ -145,8 +145,10 @@ class TestGetLaboratoryDashboard:
         ensure_country(sa_sync_conn, "us", "USA")
         lab = insert_structure(sa_sync_conn, "LAB")
         pid = insert_person(sa_sync_conn)
-        pub_id = insert_publication(sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"])
-        aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
+        publication_id = insert_publication(
+            sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"]
+        )
+        aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
         add_contribution_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
@@ -159,8 +161,10 @@ class TestGetLaboratoryDashboard:
         ni apparaître dans le top pays."""
         lab = insert_structure(sa_sync_conn, "LAB")
         pid = insert_person(sa_sync_conn)
-        pub_id = insert_publication(sa_sync_conn, "Y", oa_status="closed", countries=["fr", "xx"])
-        aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
+        publication_id = insert_publication(
+            sa_sync_conn, "Y", oa_status="closed", countries=["fr", "xx"]
+        )
+        aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
         add_contribution_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
@@ -178,8 +182,8 @@ class TestGetLaboratorySubjects:
         pid = insert_person(sa_sync_conn)
 
         # 3 publications du labo avec sujets variables.
-        def _attach(pub_id):
-            aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
+        def _attach(publication_id):
+            aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
             add_contribution_structure(sa_sync_conn, aid, lab)
 
         p1 = insert_publication(sa_sync_conn, "p1")

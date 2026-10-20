@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from domain.structures.hal_structures import HalStructureStatus, parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructuresQueries
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def _structure(docid: int, *, parents=(), aliases=()):
@@ -50,7 +50,7 @@ def test_ids_to_fetch_ecarte_les_structures_et_alias_connus(sa_sync_conn):
     queries.save([_structure(2, aliases=[9])], {9: 2})
     record = insert_source_record(sa_sync_conn, source="hal", source_id="hal-1")
     for hal_structure_id in (2, 9, 4):
-        signature = insert_signature(
+        source_contribution = insert_source_contribution(
             sa_sync_conn, record, source="hal", author_position=hal_structure_id
         )
         sa_sync_conn.execute(
@@ -58,7 +58,7 @@ def test_ids_to_fetch_ecarte_les_structures_et_alias_connus(sa_sync_conn):
                 "INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)"
                 " VALUES (:s, :h)"
             ),
-            {"s": signature, "h": hal_structure_id},
+            {"s": source_contribution, "h": hal_structure_id},
         )
 
     assert queries.ids_to_fetch(refresh_stale=False) == {4}
@@ -66,7 +66,7 @@ def test_ids_to_fetch_ecarte_les_structures_et_alias_connus(sa_sync_conn):
     assert queries.ids_to_fetch(refresh_stale=True) == {2, 4}
 
 
-def test_un_changement_de_pays_marque_les_signatures_de_la_structure_et_de_ses_alias(
+def test_un_changement_de_pays_marque_les_contributions_sources_de_la_structure_et_de_ses_alias(
     sa_sync_conn,
 ):
     queries = HalStructuresQueries(sa_sync_conn)
@@ -74,7 +74,7 @@ def test_un_changement_de_pays_marque_les_signatures_de_la_structure_et_de_ses_a
     record = insert_source_record(sa_sync_conn, source="hal", source_id="hal-1")
     cited = {}
     for position, hal_structure_id in enumerate((2, 9, 3)):
-        cited[hal_structure_id] = insert_signature(
+        cited[hal_structure_id] = insert_source_contribution(
             sa_sync_conn, record, source="hal", author_position=position
         )
         sa_sync_conn.execute(

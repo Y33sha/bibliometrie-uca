@@ -91,7 +91,7 @@
 						<a href="{base}/journals/{item.journal.id}">{item.journal.title}</a>
 						<span class="muted">#{item.journal.id}</span>
 					</td>
-					<td>{item.journal.pub_name ?? '—'}</td>
+					<td>{item.journal.publisher_name ?? '—'}</td>
 					<td>{issns(item)}</td>
 					<td class="num">{item.conference_papers} / {item.records}</td>
 					<td class="action">

@@ -390,7 +390,7 @@
     for (const r of data.contributions) {
       let pub = byPub.get(r.publication_id);
       if (!pub) {
-        pub = { pub_id: r.publication_id, title: r.title, publication_year: r.publication_year, sources: [], checked: true };
+        pub = { publication_id: r.publication_id, title: r.title, publication_year: r.publication_year, sources: [], checked: true };
         byPub.set(r.publication_id, pub);
       }
       pub.sources.push({ source: r.source, source_contribution_id: r.source_contribution_id });

@@ -44,6 +44,6 @@ class CrossrefPersonHarvester(PersonSearchHarvester[CrossrefClient]):
         orcids = identifiers[PersonIdentifierType.ORCID]
         return self._client.fetch_page(build_orcid_filter(orcids, *years), next_token, label)
 
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         doi = clean_doi(as_str(record.get("DOI")))
         return (doi, doi) if doi else None

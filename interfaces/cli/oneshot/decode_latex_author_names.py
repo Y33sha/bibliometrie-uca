@@ -15,17 +15,17 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection, TextClause, bindparam, text
 
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
-from interfaces.cli.oneshot.backfill_author_counts import backfill_notices
-from pipeline.ingestion.common.signature_queries import (
-    IDENTITY_KEY_COLUMNS,
-    delete_orphan_identities,
+from interfaces.cli.oneshot.backfill_author_counts import backfill_source_records
+from pipeline.ingestion.common.source_contribution_queries import (
+    CONTRIBUTOR_INFORMATION_KEY_COLUMNS,
+    delete_orphan_contributor_information,
     key_hash_sql,
 )
-from pipeline.ingestion.common.signatures import signature_name_fields
+from pipeline.ingestion.common.source_contributions import contributor_name_fields
 
 log = setup_logger("decode_latex_author_names", os.path.dirname(__file__))
 
@@ -33,7 +33,7 @@ log = setup_logger("decode_latex_author_names", os.path.dirname(__file__))
 def candidates_sql(condition: str) -> TextClause:
     """Signatures candidates : celles dont les noms réunis (`n.names`) vérifient `condition`."""
     return text(f"""
-        SELECT sa.id, sa.source_record_id AS notice, sa.raw_author_name, sa.raw_last_name,
+        SELECT sa.id, sa.source_record_id AS source_record, sa.raw_author_name, sa.raw_last_name,
                sa.raw_first_name, aik.identifiers
         FROM source_contributions sa JOIN contributor_information aik ON aik.id = sa.contributor_information_id
         CROSS JOIN LATERAL (
@@ -45,15 +45,15 @@ def candidates_sql(condition: str) -> TextClause:
 
 _LATEX_CANDIDATES_SQL = candidates_sql("strpos(n.names, chr(92)) > 0")
 
-_UPSERT_IDENTITIES_SQL = text(f"""
-    INSERT INTO contributor_information ({", ".join(IDENTITY_KEY_COLUMNS)})
+_UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
+    INSERT INTO contributor_information ({", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)})
     SELECT DISTINCT t.last_name_normalized, t.first_name_normalized, t.identifiers
     FROM jsonb_to_recordset(:payload) AS t(
         last_name_normalized text, first_name_normalized text, identifiers jsonb)
-    ON CONFLICT ({", ".join(IDENTITY_KEY_COLUMNS)}) DO NOTHING
+    ON CONFLICT ({", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)}) DO NOTHING
 """).bindparams(bindparam("payload", type_=Jsonb))
 
-_UPDATE_SIGNATURES_SQL = text(
+_UPDATE_SOURCE_CONTRIBUTIONS_SQL = text(
     """
     UPDATE source_contributions sa
     SET raw_author_name = t.raw_author_name, raw_last_name = t.raw_last_name,
@@ -64,7 +64,7 @@ _UPDATE_SIGNATURES_SQL = text(
         id integer, raw_author_name text, raw_last_name text, raw_first_name text,
         last_name_normalized text, first_name_normalized text, identifiers jsonb)
     JOIN contributor_information aik ON aik.key_hash = """
-    + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
+    + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
     + """
     LEFT JOIN confirmed_source_contributions ca ON ca.source_contribution_id = t.id
     WHERE sa.id = t.id
@@ -74,7 +74,7 @@ _UPDATE_SIGNATURES_SQL = text(
 _MARK_DIRTY_SQL = text("""
     UPDATE publications p SET contributions_dirty = true
     FROM source_records sp
-    WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+    WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
 """)
 
 
@@ -85,16 +85,16 @@ def decoded_names(
 ) -> tuple[list[dict[str, object]], list[int]]:
     """Signatures `candidates` dont le nom nettoyé diffère du nom stocké, avec leurs nouvelles colonnes de nom, et leurs notices."""
     rows: list[dict[str, object]] = []
-    notices: set[int] = set()
+    source_records: set[int] = set()
     for r in conn.execute(candidates, params or {}):
         name = (
-            SignatureName.from_parts(r.raw_last_name, r.raw_first_name)
+            ContributorName.from_parts(r.raw_last_name, r.raw_first_name)
             if r.raw_last_name is not None
-            else SignatureName.from_raw(r.raw_author_name)
+            else ContributorName.from_raw(r.raw_author_name)
         )
         if name is None:
             continue
-        fields = signature_name_fields(name)
+        fields = contributor_name_fields(name)
         if (fields["raw_author_name"], fields["raw_last_name"], fields["raw_first_name"]) == (
             r.raw_author_name,
             r.raw_last_name,
@@ -102,17 +102,17 @@ def decoded_names(
         ):
             continue
         rows.append({"id": r.id, **fields, "identifiers": r.identifiers})
-        notices.add(r.notice)
-    return rows, sorted(notices)
+        source_records.add(r.source_record)
+    return rows, sorted(source_records)
 
 
-def decode(conn: Connection, rows: list[dict[str, object]], notices: list[int]) -> int:
+def decode(conn: Connection, rows: list[dict[str, object]], source_records: list[int]) -> int:
     """Écrit les noms décodés et leurs identités, détache les personnes, met à jour les notices et les publications. Rend le nombre d'identités orphelines supprimées."""
-    conn.execute(_UPSERT_IDENTITIES_SQL, {"payload": rows})
-    conn.execute(_UPDATE_SIGNATURES_SQL, {"payload": rows})
-    backfill_notices(conn, notices)
-    conn.execute(_MARK_DIRTY_SQL, {"notices": notices})
-    return delete_orphan_identities(conn)
+    conn.execute(_UPSERT_CONTRIBUTOR_INFORMATION_SQL, {"payload": rows})
+    conn.execute(_UPDATE_SOURCE_CONTRIBUTIONS_SQL, {"payload": rows})
+    backfill_source_records(conn, source_records)
+    conn.execute(_MARK_DIRTY_SQL, {"source_records": source_records})
+    return delete_orphan_contributor_information(conn)
 
 
 def main() -> int:
@@ -121,8 +121,8 @@ def main() -> int:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        rows, notices = decoded_names(conn)
-        log.info("signatures à décoder : %d, dans %d notices", len(rows), len(notices))
+        rows, source_records = decoded_names(conn)
+        log.info("signatures à décoder : %d, dans %d notices", len(rows), len(source_records))
         for row in rows[:5]:
             log.info(
                 "  %s / %s / %s",
@@ -133,7 +133,7 @@ def main() -> int:
         if args.dry_run or not rows:
             conn.rollback()
             return 0
-        orphans = decode(conn, rows, notices)
+        orphans = decode(conn, rows, source_records)
         conn.commit()
         log.info(
             "signatures décodées : %d ; identités orphelines supprimées : %d", len(rows), orphans

@@ -29,21 +29,21 @@ class PublicationStore:
         )
         return [row.id for row in result]
 
-    def find_doc_types_by_ids(self, pub_ids: list[int]) -> dict[int, str]:
+    def find_doc_types_by_ids(self, publication_ids: list[int]) -> dict[int, str]:
         """`doc_type` de chaque publication demandée, en une lecture. Une publication absente de la table manque de la réponse — un refresh peut l'avoir supprimée."""
-        if not pub_ids:
+        if not publication_ids:
             return {}
         result = self._conn.execute(
             text(
                 "SELECT id, CAST(doc_type AS text) AS doc_type FROM publications WHERE id = ANY(:ids)"
             ),
-            {"ids": pub_ids},
+            {"ids": publication_ids},
         )
         return {row.id: row.doc_type for row in result}
 
     # ── Chargement / persistance de l'aggregate Publication ────────
 
-    def find_by_id(self, pub_id: int) -> Publication | None:
+    def find_by_id(self, publication_id: int) -> Publication | None:
         """Hydrate l'agrégat `Publication` depuis `publications` (attributs canoniques), ou `None` si absente. Les contributions ne sont pas chargées ici (projection lecture séparée au besoin)."""
         row = self._conn.execute(
             text("""
@@ -60,7 +60,7 @@ class PublicationStore:
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = :id
             """),
-            {"id": pub_id},
+            {"id": publication_id},
         ).first()
         if not row:
             return None
@@ -88,9 +88,9 @@ class PublicationStore:
             meta=m["meta"],
         )
 
-    def save(self, pub: Publication) -> None:
+    def save(self, publication: Publication) -> None:
         """Persiste l'état mutable de l'agrégat `Publication` (tous les champs éditables ; `publication_year` reste immuable après création). Requiert `pub.id` posé."""
-        if pub.id is None:
+        if publication.id is None:
             raise ValueError("save(pub) : pub.id doit être posé (utiliser create pour insérer)")
         self._conn.execute(
             text("""
@@ -115,21 +115,21 @@ class PublicationStore:
                 WHERE id = :id
             """),
             {
-                "id": pub.id,
-                "title": pub.title,
-                "tn": pub.title_normalized,
-                "dt": pub.doc_type,
-                "doi": str(pub.doi) if pub.doi else None,
-                "oa": pub.oa_status,
-                "license": pub.license,
-                "deposit_license": pub.deposit_license,
-                "jid": pub.journal_id,
-                "mid": pub.monograph_id,
-                "ct": pub.container_title,
-                "lang": pub.language,
-                "is_retracted": pub.is_retracted,
-                "countries": list(pub.countries) if pub.countries else None,
-                "meta": _json_dumps_or_none(pub.meta),
+                "id": publication.id,
+                "title": publication.title,
+                "tn": publication.title_normalized,
+                "dt": publication.doc_type,
+                "doi": str(publication.doi) if publication.doi else None,
+                "oa": publication.oa_status,
+                "license": publication.license,
+                "deposit_license": publication.deposit_license,
+                "jid": publication.journal_id,
+                "mid": publication.monograph_id,
+                "ct": publication.container_title,
+                "lang": publication.language,
+                "is_retracted": publication.is_retracted,
+                "countries": list(publication.countries) if publication.countries else None,
+                "meta": _json_dumps_or_none(publication.meta),
             },
         )
         # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1 publications_detail (upsert).
@@ -146,11 +146,11 @@ class PublicationStore:
                     biblio = EXCLUDED.biblio
             """),
             {
-                "id": pub.id,
-                "abstract": pub.abstract,
-                "keywords": list(pub.keywords) if pub.keywords else None,
-                "topics": _json_dumps_or_none(pub.topics),
-                "biblio": _json_dumps_or_none(pub.biblio),
+                "id": publication.id,
+                "abstract": publication.abstract,
+                "keywords": list(publication.keywords) if publication.keywords else None,
+                "topics": _json_dumps_or_none(publication.topics),
+                "biblio": _json_dumps_or_none(publication.biblio),
             },
         )
 
@@ -189,12 +189,12 @@ class PublicationStore:
 
     # ── Suppression ────────────────────────────────────────────────
 
-    def has_source_records(self, pub_id: int) -> bool:
+    def has_source_records(self, publication_id: int) -> bool:
         """Vrai si au moins une `source_record` est rattachée à la publication."""
         return bool(
             self._conn.execute(
                 text("SELECT EXISTS (SELECT 1 FROM source_records WHERE publication_id = :id)"),
-                {"id": pub_id},
+                {"id": publication_id},
             ).scalar_one()
         )
 
@@ -208,11 +208,11 @@ class PublicationStore:
             self._conn, MergedEntity.PUBLICATION, to_publication_id, from_publication_id
         )
 
-    def delete(self, pub_id: int) -> None:
+    def delete(self, publication_id: int) -> None:
         """Supprime une publication. Le cascade DB nettoie `contributions` et `publication_subjects` ; `apc_payments` et `source_records.publication_id` passent à NULL. Appelée par le module du cycle de vie (`pipeline.transformation.publications.lifecycle`)."""
         self._conn.execute(
             text("DELETE FROM publications WHERE id = :id"),
-            {"id": pub_id},
+            {"id": publication_id},
         )
 
 

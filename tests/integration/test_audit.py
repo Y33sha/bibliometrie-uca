@@ -305,11 +305,11 @@ class TestEndToEndServiceIntegration:
         from infrastructure.repositories import contribution_repository
 
         person_id = _person(sa_sync_conn)
-        pub_id = insert_publication(sa_sync_conn)
+        publication_id = insert_publication(sa_sync_conn)
         token = set_current_user("admin")
         try:
             reject_pair(
-                pub_id,
+                publication_id,
                 person_id,
                 repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
@@ -320,5 +320,5 @@ class TestEndToEndServiceIntegration:
         row = self._last_event(sa_sync_conn)
         assert row.event_type == "contribution.rejected"
         assert row.aggregate_type == "publication"
-        assert row.aggregate_id == pub_id
+        assert row.aggregate_id == publication_id
         assert row.payload == {"person_id": person_id}

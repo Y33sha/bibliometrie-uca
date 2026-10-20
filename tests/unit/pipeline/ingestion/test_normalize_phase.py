@@ -24,7 +24,7 @@ def _run(
     return NormalizePhase(
         normalize_one=lambda _ctx, source: (appels.append(f"normalize:{source}"), bilan)[1],
         prune_disappeared=lambda _ctx: (appels.append("prune"), disparues)[1],
-        cleanup_orphan_identities=lambda _ctx: (appels.append("cleanup"), 0)[1],
+        cleanup_orphan_contributor_information=lambda _ctx: (appels.append("cleanup"), 0)[1],
         cleanup_orphan_addresses=lambda _ctx: (appels.append("cleanup_addresses"), 0)[1],
     ).run(ctx)
 

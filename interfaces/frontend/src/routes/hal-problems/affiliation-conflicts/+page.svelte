@@ -11,7 +11,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	import type { components } from '$lib/api/schema';
-	type Pub = components['schemas']['HalAffiliationConflictPub'];
+	type Pub = components['schemas']['HalAffiliationConflictPublication'];
 
 	const list = usePaginatedFetch<Pub>({
 		endpoint: '/api/hal-problems/affiliation-conflicts',

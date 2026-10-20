@@ -297,7 +297,7 @@ class _MinimalNorm(SourceNormalizer):
 
 
 class TestProcessWorkMinimalMetadata:
-    def test_notice_vide_sautee(self):
+    def test_enregistrement_source_vide_saute(self):
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
@@ -305,7 +305,7 @@ class TestProcessWorkMinimalMetadata:
         staging.mark_done.assert_called_once()
         staging.discard_source_record.assert_not_called()
 
-    def test_notice_sans_annee_ecartee_et_son_enregistrement_supprime(self):
+    def test_enregistrement_source_sans_annee_ecarte_et_supprime(self):
         """Régression : une notice qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement qu'elle avait produit disparaît."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
@@ -315,7 +315,7 @@ class TestProcessWorkMinimalMetadata:
         staging.mark_done.assert_called_once_with(ANY, 7)
         assert norm.normalized == []
 
-    def test_notice_refusee_par_la_source(self):
+    def test_enregistrement_source_refuse_par_la_source(self):
         """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'une notice incomplète."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
@@ -325,7 +325,7 @@ class TestProcessWorkMinimalMetadata:
         staging.discard_source_record.assert_called_once_with(ANY, 3)
         staging.mark_done.assert_called_once_with(ANY, 3)
 
-    def test_notice_complete_normalisee(self):
+    def test_enregistrement_source_complet_normalise(self):
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=2, source_id="b", doi=None, raw_data={"title": "T", "year": 2020})

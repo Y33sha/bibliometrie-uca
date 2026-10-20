@@ -147,7 +147,7 @@ def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[s
     return out
 
 
-def notice_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
+def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
     """Identifiants propres d'une notice, par type : le dépôt HAL d'une notice HAL ou d'une notice ScanR issue de HAL, le NNT d'une notice theses.fr."""
     if source == Source.HAL:
         hal_id = HALId.try_parse(source_id)
@@ -291,7 +291,7 @@ def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
 def resolve_cluster_doi_corrections(
     group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
 ) -> list[DoiClusterDecision]:
-    """Pour un groupe de `source_records` partageant `shared_doi`, renvoie les corrections `(sp_id, target_doi, cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
+    """Pour un groupe de `source_records` partageant `shared_doi`, renvoie les corrections `(source_record_id, target_doi, cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **Même œuvre DataCite** (un membre porte un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres convergent sur l'œuvre principale (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.

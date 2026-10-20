@@ -8,7 +8,7 @@ Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.f
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import THESES_FIELD_ROLES, ContributionRole, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
@@ -32,7 +32,7 @@ class ThesisContribution:
 
     person: Mapping[str, JsonValue]
     roles: list[ContributionRole]
-    name: SignatureName
+    name: ContributorName
     author_position: int | None
     identifiers: dict[str, str] | None
     is_author: bool
@@ -70,7 +70,7 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContr
     out: list[ThesisContribution] = []
     position = 0
     for key, person in personnes.items():
-        name = SignatureName.from_parts(as_str(person.get("nom")), as_str(person.get("prenom")))
+        name = ContributorName.from_parts(as_str(person.get("nom")), as_str(person.get("prenom")))
         if name is None:
             continue
         merged = merge_roles([roles_par_personne[key]])

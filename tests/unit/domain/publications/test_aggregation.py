@@ -14,7 +14,7 @@ from domain.publications.publication import Publication
 from domain.source_records.source_record import SourceRecord
 
 
-def _sp(**overrides) -> SourceRecord:
+def _source_record(**overrides) -> SourceRecord:
     defaults = {
         "id": 1,
         "source": "datacite",
@@ -41,7 +41,7 @@ def _sp(**overrides) -> SourceRecord:
     return SourceRecord(**defaults)  # type: ignore[arg-type]
 
 
-def _pub() -> Publication:
+def _publication() -> Publication:
     return Publication(id=10, title="obsolète", publication_year=2020)
 
 
@@ -50,40 +50,44 @@ _PRIORITY = ("openalex", "datacite")
 
 
 def test_parent_wins_title_over_higher_priority_secondary_piece():
-    parent = _sp(id=1, source="datacite", title="Jeu de données phénotypiques", keywords=("blé",))
-    piece = _sp(id=2, source="openalex", title="README_data.txt", keywords=("supplément",))
+    parent = _source_record(
+        id=1, source="datacite", title="Jeu de données phénotypiques", keywords=("blé",)
+    )
+    piece = _source_record(
+        id=2, source="openalex", title="README_data.txt", keywords=("supplément",)
+    )
 
-    pub = _pub()
+    publication = _publication()
     refresh_from_sources(
-        pub, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
+        publication, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
     )
 
     # Le parent (canonique) gagne le titre malgré la priorité de source de la pièce.
-    assert pub.title == "Jeu de données phénotypiques"
+    assert publication.title == "Jeu de données phénotypiques"
     # Les mots-clés restent unionnés toutes sources confondues.
-    assert set(pub.keywords) == {"blé", "supplément"}
+    assert set(publication.keywords) == {"blé", "supplément"}
 
 
 def test_secondary_fills_scalar_absent_on_parent():
     # Le parent n'a pas d'abstract : la pièce, reléguée, comble quand même le champ vide.
-    parent = _sp(id=1, source="datacite", abstract=None)
-    piece = _sp(id=2, source="openalex", abstract="Description du jeu de données")
+    parent = _source_record(id=1, source="datacite", abstract=None)
+    piece = _source_record(id=2, source="openalex", abstract="Description du jeu de données")
 
-    pub = _pub()
+    publication = _publication()
     refresh_from_sources(
-        pub, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
+        publication, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
     )
-    assert pub.abstract == "Description du jeu de données"
+    assert publication.abstract == "Description du jeu de données"
 
 
 def test_without_secondary_ids_source_priority_decides():
     # Comportement par défaut inchangé : sans dépriorisation, la source prioritaire gagne le titre.
-    parent = _sp(id=1, source="datacite", title="Jeu de données phénotypiques")
-    piece = _sp(id=2, source="openalex", title="README_data.txt")
+    parent = _source_record(id=1, source="datacite", title="Jeu de données phénotypiques")
+    piece = _source_record(id=2, source="openalex", title="README_data.txt")
 
-    pub = _pub()
-    refresh_from_sources(pub, [piece, parent], source_priority=_PRIORITY)
-    assert pub.title == "README_data.txt"
+    publication = _publication()
+    refresh_from_sources(publication, [piece, parent], source_priority=_PRIORITY)
+    assert publication.title == "README_data.txt"
 
 
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
@@ -91,53 +95,55 @@ def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
 
     Toutes les sources ne renseignent pas le type de document. La plus prioritaire restant muette, l'agrégation lit la suivante plutôt que de conclure à l'absence de type.
     """
-    muette = _sp(id=1, source="openalex", doc_type=None)
-    parlante = _sp(id=2, source="datacite", doc_type="dataset")
+    muette = _source_record(id=1, source="openalex", doc_type=None)
+    parlante = _source_record(id=2, source="datacite", doc_type="dataset")
 
-    pub = _pub()
-    refresh_from_sources(pub, [muette, parlante], source_priority=_PRIORITY)
-    assert pub.doc_type == "dataset"
+    publication = _publication()
+    refresh_from_sources(publication, [muette, parlante], source_priority=_PRIORITY)
+    assert publication.doc_type == "dataset"
 
 
 def test_un_sous_type_d_article_prime_sur_l_article_generique():
     """Une source sans type, placée en tête, n'interrompt pas la recherche du sous-type."""
-    muette = _sp(id=1, source="openalex", doc_type=None)
-    generique = _sp(id=2, source="crossref", doc_type="article")
-    precise = _sp(id=3, source="datacite", doc_type="review")
+    muette = _source_record(id=1, source="openalex", doc_type=None)
+    generique = _source_record(id=2, source="crossref", doc_type="article")
+    precise = _source_record(id=3, source="datacite", doc_type="review")
 
-    pub = _pub()
+    publication = _publication()
     refresh_from_sources(
-        pub, [muette, generique, precise], source_priority=("openalex", "crossref", "datacite")
+        publication,
+        [muette, generique, precise],
+        source_priority=("openalex", "crossref", "datacite"),
     )
-    assert pub.doc_type == "review"
+    assert publication.doc_type == "review"
 
 
 def test_sans_source_l_agregation_est_refusee():
     with pytest.raises(ValueError, match=r"^refresh_from_sources requiert au moins une source"):
-        refresh_from_sources(_pub(), [], source_priority=_PRIORITY)
+        refresh_from_sources(_publication(), [], source_priority=_PRIORITY)
 
 
 class TestOrdreDesSources:
     def test_la_priorite_ordonne_des_sources_recues_dans_le_desordre(self):
-        datacite = _sp(id=1, source="datacite", title="Titre DataCite")
-        openalex = _sp(id=2, source="openalex", title="Titre OpenAlex")
+        datacite = _source_record(id=1, source="datacite", title="Titre DataCite")
+        openalex = _source_record(id=2, source="openalex", title="Titre OpenAlex")
 
-        pub = _pub()
-        refresh_from_sources(pub, [datacite, openalex], source_priority=_PRIORITY)
-        assert pub.title == "Titre OpenAlex"
+        publication = _publication()
+        refresh_from_sources(publication, [datacite, openalex], source_priority=_PRIORITY)
+        assert publication.title == "Titre OpenAlex"
 
     def test_une_source_hors_priorite_passe_apres_les_sources_classees(self):
-        inconnue = _sp(id=1, source="wos", title="Titre WoS")
-        classee = _sp(id=2, source="datacite", title="Titre DataCite")
+        inconnue = _source_record(id=1, source="wos", title="Titre WoS")
+        classee = _source_record(id=2, source="datacite", title="Titre DataCite")
 
-        pub = _pub()
-        refresh_from_sources(pub, [inconnue, classee], source_priority=_PRIORITY)
-        assert pub.title == "Titre DataCite"
+        publication = _publication()
+        refresh_from_sources(publication, [inconnue, classee], source_priority=_PRIORITY)
+        assert publication.title == "Titre DataCite"
 
 
 class TestChampsAgreges:
     def test_chaque_champ_vient_de_la_source(self):
-        source = _sp(
+        source = _source_record(
             title="Blé <i>durum</i>",
             publication_year=2021,
             doi="10.1234/ABC",
@@ -152,83 +158,85 @@ class TestChampsAgreges:
             is_retracted=True,
         )
 
-        pub = _pub()
-        refresh_from_sources(pub, [source], source_priority=_PRIORITY)
-        assert pub.title_normalized == "ble durum"
-        assert pub.publication_year == 2021
-        assert pub.doi == DOI("10.1234/abc")
-        assert pub.journal_id == 7
-        assert pub.monograph_id == 9
-        assert pub.container_title == "Revue d'agronomie"
-        assert pub.language == "fr"
-        assert pub.countries == ("FR",)
-        assert pub.topics == {"datacite": {"domaine": "agronomie"}}
-        assert pub.biblio == {"volume": "3"}
-        assert pub.meta == {"licence": "cc-by"}
-        assert pub.is_retracted is True
+        publication = _publication()
+        refresh_from_sources(publication, [source], source_priority=_PRIORITY)
+        assert publication.title_normalized == "ble durum"
+        assert publication.publication_year == 2021
+        assert publication.doi == DOI("10.1234/abc")
+        assert publication.journal_id == 7
+        assert publication.monograph_id == 9
+        assert publication.container_title == "Revue d'agronomie"
+        assert publication.language == "fr"
+        assert publication.countries == ("FR",)
+        assert publication.topics == {"datacite": {"domaine": "agronomie"}}
+        assert publication.biblio == {"volume": "3"}
+        assert publication.meta == {"licence": "cc-by"}
+        assert publication.is_retracted is True
 
     def test_les_mots_cles_sont_dedoublonnes_sans_egard_a_la_casse(self):
-        premiere = _sp(id=1, source="openalex", keywords=("Blé",))
-        seconde = _sp(id=2, source="datacite", keywords=("blé", "maïs"))
+        premiere = _source_record(id=1, source="openalex", keywords=("Blé",))
+        seconde = _source_record(id=2, source="datacite", keywords=("blé", "maïs"))
 
-        pub = _pub()
-        refresh_from_sources(pub, [premiere, seconde], source_priority=_PRIORITY)
-        assert pub.keywords == ("Blé", "maïs")
+        publication = _publication()
+        refresh_from_sources(publication, [premiere, seconde], source_priority=_PRIORITY)
+        assert publication.keywords == ("Blé", "maïs")
 
     def test_les_jsonb_fusionnent_par_cle_au_profit_de_la_source_prioritaire(self):
-        premiere = _sp(id=1, source="openalex", biblio={"volume": "3", "issue": "1"})
-        seconde = _sp(id=2, source="datacite", biblio={"volume": "4", "pages": "5-9"})
+        premiere = _source_record(id=1, source="openalex", biblio={"volume": "3", "issue": "1"})
+        seconde = _source_record(id=2, source="datacite", biblio={"volume": "4", "pages": "5-9"})
 
-        pub = _pub()
-        refresh_from_sources(pub, [premiere, seconde], source_priority=_PRIORITY)
-        assert pub.biblio == {"volume": "3", "issue": "1", "pages": "5-9"}
+        publication = _publication()
+        refresh_from_sources(publication, [premiere, seconde], source_priority=_PRIORITY)
+        assert publication.biblio == {"volume": "3", "issue": "1", "pages": "5-9"}
 
 
 class TestStatutOa:
     """Le statut OA tiré des sources et du verdict d'Unpaywall sur le DOI de la publication."""
 
     def test_le_statut_le_plus_ouvert_l_emporte(self):
-        verte = _sp(id=1, source="hal", oa_status="green")
-        doree = _sp(id=2, source="openalex", oa_status="gold")
+        verte = _source_record(id=1, source="hal", oa_status="green")
+        doree = _source_record(id=2, source="openalex", oa_status="gold")
 
-        pub = _pub()
-        refresh_from_sources(pub, [verte, doree], source_priority=("hal", "openalex"))
-        assert pub.oa_status == "gold"
+        publication = _publication()
+        refresh_from_sources(publication, [verte, doree], source_priority=("hal", "openalex"))
+        assert publication.oa_status == "gold"
 
     def test_des_sources_muettes_donnent_un_statut_inconnu(self):
-        pub = _pub()
-        refresh_from_sources(pub, [_sp(oa_status=None)], source_priority=_PRIORITY)
-        assert pub.oa_status == OA_STATUS_UNKNOWN_DEFAULT
+        publication = _publication()
+        refresh_from_sources(
+            publication, [_source_record(oa_status=None)], source_priority=_PRIORITY
+        )
+        assert publication.oa_status == OA_STATUS_UNKNOWN_DEFAULT
 
     def test_un_depot_en_archive_ouverte_tient_face_a_un_verdict_ferme(self):
-        pub = _pub()
+        publication = _publication()
         refresh_from_sources(
-            pub,
-            [_sp(source="hal", oa_status="green")],
+            publication,
+            [_source_record(source="hal", oa_status="green")],
             source_priority=("hal",),
             unpaywall={"10.9001/set": "closed"},
         )
-        assert pub.oa_status == "green"
+        assert publication.oa_status == "green"
 
     def test_sans_depot_le_verdict_ferme_tient(self):
-        pub = _pub()
+        publication = _publication()
         refresh_from_sources(
-            pub,
-            [_sp(source="openalex", oa_status="gold")],
+            publication,
+            [_source_record(source="openalex", oa_status="gold")],
             source_priority=_PRIORITY,
             unpaywall={"10.9001/set": "closed"},
         )
-        assert pub.oa_status == "closed"
+        assert publication.oa_status == "closed"
 
     def test_le_verdict_vise_le_doi_de_la_publication(self):
-        pub = _pub()
+        publication = _publication()
         refresh_from_sources(
-            pub,
-            [_sp(source="openalex", oa_status="gold")],
+            publication,
+            [_source_record(source="openalex", oa_status="gold")],
             source_priority=_PRIORITY,
             unpaywall={"10.9001/autre": "closed"},
         )
-        assert pub.oa_status == "gold"
+        assert publication.oa_status == "gold"
 
 
 class TestLicences:
@@ -238,47 +246,55 @@ class TestLicences:
 
     def test_crossref_avant_openalex_pour_un_article(self):
         sources = [
-            _sp(id=1, source="openalex", doc_type="article", license="cc-by-nc"),
-            _sp(id=2, source="crossref", doc_type="article", license="cc-by"),
-            _sp(id=3, source="hal", doc_type="article", license="repository-distribution"),
+            _source_record(id=1, source="openalex", doc_type="article", license="cc-by-nc"),
+            _source_record(id=2, source="crossref", doc_type="article", license="cc-by"),
+            _source_record(
+                id=3, source="hal", doc_type="article", license="repository-distribution"
+            ),
         ]
-        pub = _pub()
-        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
-        assert (pub.license, pub.deposit_license) == ("cc-by", "repository-distribution")
+        publication = _publication()
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert (publication.license, publication.deposit_license) == (
+            "cc-by",
+            "repository-distribution",
+        )
 
     def test_source_sans_licence_passee(self):
         sources = [
-            _sp(id=1, source="crossref", doc_type="article", license=None),
-            _sp(id=2, source="scanr", doc_type="article", license="cc-by-sa"),
+            _source_record(id=1, source="crossref", doc_type="article", license=None),
+            _source_record(id=2, source="scanr", doc_type="article", license="cc-by-sa"),
         ]
-        pub = _pub()
-        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
-        assert (pub.license, pub.deposit_license) == ("cc-by-sa", None)
+        publication = _publication()
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert (publication.license, publication.deposit_license) == ("cc-by-sa", None)
 
     def test_datacite_en_tete_pour_un_jeu_de_donnees(self):
         sources = [
-            _sp(id=1, source="openalex", doc_type="dataset", license="other-oa"),
-            _sp(id=2, source="datacite", doc_type="dataset", license="public-domain"),
+            _source_record(id=1, source="openalex", doc_type="dataset", license="other-oa"),
+            _source_record(id=2, source="datacite", doc_type="dataset", license="public-domain"),
         ]
-        pub = _pub()
-        refresh_from_sources(pub, sources, source_priority=self._ORDRE)
-        assert pub.license == "public-domain"
+        publication = _publication()
+        refresh_from_sources(publication, sources, source_priority=self._ORDRE)
+        assert publication.license == "public-domain"
 
 
 class TestCollectionDeLaMonographie:
     def test_publication_sans_revue_prend_la_collection_de_sa_monographie(self):
-        pub = _pub()
+        publication = _publication()
         refresh_from_sources(
-            pub, [_sp(monograph_id=9)], source_priority=_PRIORITY, monograph_journals={9: 7}
-        )
-        assert (pub.monograph_id, pub.journal_id) == (9, 7)
-
-    def test_revue_d_une_source_passe_avant_la_collection(self):
-        pub = _pub()
-        refresh_from_sources(
-            pub,
-            [_sp(monograph_id=9, journal_id=3)],
+            publication,
+            [_source_record(monograph_id=9)],
             source_priority=_PRIORITY,
             monograph_journals={9: 7},
         )
-        assert pub.journal_id == 3
+        assert (publication.monograph_id, publication.journal_id) == (9, 7)
+
+    def test_revue_d_une_source_passe_avant_la_collection(self):
+        publication = _publication()
+        refresh_from_sources(
+            publication,
+            [_source_record(monograph_id=9, journal_id=3)],
+            source_priority=_PRIORITY,
+            monograph_journals={9: 7},
+        )
+        assert publication.journal_id == 3

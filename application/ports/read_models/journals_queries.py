@@ -28,7 +28,7 @@ JournalSort = Literal[
 class JournalFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `search` porte sur le titre et sur les ISSN — les trois colonnes de support et les ISSN rejetés. `journal_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_pubs` restreint aux revues portant au moins une publication.
+    `search` porte sur le titre et sur les ISSN — les trois colonnes de support et les ISSN rejetés. `journal_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_publications` restreint aux revues portant au moins une publication.
     """
 
     search: str = ""
@@ -36,7 +36,7 @@ class JournalFilters:
     journal_types: list[str] = field(default_factory=list)
     is_in_doaj: bool | None = None
     oa_models: list[str] = field(default_factory=list)
-    with_pubs: bool = False
+    with_publications: bool = False
 
 
 class JournalIssnDetail(BaseModel):
@@ -53,7 +53,7 @@ class JournalIssnDetail(BaseModel):
 class JournalListItem(BaseModel):
     """Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
 
-    `pub_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
+    `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
     """
 
     id: int
@@ -61,7 +61,7 @@ class JournalListItem(BaseModel):
     issns: list[str]
     """ISSN actifs."""
     publisher_id: int | None
-    pub_name: str | None
+    publisher_name: str | None
     is_in_doaj: bool
     journal_type: JournalType | None
     publication_count: int

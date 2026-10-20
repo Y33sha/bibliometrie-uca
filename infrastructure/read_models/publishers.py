@@ -47,7 +47,7 @@ def _build_publisher_where(
     if filters.countries and not skip_countries:
         parts.append("p.country = ANY(:countries)")
         binds["countries"] = filters.countries
-    if filters.with_pubs:
+    if filters.with_publications:
         parts.append("p.publication_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 

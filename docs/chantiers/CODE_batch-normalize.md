@@ -4,7 +4,7 @@
 
 La phase `normalize` traite les sources l'une après l'autre, dans l'ordre de `SOURCE_PRIORITY`. Pour chaque source, la boucle de `SourceNormalizer.run` (`pipeline/ingestion/common/normalize.py`) lit le `staging` par sous-lots de 50 lignes. Chaque document est analysé puis écrit sous un SAVEPOINT. Un commit a lieu tous les 100 ou 500 documents selon la source (`DEFAULT_BATCH_SIZE`).
 
-Le writer partagé (`pipeline/ingestion/common/signatures.py`) écrit les signatures de toutes les sources, theses comprise. Ses requêtes (`ContributionsBatchQueries`, dans `signature_queries.py`) traitent déjà plusieurs signatures en une requête, mais toujours celles d'un seul document. Le writer fait donc un nombre constant d'allers-retours par document :
+Le writer partagé (`pipeline/ingestion/common/signatures.py`) écrit les signatures de toutes les sources, theses comprise. Ses requêtes (`ContributionsBatchQueries`, dans `source_contribution_queries.py`) traitent déjà plusieurs signatures en une requête, mais toujours celles d'un seul document. Le writer fait donc un nombre constant d'allers-retours par document :
 
 - lecture de l'empreinte du bloc auteurs (`fetch_authors_hash`) : un bloc inchangé s'arrête là, sauf avec `--normalize-full` ;
 - lecture des signatures stockées (`fetch_stored_source_contributions`), relue après insertion pour obtenir les identifiants des signatures insérées ;
@@ -25,7 +25,7 @@ Le rejeu isole le document fautif. Les erreurs sont rares, donc le rejeu l'est a
 **Périmètre du lot.** Seules les signatures et leurs dépendances passent en lot :
 
 - `fetch_authors_hash` et `fetch_stored_source_contributions` lisent les K `source_record_id` en une requête ;
-- `plan_signature_sync` reste par document ;
+- `plan_source_contribution_sync` reste par document ;
 - suppressions, mises à jour, insertions, adresses, liens d'adresse et ROR deviennent une requête par lot ;
 - les identifiants des signatures insérées se lisent pour les K documents en une requête.
 

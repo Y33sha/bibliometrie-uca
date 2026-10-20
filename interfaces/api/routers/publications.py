@@ -2,7 +2,7 @@
 
 Les lectures passent par le port `PublicationsQueries`.
 
-Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{pub_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from collections.abc import Iterator
@@ -254,23 +254,23 @@ def suspect_merges(
     return queries.suspect_merges(page=page, per_page=per_page)
 
 
-@router.get("/{pub_id}", response_model=PublicationDetailResponse)
+@router.get("/{publication_id}", response_model=PublicationDetailResponse)
 def get_publication(
-    pub_id: int,
+    publication_id: int,
     queries: PublicationsQueries = Depends(publications_queries),
     detail: EntityDetail = Depends(entity_detail(MergedEntity.PUBLICATION)),
 ) -> PublicationDetailResponse:
     """Détail complet d'une publication."""
-    return detail.found(queries.get_publication_detail(pub_id))
+    return detail.found(queries.get_publication_detail(publication_id))
 
 
-@router.get("/{pub_id}/sources", response_model=PublicationSourcesResponse)
+@router.get("/{publication_id}/sources", response_model=PublicationSourcesResponse)
 def get_publication_sources(
-    pub_id: int,
+    publication_id: int,
     queries: PublicationsQueries = Depends(publications_queries),
 ) -> PublicationSourcesResponse:
     """Métadonnées de chaque enregistrement source de la publication, toutes sources confondues."""
-    sources = queries.get_publication_sources(pub_id)
+    sources = queries.get_publication_sources(publication_id)
     if sources is None:
         raise HTTPException(status_code=404, detail="Publication introuvable")
     return sources

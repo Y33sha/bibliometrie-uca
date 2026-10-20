@@ -224,10 +224,10 @@ def _persist_updates(
     return len(rows)
 
 
-# La notice `{sp}` a au moins une signature individuelle.
-_HAS_INDIVIDUAL_SIGNATURE = (
+# La notice `{source_record}` a au moins une signature individuelle.
+_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION = (
     "EXISTS (SELECT 1 FROM source_contributions s"
-    " WHERE s.source_record_id = {sp} AND NOT s.collective)"
+    " WHERE s.source_record_id = {source_record} AND NOT s.collective)"
 )
 
 
@@ -386,8 +386,8 @@ class PgMetadataCorrectionQueries:
                 ),
                 foreign_hal_dois AS (
                     SELECT DISTINCT hc.d FROM hal_crossref hc
-                    WHERE {_HAS_INDIVIDUAL_SIGNATURE.format(sp="hc.hal_id")}
-                      AND {_HAS_INDIVIDUAL_SIGNATURE.format(sp="hc.crossref_id")}
+                    WHERE {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.hal_id")}
+                      AND {_HAS_INDIVIDUAL_SOURCE_CONTRIBUTION.format(source_record="hc.crossref_id")}
                       AND NOT EXISTS (
                           SELECT 1
                           FROM source_contributions a

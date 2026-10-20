@@ -130,7 +130,7 @@
 			<tbody>
 				{#each meta.items as pair}
 					<tr>
-						{#each [pair.pub_a, pair.pub_b] as pub}
+						{#each [pair.publication_a, pair.publication_b] as pub}
 							<td>
 								<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>
 								<div class="pub-meta-line">

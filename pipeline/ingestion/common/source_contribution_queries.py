@@ -17,8 +17,8 @@ from infrastructure.db.jsonb import Jsonb
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
-class SignatureNameFields(TypedDict):
-    """Colonnes de nom d'une signature (`signature_name_fields`).
+class ContributorNameFields(TypedDict):
+    """Colonnes de nom d'une signature (`contributor_name_fields`).
 
     Sur `source_contributions`, le nom tel que la source le donne : `raw_last_name` et `raw_first_name`, ou `raw_author_name`. Sur l'identité (`contributor_information`), le découpage retenu normalisé.
     """
@@ -30,7 +30,7 @@ class SignatureNameFields(TypedDict):
     first_name_normalized: str | None
 
 
-class SourceContributionItem(SignatureNameFields):
+class SourceContributionItem(ContributorNameFields):
     """Une signature à écrire dans `source_contributions` (toutes sources).
 
     `identifiers` est nullable selon ce que la source fournit.
@@ -58,7 +58,7 @@ class SourceContributionUpdate(SourceContributionItem):
     id: int
 
 
-class StoredSourceContribution(NamedTuple):
+class StoredSourceContributionRow(NamedTuple):
     """Une signature en base d'une notice : identifiant, position, identité, empreinte, marque collective et rôles."""
 
     id: int
@@ -81,14 +81,14 @@ class AddressBatchItem(TypedDict):
 class ContributionAddressItem(TypedDict):
     """Ligne du batch insert `source_contribution_addresses` : pivot (contribution, adresse)."""
 
-    sa_id: int
+    source_contribution_id: int
     addr_id: int
 
 
 class ContributionRorItem(TypedDict):
     """Ligne du batch insert `source_contribution_rors` : ROR attribué par la source à une signature, et adresse de son affiliation (`None` pour une affiliation sans texte)."""
 
-    sa_id: int
+    source_contribution_id: int
     ror_id: str
     addr_id: int | None
 
@@ -100,22 +100,26 @@ _KEY_HASH_NULL = r"E'\x01'"
 _KEY_HASH_SEP = r"E'\x1f'"
 
 # Colonnes de la clé d'identité d'`contributor_information`, dans l'ordre du `key_hash`.
-IDENTITY_KEY_COLUMNS = ("last_name_normalized", "first_name_normalized", "identifiers")
+CONTRIBUTOR_INFORMATION_KEY_COLUMNS = (
+    "last_name_normalized",
+    "first_name_normalized",
+    "identifiers",
+)
 
 
 def key_hash_sql(exprs: Sequence[str]) -> str:
     """Expression SQL du `key_hash` d'une identité, pour le lookup indexé.
 
-    `exprs` : expressions SQL des champs de la clé (colonnes de table ou bind params), dans l'ordre de `IDENTITY_KEY_COLUMNS`.
+    `exprs` : expressions SQL des champs de la clé (colonnes de table ou bind params), dans l'ordre de `CONTRIBUTOR_INFORMATION_KEY_COLUMNS`.
     """
     parts = [f"coalesce(({e})::text, {_KEY_HASH_NULL})" for e in exprs]
     return "md5(" + f" || {_KEY_HASH_SEP} || ".join(parts) + ")"
 
 
-_KEY_COLUMNS_SQL = ", ".join(IDENTITY_KEY_COLUMNS)
+_KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
 
-def mark_signatures_to_resync(conn: Connection, source: str) -> int:
+def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
     """Vide l'empreinte du bloc auteurs des notices de `source` : leur prochaine normalisation synchronise leurs signatures. Rend le nombre de notices marquées."""
     return conn.execute(
         text("""
@@ -126,7 +130,7 @@ def mark_signatures_to_resync(conn: Connection, source: str) -> int:
     ).rowcount
 
 
-def delete_orphan_identities(conn: Connection) -> int:
+def delete_orphan_contributor_information(conn: Connection) -> int:
     """Supprime les identités de `contributor_information` que plus aucune signature ne référence.
 
     Une identité devient orpheline quand la dernière `source_contributions` qui la portait change de clé (nom ou identifiants corrigés) et bascule vers une autre identité. Balayage ensembliste appuyé sur l'index `idx_source_contributions_contributor_information`. Idempotent (no-op si rien n'est orphelin). Retourne le nombre d'identités supprimées.
@@ -162,10 +166,10 @@ class ContributionsBatchQueries:
     def upsert_source_contributions_batch(
         self, conn: Connection, values: list[SourceContributionItem]
     ) -> None:
-        """L'identité de l'auteur (`IDENTITY_KEY_COLUMNS`) vit sur la table dédupliquée `contributor_information` ; la signature porte seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
+        """L'identité de l'auteur (`CONTRIBUTOR_INFORMATION_KEY_COLUMNS`) vit sur la table dédupliquée `contributor_information` ; la signature porte seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
 
         1. **Upsert des identités du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les identités du document, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque identité récurrente à chaque document).
-        2. **Insert des signatures** — `contributor_information_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_record_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`signature_name_fields`).
+        2. **Insert des signatures** — `contributor_information_id` résolu par `key_hash` (colonne générée, index dédié), rapprochement indexé et NULL-safe. Le batch est transmis en JSONB et étendu via `jsonb_to_recordset`. `source`/`source_record_id`, invariants au sein d'un document, sont hoistés. Les noms normalisés sont fournis pré-calculés (`contributor_name_fields`).
 
         Les deux requêtes restent séquentielles, sans fusion possible : une CTE modifiant `contributor_information` laisserait ses lignes invisibles au JOIN de la même requête (même snapshot). La seconde requête voit celles de la première.
         """
@@ -220,7 +224,7 @@ class ContributionsBatchQueries:
                 identifiers jsonb, neutralized_identifiers jsonb, content_hash text)
             JOIN contributor_information aik
               ON aik.key_hash = """
-            + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
+            + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
         ).bindparams(bindparam("payload", type_=Jsonb))
         conn.execute(
             stmt,
@@ -233,7 +237,7 @@ class ContributionsBatchQueries:
 
     def fetch_stored_source_contributions(
         self, conn: Connection, source_record_id: int
-    ) -> list[StoredSourceContribution]:
+    ) -> list[StoredSourceContributionRow]:
         rows = conn.execute(
             text("""
                 SELECT sa.id, sa.author_position, aik.last_name_normalized,
@@ -245,7 +249,7 @@ class ContributionsBatchQueries:
             """),
             {"spid": source_record_id},
         ).all()
-        return [StoredSourceContribution(*r) for r in rows]
+        return [StoredSourceContributionRow(*r) for r in rows]
 
     def mark_contributions_dirty(self, conn: Connection, source_record_id: int) -> None:
         """Pose `contributions_dirty` sur la publication de la notice."""
@@ -400,18 +404,18 @@ class ContributionsBatchQueries:
     def insert_source_contribution_addresses_batch(
         self, conn: Connection, values: list[ContributionAddressItem]
     ) -> None:
-        # Pas d'ON CONFLICT : le writer supprime les liens d'une signature réécrite avant de les réinsérer, et déduplique les couples (sa_id, addr_id).
+        # Pas d'ON CONFLICT : le writer supprime les liens d'une signature réécrite avant de les réinsérer, et déduplique les couples (source_contribution_id, addr_id).
         if not values:
             return
         stmt = text("""
             INSERT INTO source_contribution_addresses (source_contribution_id, address_id)
-            SELECT sa_id, addr_id
-            FROM unnest(:sa_ids ::integer[], :addr_ids ::integer[]) AS t(sa_id, addr_id)
+            SELECT source_contribution_id, addr_id
+            FROM unnest(:source_contribution_ids ::integer[], :addr_ids ::integer[]) AS t(source_contribution_id, addr_id)
         """)
         conn.execute(
             stmt,
             {
-                "sa_ids": [v["sa_id"] for v in values],
+                "source_contribution_ids": [v["source_contribution_id"] for v in values],
                 "addr_ids": [v["addr_id"] for v in values],
             },
         )
@@ -425,11 +429,13 @@ class ContributionsBatchQueries:
         conn.execute(
             text("""
                 INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)
-                SELECT sa_id, hal_structure_id
-                FROM unnest(:sa_ids ::integer[], :hal_structure_ids ::integer[]) AS t(sa_id, hal_structure_id)
+                SELECT source_contribution_id, hal_structure_id
+                FROM unnest(:source_contribution_ids ::integer[], :hal_structure_ids ::integer[]) AS t(source_contribution_id, hal_structure_id)
             """),
             {
-                "sa_ids": [sa_id for sa_id, _ in values],
+                "source_contribution_ids": [
+                    source_contribution_id for source_contribution_id, _ in values
+                ],
                 "hal_structure_ids": [hal_id for _, hal_id in values],
             },
         )
@@ -443,12 +449,12 @@ class ContributionsBatchQueries:
         conn.execute(
             text("""
                 INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id)
-                SELECT sa_id, ror_id, addr_id
-                FROM unnest(:sa_ids ::integer[], :ror_ids ::text[], :addr_ids ::integer[])
-                    AS t(sa_id, ror_id, addr_id)
+                SELECT source_contribution_id, ror_id, addr_id
+                FROM unnest(:source_contribution_ids ::integer[], :ror_ids ::text[], :addr_ids ::integer[])
+                    AS t(source_contribution_id, ror_id, addr_id)
             """),
             {
-                "sa_ids": [v["sa_id"] for v in values],
+                "source_contribution_ids": [v["source_contribution_id"] for v in values],
                 "ror_ids": [v["ror_id"] for v in values],
                 "addr_ids": [v["addr_id"] for v in values],
             },

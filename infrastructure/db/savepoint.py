@@ -20,19 +20,19 @@ def savepoint(
         with savepoint(conn):
             do_work(conn)
     """
-    sp: NestedTransaction = conn.begin_nested()
+    source_record: NestedTransaction = conn.begin_nested()
     try:
         yield
     except Exception:
         try:
-            sp.rollback()
+            source_record.rollback()
         except Exception:
             if on_rollback_failure is not None:
                 with suppress(Exception):
                     on_rollback_failure()
         raise
     else:
-        sp.commit()
+        source_record.commit()
 
 
 def rollback_unless_invalidated(conn: Connection) -> None:

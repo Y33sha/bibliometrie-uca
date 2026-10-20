@@ -43,7 +43,7 @@ def test_la_suppression_suit_la_reconciliation_et_precede_le_decompte(contexte):
 def test_le_total_est_compte_apres_la_suppression(contexte):
     rendu, _ = _run(contexte, supprimees=2, total=40)
 
-    assert rendu.details["summary"]["pub_total"] == 40
+    assert rendu.details["summary"]["publication_total"] == 40
 
 
 def test_le_journal_compte_les_publications_supprimees(contexte, caplog):
