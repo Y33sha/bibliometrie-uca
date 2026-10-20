@@ -46,15 +46,6 @@ Le niveau source décrit une entité telle qu'une source la donne. Le niveau con
 | store | `*Store` : l'accès SQL à une entité dans le pipeline |
 | repository | `Pg*Repository` : un adaptateur de `infrastructure/` |
 
-## Mots écartés
-
-| Écarté | Employer |
-|---|---|
-| notice, document, enregistrement (pour une ligne de `source_records`) | enregistrement source |
-| signature (pour une ligne de `source_contributions`) | contribution source |
-| authorship | contribution |
-| identité (d'un contributeur) | informations du contributeur |
-| extraction, extracteur | moissonnage, moissonneur |
-| nœud (du run) | tâche |
+## Identifiants
 
 Les identifiants Python gardent les noms d'entité entiers : `publication_id`, `source_record`. Les alias de table du SQL restent courts : leur portée est la requête qui les déclare.

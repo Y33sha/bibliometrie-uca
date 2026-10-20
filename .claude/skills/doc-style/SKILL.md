@@ -43,12 +43,17 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 - **Pronoms « y » et « en ».** Ne les employer que si l'antécédent est le groupe nominal qui précède immédiatement, dans la même phrase. Sinon, répéter le nom.
 - **Phrases négatives.** Les remplacer chaque fois que possible par des phrases positives. Si une phrase décrit ce que le code ne fait pas ou plus, la supprimer. Eviter les négations multiples.
 - **Un mot par notion.** Ne pas chercher l'élégance littéraire. Ne pas varier le vocabulaire pour éviter une répétition : en documentation technique, répéter le même mot est un service rendu au lecteur, pas une faiblesse de style.
+- **Vocabulaire du code.** Employer les mots de `docs/architecture/08-vocabulaire.md`. `styles/Maison/Lexique.yml` signale les mots écartés hors contexte. Trois mots dépendent du contexte et restent au contrôle manuel :
+  - « document », « enregistrement » seul, pour une ligne de `source_records` → « enregistrement source » ;
+  - « signature » désigne seulement la chaîne d'adresse ; pour une ligne de `source_contributions` → « contribution source » ;
+  - « extraction » pour la collecte des sources → « moissonnage ».
 - **Simplicité et précision.** Remplacer les mots vagues par des équivalents précis ("la source atteste d'un document" => "le document est présent dans la source"; "la source ignore le document" => "le document est absent de la source").
 
 ## Alimentation
 
 Quand l'utilisatrice signale une tournure qui l'agace, la classer :
 
+- Mot écarté du vocabulaire du code → ajouter au `swap` de `styles/Maison/Lexique.yml`, ou à la liste des mots à contrôle manuel ci-dessus s'il dépend du contexte.
 - Expression figée remplaçable mot à mot → ajouter au `swap` de `styles/Maison/Vocabulaire.yml`, avec le substitut qu'elle propose. Si elle n'en propose pas, en suggérer un et le lui faire valider.
 - Défaut de structure (redite, remplissage, longueur, ton) → ajouter une paire AVANT / APRÈS dans `reference.md`, en gardant son texte exact en AVANT.
 - Motif récurrent qui n'est pas une expression figée → proposer une nouvelle règle `existence` dans `styles/Maison/`, et la lui soumettre avant de l'écrire.

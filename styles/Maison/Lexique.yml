@@ -1,0 +1,12 @@
+# Mots hors du vocabulaire du code (docs/architecture/08-vocabulaire.md). Les identifiants
+# composés (`source_authorships`) échappent à la règle : seul le mot isolé est visé.
+extends: substitution
+message: "Vocabulaire du code : écrire « %s » plutôt que « %s »."
+level: warning
+ignorecase: true
+swap:
+  "notices?": "enregistrement source"
+  "authorships?": "contribution"
+  "identités?": "informations du contributeur"
+  "extracteurs?": "moissonneur"
+  "nœuds?": "tâche"
