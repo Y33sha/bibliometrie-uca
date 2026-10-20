@@ -139,7 +139,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 8 — Vocabulaire
 
-- [ ] Glossaire du code (`docs/architecture/08-vocabulaire.md`) : pour chaque notion, le mot des textes et l'identifiant du code.
+- [x] Glossaire du code (`docs/architecture/08-vocabulaire.md`) : pour chaque notion, le mot des textes et l'identifiant du code. 4053fbda3
 - [ ] Abréviations des identifiants Python (`pub`, `sp`, `sa`, `sd`, `nf`) renommées ; un test sur l'AST les refuse.
 - [ ] Renommage du schéma, de l'API et du frontend, en une migration :
   - `source_publications` → `source_records`, `source_authorships` → `source_contributions`, `authorships` → `contributions` ;
