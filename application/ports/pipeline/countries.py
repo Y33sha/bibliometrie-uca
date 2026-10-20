@@ -1,4 +1,4 @@
-"""Port : résolution, par le pipeline, des pays d'un lot d'adresses, puis recalcul des pays de leurs notices et publications, après une saisie manuelle.
+"""Port : résolution, par le pipeline, des pays d'un lot d'adresses, puis recalcul des pays de leurs enregistrements sources et publications, après une saisie manuelle.
 
 Implémenté par `pipeline.transformation.countries.refresh_publication_countries.CountryRecompute`.
 """
@@ -20,7 +20,7 @@ class CountryRecompute(Protocol):
     def refresh_source_records_countries_for_addresses(
         self, conn: Connection, address_ids: list[int]
     ) -> int:
-        """Recalcule `source_records.countries` (union des pays des adresses de leurs signatures) pour les documents rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre de documents mis à jour."""
+        """Recalcule `source_records.countries` (union des pays des adresses de leurs contributions sources) pour les enregistrements sources rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre d'enregistrements sources mis à jour."""
         ...
 
     def refresh_publications_countries_for_addresses(

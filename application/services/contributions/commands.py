@@ -23,7 +23,7 @@ def exclude_contribution(
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
 
-    `contribution_id` désigne la ligne consolidée, quand les gestes sur les orphelines adressent une signature source.
+    `contribution_id` désigne la ligne de `contributions`, quand les gestes sur les orphelines adressent une contribution source.
     """
     contributions_service.exclude_contribution(
         contribution_id, repo=repo, person_repo=person_repo, audit_repo=audit_repo

@@ -99,7 +99,7 @@ class PersonRepository(Protocol):
         ...
 
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
-        """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les signatures de ses comptes HAL. Ces comptes sont ceux des signatures HAL qui contiennent l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
+        """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:

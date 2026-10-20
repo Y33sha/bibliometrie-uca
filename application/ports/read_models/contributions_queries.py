@@ -1,6 +1,6 @@
-"""Port : lectures sur les signatures (consommé par le router contributions).
+"""Port : lectures sur les contributions sources (consommé par le router contributions).
 
-Implémenté par `infrastructure.read_models.contributions.PgContributionsQueries`. La file des signatures orphelines lit `source_contributions` un cran sous les signatures consolidées : elle appartient donc aux contributions, non aux personnes qu'elle sert à rattacher.
+Implémenté par `infrastructure.read_models.contributions.PgContributionsQueries`. La file des contributions sources orphelines lit `source_contributions`, un cran sous les contributions : elle appartient donc aux contributions, et non aux personnes qu'elle sert à rattacher.
 """
 
 from dataclasses import dataclass, field
@@ -26,7 +26,7 @@ class OrphanContributionOut(BaseModel):
     publication_title: str
     publication_year: int | None
     labs: list[PublicationLabItem]
-    """Laboratoires du périmètre détectés dans les adresses de la signature."""
+    """Laboratoires du périmètre détectés dans les adresses de la contribution source."""
 
 
 class OrphanContributionsResponse(PaginatedResponse):
@@ -35,9 +35,9 @@ class OrphanContributionsResponse(PaginatedResponse):
 
 @dataclass(frozen=True, slots=True)
 class OrphanFilters:
-    """Filtres de la file des signatures orphelines.
+    """Filtres de la file des contributions sources orphelines.
 
-    `search` porte sur le nom de la signature. `lab_ids` et `lab_none` se combinent en OU : signatures dont les adresses désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
+    `search` vise le nom de la contribution source. `lab_ids` et `lab_none` se combinent en OU : contributions sources dont les adresses désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
     """
 
     search: str = ""
@@ -46,7 +46,7 @@ class OrphanFilters:
 
 
 class OrphanContributionsFacetsResponse(BaseModel):
-    """Facette laboratoires de la file des signatures orphelines : décompte par laboratoire détecté dans la signature, et nombre de signatures sans laboratoire."""
+    """Facette laboratoires de la file des contributions sources orphelines : décompte par laboratoire détecté dans la contribution source, et nombre de contributions sources sans laboratoire."""
 
     labs: list[FacetOption]
     no_lab_count: int
@@ -56,17 +56,17 @@ class ContributionsQueries(Protocol):
     """Lectures sync pour `/api/contributions/*`."""
 
     def orphan_contributions_count(self) -> OrphanCountResponse:
-        """Nombre de signatures du périmètre qu'aucune personne ne porte."""
+        """Nombre de contributions sources du périmètre rattachées à aucune personne."""
         ...
 
     def list_orphan_contributions(
         self, *, filters: OrphanFilters, page: int, per_page: int
     ) -> OrphanContributionsResponse:
-        """Liste paginée des signatures orphelines, avec la publication qu'elles signent."""
+        """Liste paginée des contributions sources orphelines, avec leur publication."""
         ...
 
     def orphan_contributions_facets(
         self, *, filters: OrphanFilters
     ) -> OrphanContributionsFacetsResponse:
-        """Facette laboratoires des signatures orphelines. Le filtre de recherche s'applique ; le filtre laboratoires, objet de la facette, ne s'applique pas."""
+        """Facette laboratoires des contributions sources orphelines. Le filtre de recherche s'applique ; le filtre laboratoires, objet de la facette, ne s'applique pas."""
         ...

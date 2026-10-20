@@ -360,9 +360,9 @@ class SourceRecordMetadataOut(BaseModel):
 
 
 class SourceContributionOut(BaseModel):
-    """Signature d'un enregistrement source, avec son groupe : les signatures d'un même auteur dans la publication.
+    """Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
 
-    `position` : rang d'auteur dans l'enregistrement, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la signature. `group_id` et `group_position`, position de la signature de référence du groupe : absents pour une signature hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la signature dans son groupe ; score et marge en bits, pour le modèle.
+    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `group_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
     """
 
     id: int
@@ -384,7 +384,7 @@ class SourceContributionOut(BaseModel):
 
 
 class PublicationSourcesResponse(BaseModel):
-    """Enregistrements sources d'une publication, toutes sources confondues, leurs signatures, et les structures que ces signatures citent."""
+    """Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures que ces contributions sources citent."""
 
     title: str
     source_records: list[SourceRecordMetadataOut]
@@ -393,7 +393,7 @@ class PublicationSourcesResponse(BaseModel):
 
 
 class SuspectMergeSourceRecordOut(BaseModel):
-    """Notice d'une publication de la file des fusions suspectes, et ses signatures d'auteur."""
+    """Enregistrement source d'une publication de la file des fusions suspectes, et ses contributions sources d'auteur."""
 
     source: str
     source_id: str
@@ -402,7 +402,7 @@ class SuspectMergeSourceRecordOut(BaseModel):
 
 
 class SuspectMergeOut(BaseModel):
-    """Publication dont moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice : ses notices ont des listes d'auteurs qui ne se recouvrent pas."""
+    """Publication dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source : ses enregistrements sources ont des listes d'auteurs qui ne se recouvrent pas."""
 
     publication_id: int
     title: str
@@ -459,5 +459,5 @@ class PublicationsQueries(Protocol):
     def suspect_merges_count(self) -> int: ...
 
     def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
-        """Fusions suspectes, la plus faible part de signatures d'auteur avec correspondant d'abord."""
+        """Fusions suspectes, la plus faible part de contributions sources d'auteur avec correspondant d'abord."""
         ...

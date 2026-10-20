@@ -1,8 +1,8 @@
 """Service Contributions — écritures sur l'agrégat Contribution, transaction-agnostiques.
 
-Couvre les lignes consolidées (`contributions`) et les signatures sources (`source_contributions`), dont le `person_id` porte le lien vers la personne. Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une signature à la fois.
+Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`), dont le `person_id` fait le lien vers la personne. Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
 
-La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la phase `contributions` (`build_contributions.py`) reconstruit les lignes consolidées depuis les signatures, les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les signatures.
+La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la phase `contributions` (`build_contributions.py`) reconstruit les contributions depuis les contributions sources, les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources.
 """
 
 from sqlalchemy import Connection
@@ -83,7 +83,7 @@ def propagate_in_perimeter_for_addresses(
     perimeter_structures: PerimeterStructures,
     perimeter_recompute: SourceContributionPerimeterRecompute,
 ) -> None:
-    """Recalcule le périmètre des signatures liées aux adresses données, de leurs contributions et de leurs publications.
+    """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs contributions et de leurs publications.
 
     Appelé en tâche de fond après chaque review/assign/unassign d'adresse.
     """

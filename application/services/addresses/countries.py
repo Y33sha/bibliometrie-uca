@@ -1,6 +1,6 @@
 """Pays des adresses — saisie manuelle, résolution, propagation vers `source_records` et `publications`.
 
-Une saisie manuelle s'écrit en candidats `manual` par `AddressRepository`, qui l'emportent sur les autres moyens. La résolution de `addresses.countries` et le recalcul des pays des notices et des publications appartiennent au pipeline, qui les expose par `CountryRecompute`.
+Une saisie manuelle s'écrit en candidats `manual` par `AddressRepository`, qui l'emportent sur les autres moyens. La résolution de `addresses.countries` et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline, qui les expose par `CountryRecompute`.
 """
 
 import logging
