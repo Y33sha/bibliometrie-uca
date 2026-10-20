@@ -80,7 +80,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Contrats import-linter du sens des dépendances. daf45dab6
 - [x] Contexte de phase seul canal des transactions et du journal. 08a950ab6
 - [x] `RunOptions` résolues une fois : ensemble de sources explicite, politique du mode. fd7d41c5d
-- [ ] `runtime/config.py` : identifiants d'accès vers `ingestion/`, collections HAL et identifiants d'API vers `infrastructure/read_models/perimeters.py`. `savepoint.py` vers `infrastructure/db/`.
+- [x] `runtime/config.py` : identifiants d'accès vers `ingestion/`, collections HAL et identifiants d'API vers `infrastructure/read_models/perimeters.py`. `savepoint.py` vers `infrastructure/db/`. Le contexte de phase transmet le contrôle des identifiants à `access_source`. a5061104b
 - [ ] Interface de `run_nodes` et de `PhaseMetrics` : ligne de clôture optionnelle, `resume`, `add(total=…)`, `Node.group`, `Node.lot`.
 - [ ] Description d'une phase en un seul endroit.
 
