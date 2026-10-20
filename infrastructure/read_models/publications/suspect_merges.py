@@ -1,4 +1,4 @@
-"""File des fusions suspectes : publications dont les notices ont des listes d'auteurs qui ne se recouvrent pas, lues dans `publication_author_alignment`."""
+"""File des fusions suspectes : publications dont les enregistrements sources ont des listes d'auteurs qui ne se recouvrent pas, lues dans `publication_author_alignment`."""
 
 from sqlalchemy import Connection, text
 
@@ -9,7 +9,7 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.publications.contribution_roles import ContributionRole
 
-# Moins de la moitié des signatures d'auteur ont un correspondant dans une autre notice.
+# Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
 _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
 
 _SOURCE_RECORDS_SQL = text(f"""
@@ -41,7 +41,7 @@ def suspect_merges_count(conn: Connection) -> int:
 
 
 def suspect_merges(conn: Connection, *, page: int, per_page: int) -> SuspectMergesResponse:
-    """Publications de la file, la plus faible part de signatures d'auteur avec correspondant d'abord, avec le décompte de chaque notice."""
+    """Publications de la file, la plus faible part de contributions sources d'auteur avec correspondant d'abord, avec le décompte de chaque enregistrement source."""
     total = suspect_merges_count(conn)
     rows = conn.execute(
         text(f"""

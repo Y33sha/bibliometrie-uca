@@ -22,7 +22,7 @@ from infrastructure.sql_fragments import (
 def detach_rejected_source_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
-    """Détache les signatures de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de signatures détachées.
+    """Détache les contributions sources de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de contributions sources détachées.
 
     Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
     """
@@ -53,7 +53,7 @@ def detach_rejected_source_contributions(
 
 
 def delete_orphan_contributions(conn: Connection, person_id: int) -> int:
-    """Supprime les lignes consolidées de la personne qu'aucune signature n'atteste. Retourne le nombre supprimé."""
+    """Supprime les lignes consolidées de la personne qu'aucune contribution source n'atteste. Retourne le nombre supprimé."""
     return conn.execute(
         text("""
             DELETE FROM contributions a
@@ -69,12 +69,12 @@ def delete_orphan_contributions(conn: Connection, person_id: int) -> int:
 
 
 class PgContributionRepository(ContributionRepository):
-    """Accès PostgreSQL sync aux contributions canoniques et à leurs signatures sources."""
+    """Accès PostgreSQL sync aux contributions et à leurs contributions sources."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Recomposition d'une contribution depuis ses signatures ───────
+    # ── Recomposition d'une contribution depuis ses contributions sources ───────
 
     def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
         """Les structures dérivées vivent dans la matview `contribution_structures`, rafraîchie par le pipeline."""
@@ -88,7 +88,7 @@ class PgContributionRepository(ContributionRepository):
             text(propagate_contribution_attributes_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
         )
 
-    # ── source_contributions : lien personne ↔ signature
+    # ── source_contributions : lien personne ↔ contribution source
 
     def find_source_contribution_owner(self, source_contribution_id: int) -> int | None:
         return self._conn.execute(
@@ -231,7 +231,7 @@ class PgContributionRepository(ContributionRepository):
     def delete_orphan_contributions_for_person(self, person_id: int) -> int:
         return delete_orphan_contributions(self._conn, person_id)
 
-    # ── confirmed_source_contributions (épinglage admin, must-link grain signature) ──
+    # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
 
     def pin_contributions(self, source_contribution_ids: list[int], person_id: int) -> None:
         if not source_contribution_ids:
@@ -254,9 +254,9 @@ class PgContributionRepository(ContributionRepository):
     ) -> list[int]:
         result = self._conn.execute(
             text("""
-                SELECT DISTINCT saa.source_contribution_id
-                FROM source_contribution_addresses saa
-                WHERE saa.address_id = ANY(:ids)
+                SELECT DISTINCT sca.source_contribution_id
+                FROM source_contribution_addresses sca
+                WHERE sca.address_id = ANY(:ids)
             """),
             {"ids": address_ids},
         )

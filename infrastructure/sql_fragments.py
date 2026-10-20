@@ -1,6 +1,6 @@
 """Fragments SQL partagés entre plusieurs adaptateurs de l'API ou du pipeline.
 
-Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une signature), et des expressions SQL figées.
+Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une contribution source), et des expressions SQL figées.
 """
 
 from application.ports.repositories.address_repository import AddressCountryFilter
@@ -27,12 +27,12 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la signature aliasée `signature` désigne une personne : elle n'est ni collective, ni un doublon d'auteur (`duplicate_of`)."""
+    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle n'est ni collective, ni un doublon d'auteur (`duplicate_of`)."""
     return f"NOT {source_contribution}.collective AND {source_contribution}.duplicate_of IS NULL"
 
 
 def pinned(source_contribution_id: str) -> str:
-    """Condition vraie quand l'administration a épinglé la signature d'identifiant `source_contribution_id` à une personne (`confirmed_source_contributions`)."""
+    """Condition vraie quand l'administration a épinglé la contribution source d'identifiant `source_contribution_id` à une personne (`confirmed_source_contributions`)."""
     return f"EXISTS (SELECT 1 FROM confirmed_source_contributions ca WHERE ca.source_contribution_id = {source_contribution_id})"
 
 
@@ -45,7 +45,7 @@ def active_name_form(form: str) -> str:
 
 
 DETACHED_SOURCE_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE source_contributions` qui détache une signature de sa personne."""
+"""Affectations d'un `UPDATE source_contributions` qui détache une contribution source de sa personne."""
 
 
 def diamond_journal_sql(journal: str = "j") -> str:
@@ -58,14 +58,14 @@ def diamond_journal_sql(journal: str = "j") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la signature ou la contribution aliasée `signature` tient le rôle d'auteur."""
+    """Condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
 def identifier_neutralized(
     id_type: str, source_contribution: str = "sc", *, reason: str | None = None
 ) -> str:
-    """Condition vraie quand la signature aliasée `signature` neutralise l'identifiant `id_type`, pour le motif `reason` s'il est donné.
+    """Condition vraie quand la contribution source aliasée `source_contribution` neutralise l'identifiant `id_type`, pour le motif `reason` s'il est donné.
 
     `id_type` est une expression SQL : littéral (`'orcid'`), paramètre (`:id_type`) ou colonne.
     """
@@ -79,7 +79,7 @@ def identifier_neutralized(
 def usable_identifier(
     id_type: str, *, source_contribution: str = "sc", contributor_information: str = "ci"
 ) -> str:
-    """Valeur de l'identifiant `id_type` dans l'identité d'une signature, NULL quand la signature le neutralise."""
+    """Valeur de l'identifiant `id_type` dans les informations du contributeur d'une contribution source, NULL quand la contribution source le neutralise."""
     return (
         f"CASE WHEN {identifier_neutralized(id_type, source_contribution)} THEN NULL"
         f" ELSE {contributor_information}.identifiers ->> {id_type} END"
@@ -87,7 +87,7 @@ def usable_identifier(
 
 
 def trusted_identifier_sql(id_type: str, source_contribution: str = "sc") -> str:
-    """Condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la signature aliasée `signature`."""
+    """Condition SQL de `trusted_identifier` pour l'identifiant `id_type` de la contribution source aliasée `source_contribution`."""
     if id_type != PersonIdentifierType.ORCID:
         return "TRUE"
     return f"{source_contribution}.source::text IN {in_clause(tuple(sorted(ORCID_MATCH_SOURCES)))}"
@@ -101,9 +101,9 @@ def strong_identifier_source_contributions(
     joins: str = "",
     where: str = "",
 ) -> str:
-    """Requête des signatures `sa_auth` dont l'identité contient l'identifiant `id_type` d'une ligne de `identifiers`.
+    """Requête des contributions sources `sc_auth` dont les informations du contributeur contiennent l'identifiant `id_type` d'une ligne de `identifiers`.
 
-    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les signatures par `contributor_information_id` après un rapprochement sur `contributor_information`.
+    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la contribution source neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les contributions sources par `contributor_information_id` après un rapprochement sur `contributor_information`.
     """
     return f"""
         SELECT {select}
@@ -131,9 +131,9 @@ _RH_IDENTIFIERS = f"""(
 
 
 def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
-    """Requête des ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre l'année qui suit son arrivée et l'année de fin de son contrat, sans rejet de la personne pour la notice.
+    """Requête des ids des contributions sources qui entrent dans le périmètre par l'identifiant fort d'une personne qui a une fiche RH. La publication paraît entre l'année qui suit son arrivée et l'année de fin de son contrat, sans rejet de la personne pour l'enregistrement source.
 
-    `source_contribution_filter` : condition supplémentaire sur la signature `sa_auth`.
+    `source_contribution_filter` : condition supplémentaire sur la contribution source `sc_auth`.
     """
     conditions = [
         "sr_rh.publication_year BETWEEN pi.first_year AND pi.last_year",
@@ -157,7 +157,7 @@ def hr_record_source_contributions(source_contribution_filter: str = "") -> str:
     )
 
 
-# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est.
+# Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est.
 REJECTED_PAIRS = (
     "SELECT sr_rej.publication_id, rej.person_id FROM rejected_contributions rej"
     " JOIN source_records sr_rej ON sr_rej.id = rej.source_record_id"
@@ -165,7 +165,7 @@ REJECTED_PAIRS = (
 
 
 def publication_rejected_for(publication_id: str, person_id: str) -> str:
-    """Condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : une de ses notices l'est."""
+    """Condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : un de ses enregistrements sources l'est."""
     return (
         "EXISTS (SELECT 1 FROM rejected_contributions rej"
         " JOIN source_records sr_rej ON sr_rej.id = rej.source_record_id"
@@ -178,20 +178,20 @@ NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 
 
 def source_contribution_perimeter_evidence(source_contribution_ids: str | None = None) -> str:
-    """Requête des indices de l'entrée dans le périmètre de chaque signature qui en a : colonnes `id` et `evidence`, tableau trié.
+    """Requête des indices de l'entrée dans le périmètre de chaque contribution source qui en a : colonnes `id` et `evidence`, tableau trié.
 
-    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_contribution_structures`. `source_contribution_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les signatures.
+    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_contribution_structures`. `source_contribution_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les contributions sources.
     """
-    by_structure = "sas.structure_id = ANY(:perimeter_ids)"
+    by_structure = "scs.structure_id = ANY(:perimeter_ids)"
     by_contributor_information = ""
     if source_contribution_ids:
-        by_structure += f" AND sas.source_contribution_id = ANY(:{source_contribution_ids})"
+        by_structure += f" AND scs.source_contribution_id = ANY(:{source_contribution_ids})"
         by_contributor_information = f"sc_auth.id = ANY(:{source_contribution_ids})"
     return f"""
         SELECT id, array_agg(evidence ORDER BY evidence) AS evidence
         FROM (
-            SELECT sas.source_contribution_id AS id, sas.evidence
-            FROM source_contribution_structures sas
+            SELECT scs.source_contribution_id AS id, scs.evidence
+            FROM source_contribution_structures scs
             WHERE {by_structure}
             UNION
             SELECT rh.id, '{PerimeterEvidence.HR_RECORD}'::perimeter_evidence
@@ -202,46 +202,46 @@ def source_contribution_perimeter_evidence(source_contribution_ids: str | None =
 
 
 def corrected(field: str, source_record: str = "sr") -> str:
-    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de la notice aliasée `notice` (`domain.source_records.raw_metadata`)."""
+    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.raw_metadata`)."""
     return f"{source_record}.raw_metadata ? '{field}'"
 
 
 def corrected_by(field: str, source_record: str = "sr") -> str:
-    """Règle qui a corrigé le champ `field` de la notice aliasée `notice`. NULL quand le champ est intact."""
+    """Règle qui a corrigé le champ `field` de l'enregistrement source aliasé `source_record`. NULL quand le champ est intact."""
     return f"{source_record}.raw_metadata -> '{field}' ->> '{CORRECTED_BY}'"
 
 
 def stashed_raw(field: str, source_record: str = "sr") -> str:
-    """Valeur que la source donne pour le champ `field` de la notice aliasée `notice`, quand une correction l'a changée. NULL quand le champ est intact."""
+    """Valeur que la source donne pour le champ `field` de l'enregistrement source aliasé `source_record`, quand une correction l'a changée. NULL quand le champ est intact."""
     return f"{source_record}.raw_metadata -> '{field}' ->> '{RAW}'"
 
 
 def raw_column(field: str, source_record: str = "sr") -> str:
-    """Valeur que la source donne pour la colonne texte `field` de la notice aliasée `notice` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
+    """Valeur que la source donne pour la colonne texte `field` de l'enregistrement source aliasé `source_record` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
     return (
         f"CASE WHEN {source_record}.raw_metadata -> '{field}' ? '{RAW}'"
         f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
     )
 
 
-# Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la signature `sa` et sa notice `sp`.
+# Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la contribution source `sc` et son enregistrement source `sr`.
 PERSON_PUBLICATIONS_SCOPE = (
     "AND sc.person_id = :person_id AND sr.publication_id = ANY(:publication_ids)"
 )
 """Paires (publication, personne) de la personne `:person_id` sur les publications `:publication_ids`."""
 
 SOURCE_CONTRIBUTIONS_SCOPE = """AND (sr.publication_id, sc.person_id) IN (
-    SELECT s_sp.publication_id, s.person_id
-    FROM source_contributions s JOIN source_records s_sp ON s_sp.id = s.source_record_id
+    SELECT s_sr.publication_id, s.person_id
+    FROM source_contributions s JOIN source_records s_sr ON s_sr.id = s.source_record_id
     WHERE s.id = ANY(:source_contribution_ids)
 )"""
-"""Paires (publication, personne) des signatures `:source_contribution_ids`."""
+"""Paires (publication, personne) des contributions sources `:source_contribution_ids`."""
 
 
 def insert_missing_contributions_sql(*, scope: str = "") -> str:
-    """Insère une contribution par paire (publication, personne) que lient des signatures, et absente de la table.
+    """Insère une contribution par paire (publication, personne) que lient des contributions sources, et absente de la table.
 
-    Une paire rejetée est écartée, sauf si une signature confirmée la relie : la confirmation vise la signature elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
+    Une paire rejetée est écartée, sauf si une contribution source confirmée la relie : la confirmation vise la contribution source elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
     """
     return f"""
         WITH all_pairs AS (
@@ -269,9 +269,9 @@ def insert_missing_contributions_sql(*, scope: str = "") -> str:
 
 
 def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
-    """Recompose les attributs de chaque contribution depuis ses signatures.
+    """Recompose les attributs de chaque contribution depuis ses contributions sources.
 
-    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une signature le dit. Les indices de périmètre et les rôles sont l'union de ceux des signatures. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
+    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une contribution source le dit. Les indices de périmètre et les rôles sont l'union de ceux des contributions sources. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
     """
     return f"""
         WITH linked AS (

@@ -1,4 +1,4 @@
-"""Query service : lectures des signatures servies par les routes `/api/contributions/*`."""
+"""Query service : lectures des contributions sources servies par les routes `/api/contributions/*`."""
 
 from sqlalchemy import Connection, text
 
@@ -19,7 +19,7 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import has_author_role, in_clause
 
-# Une signature est orpheline quand aucune personne ne la porte, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
+# Une contribution source est orpheline quand elle est rattachée à aucune personne, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
     sc.person_id IS NULL AND sc.in_perimeter = TRUE
     AND sc.source IN {in_clause(AUTHOR_SOURCES)}
@@ -32,17 +32,17 @@ _ORPHANS_FROM = """
     JOIN publications p ON p.id = sr.publication_id
 """
 
-# Laboratoires du périmètre détectés dans les adresses d'une signature.
+# Laboratoires du périmètre détectés dans les adresses d'une contribution source.
 _LABS = f"""
-    (source_contribution_structures sas
-     JOIN structures s ON s.id = sas.structure_id
+    (source_contribution_structures scs
+     JOIN structures s ON s.id = scs.structure_id
       AND s.structure_type = '{StructureType.LABO.value}')
 """
-_SOURCE_CONTRIBUTION_LABS = f"{_LABS} WHERE sas.source_contribution_id = sc.id"
+_SOURCE_CONTRIBUTION_LABS = f"{_LABS} WHERE scs.source_contribution_id = sc.id"
 
 
 def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dict[str, object]]:
-    """Condition des signatures orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`."""
+    """Condition des contributions sources orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`."""
     conditions = [_ORPHAN_BASE]
     binds: dict[str, object] = {}
     if filters.search.strip():
@@ -55,7 +55,7 @@ def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dic
         if filters.lab_ids:
             binds["lab_ids"] = filters.lab_ids
             lab_conditions.append(
-                f"EXISTS (SELECT 1 FROM {_SOURCE_CONTRIBUTION_LABS} AND sas.structure_id = ANY(:lab_ids))"
+                f"EXISTS (SELECT 1 FROM {_SOURCE_CONTRIBUTION_LABS} AND scs.structure_id = ANY(:lab_ids))"
             )
         if filters.lab_none:
             lab_conditions.append(f"NOT EXISTS (SELECT 1 FROM {_SOURCE_CONTRIBUTION_LABS})")
@@ -131,7 +131,7 @@ class PgContributionsQueries(ContributionsQueries):
         self, *, filters: OrphanFilters
     ) -> OrphanContributionsFacetsResponse:
         where, binds = _orphans_where(filters, with_labs=False)
-        # Une ligne par laboratoire, plus une ligne `id` NULL pour les signatures sans laboratoire.
+        # Une ligne par laboratoire, plus une ligne `id` NULL pour les contributions sources sans laboratoire.
         rows = self._conn.execute(
             text(f"""
                 WITH orphan AS MATERIALIZED (SELECT sc.id {_ORPHANS_FROM} WHERE {where})

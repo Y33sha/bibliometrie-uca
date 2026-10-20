@@ -154,7 +154,7 @@ def delete_orphan_addresses(conn: Connection) -> int:
         text("""
             DELETE FROM addresses a
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_contribution_addresses saa WHERE saa.address_id = a.id
+                SELECT 1 FROM source_contribution_addresses sca WHERE sca.address_id = a.id
             )
         """)
     ).rowcount

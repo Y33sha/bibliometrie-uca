@@ -329,7 +329,7 @@ _SQL_IN_COLLECTION_SOURCE_CONTRIBUTION = (
 def hal_status_expression(lab_hal_col: str | None) -> WhereClause:
     """Statut de dépôt HAL de la publication `p` (`HAL_DEPOSIT_STATUSES`), au regard de la collection du laboratoire.
 
-    Sans collection déclarée, aucune publication n'est en collection : une notice HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
+    Sans collection déclarée, aucune publication n'est en collection : un dépôt HAL vaut `hors_collection`. Le filtre, la facette et l'export lisent tous cette expression, donc classent de la même façon.
     """
     if lab_hal_col is None:
         return WhereClause(

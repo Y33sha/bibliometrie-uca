@@ -22,9 +22,9 @@ _DIRTY_SOURCE_CONTRIBUTION = """
     WITH dirty_source_contribution AS (
         SELECT id FROM source_contributions WHERE countries_dirty
         UNION
-        SELECT saa.source_contribution_id
-        FROM source_contribution_addresses saa
-        JOIN addresses a ON a.id = saa.address_id
+        SELECT sca.source_contribution_id
+        FROM source_contribution_addresses sca
+        JOIN addresses a ON a.id = sca.address_id
         WHERE a.countries_dirty
     )
 """
@@ -32,17 +32,17 @@ _DIRTY_SOURCE_CONTRIBUTION = """
 # Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)` ; marque `countries_dirty` les contributions sources modifiées.
 _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
     contributions AS (
-        SELECT saa.source_contribution_id AS source_contribution_id, c::text AS code
+        SELECT sca.source_contribution_id AS source_contribution_id, c::text AS code
         FROM scoped_sa s
-        JOIN source_contribution_addresses saa ON saa.source_contribution_id = s.id
-        JOIN addresses a ON a.id = saa.address_id
+        JOIN source_contribution_addresses sca ON sca.source_contribution_id = s.id
+        JOIN addresses a ON a.id = sca.address_id
         CROSS JOIN LATERAL unnest(a.countries) AS c
         UNION
-        SELECT sar.source_contribution_id, ro.country_code::text
+        SELECT scr.source_contribution_id, ro.country_code::text
         FROM scoped_sa s
-        JOIN source_contribution_rors sar ON sar.source_contribution_id = s.id
-        JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
-        WHERE sar.address_id IS NULL
+        JOIN source_contribution_rors scr ON scr.source_contribution_id = s.id
+        JOIN ror_organizations ro ON ro.ror_id = scr.ror_id
+        WHERE scr.address_id IS NULL
         UNION
         SELECT h.source_contribution_id, hs.country_code::text
         FROM scoped_sa s
@@ -82,22 +82,22 @@ _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
       AND sr.countries IS DISTINCT FROM agg.new_countries
 """
 
-# Recalcul de `publications.countries` sur la CTE amont `scoped_pub(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites.
+# Recalcul de `publications.countries` sur la CTE amont `scoped_publications(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites.
 _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
     agg AS (
         SELECT sr.publication_id AS publication_id,
                array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
         FROM source_records sr
-        JOIN scoped_pub spp ON spp.publication_id = sr.publication_id
+        JOIN scoped_publications scp ON scp.publication_id = sr.publication_id
         CROSS JOIN LATERAL unnest(sr.countries) AS c
         WHERE sr.countries IS NOT NULL
         GROUP BY sr.publication_id
     )
     UPDATE publications p
     SET countries = agg.new_countries
-    FROM scoped_pub spp
-    LEFT JOIN agg ON agg.publication_id = spp.publication_id
-    WHERE p.id = spp.publication_id
+    FROM scoped_publications scp
+    LEFT JOIN agg ON agg.publication_id = scp.publication_id
+    WHERE p.id = scp.publication_id
       AND p.countries IS DISTINCT FROM agg.new_countries
 """
 
@@ -154,7 +154,7 @@ def refresh_publication_countries(conn: Connection) -> int:
         text(
             _DIRTY_SOURCE_CONTRIBUTION
             + """,
-            scoped_pub AS (
+            scoped_publications AS (
                 SELECT DISTINCT sr.publication_id AS publication_id
                 FROM source_records sr
                 JOIN source_contributions sc ON sc.source_record_id = sr.id
@@ -234,9 +234,9 @@ class CountryRecompute:
                 """
                 WITH scoped_sp AS (
                     SELECT DISTINCT sc.source_record_id AS source_record_id
-                    FROM source_contribution_addresses saa
-                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
-                    WHERE saa.address_id = ANY(:ids)
+                    FROM source_contribution_addresses sca
+                    JOIN source_contributions sc ON sc.id = sca.source_contribution_id
+                    WHERE sca.address_id = ANY(:ids)
                       AND sc.source_record_id IS NOT NULL
                 )
                 """
@@ -254,12 +254,12 @@ class CountryRecompute:
         return conn.execute(
             text(
                 """
-                WITH scoped_pub AS (
+                WITH scoped_publications AS (
                     SELECT DISTINCT sr.publication_id AS publication_id
-                    FROM source_contribution_addresses saa
-                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+                    FROM source_contribution_addresses sca
+                    JOIN source_contributions sc ON sc.id = sca.source_contribution_id
                     JOIN source_records sr ON sr.id = sc.source_record_id
-                    WHERE saa.address_id = ANY(:ids) AND sr.publication_id IS NOT NULL
+                    WHERE sca.address_id = ANY(:ids) AND sr.publication_id IS NOT NULL
                 )
                 """
                 + _PUBLICATION_COUNTRIES_FROM_SCOPE

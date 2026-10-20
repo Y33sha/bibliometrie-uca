@@ -142,11 +142,11 @@ def _count_crossref(conn) -> dict[str, int]:
     counts["sa"] = conn.execute(
         text("SELECT COUNT(*) AS n FROM source_contributions WHERE source = 'crossref'")
     ).scalar_one()
-    counts["saa"] = conn.execute(
+    counts["sca"] = conn.execute(
         text("""
             SELECT COUNT(*) AS n
-            FROM source_contribution_addresses saa
-            JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+            FROM source_contribution_addresses sca
+            JOIN source_contributions sc ON sc.id = sca.source_contribution_id
             WHERE sc.source = 'crossref'
         """)
     ).scalar_one()
@@ -170,7 +170,7 @@ class TestNormalizeCrossrefIdempotence:
         # 2 auteurs sur le 1er record, 0 sur le 2nd → 2 source_contributions.
         assert counts_1["sa"] == 2
         # 2 affiliations distinctes (UCA, CNRS) liées via address linker.
-        assert counts_1["saa"] == 2
+        assert counts_1["sca"] == 2
 
         # Réinjecter le raw_data (le normaliseur peut le purger via VACUUM
         # post-pipeline ; ici on re-stage explicitement pour relancer).
@@ -219,9 +219,9 @@ class TestNormalizeCrossrefIdempotence:
         addr_rows = sa_sync_conn.execute(
             text("""
                 SELECT a.raw_text
-                FROM source_contribution_addresses saa
-                JOIN source_contributions sc ON sc.id = saa.source_contribution_id
-                JOIN addresses a ON a.id = saa.address_id
+                FROM source_contribution_addresses sca
+                JOIN source_contributions sc ON sc.id = sca.source_contribution_id
+                JOIN addresses a ON a.id = sca.address_id
                 WHERE sc.source = 'crossref'
                 ORDER BY a.raw_text
             """)

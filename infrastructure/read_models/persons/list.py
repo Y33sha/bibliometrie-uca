@@ -30,7 +30,7 @@ from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.sql_fragments import other_name_form_holders
 from infrastructure.sql_fragments import has_author_role, in_clause
 
-# Sous scope `lab_id`, chaque dénombrement se limite aux signatures de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
+# Sous scope `lab_id`, chaque dénombrement se limite aux contributions sources de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_SOURCE_CONTRIBUTIONS = (
     " AND EXISTS (SELECT 1 FROM contribution_structures aus "
     "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
@@ -73,7 +73,7 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonS
 
 
 def _source_contribution_counts_sql(*, lab_scoped: bool) -> str:
-    """Les deux dénombrements de signatures en tant qu'auteur, sous la même condition de scope."""
+    """Les deux dénombrements de contributions sources en tant qu'auteur, sous la même condition de scope."""
     scope = _LAB_SCOPED_SOURCE_CONTRIBUTIONS if lab_scoped else ""
     return f"""
         (SELECT COUNT(*) FROM contributions a

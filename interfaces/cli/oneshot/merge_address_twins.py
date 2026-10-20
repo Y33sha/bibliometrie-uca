@@ -67,9 +67,9 @@ _STEPS = (
         "liens aux signatures repris",
         """
         INSERT INTO source_contribution_addresses (source_contribution_id, address_id)
-        SELECT DISTINCT saa.source_contribution_id, t.keeper
-        FROM source_contribution_addresses saa
-        JOIN _twins t ON t.old_id = saa.address_id
+        SELECT DISTINCT sca.source_contribution_id, t.keeper
+        FROM source_contribution_addresses sca
+        JOIN _twins t ON t.old_id = sca.address_id
         ON CONFLICT DO NOTHING
         """,
     ),

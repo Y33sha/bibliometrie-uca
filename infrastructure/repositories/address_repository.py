@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays saisis à la main (candidats `manual`, unitairement ou par lot).
 
-La résolution des pays d'une adresse et le recalcul des pays des notices et des publications appartiennent au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque saisie marque l'adresse `candidates_dirty` : le run suivant résout l'adresse si la résolution immédiate a échoué.
+La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque saisie marque l'adresse `candidates_dirty` : le run suivant résout l'adresse si la résolution immédiate a échoué.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
