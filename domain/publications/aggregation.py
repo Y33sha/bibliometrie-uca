@@ -41,7 +41,7 @@ def refresh_from_sources(
     monograph_journals: Mapping[int, int | None] | None = None,
     unpaywall: Mapping[str, str] | None = None,
 ) -> None:
-    """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
+    """Recalcule l'état de `publication` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `publication` en place ; persistance via `repo.save(publication)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA tiré des sources et du verdict d'Unpaywall (`publication_oa_status`), union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 

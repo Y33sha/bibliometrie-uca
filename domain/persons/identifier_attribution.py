@@ -1,6 +1,6 @@
 """Aggregate root `IdentifierAttribution` — relation Personne ↔ identifiant externe avec statut.
 
-Aggregate à part (pas un VO, pas une entité fille de `Person`) : le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, et la réattribution charge et mute le seul identifier (load + save), pas les deux personnes. Identité naturelle : `(id_type, id_value)` ; identité surrogate : `id`.
+Aggregate à part (pas un VO, pas une entité fille de `Person`) : le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, et la réattribution charge et mute le seul identifier (load + save), pas les deux personnes. Clé naturelle : `(id_type, id_value)` ; clé surrogate : `id`.
 
 `Person.identifiers: tuple[IdentifierAttribution, ...]` est une projection en lecture hydratée par le repository à la demande, pas la source de vérité des mutations.
 

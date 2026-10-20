@@ -42,7 +42,7 @@ ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
 """Sources dont l'ORCID porté par une contribution est déposé par l'auteur, fiable comme signal de matching personne.
 
 - `crossref` : ORCID fourni par l'auteur à l'éditeur lors de la soumission.
-- `datacite` : ORCID du créateur, déposé avec la notice (`creators[].nameIdentifiers`).
+- `datacite` : ORCID du créateur, déposé avec l'enregistrement (`creators[].nameIdentifiers`).
 - `openalex` : `raw_orcid` recopié par OpenAlex de la métadonnée brute de la source amont (cf. `_extract_openalex_orcid`) — même provenance que Crossref.
 - `hal` : ORCID attaché à l'auteur dans le TEI HAL (`label_xml`).
 
@@ -53,11 +53,11 @@ STRONG_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.IDREF,
     PersonIdentifierType.HAL_PERSON_ID,
 )
-"""Identifiants qui rattachent une signature à une personne sans forme de nom : hors périmètre, et pour l'entrée dans le périmètre d'une personne RH."""
+"""Identifiants qui rattachent une contribution source à une personne sans forme de nom : hors périmètre, et pour l'entrée dans le périmètre d'une personne qui a une fiche RH."""
 
 
 def trusted_identifier(id_type: str, source: str) -> bool:
-    """Vrai quand l'identifiant `id_type` d'une signature de `source` sert de signal de rattachement. Un ORCID compte seulement s'il vient de `ORCID_MATCH_SOURCES`."""
+    """Vrai quand l'identifiant `id_type` d'une contribution source de `source` sert de signal de rattachement. Un ORCID compte seulement s'il vient de `ORCID_MATCH_SOURCES`."""
     return id_type != PersonIdentifierType.ORCID or source in ORCID_MATCH_SOURCES
 
 
@@ -78,7 +78,7 @@ class MatchReason(StrEnum):
 
 
 class ResolutionMode(StrEnum):
-    """Canal de résolution par lequel la cascade a posé le `person_id` d'une signature, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_contributions.resolution_mode`, il porte les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
+    """Canal de résolution par lequel la cascade a posé le `person_id` d'une contribution source, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_contributions.resolution_mode`, il guide les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
 
     IDENTIFIER = "identifier"
     NAME = "name"
@@ -98,7 +98,7 @@ RESOLUTION_MODE_BY_REASON: dict[MatchReason, ResolutionMode] = {
 class Namesake(NamedTuple):
     """Personne portant un nom de famille donné, telle que la voit le rattachement par initiales.
 
-    `conflicting` marque une personne au prénom réduit dont les signatures donnent plusieurs prénoms pleins distincts : elle ne peut recevoir aucun prénom plein de plus.
+    `conflicting` marque une personne au prénom réduit dont les contributions sources donnent plusieurs prénoms pleins distincts : elle ne peut recevoir aucun prénom plein de plus.
     """
 
     person_id: int
@@ -117,11 +117,11 @@ def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> 
 
 
 def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
-    """Personnes de même nom de famille qu'une signature désigne par la compatibilité des initiales, quand sa forme de nom exacte est inconnue.
+    """Personnes de même nom de famille qu'une contribution source désigne par la compatibilité des initiales, quand sa forme de nom exacte est inconnue.
 
-    - Signature au prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la signature (« Abdul-Majeed », « A. M. »).
-    - Signature au prénom plein (« Abdellah ») : toute personne au prénom réduit dont les initiales commencent celles de la signature (« A. »), et qu'aucun autre prénom ne revendique : ni une personne de même nom au prénom plein compatible, ni plusieurs prénoms pleins distincts donnés par ses signatures (`conflicting`).
-    - Signature sans prénom : aucune.
+    - Contribution source au prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la contribution source (« Abdul-Majeed », « A. M. »).
+    - Contribution source au prénom plein (« Abdellah ») : toute personne au prénom réduit dont les initiales commencent celles de la contribution source (« A. »), et qu'aucun autre prénom ne revendique : ni une personne de même nom au prénom plein compatible, ni plusieurs prénoms pleins distincts donnés par ses contributions sources (`conflicting`).
+    - Contribution source sans prénom : aucune.
     """
     contributor_initials = first_name_initials(contributor_first_name)
     if contributor_initials is not None:
@@ -147,7 +147,7 @@ def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesa
 def compatible_persons(
     source_contribution: ContributorName, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
 ) -> list[int]:
-    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`ContributorName.splits`).
+    """Personnes que la contribution source désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`ContributorName.splits`).
 
     `namesakes_by_last_name` indexe les personnes par nom de famille normalisé. Chaque personne figure une fois, dans l'ordre de découverte.
     """
@@ -163,9 +163,9 @@ def compatible_persons(
 def attested_full_first_names(
     last_name: str, initials: tuple[str, ...], contributor_names: Iterable[ContributorName]
 ) -> dict[str, str]:
-    """Prénoms pleins que des signatures donnent à une personne au prénom réduit, indexés par leur forme normalisée.
+    """Prénoms pleins que des contributions sources donnent à une personne au prénom réduit, indexés par leur forme normalisée.
 
-    Retient les signatures dont un découpage donne le même nom de famille (`ContributorName.first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
+    Retient les contributions sources dont un découpage donne le même nom de famille (`ContributorName.first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
     """
     spellings: dict[str, Counter[str]] = {}
     for name in contributor_names:
@@ -191,9 +191,9 @@ def decide_cross_source_match(
     first_norm: str,
     candidates: list[tuple[int, str, str, str]],
 ) -> int | None:
-    """Décide si une contribution peut être rattachée à la `person` d'une autre signature de son groupe (signatures du même auteur dans la publication, `source_contribution_group_members`).
+    """Décide si une contribution peut être rattachée à la `person` d'une autre contribution source de son groupe (contributions sources du même auteur dans la publication, `source_contribution_group_members`).
 
-    Quand HAL a déjà rattaché un auteur à la personne 42, la signature OpenAlex du même groupe reçoit la même personne, à condition que son nom soit compatible.
+    Quand HAL a déjà rattaché un auteur à la personne 42, la contribution source OpenAlex du même groupe reçoit la même personne, à condition que son nom soit compatible.
 
     Paramètres :
 
@@ -218,7 +218,7 @@ def decide_cross_source_match(
     return matched_pid
 
 
-# Motifs d'un `skip` par forme de nom connue : la signature ne peut ni se rattacher par son nom, ni créer de personne.
+# Motifs d'un `skip` par forme de nom connue : la contribution source ne peut ni se rattacher par son nom, ni créer de personne.
 UNDECIDABLE_NAME_FORM_REASONS = frozenset(
     {MatchReason.AMBIGUOUS_NAME_FORM, MatchReason.ALL_CANDIDATES_REJECTED}
 )
@@ -246,13 +246,13 @@ def decide_name_form_outcome(
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution traitée (store `rejected_contributions`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
 
-    `compatible_person_ids` : personnes de même nom de famille que la signature désigne par ses initiales (`compatible_namesakes`). Consultées seulement quand la forme exacte est inconnue.
+    `compatible_person_ids` : personnes de même nom de famille que la contribution source désigne par ses initiales (`compatible_namesakes`). Consultées seulement quand la forme exacte est inconnue.
 
     Cascade (sur les candidats restants après élimination) :
 
     - Forme connue, 1 candidat → `match`.
     - Forme connue, N candidats → `skip` avec `reason="ambiguous_name_form"` (homonymes en BDD, on laisse le traitement manuel trancher).
-    - Forme connue, 0 candidat (tous rejetés) → `skip` avec `reason="all_candidates_rejected"` : la signature reste orpheline, sans création.
+    - Forme connue, 0 candidat (tous rejetés) → `skip` avec `reason="all_candidates_rejected"` : la contribution source reste orpheline, sans création.
     - Forme inconnue, personnes compatibles : mêmes règles sur elles, le `match` portant `reason="compatible_name"`.
     - Forme inconnue, aucune personne compatible, `allow_create` → `create`.
     - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
@@ -277,8 +277,8 @@ def decide_name_form_outcome(
 class IdentifierMatch:
     """Résultat de la résolution d'un identifiant vers une personne, corroborée par le nom.
 
-    - `person_id` : la personne si l'identifiant résout **et** que son nom est compatible avec la signature ; `None` sinon.
-    - `rejection` : `(person_id, target_name)` quand l'identifiant résolvait vers une personne mais que son nom est jugé incompatible avec la signature — le match est refusé, et l'info sert à journaliser le rejet (identifiant + les deux formes).
+    - `person_id` : la personne si l'identifiant résout **et** que son nom est compatible avec la contribution source ; `None` sinon.
+    - `rejection` : `(person_id, target_name)` quand l'identifiant résolvait vers une personne mais que son nom est jugé incompatible avec la contribution source — le match est refusé, et l'info sert à journaliser le rejet (identifiant + les deux formes).
     """
 
     person_id: int | None = None
@@ -298,8 +298,8 @@ def decide_match_by_identifier(
 
     Corroboration par le nom, du verdict humain au test heuristique :
 
-    1. Le statut du couple (forme de la signature, `person_id`) dans `person_name_forms` (`name_form_status`), pour la première des `contributor_name_forms` qui en porte un, tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
-    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« toufic » pour « toufik ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
+    1. Le statut du couple (forme de la contribution source, `person_id`) dans `person_name_forms` (`name_form_status`), pour la première des `contributor_name_forms` qui en a un, tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
+    2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant présent sur une contribution source étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« toufic » pour « toufik ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une contribution source trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
 
     Un refus est matérialisé dans `rejection` pour journalisation.
     """
@@ -343,7 +343,7 @@ def form_matches_person(
 
     Vrai si `form` est compatible (`names_compatible`, comparaison par tokens) avec le nom-prénom de la personne, ou avec l'une de ses formes de nom **confirmées** (un nom validé par un humain que le nom-prénom canonique ne recouvre pas, changement de nom inclus).
 
-    Sert à arbitrer un conflit d'attribution d'identifiant : la forme majoritaire des signatures portant une valeur (le *consensus*, agrégat ordre-indépendant fourni par le caller) est confrontée au propriétaire actuel et au candidat en conflit — l'identifiant se transfère vers le candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire.
+    Sert à arbitrer un conflit d'attribution d'identifiant : la forme majoritaire des contributions sources qui contiennent une valeur (le *consensus*, agrégat ordre-indépendant fourni par le caller) est confrontée au propriétaire actuel et au candidat en conflit — l'identifiant se transfère vers le candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire.
     """
     if names_compatible(form, "", last_name, first_name):
         return True
@@ -353,7 +353,7 @@ def form_matches_person(
 def consensus_name(votes: Mapping[str, int]) -> str | None:
     """Consensus d'une valeur d'identifiant : le nom qui porte strictement plus de voix que chacun des autres.
 
-    `votes` compte les signatures portant la valeur sous chaque nom normalisé. `None` en cas d'égalité en tête ou sans aucune voix.
+    `votes` compte les contributions sources qui contiennent la valeur sous chaque nom normalisé. `None` en cas d'égalité en tête ou sans aucune voix.
     """
     if not votes:
         return None
@@ -364,7 +364,7 @@ def consensus_name(votes: Mapping[str, int]) -> str | None:
 
 
 def identifier_misplaced(contributor_name_form: str, consensus: str | None) -> bool:
-    """Vrai quand le consensus d'une valeur d'identifiant désigne une autre personne que le nom de la signature qui la porte. Sans consensus, aucun identifiant n'est mal placé."""
+    """Vrai quand le consensus d'une valeur d'identifiant désigne une autre personne que le nom de la contribution source qui la contient. Sans consensus, aucun identifiant n'est mal placé."""
     return consensus is not None and not names_compatible(contributor_name_form, "", consensus, "")
 
 
@@ -391,11 +391,11 @@ def decide_person_match(
     Hiérarchie par fiabilité de provenance :
 
     1. **ORCID déposé par l'auteur** (`orcid_match`) — ORCID issu d'une source à dépôt auteur (`ORCID_MATCH_SOURCES`), borné côté caller.
-    2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la signature dans le TEI HAL.
+    2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la contribution source dans le TEI HAL.
     3. **IdRef** (`idref_match`).
     4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne, ou, à forme inconnue, seule personne aux initiales compatibles (`reason="compatible_name"`). Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
-    5. **Cross-source** (`cross_source_match`) — match par le groupe de signatures, avec une contribution d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
-    6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une signature à créer peut encore rejoindre une ancre cross-source posée par une signature traitée plus loin.
+    5. **Cross-source** (`cross_source_match`) — match par le groupe de contributions sources, avec une contribution d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
+    6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une contribution source à créer peut encore rejoindre une ancre cross-source posée par une contribution source traitée plus loin.
 
     `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution (store `rejected_contributions`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse la contribution orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
 

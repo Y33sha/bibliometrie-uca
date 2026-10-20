@@ -327,7 +327,7 @@ _TRAILING_SEPARATORS = ",;:-–—/"
 def clean_raw_author_name(raw: str) -> str:
     """Nom d'auteur brut sans balisage, à l'encodage réparé, sans accents LaTeX ni accolades, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
 
-    Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé d'identité, et les formes de nom dérivées.
+    Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé aux informations du contributeur, et les formes de nom dérivées.
 
     Un nom fait seulement de chiffres et de ponctuation (un ORCID recopié à la place du nom) reste tel quel.
     """

@@ -1,6 +1,6 @@
 """Règles métier pures spécifiques à la source ScanR.
 
-Interprétation des champs propres au schéma ScanR (élasticsearch dataesr) — prédicats et extracteurs qui encapsulent la connaissance de la sémantique ScanR pour le reste du pipeline.
+Interprétation des champs propres au schéma ScanR (élasticsearch dataesr) — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique ScanR pour le reste du pipeline.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé).
 """
@@ -9,9 +9,9 @@ from domain.publications.identifiers import HALId
 
 
 def extract_hal_id_from_scanr_id(scanr_id: str | None) -> str | None:
-    """Identifiant du dépôt HAL dont une notice ScanR est issue, ou `None`.
+    """Identifiant du dépôt HAL dont un enregistrement source ScanR est issu, ou `None`.
 
-    ScanR encode une notice issue de HAL sous la forme `hal<identifiant HAL>` (ex. `halhal-04501427` → `hal-04501427`, `haltel-01234567` → `tel-01234567`).
+    ScanR encode un enregistrement issu de HAL sous la forme `hal<identifiant HAL>` (ex. `halhal-04501427` → `hal-04501427`, `haltel-01234567` → `tel-01234567`).
     """
     if not scanr_id or not scanr_id.startswith("hal"):
         return None

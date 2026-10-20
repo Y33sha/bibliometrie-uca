@@ -1,6 +1,6 @@
 """Value object `PersonNameForm` + factory `compute_person_name_forms`.
 
-Une forme de nom est une chaîne « prénom nom » normalisée, destinée au matching. Elle a le format de `contributor_information.author_name_normalized` : une forme de personne se compare telle quelle à l'identité d'une signature.
+Une forme de nom est une chaîne « prénom nom » normalisée, destinée au matching. Elle a le format de `contributor_information.author_name_normalized` : une forme de personne se compare telle quelle aux informations du contributeur d'une contribution source.
 
 Du point de vue domain, une forme de nom est entièrement définie par sa string normalisée — VO immuable, égalité par valeur.
 
@@ -18,7 +18,7 @@ from domain.persons.name_matching import normalize_first_name
 class PersonNameForm:
     """Forme normalisée du nom d'une personne (VO).
 
-    Identité = la string normalisée. La normalisation préalable est portée par `compute_person_name_forms` ; le VO se contente de garantir la non-vacuité.
+    Clé : la chaîne normalisée. La normalisation préalable est portée par `compute_person_name_forms` ; le VO se contente de garantir la non-vacuité.
     """
 
     value: str
@@ -37,7 +37,7 @@ def name_form(last_name: str, first_name: str | None) -> str:
 
 
 def contributor_name_forms(last_name: str, first_name: str | None) -> tuple[str, ...]:
-    """Formes cherchées pour une signature de nom et prénom normalisés : « prénom nom », puis « nom prénom » pour une signature au nom et prénom inversés."""
+    """Formes cherchées pour une contribution source de nom et prénom normalisés : « prénom nom », puis « nom prénom » pour une contribution source au nom et prénom inversés."""
     forms = (name_form(last_name, first_name), name_form(first_name or "", last_name))
     return tuple(dict.fromkeys(form for form in forms if form))
 
@@ -45,9 +45,9 @@ def contributor_name_forms(last_name: str, first_name: str | None) -> tuple[str,
 def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
     """Formes de nom d'une personne : « prénom nom » et « initiales nom », initiales séparées (« j m dupont »). Sans prénom, le nom seul.
 
-    Le prénom est normalisé comme celui des signatures (`normalize_first_name`).
+    Le prénom est normalisé comme celui des contributions sources (`normalize_first_name`).
     """
-    # Même nettoyage que les signatures : une fiche créée d'après une forme d'autorité porte l'année de naissance (« Philippe 1973- »).
+    # Même nettoyage que les contributions sources : une fiche créée d'après une forme d'autorité contient l'année de naissance (« Philippe 1973- »).
     ln = normalize_name(clean_raw_author_name(last_name))
     fn = normalize_first_name(clean_raw_author_name(first_name))
     if not ln:

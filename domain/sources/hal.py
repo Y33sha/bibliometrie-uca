@@ -1,13 +1,13 @@
 """Règles métier pures spécifiques à la source HAL.
 
-Interprétation des champs propres au schéma HAL — prédicats et extracteurs qui encapsulent la connaissance de la sémantique HAL pour le reste du pipeline.
+Interprétation des champs propres au schéma HAL — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique HAL pour le reste du pipeline.
 """
 
 import re
 
 # Situation d'une publication vis-à-vis de HAL, du dépôt le plus complet au plus absent.
 # `ok` : déposée dans la collection d'un laboratoire, et son texte y est accessible.
-# `notice` : dans la collection, mais réduite à une notice — aucun accès ouvert.
+# `notice` : dans la collection, dépôt sans fichier — pas d'open access.
 # `hors_collection` : présente dans HAL sans figurer dans cette collection.
 # `hors_hal` : absente de HAL.
 # Les trois premières se lisent au regard d'une collection ; seule la dernière s'en passe.

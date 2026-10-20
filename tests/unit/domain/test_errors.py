@@ -53,8 +53,8 @@ class TestContributionAlreadyAssignedError:
         exc = ContributionAlreadyAssignedError(7, 42)
         assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
         assert str(exc) == (
-            "La signature #7 est déjà attribuée à la personne #42 ; "
-            "seule une signature orpheline peut être attribuée."
+            "La contribution source #7 est déjà attribuée à la personne #42 ; "
+            "seule une contribution source orpheline peut être attribuée."
         )
 
 

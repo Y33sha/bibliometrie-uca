@@ -80,9 +80,9 @@ DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
 def meme_oeuvre_declaree(
     case: DoiClusterCase, doc_type: str | None, own_doi: str | None, target_doi: str | None
 ) -> bool:
-    """Vrai si la relation déclarée par une notice réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
+    """Vrai si la relation déclarée par un enregistrement source réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
 
-    Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf une notice `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
+    Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf un enregistrement source `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
     """
     if case is DoiClusterCase.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
         return True
@@ -99,10 +99,10 @@ class DoiClusterMember(NamedTuple):
     same_work_case: DoiClusterCase | None = None
     # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants externes, par type.
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
-    # Identifiants propres de la notice, par type : le `hal_id` d'une notice HAL, le NNT d'une notice theses.fr.
+    # Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr.
     own_ids: Mapping[str, tuple[str, ...]] = {}
     source: str = ""
-    # Noms de famille normalisés de ses signatures individuelles.
+    # Noms de famille normalisés de ses contributions sources individuelles.
     author_names: frozenset[str] = frozenset()
 
 
@@ -148,7 +148,7 @@ def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[s
 
 
 def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
-    """Identifiants propres d'une notice, par type : le dépôt HAL d'une notice HAL ou d'une notice ScanR issue de HAL, le NNT d'une notice theses.fr."""
+    """Identifiants propres d'un enregistrement source, par type : le dépôt HAL d'un enregistrement source HAL ou d'un enregistrement source ScanR issu de HAL, le NNT d'un enregistrement source theses.fr."""
     if source == Source.HAL:
         hal_id = HALId.try_parse(source_id)
     elif source == Source.SCANR:
@@ -166,7 +166,7 @@ def confirmation_id_removals(
 ) -> list[ConfirmationIdRemoval]:
     """Retraits d'identifiants externes après une divergence (`DIVERGENCE_CASES`).
 
-    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication que la notice OpenAlex du volume d'actes recopie. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
+    Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication que l'enregistrement source OpenAlex du volume d'actes recopie. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
     """
     losers = {d.id: d.case for d in decisions if d.case in DIVERGENCE_CASES}
     if not losers:
@@ -206,7 +206,7 @@ _CHAPTER_TITLE_MARKERS = re.compile(
 
 
 def _clean_title(title_normalized: str | None) -> str:
-    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page, mots-marqueurs) et re-collapse les espaces, pour comparer des titres à leur résidu. Déterministe (identité stricte, aucune similarité floue)."""
+    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page, mots-marqueurs) et re-collapse les espaces, pour comparer des titres à leur résidu. Déterministe (égalité stricte, aucune similarité floue)."""
     cleaned = re.sub(r"\d+", " ", title_normalized or "")
     cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
@@ -218,7 +218,7 @@ def _same_title(a: str, b: str) -> bool:
 
 
 def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
-    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne désignent pas la même œuvre (`_same_title`). Identité stricte sur le résidu, sans seuil flou."""
+    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne désignent pas la même œuvre (`_same_title`). Égalité stricte sur le résidu, sans seuil flou."""
     cleaned = [c for c in (_clean_title(t) for t in titles) if c]
     return any(not _same_title(a, b) for a, b in combinations(cleaned, 2))
 
@@ -257,11 +257,11 @@ def _shared_title_words(a: str | None, b: str | None) -> float | None:
 def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClusterMember]:
     """Dépôts HAL dont le DOI est celui d'une autre œuvre.
 
-    Un dépôt HAL du groupe est retenu quand deux conditions sont réunies face à la notice Crossref du DOI :
+    Un dépôt HAL du groupe est retenu quand deux conditions sont réunies face à l'enregistrement source Crossref du DOI :
     - aucun nom de famille d'auteur commun ;
     - moins de 35 % des mots du plus court des deux titres présents dans l'autre (`SHARED_TITLE_WORDS_MIN`).
 
-    Les titres sont les titres normalisés, réduits aux mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques ne comptent pas. Seules les signatures individuelles comptent. Un dépôt ou une notice Crossref sans signature individuelle n'est pas comparé.
+    Les titres sont les titres normalisés, réduits aux mots de 3 lettres ou plus : les mots grammaticaux et les restes de formules mathématiques ne comptent pas. Seules les contributions sources individuelles comptent. Un dépôt ou un enregistrement source Crossref sans contribution source individuelle reste hors de la comparaison.
     """
     crossref = [m for m in group if m.source == Source.CROSSREF and m.author_names]
     if len(crossref) != 1:
@@ -296,9 +296,9 @@ def resolve_cluster_doi_corrections(
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **Même œuvre DataCite** (un membre porte un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres convergent sur l'œuvre principale (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
     - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
-    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
+    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + égalité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
-    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec la notice Crossref du DOI, et dont le titre partage moins de 35 % de ses mots avec elle, perd le DOI. S'ajoute aux cas précédents.
+    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et dont le titre partage moins de 35 % de ses mots avec elle, perd le DOI. S'ajoute aux cas précédents.
 
     Hors de ces cas, un membre partageant le DOI par accident ne reçoit aucune décision.
 

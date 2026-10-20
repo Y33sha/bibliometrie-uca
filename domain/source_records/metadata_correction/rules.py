@@ -63,7 +63,7 @@ class MetadataForCorrection:
     journal_diamond: bool = False
     # Source de l'enregistrement.
     source: str | None = None
-    # Calculé à la lecture : nombre de signatures de l'enregistrement.
+    # Calculé à la lecture : nombre de contributions sources de l'enregistrement source.
     author_count: int | None = None
 
 
@@ -267,12 +267,12 @@ _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 # Ordre = priorité de la cascade (signaux forts d'abord : URL > journal_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
 
 _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
-    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `journal_id_present: False` : une SP theses.fr AVEC un journal_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_JOURNAL_TO_ARTICLE`), pas l'URL theses.fr. La règle ne corrige donc en `thesis` que les SP theses.fr **sans** journal.
+    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `journal_id_present: False` : un enregistrement source theses.fr AVEC un journal_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_JOURNAL_TO_ARTICLE`), pas l'URL theses.fr. La règle corrige donc en `thesis` les seuls enregistrements sources theses.fr **sans** journal.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
         "applies_to": {"url_contains": "theses.fr/", "journal_id_present": False},
         "applies_correction": {"doc_type": DocType.THESIS},
     },
-    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `journal_id_present: False` que theses.fr (une SP DUMAS avec journal_id = article publié → prime sur le mémoire).
+    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `journal_id_present: False` que theses.fr (un enregistrement source DUMAS avec journal_id = article publié → prime sur le mémoire).
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
         "applies_to": {"url_contains": "dumas.ccsd", "journal_id_present": False},
         "applies_correction": {"doc_type": DocType.MEMOIR},
@@ -283,7 +283,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # donc un article publié (mistype d'OpenAlex/ScanR, ou conflation thèse↔version publiée mergées
     # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `journal_id` est parasite (la version
     # publiée d'une conflation) : le type reste thèse, le nettoyage du journal_id relève des relations.
-    # Placée APRÈS les règles URL : une SP theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
+    # Placée APRÈS les règles URL : un enregistrement source theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
     # fort). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est traité à
     # part (mutation `external_ids`, hors DSL colonne).
     MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE: {
@@ -304,7 +304,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # Notice Crossref d'un volume d'actes ou d'un recueil de résumés, sans auteur ou signée par son seul éditeur ⇒ `proceedings`.
+    # Enregistrement source Crossref d'un volume d'actes ou d'un recueil de résumés, sans auteur ou avec son seul éditeur pour contributeur ⇒ `proceedings`.
     MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: {
         "applies_to": {
             "source": "crossref",
@@ -357,7 +357,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les SPs CrossRef ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
+    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les enregistrements sources Crossref ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
     MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
             "journal_type": JournalType.PREPRINT_SERVER,
@@ -365,7 +365,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # La SP déclare elle-même une relation `is-preprint-of` (Crossref `meta.relation`) : elle EST
+    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `meta.relation`) : il EST
     # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
     # des relations dérivées du type). Sans whitelist `doc_type` : la déclaration prime, y compris
     # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`
@@ -665,7 +665,7 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
 def origin_doc_type_correction(
     doc_type: str | None, origin_doc_type: str | None
 ) -> Correction[str] | None:
-    """Une notice ScanR issue d'un dépôt HAL prend le type corrigé de ce dépôt. `origin_doc_type` : type corrigé du dépôt HAL, `None` si la notice n'en est pas issue ou si le dépôt est absent."""
+    """Un enregistrement source ScanR issu d'un dépôt HAL prend le type corrigé de ce dépôt. `origin_doc_type` : type corrigé du dépôt HAL, `None` si l'enregistrement source n'en est pas issu ou si le dépôt est absent."""
     if origin_doc_type is None or origin_doc_type == doc_type:
         return None
     return Correction(origin_doc_type, MetadataCorrectionRule.SCANR_FROM_HAL_TO_HAL_TYPE)

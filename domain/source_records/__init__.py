@@ -1,6 +1,6 @@
 """Entité `SourceRecord` et logique métier associée.
 
-Une `SourceRecord` est l'image d'un document dans une source externe (HAL, OpenAlex, WoS, theses.fr, ScanR, …), agrégée plus tard dans la `Publication` canonique. Entité de lecture : identité `(source, source_id)` / `id`, immuable et utilisée en lecture seule ; jamais persistée via cet objet (les écritures passent par le SQL).
+Un `SourceRecord` est l'image d'un document dans une source externe (HAL, OpenAlex, WoS, theses.fr, ScanR, …), agrégé plus tard dans la `Publication` du référentiel. Entité de lecture : clés `(source, source_id)` et `id`, immuable et utilisée en lecture seule ; jamais persistée via cet objet (les écritures passent par le SQL).
 
 Sous-modules :
 - `source_record` : l'entité `SourceRecord`
