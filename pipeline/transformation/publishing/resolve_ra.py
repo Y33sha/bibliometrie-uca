@@ -2,6 +2,8 @@
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
+La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe reste à résoudre.
+
 La requête à `doi.org/ra` est injectée par le câblage de la phase.
 """
 
@@ -112,10 +114,6 @@ def _resolve(
 
 
 def build() -> Phase:
-    """Résout la Registration Agency des préfixes de tous les DOI connus (`doi.org/ra`), après la normalisation du run.
-
-    La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals`, qui suit, rattache les préfixes à leur éditeur via les API `/prefixes` ; `fetch_missing`, au run suivant, adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe n'est pas encore résolu.
-    """
     from pipeline.http.polite_pool import build_user_agent, get_polite_pool_email_optional
     from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
     from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries

@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans section écrit elle-même ses lignes.
+Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans libellé écrit elle-même ses lignes.
 """
 
 from __future__ import annotations
@@ -27,8 +27,9 @@ class TaskStep:
     """Ce que l'exécuteur sait d'une tâche en plus du graphe."""
 
     run: TaskRun
-    # Section et libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes.
+    # Titre de la sous-étape que la tâche ouvre. `None` : la tâche écrit sous le titre courant.
     section: str | None = None
+    # Libellé de la ligne de bilan. `None` : la tâche écrit elle-même ses lignes.
     label: str | None = None
     # La tâche affiche une barre d'avancement en terminal : sa ligne de bilan va au seul journal.
     progress_bar: bool = False
@@ -99,16 +100,13 @@ def _write_lines(
         *_maintain(task, ctx),
     ]
     for rank, (label, outcome) in enumerate(lines):
-        if step.section is None:
-            ctx.logger.info("%s : %s", label, outcome, extra={"detail": True})
-            continue
         last = step.section != next_section and rank == len(lines) - 1
         ctx.logger.info(
             "%s%s : %s",
             DERNIERE_BRANCHE if last else BRANCHE,
             label,
             outcome,
-            extra={"detail": step.progress_bar and rank == 0},
+            extra={"detail": step.section is None or (step.progress_bar and rank == 0)},
         )
 
 

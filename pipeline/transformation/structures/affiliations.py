@@ -117,7 +117,6 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
 
 
 def build() -> Phase:
-    """Rattachement des signatures aux structures du périmètre."""
     from pipeline.transformation.structures.address_resolution import (
         AddressResolutionQueries,
     )

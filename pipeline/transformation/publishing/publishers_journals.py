@@ -13,6 +13,8 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
+`enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
+
 Chaque sous-étape est une tâche du graphe (`pipeline.graph`), exécutée par `pipeline.task_runner` dans l'ordre du graphe : une ligne du journal par tâche, sous le titre de sa section. Une tâche qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Ici, les étapes de chaque tâche et l'assemblage des métriques.
 """
 
@@ -136,13 +138,6 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
 
 
 def build() -> Phase:
-    """Enrichissement du référentiel `journals`.
-
-    `resolve_crossref_publishers` et `resolve_datacite_publishers` rattachent chaque préfixe DOI en attente à son éditeur, via l'API `/prefixes` de son agence. `enrich_journals_from_openalex` lit dans OpenAlex Sources les frais de publication et le type des revues encore typées `unknown`. `check_journals_in_sudoc` vérifie dans le Sudoc les ISSN des revues jamais vérifiées, les corrige et les range par support. `enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`.
-
-    La phase suit `normalize`, qui crée les éditeurs et les revues à enrichir. L'enrichissement des éditeurs eux-mêmes — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
-    """
-
     return PublishersJournalsPhase(
         {
             f"{_PHASE}.{name}": step

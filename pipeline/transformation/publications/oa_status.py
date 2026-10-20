@@ -2,6 +2,8 @@
 
 La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs notices et du verdict.
 
+Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse du polite pool.
+
 Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
 
@@ -219,11 +221,6 @@ def _apply_verdicts(
 
 
 def build() -> Phase:
-    """Statut open access des publications, d'après le verdict d'Unpaywall sur leur DOI.
-
-    Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
-    """
-
     from pipeline.http.polite_pool import get_polite_pool_email_optional
     from pipeline.ingestion.api_params import API_BASE_URLS
     from pipeline.ingestion.complements.unpaywall import fetch_oa_status

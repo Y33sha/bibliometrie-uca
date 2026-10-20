@@ -6,6 +6,8 @@ Deux tâches (`pipeline.graph`), chacune dans sa propre transaction :
 2. **co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`) — recalcule l'usage de chaque sujet et rafraîchit la matview des paires de sujets co-présents sur une même publication.
 
 Aucun filtre périmètre : la phase `authorships` a purgé en amont les publications orphelines, donc `publication_subjects` ne porte que du périmètre et les deux caches en héritent. Idempotente.
+
+`--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
 """
 
 from __future__ import annotations
@@ -51,14 +53,6 @@ class SubjectsPhase:
 
 
 def build() -> Phase:
-    """Sujets et mots-clés : ingestion, puis recalcul des décomptes.
-
-    L'ingestion reprend les publications dont le contenu a changé depuis leur dernier passage, lit les sujets de leurs documents sources, et purge les sujets restés sans lien. Le recalcul qui suit compte les publications de chaque sujet et rafraîchit la matview des paires de sujets présents sur une même publication.
-
-    La phase `authorships` ayant supprimé les publications sans auteur, `publication_subjects` contient seulement le périmètre, dont les deux décomptes héritent.
-
-    `--rebuild-subjects` reprend toutes les publications, pour propager une évolution des règles d'ingestion sur tout le stock.
-    """
     from pipeline.transformation.publications.subjects.subjects_queries import (
         SubjectsIngestionQueries,
     )

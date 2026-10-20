@@ -24,7 +24,6 @@ def test_mode_daily_saute_la_phase(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, "daily", searched)
     assert searched == []
-    assert "Moissonnage par personne" in caplog.text
     assert "Sautée en mode daily" in caplog.text
 
 

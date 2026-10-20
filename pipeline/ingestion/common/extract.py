@@ -125,7 +125,6 @@ class ExtractPhase:
             {
                 f"extract.{source}": TaskStep(
                     task(source),
-                    section="Moissonnage par affiliation",
                     label=source_label(source),
                     progress_bar=True,
                     threshold=5,
@@ -182,10 +181,6 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 
 
 def build() -> Phase:
-    """Extraction des sources vers staging.
-
-    `pipeline/runtime/modes.py` définit la policy du mode : sources retenues et stratégie d'années. Séquence, parallélisme et métriques dans `pipeline/ingestion/common/extract.py` ; ici, le câblage : registre des extracteurs, primitif de parallélisme, lecture de la date de dernière extraction.
-    """
     from infrastructure.observability.phase_executions import get_last_daily_extract_date
     from pipeline.runtime.parallel import run_parallel
 

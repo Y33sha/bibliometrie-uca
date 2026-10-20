@@ -1,10 +1,10 @@
-"""Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Deux mécanismes, dans cet ordre :
+"""Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Trois mécanismes, dans cet ordre :
 
 1. **Recherche dans HAL** (`pipeline.ingestion.hal.fetch_missing`) : par hal-id (repéré dans OpenAlex et ScanR), puis par NNT (thèses sans document HAL).
 2. **Recherche dans theses.fr** (`pipeline.ingestion.theses.fetch_missing`) : par NNT repéré dans une autre source.
 3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `fetch_missing.doi.<source>` forment un groupe parallèle.
 
-Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`).
+Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`). Il est cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre. WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations
@@ -389,12 +389,6 @@ def _doi_org_user_agent() -> str:
 
 
 def build() -> Phase:
-    """Rattrapage des documents repérés dans une source mais absents d'une autre.
-
-    La recherche dans HAL télécharge les documents présents dans HAL et absents du staging, repérés par leur hal-id dans OpenAlex et ScanR, ou par le NNT d'une thèse soutenue. La recherche dans theses.fr télécharge les thèses dont le NNT figure dans une autre source. La recherche par DOI vise ensuite, pour chaque source cible, les DOI vus dans les autres sources et absents de la sienne. WoS est opt-in (`--include-wos`) : crédit API limité, source exclue par défaut.
-
-    Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre.
-    """
     from pipeline.runtime.parallel import run_parallel
 
     return FetchMissingPhase(

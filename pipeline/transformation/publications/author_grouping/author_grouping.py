@@ -280,7 +280,6 @@ class AuthorGroupingPhase:
 
 
 def build() -> Phase:
-    """Groupe les signatures d'un même auteur dans les publications marquées."""
     return SingleTaskPhase(
         "author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()), label="Bilan"
     )

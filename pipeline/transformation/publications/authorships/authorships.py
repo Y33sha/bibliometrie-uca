@@ -8,6 +8,8 @@ Tâches (`pipeline.graph`), chacune dans sa transaction :
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 5. **refresh des `pub_count`** — recalcule le nombre de publications que porte chaque adresse, revue et éditeur.
 
+La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une signature change aussi par d'autres voies que sa normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
+
 Le build est incrémental et convergent (add + prune + recompute en une passe).
 """
 
@@ -205,14 +207,6 @@ def _refresh_pub_counts(
 
 
 def build() -> Phase:
-    """Construction du référentiel `authorships`.
-
-    Les signatures des sources se consolident en une entrée par couple publication-personne, avec son appartenance au périmètre ; les structures dérivent de la matview `authorship_structures`. Après les dernières suppressions de publications, les monographies, revues et éditeurs vides sont supprimés.
-
-    La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une signature se trouve modifiée par d'autres voies que sa propre normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
-
-    Une passe unique ajoute les liens attestés, retire les liens sans attestation et recalcule les attributs, de sorte que la table converge sans être vidée.
-    """
     from pipeline.transformation.publications.authorships.address_pub_count import (
         AddressPubCountQueries,
     )

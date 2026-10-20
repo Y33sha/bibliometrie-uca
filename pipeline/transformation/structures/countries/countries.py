@@ -106,7 +106,6 @@ class CountriesPhase:
 
 
 def build() -> Phase:
-    """Détection des pays des adresses et recalcul sur les publications."""
     from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 
     return CountriesPhase(CountryQueries())
