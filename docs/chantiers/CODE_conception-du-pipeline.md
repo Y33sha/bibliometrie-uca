@@ -66,7 +66,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - Le SQL propre à un module vit dans ce module. Le SQL partagé par plusieurs modules est l'accès à une entité : il vit dans le *store* de l'entité, une classe qui reçoit la connexion à sa construction et rend un agrégat ou des lignes. *Repository* désigne seulement les adaptateurs d'`infrastructure/`. Pas de préfixe `Pg` ni de suffixe `Gateway` ou `Queries`.
 - `transformation/` est organisé par entité. Le graphe déclare des nœuds ; une phase regroupe des nœuds pour l'affichage dans les journaux et l'administration.
 - Les identifiants du code sont en anglais. Les textes affichés sont en français.
-- Une notion, un mot. `authorships` devient `contributions`. La collecte des sources s'appelle *harvest* partout, phases comprises, et « moissonnage » dans les textes affichés.
+- Une notion, un mot. `authorships` devient `contributions`, `source_authorships` devient `source_contributions` (« contribution source » dans les textes). « Signature » désigne seulement la chaîne d'adresse, au sens du glossaire. Les noms et textes ajoutés avant la phase 8 emploient déjà ces termes. La collecte des sources s'appelle *harvest* partout, phases comprises, et « moissonnage » dans les textes affichés.
 - L'outillage HTTP quitte `ingestion/` pour un paquet neutre `pipeline/http/`. `parallel.py` et `access_source.py` rejoignent `runtime/`. Des contrats import-linter fixent le sens des dépendances : le noyau (`runtime`, `graph`, `node_runner`) n'importe ni `ingestion` ni `transformation`.
 - Le contexte de phase est le seul canal des transactions et du journal.
 - Chaque phase par paquet applique les conventions SQL, de nommage et de langue aux modules qu'elle touche. Un module se modifie une seule fois.
@@ -132,7 +132,7 @@ D'autres modules réunissent des connaissances sans rapport :
 ### Phase 8 — Vocabulaire
 
 - [ ] Glossaire : un mot par notion, abréviations bannies.
-- [ ] `authorships` renommé `contributions`.
+- [ ] `authorships` renommé `contributions`, `source_authorships` renommé `source_contributions`, « signature » retiré comme nom de notion.
 
 ### Phase 9 — Documentation
 
