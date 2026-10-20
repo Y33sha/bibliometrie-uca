@@ -140,7 +140,6 @@ D'autres modules réunissent des connaissances sans rapport :
 ### Phase 8 — Vocabulaire
 
 - [x] Glossaire du code (`docs/architecture/08-vocabulaire.md`) : pour chaque notion, le mot des textes et l'identifiant du code. 4053fbda3
-- [ ] Abréviations des identifiants Python (`pub`, `sp`, `sa`, `sd`, `nf`) renommées ; un test sur l'AST les refuse.
 - [ ] Renommage du schéma, de l'API et du frontend, en une migration :
   - `source_publications` → `source_records`, `source_authorships` → `source_contributions`, `authorships` → `contributions` ;
   - `author_identifying_keys` → `contributor_information`, sa colonne `person_identifiers` → `identifiers`, `source_authorships.identity_id` → `contributor_information_id` ;
@@ -148,7 +147,8 @@ D'autres modules réunissent des connaissances sans rapport :
   - `source_authorship_groups` → `source_contribution_groups`, `grouped_source_authorships` → `source_contribution_group_members` ;
   - `confirmed_authorships` → `confirmed_source_contributions`, `rejected_authorships` → `rejected_contributions`, `publication_author_alignment.matched_signatures` → `matched_source_contributions` ;
   - `pub_count` → `publication_count`, `pub_year` → `publication_year`, `persons_rh` → `hr_records`, `structure_tutelles` → `structure_parents`, valeur `perimeter_evidence = 'rh_identity'` → `'hr_record'`.
-- [ ] Vocabulaire du code et des textes aligné : « signature », « notice », « identité » et « authorship » remplacés.
+- [ ] Identifiants Python renommés vers les mots du glossaire, abréviations comprises (`pub`, `sp`, `sa`, `sd`, `nf`). Un test sur l'AST refuse `pub`, `sp`, `sd` et `nf` ; `sa` reste l'alias de SQLAlchemy.
+- [ ] Textes alignés : « signature », « notice », « identité » et « authorship » remplacés.
 
 ### Phase 9 — Documentation
 
