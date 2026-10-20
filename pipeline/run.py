@@ -211,8 +211,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--normalize-full",
         action="store_true",
-        help="À la phase normalize, marque toutes les notices des sources normalisées : chacune "
-        "resynchronise ses signatures à sa prochaine normalisation, même si son bloc auteurs est "
+        help="À la phase normalize, marque tous les enregistrements sources des sources normalisées : chacun "
+        "resynchronise ses contributions sources à sa prochaine normalisation, même si son bloc auteurs est "
         "inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
     )
     parser.add_argument(
@@ -352,7 +352,7 @@ def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder
             (args.rebuild_publications, "publications reconstruites"),
             (args.rebuild_subjects, "sujets reconstruits"),
             (args.raw_store, "archivage des données brutes"),
-            (args.normalize_full, "signatures resynchronisées"),
+            (args.normalize_full, "contributions sources resynchronisées"),
         )
         if drapeau
     ]

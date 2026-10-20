@@ -1,1 +1,1 @@
-"""Sujets des publications : extraction depuis les notices, référentiel et cooccurrences."""
+"""Sujets des publications : extraction depuis les enregistrements sources, référentiel et cooccurrences."""

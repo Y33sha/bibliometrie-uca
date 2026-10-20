@@ -1,10 +1,10 @@
 """Purge de la phase personnes : re-orphelinage des formes de nom devenues ambiguës, suppression des attributions d'identifiant sans appui, puis suppression des personnes vidées.
 
-Tourne **après `populate_person_name_forms`**, qui régénère les formes canoniques : c'est seulement là qu'une forme réduite (« j martin »), partagée par une personne réduite et par la forme pleine dont elle est l'initiale, devient ambiguë. Le re-orphelinage détache alors les signatures nominales à forme ambiguë, non épinglées ; le GC supprime les personnes ainsi vidées (hors référentiel RH), ce qui retire leurs formes canoniques et désambiguïse. La signature libérée rejoint la forme pleine au `match` du run suivant.
+Tourne **après `populate_person_name_forms`**, qui régénère les formes dérivées du nom des personnes : c'est seulement là qu'une forme réduite (« j martin »), partagée par une personne réduite et par la forme pleine dont elle est l'initiale, devient ambiguë. Le re-orphelinage détache alors les contributions sources nominales à forme ambiguë, non épinglées ; le GC supprime les personnes ainsi vidées (hors référentiel RH), ce qui retire les formes dérivées de leur nom et désambiguïse. La contribution source libérée rejoint la forme pleine au `match` du run suivant.
 
 Placée après le peuplement, la purge voit l'ambiguïté née des créations du run courant : la convergence se fait en deux runs.
 
-Elle supprime aussi les attributions d'identifiant d'origine automatique, en attente, qu'aucune signature de leur personne ne porte : celles d'un rattachement défait pendant le passage.
+Elle supprime aussi les attributions d'identifiant d'origine automatique, en attente, qu'aucune contribution source de leur personne ne contient : celles d'un rattachement défait pendant le passage.
 """
 
 from sqlalchemy import Connection, text
@@ -27,12 +27,12 @@ from infrastructure.sql_fragments import (
 
 
 def reorphan_ambiguous_nominal(conn: Connection) -> int:
-    """Une signature résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_source_contributions`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion.
+    """Une contribution source résolue par forme de nom (`resolution_mode = 'name'`), non épinglée par l'admin (`confirmed_source_contributions`), dont l'`author_name_normalized` désigne au moins deux personnes dans `person_name_forms` (hors `rejected`), repasse à NULL — `person_id` et mode. Le sur-regroupement (une forme réduite collée au seul candidat présent avant l'arrivée de l'homonyme qui la départage) se défait ainsi dès que l'homonyme coexiste, quel que soit l'ordre d'ingestion.
 
-    Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la signature (`rejected_contributions`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette signature.
+    Comme la cascade, le décompte écarte les personnes rejetées pour la publication de la contribution source (`rejected_contributions`) : un rejet qui laisse un seul candidat rend la forme univoque pour cette contribution source.
     """
     # Les candidates (nominales, non épinglées, à forme ambiguë) sont matérialisées d'abord : le
-    # décompte par signature et la jointure vers la publication ne portent que sur elles.
+    # décompte par contribution source et la jointure vers la publication visent elles seules.
     return conn.execute(
         text(f"""
             WITH candidates AS MATERIALIZED (
@@ -67,9 +67,9 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
 
 
 def delete_empty_persons(conn: Connection) -> int:
-    """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_contributions` — typiquement une forme réduite dont les signatures ont rejoint la forme pleine. La supprimer retire ses formes de nom canoniques (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
+    """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_contributions` — typiquement une forme réduite dont les contributions sources ont rejoint la forme pleine. La supprimer retire les formes dérivées de son nom (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
 
-    Une personne vide est conservée si elle a une notice RH, ou une décision humaine (`person_without_decision_sql`). Une personne rejetée reste ainsi un candidat connu, écarté par son rejet, au lieu d'être recréée à l'identique par la cascade.
+    Une personne vide est conservée si elle a une fiche RH, ou une décision humaine (`person_without_decision_sql`). Une personne rejetée reste ainsi un candidat connu, écarté par son rejet, au lieu d'être recréée à l'identique par la cascade.
     """
     return conn.execute(
         text(f"""
@@ -82,7 +82,7 @@ def delete_empty_persons(conn: Connection) -> int:
 
 
 def delete_unsupported_identifier_attributions(conn: Connection) -> int:
-    """Supprime les attributions d'identifiant posées par le pipeline (origine `auto`), encore en attente, qu'aucune signature de leur personne ne porte. Une signature qui neutralise l'identifiant ne le porte pas. Les attributions confirmées, authentifiées ou saisies à la main restent."""
+    """Supprime les attributions d'identifiant posées par le pipeline (origine `auto`), encore en attente, qu'aucune contribution source de leur personne ne contient. Une contribution source qui neutralise l'identifiant compte comme sans lui. Les attributions confirmées, authentifiées ou saisies à la main restent."""
     return conn.execute(
         text(f"""
             DELETE FROM person_identifiers pi
@@ -101,7 +101,7 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
 
 
 def purge(conn: Connection) -> dict[str, int]:
-    """Re-orpheline les signatures nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes vidées.
+    """Re-orpheline les contributions sources nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes vidées.
 
     Retourne les compteurs `{reorphaned, deleted_attributions, deleted_persons}`. Le commit est laissé au caller.
     """

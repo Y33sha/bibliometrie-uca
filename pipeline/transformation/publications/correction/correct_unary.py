@@ -62,7 +62,7 @@ def compute_updates(
     hal_rows: Mapping[str, UnaryCorrectionRow],
     language_forms: Mapping[str, str],
 ) -> list[CorrectionUpdate]:
-    """Mises à jour à persister pour `rows`. `hal_rows` : notices HAL par identifiant, où se trouvent les dépôts d'origine des notices ScanR de `rows`."""
+    """Mises à jour à persister pour `rows`. `hal_rows` : enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR de `rows`."""
     updates: list[CorrectionUpdate] = []
     for row in rows:
         origin = (
@@ -77,7 +77,7 @@ def compute_updates(
 
 
 def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
-    """Identifiants des dépôts HAL dont sont issues les notices ScanR de `rows`."""
+    """Identifiants des dépôts HAL dont sont issus les enregistrements sources ScanR de `rows`."""
     return sorted(
         {
             hal_id
@@ -110,7 +110,7 @@ def compute_update(
 
     `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). `language` n'a que le mapping : `language_forms` associe chaque forme connue au code de sa langue, et une valeur inconnue donne `None`. Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` / `LANGUAGE_MAP` quand seul le mapping a changé la valeur.
 
-    `origin_doc_type` : type corrigé du dépôt HAL dont la notice ScanR est issue, qui prime sur le sien.
+    `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu, qui prime sur le sien.
 
     Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, la sous-étape `journal_by_doi` gère `journal_id`)."""
     raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)

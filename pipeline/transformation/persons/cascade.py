@@ -3,23 +3,23 @@
 Deux populations de candidats traversent la même cascade :
 
 - **In-périmètre** (`source_contributions.in_perimeter = TRUE`) : contributions dont la source a détecté une affiliation dans le périmètre. Éligibles à tous les barreaux.
-- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même groupe de signatures qu'une contribution déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
+- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : rattachables sans forme de nom — identifiant fort partagé avec une personne connue, ou ancrage cross-source (même groupe de contributions sources qu'une contribution déjà lié). Le barreau `person_name_forms` (match unique / création) y est neutralisé : un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
 
-`match` interroge, pour chaque signature non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
+`match` interroge, pour chaque contribution source non liée, les signaux du plus fiable au moins fiable et rattache **sans jamais créer** :
 
 1. **ORCID** déposé par l'auteur (sources de `ORCID_MATCH_SOURCES`).
 2. **`hal_person_id`** — compte HAL, porté par les contributions HAL.
 3. **IdRef**.
-4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne, dans l'ordre « prénom nom » puis, pour une signature au nom et prénom inversés, « nom prénom » ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la signature (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
-5. **Cross-source** — même groupe de signatures, nom compatible ; inopérant au bootstrap.
+4. **Match par `person_name_forms`** — nom normalisé désignant une seule personne, dans l'ordre « prénom nom » puis, pour une contribution source au nom et prénom inversés, « nom prénom » ; à forme inconnue, seule personne de même nom de famille aux initiales compatibles (`compatible_persons`), le nom de famille pouvant être tout groupe de mots final de la contribution source (« Florence Caldefie Chezet » rejoint « Caldefie-Chezet F. »). Avant le cross-source, pour maximiser les ancres fermes que ce dernier exploite.
+5. **Cross-source** — même groupe de contributions sources, nom compatible ; inopérant au bootstrap.
 
-Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une signature qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses signatures attestent seul.
+Une personne au prénom réduit à des initiales prend le prénom plein compatible d'une contribution source qui la rejoint. Avant la cascade, `complete_reduced_first_names` lui donne le prénom plein que ses contributions sources attestent seul.
 
-Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la signature est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les signatures qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
+Un match par identifiant est **corroboré par le nom** : refusé (et journalisé) si le nom de la contribution source est incompatible avec le propriétaire de la valeur (identifiant recopié sur le mauvais co-auteur). Les contributions sources qu'aucun signal ne rattache — nom inconnu, ou ambigu — restent non liées.
 
-`create` (2ᵉ passe) reprend les seules signatures **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les signatures dont la source sépare nom et prénom passent en premier : une personne créée prend le découpage de la source plutôt que celui du parseur. Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch. La cascade écrit les personnes et les rattachements des signatures ; `person_name_forms` est synchronisée après elle (`populate_person_name_forms`).
+`create` (2ᵉ passe) reprend les seules contributions sources **du périmètre** restées sans personne après `match`, et les re-juge **cross-source et forme de nom** (les restantes n'ont aucun match identifiant, sinon `match` les aurait prises). Une à-créer peut ainsi rejoindre par cross-source une ancre d'une autre source de la même publication — deux graphies du même auteur aux formes disjointes (« Jean Martin » / « J-P Martin ») ne créent pas deux personnes selon l'ordre ; ne restent créées que les vraies inconnues. Les contributions sources dont la source sépare nom et prénom passent en premier : une personne créée prend le découpage de la source plutôt que celui du parseur. Les contributions sources qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë — passent après les créations : seul un rattachement cross-source leur reste possible, et elles reçoivent ainsi tous les ancrages de la passe. Les deux passes partagent le même `_Cascade` : `create` voit l'état ferme posé par `match` via les index tenus en mémoire, sans re-fetch. La cascade écrit les personnes et les rattachements des contributions sources ; `person_name_forms` est synchronisée après elle (`populate_person_name_forms`).
 
-Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces signatures n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
+Hors périmètre, seule une création poserait une ancre nouvelle pendant `create` — une identification cross-source n'en pose jamais. Ces contributions sources n'ont donc rien à y gagner : la passe `match` du run suivant les rejuge contre l'état complet.
 
 Garde de rejet : les personnes rejetées pour la publication (`rejected_contributions`) sont éliminées des candidats à chaque signal — un match ne recrée pas une paire rejetée, et l'élimination peut désambiguïser un name form (2 candidats dont 1 rejeté → match univoque).
 """
@@ -76,7 +76,7 @@ from pipeline.transformation.persons.store import PersonsStore
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une signature étrangère."""
+    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,
@@ -106,7 +106,7 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
 
 
 def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
-    """Sert à la corroboration du matching par identifiant : quand un identifiant résout vers une personne, le verdict du couple (forme de la signature, personne) tranche sans test de compatibilité de nom — `confirmed` corrobore, `rejected` refuse ; en l'absence de verdict, on retombe sur la comparaison par tokens.
+    """Sert à la corroboration du matching par identifiant : quand un identifiant résout vers une personne, le verdict du couple (forme de la contribution source, personne) tranche sans test de compatibilité de nom — `confirmed` corrobore, `rejected` refuse ; en l'absence de verdict, on retombe sur la comparaison par tokens.
 
     Le verdict combine le statut admin et la provenance de la forme : une forme dérivée du nom de la personne (`'persons' ∈ sources`) corrobore toujours ; sinon un rejet admin refuse et une confirmation admin (`status = 'confirmed'`) corrobore. Les formes seulement `pending` et non dérivées du nom sont omises.
     """
@@ -128,7 +128,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'une de ses notices l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
+    """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
     rows = conn.execute(
         text(f"""
             SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids
@@ -150,7 +150,7 @@ _LINK_CONTRIBUTION = text("""
 def link_contribution(
     conn: Connection, person_id: int, source: str, source_contribution_id: int, resolution_mode: str
 ) -> None:
-    """Rattache une signature à une personne, avec le canal de résolution (`identifier`, `name` ou `cross_source`). Lève `ValidationError` sur une source hors registre."""
+    """Rattache une contribution source à une personne, avec le canal de résolution (`identifier`, `name` ou `cross_source`). Lève `ValidationError` sur une source hors registre."""
     require_known_source(source)
     conn.execute(
         _LINK_CONTRIBUTION,
@@ -164,9 +164,9 @@ def link_contribution(
 
 
 class _Cascade:
-    """État de la cascade : signatures non liées, index préchargés, compteurs, effets.
+    """État de la cascade : contributions sources non liées, index préchargés, compteurs, effets.
 
-    Un seul `_Cascade` sert aux deux passes : un fetch, un chargement d'index. Les index sont tenus à jour en vif, si bien qu'une signature voit ce qu'une signature précédente vient de poser, y compris depuis la passe `match`.
+    Un seul `_Cascade` sert aux deux passes : un fetch, un chargement d'index. Les index sont tenus à jour en vif, si bien qu'une contribution source voit ce qu'une contribution source précédente vient de poser, y compris depuis la passe `match`.
     """
 
     def __init__(
@@ -185,7 +185,7 @@ class _Cascade:
         self.contributions = in_perimeter + out_of_perimeter + cross_source
         self.in_perimeter_total = len(in_perimeter)
         self.out_of_perimeter_total = len(out_of_perimeter)
-        # Signatures déjà liées en cross-source, re-jugées ce run. Celles qu'aucune passe ne re-résout (absentes de `resolved_cross_source_ids`) ont perdu leur ancre : la phase les détache.
+        # Contributions sources déjà liées en cross-source, re-jugées ce run. Celles qu'aucune passe ne re-résout (absentes de `resolved_cross_source_ids`) ont perdu leur ancre : la phase les détache.
         self.cross_source_candidate_ids = {a.source_contribution_id for a in cross_source}
         self.resolved_cross_source_ids: set[int] = set()
 
@@ -202,7 +202,7 @@ class _Cascade:
         for namesake in PersonsStore(conn).namesakes():
             self._index_namesake(namesake._replace(conflicting=namesake.person_id in conflicting))
         self.first_names_completed = 0
-        # Signatures du périmètre restées sans personne en passe `create`, avec le motif du `skip`.
+        # Contributions sources du périmètre restées sans personne en passe `create`, avec le motif du `skip`.
         self.orphans: list[tuple[EnrichedContribution, str]] = []
 
         self.matched_counts: dict[str, int] = defaultdict(int)
@@ -210,7 +210,7 @@ class _Cascade:
         self.created = 0
         self.out_of_perimeter_matched = 0
         self.corroboration_rejected = 0
-        # Identifiants distincts refusés. Une même signature revient sur chaque publication
+        # Identifiants distincts refusés. Une même contribution source revient sur chaque publication
         # d'une collaboration : le compteur d'occurrences en dit surtout la fréquence, pas
         # l'ampleur — c'est le nombre d'identifiants concernés qui la mesure.
         self.corroboration_rejected_ids: set[tuple[str, str]] = set()
@@ -238,7 +238,7 @@ class _Cascade:
         return cross_source_match, name_form_outcome, rejected_for_publication
 
     def _rejected_for(self, a: EnrichedContribution) -> frozenset[int]:
-        """Personnes rejetées pour la publication de la signature."""
+        """Personnes rejetées pour la publication de la contribution source."""
         if a.publication_id is None:
             return frozenset()
         return self._rejected_by_publication.get(a.publication_id, frozenset())
@@ -259,7 +259,7 @@ class _Cascade:
         )
 
     def name_form_undecidable(self, a: EnrichedContribution) -> bool:
-        """Vrai quand la forme du nom est connue mais ne désigne aucune personne unique, par homonymie ou parce que toutes ses personnes sont rejetées pour la publication : la signature ne peut ni se rattacher par son nom, ni créer de personne."""
+        """Vrai quand la forme du nom est connue mais ne désigne aucune personne unique, par homonymie ou parce que toutes ses personnes sont rejetées pour la publication : la contribution source ne peut ni se rattacher par son nom, ni créer de personne."""
         return (
             self._name_form_outcome(a, self._rejected_for(a)).reason
             in UNDECIDABLE_NAME_FORM_REASONS
@@ -316,7 +316,7 @@ class _Cascade:
         )
 
     def resolve_or_create(self, a: EnrichedContribution) -> bool:
-        """Rattache, crée ou écarte la signature d'après la décision cross-source et nom. Rend `True` sur une création."""
+        """Rattache, crée ou écarte la contribution source d'après la décision cross-source et nom. Rend `True` sur une création."""
         decision = self.decide_cross_and_name(a)
         if decision.action == "match":
             self.apply_match(a, decision.person_id, decision.reason)
@@ -330,13 +330,13 @@ class _Cascade:
         return False
 
     def log_orphans(self, orphans_log: logging.Logger) -> None:
-        """Écrit une ligne par signature restée sans personne : motif, personnes que désignent ses formes de nom, personnes aux initiales compatibles, personnes rejetées pour la publication. Les signatures dont la création est interdite (jurys de thèse) sont omises."""
+        """Écrit une ligne par contribution source restée sans personne : motif, personnes que désignent ses formes de nom, personnes aux initiales compatibles, personnes rejetées pour la publication. Les contributions sources dont la création est interdite (jurys de thèse) sont omises."""
         for a, reason in self.orphans:
             if reason == MatchReason.CREATION_NOT_ALLOWED:
                 continue
             forms = {f: self._name_form_map.get(f) for f in a.name_forms}
             orphans_log.info(
-                "signature %d (%s) « %s » : %s ; formes %s ; initiales compatibles %s ; rejetées pour la publication %s",
+                "contribution source %d (%s) « %s » : %s ; formes %s ; initiales compatibles %s ; rejetées pour la publication %s",
                 a.source_contribution_id,
                 a.source,
                 a.name.display(),
@@ -349,12 +349,12 @@ class _Cascade:
     def apply_match(
         self, a: EnrichedContribution, pid: int | None, reason: MatchReason | None
     ) -> bool:
-        """Rattache la signature à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
+        """Rattache la contribution source à `pid`. Rend `False` quand elle confirme à l'identique un rattachement cross-source existant, sans rien écrire."""
         assert (
             pid is not None and reason is not None
         )  # garantis par decide_person_match action=match
         if a.current_person_id is not None:
-            # Signature déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
+            # Contribution source déjà liée en cross-source, re-jugée : couverte ce run, la phase ne la détache pas.
             self.resolved_cross_source_ids.add(a.source_contribution_id)
             if reason == MatchReason.CROSS_SOURCE and pid == a.current_person_id:
                 return False  # ré-affirmée à l'identique : pas d'écriture, pas d'ancrage, pas de compteur
@@ -378,7 +378,7 @@ class _Cascade:
 
     def apply_create(self, a: EnrichedContribution) -> None:
         if a.current_person_id is not None:
-            # Ancienne signature cross-source qui rejoint une création : couverte ce run.
+            # Ancienne contribution source cross-source qui rejoint une création : couverte ce run.
             self.resolved_cross_source_ids.add(a.source_contribution_id)
         last, first = validated_name(a.last_name or a.name.display(), a.first_name or "")
         marker = self._repo.create(last, first)
@@ -391,7 +391,7 @@ class _Cascade:
         )
         add_identifiers(marker, [a.identifiers], repo=self._repo)
         self._index_namesake(Namesake(marker, last, first))
-        # La personne créée ancre aussi le cross-source de son groupe, pour les autres signatures du même auteur.
+        # La personne créée ancre aussi le cross-source de son groupe, pour les autres contributions sources du même auteur.
         if a.group_id is not None:
             self._linked_index[a.group_id].append((marker, a.last_norm, a.first_norm, a.source))
         self.created += 1
@@ -413,7 +413,7 @@ class _Cascade:
                 form_person_ids.append(namesake.person_id)
 
     def _complete_first_name(self, pid: int, a: EnrichedContribution) -> None:
-        """Donne à une personne au prénom réduit le prénom plein compatible de la signature qui la rejoint (« Tnourji A. » → « Tnourji Abdellah ») : une signature d'un autre prénom plein ne s'y rattache plus par ses initiales."""
+        """Donne à une personne au prénom réduit le prénom plein compatible de la contribution source qui la rejoint (« Tnourji A. » → « Tnourji Abdellah ») : une contribution source d'un autre prénom plein ne s'y rattache plus par ses initiales."""
         namesake = self._namesake_of.get(pid)
         if namesake is None or namesake.conflicting:
             return
@@ -453,24 +453,24 @@ def run_cascade(
     repo: PgPersonRepository,
     orphans_log: logging.Logger | None = None,
 ) -> CascadeResult:
-    """Rattache les signatures aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
+    """Rattache les contributions sources aux personnes, en deux passes sur un **seul** `_Cascade` (index vivants partagés — un seul fetch, un seul chargement).
 
-    Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les signatures non rattachées sont reprises en passe suivante.
+    Passe `match` (`decide_full`) : rattachement ferme (identifiant, nom) et cross-source contre les ancres présentes ; les contributions sources non rattachées sont reprises en passe suivante.
 
-    `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`_Cascade.log_orphans`).
+    `orphans_log` reçoit le motif de chaque contribution source du périmètre restée sans personne (`_Cascade.log_orphans`).
 
-    Passe `create` (`decide_cross_and_name`) sur les seules signatures du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une co-signature traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
+    Passe `create` (`decide_cross_and_name`) sur les seules contributions sources du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une autre contribution source du groupe traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
     etape(logger, "Identification des personnes")
     completion = complete_reduced_first_names(conn, repo=repo)
     logger.info(
-        "%s%s d'après les signatures",
+        "%s%s d'après les contributions sources",
         BRANCHE,
         accord(completion.completed, "prénom complété", "prénoms complétés"),
     )
     # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
     # muette jusqu'à ce qu'il rende la main.
-    with attente(f"{BRANCHE}chargement des signatures", logger) as ligne:
+    with attente(f"{BRANCHE}chargement des contributions sources", logger) as ligne:
         c = _Cascade(
             conn,
             repo=repo,
@@ -478,7 +478,9 @@ def run_cascade(
         )
         c.first_names_completed = completion.completed
         total = len(c.contributions)
-        ligne.conclut(f"{BRANCHE}{accord(total, 'signature')} à examiner")
+        ligne.conclut(
+            f"{BRANCHE}{accord(total, 'contribution source', 'contributions sources')} à examiner"
+        )
 
     unresolved: list[EnrichedContribution] = []
     with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
@@ -495,7 +497,7 @@ def run_cascade(
 
     log_matching_breakdown(logger, c.result())
 
-    # Seules les signatures du périmètre encore sans personne peuvent en créer une. Les autres —
+    # Seules les contributions sources du périmètre encore sans personne peuvent en créer une. Les autres —
     # hors périmètre, ou déjà liées en cross-source — n'attendent de cette passe qu'un
     # rattachement à une personne qu'elle vient de créer ; la passe suivante du run d'après les
     # rejuge contre l'état ferme complet.
@@ -504,7 +506,7 @@ def run_cascade(
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme indécidable le reste.
     indecidables = [a for a in non_identifiees if c.name_form_undecidable(a)]
     indecidables_ids = {a.source_contribution_id for a in indecidables}
-    # Les signatures au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
+    # Les contributions sources au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
     a_creer = sorted(
         (a for a in non_identifiees if a.source_contribution_id not in indecidables_ids),
         key=lambda a: not a.name.split_by_source,
@@ -514,7 +516,7 @@ def run_cascade(
     logger.info(
         "%s%s %s",
         BRANCHE,
-        accord(len(non_identifiees), "signature"),
+        accord(len(non_identifiees), "contribution source", "contributions sources"),
         forme(len(non_identifiees), "non identifiée"),
     )
     logger.info(
@@ -528,8 +530,8 @@ def run_cascade(
             avancement.avance()
             if c.resolve_or_create(a):
                 avancement.retient()
-    # Les signatures qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë —
-    # peuvent encore rejoindre en cross-source une personne créée pour une co-signature. Traitées
+    # Les contributions sources qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë —
+    # peuvent encore rejoindre en cross-source une personne créée pour une autre contribution source du groupe. Traitées
     # après toutes les créations, elles en reçoivent tous les ancrages.
     for a in [*(a for a in sans_personne if not a.allow_create), *indecidables]:
         c.resolve_or_create(a)

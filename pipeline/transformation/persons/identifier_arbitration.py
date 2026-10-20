@@ -1,10 +1,10 @@
 """Arbitrage des identifiants de personne, avant la cascade : identifiants mal placés et conflits d'attribution.
 
-Le consensus d'une valeur d'identifiant est le nom que contiennent strictement plus de signatures que chacun des autres (`consensus_name`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`).
+Le consensus d'une valeur d'identifiant est le nom que contiennent strictement plus de contributions sources que chacun des autres (`consensus_name`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`).
 
-Une identité dont le nom désigne une autre personne que celle du consensus contient la valeur par erreur. Ses signatures la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`).
+Des informations du contributeur dont le nom désigne une autre personne que celle du consensus contiennent la valeur par erreur. Ses contributions sources la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`).
 
-Un conflit (`IdentifierConflict`) est une valeur qu'une signature du candidat contient et qu'une autre personne détient. Le même consensus le tranche (`resolve_identifier_transfers`) : la valeur va au candidat quand le consensus désigne le candidat seul. Seules les attributions `pending` sont transférables. Les signatures affectées repassent à NULL, et la cascade les re-résout.
+Un conflit (`IdentifierConflict`) est une valeur qu'une contribution source du candidat contient et qu'une autre personne détient. Le même consensus le tranche (`resolve_identifier_transfers`) : la valeur va au candidat quand le consensus désigne le candidat seul. Seules les attributions `pending` sont transférables. Les contributions sources affectées repassent à NULL, et la cascade les re-résout.
 
 L'arbitrage est ordre-indépendant : le consensus agrège tous les porteurs, et le calcul repart des données à chaque exécution.
 """
@@ -52,7 +52,7 @@ from pipeline.transformation.persons.store import PersonsStore
 
 
 class ContributorInformationIdentifier(NamedTuple):
-    """Identité d'auteur portant une valeur d'identifiant, avec son nom normalisé."""
+    """Informations du contributeur qui contiennent une valeur d'identifiant, avec leur nom normalisé."""
 
     contributor_information_id: int
     name: str
@@ -63,24 +63,24 @@ class MisplacedNeutralizations(NamedTuple):
     """Résultat d'une réécriture des neutralisations `misplaced`."""
 
     neutralized: int
-    """Signatures qui gagnent un identifiant neutralisé."""
+    """Contributions sources qui gagnent un identifiant neutralisé."""
     to_detach: list[int]
-    """Parmi elles, les signatures résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
+    """Parmi elles, les contributions sources résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
 
 
-# Condition vraie quand la signature `sa` neutralise l'identifiant du paramètre `:id_type`.
+# Condition vraie quand la contribution source `sa` neutralise l'identifiant du paramètre `:id_type`.
 _ID_TYPE_NEUTRALIZED = identifier_neutralized(":id_type")
 
-# Même condition, restreinte au partage de la valeur entre signatures d'un document.
+# Même condition, restreinte au partage de la valeur entre contributions sources d'un document.
 _ID_TYPE_SHARED = identifier_neutralized(":id_type", reason=IdentifierNeutralization.SHARED.value)
 
 _MISPLACED = IdentifierNeutralization.MISPLACED.value
 
 
 def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
-    """Pour chaque valeur du type, le nombre de **signatures** qui la portent sous chaque `author_name_normalized` (poids en signatures, pas en identités — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des identités portant le type (`contributor_information`), jointes aux `source_contributions` (index `contributor_information_id`) pour le comptage.
+    """Pour chaque valeur du type, le nombre de **contributions sources** qui la contiennent sous chaque `author_name_normalized` (poids en contributions sources, et non en lignes de `contributor_information` — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des informations du contributeur qui contiennent le type (`contributor_information`), jointes aux `source_contributions` (index `contributor_information_id`) pour le comptage.
 
-    Une signature collective ou un doublon d'auteur ne vote pas. Une signature qui neutralise la valeur pour cause de partage ne vote pas. Une signature qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
+    Une contribution source collective ou un doublon d'auteur ne vote pas. Une contribution source qui neutralise la valeur pour cause de partage ne vote pas. Une contribution source qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
     rows = conn.execute(
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value,
@@ -106,7 +106,7 @@ def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str
 def fetch_contributor_information_identifiers(
     conn: Connection, id_type: str
 ) -> list[ContributorInformationIdentifier]:
-    """Identités portant un identifiant du type, avec leur nom normalisé."""
+    """Informations du contributeur qui contiennent un identifiant du type, avec leur nom normalisé."""
     rows = conn.execute(
         text("""
             SELECT id, author_name_normalized AS name, identifiers->>:id_type AS value
@@ -121,7 +121,7 @@ def fetch_contributor_information_identifiers(
 def write_misplaced_neutralizations(
     conn: Connection, misplaced: Mapping[int, Sequence[str]]
 ) -> MisplacedNeutralizations:
-    """Réécrit les neutralisations `misplaced` de toutes les signatures : celles des identités de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `contributions_dirty`."""
+    """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `contributions_dirty`."""
     payload = [
         {
             "contributor_information_id": contributor_information_id,
@@ -211,7 +211,7 @@ def fetch_person_name_forms(conn: Connection, person_ids: list[int]) -> dict[int
 
 
 def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
-    """Sert au balayage frontal des conflits d'attribution : le propriétaire attribué d'une valeur, à confronter aux personnes qui en portent des signatures."""
+    """Sert au balayage frontal des conflits d'attribution : le propriétaire attribué d'une valeur, à confronter aux personnes qui en ont des contributions sources."""
     rows = conn.execute(
         text(f"""
             SELECT id_value, person_id, status
@@ -224,7 +224,7 @@ def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[i
 
 
 def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tuple[str, int]]:
-    """Agrégat sur les signatures rattachées dont l'identité contient l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
+    """Agrégat sur les contributions sources rattachées dont les informations du contributeur contiennent l'identifiant `id_type`, fiable selon sa source (`trusted_identifier`)."""
     rows = conn.execute(
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value, sc.person_id
@@ -244,7 +244,7 @@ def fetch_identifier_bearer_persons(conn: Connection, id_type: str) -> list[tupl
 def null_identifier_source_contributions(
     conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
 ) -> int:
-    """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les signatures portées sur l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont l'identité porte cette valeur et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les signatures nominales portant la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
+    """Après réattribution d'une valeur de l'ancien propriétaire vers la personne du consensus, les contributions sources rattachées à l'ancien propriétaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont les informations du contributeur contiennent cette valeur, et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les contributions sources nominales qui contiennent la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
     return conn.execute(
         text(f"""
             UPDATE source_contributions sc
@@ -279,9 +279,9 @@ def requalify_misplaced_identifiers(
     conn: Connection,
     consensus: IdentifierConsensus,
 ) -> dict[str, int]:
-    """Neutralise les identifiants mal placés et détache les signatures qu'ils ont pu rattacher.
+    """Neutralise les identifiants mal placés et détache les contributions sources qu'ils ont pu rattacher.
 
-    Retourne `{neutralized, detached}` : le nombre de signatures qui gagnent un identifiant neutralisé, et de celles qui sont détachées pour que la cascade les re-résolve.
+    Retourne `{neutralized, detached}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, et de celles qui sont détachées pour que la cascade les re-résolve.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
@@ -299,7 +299,7 @@ def requalify_misplaced_identifiers(
 
 
 class IdentifierConflict(NamedTuple):
-    """Une valeur d'identifiant qu'une signature du candidat contient est déjà attribuée à une autre personne.
+    """Une valeur d'identifiant qu'une contribution source du candidat contient est déjà attribuée à une autre personne.
 
     L'arbitrage par consensus des porteurs la transfère au candidat si le consensus le désigne. Une attribution `confirmed` n'est jamais transférée.
     """
@@ -314,7 +314,7 @@ class IdentifierConflict(NamedTuple):
 def detect_identifier_conflicts(conn: Connection) -> list[IdentifierConflict]:
     """Balaye le snapshot pour tous les conflits d'attribution d'identifiant.
 
-    Chaque personne qui détient des signatures d'une valeur d'identifiant sans en être le propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
+    Chaque personne qui détient des contributions sources d'une valeur d'identifiant sans en être le propriétaire attribué est un conflit. Lecture d'agrégat — le résultat ne dépend pas de la séquence de la cascade —, à confier ensuite à `resolve_identifier_transfers` qui tranche par consensus. Partagé par le pipeline (balayage frontal) et la remédiation du stock.
     """
     conflicts: list[IdentifierConflict] = []
     for id_type in STRONG_PERSON_IDENTIFIER_TYPES:
@@ -383,7 +383,7 @@ def resolve_identifier_transfers(
             continue  # l'état a changé entre la collecte et la résolution
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
-        # Les signatures affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
+        # Les contributions sources affectées, restées sur l'ancien propriétaire et résolues par identifiant, repassent à NULL : la cascade les re-résout vers le nouveau propriétaire.
         detached = null_identifier_source_contributions(conn, id_type, id_value, owner_id)
         logger.info(
             "%sTransfert %s=%s : personne %d → %d (consensus %r), %s %s",
@@ -393,7 +393,7 @@ def resolve_identifier_transfers(
             owner_id,
             target,
             cons,
-            accord(detached, "signature"),
+            accord(detached, "contribution source", "contributions sources"),
             forme(detached, "détachée"),
         )
         transferred += 1
@@ -426,7 +426,7 @@ def arbitrate_identifier_conflicts(
         if requalified["neutralized"]:
             ligne.conclut(
                 f"{BRANCHE}Identifiants mal placés neutralisés sur "
-                f"{accord(requalified['neutralized'], 'signature')}"
+                f"{accord(requalified['neutralized'], 'contribution source', 'contributions sources')}"
             )
         else:
             ligne.efface()

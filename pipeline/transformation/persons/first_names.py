@@ -1,6 +1,6 @@
-"""Complétion des prénoms réduits à des initiales, d'après les signatures des personnes.
+"""Complétion des prénoms réduits à des initiales, d'après les contributions sources des personnes.
 
-Une personne créée depuis une signature « Tnourji, A. » porte le prénom « A. ». Quand ses signatures lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom : le rattachement par initiales compatibles ne lui envoie ensuite que les signatures de ce prénom. Quand elles lui en donnent plusieurs, elle garde ses initiales et ne reçoit aucun prénom plein de plus (`Namesake.conflicting`).
+Une personne créée depuis une contribution source « Tnourji, A. » a le prénom « A. ». Quand ses contributions sources lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom : le rattachement par initiales compatibles ne lui envoie ensuite que les contributions sources de ce prénom. Quand elles lui en donnent plusieurs, elle garde ses initiales et ne reçoit aucun prénom plein de plus (`Namesake.conflicting`).
 """
 
 from typing import NamedTuple
@@ -17,7 +17,7 @@ from pipeline.transformation.persons.store import PersonsStore
 def fetch_linked_contributor_names(
     conn: Connection, person_ids: list[int]
 ) -> dict[int, list[ContributorName]]:
-    """`{person_id: [nom, ...]}` — les noms des signatures rattachées à chacune des personnes, tels que les sources les donnent."""
+    """`{person_id: [nom, ...]}` — les noms des contributions sources rattachées à chacune des personnes, tels que les sources les donnent."""
     if not person_ids:
         return {}
     rows = conn.execute(
@@ -46,7 +46,7 @@ class FirstNameCompletion(NamedTuple):
 def complete_reduced_first_names(
     conn: Connection, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
-    """Donne à chaque personne au prénom réduit le prénom plein que ses signatures attestent seul."""
+    """Donne à chaque personne au prénom réduit le prénom plein que ses contributions sources attestent seul."""
     reduced = {}
     for namesake in PersonsStore(conn).namesakes():
         initials = first_name_initials(namesake.first_name)

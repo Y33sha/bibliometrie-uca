@@ -1,6 +1,6 @@
 """Chargement et enrichissement des candidats de la cascade personnes.
 
-Deux populations de signatures non liées traversent la cascade (`match`/`create`) : in-périmètre (éligibles à tous les barreaux) et hors-périmètre ancrés (rattachables sans forme de nom). Ce module les charge via le port, enrichit chaque row (parsing du nom, normalisations, flag de création autorisée), et construit l'index des contributions déjà rattachées par groupe de signatures, qui alimente le signal cross-source.
+Deux populations de contributions sources non liées traversent la cascade (`match`/`create`) : in-périmètre (éligibles à tous les barreaux) et hors-périmètre ancrés (rattachables sans forme de nom). Ce module les charge via le port, enrichit chaque row (parsing du nom, normalisations, flag de création autorisée), et construit l'index des contributions déjà rattachées par groupe de contributions sources, qui alimente le signal cross-source.
 """
 
 from collections import defaultdict
@@ -32,26 +32,26 @@ class BareUnlinkedContribution(NamedTuple):
 
     `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
 
-    `in_perimeter` reflète la détection d'une structure du périmètre sur cette signature. Les candidats `in_perimeter = FALSE` ne sont rattachables que par les barreaux non-nominaux de la cascade (identifiants forts, cross-source) — le matching/création par forme de nom reste réservé au périmètre (cf. `decide_name_form_outcome` et l'orchestrateur).
+    `in_perimeter` reflète la détection d'une structure du périmètre sur cette contribution source. Les candidats `in_perimeter = FALSE` ne sont rattachables que par les barreaux non-nominaux de la cascade (identifiants forts, cross-source) — le matching/création par forme de nom reste réservé au périmètre (cf. `decide_name_form_outcome` et l'orchestrateur).
     """
 
     source_contribution_id: int
     source: str
     name: ContributorName
     author_name_normalized: str | None
-    # `{id_type: valeur}` des identifiants de l'identité, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la signature.
+    # `{id_type: valeur}` des identifiants des informations du contributeur, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la contribution source.
     identifiers: dict[str, str]
     roles: list[str] | None
     publication_id: int | None
     in_perimeter: bool
-    # `person_id` courant si la signature est déjà liée en cross-source et re-jugée ce run ; `None` pour une signature non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
+    # `person_id` courant si la contribution source est déjà liée en cross-source et re-jugée ce run ; `None` pour une contribution source non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
     current_person_id: int | None
-    # Groupe des signatures du même auteur dans la publication (`source_contribution_group_members`) : clé du matching cross-source.
+    # Groupe des contributions sources du même auteur dans la publication (`source_contribution_group_members`) : clé du matching cross-source.
     group_id: int | None = None
 
 
 class LinkedContributionRow(NamedTuple):
-    """Projection SQL : `source_contributions` déjà rattaché à une personne, toutes sources confondues. Sert au matching cross-source par groupe de signatures."""
+    """Projection SQL : `source_contributions` déjà rattaché à une personne, toutes sources confondues. Sert au matching cross-source par groupe de contributions sources."""
 
     person_id: int
     group_id: int
@@ -60,7 +60,7 @@ class LinkedContributionRow(NamedTuple):
 
 
 def _usable(id_type: str) -> str:
-    """Valeur de l'identifiant `id_type` de la signature `sa_auth`, NULL quand elle le neutralise."""
+    """Valeur de l'identifiant `id_type` de la contribution source `sa_auth`, NULL quand elle le neutralise."""
     return usable_identifier(f"'{id_type}'", source_contribution="sc_auth")
 
 
@@ -82,7 +82,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedContribution:
 
 # Colonnes communes des projections de contribution non-liée (`BareUnlinkedContribution`).
 # Chaque requête y ajoute ses deux colonnes finales `in_perimeter` et `current_person_id`.
-# `identifiers` porte un objet jsonb par type de `PersonIdentifierType`, sans les identifiants absents ou neutralisés par la signature.
+# `identifiers` contient un objet jsonb par type de `PersonIdentifierType`, sans les identifiants absents ou neutralisés par la contribution source.
 _IDENTIFIERS_OBJECT = ", ".join(f"'{t.value}', {_usable(t.value)}" for t in PersonIdentifierType)
 
 _BARE_PROJECTION_HEAD = f"""
@@ -113,7 +113,7 @@ _OOP_COMMON_WHERE = f"""
 
 
 def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
-    """Branche « identifiant-ancré » : signature hors-périmètre dont l'identifiant fort `id_type` est déjà celui d'une personne connue (non rejeté)."""
+    """Branche « identifiant-ancré » : contribution source hors-périmètre dont l'identifiant fort `id_type` est déjà celui d'une personne connue (non rejeté)."""
     return strong_identifier_source_contributions(
         id_type,
         identifiers="person_identifiers",
@@ -126,7 +126,7 @@ def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
     )
 
 
-# Branche « cross-source-ancrée » : signature hors-périmètre dont le groupe (`source_contribution_group_members`) compte une signature déjà rattachée. Le matching nom-compatible est tranché côté Python (`decide_cross_source_match`).
+# Branche « cross-source-ancrée » : contribution source hors-périmètre dont le groupe (`source_contribution_group_members`) compte une contribution source déjà rattachée. Le matching nom-compatible est tranché côté Python (`decide_cross_source_match`).
 _OOP_CROSS_SOURCE_BRANCH = f"""
     SELECT {_OOP_PROJECTION}
     FROM source_contributions linked
@@ -150,7 +150,7 @@ _OOP_CANDIDATES_SQL = " UNION ".join(
 def fetch_unlinked_contributions(conn: Connection) -> list[BareUnlinkedContribution]:
     """Colonnes de la projection des `source_contributions` in-perimeter, individuelles, non liées :
 
-    - `identifiers` : identifiants de l'identité (`contributor_information`, jointe par `contributor_information_id`), sans filtre par source. Seules les signatures HAL contiennent `hal_person_id` et `idhal`. La cascade écarte les identifiants que leur source rend non fiables (`trusted_identifier`).
+    - `identifiers` : identifiants des informations du contributeur (`contributor_information`, jointe par `contributor_information_id`), sans filtre par source. Seules les contributions sources HAL contiennent `hal_person_id` et `idhal`. La cascade écarte les identifiants que leur source rend non fiables (`trusted_identifier`).
     """
     rows = conn.execute(
         text(f"""
@@ -172,16 +172,16 @@ def fetch_unlinked_contributions(conn: Connection) -> list[BareUnlinkedContribut
 
 
 def fetch_out_of_perimeter_candidates(conn: Connection) -> list[BareUnlinkedContribution]:
-    """Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même signature peut être candidate par plusieurs chemins (identifiant fort partagé, ou ancrage cross-source sur un groupe de signatures déjà lié). La cascade côté orchestrateur arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces candidats hors-périmètre).
+    """Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même contribution source peut être candidate par plusieurs chemins (identifiant fort partagé, ou ancrage cross-source sur un groupe de contributions sources déjà lié). La cascade côté orchestrateur arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces candidats hors-périmètre).
 
-    Seules les signatures ancrées sur une personne existante (identifiant partagé) ou sur un groupe de signatures déjà rattaché (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source porte l'essentiel de son coût.
+    Seules les contributions sources ancrées sur une personne existante (identifiant partagé) ou sur un groupe de contributions sources déjà rattaché (cross-source) sont ramenées. La requête reparcourt cet ensemble à chaque run, et la branche cross-source fait l'essentiel de son coût.
     """
     rows = conn.execute(text(_OOP_CANDIDATES_SQL)).all()
     return [_to_bare(r) for r in rows]
 
 
 def fetch_linked_contributions(conn: Connection) -> list[LinkedContributionRow]:
-    """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une signature collective ou un doublon d'auteur n'ancre rien."""
+    """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une contribution source collective ou un doublon d'auteur n'ancre rien."""
     rows = conn.execute(
         text(f"""
             SELECT sc_auth.person_id, gs.group_id,
@@ -206,7 +206,7 @@ def fetch_linked_contributions(conn: Connection) -> list[LinkedContributionRow]:
 
 
 def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedContribution]:
-    """Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une signature cross-source peut porter un identifiant ou un nom qui matche une personne existante : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant."""
+    """Même projection que les non-liées, plus `current_person_id` = le `person_id` courant. Une contribution source cross-source peut contenir un identifiant ou un nom qui matche une personne existante : la ré-évaluation passe par toute la cascade, d'où les colonnes d'identifiant."""
     rows = conn.execute(
         text(f"""
             SELECT {_BARE_PROJECTION_HEAD},
@@ -243,7 +243,7 @@ class EnrichedContribution(NamedTuple):
     last_norm: str
     first_norm: str
     allow_create: bool
-    # Groupe des signatures du même auteur dans la publication : clé du matching cross-source.
+    # Groupe des contributions sources du même auteur dans la publication : clé du matching cross-source.
     group_id: int | None = None
 
 
@@ -285,7 +285,7 @@ def get_out_of_perimeter_candidates(conn: Connection) -> list[EnrichedContributi
 
 
 def get_cross_source_candidates(conn: Connection) -> list[EnrichedContribution]:
-    """Charge les signatures déjà liées **en cross-source**, à re-juger contre les ancres fermes.
+    """Charge les contributions sources déjà liées **en cross-source**, à re-juger contre les ancres fermes.
 
     Elles portent leur `current_person_id` : la cascade compare la nouvelle décision au lien courant — même personne → no-op, différente → update, plus d'appui → détachée."""
     return [_enrich(row) for row in fetch_cross_source_linked(conn)]
@@ -294,7 +294,7 @@ def get_cross_source_candidates(conn: Connection) -> list[EnrichedContribution]:
 def load_linked_contributions_by_group(
     conn: Connection,
 ) -> dict[int, list[tuple[int, str, str, str]]]:
-    """Index des contributions rattachées, par groupe de signatures."""
+    """Index des contributions rattachées, par groupe de contributions sources."""
     index: dict[int, list[tuple[int, str, str, str]]] = defaultdict(list)
 
     for r in fetch_linked_contributions(conn):

@@ -552,7 +552,7 @@ class TestCascadeRun:
             )
 
         (line,) = [r.getMessage() for r in caplog.records if r.name == "test_orphelines"]
-        assert f"signature {orphan} (openalex)" in line
+        assert f"contribution source {orphan} (openalex)" in line
         assert "ambiguous_name_form" in line
         assert f"[{pid1}, {pid2}]" in line
 

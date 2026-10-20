@@ -175,7 +175,7 @@ class PublicationRelationsQueries:
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
         """Les `source_records` rattachées dont le `meta` déclare des relations."""
-        # Le DOI d'origine, et non le DOI corrigé : c'est lui que la notice déclare, et c'est son
+        # Le DOI d'origine, et non le DOI corrigé : c'est lui que l'enregistrement source déclare, et c'est son
         # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
             text(f"""

@@ -3,7 +3,7 @@
 Référentiel unique des modes : quelles sources interroger, quelle stratégie d'années, et les bascules de coût (vacuum, rafraîchissement des documents périmés).
 
 Deux modes :
-- `daily` : HAL seul, notices modifiées depuis la dernière extraction quotidienne réussie, sans `fetch_stale` ni `harvest_by_person` ;
+- `daily` : HAL seul, dépôts modifiés depuis le dernier moissonnage quotidien réussi, sans `fetch_stale` ni `harvest_by_person` ;
 - `full` : toutes les sources sauf WoS, plage d'années (depuis une ancre fixe).
 
 WoS est opt-in (`--include-wos`) : crédit API contractuel limité, donc exclue par défaut pour ne pas multiplier les 429.

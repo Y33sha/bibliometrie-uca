@@ -1,14 +1,14 @@
 """Passe d'assignation + réconciliation des composantes — match/create/skip **et** merge/split unifiés.
 
-Recalcule les composantes connexes du voisinage 1-hop des `source_records` marquées `keys_dirty` et assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision est portée par `domain.publications.reconciliation.plan_reconciliation` (pure) ; ici on applique :
+Recalcule les composantes connexes du voisinage 1-hop des `source_records` marquées `keys_dirty` et assigne chaque enregistrement source à la publication ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision revient à `domain.publications.reconciliation.plan_reconciliation` (pure) ; ce module l'applique :
 
-- **groupes** : on rattache les SP de chaque groupe à son ancre (pub existant conservé), ou à un pub créé quand la partition n'a pas d'ancre existante (split) ;
-- **publications dissoutes** (vidées de toutes leurs SP par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
+- **groupes** : les enregistrements sources de chaque groupe sont rattachés à son ancre (publication existante conservée), ou à une publication créée quand la partition est sans ancre existante (split) ;
+- **publications dissoutes** (vidées de tous leurs enregistrements sources par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
 - **rafraîchissement** : `lifecycle.refresh` recalcule les métadonnées consolidées de chaque publication touchée, et supprime celles restées sans source.
 
-Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des SP et les métadonnées des publications, pas la projection contributions.
+Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des enregistrements sources et les métadonnées des publications, et laisse les contributions.
 
-Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux source_records co-rattachées à une publication avec une SP dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
+Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux enregistrements sources co-rattachés à une publication avec un enregistrement source dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
 Tâche `publications.reconcile`.
 """
@@ -47,7 +47,7 @@ class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
     `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = la SP a ≥1 contribution in-périmètre (gate de création d'une pub neuve)."""
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve)."""
 
     id: int
     doi: str | None
@@ -63,7 +63,7 @@ class ReconcileRow(NamedTuple):
 # Voisinage 1-hop : les `source_records` dirty (orphelines comprises) et celles qui
 # partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
-# (EXISTS) gate la création d'une pub neuve pour une partition d'orphelins.
+# (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, p.doi AS publication_doi, "
@@ -129,8 +129,8 @@ _UNIVERSE_SQL = text(f"""
 
 
 # Clôture du voisinage sur l'appartenance déjà matérialisée : les `source_records` rattachées
-# à la même publication qu'une SP dirty deviennent dirty à leur tour. Le voisinage 1-hop est calculé
-# sur les clés courantes : une SP rattachée par une clé disparue en est absente, et resterait sur sa
+# à la même publication qu'un enregistrement source dirty deviennent dirty à leur tour. Le voisinage 1-hop est calculé
+# sur les clés courantes : un enregistrement source rattaché par une clé disparue en est absent, et resterait sur sa
 # publication sans être réexaminée. Marquées dirty, ces voisines obtiennent leur propre 1-hop, donc
 # un rattachement à la publication de leurs vraies voisines, sans publication en doublon.
 _SPREAD_TO_SIBLINGS_SQL = text("""
@@ -161,9 +161,9 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
 
 
 def mark_publication_siblings_dirty(conn: Connection) -> int:
-    """Propage `keys_dirty` aux `source_records` rattachées à la même publication qu'une SP déjà dirty. Retourne le nombre de lignes marquées.
+    """Propage `keys_dirty` aux `source_records` rattachés à la même publication qu'un enregistrement source déjà dirty. Retourne le nombre de lignes marquées.
 
-    Clôt le voisinage sur l'appartenance déjà matérialisée. Une SP rattachée par une clé de confirmation disparue (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) est absente du voisinage 1-hop, calculé sur les clés courantes : marquée dirty, elle est réexaminée.
+    Clôt le voisinage sur l'appartenance déjà matérialisée. Un enregistrement source rattaché par une clé de confirmation disparue (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) est absent du voisinage 1-hop, calculé sur les clés courantes : marqué dirty, il est réexaminé.
     """
     return conn.execute(_SPREAD_TO_SIBLINGS_SQL).rowcount
 
@@ -175,7 +175,7 @@ def fetch_dirty_source_record_ids(conn: Connection) -> list[int]:
 
 
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    """Le voisinage 1-hop : les SP dirty (orphelines comprises) **et** les SP qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
+    """Le voisinage 1-hop : les enregistrements sources dirty (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
         ReconcileRow(
@@ -196,7 +196,7 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
 def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
     """Map `lower(doi) → id` des publications existantes qui ont un DOI.
 
-    Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui a déjà son DOI même quand **aucune** SP du voisinage n'y est rattachée — publication devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une publication qui heurterait la contrainte unique sur le DOI."""
+    Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui a déjà son DOI même quand **aucun** enregistrement source du voisinage n'y est rattaché — publication devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une publication qui heurterait la contrainte unique sur le DOI."""
     # Clé sur `lower(doi)` : l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
     rows = conn.execute(
         text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
@@ -250,7 +250,7 @@ def mark_contributions_dirty(conn: Connection, publication_ids: list[int]) -> in
 
 
 def clear_keys_dirty(conn: Connection, source_record_ids: list[int]) -> int:
-    """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""
+    """Efface `keys_dirty` sur les enregistrements sources réconciliés. Retourne le nombre de lignes touchées."""
     if not source_record_ids:
         return 0
     stmt = text("UPDATE source_records SET keys_dirty = false WHERE id = ANY(:ids)").bindparams(
@@ -282,7 +282,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
 def _create_new_publication(
     conn: Connection, group: WorkGroup, rows_by_source_record: dict[int, ReconcileRow]
 ) -> int:
-    """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis sa plus petite SP qui a une année. Les métadonnées définitives sont posées juste après par `lifecycle.refresh`.
+    """Crée la publication d'un groupe sans ancre existante (split, ou création depuis orphelins), semée depuis son plus petit enregistrement source qui a une année. Les métadonnées définitives sont posées juste après par `lifecycle.refresh`.
 
     Un groupe `target=None` est soit une partition d'orphelins ayant passé le gate `has_minimal_publication_metadata` (≥1 membre titre + année), soit une partition split perdante (membres matérialisés, qui avaient déjà une année) — dans les deux cas ≥1 membre a une année."""
     seed = min(
@@ -306,7 +306,7 @@ def _create_new_publication(
 class ReconcileStats(NamedTuple):
     """Bilan d'une passe de réconciliation.
 
-    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des SP sont rattachées) ; `created` = parmi elles, publications créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = publications existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = publications créées par une scission (un DOI distinct détaché d'une publication existante) ; `detached` = `source_records` rendues orphelines, faute de pouvoir fonder une publication.
+    `processed` = enregistrements sources dirty traités ; `publications` = publications résultantes (auxquelles des enregistrements sources sont rattachés) ; `created` = parmi elles, publications créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = publications existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = publications créées par une scission (un DOI distinct détaché d'une publication existante) ; `detached` = `source_records` rendues orphelines, faute de pouvoir fonder une publication.
     """
 
     processed: int = 0
@@ -319,7 +319,7 @@ class ReconcileStats(NamedTuple):
 
 
 def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False) -> ReconcileStats:
-    """Planifie et applique la réconciliation du voisinage dirty. Rend un bilan à zéro si aucune SP n'est dirty. Le commit est à la charge de l'appelant.
+    """Planifie et applique la réconciliation du voisinage dirty. Rend un bilan à zéro si aucun enregistrement source n'est dirty. Le commit est à la charge de l'appelant.
 
     `rebuild` marque d'abord toutes les `source_records` dirty : la réconciliation reprend alors le stock entier.
     """
@@ -360,7 +360,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         )
 
     survivors: set[int] = set()
-    # Publications qui gagnent ou perdent une notice.
+    # Publications qui gagnent ou perdent un enregistrement source.
     membership_changed: set[int] = set()
     dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     created = 0
@@ -368,7 +368,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
 
     t0 = time.perf_counter()
     with attente(f"{DERNIERE_BRANCHE}application", logger) as ligne:
-        # 1. Groupes : rattacher chaque SP à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
+        # 1. Groupes : rattacher chaque enregistrement source à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
         for group in plan.groups:
             target = group.target_publication_id
             if target is None:
@@ -423,7 +423,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
             with savepoint(conn):
                 lifecycle.refresh(conn, publication_id)
 
-    # 5. Les publications qui gagnent ou perdent une notice regroupent leurs signatures.
+    # 5. Les publications qui gagnent ou perdent un enregistrement source regroupent leurs contributions sources.
     mark_contributions_dirty(conn, sorted(membership_changed - dissolved_ids))
     clear_keys_dirty(conn, dirty_ids)
     return ReconcileStats(

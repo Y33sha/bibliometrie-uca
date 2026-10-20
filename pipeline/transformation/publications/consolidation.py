@@ -224,7 +224,7 @@ def _apply_canonical_doc_type_correction(
 
     `effective_doc_type_for_publication` écarte les règles lisant un fait propre à un enregistrement source ; les champs correspondants restent nuls ici. L'`oa_status` est hors du rejeu, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
 
-    `journal_type` est le type de la revue `pub.journal_id`. Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']`. Idempotent.
+    `journal_type` est le type de la revue `publication.journal_id`. Mute `publication.doc_type` et trace la règle dans `publication.meta['corrections']['doc_type']`. Idempotent.
     """
     corrected = effective_doc_type_for_publication(
         MetadataForCorrection(
