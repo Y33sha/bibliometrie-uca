@@ -107,7 +107,7 @@ repos:
       # Scan de vulnérabilités des dépendances installées.
       - id: ci-pip-audit
         name: pip-audit (vulnérabilités)
-        entry: uv run python -m pip_audit
+        entry: uv run python -m pip_audit --skip-editable
         language: system
         pass_filenames: false
         always_run: true
