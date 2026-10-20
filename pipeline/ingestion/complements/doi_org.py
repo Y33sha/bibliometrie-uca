@@ -15,9 +15,9 @@ from collections.abc import Iterator, Sequence
 import httpx2
 
 from domain.types import as_mapping, as_sequence, as_str
-from pipeline.ingestion.http.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
-from pipeline.ingestion.http.http_retry import http_request_with_retry, lookup_json_async
-from pipeline.ingestion.http.lookup import NotFound, Unavailable
+from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
+from pipeline.http.lookup import NotFound, Unavailable
+from pipeline.ingestion.api_params import API_BASE_URLS, DOI_ORG_RA_BATCH
 
 logger = logging.getLogger(__name__)
 

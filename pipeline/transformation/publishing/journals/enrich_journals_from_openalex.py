@@ -14,7 +14,7 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from domain.journals.journal import JournalType
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.observability.libelles import forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries

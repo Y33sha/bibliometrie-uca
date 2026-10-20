@@ -14,6 +14,11 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping
+from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.throttle import Throttle
+from pipeline.http.tls import tls_context
+from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -21,11 +26,6 @@ from pipeline.ingestion.common.harvest import (
     scoped_logger,
     stage_document,
 )
-from pipeline.ingestion.http.api_params import WOS_DELAY, WOS_PER_PAGE
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.throttle import Throttle
-from pipeline.ingestion.http.tls import tls_context
 from pipeline.ingestion.wos.fields import (
     build_query,
     extract_doi,

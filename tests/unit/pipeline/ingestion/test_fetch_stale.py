@@ -14,9 +14,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.common import fetch_stale
 from pipeline.ingestion.common.fetch_stale import FetchedRecord, StaleRefetch, refresh
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 
 
 class _Lecture(StaleRefetch):

@@ -4,9 +4,9 @@ import ast
 import ssl
 from pathlib import Path
 
-from pipeline.ingestion.http.tls import tls_context
+from pipeline.http.tls import tls_context
 
-_PIPELINE = Path(__file__).resolve().parents[5] / "pipeline"
+_PIPELINE = Path(__file__).resolve().parents[4] / "pipeline"
 # Appels httpx2 qui ouvrent des connexions et créent leur contexte TLS faute de `verify=`.
 _CONNECTING = frozenset(
     {"Client", "AsyncClient", "request", "get", "post", "put", "delete", "stream"}

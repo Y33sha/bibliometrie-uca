@@ -13,6 +13,9 @@ from sqlalchemy import Connection
 
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from pipeline.http.http_retry import http_request_with_retry
+from pipeline.http.throttle import Throttle
+from pipeline.ingestion.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
@@ -20,9 +23,6 @@ from pipeline.ingestion.common.harvest import (
     scoped_logger,
     stage_document,
 )
-from pipeline.ingestion.http.api_params import OPENALEX_DELAY, OPENALEX_PER_PAGE
-from pipeline.ingestion.http.http_retry import http_request_with_retry
-from pipeline.ingestion.http.throttle import Throttle
 from pipeline.ingestion.openalex.api import auth_params
 from pipeline.ingestion.openalex.fields import SELECT_FIELDS, extract_doi, extract_openalex_id
 from pipeline.runtime.config import (

@@ -15,11 +15,11 @@ from defusedxml.common import DefusedXmlException
 from domain.publications.identifiers import ISSN
 from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
 from domain.types import as_mapping, as_sequence, as_str
-from pipeline.ingestion.http.api_params import SUDOC_ISSN2PPN_BATCH
-from pipeline.ingestion.http.http_retry import (
+from pipeline.http.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
 )
+from pipeline.ingestion.api_params import SUDOC_ISSN2PPN_BATCH
 
 logger = logging.getLogger(__name__)
 

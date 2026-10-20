@@ -8,13 +8,13 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
-from pipeline.ingestion.http import http_retry
-from pipeline.ingestion.http.http_retry import (
+from pipeline.http import http_retry
+from pipeline.http.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
     lookup_json_async,
 )
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 
 _API_KEY = "cle-secrete-de-test"
 
@@ -74,7 +74,7 @@ def test_5xx_is_retried():
 
 def test_5xx_with_breaker_raises_source_unavailable():
     """Sous circuit-breaker, un 5xx qui épuise ses retries lève `SourceUnavailableError` et compte un échec au breaker."""
-    from pipeline.ingestion.http.circuit_breaker import (
+    from pipeline.http.circuit_breaker import (
         SourceCircuitBreaker,
         SourceUnavailableError,
         reset_current_breaker,
@@ -395,7 +395,7 @@ class TestLookupJsonAsync:
 
     @pytest.mark.asyncio
     async def test_tripped_breaker_is_unavailable_without_request(self, http_mock):
-        from pipeline.ingestion.http.circuit_breaker import (
+        from pipeline.http.circuit_breaker import (
             SourceCircuitBreaker,
             reset_current_breaker,
             set_current_breaker,

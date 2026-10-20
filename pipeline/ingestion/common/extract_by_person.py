@@ -16,10 +16,9 @@ from typing import TYPE_CHECKING
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.extract import Extracteur
 from pipeline.ingestion.common.harvest import ExtractionConfigError
-from pipeline.ingestion.common.parallel import RunParallel
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import open_tx
@@ -27,6 +26,7 @@ from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
+from pipeline.runtime.parallel import RunParallel
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -97,7 +97,7 @@ type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
 
 def build() -> Phase:
     """Moissonnage des sources par l'identifiant des personnes RH, vers le staging."""
-    from pipeline.ingestion.common.parallel import run_parallel
+    from pipeline.runtime.parallel import run_parallel
 
     registry = _extractors()
 
@@ -113,7 +113,7 @@ def build() -> Phase:
 
 def _extractors() -> dict[str, ConstructeurExtracteur]:
     """Constructeur de l'extracteur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
-    from pipeline.ingestion.http.api_params import API_BASE_URLS
+    from pipeline.ingestion.api_params import API_BASE_URLS
 
     def datacite(conn: Connection, source_log: logging.Logger) -> Extracteur:
         from pipeline.ingestion.datacite.harvest import DataciteClient

@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from functools import partial
 
 from pipeline.graph import NODES, Node
-from pipeline.ingestion.common.parallel import RunParallel, run_parallel
-from pipeline.ingestion.http.access_source import access_source
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.parallel import RunParallel, run_parallel
 
 type NodeRun = Callable[[PhaseContext, SourceCircuitBreaker | None], PhaseMetrics]
 """Exécute un nœud. Reçoit le contexte de la phase, et le circuit-breaker de sa source (`None` pour un nœud sans source)."""

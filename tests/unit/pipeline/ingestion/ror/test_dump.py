@@ -10,8 +10,8 @@ import pytest
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorStatus, RorType
-from pipeline.ingestion.http.api_params import API_BASE_URLS
-from pipeline.ingestion.http.dump_download import DumpDownloadError, DumpUnavailableError
+from pipeline.http.dump_download import DumpDownloadError, DumpUnavailableError
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.ror.dump import (
     ZenodoRorDumpSource,
     fetch_ror_dump,

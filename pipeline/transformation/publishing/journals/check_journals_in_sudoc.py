@@ -21,8 +21,8 @@ from domain.journals.issn_check import (
 from domain.journals.issns import IssnStatus
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.sources.sudoc import SudocSerialRecord
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
-from pipeline.ingestion.http.fetch_pool import RequestPace, run_fetch_pool
+from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.http.fetch_pool import RequestPace, run_fetch_pool
 from pipeline.runtime.observability.libelles import BRANCHE, accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression

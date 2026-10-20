@@ -16,8 +16,8 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.publications.metadata import publication_oa_status
-from pipeline.ingestion.http.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.http.tls import tls_context
+from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.http.tls import tls_context
 from pipeline.node_runner import NodePhase
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
@@ -226,8 +226,8 @@ def build() -> Phase:
     Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse électronique du polite pool.
     """
 
+    from pipeline.ingestion.api_params import API_BASE_URLS
     from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-    from pipeline.ingestion.http.api_params import API_BASE_URLS
     from pipeline.runtime.config import (
         get_polite_pool_email_optional,
         get_unpaywall_max_per_run,

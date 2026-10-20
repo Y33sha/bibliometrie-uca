@@ -12,7 +12,7 @@ import pytest
 
 from interfaces.cli.maintenance import enrich_publishers as module
 from interfaces.cli.maintenance.enrich_publishers import main
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.openalex import api
 
 

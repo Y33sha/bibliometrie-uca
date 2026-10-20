@@ -12,9 +12,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
-from pipeline.ingestion.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.wos import harvest
 from pipeline.ingestion.wos.harvest import WosExtractor, extract_year
 from pipeline.runtime.observability.progression import Progression

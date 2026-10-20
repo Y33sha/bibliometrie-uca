@@ -26,16 +26,15 @@ from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
 )
 from domain.types import JsonValue
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.fetch_pool import run_fetch_pool
+from pipeline.http.polite_pool import build_user_agent
 from pipeline.ingestion.common.failed_lookups import (
     forget_failed_doi_lookups,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.parallel import RunParallel
 from pipeline.ingestion.complements.doi_org import doi_existence
-from pipeline.ingestion.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.http.fetch_pool import run_fetch_pool
-from pipeline.ingestion.http.polite_pool import build_user_agent
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.execution import log, open_tx
@@ -44,6 +43,7 @@ from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
+from pipeline.runtime.parallel import RunParallel
 
 FetchChannel = Callable[[], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
@@ -399,7 +399,7 @@ def build() -> Phase:
 
     Les deux se bornent d'elles-mêmes : un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre.
     """
-    from pipeline.ingestion.common.parallel import run_parallel
+    from pipeline.runtime.parallel import run_parallel
 
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,

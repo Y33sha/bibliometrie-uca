@@ -9,7 +9,7 @@ import logging
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 
-from pipeline.ingestion.http.circuit_breaker import (
+from pipeline.http.circuit_breaker import (
     DEFAULT_THRESHOLD,
     SourceCircuitBreaker,
     SourceUnavailableError,

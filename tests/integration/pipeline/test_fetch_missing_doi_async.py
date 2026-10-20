@@ -14,13 +14,13 @@ from unittest.mock import MagicMock, patch
 import httpx2
 import pytest
 
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common import fetch_missing
 from pipeline.ingestion.common.fetch_missing import DoiBatchResult, fetch_missing_doi
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
 from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
-from pipeline.ingestion.http.api_params import API_BASE_URLS
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch

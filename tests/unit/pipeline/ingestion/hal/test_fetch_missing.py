@@ -8,10 +8,10 @@ from types import SimpleNamespace
 
 import pytest
 
+from pipeline.http.circuit_breaker import reset_current_breaker, set_current_breaker
+from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
-from pipeline.ingestion.http.circuit_breaker import reset_current_breaker, set_current_breaker
-from pipeline.ingestion.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 
 _LOG = logging.getLogger("test")
