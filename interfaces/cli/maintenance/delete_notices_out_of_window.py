@@ -17,7 +17,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.common.staging import delete_source_publications_before
+from pipeline.ingestion.common.source_publications import delete_source_publications_before
 
 log = setup_logger("delete_notices_out_of_window", os.path.dirname(__file__))
 

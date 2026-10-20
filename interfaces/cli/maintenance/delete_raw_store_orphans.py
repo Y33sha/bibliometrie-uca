@@ -15,13 +15,23 @@ import argparse
 import os
 from pathlib import Path
 
+from sqlalchemy import Connection, ScalarResult, text
+
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store.factory import get_raw_store
-from pipeline.ingestion.common.staging import fetch_existing_source_ids
 
 log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
+
+
+def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
+    """Set des `source_id` déjà présents en staging pour une source."""
+    rows: ScalarResult[str] = conn.execute(
+        text("SELECT source_id FROM staging WHERE source = :source"),
+        {"source": source},
+    ).scalars()
+    return set(rows)
 
 
 def main() -> int:

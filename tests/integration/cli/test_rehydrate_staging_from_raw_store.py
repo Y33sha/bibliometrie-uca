@@ -1,11 +1,11 @@
-"""Réhydratation `staging` depuis le raw store : inverse de `mark_done`.
+"""Réhydratation `staging` depuis le raw store : inverse de `StagingQueries.mark_done`.
 
 Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data, raw_hash, processed`) : un renommage casserait ces requêtes.
 """
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.staging import (
+from interfaces.cli.maintenance.rehydrate_staging_from_raw_store import (
     rehydrate_or_create_staging_row,
     rehydrate_staging_row,
 )

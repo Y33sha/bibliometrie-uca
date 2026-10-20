@@ -180,7 +180,7 @@ def _run_mark_signatures_to_resync(ctx: PhaseContext, source: str) -> None:
 
 
 def _run_prune_disappeared(ctx: PhaseContext) -> int:
-    from pipeline.ingestion.common.staging import delete_disappeared_source_publications
+    from pipeline.ingestion.common.source_publications import delete_disappeared_source_publications
 
     with ctx.open_tx() as conn:
         return delete_disappeared_source_publications(conn)

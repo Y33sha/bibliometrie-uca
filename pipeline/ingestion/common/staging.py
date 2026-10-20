@@ -2,7 +2,6 @@
 
 - `upsert_staging` écrit un document, pour toutes les voies d'entrée (phases `extract`, `fetch_missing` et `fetch_stale`).
 - `StagingQueries` lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
-- `delete_disappeared_source_publications` retire les notices des documents disparus de leur source, `delete_source_publications_before` celles parues avant une année ; `rehydrate_*` réinjecte un payload archivé.
 
 Le commit est à la charge de l'appelant.
 """
@@ -14,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import Connection, Row, ScalarResult, bindparam, text
+from sqlalchemy import Connection, Row, bindparam, text
 
 from domain.publications.identifiers import clean_doi
 from domain.sources.staging import StagingEntryMode
@@ -23,6 +22,7 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
+from pipeline.ingestion.common.source_publications import delete_source_publication_of_staging
 
 _logger = logging.getLogger(__name__)
 
@@ -120,27 +120,6 @@ class UpsertOutcome(StrEnum):
 
 
 @dataclass(frozen=True)
-class BatchInsertCounts:
-    """Résultat d'un `insert_batch`, ventilé en trois.
-
-    - `new` : vraie insertion (`RETURNING (xmax = 0)`).
-    - `updated` : row existante dont le **contenu a changé** (`raw_data` réécrit, `raw_hash` distinct de l'ancien — capté via une CTE qui lit l'ancien hash avant l'UPSERT, comparé au nouveau dans le `RETURNING`).
-    - `unchanged` : row re-vue à contenu identique (seul `last_seen_at` bumpé).
-    """
-
-    new: int
-    updated: int
-    unchanged: int
-
-    @property
-    def total(self) -> int:
-        return self.new + self.updated + self.unchanged
-
-
-# ── Normalisation ─────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
 class StagingRow:
     """Ligne de `staging` à normaliser."""
 
@@ -170,84 +149,6 @@ _MARK_DONE_SQL = text(
     RETURNING old.source AS source, old.source_id AS source_id, old.raw_data AS raw_data
     """
 )
-
-
-def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
-    """Set des `source_id` déjà présents en staging pour une source."""
-    rows: ScalarResult[str] = conn.execute(
-        text("SELECT source_id FROM staging WHERE source = :source"),
-        {"source": source},
-    ).scalars()
-    return set(rows)
-
-
-# ── Réhydratation depuis le raw store (inverse de mark_done) ────
-
-_REHYDRATE_UPDATE_SQL = text(
-    """
-    UPDATE staging
-    SET raw_data = :raw_data, raw_hash = :raw_hash, processed = FALSE
-    WHERE source = :source AND source_id = :source_id
-    """
-).bindparams(bindparam("raw_data", type_=Jsonb))
-
-_REHYDRATE_UPSERT_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, FALSE)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = EXCLUDED.raw_data,
-        raw_hash = EXCLUDED.raw_hash,
-        processed = FALSE
-    RETURNING (xmax = 0) AS inserted
-    """
-).bindparams(bindparam("raw_data", type_=Jsonb))
-
-
-def rehydrate_staging_row(
-    conn: Connection, source: str, source_id: str, raw_data: Mapping[str, JsonValue]
-) -> bool:
-    """Réinjecte un payload archivé dans une ligne `staging` existante, prête à renormaliser.
-
-    Inverse de `mark_done` : repose `raw_data`, recalcule `raw_hash` (`change_detection_hash`, même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant) et remet `processed = FALSE`. Ne touche que les lignes déjà présentes : retourne `False` si `(source, source_id)` est absent (clé orpheline au raw store).
-    """
-    return (
-        conn.execute(
-            _REHYDRATE_UPDATE_SQL,
-            {
-                "raw_data": raw_data,
-                "raw_hash": change_detection_hash(source, raw_data),
-                "source": source,
-                "source_id": source_id,
-            },
-        ).rowcount
-        > 0
-    )
-
-
-def rehydrate_or_create_staging_row(
-    conn: Connection,
-    source: str,
-    source_id: str,
-    doi: str | None,
-    raw_data: Mapping[str, JsonValue],
-) -> bool:
-    """Réhydrate une ligne `staging`, en la créant si elle manque (après un `TRUNCATE staging`, où tout est orphelin).
-
-    Upsert : réinsère les clés orphelines et écrase inconditionnellement les existantes. `doi` n'est posé qu'à l'insertion — une ligne préexistante garde son `doi` d'origine. Retourne `True` si la ligne vient d'être insérée, `False` si elle existait et a été mise à jour.
-    """
-    return bool(
-        conn.execute(
-            _REHYDRATE_UPSERT_SQL,
-            {
-                "raw_data": raw_data,
-                "raw_hash": change_detection_hash(source, raw_data),
-                "source": source,
-                "source_id": source_id,
-                "doi": doi,
-            },
-        ).scalar_one()
-    )
 
 
 class StagingQueries:
@@ -306,7 +207,7 @@ class StagingQueries:
         return [_row(r) for r in rows]
 
     def discard_source_publication(self, conn: Connection, staging_id: int) -> None:
-        _delete_source_publications(conn, "s.id = :staging_id", {"staging_id": staging_id})
+        delete_source_publication_of_staging(conn, staging_id)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).
@@ -322,80 +223,3 @@ class StagingQueries:
                 row.source_id,
                 exc_info=True,
             )
-
-
-def _delete_source_publications(
-    conn: Connection, staging_filter: str, params: dict[str, object]
-) -> int:
-    """Supprime les `source_publications` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
-
-    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication reçoit `authorships_dirty`. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. Rend le nombre de `source_publications` supprimées.
-    """
-    conn.execute(
-        text(f"""
-            UPDATE publications p
-            SET authorships_dirty = true
-            FROM source_publications sp
-            JOIN staging s ON s.id = sp.staging_id
-            WHERE {staging_filter}
-              AND p.id = sp.publication_id
-              AND NOT p.authorships_dirty
-        """),  # noqa: S608
-        params,
-    )
-    # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.
-    conn.execute(
-        text(f"""
-            UPDATE source_publications soeur
-            SET keys_dirty = true
-            FROM source_publications sp
-            JOIN staging s ON s.id = sp.staging_id
-            WHERE {staging_filter}
-              AND soeur.publication_id = sp.publication_id
-              AND soeur.id <> sp.id
-              AND NOT soeur.keys_dirty
-        """),  # noqa: S608
-        params,
-    )
-    return conn.execute(
-        text(f"""
-            DELETE FROM source_publications sp
-            USING staging s
-            WHERE sp.staging_id = s.id AND {staging_filter}
-        """),  # noqa: S608
-        params,
-    ).rowcount
-
-
-def delete_disappeared_source_publications(conn: Connection) -> int:
-    """Supprime les `source_publications` dont le staging porte `disappeared_at` (cf. `_delete_source_publications`). La ligne de `staging` reste, avec sa marque.
-
-    Balayage ensembliste, idempotent.
-    """
-    return _delete_source_publications(conn, "s.disappeared_at IS NOT NULL", {})
-
-
-def delete_source_publications_before(
-    conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
-) -> tuple[int, int]:
-    """Supprime les notices parues avant `start_year` (cf. `_delete_source_publications`), puis leur ligne de `staging`. Les notices des sources `exempt_sources` restent.
-
-    Rend le nombre de `source_publications` et de lignes de `staging` supprimées.
-    """
-    staging_ids = list(
-        conn.execute(
-            text("""
-                SELECT sp.staging_id FROM source_publications sp
-                WHERE sp.pub_year < :start_year AND sp.staging_id IS NOT NULL
-                  AND sp.source::text <> ALL(:exempt)
-            """),
-            {"start_year": start_year, "exempt": list(exempt_sources)},
-        ).scalars()
-    )
-    if not staging_ids:
-        return 0, 0
-    deleted = _delete_source_publications(conn, "s.id = ANY(:ids)", {"ids": staging_ids})
-    staged = conn.execute(
-        text("DELETE FROM staging WHERE id = ANY(:ids)"), {"ids": staging_ids}
-    ).rowcount
-    return deleted, staged
