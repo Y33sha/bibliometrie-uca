@@ -32,6 +32,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 - **FWCI et top 10 % d'OpenAlex conservés quand le compte OpenAlex est aberrant.** OpenAlex sous-compte les citations de certaines publications : 0 citation pour un article de la collaboration ATLAS cité 59 fois dans le WoS, avec la même valeur dans l'API. 68 publications ont un compte OpenAlex inférieur à la moitié du maximum des autres sources, ce maximum étant d'au moins 5 (0,38 %). Les écarter fait passer le FWCI moyen de 1,652 à 1,656 et la part dans le top 10 % de 16,48 % à 16,51 %. Le laboratoire le plus touché, de physique des particules, en compte 45 : son FWCI moyen passe de 2,16 à 2,21.
 - **Groupes de publications.** Articles originaux : type `article`, qui comprend les short communications dans toutes les sources. Autres publications : articles de synthèse et conference papers. Publications non anglophones : publications des deux premiers groupes dont la langue est connue et autre que l'anglais.
 - **Rôles clés.** Ceux du rapport, choisis par unité. Le tableau InCites vient de l'Inserm : ses rôles PDC conviennent à la médecine.
+- **Période.** Années complètes, de 2020 à 2025.
 - **Présentation.** Lignes par année. La mise en forme PDF décide des agrégations éventuelles.
 
 ## Phasage
