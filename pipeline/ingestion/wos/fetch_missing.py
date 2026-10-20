@@ -15,14 +15,13 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_mapping
-from pipeline.http.http_retry import lookup_json_async
+from domain.types import JsonValue
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
+from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.ingestion.credentials import get_wos_api_key
+from pipeline.ingestion.wos.api import search
 from pipeline.ingestion.wos.fields import (
     extract_doi,
     extract_ut,
@@ -44,10 +43,6 @@ class WosDoiSearch:
     max_concurrent = 2
     request_delay_s = 0.5
 
-    def __init__(self) -> None:
-        self.base_url = API_BASE_URLS["wos"]
-        self.headers = {"X-ApiKey": get_wos_api_key(), "Accept": "application/json"}
-
     async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
@@ -59,35 +54,15 @@ class WosDoiSearch:
         first_record = 1
         while clean:
             query = "DO=(" + " OR ".join(f'"{d}"' for d in clean) + ")"
-            params: dict[str, str | int | float] = {
-                "databaseId": "WOS",
-                "usrQuery": query,
-                "count": WOS_PER_PAGE,
-                "firstRecord": first_record,
-            }
-            outcome = await lookup_json_async(
-                client,
-                "GET",
-                self.base_url,
-                headers=self.headers,
-                params=params,
-                timeout=60,
-                # Backoff initial 4s : séquence 2^(attempt+2) = 4, 8, 16, 32, 64.
-                initial_backoff=4.0,
-                retry_on_empty_body=True,
-                not_found_statuses=frozenset({400}),
-                label=f"rec {first_record}",
+            data = await search(
+                client, query, first_record=first_record, label=f"rec {first_record}"
             )
-            if isinstance(outcome, NotFound):
+            if isinstance(data, NotFound):
                 # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).
                 log.warning("WoS 400 rec %d, lot ignoré", first_record)
                 break
-            if isinstance(outcome, Unavailable):
-                # Lot non fiable : on rend ce qu'on a sans calculer de not-found.
-                complete = False
-                break
-            data = as_mapping(outcome)
-            if not data:
+            if isinstance(data, Unavailable):
+                # Lot non fiable (erreur réseau, corps vide) : on rend ce qu'on a sans calculer de not-found.
                 complete = False
                 break
             recs = get_records(data)

@@ -7,27 +7,20 @@ from __future__ import annotations
 
 import argparse
 import time
-from collections.abc import Mapping
 from dataclasses import dataclass
 
-import httpx2
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_mapping
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.http.http_retry import http_request_with_retry
-from pipeline.http.throttle import Throttle
-from pipeline.http.tls import tls_context
-from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
     stage_document,
 )
+from pipeline.ingestion.wos.api import WosClient
 from pipeline.ingestion.wos.fields import (
-    build_query,
     extract_doi,
     extract_ut,
     get_records,
@@ -36,8 +29,6 @@ from pipeline.ingestion.wos.fields import (
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
-
-type QueryParams = Mapping[str, str | int | float | bool | None]
 
 # Pause longue toutes les `_BREATHER_EVERY` pages.
 _BREATHER_EVERY = 10
@@ -54,77 +45,6 @@ class WosExtractConfig:
 
     # Variantes d'affiliation (Organization-Enhanced) du périmètre d'extraction.
     affiliations: list[str]
-
-
-class WosClient:
-    """Client de l'API WoS Expanded, limité à un appel toutes les `WOS_DELAY` secondes.
-
-    Le backoff est plus long qu'aux autres sources (`initial_backoff=2.0`) : WoS renvoie plus volontiers des 429.
-    """
-
-    def __init__(self, base_url: str, api_key: str) -> None:
-        self._url = base_url
-        self._headers = {"X-ApiKey": api_key, "Accept": "application/json"}
-        self._throttle = Throttle(WOS_DELAY)
-
-    def _get(self, params: QueryParams, label: str) -> Mapping[str, JsonValue]:
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "GET",
-                    self._url,
-                    params=params,
-                    headers=self._headers,
-                    timeout=60,
-                    retry_on_empty_body=True,
-                    initial_backoff=2.0,
-                    label=label,
-                )
-            )
-
-    def fetch_page(
-        self, year: int, first_record: int, affiliations: list[str]
-    ) -> Mapping[str, JsonValue]:
-        """Une page de records, à partir du rang `first_record`."""
-        params: QueryParams = {
-            "databaseId": "WOS",
-            "usrQuery": build_query(year, affiliations),
-            "count": WOS_PER_PAGE,
-            "firstRecord": first_record,
-        }
-        return self._get(params, label=f"({year}, rec {first_record})")
-
-    def count(self, year: int, affiliations: list[str]) -> int:
-        """Nombre de records d'une année, lu sur une recherche qui n'en renvoie aucun (`count=0`)."""
-        params: QueryParams = {
-            "databaseId": "WOS",
-            "usrQuery": build_query(year, affiliations),
-            "count": 0,
-            "firstRecord": 1,
-        }
-        return get_records_found(self._get(params, label=f"({year}, comptage)"))
-
-    def check_quota(self) -> str | None:
-        """Quota annuel restant (en-tête `X-REC-AmtPerYear-Remaining`), ou `None` s'il est illisible.
-
-        Lève `RuntimeError` si l'API refuse la clé (401/403).
-        """
-        resp = httpx2.get(
-            self._url,
-            headers=self._headers,
-            params={"databaseId": "WOS", "usrQuery": "OG=(test)", "count": "0", "firstRecord": "1"},
-            timeout=30,
-            verify=tls_context(),
-        )
-        if resp.status_code in (401, 403):
-            raise RuntimeError(
-                f"Erreur d'authentification WoS ({resp.status_code}). "
-                f"Vérifier la clé API. Réponse : {resp.text[:300]}"
-            )
-        if resp.status_code != 200:
-            return None
-        restant: str | None = resp.headers.get("X-REC-AmtPerYear-Remaining")
-        return restant
 
 
 def extract_year(

@@ -218,7 +218,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
 
     def wos(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.credentials import get_wos_api_key
-        from pipeline.ingestion.wos.harvest import WosClient, WosExtractor
+        from pipeline.ingestion.wos.api import WosClient
+        from pipeline.ingestion.wos.harvest import WosExtractor
 
         client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, client)
