@@ -23,6 +23,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ## Décisions
 
 - La méthode de résolution des personnes se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](DATA_alignement-auteurs.md).
+- **Rejet d'un identifiant.** Un identifiant est rejeté pour une personne. Le rejet invalide les rattachements non épinglés que cet identifiant soutient seul : la signature redevient orpheline. Le run suivant la résout sans cet identifiant, par le nom si elle est du périmètre, ou par une autre source où la même signature est présente. Les rattachements entre sources ancrés sur elle tombent s'ils n'ont pas d'autre appui.
 
 ## Phasage
 
@@ -78,6 +79,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ### Phase 4 — Intégration au pipeline
 
 - [ ] `person_id` et `resolution_mode` passent de `source_authorships` à `source_authorship_groups`. `source_authorship_groups` remplace `authorships`, matviews reportées.
+- [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 signatures non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [ ] Correction du stock : doubles rattachements (une personne rattachée à deux signatures d'une même notice), personnes qui ont les identifiants de deux personnes, ORCID en attente rattachés à une autre personne que leur titulaire (21 groupes dans la relecture du 2026-10-19).
 
 ### Phase 5 — Fin de chantier
