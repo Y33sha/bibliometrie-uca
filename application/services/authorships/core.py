@@ -8,8 +8,10 @@ La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.in_perimeter import AffiliationsQueries
-from application.ports.pipeline.perimeter_structures import PerimeterStructuresQueries
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
+from application.ports.pipeline.source_contribution_perimeter import (
+    SourceContributionPerimeterRecompute,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -78,8 +80,8 @@ def propagate_in_perimeter_for_addresses(
     address_ids: list[int],
     *,
     repo: AuthorshipRepository,
-    perimeter_queries: PerimeterStructuresQueries,
-    affiliations_queries: AffiliationsQueries,
+    perimeter_structures: PerimeterStructures,
+    perimeter_recompute: SourceContributionPerimeterRecompute,
 ) -> None:
     """Recalcule le périmètre des signatures liées aux adresses données, de leurs authorships et de leurs publications.
 
@@ -88,7 +90,7 @@ def propagate_in_perimeter_for_addresses(
     if not address_ids:
         return
 
-    perimeter_ids = perimeter_queries.get_persons_structure_ids_list(conn)
+    perimeter_ids = perimeter_structures.persons_structure_ids(conn)
     if not perimeter_ids:
         return
 
@@ -96,7 +98,7 @@ def propagate_in_perimeter_for_addresses(
     if not affected_sa_ids:
         return
 
-    affiliations_queries.recompute_perimeter(conn, affected_sa_ids, perimeter_ids)
+    perimeter_recompute.recompute_perimeter(conn, affected_sa_ids, perimeter_ids)
 
 
 def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:

@@ -1,6 +1,6 @@
-"""Port : lecture des périmètres (ensembles de structures).
+"""Port : structures des périmètres, matérialisées dans `perimeter_structures`.
 
-Implémenté par `pipeline.transformation.structures.perimeter.PerimeterQueries`.
+Implémenté par `pipeline.transformation.structures.perimeter.PerimeterStructures`.
 """
 
 from typing import Protocol
@@ -8,17 +8,13 @@ from typing import Protocol
 from sqlalchemy import Connection
 
 
-class PerimeterStructuresQueries(Protocol):
-    """Opérations sur les périmètres (lecture des structures, rematérialisation)."""
+class PerimeterStructures(Protocol):
+    """Clôture des tutelles des périmètres : rematérialisation et lecture."""
 
-    def count_extraction_structures(self, conn: Connection) -> int:
-        """Nombre de structures du périmètre d'extraction, zéro s'il n'est pas configuré."""
-        ...
-
-    def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
-        """Structures du périmètre personnes, en liste — forme attendue d'un paramètre lié `ANY(:ids)`."""
-        ...
-
-    def refresh_perimeter_structures(self, conn: Connection) -> None:
+    def refresh(self, conn: Connection) -> None:
         """Recompute la table matérialisée `perimeter_structures` (clôture des tutelles). Idempotent. Commit laissé au caller."""
+        ...
+
+    def persons_structure_ids(self, conn: Connection) -> list[int]:
+        """Structures du périmètre personnes, en liste — forme attendue d'un paramètre lié `ANY(:ids)`."""
         ...

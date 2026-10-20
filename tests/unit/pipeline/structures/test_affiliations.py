@@ -15,23 +15,16 @@ from pipeline.transformation.structures.perimeter import EmptyExtractionPerimete
 PERIMETRE = [10, 20]
 
 
-class _FakePerimeterQueries:
-    def __init__(self, extraction_structures: int = 5) -> None:
-        self.refreshed = 0
-        self.extraction_structures = extraction_structures
-
-    def refresh_perimeter_structures(self, conn) -> None:
-        self.refreshed += 1
-
-    def count_extraction_structures(self, conn) -> int:
-        return self.extraction_structures
-
-    def get_persons_structure_ids_list(self, conn) -> list[int]:
-        return PERIMETRE
+@pytest.fixture(autouse=True)
+def perimetre(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[int]]:
+    """Périmètres lus par la phase : `extraction` et `persons`."""
+    lus = {"extraction": [1, 2, 3, 4, 5], "persons": PERIMETRE}
+    monkeypatch.setattr(phase, "get_extraction_structure_ids", lambda conn: lus["extraction"])
+    monkeypatch.setattr(phase, "get_persons_structure_ids_list", lambda conn: lus["persons"])
+    return lus
 
 
 def _run(contexte, *, processed=7, in_perimeter=3):
-    perimeter = _FakePerimeterQueries()
     vus: dict[str, set[int]] = {}
     with (
         patch.object(
@@ -50,18 +43,15 @@ def _run(contexte, *, processed=7, in_perimeter=3):
     ):
         metrics = phase.AffiliationsPhase(
             object(),
-            perimeter,
             refresh_ror=lambda _ctx: PhaseMetrics(),
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
-    return metrics, perimeter, vus
+    return metrics, vus
 
 
 def test_assemble_les_metriques_de_la_resolution(contexte):
-    metrics, perimeter, _ = _run(contexte, processed=7, in_perimeter=3)
-
-    assert perimeter.refreshed == 0  # `run.py` matérialise le périmètre avant toute phase
+    metrics, _ = _run(contexte, processed=7, in_perimeter=3)
 
     assert metrics.total == 7
     assert metrics.details["summary"] == {"adresses": 7, "in_perimeter": 3}
@@ -74,20 +64,20 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte):
 
 
 def test_les_deux_taches_lisent_le_perimetre_des_personnes(contexte):
-    _, _, vus = _run(contexte)
+    _, vus = _run(contexte)
 
     assert vus["resolution"] == vus["populate"] == set(PERIMETRE)
 
 
-def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
+def test_perimetre_d_extraction_vide_arrete_la_phase(contexte, perimetre):
     """Sans structure dans le périmètre d'extraction, la phase s'arrête avant de résoudre les adresses."""
+    perimetre["extraction"] = []
     with (
         patch.object(phase, "run_resolution") as resolution,
         pytest.raises(EmptyExtractionPerimeterError),
     ):
         phase.AffiliationsPhase(
             object(),
-            _FakePerimeterQueries(extraction_structures=0),
             refresh_ror=lambda _ctx: PhaseMetrics(),
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
@@ -109,7 +99,6 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
     ):
         metrics = phase.AffiliationsPhase(
             object(),
-            _FakePerimeterQueries(),
             refresh_ror=lambda _ctx: ror,
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,

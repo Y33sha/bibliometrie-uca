@@ -1,13 +1,10 @@
 """Périmètres : clôture des tutelles matérialisée dans `perimeter_structures`, lecture des structures d'un périmètre, condition d'exécution des phases qui dépendent du périmètre d'extraction.
 
-`refresh_perimeter_structures` est rejouée en tête de pipeline, avant toute phase, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (port `PerimeterStructuresQueries`, injecté par l'API)."""
+`refresh_perimeter_structures` est rejouée en tête de pipeline, avant toute phase, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (`PerimeterStructures`)."""
 
 from sqlalchemy import Connection, text
 
-from infrastructure.read_models.perimeters import (
-    get_extraction_structure_ids,
-    get_persons_structure_ids_list,
-)
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 
 
 class EmptyExtractionPerimeterError(RuntimeError):
@@ -45,14 +42,11 @@ def refresh_perimeter_structures(conn: Connection) -> None:
     )
 
 
-class PerimeterQueries:
-    """Opérations sur les périmètres : lecture des structures, rematérialisation de la clôture."""
+class PerimeterStructures:
+    """Clôture des tutelles des périmètres : rematérialisation et lecture (port injecté par l'API)."""
 
-    def count_extraction_structures(self, conn: Connection) -> int:
-        return len(get_extraction_structure_ids(conn))
-
-    def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
-        return get_persons_structure_ids_list(conn)
-
-    def refresh_perimeter_structures(self, conn: Connection) -> None:
+    def refresh(self, conn: Connection) -> None:
         refresh_perimeter_structures(conn)
+
+    def persons_structure_ids(self, conn: Connection) -> list[int]:
+        return get_persons_structure_ids_list(conn)

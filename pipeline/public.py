@@ -11,16 +11,18 @@ from pipeline.transformation.publications.publication_perimeter import (
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
 from pipeline.transformation.publishing.pub_counts import PubCountRecompute
 from pipeline.transformation.structures.countries.countries_queries import CountryQueries
-from pipeline.transformation.structures.in_perimeter import InPerimeterRecompute
-from pipeline.transformation.structures.perimeter import PerimeterQueries
+from pipeline.transformation.structures.perimeter import PerimeterStructures
+from pipeline.transformation.structures.perimeter_evidence import (
+    SourceContributionPerimeterRecompute,
+)
 
 __all__ = [
     "PHASE_ORDER",
     "AuthorshipsBuild",
     "CountryQueries",
-    "InPerimeterRecompute",
+    "SourceContributionPerimeterRecompute",
     "JournalRecompute",
-    "PerimeterQueries",
+    "PerimeterStructures",
     "PubCountRecompute",
     "PublicationPerimeterRecompute",
 ]
