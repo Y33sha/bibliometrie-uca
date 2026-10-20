@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions sources (`source_contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 class ContributionRef(TypedDict):
-    """Référence d'une signature source (entrée de `detach_contributions`)."""
+    """Référence d'une contribution source (entrée de `detach_contributions`)."""
 
     source: str
     source_contribution_id: int
@@ -99,7 +99,7 @@ def update_name(
 ) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
-    Le nom est ce par quoi les signatures reviennent à une personne : en changer déplace des publications d'une personne à une autre, d'où l'événement d'audit.
+    Le nom est ce par quoi les contributions sources reviennent à une personne : en changer déplace des publications d'une personne à une autre, d'où l'événement d'audit.
 
     Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
     """
@@ -161,7 +161,7 @@ def add_identifier(
       référence d'un compte HAL, que l'extraction observe dans le TEI, et que personne
       n'attribue à la main ;
     - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
-      promotion depuis les signatures (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
+      promotion depuis les contributions sources (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
       une personne que la cascade vient de créer ou de rapprocher.
     """
     if source == IdentifierOrigin.MANUAL:
@@ -282,7 +282,7 @@ def update_name_form_status(
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des signatures portant cette forme : leurs `source_contributions` sont nullées et les `contributions` consolidées devenues sans source sont supprimées. Les signatures que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL et les `contributions` devenues sans source sont supprimées. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """

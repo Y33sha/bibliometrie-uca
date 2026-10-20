@@ -123,9 +123,9 @@ class PersonOut(BaseModel):
     has_rh: bool
     exclusion: PersonExclusion | None
     source_contribution_count: int
-    """Signatures où la personne tient le rôle d'auteur."""
+    """Contributions sources où la personne tient le rôle d'auteur."""
     in_perimeter_source_contribution_count: int
-    """Celles de ces signatures que le périmètre retient."""
+    """Celles de ces contributions sources que le périmètre retient."""
     identifiers: list[PersonIdentifierOut]
 
 
@@ -281,7 +281,7 @@ class CurationPersonOut(BaseModel):
     last_name: str
     has_rh: bool
     source_contribution_count: int
-    """Signatures où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
+    """Contributions sources où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
     labs: list[str]
 
 

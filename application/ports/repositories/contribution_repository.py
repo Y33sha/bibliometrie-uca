@@ -8,7 +8,7 @@ from typing import Protocol, TypedDict
 
 
 class ContributionPersonRow(TypedDict):
-    """Ligne renvoyée par `get_contribution_person` : identité d'une ligne consolidée `contributions`."""
+    """Ligne renvoyée par `get_contribution_person` : clés d'une ligne de `contributions`."""
 
     id: int
     person_id: int
@@ -16,7 +16,7 @@ class ContributionPersonRow(TypedDict):
 
 
 class AssignedSourceContributionRow(TypedDict):
-    """Ligne renvoyée par `assign_orphan_source_contribution` : source et forme de nom de la signature rattachée."""
+    """Ligne renvoyée par `assign_orphan_source_contribution` : source et forme de nom de la contribution source rattachée."""
 
     source: str
     author_name_normalized: str | None
@@ -25,14 +25,14 @@ class AssignedSourceContributionRow(TypedDict):
 class ContributionRepository(Protocol):
     """Contrat d'accès aux tables contributions et source_contributions."""
 
-    # ── source_contributions : lien personne ↔ signature ─────────────
+    # ── source_contributions : lien personne ↔ contribution source ─────────────
 
     def assign_orphan_source_contribution(
         self,
         person_id: int,
         source_contribution_id: int,
     ) -> AssignedSourceContributionRow | None:
-        """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_contribution_owner` départage."""
+        """Pose `person_id` sur une contribution source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la contribution source est absente ou a déjà un `person_id` — `find_source_contribution_owner` départage."""
         ...
 
     def assign_orphan_source_contributions(
@@ -44,32 +44,32 @@ class ContributionRepository(Protocol):
         ...
 
     def find_source_contribution_owner(self, source_contribution_id: int) -> int | None:
-        """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
+        """`person_id` d'une contribution source. `None` si elle est orpheline ou absente."""
         ...
 
     def get_distinct_name_forms_from_source_contributions(
         self,
         source_contribution_ids: list[int],
     ) -> list[str]:
-        """Les `author_name_normalized` distincts observés dans le lot de signatures."""
+        """Les `author_name_normalized` distincts observés dans le lot de contributions sources."""
         ...
 
     def find_publication_id_for_source_contribution(
         self,
         source_contribution_id: int,
     ) -> int | None:
-        """`publication_id` d'une signature, ou `None` si elle n'existe pas ou n'est pas rattachée à une publication."""
+        """`publication_id` d'une contribution source, ou `None` si elle est absente ou rattachée à aucune publication."""
         ...
 
     def find_publication_ids_for_source_contributions(
         self,
         source_contribution_ids: list[int],
     ) -> list[int]:
-        """Les `publication_id` distincts couverts par un lot de signatures. Sert au pré-contrôle de rejet en batch."""
+        """Les `publication_id` distincts couverts par un lot de contributions sources. Sert au pré-contrôle de rejet en batch."""
         ...
 
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Détache (person_id → NULL) les signatures d'une personne portant une forme de nom donnée, sauf celles que l'admin a épinglées sur elle. Retourne le nombre de signatures détachées."""
+        """Détache (person_id → NULL) les contributions sources d'une personne sous une forme de nom donnée, sauf celles que l'admin a épinglées sur elle. Retourne le nombre de contributions sources détachées."""
         ...
 
     # ── contributions ────────────────────────────────────────────────
@@ -79,29 +79,29 @@ class ContributionRepository(Protocol):
         ...
 
     def reject_contribution(self, publication_id: int, person_id: int) -> None:
-        """Enregistre le rejet d'une paire (publication, personne) sur chaque notice de la publication (`rejected_contributions`) : le rejet suit les notices quand la réconciliation regroupe autrement les publications. Idempotent."""
+        """Enregistre le rejet d'une paire (publication, personne) sur chaque enregistrement source de la publication (`rejected_contributions`) : le rejet suit les enregistrements sources quand la réconciliation regroupe autrement les publications. Idempotent."""
         ...
 
     def find_rejected_contribution(self, publication_id: int, person_id: int) -> datetime | None:
-        """Date du premier rejet de la personne sur une notice de la publication, ou None si la publication n'est pas rejetée pour elle."""
+        """Date du premier rejet de la personne sur un enregistrement source de la publication, ou None si la publication n'est pas rejetée pour elle."""
         ...
 
     def delete_rejected_contribution(self, publication_id: int, person_id: int) -> None:
-        """Lève le rejet d'une paire (publication, personne) sur toutes les notices de la publication. Idempotent."""
+        """Lève le rejet d'une paire (publication, personne) sur tous les enregistrements sources de la publication. Idempotent."""
         ...
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        """Détache toutes les signatures de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de signatures détachées."""
+        """Détache toutes les contributions sources de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de contributions sources détachées."""
         ...
 
     def delete_orphan_contributions_for_person(self, person_id: int) -> int:
-        """Supprime les lignes consolidées de la personne dépourvues de toute signature source active. Retourne le nombre supprimé."""
+        """Supprime les lignes consolidées de la personne dépourvues de toute contribution source active. Retourne le nombre supprimé."""
         ...
 
-    # ── confirmed_source_contributions (épinglage admin, must-link grain signature) ──
+    # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
 
     def pin_contributions(self, source_contribution_ids: list[int], person_id: int) -> None:
-        """Épingle des signatures à une personne dans `confirmed_source_contributions` (résolution admin d'orphelines). Upsert par signature : le dernier épinglage l'emporte."""
+        """Épingle des contributions sources à une personne dans `confirmed_source_contributions` (résolution admin d'orphelines). Upsert par contribution source : le dernier épinglage l'emporte."""
         ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────
@@ -110,11 +110,11 @@ class ContributionRepository(Protocol):
         self,
         address_ids: list[int],
     ) -> list[int]:
-        """Ids des signatures liées à l'une des adresses données (via `source_contribution_addresses`)."""
+        """Ids des contributions sources liées à l'une des adresses données (via `source_contribution_addresses`)."""
         ...
 
-    # ── Recomposition d'une contribution depuis ses signatures ───────
+    # ── Recomposition d'une contribution depuis ses contributions sources ───────
 
     def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
-        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses signatures, par les requêtes de la phase `contributions`."""
+        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses contributions sources, par les requêtes de la phase `contributions`."""
         ...

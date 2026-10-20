@@ -72,7 +72,7 @@ def merge_publishers(
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
 
-    Deux invariants métier refusent la fusion (`ConflictError`), chacun sur une identité déclarée : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
+    Deux invariants métier refusent la fusion (`ConflictError`), chacun sur un identifiant déclaré : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
 
     La détection est côté `journal_repo` (requête sur `journals`), la fusion finale côté `publisher_repo` (transferts + delete).
 
@@ -80,7 +80,7 @@ def merge_publishers(
     """
     load_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
 
-    # 1. Deux identités Crossref distinctes désignent deux éditeurs : la fusion s'arrête là.
+    # 1. Deux membres Crossref distincts désignent deux éditeurs : la fusion s'arrête là.
     if conflict := crossref_member_conflict(
         publisher_repo.crossref_member_ids(target_id),
         publisher_repo.crossref_member_ids(source_id),

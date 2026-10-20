@@ -175,7 +175,7 @@ def update_name_form_status(
     contribution_repo: ContributionRepository,
     audit_repo: AuditRepository,
 ) -> NameFormStatusRow:
-    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les signatures portant la forme. Retourne la ligne {person_id, name_form, status}."""
+    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les contributions sources sous cette forme. Retourne la ligne {person_id, name_form, status}."""
     row = persons_service.update_name_form_status(
         person_id,
         name_form,
