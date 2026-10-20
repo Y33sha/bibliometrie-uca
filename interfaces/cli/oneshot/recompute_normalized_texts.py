@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import normalize_name, normalize_text, to_plain_text
+from domain.normalize import normalize_text, to_plain_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.metadata import normalized_title
 from domain.publishers.names import publisher_name_key
@@ -81,8 +81,8 @@ _COLUMNS = (
     _Column(
         "doi_prefixes", "prefix", "client_name_raw", "client_name_normalized", _plain_normalized
     ),
-    _Column("persons", "id", "last_name", "last_name_normalized", normalize_name),
-    _Column("persons", "id", "first_name", "first_name_normalized", normalize_name),
+    _Column("persons", "id", "last_name", "last_name_normalized", normalize_text),
+    _Column("persons", "id", "first_name", "first_name_normalized", normalize_text),
     _Column("addresses", "id", "raw_text", "normalized_text", normalize_text),
     _Column("subjects", "id", "label", "label_normalized", normalize_text),
 )

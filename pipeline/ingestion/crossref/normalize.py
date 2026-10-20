@@ -1,7 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 Particularités CrossRef :
-- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_records.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
+- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; la phase `metadata_correction` le traduit par `domain.source_records.doc_types._SOURCE_MAPS["crossref"]`. `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 

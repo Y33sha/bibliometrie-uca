@@ -23,10 +23,9 @@ from application.ports.read_models.persons_queries import (
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
-from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from infrastructure.read_models.sql_fragments import name_form_holder, other_name_form_holders
-from infrastructure.sql_fragments import has_author_role, identifier_neutralized, in_clause
+from infrastructure.sql_fragments import has_author_role, identifier_neutralized
 
 # ── Name-form contributions ────────────────────────────────────────
 
@@ -36,14 +35,13 @@ def name_form_contributions(
 ) -> NameFormContributionsResponse:
     """Contributions sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
-        text(f"""
+        text("""
             SELECT sc.source, sc.id AS source_contribution_id,
                    sr.publication_id, sr.title, sr.publication_year, sr.doi
             FROM source_contributions sc
             JOIN contributor_information ci ON ci.id = sc.contributor_information_id
             JOIN source_records sr ON sr.id = sc.source_record_id
             WHERE sc.person_id = :pid AND ci.author_name_normalized = :nf
-              AND sc.source IN {in_clause(AUTHOR_SOURCES)}
             ORDER BY sr.publication_year DESC, sr.title
         """),
         {"pid": person_id, "nf": name_form},

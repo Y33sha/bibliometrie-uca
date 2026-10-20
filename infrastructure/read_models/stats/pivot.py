@@ -71,7 +71,7 @@ _MEASURE_JOIN: dict[str, str] = {
     ),
 }
 
-# Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et réciproquement ; idem pour les mesures. Les dimensions filtrables-seules (APC, labo) n'ont pas de groupement — leur filtrage vit dans `filters.py`.
+# Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et réciproquement ; idem pour les mesures. Les dimensions seulement filtrables (type de document, APC) n'ont pas de groupement — leur filtrage vit dans `filters.py`.
 _GROUPABLE = {key for key, dim in DIMENSIONS.items() if dim.groupable}
 assert set(_DIM_EXPR) == _GROUPABLE, "liaison SQL des dimensions désynchronisée du registre"
 assert set(_MEASURE_AGG) == set(MEASURES), "liaison SQL des mesures désynchronisée du registre"

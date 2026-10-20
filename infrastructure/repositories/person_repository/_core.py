@@ -3,7 +3,7 @@
 from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
-from domain.normalize import normalize_name
+from domain.normalize import normalize_text
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 from domain.persons.name_forms import PersonNameForm
@@ -76,8 +76,8 @@ def create(conn: Connection, last_name: str, first_name: str = "") -> int:
             {
                 "ln": last_name,
                 "fn": first_name,
-                "lnn": normalize_name(last_name),
-                "fnn": normalize_name(first_name),
+                "lnn": normalize_text(last_name),
+                "fnn": normalize_text(first_name),
             },
         )
     )
@@ -93,8 +93,8 @@ def update_name(conn: Connection, person_id: int, last_name: str, first_name: st
         {
             "ln": last_name,
             "fn": first_name,
-            "lnn": normalize_name(last_name),
-            "fnn": normalize_name(first_name),
+            "lnn": normalize_text(last_name),
+            "fnn": normalize_text(first_name),
             "id": person_id,
         },
     )

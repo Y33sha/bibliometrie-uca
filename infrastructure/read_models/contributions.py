@@ -13,16 +13,14 @@ from application.ports.read_models.contributions_queries import (
 )
 from application.ports.read_models.publications_queries import PublicationLabItem
 from domain.persons.contributor_name import ContributorName
-from domain.sources.registry import AUTHOR_SOURCES
 from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import has_author_role, in_clause
+from infrastructure.sql_fragments import has_author_role
 
-# Une contribution source est orpheline quand elle est rattachée à aucune personne, dans le périmètre et sous un rôle d'auteur d'une source principale : c'est la matière que la file de rattachement présente.
+# Une contribution source est orpheline quand elle est rattachée à aucune personne, dans le périmètre et sous un rôle d'auteur : c'est la matière que la file de rattachement présente.
 _ORPHAN_BASE = f"""
     sc.person_id IS NULL AND sc.in_perimeter = TRUE
-    AND sc.source IN {in_clause(AUTHOR_SOURCES)}
     AND {has_author_role("sc")}
 """
 

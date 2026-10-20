@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
-from domain.normalize import clean_raw_author_name, normalize_name
+from domain.normalize import clean_raw_author_name, normalize_text
 from domain.persons.name_matching import (
     family_name_splits,
     normalize_first_name,
@@ -86,16 +86,16 @@ class ContributorName:
 
     def first_name_for(self, last_name: str) -> str | None:
         """Prénom d'un découpage dont le nom de famille est `last_name`, `None` sinon."""
-        target = normalize_name(last_name)
+        target = normalize_text(last_name)
         for last, first in self.splits():
-            if normalize_name(last) == target:
+            if normalize_text(last) == target:
                 return first
         return None
 
     def normalized(self) -> tuple[str, str | None]:
         """(nom de famille, prénom) normalisés, initiales du prénom séparées (`normalize_first_name`). Prénom `None` quand il est vide."""
         last, first = self.split()
-        return normalize_name(last), normalize_first_name(first) or None
+        return normalize_text(last), normalize_first_name(first) or None
 
     def display(self) -> str:
         """Forme « Prénom Nom », ou la chaîne brute."""

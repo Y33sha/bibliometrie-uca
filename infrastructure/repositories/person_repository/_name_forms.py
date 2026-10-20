@@ -9,10 +9,8 @@ from sqlalchemy import Connection, text
 
 from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import ConflictError, NotFoundError
-from domain.normalize import normalize_name
+from domain.normalize import normalize_text
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from domain.sources.registry import AUTHOR_SOURCES
-from infrastructure.sql_fragments import in_clause
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
@@ -42,7 +40,7 @@ def add_name_form(
     """Pose le couple `(name_form, person_id)` avec `sources = [source]` (vide si `source` est None) ; sur conflit, fusionne avec les sources existantes."""
     if not full_name or not full_name.strip():
         return
-    norm = normalize_name(full_name)
+    norm = normalize_text(full_name)
     if not norm:
         return
     add_person_source(conn, name_form=norm, person_id=person_id, source=source)
@@ -87,7 +85,6 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
                   JOIN contributor_information ci ON ci.id = sc.contributor_information_id
                   WHERE sc.person_id = :pid
                     AND ci.author_name_normalized = pnf.name_form
-                    AND sc.source IN {in_clause(AUTHOR_SOURCES)}
               )
         """),
         {"pid": person_id},

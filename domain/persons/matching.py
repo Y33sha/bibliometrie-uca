@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, NamedTuple
 
-from domain.normalize import normalize_name
+from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.name_matching import (
@@ -128,7 +128,7 @@ def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesa
         return [
             n.person_id for n in namesakes if initials_extend(contributor_initials, n.first_name)
         ]
-    if not normalize_name(contributor_first_name):
+    if not normalize_text(contributor_first_name):
         return []
     candidates = []
     for n in namesakes:
@@ -153,7 +153,7 @@ def compatible_persons(
     """
     found: list[int] = []
     for last, first in source_contribution.splits():
-        namesakes = namesakes_by_last_name.get(normalize_name(last), ())
+        namesakes = namesakes_by_last_name.get(normalize_text(last), ())
         for person_id in compatible_namesakes(first, namesakes):
             if person_id not in found:
                 found.append(person_id)
@@ -177,7 +177,7 @@ def attested_full_first_names(
             continue
         if not initials_extend(initials, contributor_first_name):
             continue
-        spellings.setdefault(normalize_name(contributor_first_name), Counter())[
+        spellings.setdefault(normalize_text(contributor_first_name), Counter())[
             contributor_first_name
         ] += 1
     return {

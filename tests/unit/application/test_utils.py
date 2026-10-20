@@ -2,52 +2,52 @@
 
 import pytest
 
-from domain.normalize import normalize_name
+from domain.normalize import normalize_text
 from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
 )
 from domain.publications.identifiers import clean_doi
 
-# ── normalize_name ──
+# ── normalize_text ──
 
 
 class TestNormalizeName:
     def test_accents(self):
-        assert normalize_name("José García") == "jose garcia"
+        assert normalize_text("José García") == "jose garcia"
 
     def test_punctuation(self):
         # L'apostrophe est remplacée par un espace
-        assert normalize_name("O'Brien-Smith") == "o brien smith"
+        assert normalize_text("O'Brien-Smith") == "o brien smith"
 
     def test_none(self):
-        assert normalize_name(None) == ""
+        assert normalize_text(None) == ""
 
     def test_empty(self):
-        assert normalize_name("") == ""
+        assert normalize_text("") == ""
 
     def test_uppercase(self):
-        assert normalize_name("DUPONT") == "dupont"
+        assert normalize_text("DUPONT") == "dupont"
 
     def test_digits_kept(self):
-        # normalize_name conserve les chiffres
-        assert normalize_name("Jean2") == "jean2"
+        # normalize_text conserve les chiffres
+        assert normalize_text("Jean2") == "jean2"
 
     def test_multiple_spaces(self):
-        assert normalize_name("  Jean   Dupont  ") == "jean dupont"
+        assert normalize_text("  Jean   Dupont  ") == "jean dupont"
 
     def test_unicode_hyphen(self):
         """Les tirets Unicode (U+2010, U+2013, etc.) doivent être traités
         comme le tiret ASCII — sinon les mots sont collés et les formes
         de nom divergent (bug doublons Abeywickrama‐Samarakoon)."""
-        assert normalize_name("Abeywickrama\u2010Samarakoon") == "abeywickrama samarakoon"
-        assert normalize_name("Abeywickrama\u2013Samarakoon") == "abeywickrama samarakoon"
-        assert normalize_name("Abeywickrama-Samarakoon") == "abeywickrama samarakoon"
+        assert normalize_text("Abeywickrama\u2010Samarakoon") == "abeywickrama samarakoon"
+        assert normalize_text("Abeywickrama\u2013Samarakoon") == "abeywickrama samarakoon"
+        assert normalize_text("Abeywickrama-Samarakoon") == "abeywickrama samarakoon"
 
     def test_unicode_apostrophe(self):
         """Les apostrophes typographiques doivent être traitées comme l'apostrophe ASCII."""
-        assert normalize_name("O\u2019Brien") == "o brien"
-        assert normalize_name("O'Brien") == "o brien"
+        assert normalize_text("O\u2019Brien") == "o brien"
+        assert normalize_text("O'Brien") == "o brien"
 
 
 # ── clean_doi ──

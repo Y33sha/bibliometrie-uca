@@ -1,6 +1,6 @@
 """Exceptions métier du domaine bibliométrique.
 
-Ces exceptions sont levées par la couche services/ pour signaler des situations métier sans dépendre de FastAPI. La traduction en codes HTTP se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
+Ces exceptions signalent des situations métier sans dépendre de FastAPI. La traduction en codes HTTP se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
 """
 
 from typing import TypedDict
@@ -25,7 +25,7 @@ class ConflictError(DomainError):
 class CannotAttributeConflict(ConflictError):
     """Tentative d'attribution d'un identifiant déjà attribué à une autre personne avec un statut `pending` ou `confirmed`. Pour réattribuer, le statut existant doit d'abord passer à `rejected`.
 
-    Porte, quand ils sont disponibles, les champs structurés du conflit (type et valeur de l'identifiant, personne détentrice et son statut) : le path batch de la cascade personnes les collecte pour arbitrer un transfert par consensus. Le chemin admin unitaire les ignore (refus strict → 409)."""
+    Contient, quand ils sont disponibles, les champs structurés du conflit : type et valeur de l'identifiant, personne détentrice et son statut."""
 
     def __init__(
         self,
@@ -78,10 +78,6 @@ class ContributionAlreadyAssignedError(ConflictError):
             f"La contribution source #{contribution_id} est déjà attribuée à la personne "
             f"#{owner_person_id} ; seule une contribution source orpheline peut être attribuée."
         )
-
-
-class UnauthorizedError(DomainError):
-    """Accès refusé : session invalide ou permissions insuffisantes (→ HTTP 401)."""
 
 
 class RejectedPair(TypedDict):
