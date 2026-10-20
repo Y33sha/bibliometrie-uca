@@ -703,7 +703,7 @@ class WosNormalizer(BibliographicNormalizer):
         return as_str(rec.get("title")), as_int(rec.get("pub_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._require_repos()
+        container_repo, publisher_repo = self._container_repo, self._publisher_repo
         return process_record(
             conn,
             self._queries,

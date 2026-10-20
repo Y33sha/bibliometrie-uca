@@ -691,8 +691,8 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        container_repo_factory=lambda c: MagicMock(),
-        publisher_repo_factory=lambda c: MagicMock(),
+        container_repo=MagicMock(),
+        publisher_repo=MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
     )
 
@@ -705,15 +705,8 @@ class TestHalNormalizerClass:
             staging_row(raw={"title_s": ["T"], "producedDateY_i": 2024})
         ) == ("T", 2024)
 
-    def test_preload_caches_sets_repos(self):
-        norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
-        assert norm._container_repo is not None
-        assert norm._publisher_repo is not None
-
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
         result = norm.normalize_record(MagicMock(), staging_row())
         assert result is True

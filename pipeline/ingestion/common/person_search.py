@@ -22,10 +22,10 @@ from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
-    scoped_logger,
     stage_document,
 )
 from pipeline.runtime.observability.libelles import accord, forme
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 

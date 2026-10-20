@@ -219,8 +219,8 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
             logger,
             StagingQueries(raw_store),
             SourcePublicationQueries(),
-            container_repo_factory=ContainerGatewayQueries,
-            publisher_repo_factory=PublisherGatewayQueries,
+            container_repo=ContainerGatewayQueries(conn),
+            publisher_repo=PublisherGatewayQueries(conn),
             authorship_queries=AuthorshipsBatchQueries(),
         )
 

@@ -20,10 +20,10 @@ from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
-    scoped_logger,
     stage_document,
 )
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression, progression
 

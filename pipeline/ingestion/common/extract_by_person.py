@@ -18,8 +18,11 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.common.extract import Extracteur
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvest import (
+    ExtractionConfigError,
+    Extractor,
+    ExtractorFactory,
+)
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -90,9 +93,6 @@ class ExtractByPersonPhase:
 # ── Câblage ───────────────────────────────────────────────────
 
 
-type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
-
-
 def build() -> Phase:
     from pipeline.runtime.parallel import run_parallel
 
@@ -111,17 +111,17 @@ def build() -> Phase:
     return ExtractByPersonPhase(search_one=search_one, run_parallel=run_parallel)
 
 
-def _extractors() -> dict[str, ConstructeurExtracteur]:
+def _extractors() -> dict[str, ExtractorFactory]:
     """Constructeur de l'extracteur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
     from pipeline.ingestion.api_params import API_BASE_URLS
 
-    def datacite(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def datacite(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.datacite.harvest import DataciteClient
         from pipeline.ingestion.datacite.person_search import DatacitePersonExtractor
 
         return DatacitePersonExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
 
-    def crossref(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def crossref(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.crossref.person_search import (
             CrossrefClient,
             CrossrefPersonExtractor,
@@ -129,19 +129,19 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
         return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
 
-    def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def openalex(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.openalex.harvest import OpenalexClient
         from pipeline.ingestion.openalex.person_search import OpenalexPersonExtractor
 
         return OpenalexPersonExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
-    def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def hal(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.hal.harvest import HalClient
         from pipeline.ingestion.hal.person_search import HalPersonExtractor
 
         return HalPersonExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
-    def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def scanr(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.harvest import ScanrClient
         from pipeline.ingestion.scanr.person_search import ScanrPersonExtractor

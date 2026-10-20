@@ -555,7 +555,7 @@ class OpenalexNormalizer(BibliographicNormalizer):
         return title, as_int(work.get("publication_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._require_repos()
+        container_repo, publisher_repo = self._container_repo, self._publisher_repo
         return process_work(
             conn,
             self._queries,

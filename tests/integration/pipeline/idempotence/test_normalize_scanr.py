@@ -180,11 +180,10 @@ def run_normalize_scanr(conn):
         logger,
         staging_queries,
         queries,
-        container_repo_factory=ContainerGatewayQueries,
-        publisher_repo_factory=PublisherGatewayQueries,
+        container_repo=ContainerGatewayQueries(conn),
+        publisher_repo=PublisherGatewayQueries(conn),
         authorship_queries=authorship_queries,
     )
-    normalizer.preload_caches(conn)
 
     rows = conn.execute(
         text("""

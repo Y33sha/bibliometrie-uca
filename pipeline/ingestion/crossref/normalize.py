@@ -426,7 +426,7 @@ class CrossrefNormalizer(BibliographicNormalizer):
         return get_title(row.raw_data), get_pub_year(row.raw_data)
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_repo = self._require_repos()
+        container_repo, publisher_repo = self._container_repo, self._publisher_repo
         return process_work(
             conn,
             self._queries,

@@ -24,7 +24,6 @@ from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     ExtractLogger,
     SourceExtractor,
-    scoped_logger,
     stage_document,
 )
 from pipeline.ingestion.wos.fields import (
@@ -34,6 +33,7 @@ from pipeline.ingestion.wos.fields import (
     get_records,
     get_records_found,
 )
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
