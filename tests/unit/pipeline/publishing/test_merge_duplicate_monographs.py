@@ -3,10 +3,10 @@
 import logging
 
 from domain.monographs.matching import MonographCandidate
+from pipeline.transformation.publishing.monographs import merge_duplicate_monographs as step
 from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
-    run_merge_duplicate_monographs,
+    MonographTitleGroup,
 )
-from pipeline.transformation.publishing.monographs.monographs import MonographTitleGroup
 
 
 class _Repo:
@@ -21,7 +21,17 @@ class _Repo:
         self.merged.append((target_id, source_id))
 
 
-def test_monographie_sans_editeur_fusionnee_et_journalisee(caplog):
+def _run(monkeypatch, logger, repo: _Repo):
+    monkeypatch.setattr(
+        step, "find_monographs_sharing_a_title", lambda conn: repo.find_monographs_sharing_a_title()
+    )
+    monkeypatch.setattr(
+        step, "merge_monograph_into", lambda conn, t, s: repo.merge_monograph_into(t, s)
+    )
+    return step.run_merge_duplicate_monographs(None, logger)
+
+
+def test_monographie_sans_editeur_fusionnee_et_journalisee(caplog, monkeypatch):
     logger = logging.getLogger("test_monographies_en_double")
     group = MonographTitleGroup(
         "Pascal intempestif",
@@ -32,15 +42,15 @@ def test_monographie_sans_editeur_fusionnee_et_journalisee(caplog):
     )
     repo = _Repo([group])
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_merge_duplicate_monographs(logger, monograph_repo=repo)
+        metrics = _run(monkeypatch, logger, repo)
     assert repo.merged == [(2, 1)]
     assert metrics.extras["monographs_merged"] == 1
     assert "Monographie 1 fusionnée dans 2 : « Pascal intempestif »" in caplog.text
 
 
-def test_sans_doublon_rien_n_est_journalise(caplog):
+def test_sans_doublon_rien_n_est_journalise(caplog, monkeypatch):
     logger = logging.getLogger("test_monographies_en_double_aucune")
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_merge_duplicate_monographs(logger, monograph_repo=_Repo([]))
+        metrics = _run(monkeypatch, logger, _Repo([]))
     assert metrics.total == 0
     assert caplog.text == ""

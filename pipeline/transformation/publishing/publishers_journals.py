@@ -41,7 +41,6 @@ from pipeline.runtime.config import get_doaj_refresh_after_days
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
@@ -82,7 +81,6 @@ from pipeline.transformation.publishing.monographs.link_monographs_to_collection
 from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
     run_merge_duplicate_monographs,
 )
-from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
@@ -340,27 +338,21 @@ def _run_merge_duplicate_monographs(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_merge_duplicate_monographs(
-            ctx.logger, monograph_repo=MonographGatewayQueries(conn)
-        )
+        return run_merge_duplicate_monographs(conn, ctx.logger)
 
 
 def _run_link_monographs_to_collections(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_link_monographs_to_collections(
-            ctx.logger, monograph_repo=ContainerGatewayQueries(conn)
-        )
+        return run_link_monographs_to_collections(conn, ctx.logger)
 
 
 def _run_type_proceedings_volumes(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_type_proceedings_volumes(
-            ctx.logger, monograph_repo=MonographGatewayQueries(conn)
-        )
+        return run_type_proceedings_volumes(conn, ctx.logger)
 
 
 def _run_type_proceedings_journals(

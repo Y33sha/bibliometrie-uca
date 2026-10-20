@@ -5,9 +5,8 @@ import logging
 from domain.journals.journal import JournalType
 from pipeline.transformation.publishing.monographs import link_monographs_to_collections as mod
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
-    run_link_monographs_to_collections,
+    MonographJournalCandidates,
 )
-from pipeline.transformation.publishing.monographs.monographs import MonographJournalCandidates
 
 
 class _Repo:
@@ -25,7 +24,20 @@ class _Repo:
         self.typed = (journal_id, journal_type)
 
 
-def test_rattachements_et_conflits_journalises(caplog):
+def _run(monkeypatch, logger, repo: _Repo):
+    monkeypatch.setattr(
+        mod,
+        "find_monograph_journal_candidates",
+        lambda conn: repo.find_monograph_journal_candidates(),
+    )
+    monkeypatch.setattr(
+        mod, "set_monograph_journal", lambda conn, m, j: repo.set_monograph_journal(m, j)
+    )
+    monkeypatch.setattr(mod, "JournalGatewayQueries", lambda conn: repo)
+    return mod.run_link_monographs_to_collections(None, logger)
+
+
+def test_rattachements_et_conflits_journalises(caplog, monkeypatch):
     logger = logging.getLogger("test_collections_des_monographies")
     repo = _Repo(
         [
@@ -35,7 +47,7 @@ def test_rattachements_et_conflits_journalises(caplog):
         ]
     )
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_link_monographs_to_collections(logger, monograph_repo=repo)
+        metrics = _run(monkeypatch, logger, repo)
     assert repo.set == [(12, 7)]
     assert metrics.extras == {
         "monographs_linked": 1,
@@ -61,17 +73,17 @@ def test_volumes_d_une_serie_rattaches_a_la_serie(monkeypatch):
             MonographJournalCandidates(2, "NuFACT 2023", 3, True, 92, (), (92,)),
         ]
     )
-    metrics = run_link_monographs_to_collections(logging.getLogger("t"), monograph_repo=repo)
+    metrics = _run(monkeypatch, logging.getLogger("t"), repo)
     assert created == [("NuFACT", 3)]
     assert repo.typed == (500, JournalType.PROCEEDINGS)
     assert repo.set == [(1, 500), (2, 500)]
     assert metrics.extras["monograph_series"] == 1
 
 
-def test_sans_changement_rien_n_est_journalise(caplog):
+def test_sans_changement_rien_n_est_journalise(caplog, monkeypatch):
     logger = logging.getLogger("test_collections_des_monographies_aucune")
     repo = _Repo([MonographJournalCandidates(14, "Déjà rattachée", None, False, 7, (7,), ())])
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_link_monographs_to_collections(logger, monograph_repo=repo)
+        metrics = _run(monkeypatch, logger, repo)
     assert metrics.total == 0
     assert caplog.text == ""

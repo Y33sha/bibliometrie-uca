@@ -43,7 +43,6 @@ from pipeline.transformation.publishing.monographs import delete_empty_monograph
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
-from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 from pipeline.transformation.publishing.pub_counts import PgPubCountsQueries
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
@@ -252,7 +251,7 @@ def build() -> Phase:
 
 def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_delete_empty_monographs(ctx.logger, monograph_repo=MonographGatewayQueries(conn))
+        return run_delete_empty_monographs(conn, ctx.logger)
 
 
 def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
