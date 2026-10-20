@@ -171,7 +171,7 @@ def run_refresh_ror(
         logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", DERNIERE_BRANCHE, e)
         signal_source_unavailable(metrics, "ROR", logger=logger, phase="affiliations")
         metrics.details["ror"] = {"imported": False, "error": str(e)}
-        metrics.resume = "dump ROR inaccessible, import repris au prochain run"
+        metrics.report = "dump ROR inaccessible, import repris au prochain run"
         return metrics
     logger.info(
         "%sVersion %s importée : %d organisations, %d relations",

@@ -104,7 +104,7 @@ def _resolve(
     }
     resolus = metrics.extras.get("resolved", 0)
     total = metrics.total
-    metrics.resume = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
+    metrics.report = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
     return metrics
 
 
@@ -128,4 +128,5 @@ def build() -> Phase:
             DoiPrefixesQueries,
             lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
         ),
+        label="Bilan",
     )

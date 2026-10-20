@@ -136,4 +136,4 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
 def build() -> Phase:
     """Relit les works OpenAlex tronqués à 100 auteurs, par l'accès à OpenAlex."""
 
-    return NodePhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase())
+    return NodePhase("fetch_truncated.refetch_openalex", FetchTruncatedPhase(), label="Bilan")

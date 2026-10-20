@@ -147,7 +147,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
             m = PhaseMetrics()
             if n:
                 m.add(journals_deleted=n)
-                m.resume = f"{n} supprimées"
+                m.report = f"{n} supprimées"
             return m
 
         return run

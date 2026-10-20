@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, ClassVar, NamedTuple, cast
 from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.source_publications import SourcePublicationQueries
@@ -268,7 +268,11 @@ class NormalizePhase:
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
             f"normalize.{source}": NodeStep(
-                self._normalize_node(source), section="Normalisation", when=_retenue(source)
+                self._normalize_node(source),
+                section="Normalisation",
+                label=source_label(source),
+                progress_bar=True,
+                when=_retenue(source),
             )
             for source in sources
         }
@@ -292,7 +296,6 @@ class NormalizePhase:
         metrics = PhaseMetrics()
         normalises = sum(cast("int", row["processed"]) for row in rows)
         metrics.add(seen=normalises)
-        metrics.resume = f"{accord(normalises, 'document normalisé', 'documents normalisés')}"
         metrics.details["table"] = {"rows": rows}
         metrics.details["disappeared_pruned"] = by_node["normalize.prune_disappeared"].extras.get(
             "disappeared", 0
@@ -332,14 +335,14 @@ class NormalizePhase:
         supprimees = self.cleanup_orphan_identities(ctx)
         metrics = PhaseMetrics()
         if supprimees:
-            metrics.resume = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
+            metrics.report = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
         return metrics
 
     def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         supprimees = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
         if supprimees:
-            metrics.resume = f"{accord(supprimees, 'adresse supprimée', 'adresses supprimées')}"
+            metrics.report = f"{accord(supprimees, 'adresse supprimée', 'adresses supprimées')}"
         return metrics
 
 

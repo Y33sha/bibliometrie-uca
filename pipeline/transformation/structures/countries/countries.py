@@ -99,8 +99,6 @@ class CountriesPhase:
             "newly_attached": final.with_country - initial.with_country,
             "remaining": total - final.with_country,
         }
-        # Chaque sous-étape journalise ce qu'elle a résolu : une ligne de clôture les répéterait.
-        metrics.resume = ""
         return metrics
 
 

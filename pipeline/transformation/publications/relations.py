@@ -218,8 +218,6 @@ class RelationsPhase:
         metrics.details["table"] = {
             "rows": [{"key": relation_type, "count": count} for relation_type, count in by_type]
         }
-        # La sous-étape journalise le détail des nouvelles relations : une ligne de clôture le répéterait.
-        metrics.resume = ""
         return metrics
 
 

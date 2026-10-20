@@ -270,7 +270,7 @@ def run_refresh_hal_structures(
         queries.rebuild_relations()
         conn.commit()
         signal_source_unavailable(metrics, "hal", logger=logger, phase="affiliations")
-        metrics.resume = "référentiel HAL inaccessible, chargement repris au prochain run"
+        metrics.report = "référentiel HAL inaccessible, chargement repris au prochain run"
         return metrics
     queries.rebuild_relations()
     conn.commit()

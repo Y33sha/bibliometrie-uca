@@ -50,5 +50,5 @@ def run_type_proceedings_volumes(
         monographs_to_books=len(to_books),
     )
     volumes = accord(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
-    metrics.resume = f"{volumes}, {accord(len(to_books), 'livre reconnu', 'livres reconnus')}"
+    metrics.report = f"{volumes}, {accord(len(to_books), 'livre reconnu', 'livres reconnus')}"
     return metrics

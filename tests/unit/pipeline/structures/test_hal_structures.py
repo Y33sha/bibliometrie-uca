@@ -113,4 +113,4 @@ def test_source_indisponible_garde_les_lots_enregistres():
 
     conn.rollback.assert_called_once()
     queries.rebuild_relations.assert_called_once()
-    assert metrics.resume
+    assert metrics.report

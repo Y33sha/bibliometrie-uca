@@ -26,7 +26,7 @@ from datetime import date, timedelta
 from typing import TYPE_CHECKING, Protocol
 
 from domain.dates import date_to_french, today
-from domain.sources.registry import HARVESTED_SOURCES
+from domain.sources.registry import HARVESTED_SOURCES, source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
@@ -126,6 +126,8 @@ class ExtractPhase:
                 f"extract.{source}": NodeStep(
                     node(source),
                     section="Moissonnage par affiliation",
+                    label=source_label(source),
+                    progress_bar=True,
                     threshold=5,
                     when=retenue(source),
                 )

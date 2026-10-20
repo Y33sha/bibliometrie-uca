@@ -111,7 +111,7 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
 
 def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     """Reporte dans `metrics` les métriques des sous-étapes, dans l'ordre de leur exécution."""
-    # Les compteurs et signaux des sous-étapes remontent à la phase : le log (`as_summary()`), l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
+    # Les compteurs et signaux des sous-étapes remontent à la phase : l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
     for sub in by_step.values():
         metrics.merge(sub)
 
@@ -130,8 +130,6 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     metrics.details["summary"] = {
         "doaj_matched": by_step["enrich_journals_from_doaj"].extras.get("matched", 0)
     }
-    # Chaque sous-étape a écrit sa ligne ; la table d'observabilité garde le détail.
-    metrics.resume = ""
 
 
 # ── Câblage ───────────────────────────────────────────────────

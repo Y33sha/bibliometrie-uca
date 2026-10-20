@@ -61,7 +61,6 @@ class PublicationsPhase:
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
             summary["pub_total"] = pub_total
-        metrics.resume = ""
         return metrics
 
 

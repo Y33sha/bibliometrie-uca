@@ -50,8 +50,6 @@ class MetadataCorrectionPhase:
         counts = list(unary.extras.items()) + list(cluster.extras.items())
         counts.sort(key=lambda kc: kc[1], reverse=True)
         metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
-        # Chaque nœud conclut sa section ; la table d'observabilité garde le détail.
-        metrics.resume = ""
         return metrics
 
     def _steps(self) -> dict[str, NodeStep]:
