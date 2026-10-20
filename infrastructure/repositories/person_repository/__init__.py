@@ -1,6 +1,6 @@
 """Adapter PostgreSQL pour l'agrégat Person.
 
-Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un point d'agrégation qui borne la connexion et délègue.
+Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms`. `PgPersonRepository` borne la connexion et délègue. Le renommage et l'attribution d'un identifiant y appliquent les règles de `domain.persons`, pour l'API comme pour la phase `persons`.
 
 Usage :
     repo = PgPersonRepository(conn)
@@ -12,6 +12,19 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Connection
 
 from application.ports.repositories.person_repository import PersonRepository
+from domain.persons.identifier_attribution import (
+    AttributionOutcome,
+    AttributionResult,
+    IdentifierAttribution,
+    attribution_outcome,
+)
+from domain.persons.identifiers import (
+    AttributionStatus,
+    IdentifierOrigin,
+    normalized_identifier_value,
+)
+from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.person import validated_name
 from infrastructure.repositories.person_repository import (
     _core,
     _identifiers,
@@ -32,7 +45,6 @@ if TYPE_CHECKING:
         IdentifierStatusRow,
         NameFormStatusRow,
     )
-    from domain.persons.identifier_attribution import IdentifierAttribution
     from domain.persons.person import Person, PersonExclusion
 
 
@@ -52,6 +64,12 @@ class PgPersonRepository(PersonRepository):
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         _core.update_name(self._conn, person_id, last_name, first_name)
+
+    def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
+        last_name, first_name = validated_name(last_name, first_name)
+        self.update_name(person_id, last_name, first_name)
+        self.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+        return last_name, first_name
 
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
         _core.set_exclusion(self._conn, person_id, exclusion)
@@ -79,6 +97,28 @@ class PgPersonRepository(PersonRepository):
 
     def update_identifier(self, ident: "IdentifierAttribution") -> None:
         _identifiers.update_identifier(self._conn, ident)
+
+    def attribute_identifier(
+        self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
+    ) -> AttributionResult:
+        id_value = normalized_identifier_value(id_type, id_value)
+        existing = self.find_identifier(id_type, id_value)
+        outcome = attribution_outcome(existing, person_id)
+        if outcome is AttributionOutcome.ADDED:
+            self.insert_identifier(
+                IdentifierAttribution(
+                    id=None,
+                    person_id=person_id,
+                    id_type=id_type,
+                    id_value=id_value,
+                    status=AttributionStatus.PENDING,
+                    source=source,
+                )
+            )
+        elif existing is not None and outcome is AttributionOutcome.REASSIGNED:
+            existing.reattribute_to(person_id, source=source)
+            self.update_identifier(existing)
+        return AttributionResult(outcome, id_value, existing)
 
     def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
         return _identifiers.update_identifier_status(self._conn, ident_id, status)

@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. La phase `persons` du pipeline a ses propres écritures (`pipeline/transformation/persons/person_writes.py`), sur les mêmes règles du domaine.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging
@@ -21,15 +21,12 @@ from application.services.authorships.core import reject_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
-    IdentifierAttribution,
-    attribution_outcome,
     held_elsewhere_conflict,
 )
 from domain.persons.identifiers import (
     PUBLIC_PERSON_IDENTIFIER_TYPES,
     AttributionStatus,
     IdentifierOrigin,
-    normalized_identifier_value,
 )
 from domain.persons.merge import merge_roles
 from domain.persons.name_forms import compute_person_name_forms
@@ -106,9 +103,7 @@ def update_name(
 
     Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
     """
-    last_name, first_name = validated_name(last_name, first_name)
-    repo.update_name(person_id, last_name, first_name)
-    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+    last_name, first_name = repo.rename(person_id, last_name, first_name)
     emit_event(
         audit_repo,
         "person.name_updated",
@@ -157,12 +152,7 @@ def add_identifier(
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
-    L'issue suit la règle du domaine (`attribution_outcome`) : insertion en `pending`, rien à faire, ou reprise d'un identifiant rejeté chez une autre personne. Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
-
-    La valeur est validée et normalisée via le value object du type
-    (`normalized_identifier_value`) avant lookup et écriture, de sorte que la même
-    forme canonique sert aux deux et soit renvoyée dans le résultat. Lève
-    `ValidationError` si elle est malformée.
+    L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`, `ValidationError` sur une valeur malformée.
 
     `IdentifierOrigin.MANUAL` désigne l'attribution par une utilisatrice, et resserre deux gardes que
     l'appel automatique n'a pas lieu de payer :
@@ -179,29 +169,14 @@ def add_identifier(
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
         if repo.find_by_id(person_id) is None:
             raise NotFoundError(f"Personne {person_id} introuvable")
-    id_value = normalized_identifier_value(id_type, id_value)
-    existing = repo.find_identifier(id_type, id_value)
-    outcome = attribution_outcome(existing, person_id)
-
+    outcome, id_value, existing = repo.attribute_identifier(
+        person_id, id_type, id_value, source=source
+    )
     if existing is not None and outcome is AttributionOutcome.HELD_ELSEWHERE:
         raise held_elsewhere_conflict(existing, person_id)
     if outcome is AttributionOutcome.ALREADY_EXISTS:
         # Rien n'a changé : l'appel est idempotent, aucune décision n'a été prise.
         return AddIdentifierResult(outcome, id_value)
-    if existing is None:
-        repo.insert_identifier(
-            IdentifierAttribution(
-                id=None,
-                person_id=person_id,
-                id_type=id_type,
-                id_value=id_value,
-                status=AttributionStatus.PENDING,
-                source=source,
-            )
-        )
-    else:
-        existing.reattribute_to(person_id, source=source)
-        repo.update_identifier(existing)
     return _identifiant_ajoute(audit_repo, person_id, id_type, id_value, outcome)
 
 
