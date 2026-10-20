@@ -37,7 +37,6 @@ from pipeline.ingestion.common.failed_lookups import (
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import branche_de_source, rien_a_faire
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -45,9 +44,9 @@ from pipeline.runtime.observability.progression import progression
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.runtime.parallel import RunParallel
 
-FetchChannel = Callable[[], PhaseMetrics]
+FetchChannel = Callable[[PhaseContext], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
-FetchDoiOne = Callable[[str, SourceCircuitBreaker], PhaseMetrics]
+FetchDoiOne = Callable[[PhaseContext, str, SourceCircuitBreaker], PhaseMetrics]
 """Recherche par DOI dans une source cible, sous le circuit-breaker de la source."""
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
@@ -98,12 +97,12 @@ class FetchMissingPhase:
             return lambda _ctx: retenus[node]
 
         def channel(fetch: FetchChannel) -> NodeRun:
-            return lambda _ctx, _breaker: fetch()
+            return lambda ctx, _breaker: fetch(ctx)
 
         def doi(target: str) -> NodeRun:
-            def run(_ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
-                return self.fetch_doi_one(target, breaker)
+                return self.fetch_doi_one(ctx, target, breaker)
 
             return run
 
@@ -410,35 +409,39 @@ def build() -> Phase:
     )
 
 
-def _run_fetch_missing_hal_by_id() -> PhaseMetrics:
+def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
     from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
-        return asyncio.run(fetch_missing_hal_by_id(conn, log, retry_after_days=retry_after_days))
+        return asyncio.run(
+            fetch_missing_hal_by_id(conn, ctx.logger, retry_after_days=retry_after_days)
+        )
 
 
-def _run_fetch_missing_hal_by_nnt() -> PhaseMetrics:
+def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
     from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
-        return asyncio.run(fetch_missing_hal_by_nnt(conn, log, retry_after_days=retry_after_days))
+        return asyncio.run(
+            fetch_missing_hal_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
+        )
 
 
-def _run_fetch_missing_theses_by_nnt() -> PhaseMetrics:
+def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans theses.fr par NNT : thèses trouvées dans d'autres sources, absentes du staging theses.fr."""
     from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
     from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         return asyncio.run(
-            fetch_missing_theses_by_nnt(conn, log, retry_after_days=retry_after_days)
+            fetch_missing_theses_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
         )
 
 
@@ -462,21 +465,23 @@ def _make_doi_search(target: str) -> DoiSearch:
     return searches[target]()
 
 
-def _run_fetch_missing_doi(target: str, breaker: SourceCircuitBreaker) -> PhaseMetrics:
+def _run_fetch_missing_doi(
+    ctx: PhaseContext, target: str, breaker: SourceCircuitBreaker
+) -> PhaseMetrics:
     from pipeline.runtime.config import (
         get_fetch_missing_max_per_source,
         get_fetch_missing_retry_after_days,
     )
 
     search = _make_doi_search(target)
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
         limit = get_fetch_missing_max_per_source(conn)
         return asyncio.run(
             fetch_missing_doi(
                 conn,
                 search,
-                log,
+                ctx.logger,
                 retry_after_days=retry_after_days,
                 limit=limit,
                 breaker=breaker,

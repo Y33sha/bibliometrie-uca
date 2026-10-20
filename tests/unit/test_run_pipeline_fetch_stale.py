@@ -42,7 +42,7 @@ def test_fetch_stale_excludes_wos_by_default():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
-    targets = [c.args[0] for c in run_one.call_args_list]
+    targets = [c.args[1] for c in run_one.call_args_list]
     assert "wos" not in targets
     assert targets  # d'autres sources sont bien refetch
 
@@ -51,7 +51,7 @@ def test_fetch_stale_includes_wos_when_opted_in():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions(include_wos=True))
-    targets = [c.args[0] for c in run_one.call_args_list]
+    targets = [c.args[1] for c in run_one.call_args_list]
     assert "wos" in targets
 
 
@@ -61,7 +61,7 @@ def test_fetch_stale_covers_theses():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
-    assert "theses" in [c.args[0] for c in run_one.call_args_list]
+    assert "theses" in [c.args[1] for c in run_one.call_args_list]
 
 
 def test_fetch_stale_couples_years_per_source():
@@ -69,7 +69,7 @@ def test_fetch_stale_couples_years_per_source():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
-    by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
+    by_target = {c.args[1]: c.args[2] for c in run_one.call_args_list}
     assert by_target["theses"] is None
     assert by_target["hal"] == [2024]
 
@@ -79,7 +79,7 @@ def test_fetch_stale_year_narrows_all_including_theses():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions(year=2023))
-    by_target = {c.args[0]: c.args[1] for c in run_one.call_args_list}
+    by_target = {c.args[1]: c.args[2] for c in run_one.call_args_list}
     assert by_target["theses"] == [2023]
     assert by_target["hal"] == [2023]
 
@@ -88,7 +88,7 @@ def test_fetch_stale_respects_sources_filter():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions(sources={"hal"}, include_wos=True))
-    assert [c.args[0] for c in run_one.call_args_list] == ["hal"]
+    assert [c.args[1] for c in run_one.call_args_list] == ["hal"]
 
 
 def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():

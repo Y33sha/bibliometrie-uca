@@ -27,7 +27,6 @@ from pipeline.ingestion.common.source_publications import SourcePublicationQueri
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
     SUITE_DE_BRANCHE,
@@ -246,7 +245,7 @@ class BibliographicNormalizer(SourceNormalizer):
         return self._container_repo, self._publisher_repo
 
 
-NormalizeOne = Callable[[str], NormalizeStats]
+NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
 
 
@@ -260,9 +259,9 @@ class NormalizePhase:
     """Le run normalise les sources de ses options, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
 
     normalize_one: NormalizeOne
-    prune_disappeared: Callable[[], int]
-    cleanup_orphan_identities: Callable[[], int]
-    cleanup_orphan_addresses: Callable[[], int]
+    prune_disappeared: Callable[[PhaseContext], int]
+    cleanup_orphan_identities: Callable[[PhaseContext], int]
+    cleanup_orphan_addresses: Callable[[PhaseContext], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Normalise les sources retenues, retire les documents disparus, nettoie les identités et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
@@ -303,8 +302,8 @@ class NormalizePhase:
     def _normalize_node(self, source: str) -> NodeRun:
         """Nœud `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
 
-        def run(_ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            stats = self.normalize_one(source)
+        def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            stats = self.normalize_one(ctx, source)
             metrics = PhaseMetrics()
             metrics.details["row"] = {
                 "key": source,
@@ -318,7 +317,7 @@ class NormalizePhase:
 
     def _prune(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
-        disparues = self.prune_disappeared()
+        disparues = self.prune_disappeared(ctx)
         if disparues:
             ctx.logger.info(
                 "%s%s (disparus de leur source)",
@@ -330,14 +329,14 @@ class NormalizePhase:
         return PhaseMetrics(extras={"disappeared": disparues})
 
     def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        supprimees = self.cleanup_orphan_identities()
+        supprimees = self.cleanup_orphan_identities(ctx)
         metrics = PhaseMetrics()
         if supprimees:
             metrics.resume = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
         return metrics
 
     def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        supprimees = self.cleanup_orphan_addresses()
+        supprimees = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
         if supprimees:
             metrics.resume = f"{accord(supprimees, 'adresse supprimée', 'adresses supprimées')}"
@@ -347,7 +346,7 @@ class NormalizePhase:
 # ── Câblage ───────────────────────────────────────────────────
 
 
-type ConstructeurNormalizer = Callable[[Connection], SourceNormalizer]
+type ConstructeurNormalizer = Callable[[Connection, logging.Logger], SourceNormalizer]
 
 
 def build() -> Phase:
@@ -369,10 +368,10 @@ class _NormalizeSelonOptions:
         options = ctx.options
         registry = _normalize_builders(archive=options.raw_store)
 
-        def normalize_one(source: str) -> NormalizeStats:
+        def normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
             if options.normalize_full:
-                _run_mark_signatures_to_resync(source)
-            return _run_normalize(registry[source])
+                _run_mark_signatures_to_resync(ctx, source)
+            return _run_normalize(ctx, registry[source])
 
         return NormalizePhase(
             normalize_one=normalize_one,
@@ -382,31 +381,31 @@ class _NormalizeSelonOptions:
         ).run(ctx)
 
 
-def _run_mark_signatures_to_resync(source: str) -> None:
+def _run_mark_signatures_to_resync(ctx: PhaseContext, source: str) -> None:
     from pipeline.ingestion.common.signature_queries import mark_signatures_to_resync
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         mark_signatures_to_resync(conn, source)
 
 
-def _run_prune_disappeared() -> int:
+def _run_prune_disappeared(ctx: PhaseContext) -> int:
     from pipeline.ingestion.common.staging import delete_disappeared_source_publications
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return delete_disappeared_source_publications(conn)
 
 
-def _run_cleanup_orphan_identities() -> int:
+def _run_cleanup_orphan_identities(ctx: PhaseContext) -> int:
     from pipeline.ingestion.common.signature_queries import delete_orphan_identities
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return delete_orphan_identities(conn)
 
 
-def _run_cleanup_orphan_addresses() -> int:
+def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
     from pipeline.ingestion.common.signature_queries import delete_orphan_addresses
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return delete_orphan_addresses(conn)
 
 
@@ -431,9 +430,9 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     raw_store = get_raw_store() if archive else NullRawStore()
 
     def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
-        return lambda conn: cls(
+        return lambda conn, logger: cls(
             conn,
-            log,
+            logger,
             StagingQueries(raw_store),
             SourcePublicationQueries(),
             container_repo_factory=ContainerGatewayQueries,
@@ -442,9 +441,9 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
         )
 
     return {
-        "theses": lambda conn: ThesesNormalizer(
+        "theses": lambda conn, logger: ThesesNormalizer(
             conn,
-            log,
+            logger,
             StagingQueries(raw_store),
             SourcePublicationQueries(),
             batch_queries=AuthorshipsBatchQueries(),
@@ -458,6 +457,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     }
 
 
-def _run_normalize(build: ConstructeurNormalizer) -> NormalizeStats:
-    with open_tx() as conn:
-        return build(conn).run()
+def _run_normalize(ctx: PhaseContext, build: ConstructeurNormalizer) -> NormalizeStats:
+    with ctx.open_tx() as conn:
+        return build(conn, ctx.logger).run()

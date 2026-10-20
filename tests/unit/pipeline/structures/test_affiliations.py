@@ -51,8 +51,8 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         metrics = phase.AffiliationsPhase(
             object(),
             perimeter,
-            refresh_ror=PhaseMetrics,
-            refresh_hal_structures=lambda _: PhaseMetrics(),
+            refresh_ror=lambda _ctx: PhaseMetrics(),
+            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
     return metrics, perimeter, vus
@@ -88,8 +88,8 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte):
         phase.AffiliationsPhase(
             object(),
             _FakePerimeterQueries(extraction_structures=0),
-            refresh_ror=PhaseMetrics,
-            refresh_hal_structures=lambda _: PhaseMetrics(),
+            refresh_ror=lambda _ctx: PhaseMetrics(),
+            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
 
@@ -110,8 +110,8 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
         metrics = phase.AffiliationsPhase(
             object(),
             _FakePerimeterQueries(),
-            refresh_ror=lambda: ror,
-            refresh_hal_structures=lambda _: PhaseMetrics(),
+            refresh_ror=lambda _ctx: ror,
+            refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
         ).run(contexte())
 

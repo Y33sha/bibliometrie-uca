@@ -35,10 +35,10 @@ def _non_configuree(source: str) -> PhaseMetrics:
 def test_hal_channels_then_parallel_doi_with_skip(contexte):
     # sources=None → toutes les sources ; seule openalex est configurée côté DOI.
     metrics = FetchMissingPhase(
-        fetch_hal_by_id=lambda: PhaseMetrics(new=2),
-        fetch_hal_by_nnt=lambda: PhaseMetrics(new=1),
-        fetch_theses_by_nnt=PhaseMetrics,
-        fetch_doi_one=lambda source, _breaker: (
+        fetch_hal_by_id=lambda _ctx: PhaseMetrics(new=2),
+        fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(new=1),
+        fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+        fetch_doi_one=lambda _ctx, source, _breaker: (
             PhaseMetrics(new=5) if source == "openalex" else _non_configuree(source)
         ),
         run_parallel=_sync_run_parallel,
@@ -55,10 +55,10 @@ def test_nnt_channel_only_in_full_mode(contexte):
     calls: list[str] = []
 
     FetchMissingPhase(
-        fetch_hal_by_id=lambda: calls.append("id") or PhaseMetrics(),
-        fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
-        fetch_theses_by_nnt=PhaseMetrics,
-        fetch_doi_one=lambda source, _breaker: PhaseMetrics(),
+        fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
+        fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
+        fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+        fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="daily"))
 
@@ -69,9 +69,9 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
     """Joue la seule recherche par DOI (HAL hors du filtre `sources`) et rend le journal."""
     with caplog.at_level(logging.INFO, logger="test"):
         FetchMissingPhase(
-            fetch_hal_by_id=PhaseMetrics,
-            fetch_hal_by_nnt=PhaseMetrics,
-            fetch_theses_by_nnt=PhaseMetrics,
+            fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
+            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=fetch_doi_one,
             run_parallel=_sync_run_parallel,
         ).run(contexte(mode="daily", sources={"openalex", "scanr"}))
@@ -79,14 +79,16 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
 
 
 def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(contexte, caplog):
-    journal = _run_doi_only(contexte, lambda source, _breaker: PhaseMetrics(), caplog)
+    journal = _run_doi_only(contexte, lambda _ctx, source, _breaker: PhaseMetrics(), caplog)
     assert f"{DERNIERE_BRANCHE}Rien à faire" in journal
 
 
 def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(contexte, caplog):
     journal = _run_doi_only(
         contexte,
-        lambda source, _breaker: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(),
+        lambda _ctx, source, _breaker: (
+            PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics()
+        ),
         caplog,
     )
     assert "Rien à faire" not in journal
@@ -98,7 +100,7 @@ def test_une_source_indisponible_n_est_pas_un_rien_a_faire(contexte, caplog):
     )
     journal = _run_doi_only(
         contexte,
-        lambda source, _breaker: indisponible if source == "openalex" else PhaseMetrics(),
+        lambda _ctx, source, _breaker: indisponible if source == "openalex" else PhaseMetrics(),
         caplog,
     )
     assert "Rien à faire" not in journal
@@ -109,10 +111,10 @@ def test_theses_channel_suit_le_filtre_des_sources(contexte):
 
     def phase() -> FetchMissingPhase:
         return FetchMissingPhase(
-            fetch_hal_by_id=PhaseMetrics,
-            fetch_hal_by_nnt=PhaseMetrics,
-            fetch_theses_by_nnt=lambda: calls.append("theses") or PhaseMetrics(),
-            fetch_doi_one=lambda source, _breaker: PhaseMetrics(),
+            fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
+            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_theses_by_nnt=lambda _ctx: calls.append("theses") or PhaseMetrics(),
+            fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(),
             run_parallel=_sync_run_parallel,
         )
 
@@ -126,10 +128,10 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
     calls: list[str] = []
 
     FetchMissingPhase(
-        fetch_hal_by_id=lambda: calls.append("id") or PhaseMetrics(),
-        fetch_hal_by_nnt=lambda: calls.append("nnt") or PhaseMetrics(),
-        fetch_theses_by_nnt=PhaseMetrics,
-        fetch_doi_one=lambda source, _breaker: PhaseMetrics(new=3),
+        fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
+        fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
+        fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+        fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(new=3),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
 

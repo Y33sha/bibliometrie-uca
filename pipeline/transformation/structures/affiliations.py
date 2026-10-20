@@ -19,7 +19,6 @@ from sqlalchemy import Connection
 
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -43,8 +42,8 @@ from pipeline.transformation.structures.perimeter_evidence import (
 class AffiliationsPhase:
     address_queries: AddressResolutionQueries
     perimeter_queries: PerimeterQueries
-    refresh_ror: Callable[[], PhaseMetrics]
-    refresh_hal_structures: Callable[[bool], PhaseMetrics]
+    refresh_ror: Callable[[PhaseContext], PhaseMetrics]
+    refresh_hal_structures: Callable[[PhaseContext, bool], PhaseMetrics]
     resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -56,10 +55,10 @@ class AffiliationsPhase:
         by_node = run_nodes(
             "affiliations",
             {
-                "affiliations.refresh_ror": NodeStep(lambda _ctx, _breaker: self.refresh_ror()),
+                "affiliations.refresh_ror": NodeStep(lambda ctx, _breaker: self.refresh_ror(ctx)),
                 "affiliations.refresh_hal_structures": NodeStep(
                     lambda ctx, _breaker: self.refresh_hal_structures(
-                        MODES[ctx.options.mode].refresh_hal_structures
+                        ctx, MODES[ctx.options.mode].refresh_hal_structures
                     )
                 ),
                 "affiliations.resolve_addresses": NodeStep(
@@ -135,7 +134,7 @@ def build() -> Phase:
     )
 
 
-def _run_refresh_hal_structures(refresh_stale: bool) -> PhaseMetrics:
+def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> PhaseMetrics:
     """Chargement du référentiel des structures HAL, sur sa propre connexion."""
     from pipeline.ingestion.hal.structures import HalStructuresClient
     from pipeline.transformation.structures.hal_structures import (
@@ -143,17 +142,17 @@ def _run_refresh_hal_structures(refresh_stale: bool) -> PhaseMetrics:
         run_refresh_hal_structures,
     )
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return run_refresh_hal_structures(
             conn,
             source=HalStructuresClient(),
             queries=HalStructuresQueries(conn),
-            logger=log,
+            logger=ctx.logger,
             refresh_stale=refresh_stale,
         )
 
 
-def _run_refresh_ror() -> PhaseMetrics:
+def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
     from pipeline.http.polite_pool import build_user_agent
     from pipeline.ingestion.ror.dump import ZenodoRorDumpSource
@@ -162,7 +161,7 @@ def _run_refresh_ror() -> PhaseMetrics:
 
     # Le dump est public : l'adresse du polite pool y est facultative.
     source = ZenodoRorDumpSource(
-        user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=log
+        user_agent=build_user_agent(get_polite_pool_email_optional() or ""), logger=ctx.logger
     )
-    with open_tx() as conn:
-        return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=log)
+    with ctx.open_tx() as conn:
+        return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=ctx.logger)

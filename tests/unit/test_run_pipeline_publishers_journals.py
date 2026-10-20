@@ -85,14 +85,12 @@ def test_phase_propagates_substep_signals():
 def test_enrichissement_openalex_au_debit_d_openalex():
     from pipeline.ingestion.api_params import OPENALEX_DELAY
 
-    with (
-        patch("pipeline.transformation.publishing.publishers_journals.open_tx"),
-        patch(
-            "pipeline.transformation.publishing.journals.enrich_journals_from_openalex"
-            ".run_enrich_journals_from_openalex",
-            return_value=PhaseMetrics(),
-        ) as run,
-    ):
+    with patch(
+        "pipeline.transformation.publishing.journals.enrich_journals_from_openalex"
+        ".run_enrich_journals_from_openalex",
+        return_value=PhaseMetrics(),
+    ) as run:
+        # Le contexte est une doublure : sa transaction aussi.
         publishers_journals._run_enrich_journals_from_openalex(MagicMock(), MagicMock())
 
     assert run.call_args.kwargs["rate_delay"] == OPENALEX_DELAY

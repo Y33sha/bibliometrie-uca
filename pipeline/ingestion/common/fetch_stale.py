@@ -28,7 +28,6 @@ from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, branche_de_source, etape
 from pipeline.runtime.observability.logging_scope import scoped_logger
@@ -39,10 +38,10 @@ from pipeline.runtime.observability.signals import select_targets, skipped
 COMMIT_EVERY = 50
 
 # Dépendances techniques du phasage, injectées par le composition-root.
-RefreshOne = Callable[[str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
+RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
 """Nouvelle lecture des documents d'une source, bornée à `years`, sous le circuit-breaker de la source."""
-GetYearsForWindow = Callable[["int | None"], "list[int] | None"]
-"""`(start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
+GetYearsForWindow = Callable[[PhaseContext, "int | None"], "list[int] | None"]
+"""`(ctx, start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
 
 @dataclass(frozen=True)
@@ -66,14 +65,14 @@ class FetchStalePhase:
         )
 
         year = options.year
-        years_default = [int(year)] if year else self.get_years_for_window(options.start_year)
+        years_default = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
         years_theses = [int(year)] if year else None
 
         def node(source: str) -> NodeRun:
-            def run(_ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
                 assert breaker is not None, "nœud à source : l'exécuteur pose le circuit-breaker"
                 row_years = years_theses if source == "theses" else years_default
-                return self.refresh_one(source, row_years, breaker)
+                return self.refresh_one(ctx, source, row_years, breaker)
 
             return run
 
@@ -278,11 +277,11 @@ def build() -> Phase:
     )
 
 
-def _get_years_for_window(start_year: int | None) -> list[int] | None:
+def _get_years_for_window(ctx: PhaseContext, start_year: int | None) -> list[int] | None:
     """Années de la fenêtre du run, de `start_year` à l'année courante."""
     from pipeline.runtime.config import get_years
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return get_years(conn, start_year)
 
 
@@ -309,7 +308,7 @@ def _make_refetch(source: str) -> StaleRefetch:
 
 
 def _run_fetch_stale(
-    target: str, years: list[int] | None, breaker: SourceCircuitBreaker
+    ctx: PhaseContext, target: str, years: list[int] | None, breaker: SourceCircuitBreaker
 ) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
@@ -318,8 +317,8 @@ def _run_fetch_stale(
     from pipeline.runtime.config import get_fetch_stale_after_days
 
     refetch = _make_refetch(target)
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         after_days = get_fetch_stale_after_days(conn)
         return asyncio.run(
-            refresh(conn, refetch, log, after_days=after_days, years=years, breaker=breaker)
+            refresh(conn, refetch, ctx.logger, after_days=after_days, years=years, breaker=breaker)
         )

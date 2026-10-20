@@ -22,7 +22,7 @@ def _table_keys(metrics: PhaseMetrics) -> set[str]:
 
 
 def test_phase_extract_full_skips_unconfigured_source():
-    def _extract(source, _make, _args, _breaker):
+    def _extract(_ctx, source, _make, _args, _breaker):
         if source == "openalex":
             raise ExtractionConfigError("ni clé ni email")
         return PhaseMetrics(new=7)
@@ -41,7 +41,7 @@ def test_phase_extract_full_skips_unconfigured_source():
 
 
 def test_phase_extract_daily_hal_unconfigured():
-    def _extract(_source, _make, _args, _breaker):
+    def _extract(_ctx, _source, _make, _args, _breaker):
         raise ExtractionConfigError("aucune collection")
 
     with (
