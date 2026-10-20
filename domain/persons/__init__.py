@@ -2,7 +2,7 @@
 
 Sous-modules :
 - `person` : aggregate root `Person`
-- `merge` : fusion de deux personnes, données d'une personne et règle de fusion de chacune (`PERSON_DATA`)
+- `merge` : fusion de deux personnes, rôles et exclusion de la personne fusionnée
 - `identifier_attribution` : aggregate `IdentifierAttribution` (identité naturelle `(id_type, id_value)`)
 - `identifiers` : VOs ORCID/IdHAL/IdRef + helpers de normalisation
 - `name_forms` : VO `PersonNameForm`

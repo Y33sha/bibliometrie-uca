@@ -1,8 +1,10 @@
-"""SQL de la fusion de deux éditeurs : une étape par donnée de `domain.publishers.merge.PUBLISHER_DATA`."""
+"""SQL de la fusion de deux éditeurs : une étape par donnée de l'éditeur (`MERGE_STEPS`).
+
+Les revues homonymes des deux éditeurs sont fusionnées d'abord, par la fusion des revues."""
 
 from sqlalchemy import Connection, text
 
-from domain.merge import MergedEntity
+from domain.merge import DataNature, MergedEntity
 from domain.publishers.publisher import PublisherType
 from infrastructure.repositories.merge_steps import (
     MergeStep,
@@ -20,12 +22,15 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "apc_payments": transfer("apc_payments", "publisher_id"),
     "doi_prefixes": transfer("doi_prefixes", "publisher_id"),
     "name_forms": transfer("publisher_name_forms", "publisher_id"),
+    # Formes de nom des revues rattachées à l'éditeur, une par forme.
     "journal_name_forms": transfer_unique("journal_name_forms", "publisher_id", "form_normalized"),
-    "name": untouched("publishers", "name", "name_normalized"),
+    "name": untouched("publishers", "name", "name_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("publishers", "created_at"),
     "openalex_id": fill_empty_unique("publishers", "openalex_id"),
-    "country": fill_empty("publishers", "country"),
-    "publisher_type": fill_empty("publishers", "publisher_type", empty=PublisherType.UNKNOWN.value),
+    "country": fill_empty("publishers", "country").of_nature(DataNature.MIXED),
+    "publisher_type": fill_empty(
+        "publishers", "publisher_type", empty=PublisherType.UNKNOWN.value
+    ).of_nature(DataNature.MIXED),
     "pub_count": untouched("publishers", "pub_count"),
 }
 

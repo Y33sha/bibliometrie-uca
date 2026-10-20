@@ -1,16 +1,18 @@
-"""Étapes SQL de la fusion de deux entités, une par donnée recensée dans le domaine (`domain.merge`).
+"""Étapes SQL de la fusion de deux entités, une par donnée de l'entité.
 
-Chaque étape déclare les colonnes qui rattachent sa donnée à l'entité : clés étrangères vers la table de l'entité, ou colonnes de cette table. Un test par entité confronte ces colonnes au schéma.
+Chaque entité fusionnable recense ses données dans un dictionnaire `nom → MergeStep`. Le helper qui construit l'étape nomme sa règle de fusion (`transfer`, `fill_empty`…). Chaque étape déclare les colonnes qui rattachent sa donnée à l'entité : clés étrangères vers la table de l'entité, ou colonnes de cette table. Un test par entité confronte ces colonnes au schéma.
 
 Chaque fusion enregistre aussi la redirection de l'identifiant absorbé (`record_redirect`).
 """
 
+from __future__ import annotations
+
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection, text
 
-from domain.merge import DataNature, MergedData, MergedEntity
+from domain.merge import DataNature, MergedEntity
 
 type MergeApply = Callable[[Connection, int, int], None]
 
@@ -21,6 +23,11 @@ class MergeStep:
     columns: tuple[tuple[str, str], ...]
     # Applique la règle de fusion : (connexion, id conservé, id absorbé).
     apply: MergeApply
+    nature: DataNature = DataNature.DERIVED
+
+    def of_nature(self, nature: DataNature) -> MergeStep:
+        """La même étape, pour une donnée de nature `nature`."""
+        return replace(self, nature=nature)
 
 
 def _noop(conn: Connection, target_id: int, source_id: int) -> None:
@@ -97,15 +104,13 @@ def fill_empty_unique(table: str, column: str) -> MergeStep:
     return MergeStep(((table, column),), apply)
 
 
-def without_decision_sql(
-    table: str, alias: str, data: dict[str, MergedData], steps: dict[str, MergeStep]
-) -> str:
-    """Condition SQL vraie quand l'entité `alias` (ligne de `table`) n'a aucune donnée de nature décision. Les colonnes de chaque donnée viennent de son étape de fusion : une colonne de `table` est nulle, une clé étrangère n'a aucune ligne."""
+def without_decision_sql(table: str, alias: str, steps: dict[str, MergeStep]) -> str:
+    """Condition SQL vraie quand l'entité `alias` (ligne de `table`) n'a aucune donnée de nature décision. Une colonne de `table` est nulle, une clé étrangère n'a aucune ligne."""
     clauses = []
-    for name, merged in data.items():
-        if merged.nature != DataNature.DECISION:
+    for step in steps.values():
+        if step.nature != DataNature.DECISION:
             continue
-        for column_table, column in steps[name].columns:
+        for column_table, column in step.columns:
             if column_table == table:
                 clauses.append(f"{alias}.{column} IS NULL")
             else:

@@ -6,30 +6,24 @@ Une table ajoutée avec une clé étrangère vers l'entité, ou une colonne ajou
 import pytest
 from sqlalchemy import text
 
-from domain.journals.merge import JOURNAL_DATA
 from domain.merge import MergedEntity
-from domain.persons.merge import PERSON_DATA
-from domain.publishers.merge import PUBLISHER_DATA
 from infrastructure.repositories import publisher_merge
 from infrastructure.repositories.merge_steps import record_redirect
 from infrastructure.repositories.person_repository import _merge as person_merge
 from pipeline.transformation.publishing.journals import journal_merge
+from pipeline.transformation.publishing.monographs import monograph_merge
 from tests.integration.helpers.redirects import redirect_of
 
 _ENTITIES = [
-    pytest.param("persons", PERSON_DATA, person_merge.MERGE_STEPS, id="persons"),
-    pytest.param("journals", JOURNAL_DATA, journal_merge.MERGE_STEPS, id="journals"),
-    pytest.param("publishers", PUBLISHER_DATA, publisher_merge.MERGE_STEPS, id="publishers"),
+    pytest.param("persons", person_merge.MERGE_STEPS, id="persons"),
+    pytest.param("journals", journal_merge.MERGE_STEPS, id="journals"),
+    pytest.param("publishers", publisher_merge.MERGE_STEPS, id="publishers"),
+    pytest.param("monographs", monograph_merge.MERGE_STEPS, id="monographs"),
 ]
 
 
-@pytest.mark.parametrize(("table", "data", "steps"), _ENTITIES)
-def test_one_step_per_data(table, data, steps):
-    assert set(steps) == set(data)
-
-
-@pytest.mark.parametrize(("table", "data", "steps"), _ENTITIES)
-def test_steps_cover_schema(sa_sync_conn, table, data, steps):
+@pytest.mark.parametrize(("table", "steps"), _ENTITIES)
+def test_steps_cover_schema(sa_sync_conn, table, steps):
     foreign_keys = sa_sync_conn.execute(
         text("""
             SELECT c.conrelid::regclass::text, a.attname

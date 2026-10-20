@@ -1,9 +1,9 @@
-"""Fusion de deux revues : une étape SQL par donnée de `domain.journals.merge.JOURNAL_DATA`, puis la requalification des publications absorbées."""
+"""Fusion de deux revues : une étape SQL par donnée de la revue (`MERGE_STEPS`), puis la requalification des publications absorbées."""
 
 from sqlalchemy import Connection, text
 
 from domain.journals.journal import JournalType, ManualField
-from domain.merge import MergedEntity
+from domain.merge import DataNature, MergedEntity
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     fill_empty,
@@ -26,6 +26,7 @@ from pipeline.transformation.publishing.pub_counts import (
 
 
 def _merge_issns(conn: Connection, target_id: int, source_id: int) -> None:
+    """Un ISSN que la conservée a déjà reste le sien ; les autres passent à la conservée, à revérifier dans le Sudoc. L'ISSN de liaison de la conservée l'emporte. Des ISSN saisis à la main sur l'absorbée gardent leur marqueur."""
     conn.execute(
         text("""
             DELETE FROM journal_issns s
@@ -79,10 +80,11 @@ def _fill_empty_with_marker(
             {"t": target_id, "s": source_id, "field": field.value},
         )
 
-    return MergeStep(tuple(("journals", c) for c in columns), apply)
+    return MergeStep(tuple(("journals", c) for c in columns), apply, DataNature.MIXED)
 
 
 def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
+    """La revue conservée est au DOAJ si l'une des deux y est."""
     conn.execute(
         text("""
             UPDATE journals t SET is_in_doaj = COALESCE(t.is_in_doaj OR s.is_in_doaj, false)
@@ -98,14 +100,14 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "source_publications": transfer("source_publications", "journal_id"),
     "apc_payments": transfer("apc_payments", "journal_id"),
     "monographs": transfer("monographs", "journal_id"),
-    "issns": MergeStep((("journal_issns", "journal_id"),), _merge_issns),
+    "issns": MergeStep((("journal_issns", "journal_id"),), _merge_issns, DataNature.MIXED),
     "name_forms": transfer_unique(
         "journal_name_forms", "journal_id", "form_normalized", "publisher_id"
     ),
     "doi_namespaces": untouched("journal_doi_namespaces", "journal_id"),
-    "title": untouched("journals", "title", "title_normalized"),
+    "title": untouched("journals", "title", "title_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("journals", "created_at"),
-    "publisher": fill_empty("journals", "publisher_id"),
+    "publisher": fill_empty("journals", "publisher_id").of_nature(DataNature.MIXED),
     "openalex_id": fill_empty_unique("journals", "openalex_id"),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "apc": _fill_empty_with_marker(
@@ -116,12 +118,12 @@ MERGE_STEPS: dict[str, MergeStep] = {
         ("journal_type",),
         f"t.journal_type = '{JournalType.UNKNOWN.value}'",
     ),
-    "is_academic": untouched("journals", "is_academic"),
-    "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj),
+    "is_academic": untouched("journals", "is_academic").of_nature(DataNature.MIXED),
+    "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj, DataNature.MIXED),
     "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),
     "pub_count": untouched("journals", "pub_count"),
     # Un champ repris de l'absorbée y apporte son marqueur (`_fill_empty_with_marker`).
-    "manual_fields": untouched("journals", "manual_fields"),
+    "manual_fields": untouched("journals", "manual_fields").of_nature(DataNature.DECISION),
 }
 
 

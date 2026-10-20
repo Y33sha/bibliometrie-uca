@@ -53,5 +53,5 @@ class PublisherRepository(Protocol):
         ...
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne l'éditeur `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de l'éditeur (`domain.publishers.merge.PUBLISHER_DATA`), puis supprime la source. La fusion préalable des revues homonymes relève du service via `find_shared_title_journal_pairs`."""
+        """Fusionne l'éditeur `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de l'éditeur, puis supprime la source. La fusion préalable des revues homonymes relève du service via `find_shared_title_journal_pairs`."""
         ...
