@@ -127,7 +127,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] SQL de `journals/journals.py` réparti par étape ; stores des revues, monographies et éditeurs. 23e96abb6, 22217be80, d99f7ecb1
 - [x] Requalification par revue dans `journals/`, fusion des monographies sur le modèle des revues. dc0ad9d0f, a4d612b73
 - [x] Un inventaire de fusion par entité, celui des étapes (`MergeStep`, avec la nature de sa donnée) ; les inventaires du domaine disparaissent. a4d612b73
-- [ ] Liste des DOI connus tirée d'une vue commune avec `candidate_dois`.
+- [x] Liste des DOI connus tirée d'une vue commune avec `candidate_dois`. 4e6fb8c35
 - [ ] Noms : étape DOAJ, `pub_id` d'éditeur.
 
 ### Phase 8 — Vocabulaire
