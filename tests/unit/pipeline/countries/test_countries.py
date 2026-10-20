@@ -8,8 +8,16 @@ from unittest.mock import patch
 import pytest
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.structures.countries import countries as phase
-from pipeline.transformation.structures.countries.countries_queries import AddressCountryStatus
+from pipeline.transformation.countries import countries as phase
+from pipeline.transformation.countries.countries import AddressCountryStatus
+
+
+class _FakeStore:
+    def __init__(self, conn) -> None:
+        pass
+
+    def add_ror(self) -> int:
+        return 2
 
 
 class _FakeCountryQueries:
@@ -17,17 +25,17 @@ class _FakeCountryQueries:
 
     def __init__(self, bilans: list[AddressCountryStatus]) -> None:
         self._bilans = list(bilans)
-        self.bilans_demandes = 0
 
     def count_address_country_status(self, conn) -> AddressCountryStatus:
-        self.bilans_demandes += 1
         return self._bilans.pop(0)
 
-    def insert_ror_candidates(self, conn) -> int:
-        return 2
-
-    def resolve_address_countries(self, conn, address_ids=None) -> int:
-        return 3
+    def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Remplace les accès SQL de la phase : bilans, candidats ROR, résolution."""
+        monkeypatch.setattr(
+            phase, "count_address_country_status", self.count_address_country_status
+        )
+        monkeypatch.setattr(phase, "resolve_address_countries", lambda conn: 3)
+        monkeypatch.setattr(phase, "CountryCandidatesStore", _FakeStore)
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:
@@ -44,16 +52,16 @@ def sous_etapes():
         patch.object(
             phase.refresh_publication_countries,
             "refresh",
-            side_effect=lambda conn, q, log: appels.__setitem__("refresh", True),
+            side_effect=lambda conn, log: appels.__setitem__("refresh", True),
         ),
     ):
         yield appels
 
 
-def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes):
-    queries = _FakeCountryQueries([_bilan(100, 60), _bilan(100, 85)])
+def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes, monkeypatch):
+    _FakeCountryQueries([_bilan(100, 60), _bilan(100, 85)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
+    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
 
     assert metrics.details["summary"] == {
         "total": 100,
@@ -64,27 +72,27 @@ def test_resume_l_entonnoir_des_bilans(contexte, sous_etapes):
     }
 
 
-def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes):
-    queries = _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)])
+def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes, monkeypatch):
+    _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
+    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
 
     assert metrics.new == 12  # 2 (ROR) + 4 (nom de pays) + 6 (nom de lieu)
     assert metrics.updated == 3  # adresses dont la résolution change le pays
     assert sous_etapes["refresh"] is True
 
 
-def test_base_vide_sans_division_par_zero(contexte, sous_etapes):
-    queries = _FakeCountryQueries([_bilan(0, 0), _bilan(0, 0)])
+def test_base_vide_sans_division_par_zero(contexte, sous_etapes, monkeypatch):
+    _FakeCountryQueries([_bilan(0, 0), _bilan(0, 0)]).install(monkeypatch)
 
-    metrics = phase.CountriesPhase(queries).run(contexte(mode="daily"))
+    metrics = phase.CountriesPhase().run(contexte(mode="daily"))
 
     assert metrics.details["summary"]["without_pct"] == 0
 
 
-def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes):
-    queries = _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)])
+def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes, monkeypatch):
+    _FakeCountryQueries([_bilan(10, 5), _bilan(10, 9)]).install(monkeypatch)
 
-    phase.CountriesPhase(queries).run(contexte(mode="daily"))
+    phase.CountriesPhase().run(contexte(mode="daily"))
 
     assert open_tx.transactions == 7  # deux bilans + cinq sous-étapes

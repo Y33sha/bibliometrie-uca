@@ -4,13 +4,13 @@ Elle exporte l'ordre des phases et les recalculs ciblés. `application/` déclar
 """
 
 from pipeline.graph import PHASE_ORDER
+from pipeline.transformation.countries.refresh_publication_countries import CountryRecompute
 from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
 from pipeline.transformation.publishing.pub_counts import PubCountRecompute
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from pipeline.transformation.structures.perimeter_evidence import (
     SourceContributionPerimeterRecompute,
@@ -19,7 +19,7 @@ from pipeline.transformation.structures.perimeter_evidence import (
 __all__ = [
     "PHASE_ORDER",
     "AuthorshipsBuild",
-    "CountryQueries",
+    "CountryRecompute",
     "SourceContributionPerimeterRecompute",
     "JournalRecompute",
     "PerimeterStructures",

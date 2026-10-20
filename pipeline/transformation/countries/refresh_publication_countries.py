@@ -1,0 +1,266 @@
+"""Recalcule les pays des contributions sources, des notices et des publications à partir de `addresses.countries`.
+
+Trois caches dénormalisés, en cascade :
+  1. `source_authorships.countries` — pays retenus des adresses de la contribution source, pays de ses organisations ROR sans adresse et de ses structures HAL.
+  2. `source_publications.countries` — union des `source_authorships.countries` du document.
+  3. `publications.countries` — union des `source_publications.countries` de même publication_id.
+
+Deux portées partagent l'agrégation : les lignes `countries_dirty` (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
+"""
+
+import logging
+import time
+
+from sqlalchemy import Connection, text
+
+from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.observability.progression import attente
+from pipeline.transformation.countries.resolution import resolve_address_countries
+
+# CTE des contributions sources à recalculer : marquées `countries_dirty`, ou liées à une adresse marquée `countries_dirty`.
+_DIRTY_SA = """
+    WITH dirty_sa AS (
+        SELECT id FROM source_authorships WHERE countries_dirty
+        UNION
+        SELECT saa.source_authorship_id
+        FROM source_authorship_addresses saa
+        JOIN addresses a ON a.id = saa.address_id
+        WHERE a.countries_dirty
+    )
+"""
+
+# Recalcul de `source_authorships.countries` sur la CTE amont `scoped_sa(id)` ; marque `countries_dirty` les contributions sources modifiées.
+_SA_COUNTRIES_FROM_SCOPE = """,
+    contributions AS (
+        SELECT saa.source_authorship_id AS sa_id, c::text AS code
+        FROM scoped_sa s
+        JOIN source_authorship_addresses saa ON saa.source_authorship_id = s.id
+        JOIN addresses a ON a.id = saa.address_id
+        CROSS JOIN LATERAL unnest(a.countries) AS c
+        UNION
+        SELECT sar.source_authorship_id, ro.country_code::text
+        FROM scoped_sa s
+        JOIN source_authorship_rors sar ON sar.source_authorship_id = s.id
+        JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
+        WHERE sar.address_id IS NULL
+        UNION
+        SELECT h.source_authorship_id, hs.country_code::text
+        FROM scoped_sa s
+        JOIN source_authorship_hal_structures h ON h.source_authorship_id = s.id
+        LEFT JOIN hal_structure_aliases al ON al.alias_id = h.hal_structure_id
+        JOIN hal_structures hs ON hs.hal_structure_id = coalesce(al.hal_structure_id, h.hal_structure_id)
+        WHERE hs.country_code IS NOT NULL
+    ),
+    agg AS (
+        SELECT sa_id, array_agg(code ORDER BY code) AS new_countries
+        FROM contributions
+        GROUP BY sa_id
+    )
+    UPDATE source_authorships sa
+    SET countries = agg.new_countries, countries_dirty = true
+    FROM scoped_sa s
+    LEFT JOIN agg ON agg.sa_id = s.id
+    WHERE sa.id = s.id
+      AND sa.countries IS DISTINCT FROM agg.new_countries
+"""
+
+# Recalcul de `source_publications.countries` sur la CTE amont `scoped_sp(sp_id)` : union des pays des contributions sources.
+_SP_COUNTRIES_FROM_SCOPE = """,
+    agg AS (
+        SELECT sa.source_publication_id AS sp_id,
+               array_agg(DISTINCT c ORDER BY c) AS new_countries
+        FROM source_authorships sa
+        JOIN scoped_sp ss ON ss.sp_id = sa.source_publication_id
+        CROSS JOIN LATERAL unnest(sa.countries) AS c
+        GROUP BY sa.source_publication_id
+    )
+    UPDATE source_publications sp
+    SET countries = agg.new_countries
+    FROM scoped_sp ss
+    LEFT JOIN agg ON agg.sp_id = ss.sp_id
+    WHERE sp.id = ss.sp_id
+      AND sp.countries IS DISTINCT FROM agg.new_countries
+"""
+
+# Recalcul de `publications.countries` sur la CTE amont `scoped_pub(pub_id)` : union des `source_publications.countries` de la publication ; seules les lignes qui changent sont écrites.
+_PUB_COUNTRIES_FROM_SCOPE = """,
+    agg AS (
+        SELECT sp.publication_id AS pub_id,
+               array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
+        FROM source_publications sp
+        JOIN scoped_pub spp ON spp.pub_id = sp.publication_id
+        CROSS JOIN LATERAL unnest(sp.countries) AS c
+        WHERE sp.countries IS NOT NULL
+        GROUP BY sp.publication_id
+    )
+    UPDATE publications p
+    SET countries = agg.new_countries
+    FROM scoped_pub spp
+    LEFT JOIN agg ON agg.pub_id = spp.pub_id
+    WHERE p.id = spp.pub_id
+      AND p.countries IS DISTINCT FROM agg.new_countries
+"""
+
+
+def refresh_source_contribution_countries(
+    conn: Connection, *, id_range: tuple[int, int] | None = None
+) -> int:
+    """Recalcule `source_authorships.countries` des contributions sources de `_DIRTY_SA`. Retourne le nombre de contributions sources modifiées.
+
+    `id_range` (bornes incluses) recalcule toutes les contributions sources de l'intervalle qui ont une adresse, un ROR sans adresse ou une structure HAL.
+    """
+    if id_range is None:
+        scope = _DIRTY_SA + ", scoped_sa AS (SELECT id FROM dirty_sa)"
+        params = {}
+    else:
+        scope = """
+            WITH scoped_sa AS (
+                SELECT source_authorship_id AS id FROM source_authorship_addresses
+                WHERE source_authorship_id BETWEEN :lo AND :hi
+                UNION
+                SELECT source_authorship_id FROM source_authorship_rors
+                WHERE source_authorship_id BETWEEN :lo AND :hi AND address_id IS NULL
+                UNION
+                SELECT source_authorship_id FROM source_authorship_hal_structures
+                WHERE source_authorship_id BETWEEN :lo AND :hi
+            )"""
+        params = {"lo": id_range[0], "hi": id_range[1]}
+    return conn.execute(text(scope + _SA_COUNTRIES_FROM_SCOPE), params).rowcount
+
+
+def refresh_source_publication_countries(conn: Connection) -> int:
+    """Recalcule `source_publications.countries` des documents de `_DIRTY_SA`. Retourne le nombre de lignes modifiées."""
+    return conn.execute(
+        text(
+            _DIRTY_SA
+            + """,
+            scoped_sp AS (
+                SELECT DISTINCT sa.source_publication_id AS sp_id
+                FROM source_authorships sa
+                JOIN dirty_sa d ON d.id = sa.id
+                WHERE sa.source_publication_id IS NOT NULL
+            )
+            """
+            + _SP_COUNTRIES_FROM_SCOPE
+        )
+    ).rowcount
+
+
+def refresh_publication_countries(conn: Connection) -> int:
+    """Recalcule `publications.countries` des publications de `_DIRTY_SA`. Retourne le nombre de lignes modifiées."""
+    return conn.execute(
+        text(
+            _DIRTY_SA
+            + """,
+            scoped_pub AS (
+                SELECT DISTINCT sp.publication_id AS pub_id
+                FROM source_publications sp
+                JOIN source_authorships sa ON sa.source_publication_id = sp.id
+                JOIN dirty_sa d ON d.id = sa.id
+                WHERE sp.publication_id IS NOT NULL
+            )
+            """
+            + _PUB_COUNTRIES_FROM_SCOPE
+        )
+    ).rowcount
+
+
+def clear_countries_dirty(conn: Connection) -> None:
+    """Purge les flags `countries_dirty` (`source_authorships` et `addresses`) en fin de cascade."""
+    conn.execute(
+        text("UPDATE source_authorships SET countries_dirty = false WHERE countries_dirty")
+    )
+    conn.execute(text("UPDATE addresses SET countries_dirty = false WHERE countries_dirty"))
+
+
+def refresh(conn: Connection, logger: logging.Logger) -> int:
+    """Recalcule les caches pays (source_authorships → source_publications → publications), scopé aux `countries_dirty`, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    etape(logger, "Rafraîchissement des pays associés aux publications")
+    steps = (
+        ("signature", "signatures", refresh_source_contribution_countries),
+        ("notice", "notices", refresh_source_publication_countries),
+        ("publication", "publications", refresh_publication_countries),
+    )
+    updated = 0
+    for singular, plural, step in steps:
+        t0 = time.perf_counter()
+        with attente(f"{BRANCHE}{plural} : en cours", logger) as ligne:
+            updated = step(conn)
+            ligne.conclut(
+                f"{BRANCHE}{accord(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
+                f" en {time.perf_counter() - t0:.1f} s"
+            )
+    t0 = time.perf_counter()
+    with attente(
+        f"{DERNIERE_BRANCHE}effacement des marqueurs de recalcul : en cours", logger
+    ) as ligne:
+        clear_countries_dirty(conn)
+        ligne.conclut(
+            f"{DERNIERE_BRANCHE}marqueurs de recalcul effacés en {time.perf_counter() - t0:.1f} s"
+        )
+    return updated
+
+
+class CountryRecompute:
+    """Résolution des pays d'un lot d'adresses et recalcul ciblé de leurs caches (port injecté par l'API)."""
+
+    def resolve_address_countries(
+        self, conn: Connection, address_ids: list[int] | None = None
+    ) -> int:
+        return resolve_address_countries(conn, address_ids)
+
+    def refresh_source_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        """Recalcule `source_authorships.countries` des contributions sources liées à l'une des `address_ids`, puis `source_publications.countries` de leurs documents. Idempotent. Retourne le nombre de documents mis à jour."""
+        if not address_ids:
+            return 0
+        conn.execute(
+            text(
+                """
+                WITH scoped_sa AS (
+                    SELECT DISTINCT source_authorship_id AS id
+                    FROM source_authorship_addresses
+                    WHERE address_id = ANY(:ids)
+                )"""
+                + _SA_COUNTRIES_FROM_SCOPE
+            ),
+            {"ids": address_ids},
+        )
+        return conn.execute(
+            text(
+                """
+                WITH scoped_sp AS (
+                    SELECT DISTINCT sa.source_publication_id AS sp_id
+                    FROM source_authorship_addresses saa
+                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                    WHERE saa.address_id = ANY(:ids)
+                      AND sa.source_publication_id IS NOT NULL
+                )
+                """
+                + _SP_COUNTRIES_FROM_SCOPE
+            ),
+            {"ids": address_ids},
+        ).rowcount
+
+    def refresh_publications_countries_for_addresses(
+        self, conn: Connection, address_ids: list[int]
+    ) -> int:
+        """Recalcule `publications.countries` (union des `source_publications.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
+        if not address_ids:
+            return 0
+        return conn.execute(
+            text(
+                """
+                WITH scoped_pub AS (
+                    SELECT DISTINCT sd.publication_id AS pub_id
+                    FROM source_authorship_addresses saa
+                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                    JOIN source_publications sd ON sd.id = sa.source_publication_id
+                    WHERE saa.address_id = ANY(:ids) AND sd.publication_id IS NOT NULL
+                )
+                """
+                + _PUB_COUNTRIES_FROM_SCOPE
+            ),
+            {"ids": address_ids},
+        ).rowcount

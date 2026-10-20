@@ -54,6 +54,7 @@ from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import ecrire_hors_barre, set_flux_barres
 from pipeline.runtime.observability.signals import select_targets
+from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
@@ -63,7 +64,6 @@ from pipeline.transformation.publications.reconciliation import publications
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
-from pipeline.transformation.structures.countries import countries
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())

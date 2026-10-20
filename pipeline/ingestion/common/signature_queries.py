@@ -14,7 +14,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
 class SignatureNameFields(TypedDict):
@@ -392,8 +392,8 @@ class AuthorshipsBatchQueries:
         method: CountryDetectionMethod,
         rows: list[tuple[int, list[str]]],
     ) -> None:
-        """Ajoute les pays candidats `(adresse, pays)` du moyen `method` (`CountryQueries.insert_candidates`)."""
-        CountryQueries().insert_candidates(conn, method, rows)
+        """Ajoute les pays candidats `(adresse, pays)` du moyen `method` (`CountryCandidatesStore.add`)."""
+        CountryCandidatesStore(conn).add(method, rows)
 
     def insert_source_authorship_addresses_batch(
         self, conn: Connection, values: list[AuthorshipAddressItem]
