@@ -8,14 +8,14 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run(contexte, mode: str, refreshed: list[str]) -> PhaseMetrics:
-    def refresh_one(source: str, years: list[int] | None, breaker) -> PhaseMetrics:
+    def refresh_one(_ctx, source: str, years: list[int] | None, breaker) -> PhaseMetrics:
         refreshed.append(source)
         return PhaseMetrics()
 
     with patch("pipeline.runtime.config.source_credentials_missing", return_value=None):
         return FetchStalePhase(
             refresh_one=refresh_one,
-            get_years_for_window=lambda start_year: None,
+            get_years_for_window=lambda _ctx, start_year: None,
         ).run(contexte(mode=mode, sources={"openalex"}))
 
 

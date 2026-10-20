@@ -20,7 +20,6 @@ from dataclasses import dataclass
 
 from pipeline.node_runner import NodeStep, run_nodes
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
-from pipeline.runtime.execution import log, open_tx
 from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
@@ -46,7 +45,7 @@ class AuthorshipsPhase:
     pub_counts_queries: PgPubCountsQueries
     address_pub_count_queries: AddressPubCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
-    empty_containers: tuple[tuple[str, Callable[[], PhaseMetrics]], ...] = ()
+    empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les nœuds de la phase et retourne les métriques du build."""
@@ -87,7 +86,7 @@ class AuthorshipsPhase:
 
         def empty_containers(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             metrics = PhaseMetrics()
-            _delete_empty_containers(self.empty_containers, metrics, ctx.logger)
+            _delete_empty_containers(self.empty_containers, metrics, ctx)
             return metrics
 
         def pub_counts(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -155,19 +154,19 @@ def _purge_orphan_publications(
 
 
 def _delete_empty_containers(
-    steps: tuple[tuple[str, Callable[[], PhaseMetrics]], ...],
+    steps: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...],
     metrics: PhaseMetrics,
-    logger: logging.Logger,
+    ctx: PhaseContext,
 ) -> None:
     """Supprime les référentiels vides ; chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
     if not steps:
         return
-    etape(logger, "Référentiels vides")
+    etape(ctx.logger, "Référentiels vides")
     for indice, (libelle, run) in enumerate(steps):
-        sub = run()
+        sub = run(ctx)
         metrics.merge(sub)
         branche = DERNIERE_BRANCHE if indice == len(steps) - 1 else BRANCHE
-        logger.info("%s%s : %s", branche, libelle, sub.resume or "rien à faire")
+        ctx.logger.info("%s%s : %s", branche, libelle, sub.resume or "rien à faire")
 
 
 def _refresh_pub_counts(
@@ -243,31 +242,31 @@ def build() -> Phase:
     )
 
 
-def _run_delete_empty_monographs() -> PhaseMetrics:
+def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
         run_delete_empty_monographs,
     )
     from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 
-    with open_tx() as conn:
-        return run_delete_empty_monographs(log, monograph_repo=MonographGatewayQueries(conn))
+    with ctx.open_tx() as conn:
+        return run_delete_empty_monographs(ctx.logger, monograph_repo=MonographGatewayQueries(conn))
 
 
-def _run_delete_empty_journals() -> PhaseMetrics:
+def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.transformation.publishing.journals.delete_empty_journals import (
         run_delete_empty_journals,
     )
     from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 
-    with open_tx() as conn:
-        return run_delete_empty_journals(log, journal_repo=JournalGatewayQueries(conn))
+    with ctx.open_tx() as conn:
+        return run_delete_empty_journals(ctx.logger, journal_repo=JournalGatewayQueries(conn))
 
 
-def _run_delete_empty_publishers() -> PhaseMetrics:
+def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
         run_delete_empty_publishers,
     )
     from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
-    with open_tx() as conn:
-        return run_delete_empty_publishers(log, publisher_repo=PublisherGatewayQueries(conn))
+    with ctx.open_tx() as conn:
+        return run_delete_empty_publishers(ctx.logger, publisher_repo=PublisherGatewayQueries(conn))

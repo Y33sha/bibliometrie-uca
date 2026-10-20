@@ -142,7 +142,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     appels: list[str] = []
 
     def suppression(nom: str, n: int):
-        def run() -> PhaseMetrics:
+        def run(_ctx) -> PhaseMetrics:
             appels.append(nom)
             m = PhaseMetrics()
             if n:

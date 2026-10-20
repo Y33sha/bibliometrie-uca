@@ -10,8 +10,8 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
 Les dépendances techniques sont injectées par le composition-root :
 
-- `count_extraction_structures()` : le nombre de structures du périmètre d'extraction ;
-- `extract_one(source, args, breaker)` : ouvre la connexion, câble l'extracteur et l'exécute sous le circuit-breaker de la source ; lève `ExtractionConfigError` si le périmètre d'interrogation de la source manque ;
+- `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
+- `extract_one(ctx, source, args, breaker)` : ouvre la connexion, câble l'extracteur et l'exécute sous le circuit-breaker de la source ; lève `ExtractionConfigError` si le périmètre d'interrogation de la source manque ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_extract_date` : la date de la dernière extraction quotidienne réussie (branche incrémentale).
 """
@@ -33,7 +33,6 @@ from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.execution import open_tx
 from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -45,7 +44,9 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-ExtractOne = Callable[[str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics]
+ExtractOne = Callable[
+    [PhaseContext, str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics
+]
 GetLastDailyExtractDate = Callable[[], date | None]
 
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
@@ -73,7 +74,7 @@ def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 
 @dataclass(frozen=True)
 class ExtractPhase:
-    count_extraction_structures: Callable[[], int]
+    count_extraction_structures: Callable[[PhaseContext], int]
     extract_one: ExtractOne
     run_parallel: RunParallel
     get_last_daily_extract_date: GetLastDailyExtractDate
@@ -81,7 +82,7 @@ class ExtractPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Retient les sources effectives selon le mode, exécute leurs nœuds en parallèle, et assemble les métriques."""
         options = ctx.options
-        if self.count_extraction_structures() == 0:
+        if self.count_extraction_structures(ctx) == 0:
             raise EmptyExtractionPerimeterError()
         policy = MODES[options.mode]
         effective = set(policy.extract_sources) | ({"wos"} if options.include_wos else set())
@@ -108,7 +109,7 @@ class ExtractPhase:
                     since=since,
                 )
                 try:
-                    return self.extract_one(source, args, breaker)
+                    return self.extract_one(ctx, source, args, breaker)
                 except ExtractionConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
@@ -191,9 +192,12 @@ def build() -> Phase:
     registry = _extractors()
 
     def extract_one(
-        source: str, args: argparse.Namespace, breaker: SourceCircuitBreaker | None
+        ctx: PhaseContext,
+        source: str,
+        args: argparse.Namespace,
+        breaker: SourceCircuitBreaker | None,
     ) -> PhaseMetrics:
-        return _run_extract(source, registry[source], args, breaker)
+        return _run_extract(ctx, source, registry[source], args, breaker)
 
     return ExtractPhase(
         count_extraction_structures=_extraction_structure_count,
@@ -203,11 +207,11 @@ def build() -> Phase:
     )
 
 
-def _extraction_structure_count() -> int:
+def _extraction_structure_count(ctx: PhaseContext) -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
     from pipeline.transformation.structures.perimeter import PerimeterQueries
 
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return PerimeterQueries().count_extraction_structures(conn)
 
 
@@ -264,6 +268,7 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 
 
 def _run_extract(
+    ctx: PhaseContext,
     source: str,
     make_extractor: ConstructeurExtracteur,
     args: argparse.Namespace,
@@ -271,5 +276,5 @@ def _run_extract(
 ) -> PhaseMetrics:
     """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous le circuit-breaker de la source, fermeture. `make_extractor` contient le câblage propre à la source."""
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
-    with open_tx() as conn:
+    with ctx.open_tx() as conn:
         return make_extractor(conn, source_log).run(args, breaker=breaker)
