@@ -33,7 +33,6 @@ from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.harvest import ExtractionConfigError
 from pipeline.node_runner import NodeRun, NodeStep, run_nodes
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.modes import MODES
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
@@ -84,10 +83,9 @@ class ExtractPhase:
         options = ctx.options
         if self.count_extraction_structures(ctx) == 0:
             raise EmptyExtractionPerimeterError()
-        policy = MODES[options.mode]
+        policy = options.policy
         effective = set(policy.extract_sources) | ({"wos"} if options.include_wos else set())
-        if options.sources:
-            effective &= options.sources
+        effective &= options.sources
         depuis = self._since_last_daily() if policy.year_selection == "since_last" else None
         since = depuis[0].isoformat() if depuis else None
         if depuis is not None:

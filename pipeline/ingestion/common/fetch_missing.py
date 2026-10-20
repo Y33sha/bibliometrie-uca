@@ -79,12 +79,11 @@ class FetchMissingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les canaux HAL puis le lot parallèle de la recherche par DOI, et assemble les métriques."""
         options = ctx.options
-        sources = options.sources or None
-        hal = not sources or "hal" in sources
-        theses = not sources or "theses" in sources
-        # WoS opt-in, filtre `--sources` optionnel.
+        hal = "hal" in options.sources
+        theses = "theses" in options.sources
+        # WoS opt-in.
         doi_targets = set(
-            select_targets(DOI_SEARCHABLE_SOURCES, sources, include_wos=options.include_wos)
+            select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
         )
         retenus = {
             _HAL_BY_ID: hal,

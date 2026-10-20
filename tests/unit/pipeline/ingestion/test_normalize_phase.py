@@ -6,7 +6,7 @@ Le retrait des documents disparus précède le nettoyage des identités et des a
 import dataclasses
 import logging
 
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import ALL_SOURCES_SET, SOURCE_PRIORITY
 from pipeline.ingestion.common.normalize import NormalizePhase, NormalizeStats
 
 
@@ -34,9 +34,9 @@ def test_le_retrait_precede_le_nettoyage_des_identites_et_des_adresses(contexte)
     assert appels == ["normalize:hal", "prune", "cleanup", "cleanup_addresses", "VACUUM staging"]
 
 
-def test_sans_restriction_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
+def test_toutes_les_sources_sont_normalisees_dans_l_ordre(contexte):
     appels: list[str] = []
-    _run(contexte, appels, sources=None)
+    _run(contexte, appels, sources=ALL_SOURCES_SET)
     assert appels[: len(SOURCE_PRIORITY)] == [f"normalize:{s.value}" for s in SOURCE_PRIORITY]
 
 

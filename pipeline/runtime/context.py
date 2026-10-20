@@ -13,6 +13,8 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
+from domain.sources.registry import ALL_SOURCES_SET
+from pipeline.runtime.modes import MODES, ModePolicy
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Ouvreur de transaction : un appelable qui rend une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
@@ -23,13 +25,11 @@ OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 class RunOptions:
     """Options d'un run, telles que la ligne de commande les pose.
 
-    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent.
-
-    `sources` vaut `None` quand le run n'en restreint aucune ; les phases qui attendent une liste explicite y substituent l'ensemble des sources connues.
+    Toutes les phases reçoivent les mêmes options et lisent celles qui les concernent. `sources` contient les sources du run, toutes par défaut.
     """
 
     mode: str = "full"
-    sources: set[str] | None = None
+    sources: frozenset[str] = ALL_SOURCES_SET
     year: int | None = None
     start_year: int | None = None
     include_wos: bool = False
@@ -37,6 +37,11 @@ class RunOptions:
     rebuild_subjects: bool = False
     raw_store: bool = False
     normalize_full: bool = False
+
+    @property
+    def policy(self) -> ModePolicy:
+        """Politique du mode du run (`MODES`)."""
+        return MODES[self.mode]
 
 
 @dataclass(frozen=True, slots=True)

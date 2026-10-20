@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from domain.sources.registry import ALL_SOURCES_SET
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.ingestion.openalex.fetch_truncated import FetchTruncatedPhase, refetch_openalex
@@ -122,7 +123,7 @@ def test_phase_sautee_sans_openalex_dans_les_sources(open_tx, contexte):
     assert open_tx.transactions == 0
 
 
-@pytest.mark.parametrize("sources", [None, {"openalex"}])
+@pytest.mark.parametrize("sources", [ALL_SOURCES_SET, {"openalex"}])
 def test_phase_tourne_avec_openalex_dans_les_sources(monkeypatch, open_tx, contexte, sources):
     async def _refetch(conn, log):
         return fetch_truncated.PhaseMetrics(updated=1)

@@ -33,7 +33,7 @@ def _non_configuree(source: str) -> PhaseMetrics:
 
 
 def test_hal_channels_then_parallel_doi_with_skip(contexte):
-    # sources=None → toutes les sources ; seule openalex est configurée côté DOI.
+    # Toutes les sources, par défaut ; seule openalex est configurée côté DOI.
     metrics = FetchMissingPhase(
         fetch_hal_by_id=lambda _ctx: PhaseMetrics(new=2),
         fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(new=1),
