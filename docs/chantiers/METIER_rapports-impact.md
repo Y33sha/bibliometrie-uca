@@ -36,13 +36,13 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 ### Phase 1 — Requêtes
 
-- [ ] Total des citations
-- [ ] FWCI moyen, sur toutes les publications et sur les publications avec rôle clé
-- [ ] Ventilation en articles, autres publications et publications non anglophones
+- [x] Total des citations
+- [x] FWCI moyen, sur toutes les publications et sur les publications avec rôle clé
+- [x] Ventilation en articles, autres publications et publications non anglophones
 
 ### Phase 2 — Intégration aux rapports
 
-- [ ] Présentation des indicateurs dans le rapport
+- [x] Section « Impact » du rapport : un tableau par groupe de publications, en lignes par année
 - [ ] Comparaison du rapport d'un laboratoire avec son tableau InCites
 - [ ] Vérification ciblée des écarts suspects entre sources
 
