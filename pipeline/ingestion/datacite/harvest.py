@@ -1,4 +1,4 @@
-"""Moissonnage DataCite : tâche `extract.datacite`.
+"""Moissonnage DataCite : tâche `harvest.datacite`.
 
 Interroge `GET /dois`, année par année, sur les affiliations des créateurs (`creators.affiliation.name`) qui contiennent l'un des mots-clés du périmètre d'extraction, avec une pagination par curseur. La phase `affiliations` tranche ensuite quelles signatures relèvent du périmètre.
 
@@ -15,9 +15,9 @@ from sqlalchemy import Connection
 
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
@@ -28,7 +28,7 @@ from pipeline.runtime.observability.progression import Progression
 
 
 @dataclass(frozen=True)
-class DataciteExtractConfig:
+class DataciteHarvestConfig:
     """Configuration du moissonnage DataCite, lue en base."""
 
     # Mots-clés cherchés dans les affiliations des créateurs.
@@ -44,7 +44,7 @@ def build_query(year: int, keywords: list[str]) -> str:
     return f"publicationYear:{year} AND ({clauses})"
 
 
-def extract_year(
+def harvest_year(
     client: DataciteClient,
     conn: Connection,
     year: int,
@@ -71,7 +71,7 @@ def extract_year(
             return
 
 
-class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteClient]):
+class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
     """Moissonnage DataCite : les DOI dont une affiliation de créateur contient un mot-clé du périmètre, année par année.
 
     Une erreur sur une année est journalisée, et l'extraction passe à la suivante.
@@ -79,15 +79,15 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteClient]):
 
     SOURCE = "datacite"
 
-    def load_config(self, conn: Connection) -> DataciteExtractConfig:
+    def load_config(self, conn: Connection) -> DataciteHarvestConfig:
         keywords = get_extraction_api_ids(conn, "datacite")
         if not keywords:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucun mot-clé (api_ids->'datacite' vide pour le périmètre d'extraction)"
             )
-        return DataciteExtractConfig(keywords=keywords)
+        return DataciteHarvestConfig(keywords=keywords)
 
-    def extract_all(self, args: argparse.Namespace, config: DataciteExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: DataciteHarvestConfig) -> PhaseMetrics:
         keywords = config.keywords
         client = self._client
         years = self._years(args)
@@ -105,7 +105,7 @@ class DataciteExtractor(SourceExtractor[DataciteExtractConfig, DataciteClient]):
             # Une erreur garde les métriques des pages déjà écrites.
             metrics = PhaseMetrics()
             try:
-                extract_year(
+                harvest_year(
                     client,
                     self.conn,
                     annee,

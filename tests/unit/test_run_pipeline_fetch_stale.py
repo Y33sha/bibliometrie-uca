@@ -1,7 +1,7 @@
 """Régressions sur la phase `fetch_stale` / `_run_fetch_stale`.
 
 1. WoS est opt-in (`--include-wos`) : exclu par défaut du refresh, comme
-   `extract` et `fetch_missing`.
+   `harvest` et `fetch_missing`.
 2. Le refetch d'une source pose un circuit-breaker (coupe sur 429 répétés),
    au même titre que fetch_missing — sinon fetch_stale martèle une source
    à bout de budget API.

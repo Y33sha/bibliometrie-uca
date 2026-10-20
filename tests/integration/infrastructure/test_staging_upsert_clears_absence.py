@@ -1,4 +1,4 @@
-"""`upsert_staging` efface le marqueur de disparition : un document retrouvé dans un extract bulk est présent dans sa source."""
+"""`upsert_staging` efface le marqueur de disparition : un document retrouvé dans un harvest bulk est présent dans sa source."""
 
 from sqlalchemy import text
 

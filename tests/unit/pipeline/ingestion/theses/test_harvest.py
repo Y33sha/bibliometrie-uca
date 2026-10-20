@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.theses import harvest
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
-from pipeline.ingestion.theses.harvest import ThesesExtractor, build_query, extract_theses
+from pipeline.ingestion.theses.harvest import ThesesHarvester, build_query, harvest_theses
 from pipeline.runtime.observability.progression import Progression
-from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
 
@@ -62,7 +62,7 @@ def _client(pages: list[list[dict]], *, total: int | None = None) -> MagicMock:
 
 
 def _extraire(client: MagicMock, *, avancement: Progression | None = None, **kwargs):
-    return extract_theses(
+    return harvest_theses(
         client,
         MagicMock(),
         ["PPN1"],
@@ -117,7 +117,7 @@ def test_page_vide_interrompt_la_boucle(ecritures):
 def test_run_interroge_tous_les_etablissements_d_un_coup(configuration, ecritures):
     configuration(harvest, api_ids=["PPN1", "PPN2"])
     client = _client([[_these("2020A"), _these("2020B")]])
-    assert extracteur(ThesesExtractor, client).run(arguments_du_run()).new == 2
+    assert moissonneur(ThesesHarvester, client).run(arguments_du_run()).new == 2
     assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"])
 
 
@@ -125,7 +125,7 @@ def test_run_ecrit_le_bilan_au_feminin(configuration, ecritures, caplog):
     configuration(harvest)
     client = _client([[_these("2020A"), _these("2020B", UpsertOutcome.UNCHANGED)]])
     with caplog.at_level(logging.INFO, logger=_LOGGER.name):
-        extracteur(ThesesExtractor, client).run(arguments_du_run())
+        moissonneur(ThesesHarvester, client).run(arguments_du_run())
     assert "2 thèses trouvées : 1 nouvelle, 0 mise à jour, 1 inchangée" in caplog.text
 
 
@@ -133,20 +133,20 @@ def test_run_avec_une_annee_fait_le_bilan_des_theses_retenues(configuration, ecr
     configuration(harvest)
     client = _client([[_these("2020A"), _these("2021A")]])
     with caplog.at_level(logging.INFO, logger=_LOGGER.name):
-        extracteur(ThesesExtractor, client).run(arguments_du_run(year=2021))
+        moissonneur(ThesesHarvester, client).run(arguments_du_run(year=2021))
     assert "1 thèse trouvée : 1 nouvelle, 0 mise à jour, 0 inchangée" in caplog.text
 
 
 def test_run_sans_ppn_configure_refuse(configuration):
     configuration(harvest, api_ids=[])
-    with pytest.raises(ExtractionConfigError, match="aucun PPN"):
-        extracteur(ThesesExtractor, _client([])).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucun PPN"):
+        moissonneur(ThesesHarvester, _client([])).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     """Le circuit-breaker déclenché laisse les thèses au run suivant."""
     configuration(harvest)
     client = _client([[_these("2020A")]])
-    metrics = extracteur(ThesesExtractor, client).run(arguments_du_run(), breaker=source_a_bout())
+    metrics = moissonneur(ThesesHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
     assert metrics.total == 0
     client.fetch_page.assert_not_called()

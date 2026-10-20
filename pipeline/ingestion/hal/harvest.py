@@ -1,4 +1,4 @@
-"""Moissonnage HAL : tâche `extract.hal`.
+"""Moissonnage HAL : tâche `harvest.hal`.
 
 Interroge l'**union** des collections du périmètre en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne l'union côté serveur : chaque document est récupéré une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient.
 
@@ -15,21 +15,20 @@ from sqlalchemy import Connection
 
 from domain.types import as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_hal_collections
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.hal.api import HalClient
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
 
 @dataclass(frozen=True)
-class HalExtractConfig:
+class HalHarvestConfig:
     """Configuration du moissonnage HAL, lue en base."""
 
     # {code → libellé} des collections HAL des structures du périmètre d'extraction.
@@ -60,11 +59,11 @@ def build_collections_fq(collection_codes: list[str]) -> str:
     return f"collCode_s:({terms})"
 
 
-def extract_union(
+def harvest_union(
     client: HalClient,
-    config: HalExtractConfig,
+    config: HalHarvestConfig,
     conn: Connection,
-    logger: ExtractLogger,
+    logger: ScopedOrPlainLogger,
     avancement: Progression,
     *,
     years: list[int] | None = None,
@@ -110,20 +109,20 @@ def extract_union(
     return metrics
 
 
-class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
+class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
     """Moissonnage HAL : l'union des collections du périmètre, année par année ou depuis une date."""
 
     SOURCE = "hal"
 
-    def load_config(self, conn: Connection) -> HalExtractConfig:
+    def load_config(self, conn: Connection) -> HalHarvestConfig:
         collections = get_hal_collections(conn)
         if not collections:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucune collection HAL (aucune structure du périmètre d'extraction n'a de hal_collection)"
             )
-        return HalExtractConfig(all_collections=dict(collections))
+        return HalHarvestConfig(all_collections=dict(collections))
 
-    def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
         En mode incrémental, un seul périmètre : les notices modifiées depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
@@ -135,7 +134,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
         if args.since:
             return self._extrait_d_un_tenant(
                 client.count(build_query(years=years, since=args.since), fq),
-                lambda avancement: extract_union(
+                lambda avancement: harvest_union(
                     client,
                     config,
                     self.conn,
@@ -151,7 +150,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig, HalClient]):
             return client.count(build_query(years=[annee]), fq)
 
         def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
-            return extract_union(
+            return harvest_union(
                 client,
                 config,
                 self.conn,

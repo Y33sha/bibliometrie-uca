@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-10)
 """Audit (lecture seule) : compléter les auteurs tronqués pendant la pagination du moissonnage OpenAlex.
 
-Parcourt une année du moissonnage OpenAlex par curseur, comme la phase `extract`. Entre la lecture d'une page et la demande de la suivante, retélécharge par son identifiant chaque notice qui compte exactement 100 auteurs dans la liste, plafond des réponses de liste. Rien n'est écrit en base.
+Parcourt une année du moissonnage OpenAlex par curseur, comme la phase `harvest`. Entre la lecture d'une page et la demande de la suivante, retélécharge par son identifiant chaque notice qui compte exactement 100 auteurs dans la liste, plafond des réponses de liste. Rien n'est écrit en base.
 
 Vérifie :
 

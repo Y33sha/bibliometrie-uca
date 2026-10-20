@@ -1,6 +1,6 @@
 """Signaux partagés des phases qui ventilent par source ou par canal.
 
-Utilisés par les phases à interrogation externe (`extract`, `fetch_missing`, `fetch_stale`, `oa_status`) : `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
+Utilisés par les phases à interrogation externe (`harvest`, `fetch_missing`, `fetch_stale`, `oa_status`) : `signal_source_unconfigured` marque un accès API non configuré comme sauté sans interrompre le run.
 """
 
 import logging

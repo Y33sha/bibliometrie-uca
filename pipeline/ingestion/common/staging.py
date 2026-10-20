@@ -1,6 +1,6 @@
 """Table `staging` : écriture des documents rendus par les sources, lecture et marquage par la normalisation.
 
-- `upsert_staging` écrit un document, pour toutes les voies d'entrée (phases `extract`, `fetch_missing` et `fetch_stale`).
+- `upsert_staging` écrit un document, pour toutes les voies d'entrée (phases `harvest`, `fetch_missing` et `fetch_stale`).
 - `StagingQueries` lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
 
 Le commit est à la charge de l'appelant.

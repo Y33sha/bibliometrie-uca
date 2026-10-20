@@ -1,4 +1,4 @@
-"""Moissonnage de HAL par identifiant de personne : tâche `extract_by_person.hal`.
+"""Moissonnage de HAL par identifiant de personne : tâche `harvest_by_person.hal`.
 
 Interroge l'API de recherche avec un filtre Solr qui réunit les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) des personnes du lot, borné par l'année de production. La pagination suit `cursorMark`.
 """
@@ -12,7 +12,7 @@ from domain.persons.identifiers import PersonIdentifierType
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.person_search import (
     Identifiers,
-    PersonSearchExtractor,
+    PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.hal.api import HalClient
@@ -37,7 +37,7 @@ def build_identifiers_fq(identifiers: Identifiers) -> str:
     return " OR ".join(clauses)
 
 
-class HalPersonExtractor(PersonSearchExtractor[HalClient]):
+class HalPersonHarvester(PersonSearchHarvester[HalClient]):
     """Notices HAL des personnes RH, cherchées par ORCID, idHAL et IdRef."""
 
     SOURCE = "hal"

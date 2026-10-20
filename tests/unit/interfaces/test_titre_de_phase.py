@@ -131,7 +131,7 @@ class TestTitreDuRun:
         assert "phases ··· persons" in texte
 
     def test_un_lancement_courant_ne_liste_pas_les_phases(self, terminal) -> None:
-        assert "phases" not in _texte(_titre_du_run(_args(), [("extract", None)]))
+        assert "phases" not in _texte(_titre_du_run(_args(), [("harvest", None)]))
 
     def test_les_reconstructions_demandees_paraissent(self, terminal) -> None:
         texte = _texte(_titre_du_run(_args(rebuild_subjects=True), []))

@@ -5,10 +5,10 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.openalex.person_search import OpenalexPersonExtractor, build_orcid_filter
-from tests.helpers.extractors import arguments_du_run, extracteur
+from pipeline.ingestion.openalex.person_search import OpenalexPersonHarvester, build_orcid_filter
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
-_LOT = OpenalexPersonExtractor.BATCH_SIZE
+_LOT = OpenalexPersonHarvester.BATCH_SIZE
 
 
 def _page(works: list[dict], cursor: str | None) -> dict:
@@ -27,7 +27,7 @@ def test_un_lot_par_tranche_de_50_orcid(identifiants_rh, ecritures):
     client = MagicMock()
     client.fetch_filtered_page.return_value = _page([], None)
 
-    extracteur(OpenalexPersonExtractor, client).run(arguments_du_run())
+    moissonneur(OpenalexPersonHarvester, client).run(arguments_du_run())
 
     filters = [c.args[0] for c in client.fetch_filtered_page.call_args_list]
     assert len(filters) == 2
@@ -49,7 +49,7 @@ def test_work_ecrit_sous_son_identifiant_openalex(identifiants_rh, ecritures):
         _page([], None),
     ]
 
-    extracteur(OpenalexPersonExtractor, client).run(arguments_du_run())
+    moissonneur(OpenalexPersonHarvester, client).run(arguments_du_run())
 
     assert [(e.source_id, e.doi) for e in ecritures] == [("W1", None), ("W2", "10.1/b")]
     assert [e.authors_truncated for e in ecritures] == [False, True]

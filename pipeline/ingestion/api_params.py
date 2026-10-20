@@ -4,7 +4,7 @@ Centralise ces réglages pour éviter la dérive entre scripts. Modifier une val
 """
 
 API_BASE_URLS: dict[str, str] = {
-    # Extracteurs principaux (un endpoint par source)
+    # Moissonneurs principaux (un endpoint par source)
     "hal": "https://api.archives-ouvertes.fr/search/",
     "openalex": "https://api.openalex.org/works",
     "wos": "https://api.clarivate.com/api/wos",

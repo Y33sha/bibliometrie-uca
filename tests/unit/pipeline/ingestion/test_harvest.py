@@ -1,158 +1,122 @@
-"""Tests unitaires de `pipeline.ingestion.common.harvest.SourceExtractor`.
+"""Orchestrateur de la phase `harvest` : sélection des sources par mode, skip des non configurées.
 
-Couvre le cycle `run` (load_config → setup_logging → extract_all) et le log de résumé.
-
-Pas de DB ni de réseau : fake extractor avec `load_config`/`extract_all` déterministes et `Connection` mockée.
+Les dépendances techniques (extraction d'une source, parallélisme, dernière date) sont injectées,
+donc l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une exécution
+synchrone déterministe.
 """
 
-from __future__ import annotations
-
-import argparse
 import logging
-from typing import Any
-from unittest.mock import MagicMock
+from datetime import date
 
 import pytest
 
-from pipeline.ingestion.common.harvest import SourceExtractor
+from pipeline.ingestion.common.harvest import HarvestOne, HarvestPhase
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 
-class _FakeExtractor(SourceExtractor):
-    """Implémentation déterministe pour les tests."""
-
-    SOURCE = "fake"
-
-    def __init__(
-        self,
-        conn,
-        logger,
-        *,
-        config: dict[str, Any] | None = None,
-        metrics: PhaseMetrics | None = None,
-    ) -> None:
-        super().__init__(conn, logger, MagicMock())
-        self._config = config or {"affiliations": ["UCA"]}
-        self._metrics = metrics or PhaseMetrics(new=42)
-        self.load_config_calls = 0
-        self.extract_all_calls: list[dict[str, Any]] = []
-        self.setup_logging_calls = 0
-
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        self.load_config_calls += 1
-        return self._config
-
-    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
-        self.extract_all_calls.append({"args": args, "config": config})
-        return self._metrics
-
-    def setup_logging(self, args, config):  # type: ignore[no-untyped-def]
-        self.setup_logging_calls += 1
+def _sync_run_parallel(thunks):
+    """Exécute les thunks en séquence (déterministe) — même contrat que le primitif parallèle."""
+    return {label: thunk() for label, thunk in thunks.items()}
 
 
-@pytest.fixture
-def logger() -> logging.Logger:
-    return logging.getLogger("test_extract_base")
+def _phase(
+    harvest_one: HarvestOne, *, last_daily: date | None = None, structures: int = 1
+) -> HarvestPhase:
+    return HarvestPhase(
+        count_extraction_structures=lambda _ctx: structures,
+        harvest_one=harvest_one,
+        run_parallel=_sync_run_parallel,
+        get_last_daily_harvest_date=lambda: last_daily,
+    )
 
 
-@pytest.fixture
-def conn():
-    return MagicMock()
+def test_parallel_skips_unconfigured_source(contexte):
+    def harvest_one(_ctx, source, _args, _breaker):
+        if source == "openalex":
+            raise HarvestConfigError("aucune clé")
+        return PhaseMetrics(new=3)
+
+    metrics = _phase(harvest_one).run(contexte(mode="full", sources={"openalex", "theses"}))
+
+    assert {r["key"] for r in metrics.details["table"]["rows"]} == {"theses"}
+    assert metrics.new == 3  # la source configurée est mergée
+    assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
 
 
-class _ParAnnee(SourceExtractor):
-    """Extracteur dont chaque année rapporte un nouveau document et des inchangés, selon `volumes`."""
+def test_since_last_extracts_hal_from_last_date(contexte):
+    calls: list[tuple[str, str | None]] = []
 
-    SOURCE = "hal"
+    def harvest_one(_ctx, source, args, _breaker):
+        calls.append((source, args.since))
+        return PhaseMetrics(new=5)
 
-    def __init__(self, logger, volumes: dict[int, int]) -> None:
-        super().__init__(MagicMock(), logger, MagicMock())
-        self.volumes = volumes
-        self.libelles: list[str] = []
-        self.totaux: list[int | None] = []
-        self.avancement = None
+    metrics = _phase(harvest_one, last_daily=date(2026, 1, 1)).run(contexte(mode="daily"))
 
-    def load_config(self, conn):  # type: ignore[no-untyped-def]
-        return None
-
-    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
-        def extrait(annee, avancement):
-            self.avancement = avancement
-            self.libelles.append(avancement._libelle)
-            self.totaux.append(avancement._total)
-            return PhaseMetrics(new=1, unchanged=self.volumes[annee] - 1)
-
-        return self._extrait_par_annee(list(self.volumes), self.volumes.__getitem__, extrait)
+    assert calls == [
+        ("hal", "2026-01-01")
+    ]  # HAL seul, en incrémental depuis la dernière extraction
+    assert metrics.details["table"]["rows"][0]["key"] == "hal"
 
 
-def _args() -> argparse.Namespace:
-    return argparse.Namespace(year=None, start_year=None)
+def test_theses_ignores_year_range_bound(contexte):
+    seen: dict[str, tuple[int | None, int | None]] = {}
+
+    def harvest_one(_ctx, source, args, _breaker):
+        seen[source] = (args.start_year, args.year)
+        return PhaseMetrics()
+
+    _phase(harvest_one).run(contexte(mode="full", sources={"hal", "theses"}, start_year=2020))
+
+    assert seen["hal"] == (2020, None)  # borne large appliquée
+    assert seen["theses"] == (None, None)  # theses ramène tout l'historique des PPN
 
 
-class TestExtractionParAnnee:
-    """Une barre par source, dont le libellé suit l'année en cours, puis un bilan."""
-
-    def test_le_libelle_suit_l_annee_en_cours(self, logger):
-        ext = _ParAnnee(logger, {2023: 2, 2024: 3})
-        ext.run(_args())
-        assert "2023" in ext.libelles[0]
-        assert "2024" in ext.libelles[1]
-
-    def test_une_extraction_complete_affiche_la_plage_d_annees(self, logger):
-        ext = _ParAnnee(logger, {2023: 2, 2024: 3})
-        ext.run(_args())
-        assert ext.avancement._libelle.rstrip().endswith("2023-2024")
-
-    def test_le_total_de_la_barre_somme_les_annees(self, logger):
-        ext = _ParAnnee(logger, {2023: 2, 2024: 3})
-        ext.run(_args())
-        assert ext.totaux == [5, 5]
-
-    def test_le_bilan_ventile_les_documents(self, logger, caplog):
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _ParAnnee(logger, {2023: 2, 2024: 3}).run(_args())
-        assert "5 documents trouvés : 2 nouveaux, 0 mis à jour, 3 inchangés" in caplog.text
-
-    def test_le_bilan_accorde_au_singulier(self, logger, caplog):
-        with caplog.at_level(logging.INFO, logger=logger.name):
-            _ParAnnee(logger, {2024: 1}).run(_args())
-        assert "1 document trouvé : 1 nouveau, 0 mis à jour, 0 inchangé" in caplog.text
-
-    def test_une_source_a_bout_nomme_les_annees_sautees(self, logger, caplog):
-        breaker = MagicMock()
-        breaker.tripped = True
-        with caplog.at_level(logging.WARNING, logger=logger.name):
-            _ParAnnee(logger, {2023: 2, 2024: 3}).run(_args(), breaker=breaker)
-        assert "années 2023, 2024 sautées" in caplog.text
+def _indisponible(source: str) -> PhaseMetrics:
+    """Métriques que rend l'accès à une source indisponible."""
+    metrics = PhaseMetrics()
+    signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="harvest")
+    return metrics
 
 
-class _DUnTenant(_ParAnnee):
-    """Extracteur d'un seul tenant, dont le bilan nomme le critère de recherche."""
+def test_parallel_skips_unavailable_source(contexte):
+    """Une source indisponible (500 répétés sous circuit-breaker) est sautée : la phase se termine en ambre et les autres sources aboutissent."""
 
-    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
-        return self._extrait_d_un_tenant(
-            2, lambda avancement: PhaseMetrics(new=2), par="ORCID, IdRef"
-        )
+    def harvest_one(_ctx, source, _args, _breaker):
+        if source == "hal":
+            return _indisponible("hal")
+        return PhaseMetrics(new=3)
+
+    metrics = _phase(harvest_one).run(contexte(mode="full", sources={"hal", "theses"}))
+
+    assert {r["key"] for r in metrics.details["table"]["rows"]} == {"theses"}  # theses aboutit
+    assert metrics.new == 3
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
-def test_le_bilan_nomme_le_critere_de_recherche(logger, caplog):
-    with caplog.at_level(logging.INFO, logger=logger.name):
-        _DUnTenant(logger, {}).run(_args())
-    assert "2 documents trouvés par ORCID, IdRef : 2 nouveaux" in caplog.text
+def test_since_last_marks_hal_unavailable(contexte):
+    """En quotidien, une source HAL indisponible termine la phase en ambre."""
+
+    def harvest_one(_ctx, _source, _args, _breaker):
+        return _indisponible("hal")
+
+    metrics = _phase(harvest_one).run(contexte(mode="daily"))
+
+    assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
+    assert "table" not in metrics.details  # aucune source aboutie
 
 
-class TestRun:
-    def test_happy_path_calls_pipeline_in_order(self, conn, logger):
-        ext = _FakeExtractor(conn, logger)
-        args = argparse.Namespace(year=None, start_year=None)
+def test_empty_extraction_perimeter_stops_the_phase(contexte):
+    """Un périmètre d'extraction sans structure arrête la phase avant toute extraction."""
+    calls: list[str] = []
 
-        metrics = ext.run(args)
+    def harvest_one(_ctx, source, _args, _breaker):
+        calls.append(source)
+        return PhaseMetrics()
 
-        assert ext.load_config_calls == 1
-        assert ext.setup_logging_calls == 1
-        # extract_all reçoit args, config.
-        assert len(ext.extract_all_calls) == 1
-        call = ext.extract_all_calls[0]
-        assert call["args"] is args
-        assert call["config"] == {"affiliations": ["UCA"]}
-        assert metrics.new == 42
+    with pytest.raises(EmptyExtractionPerimeterError, match="perimeter_extraction"):
+        _phase(harvest_one, structures=0).run(contexte(mode="full"))
+
+    assert calls == []

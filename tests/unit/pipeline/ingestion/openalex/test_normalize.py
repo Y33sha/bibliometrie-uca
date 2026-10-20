@@ -350,7 +350,7 @@ class TestInsertOpenalexDocument:
         self, queries: FakeSourcePublicationQueries, work: dict, *, pub_meta: dict | None = None
     ) -> dict:
         # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
-        # cohérent avec le flux réel (extract → insert). Tests qui veulent
+        # cohérent avec le flux réel (harvest → insert). Tests qui veulent
         # forcer une valeur passent un pub_meta explicite.
         if pub_meta is None:
             pub_meta = extract_pub_metadata(work, journal_id=None)

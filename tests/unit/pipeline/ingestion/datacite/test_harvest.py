@@ -10,11 +10,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.datacite import harvest
 from pipeline.ingestion.datacite.api import DatacitePage
-from pipeline.ingestion.datacite.harvest import DataciteExtractor, build_query
-from tests.helpers.extractors import arguments_du_run, extracteur
+from pipeline.ingestion.datacite.harvest import DataciteHarvester, build_query
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 
 def test_requete_par_annee_et_mots_cles():
@@ -45,14 +45,14 @@ def test_suit_le_curseur_jusqu_a_la_derniere_page(configuration, ecritures):
             DatacitePage(records=[{"id": "10.1/c"}], next_url=None),
         ]
     )
-    assert extracteur(DataciteExtractor, client).run(arguments_du_run()).new == 3
+    assert moissonneur(DataciteHarvester, client).run(arguments_du_run()).new == 3
     assert [c.args[1] for c in client.fetch_page.call_args_list] == [None, "https://next/1"]
 
 
 def test_noeud_sans_doi_ignore(configuration, ecritures):
     configuration(harvest)
     client = _client([DatacitePage(records=[{"id": ""}, {"id": "10.1/b"}], next_url=None)])
-    extracteur(DataciteExtractor, client).run(arguments_du_run())
+    moissonneur(DataciteHarvester, client).run(arguments_du_run())
     assert [e.source_id for e in ecritures] == ["10.1/b"]
 
 
@@ -64,18 +64,18 @@ def test_une_erreur_garde_les_pages_deja_ecrites(configuration, ecritures):
             RuntimeError("API indisponible"),
         ]
     )
-    assert extracteur(DataciteExtractor, client).run(arguments_du_run()).new == 1
+    assert moissonneur(DataciteHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_source_indisponible_saute_les_annees_suivantes(configuration, ecritures):
     configuration(harvest, annees=[2023, 2024])
     client = _client([SourceUnavailableError("datacite")])
-    metrics = extracteur(DataciteExtractor, client).run(arguments_du_run())
+    metrics = moissonneur(DataciteHarvester, client).run(arguments_du_run())
     assert metrics.total == 0
     assert client.fetch_page.call_count == 1
 
 
 def test_configuration_sans_mot_cle_refusee(configuration):
     configuration(harvest, api_ids=[])
-    with pytest.raises(ExtractionConfigError, match="aucun mot-clé"):
-        extracteur(DataciteExtractor, _client([])).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucun mot-clé"):
+        moissonneur(DataciteHarvester, _client([])).run(arguments_du_run())

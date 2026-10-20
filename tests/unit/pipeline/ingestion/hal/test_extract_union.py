@@ -1,4 +1,4 @@
-"""Moissonnage HAL d'un périmètre temporel (`extract_union`).
+"""Moissonnage HAL d'un périmètre temporel (`harvest_union`).
 
 Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). On vérifie la pagination (jusqu'à stabilisation du marqueur), la ventilation new/updated/unchanged et l'arrêt sur disjoncteur.
 """
@@ -9,11 +9,11 @@ import logging
 from unittest.mock import MagicMock
 
 from pipeline.ingestion.common.staging import UpsertOutcome
-from pipeline.ingestion.hal.harvest import HalExtractConfig, extract_union
+from pipeline.ingestion.hal.harvest import HalHarvestConfig, harvest_union
 from pipeline.runtime.observability.progression import Progression
 
 _LOGGER = logging.getLogger("test")
-_CONFIG = HalExtractConfig(all_collections={"C": "Coll"})
+_CONFIG = HalHarvestConfig(all_collections={"C": "Coll"})
 
 
 def _page(docs: list[dict], next_cursor: str) -> dict:
@@ -32,7 +32,7 @@ def _client(pages: list[dict]) -> MagicMock:
 
 
 def _extrait(client: MagicMock, **options):
-    return extract_union(
+    return harvest_union(
         client,
         _CONFIG,
         MagicMock(),

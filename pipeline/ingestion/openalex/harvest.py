@@ -1,4 +1,4 @@
-"""Moissonnage OpenAlex : tâche `extract.openalex`.
+"""Moissonnage OpenAlex : tâche `harvest.openalex`.
 
 Interroge `/works` sur la lignée des institutions du périmètre (`authorships.institutions.lineage`), année par année ou depuis une date de modification, avec une pagination par curseur.
 """
@@ -14,21 +14,20 @@ from sqlalchemy import Connection
 from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_extraction_api_ids
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
 
 @dataclass(frozen=True)
-class OpenalexExtractConfig:
+class OpenalexHarvestConfig:
     """Configuration du moissonnage OpenAlex, lue en base."""
 
     # Identifiants OpenAlex des institutions du périmètre d'extraction.
@@ -51,11 +50,11 @@ def stage_work(conn: Connection, metrics: PhaseMetrics, work: Mapping[str, JsonV
     )
 
 
-def extract_period(
+def harvest_period(
     client: OpenalexClient,
     conn: Connection,
     institution_ids: list[str],
-    logger: ExtractLogger,
+    logger: ScopedOrPlainLogger,
     avancement: Progression,
     *,
     years: list[int],
@@ -92,24 +91,24 @@ def extract_period(
     return metrics
 
 
-class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexClient]):
+class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
     """Moissonnage OpenAlex : les works des institutions du périmètre, année par année ou depuis une date."""
 
     SOURCE = "openalex"
 
-    def load_config(self, conn: Connection) -> OpenalexExtractConfig:
+    def load_config(self, conn: Connection) -> OpenalexHarvestConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
         if not institution_ids:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucun institution_id (api_ids->'openalex' vide pour le périmètre d'extraction)"
             )
-        return OpenalexExtractConfig(institution_ids=institution_ids)
+        return OpenalexHarvestConfig(institution_ids=institution_ids)
 
-    def setup_logging(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> None:
+    def setup_logging(self, args: argparse.Namespace, config: OpenalexHarvestConfig) -> None:
         if args.since:
             self.logger.info("Mode incrémental : documents modifiés depuis %s", args.since)
 
-    def extract_all(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: OpenalexHarvestConfig) -> PhaseMetrics:
         """Moissonne les works du périmètre. En mode incrémental, un seul périmètre : les works modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année."""
         ids = config.institution_ids
         client = self._client
@@ -119,7 +118,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig, OpenalexClient]):
             avancement: Progression, *, years: list[int], since: str | None = None
         ) -> PhaseMetrics:
             portee = f"depuis {since}" if since else str(years[0])
-            return extract_period(
+            return harvest_period(
                 client,
                 self.conn,
                 ids,

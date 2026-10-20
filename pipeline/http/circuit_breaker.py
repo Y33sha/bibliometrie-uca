@@ -6,7 +6,7 @@ Le client HTTP le manipule (check / record) ; les boucles du pipeline consultent
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
-Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coroutines — pas de race quand les requêtes async d'une même phase partagent le compteur. Les appelants du helper sync (extracteurs page à page, clients de préfixes DOI, enrichissement des revues) fetchent en séquence.
+Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coroutines — pas de race quand les requêtes async d'une même phase partagent le compteur. Les appelants du helper sync (moissonneurs page à page, clients de préfixes DOI, enrichissement des revues) fetchent en séquence.
 """
 
 from __future__ import annotations

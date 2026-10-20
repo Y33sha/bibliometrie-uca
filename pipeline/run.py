@@ -37,10 +37,10 @@ from infrastructure.observability.log import (
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder
 from pipeline.graph import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.ingestion.common import (
-    extract,
-    extract_by_person,
     fetch_missing,
     fetch_stale,
+    harvest,
+    harvest_by_person,
     normalize,
 )
 from pipeline.ingestion.credentials import source_credentials_missing
@@ -79,8 +79,8 @@ type PhaseBuilder = Callable[[], Phase]
 # Construction de chaque phase. `PHASE_ORDER` fixe l'ordre d'exécution ; un contrôle au
 # démarrage vérifie que le registre couvre exactement les phases qu'il nomme.
 _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
-    "extract": extract.build,
-    "extract_by_person": extract_by_person.build,
+    "harvest": harvest.build,
+    "harvest_by_person": harvest_by_person.build,
     "resolve_ra": resolve_ra.build,
     "fetch_missing": fetch_missing.build,
     "fetch_stale": fetch_stale.build,
@@ -375,7 +375,7 @@ def _run_one_phase(
 
     Une interruption clavier ou une exception est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
     # Injecte le nom de phase dans tous les records émis pendant la phase (logger `normalize:`
-    # plutôt que `pipeline:`), y compris depuis les extracteurs threadés qui héritent du contexte.
+    # plutôt que `pipeline:`), y compris depuis les moissonneurs threadés qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
         # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.

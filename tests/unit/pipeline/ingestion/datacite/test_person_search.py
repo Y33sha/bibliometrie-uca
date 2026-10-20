@@ -7,12 +7,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.datacite.api import DatacitePage
-from pipeline.ingestion.datacite.person_search import DatacitePersonExtractor, build_orcid_query
-from tests.helpers.extractors import arguments_du_run, extracteur
+from pipeline.ingestion.datacite.person_search import DatacitePersonHarvester, build_orcid_query
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
-_LOT = DatacitePersonExtractor.BATCH_SIZE
+_LOT = DatacitePersonHarvester.BATCH_SIZE
 
 
 def test_requete_sur_les_orcid_et_la_plage_d_annees():
@@ -27,7 +27,7 @@ def test_un_lot_par_tranche_d_orcid(identifiants_rh, ecritures):
     client = MagicMock()
     client.fetch_page.return_value = DatacitePage(records=[], next_url=None)
 
-    extracteur(DatacitePersonExtractor, client).run(arguments_du_run())
+    moissonneur(DatacitePersonHarvester, client).run(arguments_du_run())
 
     queries = [c.args[0] for c in client.fetch_page.call_args_list]
     assert len(queries) == 2
@@ -43,7 +43,7 @@ def test_document_ramene_par_deux_lots_ecrit_une_fois(identifiants_rh, ecritures
         DatacitePage(records=[{"id": "10.1/a"}, {"id": ""}], next_url=None),
     ]
 
-    metrics = extracteur(DatacitePersonExtractor, client).run(arguments_du_run())
+    metrics = moissonneur(DatacitePersonHarvester, client).run(arguments_du_run())
 
     assert [e.source_id for e in ecritures] == ["10.1/a", "10.1/b", "10.1/c"]
     assert {e.entry_mode for e in ecritures} == {StagingEntryMode.PERSON_IDENTIFIER}
@@ -53,5 +53,5 @@ def test_document_ramene_par_deux_lots_ecrit_une_fois(identifiants_rh, ecritures
 
 def test_sans_orcid_la_source_n_est_pas_configuree(identifiants_rh):
     identifiants_rh([])
-    with pytest.raises(ExtractionConfigError):
-        extracteur(DatacitePersonExtractor, MagicMock()).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError):
+        moissonneur(DatacitePersonHarvester, MagicMock()).run(arguments_du_run())

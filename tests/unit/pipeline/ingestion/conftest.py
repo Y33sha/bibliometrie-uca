@@ -10,7 +10,7 @@ import pytest
 from domain.persons.identifiers import PersonIdentifierType
 from domain.sources.staging import StagingEntryMode
 from infrastructure.settings import settings
-from pipeline.ingestion.common import harvest, person_search
+from pipeline.ingestion.common import harvester, person_search
 from pipeline.ingestion.common.staging import UpsertOutcome
 
 # Signaux `(inserted, changed)` d'`upsert_staging` pour chaque issue.
@@ -58,7 +58,9 @@ def configuration(monkeypatch):
                 lambda conn, source: ["X"] if api_ids is None else api_ids,
             )
         monkeypatch.setattr(
-            harvest, "get_years", lambda conn, start_year=None: [2024] if annees is None else annees
+            harvester,
+            "get_years",
+            lambda conn, start_year=None: [2024] if annees is None else annees,
         )
 
     return _poser
@@ -85,7 +87,7 @@ def ecritures(monkeypatch) -> list[Ecriture]:
         ecrits.append(Ecriture(source, source_id, doi, authors_truncated, entry_mode))
         return _SIGNAUX[raw_data.get("_route", UpsertOutcome.NEW)]
 
-    monkeypatch.setattr(harvest, "upsert_staging", _upsert)
+    monkeypatch.setattr(harvester, "upsert_staging", _upsert)
     return ecrits
 
 

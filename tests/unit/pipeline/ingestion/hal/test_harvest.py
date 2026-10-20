@@ -1,6 +1,6 @@
 """Moissonnage HAL (`pipeline.ingestion.hal.harvest`).
 
-Requêtes Solr et champs des notices : fonctions pures. Pilotage par `HalExtractor` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
+Requêtes Solr et champs des notices : fonctions pures. Pilotage par `HalHarvester` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
 """
 
 from __future__ import annotations
@@ -10,12 +10,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.common import harvest as common_harvest
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common import harvester as common_harvest
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.hal import harvest
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.ingestion.hal.harvest import HalExtractor, build_collections_fq, build_query
-from tests.helpers.extractors import arguments_du_run
+from pipeline.ingestion.hal.harvest import HalHarvester, build_collections_fq, build_query
+from tests.helpers.harvesters import arguments_du_run
 
 _LOGGER = logging.getLogger("test")
 
@@ -85,7 +85,7 @@ def _client() -> MagicMock:
 def test_une_passe_par_annee_de_la_configuration(configuration):
     configuration({"C": "Coll"}, [2023, 2024])
     client = _client()
-    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run())
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run())
     requetes = [appel.args[0] for appel in client.fetch_page_cursor.call_args_list]
     assert requetes == [build_query(years=[2023]), build_query(years=[2024])]
 
@@ -93,7 +93,7 @@ def test_une_passe_par_annee_de_la_configuration(configuration):
 def test_chaque_annee_est_comptee_avant_l_extraction(configuration):
     configuration({"C": "Coll"}, [2023, 2024])
     client = _client()
-    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run())
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run())
     fq = build_collections_fq(["C"])
     comptees = [appel.args for appel in client.count.call_args_list]
     assert comptees == [(build_query(years=[2023]), fq), (build_query(years=[2024]), fq)]
@@ -102,14 +102,14 @@ def test_chaque_annee_est_comptee_avant_l_extraction(configuration):
 def test_une_annee_demandee_ignore_la_configuration(configuration):
     configuration({"C": "Coll"}, [2020, 2021])
     client = _client()
-    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(year=2024))
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(year=2024))
     assert client.fetch_page_cursor.call_args.args[0] == build_query(years=[2024])
 
 
 def test_mode_incremental_fait_une_seule_passe_sur_la_date(configuration):
     configuration({"C": "Coll"}, [2020, 2021, 2022])
     client = _client()
-    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
     assert client.fetch_page_cursor.call_count == 1
 
 
@@ -117,7 +117,7 @@ def test_mode_incremental_garde_les_annees_du_mode_complet(configuration):
     # Une notice ancienne modifiée depuis la date reste hors de la plage d'années.
     configuration({"C": "Coll"}, [2020, 2021, 2022])
     client = _client()
-    HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
+    HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))
     attendue = build_query(years=[2020, 2021, 2022], since="2026-01-01")
     assert client.count.call_args.args[0] == attendue
     assert client.fetch_page_cursor.call_args.args[0] == attendue
@@ -125,8 +125,8 @@ def test_mode_incremental_garde_les_annees_du_mode_complet(configuration):
 
 def test_sans_collection_refuse(configuration):
     configuration({}, [2024])
-    with pytest.raises(ExtractionConfigError, match="aucune collection HAL"):
-        HalExtractor(MagicMock(), _LOGGER, _client()).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucune collection HAL"):
+        HalHarvester(MagicMock(), _LOGGER, _client()).run(arguments_du_run())
 
 
 def test_s_arrete_quand_la_source_est_a_bout(configuration):
@@ -134,6 +134,6 @@ def test_s_arrete_quand_la_source_est_a_bout(configuration):
     client = _client()
     breaker = MagicMock()
     breaker.tripped = True
-    metrics = HalExtractor(MagicMock(), _LOGGER, client).run(arguments_du_run(), breaker=breaker)
+    metrics = HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(), breaker=breaker)
     assert metrics.total == 0
     client.fetch_page_cursor.assert_not_called()

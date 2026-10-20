@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 from domain.persons.identifiers import PersonIdentifierType as T
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.hal.person_search import HalPersonExtractor, build_identifiers_fq
-from tests.helpers.extractors import arguments_du_run, extracteur
+from pipeline.ingestion.hal.person_search import HalPersonHarvester, build_identifiers_fq
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 
 def _page(docs: list[dict], cursor: str) -> dict:
@@ -31,7 +31,7 @@ def test_suit_le_marqueur_jusqu_a_sa_repetition(identifiants_rh, ecritures):
         _page([{"halId_s": "hal-3"}], "c1"),
     ]
 
-    extracteur(HalPersonExtractor, client).run(arguments_du_run())
+    moissonneur(HalPersonHarvester, client).run(arguments_du_run())
 
     assert [(e.source_id, e.doi) for e in ecritures] == [
         ("hal-1", "10.1/a"),

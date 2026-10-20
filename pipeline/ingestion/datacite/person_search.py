@@ -1,4 +1,4 @@
-"""Moissonnage de DataCite par ORCID : tâche `extract_by_person.datacite`.
+"""Moissonnage de DataCite par ORCID : tâche `harvest_by_person.datacite`.
 
 Interroge `GET /dois` sur les ORCID des créateurs (`creators.nameIdentifiers.nameIdentifier`).
 """
@@ -11,7 +11,7 @@ from domain.persons.identifiers import PersonIdentifierType, orcid_uri
 from domain.types import JsonValue
 from pipeline.ingestion.common.person_search import (
     Identifiers,
-    PersonSearchExtractor,
+    PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
@@ -30,7 +30,7 @@ def build_orcid_query(orcids: list[str], first_year: int, last_year: int) -> str
     )
 
 
-class DatacitePersonExtractor(PersonSearchExtractor[DataciteClient]):
+class DatacitePersonHarvester(PersonSearchHarvester[DataciteClient]):
     """DOI DataCite des personnes RH, cherchés par ORCID."""
 
     SOURCE = "datacite"
