@@ -112,7 +112,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
 - [x] Reconnaissance des formes de nom de structures hors de `address_resolution.py`. 627f38a48
 - [x] Synchronisation des détections commune aux adresses et à IdRef. dd8a3218a
-- [ ] Modules du périmètre : `perimeter`, `perimeter_evidence`, `in_perimeter`, port `AffiliationsQueries`.
+- [x] Modules du périmètre : `perimeter`, `perimeter_evidence`, `in_perimeter`, port `AffiliationsQueries`. 2318e868f
 - [ ] Place de `countries/`.
 
 ### Phase 6 — `publications`
