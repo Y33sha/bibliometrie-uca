@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.openalex import api, harvest
 from pipeline.ingestion.openalex.api import build_params
-from pipeline.ingestion.openalex.harvest import OpenalexExtractor, extract_period
+from pipeline.ingestion.openalex.harvest import OpenalexHarvester, harvest_period
 from pipeline.runtime.observability.progression import Progression
-from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
 
@@ -102,7 +102,7 @@ def _client(pages: list[dict]) -> MagicMock:
 
 
 def _extraire(client: MagicMock, years: list[int] | None = None):
-    return extract_period(
+    return harvest_period(
         client, MagicMock(), ["I1"], _LOGGER, _avancement(), years=years or [2024]
     )
 
@@ -147,7 +147,7 @@ def test_page_sans_resultat_interrompt(ecritures):
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2023, 2024])
     client = _client([_page([_work("W1")]), _page([_work("W2")])])
-    metrics = extracteur(OpenalexExtractor, client).run(arguments_du_run())
+    metrics = moissonneur(OpenalexHarvester, client).run(arguments_du_run())
     assert metrics.new == 2
     assert [appel.kwargs["years"] for appel in client.count.call_args_list] == [[2023], [2024]]
 
@@ -155,14 +155,14 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021])
     client = _client([_page([_work("W1")])])
-    extracteur(OpenalexExtractor, client).run(arguments_du_run(year=2024))
+    moissonneur(OpenalexHarvester, client).run(arguments_du_run(year=2024))
     assert client.fetch_page.call_args.kwargs["years"] == [2024]
 
 
 def test_run_incremental_fait_une_seule_passe_sur_la_date(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021, 2022])
     client = _client([_page([_work("W1")])])
-    extracteur(OpenalexExtractor, client).run(arguments_du_run(since="2026-01-01"))
+    moissonneur(OpenalexHarvester, client).run(arguments_du_run(since="2026-01-01"))
     assert client.fetch_page.call_count == 1
     assert client.fetch_page.call_args.kwargs["since"] == "2026-01-01"
     assert client.count.call_args.kwargs["since"] == "2026-01-01"
@@ -171,20 +171,22 @@ def test_run_incremental_fait_une_seule_passe_sur_la_date(configuration, ecritur
 def test_run_incremental_garde_les_annees_du_mode_complet(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021, 2022])
     client = _client([_page([_work("W1")])])
-    extracteur(OpenalexExtractor, client).run(arguments_du_run(since="2026-01-01"))
+    moissonneur(OpenalexHarvester, client).run(arguments_du_run(since="2026-01-01"))
     assert client.fetch_page.call_args.kwargs["years"] == [2020, 2021, 2022]
     assert client.count.call_args.kwargs["years"] == [2020, 2021, 2022]
 
 
 def test_run_sans_institution_refuse(configuration):
     configuration(harvest, api_ids=[])
-    with pytest.raises(ExtractionConfigError, match="aucun institution_id"):
-        extracteur(OpenalexExtractor, _client([])).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucun institution_id"):
+        moissonneur(OpenalexHarvester, _client([])).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     configuration(harvest, annees=[2023, 2024])
     client = _client([])
-    metrics = extracteur(OpenalexExtractor, client).run(arguments_du_run(), breaker=source_a_bout())
+    metrics = moissonneur(OpenalexHarvester, client).run(
+        arguments_du_run(), breaker=source_a_bout()
+    )
     assert metrics.total == 0
     client.fetch_page.assert_not_called()

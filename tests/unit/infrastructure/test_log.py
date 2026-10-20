@@ -50,7 +50,7 @@ class TestPhaseNameFilter:
             reset_log_phase(token)
 
     def test_reset_restores_previous_phase(self):
-        token = set_log_phase("extract")
+        token = set_log_phase("harvest")
         reset_log_phase(token)
         record = _record("scanr")
         _PhaseNameFilter().filter(record)
@@ -58,7 +58,7 @@ class TestPhaseNameFilter:
 
     def test_phase_propagates_to_worker_thread(self):
         """Un worker qui rejoue sa tâche dans une copie du contexte hérite de la
-        phase — indispensable aux extracteurs threadés (`copy_context().run`)."""
+        phase — indispensable aux moissonneurs threadés (`copy_context().run`)."""
         import contextvars
         from concurrent.futures import ThreadPoolExecutor
 
@@ -69,13 +69,13 @@ class TestPhaseNameFilter:
             _PhaseNameFilter().filter(record)
             seen.append(record.name)
 
-        token = set_log_phase("extract")
+        token = set_log_phase("harvest")
         try:
             with ThreadPoolExecutor(max_workers=1) as pool:
                 pool.submit(contextvars.copy_context().run, work).result()
         finally:
             reset_log_phase(token)
-        assert seen == ["extract"]
+        assert seen == ["harvest"]
 
 
 class TestRebaseLogDir:
@@ -414,7 +414,7 @@ class TestGabaritDuMessage:
 
         from infrastructure.observability.log import JsonFormatter
 
-        record = logging.LogRecord("extract:hal", logging.INFO, "x", 1, msg, args, None)
+        record = logging.LogRecord("harvest:hal", logging.INFO, "x", 1, msg, args, None)
         return json.loads(JsonFormatter().format(record))
 
     def test_le_gabarit_accompagne_le_message_formate(self):

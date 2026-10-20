@@ -1,4 +1,4 @@
-"""Moissonnage de Crossref par ORCID : tâche `extract_by_person.crossref`.
+"""Moissonnage de Crossref par ORCID : tâche `harvest_by_person.crossref`.
 
 Interroge `GET /works` avec le filtre `orcid`, une fois par ORCID du lot : Crossref réunit par OU les filtres de même nom. Les dates de publication bornent la recherche (`from-pub-date`, `until-pub-date`). La pagination suit le curseur (`next-cursor`). Polite pool par le `User-Agent`.
 """
@@ -12,7 +12,7 @@ from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_str
 from pipeline.ingestion.common.person_search import (
     Identifiers,
-    PersonSearchExtractor,
+    PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.crossref.api import CrossrefClient
@@ -29,7 +29,7 @@ def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> st
     )
 
 
-class CrossrefPersonExtractor(PersonSearchExtractor[CrossrefClient]):
+class CrossrefPersonHarvester(PersonSearchHarvester[CrossrefClient]):
     """Œuvres Crossref des personnes RH, cherchées par ORCID."""
 
     SOURCE = "crossref"

@@ -1,4 +1,4 @@
-"""Phase `extract_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
+"""Phase `harvest_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
 
 Une tâche par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
 
@@ -18,10 +18,10 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    Extractor,
-    ExtractorFactory,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    Harvester,
+    HarvesterFactory,
 )
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
@@ -40,14 +40,14 @@ SearchOne = Callable[
 
 
 @dataclass(frozen=True)
-class ExtractByPersonPhase:
+class HarvestByPersonPhase:
     search_one: SearchOne
     run_parallel: RunParallel
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute en parallèle la tâche de chaque source retenue et assemble les métriques."""
         options = ctx.options
-        if not options.policy.extract_by_person:
+        if not options.policy.harvest_by_person:
             ctx.logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
             return PhaseMetrics()
         effective = set(PERSON_SEARCHED_SOURCES) & options.sources
@@ -57,10 +57,10 @@ class ExtractByPersonPhase:
                 args = argparse.Namespace(start_year=options.start_year, year=options.year)
                 try:
                     return self.search_one(ctx, source, args, breaker)
-                except ExtractionConfigError as exc:
+                except HarvestConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
-                        metrics, source, str(exc), logger=ctx.logger, phase="extract_by_person"
+                        metrics, source, str(exc), logger=ctx.logger, phase="harvest_by_person"
                     )
                     return metrics
 
@@ -70,9 +70,9 @@ class ExtractByPersonPhase:
             return lambda _ctx: source in effective
 
         by_task = run_tasks(
-            "extract_by_person",
+            "harvest_by_person",
             {
-                f"extract_by_person.{source}": TaskStep(
+                f"harvest_by_person.{source}": TaskStep(
                     task(source),
                     label=source_label(source),
                     progress_bar=True,
@@ -96,7 +96,7 @@ class ExtractByPersonPhase:
 def build() -> Phase:
     from pipeline.runtime.parallel import run_parallel
 
-    registry = _extractors()
+    registry = _harvesters()
 
     def search_one(
         ctx: PhaseContext,
@@ -108,44 +108,44 @@ def build() -> Phase:
         with ctx.open_tx() as conn:
             return registry[source](conn, source_log).run(args, breaker=breaker)
 
-    return ExtractByPersonPhase(search_one=search_one, run_parallel=run_parallel)
+    return HarvestByPersonPhase(search_one=search_one, run_parallel=run_parallel)
 
 
-def _extractors() -> dict[str, ExtractorFactory]:
-    """Constructeur de l'extracteur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
+def _harvesters() -> dict[str, HarvesterFactory]:
+    """Constructeur de le moissonneur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
     from pipeline.ingestion.api_params import API_BASE_URLS
 
-    def datacite(conn: Connection, source_log: logging.Logger) -> Extractor:
+    def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.datacite.api import DataciteClient
-        from pipeline.ingestion.datacite.person_search import DatacitePersonExtractor
+        from pipeline.ingestion.datacite.person_search import DatacitePersonHarvester
 
-        return DatacitePersonExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
+        return DatacitePersonHarvester(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
 
-    def crossref(conn: Connection, source_log: logging.Logger) -> Extractor:
+    def crossref(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.crossref.api import CrossrefClient
-        from pipeline.ingestion.crossref.person_search import CrossrefPersonExtractor
+        from pipeline.ingestion.crossref.person_search import CrossrefPersonHarvester
 
-        return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
+        return CrossrefPersonHarvester(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
 
-    def openalex(conn: Connection, source_log: logging.Logger) -> Extractor:
+    def openalex(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.openalex.api import OpenalexClient
-        from pipeline.ingestion.openalex.person_search import OpenalexPersonExtractor
+        from pipeline.ingestion.openalex.person_search import OpenalexPersonHarvester
 
-        return OpenalexPersonExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
+        return OpenalexPersonHarvester(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
-    def hal(conn: Connection, source_log: logging.Logger) -> Extractor:
+    def hal(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.hal.api import HalClient
-        from pipeline.ingestion.hal.person_search import HalPersonExtractor
+        from pipeline.ingestion.hal.person_search import HalPersonHarvester
 
-        return HalPersonExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
+        return HalPersonHarvester(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
-    def scanr(conn: Connection, source_log: logging.Logger) -> Extractor:
+    def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.api import ScanrClient
-        from pipeline.ingestion.scanr.person_search import ScanrPersonExtractor
+        from pipeline.ingestion.scanr.person_search import ScanrPersonHarvester
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
-        return ScanrPersonExtractor(conn, source_log, client)
+        return ScanrPersonHarvester(conn, source_log, client)
 
     return {
         "datacite": datacite,

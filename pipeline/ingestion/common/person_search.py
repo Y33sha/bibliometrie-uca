@@ -1,4 +1,4 @@
-"""Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `extract_by_person`.
+"""Moissonnage d'une source par l'identifiant des personnes RH, identifiant confirmé ou authentifié : socle commun des tâches `harvest_by_person`.
 
 Chaque source interroge des lots de personnes, page après page, sur la plage d'années de l'extraction. Une requête réunit tous les identifiants des personnes du lot, dans les types que la source accepte (`PERSON_SEARCH_IDENTIFIERS`). Un document que plusieurs lots ramènent est écrit une fois par run. Une erreur sur un lot est journalisée, et le moissonnage passe au suivant.
 """
@@ -19,9 +19,9 @@ from domain.sources.registry import Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.runtime.observability.libelles import accord, forme
@@ -82,7 +82,7 @@ class PersonSearchPage:
     next_token: str | None
 
 
-class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT]):
+class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT]):
     """Documents des personnes RH, cherchés par lots de personnes."""
 
     # Personnes par requête.
@@ -114,10 +114,10 @@ class PersonSearchExtractor[ClientT](SourceExtractor[PersonSearchConfig, ClientT
     def load_config(self, conn: Connection) -> PersonSearchConfig:
         persons = searched_persons(conn, self.id_types)
         if not persons:
-            raise ExtractionConfigError("aucune personne RH à identifiant confirmé ou authentifié")
+            raise HarvestConfigError("aucune personne RH à identifiant confirmé ou authentifié")
         return PersonSearchConfig(persons=persons)
 
-    def extract_all(self, args: argparse.Namespace, config: PersonSearchConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: PersonSearchConfig) -> PhaseMetrics:
         all_years = self._years(args)
         years = (min(all_years), max(all_years))
         persons = config.persons

@@ -1,16 +1,16 @@
 """Régression : `fetch_truncated` est une phase distincte, placée entre
-`fetch_stale` et `normalize` (ni dans la phase `extract`, ni dans la phase `normalize`).
+`fetch_stale` et `normalize` (ni dans la phase `harvest`, ni dans la phase `normalize`).
 
 Elle cible les works OpenAlex staging à 100 auteurs `processed=FALSE` juste avant
 que normalize ne les consomme — placement qui capte aussi les tronqués ramenés
-par fetch_missing et fetch_stale. La placer en extract (état antérieur) les
+par fetch_missing et fetch_stale. La placer en harvest (état antérieur) les
 ratait ; la garder dans normalize mêlait un fetch réseau à une phase de
 transformation.
 """
 
 from unittest.mock import AsyncMock, patch
 
-from pipeline.ingestion.common import extract, normalize
+from pipeline.ingestion.common import harvest, normalize
 from pipeline.ingestion.common.normalizer import NormalizeStats
 from pipeline.ingestion.openalex import fetch_truncated
 from pipeline.runtime.context import RunOptions
@@ -23,11 +23,11 @@ _REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"
 
 def test_refetch_not_called_in_extract():
     with (
-        patch.object(extract, "_extraction_structure_count", return_value=1),
-        patch.object(extract, "_run_extract", return_value=PhaseMetrics()),
+        patch.object(harvest, "_extraction_structure_count", return_value=1),
+        patch.object(harvest, "_run_harvest", return_value=PhaseMetrics()),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
-        extract.build().run(
+        harvest.build().run(
             phase_context(RunOptions(mode="full"), credentials_missing=lambda _source: None)
         )
     assert refetch.call_count == 0

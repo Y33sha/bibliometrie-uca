@@ -142,8 +142,8 @@ source_modules = [
     "pipeline.ingestion.wos",
 ]
 forbidden_modules = [
-    "pipeline.ingestion.common.extract",
-    "pipeline.ingestion.common.extract_by_person",
+    "pipeline.ingestion.common.harvest",
+    "pipeline.ingestion.common.harvest_by_person",
     "pipeline.ingestion.common.fetch_missing",
     "pipeline.ingestion.common.fetch_stale",
     "pipeline.ingestion.common.normalize",

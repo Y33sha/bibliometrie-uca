@@ -1,4 +1,4 @@
-"""Moissonnage de ScanR par identifiant de personne : tâche `extract_by_person.scanr`.
+"""Moissonnage de ScanR par identifiant de personne : tâche `harvest_by_person.scanr`.
 
 Interroge l'index Elasticsearch avec une clause `should` qui réunit l'IdRef des auteurs (`authors.person`, sous la forme `idref<IdRef>`) et leur ORCID (`authors.denormalized.orcid`), bornée par l'année. La pagination suit `search_after`, sur le tri par identifiant.
 """
@@ -14,7 +14,7 @@ from domain.types import JsonValue, as_mapping, as_sequence, at_path
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.person_search import (
     Identifiers,
-    PersonSearchExtractor,
+    PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.scanr.api import ScanrClient
@@ -48,7 +48,7 @@ def build_identifiers_query(
     return query
 
 
-class ScanrPersonExtractor(PersonSearchExtractor[ScanrClient]):
+class ScanrPersonHarvester(PersonSearchHarvester[ScanrClient]):
     """Documents ScanR des personnes RH, cherchés par IdRef et ORCID."""
 
     SOURCE = "scanr"

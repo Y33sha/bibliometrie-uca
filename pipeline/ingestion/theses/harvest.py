@@ -1,4 +1,4 @@
-"""Moissonnage theses.fr : tâche `extract.theses`.
+"""Moissonnage theses.fr : tâche `harvest.theses`.
 
 Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. Sans année demandée, ramène tout l'historique theses.fr de ces établissements : la plage d'années de la configuration ne s'applique pas.
 """
@@ -13,21 +13,20 @@ from sqlalchemy import Connection
 
 from domain.types import as_int, as_mapping, as_sequence
 from infrastructure.read_models.perimeters import get_extraction_api_ids
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.theses.api import ThesesClient
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression, progression
 
 
 @dataclass(frozen=True)
-class ThesesExtractConfig:
+class ThesesHarvestConfig:
     """Configuration du moissonnage theses.fr, lue en base."""
 
     # PPN des établissements de soutenance du périmètre d'extraction.
@@ -39,11 +38,11 @@ def build_query(ppns: list[str]) -> str:
     return f"etabSoutenancePpn:({' OR '.join(ppns)})"
 
 
-def extract_theses(
+def harvest_theses(
     client: ThesesClient,
     conn: Connection,
     ppns: list[str],
-    logger: ExtractLogger,
+    logger: ScopedOrPlainLogger,
     avancement: Progression,
     *,
     year: int | None = None,
@@ -96,28 +95,28 @@ def extract_theses(
     return metrics
 
 
-class ThesesExtractor(SourceExtractor[ThesesExtractConfig, ThesesClient]):
+class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
     """Moissonnage theses.fr : les thèses des établissements du périmètre."""
 
     SOURCE = "theses"
     DOCUMENT = "thèse"
     FEMININ = True
 
-    def load_config(self, conn: Connection) -> ThesesExtractConfig:
+    def load_config(self, conn: Connection) -> ThesesHarvestConfig:
         ppns = get_extraction_api_ids(conn, "theses")
         if not ppns:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucun PPN d'établissement (api_ids->'theses' vide pour le périmètre d'extraction)"
             )
-        return ThesesExtractConfig(ppns=ppns)
+        return ThesesHarvestConfig(ppns=ppns)
 
-    def extract_all(self, args: argparse.Namespace, config: ThesesExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: ThesesHarvestConfig) -> PhaseMetrics:
         # La colonne du périmètre reste vide sans `--year` : la barre s'aligne sur celles des autres sources.
         portee = str(args.year) if args.year is not None else ""
         with progression(
             None, self._libelle(portee), self.logger, compte_retenus=args.year is not None
         ) as avancement:
-            metrics = extract_theses(
+            metrics = harvest_theses(
                 self._client,
                 self.conn,
                 config.ppns,

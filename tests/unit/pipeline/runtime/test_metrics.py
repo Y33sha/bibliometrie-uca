@@ -4,7 +4,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def test_total_derives_from_breakdown_without_explicit_denominator():
-    # Régression : un extracteur qui catégorise sans renseigner le dénominateur
+    # Régression : un moissonneur qui catégorise sans renseigner le dénominateur
     # (cas OpenAlex/WoS, qui faisaient diverger total < new+updated+unchanged)
     # reporte quand même total = somme catégorisée.
     m = PhaseMetrics()

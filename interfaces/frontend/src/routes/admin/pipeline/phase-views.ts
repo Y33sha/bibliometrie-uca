@@ -45,7 +45,7 @@ export type PhaseView = {
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
-  extract: {
+  harvest: {
     tables: [
       {
         source: "table",

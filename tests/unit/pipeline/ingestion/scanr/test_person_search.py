@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 from domain.persons.identifiers import PersonIdentifierType as T
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.scanr.person_search import ScanrPersonExtractor, build_identifiers_query
-from tests.helpers.extractors import arguments_du_run, extracteur
+from pipeline.ingestion.scanr.person_search import ScanrPersonHarvester, build_identifiers_query
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 
 def _hit(scanr_id: str) -> dict:
@@ -35,7 +35,7 @@ def test_suit_la_cle_de_tri_jusqu_a_la_page_vide(identifiants_rh, ecritures):
         {"hits": {"hits": []}},
     ]
 
-    extracteur(ScanrPersonExtractor, client).run(arguments_du_run())
+    moissonneur(ScanrPersonHarvester, client).run(arguments_du_run())
 
     assert [e.source_id for e in ecritures] == ["doi10.1/a", "hal-2"]
     assert {e.entry_mode for e in ecritures} == {StagingEntryMode.PERSON_IDENTIFIER}

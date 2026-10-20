@@ -1,4 +1,4 @@
-"""Moissonnage d'OpenAlex par ORCID : tâche `extract_by_person.openalex`.
+"""Moissonnage d'OpenAlex par ORCID : tâche `harvest_by_person.openalex`.
 
 Interroge `/works` avec le filtre `authorships.author.orcid`, qui réunit par OU les ORCID d'un lot, borné par `publication_year`. La pagination suit le curseur (`next_cursor`).
 """
@@ -13,7 +13,7 @@ from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.person_search import (
     Identifiers,
-    PersonSearchExtractor,
+    PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
@@ -25,7 +25,7 @@ def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> st
     return f"authorships.author.orcid:{'|'.join(orcids)},publication_year:{first_year}-{last_year}"
 
 
-class OpenalexPersonExtractor(PersonSearchExtractor[OpenalexClient]):
+class OpenalexPersonHarvester(PersonSearchHarvester[OpenalexClient]):
     """Works OpenAlex des personnes RH, cherchés par ORCID."""
 
     SOURCE = "openalex"

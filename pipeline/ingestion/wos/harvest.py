@@ -1,4 +1,4 @@
-"""Moissonnage Web of Science : tâche `extract.wos`.
+"""Moissonnage Web of Science : tâche `harvest.wos`.
 
 Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : celle par `queryId` rend des pages vides.
 """
@@ -13,10 +13,9 @@ from sqlalchemy import Connection
 
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    ExtractLogger,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.wos.api import WosClient
@@ -26,7 +25,7 @@ from pipeline.ingestion.wos.fields import (
     get_records,
     get_records_found,
 )
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 
@@ -40,19 +39,19 @@ _WOS_FIRST_RECORD_LIMIT = 100_000
 
 
 @dataclass(frozen=True)
-class WosExtractConfig:
+class WosHarvestConfig:
     """Configuration du moissonnage WoS, lue en base."""
 
     # Variantes d'affiliation (Organization-Enhanced) du périmètre d'extraction.
     affiliations: list[str]
 
 
-def extract_year(
+def harvest_year(
     client: WosClient,
     conn: Connection,
     year: int,
     affiliations: list[str],
-    logger: ExtractLogger,
+    logger: ScopedOrPlainLogger,
     avancement: Progression,
 ) -> PhaseMetrics:
     """Moissonne les records d'une année, page après page.
@@ -114,7 +113,7 @@ def extract_year(
     return metrics
 
 
-class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
+class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
     """Moissonnage WoS : les records des affiliations du périmètre, année par année.
 
     Une erreur sur une année est journalisée, et l'extraction passe à la suivante.
@@ -122,15 +121,15 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
 
     SOURCE = "wos"
 
-    def load_config(self, conn: Connection) -> WosExtractConfig:
+    def load_config(self, conn: Connection) -> WosHarvestConfig:
         affiliations = get_extraction_api_ids(conn, "wos")
         if not affiliations:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucune affiliation (api_ids->'wos' vide pour le périmètre d'extraction)"
             )
-        return WosExtractConfig(affiliations=affiliations)
+        return WosHarvestConfig(affiliations=affiliations)
 
-    def setup_logging(self, args: argparse.Namespace, config: WosExtractConfig) -> None:
+    def setup_logging(self, args: argparse.Namespace, config: WosHarvestConfig) -> None:
         try:
             remaining = self._client.check_quota()
         except Exception as e:
@@ -139,7 +138,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
         if remaining:
             self.logger.info("Quota annuel restant : %s records", remaining)
 
-    def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: WosHarvestConfig) -> PhaseMetrics:
         affiliations = config.affiliations
         client = self._client
         years = self._years(args)
@@ -156,7 +155,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig, WosClient]):
         def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
             slog = scoped_logger(self.logger, self.SOURCE, str(annee))
             try:
-                metrics = extract_year(client, self.conn, annee, affiliations, slog, avancement)
+                metrics = harvest_year(client, self.conn, annee, affiliations, slog, avancement)
             except SourceUnavailableError:
                 raise
             except Exception as e:

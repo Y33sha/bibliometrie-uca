@@ -1,4 +1,4 @@
-"""Moissonnage ScanR : tâche `extract.scanr`.
+"""Moissonnage ScanR : tâche `harvest.scanr`.
 
 Interroge l'index Elasticsearch de ScanR sur les affiliations du périmètre, année par année, avec une pagination `search_after`.
 """
@@ -14,9 +14,9 @@ from sqlalchemy import Connection
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
-from pipeline.ingestion.common.harvest import (
-    ExtractionConfigError,
-    SourceExtractor,
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    SourceHarvester,
     stage_document,
 )
 from pipeline.ingestion.scanr.api import ScanrClient
@@ -29,7 +29,7 @@ _COMMIT_EVERY = 500
 
 
 @dataclass(frozen=True)
-class ScanrExtractConfig:
+class ScanrHarvestConfig:
     """Configuration du moissonnage ScanR, lue en base."""
 
     # Identifiants ScanR des structures du périmètre d'extraction.
@@ -67,7 +67,7 @@ def build_query(
     return query
 
 
-def extract_year(
+def harvest_year(
     client: ScanrClient,
     conn: Connection,
     year: int,
@@ -109,25 +109,25 @@ def extract_year(
     return metrics
 
 
-class ScanrExtractor(SourceExtractor[ScanrExtractConfig, ScanrClient]):
+class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
     """Moissonnage ScanR : les documents des structures du périmètre, année par année."""
 
     SOURCE = "scanr"
 
-    def load_config(self, conn: Connection) -> ScanrExtractConfig:
+    def load_config(self, conn: Connection) -> ScanrHarvestConfig:
         affiliation_ids = get_extraction_api_ids(conn, "scanr")
         if not affiliation_ids:
-            raise ExtractionConfigError(
+            raise HarvestConfigError(
                 "aucun affiliation_id (api_ids->'scanr' vide pour le périmètre d'extraction)"
             )
-        return ScanrExtractConfig(affiliation_ids=affiliation_ids)
+        return ScanrHarvestConfig(affiliation_ids=affiliation_ids)
 
-    def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
+    def harvest_all(self, args: argparse.Namespace, config: ScanrHarvestConfig) -> PhaseMetrics:
         ids = config.affiliation_ids
         client = self._client
         years = self._years(args)
         return self._extrait_par_annee(
             years,
             lambda annee: client.count(build_query(annee, ids)),
-            lambda annee, avancement: extract_year(client, self.conn, annee, ids, avancement),
+            lambda annee, avancement: harvest_year(client, self.conn, annee, ids, avancement),
         )

@@ -2,7 +2,7 @@
 
 Un `scoped_logger` enveloppe un logger pour préfixer chaque ligne d'un `[source · scope]` (ou `[source]`). Situe toute ligne intermédiaire dans un run multi-sources : on sait d'un coup quelle source — et le cas échéant quel périmètre (année, plage `depuis …`, PPN d'établissement) — produit la ligne, sans le répéter à la main. Indispensable quand plusieurs sources défilent (batchs de normalisation) ou tournent en parallèle (fetch DOI) et que les logs s'entrelacent.
 
-Partagé par les phases d'extraction et de normalisation (`extract/`, `normalize/`).
+Partagé par les phases d'extraction et de normalisation (`harvest/`, `normalize/`).
 """
 
 from __future__ import annotations

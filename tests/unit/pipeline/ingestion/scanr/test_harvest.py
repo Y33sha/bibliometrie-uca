@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.scanr import harvest
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
-from pipeline.ingestion.scanr.harvest import ScanrExtractor, build_query, extract_year
+from pipeline.ingestion.scanr.harvest import ScanrHarvester, build_query, harvest_year
 from pipeline.runtime.observability.progression import Progression
-from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 
 class TestBuildQuery:
@@ -78,7 +78,7 @@ def _client(pages: list[dict]) -> MagicMock:
 
 
 def _extraire(client: MagicMock):
-    return extract_year(client, MagicMock(), 2024, ["S1"], Progression(None, "ScanR", None))
+    return harvest_year(client, MagicMock(), 2024, ["S1"], Progression(None, "ScanR", None))
 
 
 def test_pagination_jusqu_a_la_page_vide(ecritures):
@@ -108,7 +108,7 @@ def test_le_curseur_suit_la_cle_de_tri_du_dernier_document(ecritures):
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2023, 2024])
     client = _client([_page([_hit("a")]), _page([]), _page([_hit("b")]), _page([])])
-    assert extracteur(ScanrExtractor, client).run(arguments_du_run()).new == 2
+    assert moissonneur(ScanrHarvester, client).run(arguments_du_run()).new == 2
     annees = [
         appel.args[0]["query"]["bool"]["filter"][0]["term"]["year"]
         for appel in client.count.call_args_list
@@ -119,20 +119,20 @@ def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
 def test_run_avec_une_annee_demandee_ignore_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2020, 2021, 2022])
     client = _client([_page([_hit("a")]), _page([])])
-    assert extracteur(ScanrExtractor, client).run(arguments_du_run(year=2024)).total == 1
+    assert moissonneur(ScanrHarvester, client).run(arguments_du_run(year=2024)).total == 1
     filtre = client.fetch_page.call_args_list[0].args[0]["query"]["bool"]["filter"]
     assert filtre[0] == {"term": {"year": 2024}}
 
 
 def test_run_sans_affiliation_refuse(configuration):
     configuration(harvest, api_ids=[])
-    with pytest.raises(ExtractionConfigError, match="aucun affiliation_id"):
-        extracteur(ScanrExtractor, _client([])).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucun affiliation_id"):
+        moissonneur(ScanrHarvester, _client([])).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     configuration(harvest, annees=[2023, 2024])
     client = _client([])
-    metrics = extracteur(ScanrExtractor, client).run(arguments_du_run(), breaker=source_a_bout())
+    metrics = moissonneur(ScanrHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
     assert metrics.total == 0
     client.fetch_page.assert_not_called()

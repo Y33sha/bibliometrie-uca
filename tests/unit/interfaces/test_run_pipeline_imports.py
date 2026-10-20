@@ -1,6 +1,6 @@
 """Chargement du code des sources par l'orchestrateur du pipeline.
 
-Chaque source retenue par le run charge ses modules au moment où son extracteur se construit. Une source écartée — `wos` sans `--include-wos` — laisse le sien de côté, et un défaut qui l'atteint laisse le run se dérouler.
+Chaque source retenue par le run charge ses modules au moment où son moissonneur se construit. Une source écartée — `wos` sans `--include-wos` — laisse le sien de côté, et un défaut qui l'atteint laisse le run se dérouler.
 
 L'épreuve passe par un sous-processus : `sys.modules` du processus de test porte ce que les autres tests ont importé.
 """
@@ -20,15 +20,15 @@ _SCRIPT = """
 import sys
 
 import pipeline.run
-from pipeline.ingestion.common import extract
+from pipeline.ingestion.common import harvest
 
-registry = extract._extractors()
+registry = harvest._harvesters()
 print(",".join(sorted(m for m in sys.modules if "{marqueur}" in m)))
 """
 
 
 def _modules_charges(marqueur: str) -> set[str]:
-    """Modules contenant `marqueur` que l'appel de `_extractors()` laisse chargés."""
+    """Modules contenant `marqueur` que l'appel de `_harvesters()` laisse chargés."""
     resultat = subprocess.run(  # noqa: S603 — commande écrite ici, sans valeur extérieure
         [sys.executable, "-c", _SCRIPT.format(marqueur=marqueur)],
         capture_output=True,

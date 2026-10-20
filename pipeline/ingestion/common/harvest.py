@@ -1,291 +1,267 @@
-"""Socle des moissonneurs : patron commun, écriture d'un document dans `staging`.
+"""Orchestrateur de la phase `harvest` : moissonnage des sources vers le staging.
 
-Le patron porte l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur circuit-breaker. Chaque source hérite de `SourceExtractor` et implémente `load_config()` et `extract_all()` ; la pagination (curseur, `search_after`, `firstRecord`, `cursorMark`) reste propre à chaque source.
+Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
-Point d'entrée unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
+- s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
+- lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
+- mode `since_last` (quotidien) : HAL en incrémental depuis le dernier moissonnage quotidien réussi ;
+- sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
+- assemble les métriques par source et signale les sources non configurées.
+
+Les dépendances techniques sont injectées par le composition-root :
+
+- `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
+- `harvest_one(ctx, source, args, breaker)` : ouvre la connexion, câble le moissonneur et l'exécute sous le circuit-breaker de la source ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
+- `run_parallel` : le primitif de parallélisme (thread pool) ;
+- `get_last_daily_harvest_date` : la date du dernier moissonnage quotidien réussi (branche incrémentale).
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
-from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
-from typing import ClassVar, Protocol
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Connection
-
-from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
-from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
-from pipeline.runtime.config import get_years
-from pipeline.runtime.observability.libelles import (
-    SUITE_DE_BRANCHE,
-    accord,
-    branche_de_source,
-    forme,
+from domain.dates import date_to_french, today
+from domain.sources.registry import HARVESTED_SOURCES, source_label
+from infrastructure import PROJECT_ROOT
+from infrastructure.observability.log import setup_logger
+from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    Harvester,
+    HarvesterFactory,
 )
-from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
+from pipeline.runtime.context import Phase, PhaseContext
+from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression, progression
+from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
+from pipeline.runtime.parallel import RunParallel
+from pipeline.task_runner import TaskRun, TaskStep, run_tasks
+from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
-__all__ = [
-    "ExtractLogger",
-    "ExtractionConfigError",
-    "Extractor",
-    "ExtractorFactory",
-    "SourceExtractor",
-    "stage_document",
+if TYPE_CHECKING:
+    from sqlalchemy import Connection
+
+
+HarvestOne = Callable[
+    [PhaseContext, str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics
 ]
+GetLastDailyHarvestDate = Callable[[], date | None]
+
+# `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
+_YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr", "datacite"})
 
 
-# Le préfixage `[source · scope]` est partagé avec la phase de normalisation : sa définition est dans `pipeline.runtime.observability.logging_scope`.
-ExtractLogger = ScopedOrPlainLogger
+def _harvest_window(
+    *, start_year: int | None = None, year: int | None = None, since: str | None = None
+) -> argparse.Namespace:
+    """Construit le `args` consommé par `SourceHarvester.run` (start_year, year, since). HAL et OpenAlex exploitent `since` (incrémental)."""
+    return argparse.Namespace(start_year=start_year, year=year, since=since)
 
 
-type Formes = tuple[str, str]
-"""Singulier et pluriel d'un mot du bilan."""
-
-_FORMES_DU_BILAN: dict[bool, tuple[Formes, Formes, Formes, Formes]] = {
-    False: (
-        ("trouvé", "trouvés"),
-        ("nouveau", "nouveaux"),
-        ("mis à jour", "mis à jour"),
-        ("inchangé", "inchangés"),
-    ),
-    True: (
-        ("trouvée", "trouvées"),
-        ("nouvelle", "nouvelles"),
-        ("mise à jour", "mises à jour"),
-        ("inchangée", "inchangées"),
-    ),
-}
-"""Mots du bilan d'une source, au masculin puis au féminin."""
+def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
+    """Ligne « par source » de la table d'observabilité de la phase."""
+    return {
+        "found": metrics.total,
+        "new": metrics.new,
+        "updated": metrics.updated,
+        "unchanged": metrics.unchanged,
+        "errors": metrics.errors,
+        "duration_s": metrics.duration_s,
+    }
 
 
-def stage_document(
-    conn: Connection,
-    metrics: PhaseMetrics,
-    *,
-    source: str,
-    source_id: str,
-    doi: str | None,
-    raw_data: Mapping[str, JsonValue],
-    authors_truncated: bool = False,
-    entry_mode: StagingEntryMode = StagingEntryMode.BULK,
-) -> None:
-    """Écrit un document dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé."""
-    inserted, changed = upsert_staging(
-        conn,
-        source=source,
-        source_id=source_id,
-        doi=doi,
-        raw_data=raw_data,
-        authors_truncated=authors_truncated,
-        entry_mode=entry_mode,
-    )
-    match UpsertOutcome.of(inserted=inserted, changed=changed):
-        case UpsertOutcome.NEW:
-            metrics.add(new=1)
-        case UpsertOutcome.UPDATED:
-            metrics.add(updated=1)
-        case UpsertOutcome.UNCHANGED:
-            metrics.add(unchanged=1)
+@dataclass(frozen=True)
+class HarvestPhase:
+    count_extraction_structures: Callable[[PhaseContext], int]
+    harvest_one: HarvestOne
+    run_parallel: RunParallel
+    get_last_daily_harvest_date: GetLastDailyHarvestDate
 
+    def run(self, ctx: PhaseContext) -> PhaseMetrics:
+        """Retient les sources effectives selon le mode, exécute leurs tâches en parallèle, et assemble les métriques."""
+        options = ctx.options
+        if self.count_extraction_structures(ctx) == 0:
+            raise EmptyExtractionPerimeterError()
+        policy = options.policy
+        effective = set(policy.harvest_sources) | ({"wos"} if options.include_wos else set())
+        effective &= options.sources
+        depuis = self._since_last_daily() if policy.year_selection == "since_last" else None
+        since = depuis[0].isoformat() if depuis else None
+        if depuis is not None:
+            # Le mode quotidien moissonne HAL seul.
+            effective &= {"hal"}
 
-class ExtractionConfigError(Exception):
-    """Configuration d'extraction incomplète (IDs/affiliations manquants).
-
-    Levée par `load_config` d'un extracteur quand un paramètre API
-    indispensable (IDs institution, affiliations, PPN…) n'est pas
-    disponible. Interrompt l'extraction proprement avec un message
-    explicite au lieu d'un 400 API opaque.
-    """
-
-
-class SourceExtractor[ConfigT, ClientT](ABC):
-    """Template pour l'extraction API → staging.
-
-    `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`, propre à chaque source. Permet aux sous-classes de retourner une dataclass typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu de la config — il la passe à `extract_all` qui sait l'interpréter.
-
-    `ClientT` (paramètre PEP 695) = type du client HTTP de la source, injecté à la construction et stocké en `self._client`.
-
-    Points d'override obligatoires :
-    - `SOURCE` : identifiant source (ex: "hal", "openalex")
-    - `load_config(conn) -> ConfigT` : charge la config depuis la DB (URL, auth, affiliations, etc.)
-    - `extract_all(args, config) -> PhaseMetrics` : boucle d'extraction
-
-    Points d'override optionnels :
-    - `setup_logging(args, config)` : logs de header personnalisés
-    """
-
-    SOURCE: ClassVar[str] = ""
-    DOCUMENT: ClassVar[str] = "document"
-    """Nom des éléments que rapporte la source, au singulier."""
-    FEMININ: ClassVar[bool] = False
-    """Genre de `DOCUMENT`, auquel s'accordent les mots du bilan."""
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        client: ClientT,
-    ) -> None:
-        self.conn = conn
-        self.logger = logger
-        self._client = client
-        # Circuit-breaker de la source (posé par `run`) : les boucles `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
-        self._breaker: SourceCircuitBreaker | None = None
-
-    def _years(self, args: argparse.Namespace) -> list[int]:
-        """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
-        return [args.year] if args.year else get_years(self.conn, start_year=args.start_year)
-
-    def _breaker_tripped(self) -> bool:
-        """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`extract_all` pour stopper la source)."""
-        return self._breaker is not None and self._breaker.tripped
-
-    def _stop_on_tripped(self, remaining: str) -> bool:
-        """`True`, avec avertissement, si le circuit-breaker a tripé : à tester en tête de boucle d'items pour stopper la source. `remaining` nomme les items non traités (accordé par l'appelant), qui repartent au prochain run."""
-        if self._breaker_tripped():
-            self._warn_stopped(remaining)
-            return True
-        return False
-
-    def _warn_stopped(self, remaining: str) -> None:
-        self.logger.warning(
-            "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
-        )
-
-    # ── Barre et bilan de la source ─────────────────────────────
-
-    def _libelle(self, portee: str | None = None) -> str:
-        """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
-        return branche_de_source(self.SOURCE, portee)
-
-    def _extrait_par_annee(
-        self,
-        annees: list[int],
-        compte: Callable[[int], int],
-        extrait: Callable[[int, Progression], PhaseMetrics],
-    ) -> PhaseMetrics:
-        """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
-
-        `compte` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
-
-        Une source indisponible (`SourceUnavailableError`) arrête la boucle : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
-        """
-        metrics = PhaseMetrics()
-        if not annees:
-            return metrics
-        total = sum(compte(annee) for annee in annees)
-        with progression(total, self._libelle(str(annees[0])), self.logger) as avancement:
-            for i, annee in enumerate(annees):
-                restantes = annees[i:]
-                sautees = (
-                    f"{forme(len(restantes), 'année')} {', '.join(map(str, restantes))} "
-                    f"{forme(len(restantes), 'sautée')}"
+        def task(source: str) -> TaskRun:
+            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+                if depuis is not None and source == "hal":
+                    ctx.logger.info(
+                        "%sMode incrémental : notices HAL modifiées depuis le %s (%s)",
+                        BRANCHE,
+                        date_to_french(depuis[0]),
+                        depuis[1],
+                    )
+                args = _harvest_window(
+                    start_year=options.start_year if source in _YEAR_BOUNDED_SOURCES else None,
+                    year=options.year,
+                    since=since,
                 )
-                if self._stop_on_tripped(sautees):
-                    break
-                avancement.renomme(self._libelle(str(annee)))
                 try:
-                    metrics.merge(extrait(annee, avancement))
-                except SourceUnavailableError:
-                    self._warn_stopped(sautees)
-                    break
-            else:
-                plage = f"{annees[0]}-{annees[-1]}" if len(annees) > 1 else str(annees[0])
-                avancement.renomme(self._libelle(plage))
-        self._ecrit_bilan(metrics)
-        return metrics
+                    return self.harvest_one(ctx, source, args, breaker)
+                except HarvestConfigError as exc:
+                    metrics = PhaseMetrics()
+                    signal_source_unconfigured(
+                        metrics, source, str(exc), logger=ctx.logger, phase="harvest"
+                    )
+                    return metrics
 
-    def _extrait_d_un_tenant(
-        self,
-        total: int,
-        extrait: Callable[[Progression], PhaseMetrics],
-        *,
-        par: str | None = None,
-    ) -> PhaseMetrics:
-        """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
-        with progression(total, self._libelle(), self.logger) as avancement:
-            metrics = extrait(avancement)
-        self._ecrit_bilan(metrics, par=par)
-        return metrics
+            return run
 
-    def _ecrit_bilan(
-        self,
-        metrics: PhaseMetrics,
-        *,
-        trouves: int | None = None,
-        par: str | None = None,
-    ) -> None:
-        """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
+        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: source in effective
 
-        `trouves` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `par` nomme le critère de recherche : « trouvés par ORCID ».
-        """
-        trouve, nouveau, mis_a_jour, inchange = _FORMES_DU_BILAN[self.FEMININ]
-        n = metrics.total if trouves is None else trouves
-        self.logger.info(
-            "%s%s %s%s : %s, %s, %s",
-            SUITE_DE_BRANCHE,
-            accord(n, self.DOCUMENT),
-            forme(n, *trouve),
-            f" par {par}" if par else "",
-            accord(metrics.new, *nouveau),
-            accord(metrics.updated, *mis_a_jour),
-            accord(metrics.unchanged, *inchange),
+        by_task = run_tasks(
+            "harvest",
+            {
+                f"harvest.{source}": TaskStep(
+                    task(source),
+                    label=source_label(source),
+                    progress_bar=True,
+                    threshold=5,
+                    when=retenue(source),
+                )
+                for source in HARVESTED_SOURCES
+            },
+            ctx,
+            parallel=self.run_parallel,
         )
 
-    # ── Hooks métier ────────────────────────────────────────────
+        metrics = PhaseMetrics()
+        by_source: dict[str, dict[str, float | None]] = {}
+        for source in HARVESTED_SOURCES:
+            source_metrics = by_task[f"harvest.{source}"]
+            metrics.merge(source_metrics)
+            if source in effective and not skipped(source_metrics):
+                by_source[source] = _source_summary(source_metrics)
+        if by_source:
+            metrics.details["table"] = {
+                "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+            }
+        return metrics
 
-    @abstractmethod
-    def load_config(self, conn: Connection) -> ConfigT:
-        """Charge la config DB (URL, auth, affiliations, années, etc.)."""
+    def _since_last_daily(self) -> tuple[date, str]:
+        """Mode quotidien : date depuis laquelle HAL est moissonné, avec son origine — le dernier moissonnage quotidien réussi, ou les 30 derniers jours."""
+        last = self.get_last_daily_harvest_date()
+        if last is not None:
+            return last, "dernier moissonnage quotidien réussi"
+        return today() - timedelta(
+            days=30
+        ), "aucun moissonnage quotidien réussi, repli sur 30 jours"
 
-    @abstractmethod
-    def extract_all(self, args: argparse.Namespace, config: ConfigT) -> PhaseMetrics:
-        """Pilote l'extraction complète. Retourne les métriques finales."""
 
-    def setup_logging(  # noqa: B027
-        self, args: argparse.Namespace, config: ConfigT
-    ) -> None:
-        """Logs de header personnalisés (ex: affiliations, collections, années)."""
+# ── Câblage ───────────────────────────────────────────────────
 
-    # ── Entry point ─────────────────────────────────────────────
 
-    def run(
-        self,
+def build() -> Phase:
+    from infrastructure.observability.phase_executions import get_last_daily_harvest_date
+    from pipeline.runtime.parallel import run_parallel
+
+    registry = _harvesters()
+
+    def harvest_one(
+        ctx: PhaseContext,
+        source: str,
         args: argparse.Namespace,
-        *,
-        breaker: SourceCircuitBreaker | None = None,
+        breaker: SourceCircuitBreaker | None,
     ) -> PhaseMetrics:
-        """Exécute l'extraction : `load_config` → `setup_logging` → `extract_all`.
+        return _run_harvest(ctx, source, registry[source], args, breaker)
 
-        Invoqué par `run_pipeline`. Les exceptions (`ExtractionConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
-
-        `breaker` : circuit-breaker de la source (posé via la ContextVar par le composition root) ; les boucles `extract_all` le consultent pour stopper une source à bout de budget.
-        """
-        self._breaker = breaker
-        config = self.load_config(self.conn)
-        self.setup_logging(args, config)
-        return self.extract_all(args, config)
+    return HarvestPhase(
+        count_extraction_structures=_extraction_structure_count,
+        harvest_one=harvest_one,
+        run_parallel=run_parallel,
+        get_last_daily_harvest_date=get_last_daily_harvest_date,
+    )
 
 
-class Extractor(Protocol):
-    """Point d'entrée d'un `SourceExtractor`, seul que les orchestrateurs appellent.
+def _extraction_structure_count(ctx: PhaseContext) -> int:
+    """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
+    from pipeline.transformation.structures.perimeter import PerimeterQueries
 
-    Le protocole efface les paramètres de type de `SourceExtractor`, la configuration et le client propres à chaque source.
-    """
-
-    def run(
-        self,
-        args: argparse.Namespace,
-        *,
-        breaker: SourceCircuitBreaker | None = None,
-    ) -> PhaseMetrics: ...
+    with ctx.open_tx() as conn:
+        return PerimeterQueries().count_extraction_structures(conn)
 
 
-type ExtractorFactory = Callable[[Connection, logging.Logger], Extractor]
-"""Construit l'extracteur d'une source sur la connexion de sa phase et le journal scopé à la source."""
+def _harvesters() -> dict[str, HarvesterFactory]:
+    """Constructeur de le moissonneur de chaque source : `(conn, source_log)` → moissonneur câblé.
+
+    `wos` et `scanr` lisent leurs identifiants d'API en configuration.
+
+    Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
+    from pipeline.ingestion.api_params import API_BASE_URLS
+
+    def hal(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.hal.api import HalClient
+        from pipeline.ingestion.hal.harvest import HalHarvester
+
+        return HalHarvester(conn, source_log, HalClient(API_BASE_URLS["hal"]))
+
+    def openalex(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.openalex.api import OpenalexClient
+        from pipeline.ingestion.openalex.harvest import OpenalexHarvester
+
+        return OpenalexHarvester(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
+
+    def wos(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.credentials import get_wos_api_key
+        from pipeline.ingestion.wos.api import WosClient
+        from pipeline.ingestion.wos.harvest import WosHarvester
+
+        client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
+        return WosHarvester(conn, source_log, client)
+
+    def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.credentials import get_scanr_credentials
+        from pipeline.ingestion.scanr.api import ScanrClient
+        from pipeline.ingestion.scanr.harvest import ScanrHarvester
+
+        client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
+        return ScanrHarvester(conn, source_log, client)
+
+    def theses(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.theses.api import ThesesClient
+        from pipeline.ingestion.theses.harvest import ThesesHarvester
+
+        return ThesesHarvester(conn, source_log, ThesesClient(API_BASE_URLS["theses"]))
+
+    def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
+        from pipeline.ingestion.datacite.api import DataciteClient
+        from pipeline.ingestion.datacite.harvest import DataciteHarvester
+
+        return DataciteHarvester(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
+
+    return {
+        "hal": hal,
+        "openalex": openalex,
+        "wos": wos,
+        "scanr": scanr,
+        "theses": theses,
+        "datacite": datacite,
+    }
+
+
+def _run_harvest(
+    ctx: PhaseContext,
+    source: str,
+    make_harvester: HarvesterFactory,
+    args: argparse.Namespace,
+    breaker: SourceCircuitBreaker | None,
+) -> PhaseMetrics:
+    """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous le circuit-breaker de la source, fermeture. `make_harvester` contient le câblage propre à la source."""
+    source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
+    with ctx.open_tx() as conn:
+        return make_harvester(conn, source_log).run(args, breaker=breaker)

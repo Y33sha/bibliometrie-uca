@@ -13,12 +13,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.wos import harvest
-from pipeline.ingestion.wos.harvest import WosExtractor, extract_year
+from pipeline.ingestion.wos.harvest import WosHarvester, harvest_year
 from pipeline.runtime.observability.progression import Progression
-from tests.helpers.extractors import arguments_du_run, extracteur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
 
@@ -52,7 +52,7 @@ def _client(reponses: list, *, total: int | None = None) -> MagicMock:
 
 
 def _extraire(client: MagicMock):
-    return extract_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progression(None, "WoS", None))
+    return harvest_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progression(None, "WoS", None))
 
 
 def test_pagination_sur_le_premier_record(ecritures):
@@ -99,14 +99,14 @@ def test_plafond_de_l_api_interrompt(ecritures):
 def test_run_parcourt_les_annees_de_la_configuration(configuration, ecritures):
     configuration(harvest, annees=[2023, 2024])
     client = _client([_reponse(_records("W1"), total=1), _reponse(_records("W2"), total=1)])
-    assert extracteur(WosExtractor, client).run(arguments_du_run()).new == 2
+    assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 2
 
 
 def test_run_isole_l_echec_d_une_annee(configuration, ecritures):
     """Une année qui lève laisse la suivante s'exécuter."""
     configuration(harvest, annees=[2023, 2024])
     client = _client([RuntimeError("API en panne"), _reponse(_records("W1"), total=1)])
-    assert extracteur(WosExtractor, client).run(arguments_du_run()).new == 1
+    assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_run_survit_a_un_comptage_impossible(configuration, ecritures):
@@ -114,27 +114,27 @@ def test_run_survit_a_un_comptage_impossible(configuration, ecritures):
     configuration(harvest)
     client = _client([_reponse(_records("W1"), total=1)])
     client.count.side_effect = RuntimeError("API en panne")
-    assert extracteur(WosExtractor, client).run(arguments_du_run()).new == 1
+    assert moissonneur(WosHarvester, client).run(arguments_du_run()).new == 1
 
 
 def test_run_survit_a_un_quota_illisible(configuration, ecritures):
     configuration(harvest)
     client = _client([_reponse([], total=0)])
     client.check_quota.side_effect = RuntimeError("service indisponible")
-    assert extracteur(WosExtractor, client).run(arguments_du_run()).total == 0
+    assert moissonneur(WosHarvester, client).run(arguments_du_run()).total == 0
 
 
 def test_run_sans_affiliation_refuse(configuration):
     configuration(harvest, api_ids=[])
-    with pytest.raises(ExtractionConfigError, match="aucune affiliation"):
-        extracteur(WosExtractor, _client([])).run(arguments_du_run())
+    with pytest.raises(HarvestConfigError, match="aucune affiliation"):
+        moissonneur(WosHarvester, _client([])).run(arguments_du_run())
 
 
 def test_run_s_arrete_quand_la_source_devient_indisponible(configuration, ecritures, pauses):
     """Retries épuisés pendant une année : les années suivantes sont sautées sans pause, les métriques déjà acquises sont gardées."""
     configuration(harvest, annees=[2023, 2024, 2025])
     client = _client([_reponse(_records("W1"), total=1), SourceUnavailableError("wos")])
-    metrics = extracteur(WosExtractor, client).run(arguments_du_run())
+    metrics = moissonneur(WosHarvester, client).run(arguments_du_run())
     assert metrics.new == 1
     assert client.fetch_page.call_count == 2
     # Une seule pause, entre 2023 et 2024.
@@ -146,7 +146,7 @@ def test_run_s_arrete_quand_le_comptage_trouve_la_source_indisponible(configurat
     client = _client([])
     client.count.side_effect = SourceUnavailableError("wos")
     with pytest.raises(SourceUnavailableError):
-        extracteur(WosExtractor, client).run(arguments_du_run())
+        moissonneur(WosHarvester, client).run(arguments_du_run())
     assert client.count.call_count == 1
     client.fetch_page.assert_not_called()
 
@@ -154,6 +154,6 @@ def test_run_s_arrete_quand_le_comptage_trouve_la_source_indisponible(configurat
 def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
     configuration(harvest, annees=[2023, 2024])
     client = _client([])
-    metrics = extracteur(WosExtractor, client).run(arguments_du_run(), breaker=source_a_bout())
+    metrics = moissonneur(WosHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
     assert metrics.total == 0
     client.fetch_page.assert_not_called()

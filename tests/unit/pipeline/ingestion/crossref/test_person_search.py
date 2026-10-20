@@ -8,10 +8,10 @@ from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.crossref.api import CrossrefClient
 from pipeline.ingestion.crossref.person_search import (
-    CrossrefPersonExtractor,
+    CrossrefPersonHarvester,
     build_orcid_filter,
 )
-from tests.helpers.extractors import arguments_du_run, extracteur
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 _WORKS = "https://api.crossref.org/works"
 
@@ -35,7 +35,7 @@ def test_suit_le_curseur_jusqu_a_la_page_vide(http_mock, identifiants_rh, ecritu
     )
     client = CrossrefClient(API_BASE_URLS["crossref"])
 
-    metrics = extracteur(CrossrefPersonExtractor, client).run(arguments_du_run())
+    metrics = moissonneur(CrossrefPersonHarvester, client).run(arguments_du_run())
 
     assert [call.url.params["cursor"] for call in route.calls] == ["*", "c1", "c2"]
     assert route.calls[0].url.params["filter"] == (

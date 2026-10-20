@@ -81,7 +81,7 @@ class PhaseMetrics:
     Il vaut le dénominateur explicite `seen` (items interrogés/vus, alimenté par
     `add(seen=…)`) dès qu'il dépasse les catégorisés, sinon la somme catégorisée.
     Garanti `≥ new+updated+unchanged` par construction — impossible de le
-    désynchroniser comme le faisait un compteur saisi à la main (un extracteur qui
+    désynchroniser comme le faisait un compteur saisi à la main (un moissonneur qui
     catégorise sans incrémenter le total fausserait l'affichage).
 
     `details` porte les indicateurs sur-mesure d'observabilité (conventions
@@ -134,7 +134,7 @@ class PhaseMetrics:
     def merge(self, other: PhaseMetrics) -> None:
         """Agrège les compteurs d'un autre `PhaseMetrics` en place.
 
-        Utilisé par les phases qui chaînent plusieurs sous-helpers (ex: la phase `extract` accumule les métriques de ses extracteurs).
+        Utilisé par les phases qui chaînent plusieurs sous-helpers (ex: la phase `harvest` accumule les métriques de ses moissonneurs).
         """
         self.new += other.new
         self.updated += other.updated

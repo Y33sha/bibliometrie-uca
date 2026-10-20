@@ -150,7 +150,7 @@ _CONTAINERS = (
 )
 
 
-# Sources que la phase `extract_by_person` interroge.
+# Sources que la phase `harvest_by_person` interroge.
 PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (
     Source.DATACITE,
     Source.CROSSREF,
@@ -175,8 +175,8 @@ TASKS: tuple[Task, ...] = (
     # Acquisition : les canaux écrivent la dernière observation d'un document dans `staging`, dans un ordre indifférent. Leurs lectures de `staging` dédoublonnent et valent quel que soit l'ordre.
     *(
         _task(
-            f"extract.{source}",
-            "extract",
+            f"harvest.{source}",
+            "harvest",
             reads=(
                 "config",
                 "structures",
@@ -188,20 +188,20 @@ TASKS: tuple[Task, ...] = (
             writes=("staging",),
             previous_run=("staging", "pipeline_phase_executions"),
             network=source,
-            parallel_group="extract",
+            parallel_group="harvest",
         )
         for source in HARVESTED_SOURCES
     ),
     # Interrogation par identifiant de personne : identifiants des personnes RH, posés par la phase `persons` au run précédent.
     *(
         _task(
-            f"extract_by_person.{source}",
-            "extract_by_person",
+            f"harvest_by_person.{source}",
+            "harvest_by_person",
             reads=("config", "persons_rh", "person_identifiers", "staging"),
             writes=("staging",),
             previous_run=("staging", "person_identifiers"),
             network=source,
-            parallel_group="extract_by_person",
+            parallel_group="harvest_by_person",
         )
         for source in PERSON_SEARCHED_SOURCES
     ),
@@ -1179,8 +1179,8 @@ PHASE_ORDER: tuple[str, ...] = tuple(
 """Ordre d'exécution des phases : celui de leurs tâches dans `TASKS`."""
 
 PHASE_LIBELLES: dict[str, str] = {
-    "extract": "Moissonnage par affiliation",
-    "extract_by_person": "Moissonnage par personne",
+    "harvest": "Moissonnage par affiliation",
+    "harvest_by_person": "Moissonnage par personne",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
     "fetch_missing": "Recherche dans chaque source des documents trouvés dans les autres",
     "fetch_stale": "Recherche des documents non revus depuis {delai}",

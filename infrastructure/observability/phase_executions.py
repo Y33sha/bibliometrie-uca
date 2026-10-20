@@ -59,7 +59,7 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
 
 
 def last_daily_extract_date(conn: Connection) -> datetime.date | None:
-    """Jour (UTC) de début de la dernière phase `extract` du mode `daily` terminée sans signal.
+    """Jour (UTC) de début de la dernière phase `harvest` du mode `daily` terminée sans signal.
 
     Sert de borne « depuis » à l'extraction incrémentale. Une extraction par années (mode `full`, éventuellement bornée à `--year`) laisse la borne en place. Le mode `daily` extrait HAL seul : le statut `ok` garantit que HAL a abouti. L'ancrage au jour de début ménage un léger recouvrement, l'upsert staging étant idempotent.
     """
@@ -68,14 +68,14 @@ def last_daily_extract_date(conn: Connection) -> datetime.date | None:
             """
             SELECT max(started_at)
             FROM pipeline_phase_executions
-            WHERE phase = 'extract' AND mode = 'daily' AND status = 'ok'
+            WHERE phase = 'harvest' AND mode = 'daily' AND status = 'ok'
             """
         )
     ).scalar()
     return last.date() if last is not None else None
 
 
-def get_last_daily_extract_date() -> datetime.date | None:
+def get_last_daily_harvest_date() -> datetime.date | None:
     """Variante best-effort ouvrant sa propre connexion ; renvoie None (→ fallback de l'appelant) si la lecture échoue (table absente, connexion impossible)."""
     try:
         with get_sync_engine().connect() as conn:

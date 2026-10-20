@@ -19,26 +19,26 @@ def _at(day: int) -> datetime.datetime:
     return datetime.datetime(2099, 6, day, 8, 0, tzinfo=datetime.UTC)
 
 
-class TestLastDailyExtractDate:
+class TestLastDailyHarvestDate:
     def test_jour_de_la_derniere_extraction_quotidienne(self, sa_sync_conn):
-        _phase(sa_sync_conn, 1, phase="extract", started_at=_at(10))
-        _phase(sa_sync_conn, 2, phase="extract", started_at=_at(15))
+        _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
+        _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(15))
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 15)
 
     def test_extraction_par_annees_ignoree(self, sa_sync_conn):
         """Cas réel : une extraction HAL bornée à 2020 ne ramène pas les dépôts récents."""
-        _phase(sa_sync_conn, 1, phase="extract", started_at=_at(10))
-        _phase(sa_sync_conn, 2, phase="extract", started_at=_at(20), mode="full")
+        _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
+        _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), mode="full")
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
     def test_run_sans_extraction_ignore(self, sa_sync_conn):
-        _phase(sa_sync_conn, 1, phase="extract", started_at=_at(10))
+        _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
         _phase(sa_sync_conn, 2, phase="publications", started_at=_at(20))
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
     def test_extraction_avec_signal_ignoree(self, sa_sync_conn):
         """HAL indisponible ou run interrompu : les notices non récupérées restent dans la fenêtre suivante."""
-        _phase(sa_sync_conn, 1, phase="extract", started_at=_at(10))
-        _phase(sa_sync_conn, 2, phase="extract", started_at=_at(20), status="warning")
-        _phase(sa_sync_conn, 3, phase="extract", started_at=_at(25), status="error")
+        _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
+        _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), status="warning")
+        _phase(sa_sync_conn, 3, phase="harvest", started_at=_at(25), status="error")
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
