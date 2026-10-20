@@ -111,6 +111,22 @@ class PgAuthorshipRepository(AuthorshipRepository):
         ).first()
         return cast(AssignedSignatureRow, dict(row._mapping)) if row else None
 
+    def assign_orphan_source_authorships(
+        self, person_id: int, source_authorship_ids: list[int]
+    ) -> list[int]:
+        if not source_authorship_ids:
+            return []
+        return list(
+            self._conn.execute(
+                text("""
+                    UPDATE source_authorships SET person_id = :pid
+                    WHERE id = ANY(:ids) AND person_id IS NULL
+                    RETURNING id
+                """),
+                {"pid": person_id, "ids": source_authorship_ids},
+            ).scalars()
+        )
+
     def get_distinct_name_forms_from_source_authorships(
         self, source_authorship_ids: list[int]
     ) -> list[str]:

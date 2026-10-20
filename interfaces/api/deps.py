@@ -11,7 +11,6 @@ from collections.abc import Callable, Iterator
 from fastapi import Depends, Request
 from sqlalchemy import Connection
 
-from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
 from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import (
@@ -85,7 +84,6 @@ from infrastructure.settings import settings
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
-    AuthorshipsBuild,
     CountryRecompute,
     JournalRecompute,
     PerimeterStructures,
@@ -343,15 +341,6 @@ _country_recompute_singleton: CountryRecomputePort = CountryRecompute()
 def country_recompute() -> CountryRecomputePort:
     """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
     return _country_recompute_singleton
-
-
-# `AuthorshipsBuild` est sans état (connexion passée aux méthodes) : un singleton par processus suffit.
-_authorships_build_queries_singleton: AuthorshipsBuildQueries = AuthorshipsBuild()
-
-
-def authorships_build_queries() -> AuthorshipsBuildQueries:
-    """Gateway de construction des authorships — variantes par lot consommées par l'attribution admin d'orphelines."""
-    return _authorships_build_queries_singleton
 
 
 # ----- Tâches de fond (BackgroundTasks) -----

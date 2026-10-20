@@ -12,7 +12,6 @@ import logging
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -147,7 +146,6 @@ def batch_assign_orphan_authorships(
     conn: Connection,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
-    build_queries: AuthorshipsBuildQueries,
     audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> int:
@@ -175,7 +173,7 @@ def batch_assign_orphan_authorships(
         force=force,
     )
 
-    assigned = build_queries.assign_orphan_source_authorships_to_person(conn, person_id, sa_ids)
+    assigned = authorship_repo.assign_orphan_source_authorships(person_id, sa_ids)
     skipped = sorted(set(sa_ids) - set(assigned))
     if skipped:
         logger.warning(

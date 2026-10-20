@@ -35,6 +35,14 @@ class AuthorshipRepository(Protocol):
         """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_authorship_owner` départage."""
         ...
 
+    def assign_orphan_source_authorships(
+        self,
+        person_id: int,
+        source_authorship_ids: list[int],
+    ) -> list[int]:
+        """Pose `person_id` sur les contributions sources orphelines du lot et retourne leurs ids. Les contributions sources déjà rattachées restent intactes."""
+        ...
+
     def find_source_authorship_owner(self, source_authorship_id: int) -> int | None:
         """`person_id` d'une signature source. `None` si elle est orpheline ou n'existe pas."""
         ...

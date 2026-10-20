@@ -8,7 +8,6 @@ Les routes sont groupées par sujet, et les chemins littéraux précèdent celui
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
-from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
 from application.ports.read_models.authorships_queries import (
     AuthorshipsQueries,
     OrphanAuthorshipsFacetsResponse,
@@ -23,7 +22,6 @@ from application.services.authorships import commands as authorship_commands
 from interfaces.api.deps import (
     audit_repo,
     authorship_repo,
-    authorships_build_queries,
     authorships_queries,
     db_conn,
     person_repo,
@@ -123,7 +121,6 @@ def batch_assign_orphan_authorships(
     persons: PersonRepository = Depends(person_repo),
     authorships: AuthorshipRepository = Depends(authorship_repo),
     audit: AuditRepository = Depends(audit_repo),
-    build_queries: AuthorshipsBuildQueries = Depends(authorships_build_queries),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs signatures orphelines à une personne existante.
 
@@ -138,7 +135,6 @@ def batch_assign_orphan_authorships(
         body.source_authorship_ids,
         repo=persons,
         authorship_repo=authorships,
-        build_queries=build_queries,
         audit_repo=audit,
         force=body.force,
     )
