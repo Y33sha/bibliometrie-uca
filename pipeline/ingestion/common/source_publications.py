@@ -1,4 +1,4 @@
-"""Écriture des `source_publications`, commune aux normaliseurs de toutes les sources.
+"""Écriture et suppression des `source_publications`. L'écriture est commune aux normaliseurs de toutes les sources.
 
 Une `source_publication` est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule l'identité `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
 
@@ -149,3 +149,85 @@ def _external_ids(row: SourcePublicationUpsert) -> dict[str, JsonValue]:
             extra={"detail": True},
         )
     return clean
+
+
+def _delete_source_publications(
+    conn: Connection, staging_filter: str, params: dict[str, object]
+) -> int:
+    """Supprime les `source_publications` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
+
+    Les `source_publications` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication reçoit `authorships_dirty`. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_authorships` suivent par cascade. Rend le nombre de `source_publications` supprimées.
+    """
+    conn.execute(
+        text(f"""
+            UPDATE publications p
+            SET authorships_dirty = true
+            FROM source_publications sp
+            JOIN staging s ON s.id = sp.staging_id
+            WHERE {staging_filter}
+              AND p.id = sp.publication_id
+              AND NOT p.authorships_dirty
+        """),  # noqa: S608
+        params,
+    )
+    # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.
+    conn.execute(
+        text(f"""
+            UPDATE source_publications soeur
+            SET keys_dirty = true
+            FROM source_publications sp
+            JOIN staging s ON s.id = sp.staging_id
+            WHERE {staging_filter}
+              AND soeur.publication_id = sp.publication_id
+              AND soeur.id <> sp.id
+              AND NOT soeur.keys_dirty
+        """),  # noqa: S608
+        params,
+    )
+    return conn.execute(
+        text(f"""
+            DELETE FROM source_publications sp
+            USING staging s
+            WHERE sp.staging_id = s.id AND {staging_filter}
+        """),  # noqa: S608
+        params,
+    ).rowcount
+
+
+def delete_source_publication_of_staging(conn: Connection, staging_id: int) -> None:
+    """Supprime la `source_publication` de la ligne de `staging` `staging_id` (cf. `_delete_source_publications`)."""
+    _delete_source_publications(conn, "s.id = :staging_id", {"staging_id": staging_id})
+
+
+def delete_disappeared_source_publications(conn: Connection) -> int:
+    """Supprime les `source_publications` dont le staging porte `disappeared_at` (cf. `_delete_source_publications`). La ligne de `staging` reste, avec sa marque.
+
+    Balayage ensembliste, idempotent.
+    """
+    return _delete_source_publications(conn, "s.disappeared_at IS NOT NULL", {})
+
+
+def delete_source_publications_before(
+    conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
+) -> tuple[int, int]:
+    """Supprime les notices parues avant `start_year` (cf. `_delete_source_publications`), puis leur ligne de `staging`. Les notices des sources `exempt_sources` restent.
+
+    Rend le nombre de `source_publications` et de lignes de `staging` supprimées.
+    """
+    staging_ids = list(
+        conn.execute(
+            text("""
+                SELECT sp.staging_id FROM source_publications sp
+                WHERE sp.pub_year < :start_year AND sp.staging_id IS NOT NULL
+                  AND sp.source::text <> ALL(:exempt)
+            """),
+            {"start_year": start_year, "exempt": list(exempt_sources)},
+        ).scalars()
+    )
+    if not staging_ids:
+        return 0, 0
+    deleted = _delete_source_publications(conn, "s.id = ANY(:ids)", {"ids": staging_ids})
+    staged = conn.execute(
+        text("DELETE FROM staging WHERE id = ANY(:ids)"), {"ids": staging_ids}
+    ).rowcount
+    return deleted, staged

@@ -8,10 +8,8 @@ from unittest.mock import MagicMock
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.staging import (
-    StagingQueries,
-    delete_disappeared_source_publications,
-)
+from pipeline.ingestion.common.source_publications import delete_disappeared_source_publications
+from pipeline.ingestion.common.staging import StagingQueries
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 from tests.integration.helpers.staging import insert_staging
