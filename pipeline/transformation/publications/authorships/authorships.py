@@ -38,7 +38,6 @@ from pipeline.transformation.publishing.journals import delete_empty_journals
 from pipeline.transformation.publishing.journals.delete_empty_journals import (
     run_delete_empty_journals,
 )
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
@@ -256,7 +255,7 @@ def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
 
 def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_delete_empty_journals(ctx.logger, journal_repo=JournalGatewayQueries(conn))
+        return run_delete_empty_journals(conn, ctx.logger)
 
 
 def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:

@@ -18,8 +18,8 @@ from domain.monographs.matching import choose_monograph
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import ISBN, issn_rejection_reason
 from domain.publishers.names import publisher_name_key
-from pipeline.transformation.publishing.containers import ContainerGatewayQueries
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.containers import ContainerStores
+from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
@@ -84,7 +84,7 @@ def find_or_create_journal(
     publisher_id: int | None = None,
     openalex_id: str | None = None,
     oa_model: OaModel | None = None,
-    repo: JournalGatewayQueries,
+    repo: JournalStore,
 ) -> int | None:
     """Trouve ou crée un journal. Retourne son id, ou `None` si le titre est vide.
 
@@ -249,7 +249,7 @@ class Containers(NamedTuple):
 
 
 def _find_series(
-    series: SeriesDescription, publisher_id: int | None, repo: ContainerGatewayQueries
+    series: SeriesDescription, publisher_id: int | None, stores: ContainerStores
 ) -> int | None:
     """Entrée de `journals` d'une série. Une série sans titre est seulement cherchée par ses ISSN valides."""
     if series.title:
@@ -259,11 +259,11 @@ def _find_series(
             publisher_id=publisher_id,
             openalex_id=series.openalex_id,
             oa_model=series.oa_model,
-            repo=repo,
+            repo=stores.journals,
         )
     for row in series.issns:
         if row.status is not IssnStatus.MALFORMED and (
-            journal_id := repo.find_journal_by_issn_any(row.issn)
+            journal_id := stores.journals.find_journal_by_issn_any(row.issn)
         ):
             return journal_id
     return None
@@ -273,14 +273,14 @@ def find_or_create_containers(
     description: ContainerDescription,
     *,
     publisher_id: int | None,
-    repo: ContainerGatewayQueries,
+    stores: ContainerStores,
 ) -> Containers:
     """Trouve ou crée les conteneurs d'un document, d'après `determine_container_type`.
 
     Le document reçoit sa série comme entrée de `journals`, et son volume comme monographie, reliée à cette série. La série d'un volume a toujours un ISSN. L'étape de rattachement de `publishers_journals` reconnaît les séries sans ISSN.
     """
     series, volume = determine_container_type(description)
-    journal_id = _find_series(series, publisher_id, repo) if series else None
+    journal_id = _find_series(series, publisher_id, stores) if series else None
     if volume is None:
         return Containers(journal_id, None)
     monograph_id = find_or_create_monograph(
@@ -291,6 +291,6 @@ def find_or_create_containers(
         year=volume.year,
         publisher_id=publisher_id,
         journal_id=journal_id,
-        repo=repo,
+        repo=stores.monographs,
     )
     return Containers(journal_id, monograph_id)

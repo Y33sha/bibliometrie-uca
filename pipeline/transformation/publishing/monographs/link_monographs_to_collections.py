@@ -15,7 +15,7 @@ from infrastructure.sql_fragments import has_active_issn
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.find_or_create import find_or_create_journal
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.store import JournalStore
 
 LIBELLE = "Rattachement aux collections"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -78,7 +78,7 @@ def set_monograph_journal(conn: Connection, monograph_id: int, journal_id: int |
 
 
 def _series_by_monograph(
-    candidates: list[MonographJournalCandidates], repo: JournalGatewayQueries
+    candidates: list[MonographJournalCandidates], repo: JournalStore
 ) -> dict[int, int]:
     """Série sans ISSN de chaque monographie qui en a une, trouvée ou créée dans `journals`."""
     proceedings = {m.monograph_id: m.proceedings for m in candidates}
@@ -106,7 +106,7 @@ def _series_by_monograph(
 def run_link_monographs_to_collections(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Rattache les monographies à leur entrée de `journals`, et journalise chaque changement et chaque conflit."""
     candidates = find_monograph_journal_candidates(conn)
-    series = _series_by_monograph(candidates, JournalGatewayQueries(conn))
+    series = _series_by_monograph(candidates, JournalStore(conn))
     changes: list[tuple[MonographJournalCandidates, MonographJournalChoice]] = []
     conflicts: list[tuple[MonographJournalCandidates, MonographJournalChoice]] = []
     for m in candidates:

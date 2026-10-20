@@ -1,18 +1,19 @@
 """Tests de la fusion des revues en double (`pipeline.transformation.publishing.journals.merge_duplicate_journals`)."""
 
+import contextlib
 import logging
 
-from pipeline.transformation.publishing.journals.journals import (
+import pytest
+
+from pipeline.transformation.publishing.journals import merge_duplicate_journals as step
+from pipeline.transformation.publishing.journals.merge_duplicate_journals import (
     JournalIssnGroup,
     JournalMergeCandidate,
     JournalMergeGroup,
     JournalPublicationPair,
-    JournalSummary,
     JournalTitleRow,
 )
-from pipeline.transformation.publishing.journals.merge_duplicate_journals import (
-    run_merge_duplicate_journals,
-)
+from pipeline.transformation.publishing.journals.store import JournalSummary
 
 
 class _Repo:
@@ -49,13 +50,47 @@ class _Repo:
         return {i: JournalSummary(i, f"Revue {i}", None, ()) for i in journal_ids}
 
 
+@contextlib.contextmanager
+def _bound(repo):
+    """Branche les fonctions SQL du module, et son store des revues, sur le faux `repo`."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            step,
+            "find_journals_sharing_issnl",
+            lambda conn, *a, **k: repo.find_journals_sharing_issnl(*a, **k),
+        )
+        mp.setattr(
+            step,
+            "find_journals_sharing_active_issn",
+            lambda conn, *a, **k: repo.find_journals_sharing_active_issn(*a, **k),
+        )
+        mp.setattr(
+            step,
+            "find_same_title_duplicates",
+            lambda conn, *a, **k: repo.find_same_title_duplicates(*a, **k),
+        )
+        mp.setattr(
+            step,
+            "find_journals_sharing_a_publication",
+            lambda conn, *a, **k: repo.find_journals_sharing_a_publication(*a, **k),
+        )
+        mp.setattr(
+            step,
+            "find_journals_sharing_an_inactive_issn",
+            lambda conn, *a, **k: repo.find_journals_sharing_an_inactive_issn(*a, **k),
+        )
+        mp.setattr(step, "JournalStore", lambda conn: repo)
+        yield
+
+
 def _run(repo: _Repo):
     merges: list[tuple[int, int]] = []
-    metrics = run_merge_duplicate_journals(
-        logging.getLogger("test"),
-        journal_repo=repo,
-        merge=lambda target, source: merges.append((target, source)),
-    )
+    with _bound(repo):
+        metrics = step.run_merge_duplicate_journals(
+            None,
+            logging.getLogger("test"),
+            merge=lambda target, source: merges.append((target, source)),
+        )
     return metrics, merges
 
 

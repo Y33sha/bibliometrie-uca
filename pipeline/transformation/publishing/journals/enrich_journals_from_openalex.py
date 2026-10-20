@@ -11,19 +11,57 @@ import logging
 import time
 from collections.abc import Callable
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, any_, func, literal, select, update
 
-from domain.journals.journal import JournalType
+from domain.journals.journal import JournalType, ManualField
+from infrastructure.db.tables import journals
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.observability.libelles import forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.store import JournalStore
 
 LIBELLE = "Type des revues sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
+
+
+# L'APC n'est pas saisi à la main : le pipeline peut l'écrire.
+_APC_NOT_MANUAL = ~(literal(ManualField.APC.value) == any_(journals.c.manual_fields))
+
+
+def find_journals_of_unknown_type(
+    conn: Connection, *, limit: int | None = None
+) -> list[tuple[int, str]]:
+    """`(id, openalex_id)` des revues au `journal_type` indéterminé qui ont un `openalex_id`, à typer via OpenAlex. Le type étant stable par revue, une revue typée sort de la file. `limit` cape le run."""
+    rows = conn.execute(
+        select(journals.c.id, journals.c.openalex_id)
+        .where(journals.c.openalex_id.is_not(None))
+        .where(journals.c.journal_type == "unknown")
+        .order_by(journals.c.id)
+        .limit(limit or None)
+    ).all()
+    return [(r.id, r.openalex_id) for r in rows]
+
+
+def update_journal_apc(
+    conn: Connection,
+    journal_id: int,
+    *,
+    apc_amount: float | None = None,
+    apc_currency: str | None = None,
+) -> None:
+    """Met à jour le montant et la devise d'APC. COALESCE : un argument `None` laisse la valeur en place."""
+    conn.execute(
+        update(journals)
+        .where(journals.c.id == journal_id, _APC_NOT_MANUAL)
+        .values(
+            apc_amount=func.coalesce(apc_amount, journals.c.apc_amount),
+            apc_currency=func.coalesce(apc_currency, journals.c.apc_currency),
+        )
+    )
+
 
 _OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
     "journal": JournalType.JOURNAL,
@@ -52,13 +90,13 @@ def run_enrich_journals_from_openalex(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalGatewayQueries,
     fetch_batch: FetchSourcesBatch,
     breaker: SourceCircuitBreaker,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
-    journals = journal_repo.find_journals_of_unknown_type()
-    total = len(journals)
+    store = JournalStore(conn)
+    pending = find_journals_of_unknown_type(conn)
+    total = len(pending)
     if total == 0:
         return PhaseMetrics()
 
@@ -77,7 +115,7 @@ def run_enrich_journals_from_openalex(
             )
             return _bilan(total, updated)
 
-        id_map = {row[1]: row[0] for row in journals[i : i + BATCH_SIZE]}
+        id_map = {row[1]: row[0] for row in pending[i : i + BATCH_SIZE]}
         sources = fetch_batch(list(id_map))
         time.sleep(rate_delay)
 
@@ -90,13 +128,13 @@ def run_enrich_journals_from_openalex(
 
             # Sans APC dans OpenAlex, montant et devise de la revue restent tels quels.
             if apc_amount is not None:
-                journal_repo.update_journal_apc(
-                    journal_id, apc_amount=apc_amount, apc_currency=apc_currency
+                update_journal_apc(
+                    conn, journal_id, apc_amount=apc_amount, apc_currency=apc_currency
                 )
             # journal_type : seules les revues `unknown` sont traitées (cf. `fetch_journals_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
             mapped_type = map_openalex_source_type(raw_type)
             if mapped_type is not None:
-                journal_repo.set_journal_type(journal_id, mapped_type)
+                store.set_journal_type(journal_id, mapped_type)
                 type_written += 1
 
             updated += 1

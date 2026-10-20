@@ -847,7 +847,7 @@ class TestUpsertWrappers:
 
     def test_sans_titre_de_source_aucun_conteneur(self):
         rec = {"journal_title": None}
-        assert upsert_containers(rec, publisher_id=1, container_repo=MagicMock()) == Containers(
+        assert upsert_containers(rec, publisher_id=1, container_stores=MagicMock()) == Containers(
             None, None
         )
 
@@ -1075,7 +1075,7 @@ class TestProcessRecord:
             queries,
             logger,
             row,
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
@@ -1127,7 +1127,7 @@ class TestProcessRecord:
             queries,
             logger,
             row,
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=MagicMock(),
             authorship_queries=MagicMock(),
@@ -1150,7 +1150,7 @@ class TestProcessRecord:
                 MagicMock(),
                 logger,
                 row,
-                container_repo=MagicMock(),
+                container_stores=MagicMock(),
                 publisher_store=MagicMock(),
                 staging_queries=MagicMock(),
                 authorship_queries=MagicMock(),
@@ -1167,7 +1167,7 @@ class TestWosNormalizer:
             logger,
             staging_queries=MagicMock(),
             queries=MagicMock(),
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             authorship_queries=MagicMock(),
         )
@@ -1188,7 +1188,7 @@ class TestWosNormalizer:
         assert captured["row"] == row
         # Les dépendances injectées sont propagées.
         assert set(captured["kwargs"].keys()) == {
-            "container_repo",
+            "container_stores",
             "publisher_store",
             "staging_queries",
             "authorship_queries",

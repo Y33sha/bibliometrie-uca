@@ -1,6 +1,6 @@
 """Libellé d'une revue dans le journal du pipeline."""
 
-from pipeline.transformation.publishing.journals.journals import JournalSummary
+from pipeline.transformation.publishing.journals.store import JournalSummary
 
 
 def journal_label(journal: JournalSummary) -> str:

@@ -323,7 +323,7 @@ class TestUpsertPublisherEtJournal:
         assert vus == ["Elsevier"]
 
     def test_sans_titre_de_revue_aucune_revue(self):
-        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
+        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
 
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
@@ -534,7 +534,7 @@ class TestProcessWork:
             MagicMock(),
             queries,
             staging_row(staging_id=42, source_id="sc-1", raw=raw),
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
@@ -563,7 +563,7 @@ class TestProcessWork:
             logger=MagicMock(),
             staging_queries=MagicMock(),
             queries=MagicMock(),
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             authorship_queries=MagicMock(),
         )
@@ -583,7 +583,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )

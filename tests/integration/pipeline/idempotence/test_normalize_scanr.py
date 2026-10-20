@@ -167,7 +167,7 @@ def run_normalize_scanr(conn):
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.scanr.normalize import ScanrNormalizer
-    from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+    from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
     queries = SourcePublicationQueries()
@@ -180,7 +180,7 @@ def run_normalize_scanr(conn):
         logger,
         staging_queries,
         queries,
-        container_repo=ContainerGatewayQueries(conn),
+        container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
         authorship_queries=authorship_queries,
     )

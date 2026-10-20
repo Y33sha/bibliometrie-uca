@@ -36,7 +36,7 @@ from pipeline.ingestion.common.signature_queries import (
     key_hash_sql,
 )
 from pipeline.ingestion.common.signatures import signature_name_fields
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 log = setup_logger("recompute_normalized_texts", os.path.dirname(__file__))
@@ -139,7 +139,7 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
     ]
     if apply:
         conn.execute(text("DELETE FROM journal_name_forms WHERE form_normalized = ''"))
-        journal_gateway = JournalGatewayQueries(conn)
+        journal_gateway = JournalStore(conn)
         for journal_id, form, publisher_id in journals:
             journal_gateway.add_journal_name_form(journal_id, form, publisher_id)
         publisher_store = PublisherStore(conn)

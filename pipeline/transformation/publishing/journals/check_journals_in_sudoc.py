@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
 
-Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement porte un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
+Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
 Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
 """
@@ -8,9 +8,11 @@ Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un c
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
+from typing import NamedTuple
 
 import httpx2
-from sqlalchemy import Connection
+from sqlalchemy import Connection, any_, delete, exists, literal, select, text, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.journals.issn_check import (
     JournalIssns,
@@ -18,18 +20,20 @@ from domain.journals.issn_check import (
     check_journal_issns,
     correction_candidates,
 )
-from domain.journals.issns import IssnStatus
+from domain.journals.issns import IssnStatus, JournalIssn
+from domain.journals.journal import JournalType, ManualField
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
+from domain.normalize import normalize_text
+from domain.publications.identifiers import ISSN
 from domain.sources.sudoc import SudocSerialRecord
+from infrastructure.db.tables import journal_issns, journals
+from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
 from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.http.fetch_pool import RequestPace, run_fetch_pool
 from pipeline.runtime.observability.libelles import BRANCHE, accord, forme
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import progression
-from pipeline.transformation.publishing.journals.journals import (
-    JournalGatewayQueries,
-    JournalSudocRow,
-)
+from pipeline.transformation.publishing.journals.store import JournalStore
 
 LIBELLE = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -44,6 +48,147 @@ FetchRecord = Callable[[httpx2.AsyncClient, str], Awaitable[SudocSerialRecord | 
 
 # Le sort des ISSN d'une revue tient du détail : le terminal le masque, le journal le garde.
 _DETAIL = {"detail": True}
+
+
+class JournalSudocRow(NamedTuple):
+    """Une revue à vérifier dans le Sudoc : son titre, ses ISSN et les ISSN de ses enregistrements sans figurer parmi les siens."""
+
+    id: int
+    title: str
+    issns: tuple[JournalIssn, ...]
+    document_issns: tuple[str, ...] = ()
+    journal_type: JournalType = JournalType.UNKNOWN
+
+
+class JournalTitleTypeRow(NamedTuple):
+    """Une revue, son titre et son type."""
+
+    id: int
+    title: str
+    journal_type: JournalType
+
+
+# ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
+_DOCUMENT_ISSNS = text("""
+    SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
+    FROM source_publications s
+    CROSS JOIN LATERAL (
+        VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
+    ) AS v(issn)
+    WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
+""")
+
+# Revues dont un ISSN n'est pas vérifié dans le Sudoc.
+_JOURNALS_WITH_UNCHECKED_ISSNS = text("""
+    SELECT DISTINCT journal_id FROM journal_issns
+    WHERE journal_id IS NOT NULL AND sudoc_checked_at IS NULL
+""")
+
+
+def find_titles_of_journals_with_issn(conn: Connection) -> list[JournalTitleTypeRow]:
+    """Les revues qui ont un ISSN actif, avec leur titre et leur type."""
+    rows = conn.execute(
+        select(journals.c.id, journals.c.title, journals.c.journal_type)
+        .where(
+            exists().where(
+                journal_issns.c.journal_id == journals.c.id,
+                journal_issns.c.status == IssnStatus.ACTIVE,
+            )
+        )
+        .order_by(journals.c.id)
+    )
+    return [JournalTitleTypeRow(r.id, r.title, JournalType(r.journal_type)) for r in rows]
+
+
+def find_journals_to_check_in_sudoc(
+    conn: Connection, also: Sequence[int] = ()
+) -> list[JournalSudocRow]:
+    """Revues dont un ISSN n'est pas vérifié dans le Sudoc, revues dont un enregistrement a un ISSN valide absent de leurs ISSN et encore jamais vérifié, et revues `also`."""
+    issns_of = issns_by_journal(conn)
+    released: set[str] = set(
+        conn.execute(
+            select(journal_issns.c.issn).where(
+                journal_issns.c.journal_id.is_(None),
+                journal_issns.c.sudoc_checked_at.is_not(None),
+            )
+        ).scalars()
+    )
+    documents: dict[int, list[str]] = {}
+    for r in conn.execute(_DOCUMENT_ISSNS):
+        issn = ISSN.try_parse(r.issn)
+        own = issns_of.get(r.journal_id, ())
+        if issn is None or str(issn) in released or any(i.issn == str(issn) for i in own):
+            continue
+        values = documents.setdefault(r.journal_id, [])
+        if str(issn) not in values:
+            values.append(str(issn))
+    ids = set(conn.execute(_JOURNALS_WITH_UNCHECKED_ISSNS).scalars()) | set(documents) | set(also)
+    # Des ISSN saisis à la main font autorité : la vérification Sudoc passe à côté.
+    rows = conn.execute(
+        select(journals.c.id, journals.c.title, journals.c.journal_type)
+        .where(
+            journals.c.id.in_(ids),
+            ~(literal(ManualField.ISSNS.value) == any_(journals.c.manual_fields)),
+        )
+        .order_by(journals.c.id)
+    ).all()
+    return [
+        JournalSudocRow(
+            r.id,
+            r.title,
+            issns_of.get(r.id, ()),
+            tuple(sorted(documents.get(r.id, ()))),
+            JournalType(r.journal_type),
+        )
+        for r in rows
+    ]
+
+
+def record_sudoc_check(
+    conn: Connection,
+    journal_id: int,
+    *,
+    issns: Sequence[JournalIssn],
+    released: Sequence[JournalIssn],
+    checked_at: datetime,
+    title: str | None = None,
+) -> None:
+    """Écrit les ISSN vérifiés d'une revue, datés de `checked_at`. `released` : ISSN d'une autre publication, retirés de la revue et gardés sans revue. Un `title` devient le titre de la revue, et une de ses formes de nom."""
+    store = JournalStore(conn)
+    if store.issns_are_manual(journal_id):
+        issns, released = [], []
+    else:
+        conn.execute(delete(journal_issns).where(journal_issns.c.journal_id == journal_id))
+    if issns:
+        conn.execute(
+            journal_issns.insert(),
+            [issn_values(row, journal_id=journal_id, checked_at=checked_at) for row in issns],
+        )
+    for row in released:
+        conn.execute(
+            pg_insert(journal_issns)
+            .values(issn_values(row, journal_id=None, checked_at=checked_at))
+            .on_conflict_do_update(
+                constraint="uq_journal_issns_issn_journal",
+                set_={"sudoc_checked_at": checked_at},
+            )
+        )
+    # Un titre saisi à la main reste.
+    if (
+        title
+        and conn.execute(
+            update(journals)
+            .where(
+                journals.c.id == journal_id,
+                ~(literal(ManualField.TITLE.value) == any_(journals.c.manual_fields)),
+            )
+            .values(title=title, title_normalized=normalize_text(title))
+        ).rowcount
+    ):
+        publisher_id: int | None = conn.execute(
+            select(journals.c.publisher_id).where(journals.c.id == journal_id)
+        ).scalar_one()
+        store.add_journal_name_form(journal_id, normalize_text(title), publisher_id)
 
 
 def _journal_issns(row: JournalSudocRow) -> JournalIssns:
@@ -82,7 +227,6 @@ async def run_check_journals_in_sudoc(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalGatewayQueries,
     fetch_ppns: FetchPpns,
     fetch_record: FetchRecord,
     breaker: SourceCircuitBreaker,
@@ -92,10 +236,10 @@ async def run_check_journals_in_sudoc(
     """Vérifie les revues à vérifier, `max_concurrent` à la fois, à `max_per_second` requêtes par seconde au plus."""
     titled_as_volumes = [
         j.id
-        for j in journal_repo.find_titles_of_journals_with_issn()
+        for j in find_titles_of_journals_with_issn(conn)
         if holds_volumes(j.journal_type) and container_level(j.title) is ContainerLevel.VOLUME
     ]
-    rows = journal_repo.find_journals_to_check_in_sudoc(also=titled_as_volumes)
+    rows = find_journals_to_check_in_sudoc(conn, also=titled_as_volumes)
     total = len(rows)
     metrics = PhaseMetrics()
     if total == 0:
@@ -144,7 +288,7 @@ async def run_check_journals_in_sudoc(
             return None
         return records
 
-    # Le compteur de la barre porte les revues présentes dans le Sudoc.
+    # Le compteur de la barre compte les revues présentes dans le Sudoc.
     with progression(
         total, f"{BRANCHE}{LIBELLE}", logger, compte_retenus=True, efface=True
     ) as avancement:
@@ -158,7 +302,8 @@ async def run_check_journals_in_sudoc(
                 return
             check = check_journal_issns(_journal_issns(row), records)
             _log_check(logger, row, check)
-            journal_repo.record_sudoc_check(
+            record_sudoc_check(
+                conn,
                 row.id,
                 issns=check.issns,
                 released=check.released,

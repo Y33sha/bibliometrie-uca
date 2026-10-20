@@ -4,24 +4,60 @@ Les couples (DOI, revue) des enregistrements de toutes les sources désignent le
 """
 
 import logging
+from collections.abc import Sequence
+from typing import NamedTuple
 
-from domain.journals.doi_namespaces import designated_by_namespace, learn_namespaces
+from sqlalchemy import Connection, text
+
+from domain.journals.doi_namespaces import DoiNamespace, designated_by_namespace, learn_namespaces
+from domain.journals.journal import JournalType
+from infrastructure.db.tables import journal_doi_namespaces
+from infrastructure.sql_fragments import corrected
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 
 LIBELLE = "Espaces de noms DOI"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 
-def run_learn_journal_doi_namespaces(
-    logger: logging.Logger, *, journal_repo: JournalGatewayQueries
-) -> PhaseMetrics:
+class DoiJournalRow(NamedTuple):
+    """Un DOI et la revue que lui donne sa source, avec le type de cette revue."""
+
+    doi: str
+    journal_id: int
+    journal_type: JournalType
+
+
+# Une revue posée par son espace de noms laisse sa trace dans `raw_metadata.journal_id`.
+_DOI_JOURNAL_PAIRS = text(f"""
+    SELECT s.doi, s.journal_id, j.journal_type
+    FROM source_publications s
+    JOIN journals j ON j.id = s.journal_id
+    WHERE s.doi IS NOT NULL AND NOT {corrected("journal_id", "s")}
+""")
+
+
+def find_doi_journal_pairs(conn: Connection) -> list[DoiJournalRow]:
+    """Le couple (DOI, revue) de chaque enregistrement. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
+    return [
+        DoiJournalRow(r.doi, r.journal_id, JournalType(r.journal_type))
+        for r in conn.execute(_DOI_JOURNAL_PAIRS)
+    ]
+
+
+def store_doi_namespaces(conn: Connection, namespaces: Sequence[DoiNamespace]) -> None:
+    """Vide `journal_doi_namespaces`, puis y écrit `namespaces`."""
+    conn.execute(journal_doi_namespaces.delete())
+    if namespaces:
+        conn.execute(journal_doi_namespaces.insert(), [ns._asdict() for ns in namespaces])
+
+
+def run_learn_journal_doi_namespaces(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """Calcule les espaces de noms DOI des revues et les enregistre."""
-    pairs = journal_repo.find_doi_journal_pairs()
+    pairs = find_doi_journal_pairs(conn)
     platforms = {p.journal_id for p in pairs if not designated_by_namespace(p.journal_type)}
     namespaces = learn_namespaces(((p.doi, p.journal_id) for p in pairs), platforms=platforms)
-    journal_repo.store_doi_namespaces(list(namespaces.values()))
+    store_doi_namespaces(conn, list(namespaces.values()))
     journals = len({ns.journal_id for ns in namespaces.values()})
     metrics = PhaseMetrics()
     metrics.add(seen=len(pairs), journal_doi_namespaces=len(namespaces))
