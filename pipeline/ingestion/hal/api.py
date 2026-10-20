@@ -15,9 +15,60 @@ from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.http.throttle import Throttle
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
-from pipeline.ingestion.hal.fields import HAL_FIELDS, HAL_FIELDS_STR
 
 type SolrParams = dict[str, str | int | float | bool | None]
+
+# Champs Solr demandés : un champ absent de la liste manque aux notices reçues.
+HAL_FIELDS = [
+    "halId_s",
+    "doiId_s",
+    "title_s",
+    "subTitle_s",
+    "authFullNameFormIDPersonIDIDHal_fs",
+    "authQuality_s",
+    # label_xml (TEI) : seul champ qui attache ORCID/IdRef à chaque auteur
+    # par position. Les listes `authORCIDIdExt_s` / `authIdRefIdExt_s`
+    # sont compactées (valeurs non-null seulement, pas d'alignement) et
+    # ne sont donc pas demandées.
+    "label_xml",
+    "producedDateY_i",
+    "publicationDate_s",
+    "docType_s",
+    "docSubType_s",
+    "language_s",
+    "journalTitle_s",
+    "journalIssn_s",
+    "journalEissn_s",
+    "journalPublisher_s",
+    "bookTitle_s",
+    "publisher_s",
+    "conferenceTitle_s",
+    # Publication d'une communication : indicateur « avec actes », collections, titre de la source.
+    "proceedings_s",
+    "serie_s",
+    "source_s",
+    "openAccess_bool",
+    "fileMain_s",
+    # Licence du fichier déposé (URL), présente quand un fichier est déposé.
+    "licence_s",
+    "linkExtId_s",
+    "linkExtUrl_s",
+    "uri_s",
+    "label_s",
+    "collCode_s",
+    "nntId_s",
+    "pubmedid_s",
+    "abstract_s",
+    "keyword_s",
+    # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, qui
+    # porte le libellé de chaque niveau. `domain_s` n'expose que les codes.
+    "fr_domainAllCodeLabel_fs",
+    "volume_s",
+    "issue_s",
+    "page_s",
+]
+
+HAL_FIELDS_STR = ",".join(HAL_FIELDS)
 
 
 class HalClient:

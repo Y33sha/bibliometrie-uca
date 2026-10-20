@@ -1,4 +1,4 @@
-"""Champs des works OpenAlex : champs demandés à l'API, identifiant et DOI d'un work."""
+"""Identité d'un work OpenAlex : identifiant et DOI."""
 
 from __future__ import annotations
 
@@ -7,32 +7,6 @@ from collections.abc import Mapping
 from domain.publications.identifiers import clean_doi
 from domain.sources.openalex import short_openalex_id
 from domain.types import JsonValue, as_str
-
-SELECT_FIELDS = ",".join(
-    [
-        "id",
-        "doi",
-        "title",
-        "display_name",
-        "publication_year",
-        "publication_date",
-        "type",
-        "language",
-        "primary_location",
-        "locations",
-        "authorships",
-        "open_access",
-        "cited_by_count",
-        "fwci",
-        "citation_normalized_percentile",
-        "biblio",
-        "is_retracted",
-        "topics",
-        "keywords",
-        "abstract_inverted_index",
-    ]
-)
-"""Champs demandés à l'API (`select`)."""
 
 
 def extract_openalex_id(work: Mapping[str, JsonValue]) -> str:

@@ -9,8 +9,8 @@ import httpx2
 
 from pipeline.http.lookup import NOT_FOUND, NotFound, Unavailable
 from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
-from pipeline.ingestion.wos.api import search
-from pipeline.ingestion.wos.fields import extract_doi, get_records
+from pipeline.ingestion.wos.api import get_records, search
+from pipeline.ingestion.wos.fields import extract_doi
 
 
 class WosStaleRefetch(StaleRefetch):

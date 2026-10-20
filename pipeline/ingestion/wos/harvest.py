@@ -18,13 +18,8 @@ from pipeline.ingestion.common.harvester import (
     SourceHarvester,
     stage_document,
 )
-from pipeline.ingestion.wos.api import WosClient
-from pipeline.ingestion.wos.fields import (
-    extract_doi,
-    extract_ut,
-    get_records,
-    get_records_found,
-)
+from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
+from pipeline.ingestion.wos.fields import extract_doi, extract_ut
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression

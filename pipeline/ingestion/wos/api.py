@@ -6,16 +6,63 @@ from collections.abc import Mapping
 
 import httpx2
 
-from domain.types import JsonValue, as_mapping
+from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.throttle import Throttle
 from pipeline.http.tls import tls_context
 from pipeline.ingestion.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
 from pipeline.ingestion.credentials import get_wos_api_key
-from pipeline.ingestion.wos.fields import build_query, get_records_found
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
+
+
+def build_query(year: int, affiliations: list[str]) -> str:
+    """Construit la requête WoS Advanced Search pour une année donnée.
+
+    Filtre `OG=(...)` (Organization-Enhanced, OR sur les variantes d'affiliation) et `PY=<year>`. `affiliations` doit être non vide : sans organisations, l'API WoS répond 400 Bad Request sur `OG=()`.
+    """
+    if not affiliations:
+        raise ValueError("build_query: affiliations vide (la requête WoS exige au moins une org)")
+    orgs = " OR ".join(affiliations)
+    return f"OG=({orgs}) AND PY=({year})"
+
+
+def get_records(data: Mapping[str, JsonValue]) -> list[Mapping[str, JsonValue]]:
+    """Extrait la liste de records depuis la réponse API WoS.
+
+    Chemin profond `data.Data.Records.records.REC`, liste ou objet unique. Retourne `[]` si n'importe quel niveau manque (réponse mal formée ou vide).
+    """
+    records = at_path(data, "Data", "Records", "records").get("REC")
+    return [
+        as_mapping(r) for r in ([records] if isinstance(records, Mapping) else as_sequence(records))
+    ]
+
+
+def get_records_found(data: Mapping[str, JsonValue]) -> int:
+    """Extrait le nombre total de records trouvés depuis la réponse API WoS."""
+    return as_int(as_mapping(data.get("QueryResult")).get("RecordsFound")) or 0
+
+
+# Préfixes DOI systématiquement absents de WoS — preprints / repositories qui ne sont pas indexés. Filtrés côté client pour éviter les appels inutiles dans `fetch_missing_doi`.
+_WOS_UNINDEXED_DOI_PREFIXES = ("10.48550/", "10.2139/", "10.21203/", "10.5281/zenodo")
+
+
+def filter_doi_for_wos(doi: str) -> str | None:
+    """Écarte un DOI (déjà normalisé par `clean_doi`) non interrogeable sur WoS.
+
+    Retourne `None` si :
+
+    - le DOI est dans `_WOS_UNINDEXED_DOI_PREFIXES` (preprints Zenodo, arXiv, SSRN, Research Square) — WoS ne les indexe pas ;
+    - le DOI contient `"` ou newline (casserait la requête WoS).
+
+    Sinon retourne le DOI tel quel. La normalisation (préfixe URL, casse, encodage, suffixes) est faite en amont par `clean_doi` : ici, uniquement le filtrage propre à WoS.
+    """
+    if any(doi.startswith(p) for p in _WOS_UNINDEXED_DOI_PREFIXES):
+        return None
+    if '"' in doi or "\n" in doi:
+        return None
+    return doi
 
 
 def headers(api_key: str) -> dict[str, str]:
