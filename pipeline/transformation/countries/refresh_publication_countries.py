@@ -56,42 +56,42 @@ _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
         FROM contributions
         GROUP BY source_contribution_id
     )
-    UPDATE source_contributions sa
+    UPDATE source_contributions sc
     SET countries = agg.new_countries, countries_dirty = true
     FROM scoped_sa s
     LEFT JOIN agg ON agg.source_contribution_id = s.id
-    WHERE sa.id = s.id
-      AND sa.countries IS DISTINCT FROM agg.new_countries
+    WHERE sc.id = s.id
+      AND sc.countries IS DISTINCT FROM agg.new_countries
 """
 
 # Recalcul de `source_records.countries` sur la CTE amont `scoped_sp(source_record_id)` : union des pays des contributions sources.
 _SOURCE_RECORD_COUNTRIES_FROM_SCOPE = """,
     agg AS (
-        SELECT sa.source_record_id AS source_record_id,
+        SELECT sc.source_record_id AS source_record_id,
                array_agg(DISTINCT c ORDER BY c) AS new_countries
-        FROM source_contributions sa
-        JOIN scoped_sp ss ON ss.source_record_id = sa.source_record_id
-        CROSS JOIN LATERAL unnest(sa.countries) AS c
-        GROUP BY sa.source_record_id
+        FROM source_contributions sc
+        JOIN scoped_sp ss ON ss.source_record_id = sc.source_record_id
+        CROSS JOIN LATERAL unnest(sc.countries) AS c
+        GROUP BY sc.source_record_id
     )
-    UPDATE source_records sp
+    UPDATE source_records sr
     SET countries = agg.new_countries
     FROM scoped_sp ss
     LEFT JOIN agg ON agg.source_record_id = ss.source_record_id
-    WHERE sp.id = ss.source_record_id
-      AND sp.countries IS DISTINCT FROM agg.new_countries
+    WHERE sr.id = ss.source_record_id
+      AND sr.countries IS DISTINCT FROM agg.new_countries
 """
 
 # Recalcul de `publications.countries` sur la CTE amont `scoped_pub(publication_id)` : union des `source_records.countries` de la publication ; seules les lignes qui changent sont écrites.
 _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
     agg AS (
-        SELECT sp.publication_id AS publication_id,
+        SELECT sr.publication_id AS publication_id,
                array_agg(DISTINCT c::text ORDER BY c::text) AS new_countries
-        FROM source_records sp
-        JOIN scoped_pub spp ON spp.publication_id = sp.publication_id
-        CROSS JOIN LATERAL unnest(sp.countries) AS c
-        WHERE sp.countries IS NOT NULL
-        GROUP BY sp.publication_id
+        FROM source_records sr
+        JOIN scoped_pub spp ON spp.publication_id = sr.publication_id
+        CROSS JOIN LATERAL unnest(sr.countries) AS c
+        WHERE sr.countries IS NOT NULL
+        GROUP BY sr.publication_id
     )
     UPDATE publications p
     SET countries = agg.new_countries
@@ -137,10 +137,10 @@ def refresh_source_record_countries(conn: Connection) -> int:
             _DIRTY_SOURCE_CONTRIBUTION
             + """,
             scoped_sp AS (
-                SELECT DISTINCT sa.source_record_id AS source_record_id
-                FROM source_contributions sa
-                JOIN dirty_source_contribution d ON d.id = sa.id
-                WHERE sa.source_record_id IS NOT NULL
+                SELECT DISTINCT sc.source_record_id AS source_record_id
+                FROM source_contributions sc
+                JOIN dirty_source_contribution d ON d.id = sc.id
+                WHERE sc.source_record_id IS NOT NULL
             )
             """
             + _SOURCE_RECORD_COUNTRIES_FROM_SCOPE
@@ -155,11 +155,11 @@ def refresh_publication_countries(conn: Connection) -> int:
             _DIRTY_SOURCE_CONTRIBUTION
             + """,
             scoped_pub AS (
-                SELECT DISTINCT sp.publication_id AS publication_id
-                FROM source_records sp
-                JOIN source_contributions sa ON sa.source_record_id = sp.id
-                JOIN dirty_source_contribution d ON d.id = sa.id
-                WHERE sp.publication_id IS NOT NULL
+                SELECT DISTINCT sr.publication_id AS publication_id
+                FROM source_records sr
+                JOIN source_contributions sc ON sc.source_record_id = sr.id
+                JOIN dirty_source_contribution d ON d.id = sc.id
+                WHERE sr.publication_id IS NOT NULL
             )
             """
             + _PUBLICATION_COUNTRIES_FROM_SCOPE
@@ -233,11 +233,11 @@ class CountryRecompute:
             text(
                 """
                 WITH scoped_sp AS (
-                    SELECT DISTINCT sa.source_record_id AS source_record_id
+                    SELECT DISTINCT sc.source_record_id AS source_record_id
                     FROM source_contribution_addresses saa
-                    JOIN source_contributions sa ON sa.id = saa.source_contribution_id
+                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
                     WHERE saa.address_id = ANY(:ids)
-                      AND sa.source_record_id IS NOT NULL
+                      AND sc.source_record_id IS NOT NULL
                 )
                 """
                 + _SOURCE_RECORD_COUNTRIES_FROM_SCOPE
@@ -255,11 +255,11 @@ class CountryRecompute:
             text(
                 """
                 WITH scoped_pub AS (
-                    SELECT DISTINCT sd.publication_id AS publication_id
+                    SELECT DISTINCT sr.publication_id AS publication_id
                     FROM source_contribution_addresses saa
-                    JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-                    JOIN source_records sd ON sd.id = sa.source_record_id
-                    WHERE saa.address_id = ANY(:ids) AND sd.publication_id IS NOT NULL
+                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+                    JOIN source_records sr ON sr.id = sc.source_record_id
+                    WHERE saa.address_id = ANY(:ids) AND sr.publication_id IS NOT NULL
                 )
                 """
                 + _PUBLICATION_COUNTRIES_FROM_SCOPE

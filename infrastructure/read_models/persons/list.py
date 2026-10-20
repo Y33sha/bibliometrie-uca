@@ -171,13 +171,13 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
                    (SELECT COUNT(*)
                     FROM ({other_name_form_holders("pnf.name_form", "pnf.person_id")}) holders
                    ) AS shared_count,
-                   (SELECT COUNT(DISTINCT sd.publication_id)
-                    FROM source_contributions sa
-                    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                    JOIN source_records sd ON sd.id = sa.source_record_id
-                    WHERE sa.person_id = pnf.person_id
-                      AND aik.author_name_normalized = pnf.name_form
-                      AND sa.source IN {in_clause(AUTHOR_SOURCES)}
+                   (SELECT COUNT(DISTINCT sr.publication_id)
+                    FROM source_contributions sc
+                    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                    JOIN source_records sr ON sr.id = sc.source_record_id
+                    WHERE sc.person_id = pnf.person_id
+                      AND ci.author_name_normalized = pnf.name_form
+                      AND sc.source IN {in_clause(AUTHOR_SOURCES)}
                    ) AS publication_count
             FROM person_name_forms pnf
             WHERE pnf.person_id = :pid

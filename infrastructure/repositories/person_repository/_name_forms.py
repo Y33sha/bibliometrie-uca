@@ -83,11 +83,11 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
               AND pnf.status = 'pending'
               AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
               AND NOT EXISTS (
-                  SELECT 1 FROM source_contributions sa
-                  JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                  WHERE sa.person_id = :pid
-                    AND aik.author_name_normalized = pnf.name_form
-                    AND sa.source IN {in_clause(AUTHOR_SOURCES)}
+                  SELECT 1 FROM source_contributions sc
+                  JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                  WHERE sc.person_id = :pid
+                    AND ci.author_name_normalized = pnf.name_form
+                    AND sc.source IN {in_clause(AUTHOR_SOURCES)}
               )
         """),
         {"pid": person_id},

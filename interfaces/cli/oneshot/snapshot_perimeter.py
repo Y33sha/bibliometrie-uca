@@ -43,10 +43,10 @@ _SOURCE_CONTRIBUTIONS = text("""
         UNION
         SELECT DISTINCT source_contribution_id FROM source_contribution_structures
     )
-    SELECT sa.id, sp.source::text AS source, sa.perimeter_evidence::text[] AS evidence
+    SELECT sc.id, sr.source::text AS source, sc.perimeter_evidence::text[] AS evidence
     FROM ids
-    JOIN source_contributions sa ON sa.id = ids.id
-    JOIN source_records sp ON sp.id = sa.source_record_id
+    JOIN source_contributions sc ON sc.id = ids.id
+    JOIN source_records sr ON sr.id = sc.source_record_id
 """)
 
 _SOURCE_CONTRIBUTION_STRUCTURES = text("""

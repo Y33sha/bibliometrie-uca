@@ -77,8 +77,8 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
 def _publication_of(conn, source_contribution_id):
     return conn.execute(
         text(
-            "SELECT sp.publication_id FROM source_contributions sa "
-            "JOIN source_records sp ON sp.id = sa.source_record_id WHERE sa.id = :i"
+            "SELECT sr.publication_id FROM source_contributions sc "
+            "JOIN source_records sr ON sr.id = sc.source_record_id WHERE sc.id = :i"
         ),
         {"i": source_contribution_id},
     ).scalar_one()

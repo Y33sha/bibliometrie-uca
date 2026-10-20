@@ -62,7 +62,7 @@ def delete_publications_without_sources(conn: Connection) -> int:
         text("""
             DELETE FROM publications p
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_records sp WHERE sp.publication_id = p.id
+                SELECT 1 FROM source_records sr WHERE sr.publication_id = p.id
             )
         """)
     ).rowcount

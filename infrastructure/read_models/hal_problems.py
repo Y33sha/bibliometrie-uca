@@ -42,18 +42,18 @@ _IDREF = usable_identifier("'idref'")
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
-    FROM source_contributions sa
-    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-    WHERE sa.source = 'hal'
-      AND sa.person_id IS NOT NULL
+    FROM source_contributions sc
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    WHERE sc.source = 'hal'
+      AND sc.person_id IS NOT NULL
       AND {_HAL_PERSON_ID} IS NOT NULL
 """
 
 # Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
-    SELECT sa.person_id
+    SELECT sc.person_id
     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-    GROUP BY sa.person_id
+    GROUP BY sc.person_id
     HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
 """
 
@@ -83,14 +83,14 @@ class PgHalProblemsQueries(HalProblemsQueries):
         ).all()
         hal_rows = self._conn.execute(
             text("""
-                SELECT sd.publication_id, sd.source_id AS halid, sd.hal_collections,
-                       sd.doc_type AS hal_doc_type,
-                       sd.publication_year AS hal_publication_year, sd.title AS hal_title,
-                       (SELECT COUNT(*) FROM source_contributions sa2
-                        WHERE sa2.source = 'hal' AND sa2.source_record_id = sd.id) AS author_count
-                FROM source_records sd
-                WHERE sd.publication_id = ANY(:pids) AND sd.source = 'hal'
-                ORDER BY sd.source_id
+                SELECT sr.publication_id, sr.source_id AS halid, sr.hal_collections,
+                       sr.doc_type AS hal_doc_type,
+                       sr.publication_year AS hal_publication_year, sr.title AS hal_title,
+                       (SELECT COUNT(*) FROM source_contributions sc2
+                        WHERE sc2.source = 'hal' AND sc2.source_record_id = sr.id) AS author_count
+                FROM source_records sr
+                WHERE sr.publication_id = ANY(:pids) AND sr.source = 'hal'
+                ORDER BY sr.source_id
             """).bindparams(bindparam("pids")),
             {"pids": publication_ids},
         ).all()
@@ -132,7 +132,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text(f"""
                 WITH hal_accounts AS (
                     SELECT
-                        sa.person_id,
+                        sc.person_id,
                         ({_HAL_PERSON_ID})::int AS hal_person_id,
                         MIN({contributor_display_name()}) AS full_name,
                         MIN({_ORCID}) AS orcid,
@@ -140,7 +140,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         MIN({_IDREF}) AS idref,
                         COUNT(*) AS publication_count
                     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-                    GROUP BY sa.person_id, {_HAL_PERSON_ID}
+                    GROUP BY sc.person_id, {_HAL_PERSON_ID}
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,
@@ -186,24 +186,24 @@ class PgHalProblemsQueries(HalProblemsQueries):
         offset = (page - 1) * per_page
         # Un même DOI (insensible à la casse) déposé sur au moins deux notices HAL de la même publication.
         dup_query = """
-            FROM source_records sd
-            WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
-            GROUP BY sd.publication_id, LOWER(sd.doi)
+            FROM source_records sr
+            WHERE sr.source = 'hal' AND sr.doi IS NOT NULL AND sr.doi != ''
+            GROUP BY sr.publication_id, LOWER(sr.doi)
             HAVING COUNT(*) >= 2
         """
 
         total_row = self._conn.execute(
-            text(f"SELECT COUNT(*) AS total FROM (SELECT sd.publication_id {dup_query}) sub")
+            text(f"SELECT COUNT(*) AS total FROM (SELECT sr.publication_id {dup_query}) sub")
         ).one()
         total = total_row.total
 
         rows = self._conn.execute(
             text(f"""
-                SELECT LOWER(sd.doi) AS doi,
-                       sd.publication_id AS publication_id,
-                       array_agg(sd.source_id ORDER BY sd.source_id) AS halids
+                SELECT LOWER(sr.doi) AS doi,
+                       sr.publication_id AS publication_id,
+                       array_agg(sr.source_id ORDER BY sr.source_id) AS halids
                 {dup_query}
-                ORDER BY LOWER(sd.doi)
+                ORDER BY LOWER(sr.doi)
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {"pg_limit": per_page, "pg_offset": offset},
@@ -241,10 +241,10 @@ class PgHalProblemsQueries(HalProblemsQueries):
               AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL
                        AND LOWER(p1.doi) <> LOWER(p2.doi))
               AND ABS(
-                  (SELECT COUNT(*) FROM source_contributions sa1
-                   WHERE sa1.source = 'hal' AND sa1.source_record_id = hd1.id)
-                  - (SELECT COUNT(*) FROM source_contributions sa2
-                     WHERE sa2.source = 'hal' AND sa2.source_record_id = hd2.id)
+                  (SELECT COUNT(*) FROM source_contributions sc1
+                   WHERE sc1.source = 'hal' AND sc1.source_record_id = hd1.id)
+                  - (SELECT COUNT(*) FROM source_contributions sc2
+                     WHERE sc2.source = 'hal' AND sc2.source_record_id = hd2.id)
               ) <= 2
         """
 
@@ -337,11 +337,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
             WHERE EXISTS (SELECT 1 FROM contribution_structures aus
                           WHERE aus.contribution_id = a.id
                             AND aus.structure_id = ANY(:lab_arr))
-              AND EXISTS (SELECT 1 FROM source_records sd
-                          WHERE sd.publication_id = p.id AND sd.source = 'hal')
-              AND NOT EXISTS (SELECT 1 FROM source_records sd
-                              WHERE sd.publication_id = p.id AND sd.source = 'hal'
-                                AND :col = ANY(sd.hal_collections))
+              AND EXISTS (SELECT 1 FROM source_records sr
+                          WHERE sr.publication_id = p.id AND sr.source = 'hal')
+              AND NOT EXISTS (SELECT 1 FROM source_records sr
+                              WHERE sr.publication_id = p.id AND sr.source = 'hal'
+                                AND :col = ANY(sr.hal_collections))
         """
 
         total_row = self._conn.execute(
@@ -353,11 +353,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text(f"""
                 SELECT DISTINCT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
                        p.doi,
-                       (SELECT array_agg(sd2.source_id) FROM source_records sd2
-                        WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
-                       NOT EXISTS (SELECT 1 FROM source_records sd2
-                                   WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
-                                     AND sd2.hal_collections && :root_cols
+                       (SELECT array_agg(sr2.source_id) FROM source_records sr2
+                        WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids,
+                       NOT EXISTS (SELECT 1 FROM source_records sr2
+                                   WHERE sr2.publication_id = p.id AND sr2.source = 'hal'
+                                     AND sr2.hal_collections && :root_cols
                                   ) AS outside_perimeter_collections
                 {base_where}
                 ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
@@ -404,24 +404,24 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 sps.publication_id,
                 bool_or(EXISTS (
                     SELECT 1 FROM source_contribution_addresses saa
-                    JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-                    WHERE sa.source_record_id = sps.id
+                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+                    WHERE sc.source_record_id = sps.id
                 )) AS any_addressed,
                 bool_or(EXISTS (
-                    SELECT 1 FROM source_contributions sa
-                    WHERE sa.source_record_id = sps.id
-                      AND sa.in_perimeter = TRUE
+                    SELECT 1 FROM source_contributions sc
+                    WHERE sc.source_record_id = sps.id
+                      AND sc.in_perimeter = TRUE
                 )) AS any_in_perimeter
             FROM wos_oa_sps sps
             GROUP BY sps.publication_id
         ),
         hal_in_perimeter_pubs AS (
-            SELECT DISTINCT sp.publication_id
-            FROM source_records sp
-            JOIN source_contributions sa ON sa.source_record_id = sp.id
-            WHERE sp.source = 'hal'
-              AND sa.in_perimeter = TRUE
-              AND sp.publication_id IS NOT NULL
+            SELECT DISTINCT sr.publication_id
+            FROM source_records sr
+            JOIN source_contributions sc ON sc.source_record_id = sr.id
+            WHERE sr.source = 'hal'
+              AND sc.in_perimeter = TRUE
+              AND sr.publication_id IS NOT NULL
         ),
         conflict_pubs AS (
             SELECT h.publication_id
@@ -440,8 +440,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text(f"""
                 {base_cte}
                 SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
-                       (SELECT array_agg(sd2.source_id) FROM source_records sd2
-                        WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
+                       (SELECT array_agg(sr2.source_id) FROM source_records sr2
+                        WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids,
                        (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
                                         ORDER BY COALESCE(l.acronym, l.name))
                         FROM (SELECT DISTINCT s.acronym, s.name

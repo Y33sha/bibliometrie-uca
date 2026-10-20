@@ -27,9 +27,9 @@ def _split(conn, source_contribution_id: int):
     return tuple(
         conn.execute(
             text(
-                "SELECT aik.last_name_normalized, aik.first_name_normalized "
-                "FROM source_contributions sa JOIN contributor_information aik ON aik.id = sa.contributor_information_id "
-                "WHERE sa.id = :id"
+                "SELECT ci.last_name_normalized, ci.first_name_normalized "
+                "FROM source_contributions sc JOIN contributor_information ci ON ci.id = sc.contributor_information_id "
+                "WHERE sc.id = :id"
             ),
             {"id": source_contribution_id},
         ).one()

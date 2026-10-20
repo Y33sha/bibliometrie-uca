@@ -20,14 +20,14 @@ from infrastructure.observability.log import setup_logger
 log = setup_logger("regroup_neutralized_identifiers", os.path.dirname(__file__))
 
 _TARGETS = """
-    SELECT DISTINCT sp.publication_id
-    FROM source_contributions sa
-    JOIN source_records sp ON sp.id = sa.source_record_id
-    WHERE sp.publication_id IS NOT NULL
-      AND sa.neutralized_identifiers ?| array['orcid', 'idref']
+    SELECT DISTINCT sr.publication_id
+    FROM source_contributions sc
+    JOIN source_records sr ON sr.id = sc.source_record_id
+    WHERE sr.publication_id IS NOT NULL
+      AND sc.neutralized_identifiers ?| array['orcid', 'idref']
       AND EXISTS (
           SELECT 1 FROM source_records o
-          WHERE o.publication_id = sp.publication_id AND o.id <> sp.id
+          WHERE o.publication_id = sr.publication_id AND o.id <> sr.id
       )
 """
 

@@ -160,10 +160,10 @@ def _delete_source_records(conn: Connection, staging_filter: str, params: dict[s
         text(f"""
             UPDATE publications p
             SET contributions_dirty = true
-            FROM source_records sp
-            JOIN staging s ON s.id = sp.staging_id
+            FROM source_records sr
+            JOIN staging s ON s.id = sr.staging_id
             WHERE {staging_filter}
-              AND p.id = sp.publication_id
+              AND p.id = sr.publication_id
               AND NOT p.contributions_dirty
         """),  # noqa: S608
         params,
@@ -173,20 +173,20 @@ def _delete_source_records(conn: Connection, staging_filter: str, params: dict[s
         text(f"""
             UPDATE source_records soeur
             SET keys_dirty = true
-            FROM source_records sp
-            JOIN staging s ON s.id = sp.staging_id
+            FROM source_records sr
+            JOIN staging s ON s.id = sr.staging_id
             WHERE {staging_filter}
-              AND soeur.publication_id = sp.publication_id
-              AND soeur.id <> sp.id
+              AND soeur.publication_id = sr.publication_id
+              AND soeur.id <> sr.id
               AND NOT soeur.keys_dirty
         """),  # noqa: S608
         params,
     )
     return conn.execute(
         text(f"""
-            DELETE FROM source_records sp
+            DELETE FROM source_records sr
             USING staging s
-            WHERE sp.staging_id = s.id AND {staging_filter}
+            WHERE sr.staging_id = s.id AND {staging_filter}
         """),  # noqa: S608
         params,
     ).rowcount
@@ -215,9 +215,9 @@ def delete_source_records_before(
     staging_ids = list(
         conn.execute(
             text("""
-                SELECT sp.staging_id FROM source_records sp
-                WHERE sp.publication_year < :start_year AND sp.staging_id IS NOT NULL
-                  AND sp.source::text <> ALL(:exempt)
+                SELECT sr.staging_id FROM source_records sr
+                WHERE sr.publication_year < :start_year AND sr.staging_id IS NOT NULL
+                  AND sr.source::text <> ALL(:exempt)
             """),
             {"start_year": start_year, "exempt": list(exempt_sources)},
         ).scalars()

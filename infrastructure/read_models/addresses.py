@@ -178,13 +178,13 @@ class PgAddressesQueries(AddressesQueries):
                     p.doc_type::text AS doc_type,
                     j.title AS journal_title,
                     {contributor_display_name()} AS author_name,
-                    sd.source_id
+                    sr.source_id
                 FROM source_contribution_addresses saa
-                JOIN source_contributions sa ON sa.id = saa.source_contribution_id
-                JOIN source_records sd ON sd.id = sa.source_record_id
-                JOIN publications p ON p.id = sd.publication_id
+                JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+                JOIN source_records sr ON sr.id = sc.source_record_id
+                JOIN publications p ON p.id = sr.publication_id
                 LEFT JOIN journals j ON j.id = p.journal_id
-                WHERE saa.address_id = :id AND sd.publication_id IS NOT NULL
+                WHERE saa.address_id = :id AND sr.publication_id IS NOT NULL
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim
             """),

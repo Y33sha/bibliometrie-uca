@@ -97,8 +97,8 @@ def _get_publication_oa_status(conn, hal_id):
         text("""
             SELECT p.oa_status::text AS oa_status
             FROM publications p
-            JOIN source_records sd ON sd.publication_id = p.id
-            WHERE sd.source = 'hal' AND sd.source_id = :hal_id
+            JOIN source_records sr ON sr.publication_id = p.id
+            WHERE sr.source = 'hal' AND sr.source_id = :hal_id
         """),
         {"hal_id": hal_id},
     ).scalar_one_or_none()

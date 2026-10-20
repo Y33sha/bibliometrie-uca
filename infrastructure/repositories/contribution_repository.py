@@ -31,22 +31,22 @@ def detach_rejected_source_contributions(
     conn.execute(
         text(f"""
             DELETE FROM confirmed_source_contributions ca
-            USING source_contributions sa, source_records sp, ({REJECTED_PAIRS}) r
-            WHERE ca.source_contribution_id = sa.id
-              AND sa.source_record_id = sp.id
-              AND r.publication_id = sp.publication_id
+            USING source_contributions sc, source_records sr, ({REJECTED_PAIRS}) r
+            WHERE ca.source_contribution_id = sc.id
+              AND sc.source_record_id = sr.id
+              AND r.publication_id = sr.publication_id
               AND r.person_id = :pid AND ca.person_id = :pid {scope}
         """),
         params,
     )
     return conn.execute(
         text(f"""
-            UPDATE source_contributions sa
+            UPDATE source_contributions sc
             SET {DETACHED_SOURCE_CONTRIBUTION}
-            FROM source_records sp, ({REJECTED_PAIRS}) r
-            WHERE sa.source_record_id = sp.id
-              AND r.publication_id = sp.publication_id
-              AND r.person_id = :pid AND sa.person_id = :pid {scope}
+            FROM source_records sr, ({REJECTED_PAIRS}) r
+            WHERE sc.source_record_id = sr.id
+              AND r.publication_id = sr.publication_id
+              AND r.person_id = :pid AND sc.person_id = :pid {scope}
         """),
         params,
     ).rowcount
@@ -59,9 +59,9 @@ def delete_orphan_contributions(conn: Connection, person_id: int) -> int:
             DELETE FROM contributions a
             WHERE a.person_id = :pid
               AND NOT EXISTS (
-                  SELECT 1 FROM source_contributions sa
-                  JOIN source_records sd ON sd.id = sa.source_record_id
-                  WHERE sa.person_id = :pid AND sd.publication_id = a.publication_id
+                  SELECT 1 FROM source_contributions sc
+                  JOIN source_records sr ON sr.id = sc.source_record_id
+                  WHERE sc.person_id = :pid AND sr.publication_id = a.publication_id
               )
         """),
         {"pid": person_id},
@@ -101,11 +101,11 @@ class PgContributionRepository(ContributionRepository):
     ) -> AssignedSourceContributionRow | None:
         row = self._conn.execute(
             text("""
-                UPDATE source_contributions sa SET person_id = :pid
-                FROM contributor_information aik
-                WHERE sa.id = :aid AND sa.person_id IS NULL
-                  AND aik.id = sa.contributor_information_id
-                RETURNING sa.source::text AS source, aik.author_name_normalized
+                UPDATE source_contributions sc SET person_id = :pid
+                FROM contributor_information ci
+                WHERE sc.id = :aid AND sc.person_id IS NULL
+                  AND ci.id = sc.contributor_information_id
+                RETURNING sc.source::text AS source, ci.author_name_normalized
             """),
             {"pid": person_id, "aid": source_contribution_id},
         ).first()
@@ -134,11 +134,11 @@ class PgContributionRepository(ContributionRepository):
             return []
         rows = self._conn.execute(
             text("""
-                SELECT DISTINCT aik.author_name_normalized
-                FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.id = ANY(:ids)
-                  AND aik.author_name_normalized IS NOT NULL
+                SELECT DISTINCT ci.author_name_normalized
+                FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.id = ANY(:ids)
+                  AND ci.author_name_normalized IS NOT NULL
             """),
             {"ids": source_contribution_ids},
         ).all()
@@ -149,9 +149,9 @@ class PgContributionRepository(ContributionRepository):
     ) -> int | None:
         return self._conn.execute(
             text("""
-                SELECT d.publication_id FROM source_contributions sa
-                JOIN source_records d ON d.id = sa.source_record_id
-                WHERE sa.id = :aid
+                SELECT d.publication_id FROM source_contributions sc
+                JOIN source_records d ON d.id = sc.source_record_id
+                WHERE sc.id = :aid
             """),
             {"aid": source_contribution_id},
         ).scalar_one_or_none()
@@ -163,9 +163,9 @@ class PgContributionRepository(ContributionRepository):
             return []
         rows = self._conn.execute(
             text("""
-                SELECT DISTINCT d.publication_id FROM source_contributions sa
-                JOIN source_records d ON d.id = sa.source_record_id
-                WHERE sa.id = ANY(:ids) AND d.publication_id IS NOT NULL
+                SELECT DISTINCT d.publication_id FROM source_contributions sc
+                JOIN source_records d ON d.id = sc.source_record_id
+                WHERE sc.id = ANY(:ids) AND d.publication_id IS NOT NULL
             """),
             {"ids": source_contribution_ids},
         ).all()
@@ -174,12 +174,12 @@ class PgContributionRepository(ContributionRepository):
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
         return self._conn.execute(
             text(
-                f"UPDATE source_contributions sa SET {DETACHED_SOURCE_CONTRIBUTION} "
-                "FROM contributor_information aik "
-                "WHERE sa.person_id = :pid AND aik.id = sa.contributor_information_id "
-                "AND aik.author_name_normalized = :nf "
+                f"UPDATE source_contributions sc SET {DETACHED_SOURCE_CONTRIBUTION} "
+                "FROM contributor_information ci "
+                "WHERE sc.person_id = :pid AND ci.id = sc.contributor_information_id "
+                "AND ci.author_name_normalized = :nf "
                 "AND NOT EXISTS (SELECT 1 FROM confirmed_source_contributions ca "
-                "WHERE ca.source_contribution_id = sa.id AND ca.person_id = :pid)"
+                "WHERE ca.source_contribution_id = sc.id AND ca.person_id = :pid)"
             ),
             {"pid": person_id, "nf": name_form},
         ).rowcount
@@ -208,8 +208,8 @@ class PgContributionRepository(ContributionRepository):
         return self._conn.execute(
             text("""
                 SELECT min(r.created_at) FROM rejected_contributions r
-                JOIN source_records sp ON sp.id = r.source_record_id
-                WHERE sp.publication_id = :pub AND r.person_id = :pid
+                JOIN source_records sr ON sr.id = r.source_record_id
+                WHERE sr.publication_id = :pub AND r.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},
         ).scalar_one_or_none()
@@ -218,9 +218,9 @@ class PgContributionRepository(ContributionRepository):
         self._conn.execute(
             text("""
                 DELETE FROM rejected_contributions r
-                USING source_records sp
-                WHERE sp.id = r.source_record_id
-                  AND sp.publication_id = :pub AND r.person_id = :pid
+                USING source_records sr
+                WHERE sr.id = r.source_record_id
+                  AND sr.publication_id = :pub AND r.person_id = :pid
             """),
             {"pub": publication_id, "pid": person_id},
         )

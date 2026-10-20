@@ -130,12 +130,12 @@ def get_publication_detail(
 
     sources_rows = conn.execute(
         text(f"""
-            SELECT sd.source, sd.source_id, sd.doi, sd.hal_collections, sd.countries,
-                   COALESCE({corrected_by("doi", "sd")} = ANY(:convergence_cases), false)
+            SELECT sr.source, sr.source_id, sr.doi, sr.hal_collections, sr.countries,
+                   COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
                        AS is_secondary
-            FROM source_records sd
-            WHERE sd.publication_id = :pid
-            ORDER BY sd.created_at DESC
+            FROM source_records sr
+            WHERE sr.publication_id = :pid
+            ORDER BY sr.created_at DESC
         """),
         {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
     ).all()
@@ -190,16 +190,16 @@ def get_publication_detail(
 
     theses_rows = conn.execute(
         text(f"""
-            SELECT sa.id, sa.author_position, {contributor_display_name()} AS full_name, sa.person_id,
-                   sa.roles, sa.in_perimeter
-            FROM source_contributions sa
-            WHERE sa.source_record_id = (
+            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, sc.person_id,
+                   sc.roles, sc.in_perimeter
+            FROM source_contributions sc
+            WHERE sc.source_record_id = (
                 SELECT id FROM source_records
                 WHERE source = '{Source.THESES.value}' AND publication_id = :pid
                 ORDER BY created_at DESC
                 LIMIT 1
             )
-            ORDER BY sa.author_position NULLS LAST, full_name
+            ORDER BY sc.author_position NULLS LAST, full_name
         """),
         {"pid": publication_id},
     ).all()
@@ -219,10 +219,10 @@ def get_publication_detail(
     if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
         meta_row = conn.execute(
             text(f"""
-                SELECT sd.meta AS source_record_meta, p.meta AS publication_meta
+                SELECT sr.meta AS source_record_meta, p.meta AS publication_meta
                 FROM publications p
-                LEFT JOIN source_records sd
-                       ON sd.publication_id = p.id AND sd.source = '{Source.THESES.value}'
+                LEFT JOIN source_records sr
+                       ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
                 WHERE p.id = :pid
                 LIMIT 1
             """),
@@ -303,8 +303,8 @@ def get_publication_external_identifiers(
     Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
     rows = conn.execute(
         text("""
-            SELECT sp.source::text, sp.source_id, sp.external_ids FROM source_records sp
-            WHERE sp.publication_id = :pid AND sp.external_ids IS NOT NULL
+            SELECT sr.source::text, sr.source_id, sr.external_ids FROM source_records sr
+            WHERE sr.publication_id = :pid AND sr.external_ids IS NOT NULL
         """),
         {"pid": publication_id},
     ).all()

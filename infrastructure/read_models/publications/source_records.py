@@ -78,24 +78,24 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
     """Signatures des enregistrements de la publication, avec leur groupe et leur entrée dans le groupe."""
     rows = conn.execute(
         text(f"""
-            SELECT sa.id, sa.source_record_id, sa.author_position AS position,
-                   {contributor_display_name()} AS full_name, sa.roles, sa.person_id,
-                   sa.in_perimeter, sa.collective, sa.countries,
+            SELECT sc.id, sc.source_record_id, sc.author_position AS position,
+                   {contributor_display_name()} AS full_name, sc.roles, sc.person_id,
+                   sc.in_perimeter, sc.collective, sc.countries,
                    (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
                     FROM source_contribution_structures sas
-                    WHERE sas.source_contribution_id = sa.id) AS structure_ids,
+                    WHERE sas.source_contribution_id = sc.id) AS structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
                     FROM source_contribution_addresses saa
                     JOIN addresses addr ON addr.id = saa.address_id
-                    WHERE saa.source_contribution_id = sa.id) AS raw_affiliation,
+                    WHERE saa.source_contribution_id = sc.id) AS raw_affiliation,
                    gs.group_id, g.reference_position AS group_position, gs.method::text AS method,
                    gs.score, gs.margin
-            FROM source_records sp
-            JOIN source_contributions sa ON sa.source_record_id = sp.id
-            LEFT JOIN source_contribution_group_members gs ON gs.source_contribution_id = sa.id
+            FROM source_records sr
+            JOIN source_contributions sc ON sc.source_record_id = sr.id
+            LEFT JOIN source_contribution_group_members gs ON gs.source_contribution_id = sc.id
             LEFT JOIN source_contribution_groups g ON g.id = gs.group_id
-            WHERE sp.publication_id = :pid
-            ORDER BY sa.source_record_id, sa.author_position NULLS LAST, sa.id
+            WHERE sr.publication_id = :pid
+            ORDER BY sc.source_record_id, sc.author_position NULLS LAST, sc.id
         """),  # noqa: S608
         {"pid": publication_id},
     ).all()
@@ -133,19 +133,19 @@ def get_publication_sources(
         return None
     rows = conn.execute(
         text(f"""
-            SELECT sp.id, sp.source::text AS source, sp.source_id, sp.doi, sp.external_ids,
-                   sp.title, sp.title_normalized, sp.doc_type, sp.publication_year, sp.language,
+            SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
+                   sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
                    lang.name AS language_name,
                    {stashed_raw("language")} AS language_raw,
-                   sp.oa_status, sp.container_title, sp.biblio,
+                   sr.oa_status, sr.container_title, sr.biblio,
                    j.id AS journal_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name
-            FROM source_records sp
-            LEFT JOIN journals j ON j.id = sp.journal_id
+            FROM source_records sr
+            LEFT JOIN journals j ON j.id = sr.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
-            LEFT JOIN languages lang ON lang.code = sp.language
-            WHERE sp.publication_id = :pid
-            ORDER BY sp.source, sp.source_id
+            LEFT JOIN languages lang ON lang.code = sr.language
+            WHERE sr.publication_id = :pid
+            ORDER BY sr.source, sr.source_id
         """),
         {"pid": publication_id},
     ).all()

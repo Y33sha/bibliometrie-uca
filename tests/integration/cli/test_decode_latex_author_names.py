@@ -50,10 +50,10 @@ def test_le_nom_decode_change_d_informations_du_contributeur_et_perd_sa_personne
         r.id: (r.raw_author_name, r.last_name_normalized, r.first_name_normalized, r.person_id)
         for r in conn.execute(
             text("""
-                SELECT sa.id, sa.raw_author_name, k.last_name_normalized, k.first_name_normalized,
-                       sa.person_id
-                FROM source_contributions sa JOIN contributor_information k ON k.id = sa.contributor_information_id
-                WHERE sa.id = ANY(:ids)
+                SELECT sc.id, sc.raw_author_name, k.last_name_normalized, k.first_name_normalized,
+                       sc.person_id
+                FROM source_contributions sc JOIN contributor_information k ON k.id = sc.contributor_information_id
+                WHERE sc.id = ANY(:ids)
             """),
             {"ids": [latex, pinned]},
         )

@@ -35,9 +35,9 @@ class PersonsStore:
             return 0
         return self._conn.execute(
             text(f"""
-                UPDATE source_contributions sa
+                UPDATE source_contributions sc
                 SET {DETACHED_SOURCE_CONTRIBUTION}
-                WHERE sa.id = ANY(:ids) AND NOT {pinned("sa.id")}
+                WHERE sc.id = ANY(:ids) AND NOT {pinned("sc.id")}
             """),
             {"ids": source_contribution_ids},
         ).rowcount

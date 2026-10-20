@@ -29,8 +29,8 @@ CANDIDATES_SQL = candidates_sql("n.names ~* '(:|none|null)'")
 
 _MARK_DIRTY_SQL = text("""
     UPDATE publications p SET contributions_dirty = true
-    FROM source_records sp
-    WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+    FROM source_records sr
+    WHERE sr.id = ANY(:source_records) AND p.id = sr.publication_id AND NOT p.contributions_dirty
 """)
 
 

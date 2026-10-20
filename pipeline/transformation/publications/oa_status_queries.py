@@ -81,10 +81,10 @@ class OaStatusQueries:
         rows = conn.execute(
             text("""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,
-                       array_agg(sp.source::text ORDER BY sp.id) AS sources,
-                       array_agg(sp.oa_status::text ORDER BY sp.id) AS statuses
+                       array_agg(sr.source::text ORDER BY sr.id) AS sources,
+                       array_agg(sr.oa_status::text ORDER BY sr.id) AS statuses
                 FROM publications p
-                JOIN source_records sp ON sp.publication_id = p.id
+                JOIN source_records sr ON sr.publication_id = p.id
                 WHERE lower(p.doi) = ANY(:dois)
                 GROUP BY p.id
             """),

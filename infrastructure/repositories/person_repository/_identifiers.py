@@ -100,28 +100,28 @@ _HAL_ACCOUNT_PEERS_SQL = text(f"""
         FROM person_identifiers WHERE id = ANY(:ids)
     ),
     hal_identities AS (
-        SELECT DISTINCT sa.person_id, sa.neutralized_identifiers, aik.identifiers
+        SELECT DISTINCT sc.person_id, sc.neutralized_identifiers, ci.identifiers
         FROM (SELECT DISTINCT person_id FROM src) p
-        JOIN source_contributions sa ON sa.person_id = p.person_id AND sa.source = 'hal'
-        JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-        WHERE aik.identifiers ? '{_HAL}'
+        JOIN source_contributions sc ON sc.person_id = p.person_id AND sc.source = 'hal'
+        JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+        WHERE ci.identifiers ? '{_HAL}'
     ),
     accounts AS (
-        SELECT DISTINCT src.src_id, src.person_id, sa.identifiers->>'{_HAL}' AS hal
+        SELECT DISTINCT src.src_id, src.person_id, sc.identifiers->>'{_HAL}' AS hal
         FROM src
-        JOIN hal_identities sa
-          ON sa.person_id = src.person_id
-         AND sa.identifiers->>src.id_type = src.id_value
+        JOIN hal_identities sc
+          ON sc.person_id = src.person_id
+         AND sc.identifiers->>src.id_type = src.id_value
         WHERE NOT {identifier_neutralized("src.id_type")}
     ),
     bundle AS (
         SELECT DISTINCT accounts.src_id, accounts.person_id,
-               k.id_type, sa.identifiers->>k.id_type AS id_value
+               k.id_type, sc.identifiers->>k.id_type AS id_value
         FROM accounts
-        JOIN hal_identities sa
-          ON sa.person_id = accounts.person_id
-         AND sa.identifiers->>'{_HAL}' = accounts.hal
-        CROSS JOIN LATERAL jsonb_object_keys(sa.identifiers) AS k(id_type)
+        JOIN hal_identities sc
+          ON sc.person_id = accounts.person_id
+         AND sc.identifiers->>'{_HAL}' = accounts.hal
+        CROSS JOIN LATERAL jsonb_object_keys(sc.identifiers) AS k(id_type)
         WHERE NOT {identifier_neutralized("k.id_type")}
     )
     SELECT bundle.src_id, pi.id AS peer_id

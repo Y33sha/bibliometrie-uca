@@ -84,15 +84,15 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
     """Les `SourceRecord` attachées à une publication canonique, matière de l'agrégation."""
     result = conn.execute(
         text("""
-            SELECT sp.id, sp.source::text AS source, sp.source_id,
-                   sp.title, sp.publication_year, sp.doc_type::text AS doc_type,
-                   sp.doi,
-                   sp.journal_id, sp.monograph_id, sp.container_title, sp.language,
-                   sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
-                   sp.countries, sp.urls, sp.keywords,
-                   sp.topics, sp.biblio, sp.meta, sp.license::text AS license
-            FROM source_records sp
-            WHERE sp.publication_id = :id
+            SELECT sr.id, sr.source::text AS source, sr.source_id,
+                   sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
+                   sr.doi,
+                   sr.journal_id, sr.monograph_id, sr.container_title, sr.language,
+                   sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
+                   sr.countries, sr.urls, sr.keywords,
+                   sr.topics, sr.biblio, sr.meta, sr.license::text AS license
+            FROM source_records sr
+            WHERE sr.publication_id = :id
         """),
         {"id": publication_id},
     )

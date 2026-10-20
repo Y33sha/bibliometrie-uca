@@ -48,12 +48,12 @@ _HAL_ID_PENDING = pending_failed_lookup_sql(
 _MISSING_HAL_IDS_SQL = text(
     f"""
     SELECT DISTINCT h.hal_id
-    FROM source_records sp
-    JOIN publications p ON p.id = sp.publication_id
-    CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
-    WHERE sp.source IN ('openalex', 'scanr')
+    FROM source_records sr
+    JOIN publications p ON p.id = sr.publication_id
+    CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
+    WHERE sr.source IN ('openalex', 'scanr')
       AND p.in_perimeter
-      AND jsonb_typeof(sp.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
+      AND jsonb_typeof(sr.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
       AND NOT EXISTS (
           SELECT 1 FROM staging s WHERE s.source = 'hal' AND s.source_id = h.hal_id
       )
@@ -62,17 +62,17 @@ _MISSING_HAL_IDS_SQL = text(
 )
 
 _NNT_PENDING = pending_failed_lookup_sql(
-    source_sql="'hal'", id_type="nnt", value_sql=f"sp.external_ids ->> '{ExternalIdType.NNT}'"
+    source_sql="'hal'", id_type="nnt", value_sql=f"sr.external_ids ->> '{ExternalIdType.NNT}'"
 )
 
 _MISSING_NNTS_SQL = text(
     f"""
-    SELECT sp.external_ids ->> '{ExternalIdType.NNT}' AS nnt
-    FROM source_records sp
-    JOIN publications p ON p.id = sp.publication_id
-    WHERE sp.source = 'theses'
+    SELECT sr.external_ids ->> '{ExternalIdType.NNT}' AS nnt
+    FROM source_records sr
+    JOIN publications p ON p.id = sr.publication_id
+    WHERE sr.source = 'theses'
       AND p.in_perimeter
-      AND sp.external_ids ->> '{ExternalIdType.NNT}' IS NOT NULL
+      AND sr.external_ids ->> '{ExternalIdType.NNT}' IS NOT NULL
       AND p.doc_type != 'ongoing_thesis'
       AND NOT EXISTS (
           SELECT 1 FROM source_records hal
@@ -80,7 +80,7 @@ _MISSING_NNTS_SQL = text(
       )
       AND NOT EXISTS (
           SELECT 1 FROM source_records hal
-          WHERE hal.source = 'hal' AND hal.external_ids ->> '{ExternalIdType.NNT}' = sp.external_ids ->> '{ExternalIdType.NNT}'
+          WHERE hal.source = 'hal' AND hal.external_ids ->> '{ExternalIdType.NNT}' = sr.external_ids ->> '{ExternalIdType.NNT}'
       )
       AND NOT {_NNT_PENDING}
     """

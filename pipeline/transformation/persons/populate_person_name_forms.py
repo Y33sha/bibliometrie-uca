@@ -92,13 +92,13 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
                 SELECT name_form, person_id, source
                 FROM _raw_forms
                 UNION
-                SELECT aik.author_name_normalized AS name_form,
-                       sa.person_id, sa.source::text AS source
-                FROM source_contributions sa
-                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-                WHERE sa.person_id IS NOT NULL
-                  AND aik.author_name_normalized IS NOT NULL
-                  AND aik.author_name_normalized != ''
+                SELECT ci.author_name_normalized AS name_form,
+                       sc.person_id, sc.source::text AS source
+                FROM source_contributions sc
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sc.person_id IS NOT NULL
+                  AND ci.author_name_normalized IS NOT NULL
+                  AND ci.author_name_normalized != ''
             )
             SELECT name_form, person_id,
                    array_agg(DISTINCT source ORDER BY source) AS sources

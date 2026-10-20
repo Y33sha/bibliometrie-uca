@@ -67,8 +67,8 @@ class ReconcileRow(NamedTuple):
 _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, p.doi AS publication_doi, "
-    "EXISTS (SELECT 1 FROM source_contributions sa "
-    "WHERE sa.source_record_id = {a}.id AND sa.in_perimeter) AS in_perimeter"
+    "EXISTS (SELECT 1 FROM source_contributions sc "
+    "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter"
 )
 
 # Premier identifiant HAL que liste une `source_record` : sa clé de fusion HAL.
@@ -88,10 +88,10 @@ _SCALAR_KEY_ARMS = "".join(
 
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
-        SELECT {_COLS.format(a="sd")}
-        FROM source_records sd
-        LEFT JOIN publications p ON p.id = sd.publication_id
-        WHERE sd.keys_dirty
+        SELECT {_COLS.format(a="sr")}
+        FROM source_records sr
+        LEFT JOIN publications p ON p.id = sr.publication_id
+        WHERE sr.keys_dirty
     )
     SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
            publication_doi, in_perimeter

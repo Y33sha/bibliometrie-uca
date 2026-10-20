@@ -33,11 +33,11 @@ log = setup_logger("decode_latex_author_names", os.path.dirname(__file__))
 def candidates_sql(condition: str) -> TextClause:
     """Signatures candidates : celles dont les noms réunis (`n.names`) vérifient `condition`."""
     return text(f"""
-        SELECT sa.id, sa.source_record_id AS source_record, sa.raw_author_name, sa.raw_last_name,
-               sa.raw_first_name, aik.identifiers
-        FROM source_contributions sa JOIN contributor_information aik ON aik.id = sa.contributor_information_id
+        SELECT sc.id, sc.source_record_id AS source_record, sc.raw_author_name, sc.raw_last_name,
+               sc.raw_first_name, ci.identifiers
+        FROM source_contributions sc JOIN contributor_information ci ON ci.id = sc.contributor_information_id
         CROSS JOIN LATERAL (
-            SELECT concat_ws(' ', sa.raw_author_name, sa.raw_last_name, sa.raw_first_name) AS names
+            SELECT concat_ws(' ', sc.raw_author_name, sc.raw_last_name, sc.raw_first_name) AS names
         ) n
         WHERE {condition}
     """)
@@ -55,26 +55,26 @@ _UPSERT_CONTRIBUTOR_INFORMATION_SQL = text(f"""
 
 _UPDATE_SOURCE_CONTRIBUTIONS_SQL = text(
     """
-    UPDATE source_contributions sa
+    UPDATE source_contributions sc
     SET raw_author_name = t.raw_author_name, raw_last_name = t.raw_last_name,
-        raw_first_name = t.raw_first_name, contributor_information_id = aik.id,
-        person_id = CASE WHEN ca.source_contribution_id IS NULL THEN NULL ELSE sa.person_id END,
-        resolution_mode = CASE WHEN ca.source_contribution_id IS NULL THEN NULL ELSE sa.resolution_mode END
+        raw_first_name = t.raw_first_name, contributor_information_id = ci.id,
+        person_id = CASE WHEN ca.source_contribution_id IS NULL THEN NULL ELSE sc.person_id END,
+        resolution_mode = CASE WHEN ca.source_contribution_id IS NULL THEN NULL ELSE sc.resolution_mode END
     FROM jsonb_to_recordset(:payload) AS t(
         id integer, raw_author_name text, raw_last_name text, raw_first_name text,
         last_name_normalized text, first_name_normalized text, identifiers jsonb)
-    JOIN contributor_information aik ON aik.key_hash = """
+    JOIN contributor_information ci ON ci.key_hash = """
     + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
     + """
     LEFT JOIN confirmed_source_contributions ca ON ca.source_contribution_id = t.id
-    WHERE sa.id = t.id
+    WHERE sc.id = t.id
 """
 ).bindparams(bindparam("payload", type_=Jsonb))
 
 _MARK_DIRTY_SQL = text("""
     UPDATE publications p SET contributions_dirty = true
-    FROM source_records sp
-    WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+    FROM source_records sr
+    WHERE sr.id = ANY(:source_records) AND p.id = sr.publication_id AND NOT p.contributions_dirty
 """)
 
 

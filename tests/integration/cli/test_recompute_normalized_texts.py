@@ -24,9 +24,9 @@ def test_une_contribution_source_en_ecriture_non_latine_rejoint_les_informations
 
     assert sa_sync_conn.execute(
         text("""
-            SELECT aik.last_name_normalized, aik.first_name_normalized
-            FROM source_contributions sa JOIN contributor_information aik ON aik.id = sa.contributor_information_id
-            WHERE sa.id = :sa
+            SELECT ci.last_name_normalized, ci.first_name_normalized
+            FROM source_contributions sc JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            WHERE sc.id = :sa
         """),
         {"sa": sa},
     ).one() == ("馬場", "重樹")

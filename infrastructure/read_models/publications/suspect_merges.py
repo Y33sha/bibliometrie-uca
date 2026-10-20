@@ -18,16 +18,16 @@ _SOURCE_RECORDS_SQL = text(f"""
                count(*) OVER (PARTITION BY gs.group_id) AS group_size
         FROM source_contribution_groups g
         JOIN source_contribution_group_members gs ON gs.group_id = g.id
-        JOIN source_contributions sa ON sa.id = gs.source_contribution_id
+        JOIN source_contributions sc ON sc.id = gs.source_contribution_id
         WHERE g.publication_id = ANY(:publications)
-          AND (sa.roles IS NULL OR '{ContributionRole.AUTHOR.value}' = ANY(sa.roles))
+          AND (sc.roles IS NULL OR '{ContributionRole.AUTHOR.value}' = ANY(sc.roles))
     )
-    SELECT m.publication_id, sp.source::text AS source, sp.source_id,
+    SELECT m.publication_id, sr.source::text AS source, sr.source_id,
            count(*) AS source_contributions, count(*) FILTER (WHERE m.group_size >= 2) AS matched_source_contributions
     FROM members m
-    JOIN source_records sp ON sp.id = m.source_record_id
-    GROUP BY m.publication_id, sp.source, sp.source_id
-    ORDER BY m.publication_id, count(*) DESC, sp.source, sp.source_id
+    JOIN source_records sr ON sr.id = m.source_record_id
+    GROUP BY m.publication_id, sr.source, sr.source_id
+    ORDER BY m.publication_id, count(*) DESC, sr.source, sr.source_id
 """)  # noqa: S608
 
 

@@ -28,15 +28,15 @@ from pipeline.runtime.observability.progression import progression
 
 _COMMIT_EVERY = 50
 
-_NNT = f"sp.external_ids ->> '{ExternalIdType.NNT}'"
+_NNT = f"sr.external_ids ->> '{ExternalIdType.NNT}'"
 
 _NNT_PENDING = pending_failed_lookup_sql(source_sql="'theses'", id_type="nnt", value_sql=_NNT)
 
 _MISSING_NNTS_SQL = text(
     f"""
     SELECT DISTINCT {_NNT} AS nnt
-    FROM source_records sp
-    WHERE sp.source <> 'theses'
+    FROM source_records sr
+    WHERE sr.source <> 'theses'
       AND {_NNT} IS NOT NULL
       AND NOT EXISTS (
           SELECT 1 FROM staging s WHERE s.source = 'theses' AND s.source_id = {_NNT}

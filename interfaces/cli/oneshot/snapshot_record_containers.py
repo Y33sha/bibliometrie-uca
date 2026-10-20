@@ -32,18 +32,18 @@ _SNAPSHOTS = Path("data/snapshots")
 _EXAMPLES = 5
 
 _RECORDS = text(f"""
-    SELECT sp.source::text AS source, sp.source_id, sp.doc_type,
+    SELECT sr.source::text AS source, sr.source_id, sr.doc_type,
            normalized.id AS journal_id, j.title AS journal_title,
            coalesce({has_active_issn("j.id")}, false) AS journal_has_issn,
-           sp.monograph_id, m.title AS monograph_title
-    FROM source_records sp
+           sr.monograph_id, m.title AS monograph_title
+    FROM source_records sr
     CROSS JOIN LATERAL (
-        SELECT CASE WHEN sp.raw_metadata ? 'journal_id'
-                    THEN (sp.raw_metadata->'journal_id'->>'raw')::int
-                    ELSE sp.journal_id END AS id
+        SELECT CASE WHEN sr.raw_metadata ? 'journal_id'
+                    THEN (sr.raw_metadata->'journal_id'->>'raw')::int
+                    ELSE sr.journal_id END AS id
     ) normalized
     LEFT JOIN journals j ON j.id = normalized.id
-    LEFT JOIN monographs m ON m.id = sp.monograph_id
+    LEFT JOIN monographs m ON m.id = sr.monograph_id
 """)
 
 Record = list[object]
