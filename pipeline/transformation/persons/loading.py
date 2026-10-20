@@ -43,7 +43,6 @@ class BareUnlinkedAuthorship(NamedTuple):
     identifiers: dict[str, str]
     roles: list[str] | None
     publication_id: int | None
-    author_position: int
     in_perimeter: bool
     # `person_id` courant si la signature est déjà liée en cross-source et re-jugée ce run ; `None` pour une signature non liée. Sert à diffuser l'écriture (no-op / update) et le détachement des sans-appui.
     current_person_id: int | None
@@ -75,7 +74,6 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedAuthorship:
         identifiers=r.identifiers,
         roles=r.roles,
         publication_id=r.publication_id,
-        author_position=r.author_position,
         in_perimeter=r.in_perimeter,
         current_person_id=r.current_person_id,
         group_id=r.group_id,
@@ -97,7 +95,6 @@ _BARE_PROJECTION_HEAD = f"""
     jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
     sa_auth.roles,
     sd.publication_id,
-    sa_auth.author_position,
     (SELECT gs.group_id FROM grouped_source_authorships gs
      WHERE gs.source_authorship_id = sa_auth.id) AS group_id"""
 
@@ -154,7 +151,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
     """Colonnes de la projection des `source_authorships` in-perimeter, individuelles, non liées :
 
     - `identifiers` : identifiants de l'identité (`author_identifying_keys`, jointe par `identity_id`), sans filtre par source. Seules les signatures HAL contiennent `hal_person_id` et `idhal`. La cascade écarte les identifiants que leur source rend non fiables (`trusted_identifier`).
-    - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
     """
     rows = conn.execute(
         text(f"""
@@ -239,9 +235,7 @@ class EnrichedAuthorship(NamedTuple):
     # Formes cherchées dans `person_name_forms`, ordre inversé compris (`signature_name_forms`).
     name_forms: tuple[str, ...]
     identifiers: dict[str, str]
-    roles: list[str] | None
     publication_id: int | None
-    author_position: int
     in_perimeter: bool
     current_person_id: int | None
     last_name: str
@@ -266,9 +260,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         author_name_normalized=row.author_name_normalized,
         name_forms=signature_name_forms(last_norm, first_norm),
         identifiers=row.identifiers,
-        roles=row.roles,
         publication_id=row.publication_id,
-        author_position=row.author_position,
         in_perimeter=row.in_perimeter,
         current_person_id=row.current_person_id,
         last_name=last_name,
