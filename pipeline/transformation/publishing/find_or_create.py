@@ -46,22 +46,22 @@ def find_or_create_publisher(
 
     # 1. Par openalex_id
     if openalex_id:
-        pub_id = repo.find_publisher_by_openalex_id(openalex_id)
-        if pub_id:
+        publisher_id = repo.find_publisher_by_openalex_id(openalex_id)
+        if publisher_id:
             name_key = publisher_name_key(to_plain_text(name))
             if name_key:
-                repo.add_publisher_name_form(pub_id, name_key)
-            return pub_id
+                repo.add_publisher_name_form(publisher_id, name_key)
+            return publisher_id
 
     # 2-3. Match ou création par forme de nom, puis rattachement de l'openalex_id
     # (sur l'éditeur trouvé comme sur celui créé).
     matched = match_or_create_publisher(name, repo=repo)
     if matched is None:
         return None
-    pub_id, _ = matched
+    publisher_id, _ = matched
     if openalex_id:
-        repo.set_publisher_openalex_id_if_missing(pub_id, openalex_id)
-    return pub_id
+        repo.set_publisher_openalex_id_if_missing(publisher_id, openalex_id)
+    return publisher_id
 
 
 def match_or_create_publisher(name: str, *, repo: PublisherStore) -> tuple[int, bool] | None:
