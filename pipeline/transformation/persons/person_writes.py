@@ -1,37 +1,17 @@
-"""Règles de la phase `persons` sur une personne : changement de nom, identifiants observés dans ses signatures.
+"""Identifiants que la phase `persons` attribue à une personne d'après ses signatures.
 
-Les écritures passent par le repository des personnes (`PgPersonRepository`), que l'API utilise aussi. Les règles communes sont dans `domain.persons` : nom requis (`validated_name`), formes de nom (`compute_person_name_forms`), attribution d'un identifiant (`attribution_outcome`).
+L'attribution passe par le repository des personnes (`PgPersonRepository.attribute_identifier`), que l'API utilise aussi.
 """
 
 import logging
 from collections.abc import Mapping, Sequence
 
 from domain.errors import ValidationError
-from domain.persons.identifier_attribution import (
-    AttributionOutcome,
-    IdentifierAttribution,
-    attribution_outcome,
-)
-from domain.persons.identifiers import (
-    PERSON_IDENTIFIER_TYPES,
-    IdentifierOrigin,
-    normalized_identifier_value,
-)
-from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person import validated_name
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, IdentifierOrigin
 from domain.types import JsonValue
 from infrastructure.repositories.person_repository import PgPersonRepository
 
 logger = logging.getLogger(__name__)
-
-
-def rename_person(
-    person_id: int, last_name: str, first_name: str, *, repo: PgPersonRepository
-) -> None:
-    """Change le nom d'une personne et recalcule aussitôt ses formes de nom. Lève `ValidationError` sans patronyme."""
-    last_name, first_name = validated_name(last_name, first_name)
-    repo.update_name(person_id, last_name, first_name)
-    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
 
 def add_identifiers_from_authorships(
@@ -56,28 +36,6 @@ def add_identifiers_from_authorships(
                 continue
             seen.add((id_type, value))
             try:
-                _add_identifier(person_id, id_type, value, repo=repo)
+                repo.attribute_identifier(person_id, id_type, value, source=IdentifierOrigin.AUTO)
             except ValidationError:
                 logger.warning("Identifiant mal formé ignoré : %s=%r", id_type, value)
-
-
-def _add_identifier(
-    person_id: int, id_type: str, id_value: str, *, repo: PgPersonRepository
-) -> None:
-    """Attribue un identifiant à la personne selon `attribution_outcome`. Un identifiant détenu par une autre personne reste à elle."""
-    id_value = normalized_identifier_value(id_type, id_value)
-    existing = repo.find_identifier(id_type, id_value)
-    outcome = attribution_outcome(existing, person_id)
-    if outcome is AttributionOutcome.ADDED:
-        repo.insert_identifier(
-            IdentifierAttribution(
-                id=None,
-                person_id=person_id,
-                id_type=id_type,
-                id_value=id_value,
-                source=IdentifierOrigin.AUTO,
-            )
-        )
-    elif existing is not None and outcome is AttributionOutcome.REASSIGNED:
-        existing.reattribute_to(person_id, source=IdentifierOrigin.AUTO)
-        repo.update_identifier(existing)

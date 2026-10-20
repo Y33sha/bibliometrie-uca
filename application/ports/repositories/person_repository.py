@@ -2,7 +2,8 @@
 
 from typing import Protocol, TypedDict
 
-from domain.persons.identifier_attribution import IdentifierAttribution
+from domain.persons.identifier_attribution import AttributionResult, IdentifierAttribution
+from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.person import Person, PersonExclusion
 
 
@@ -37,6 +38,13 @@ class PersonRepository(Protocol):
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
         """Met à jour le nom d'une personne. Lève `NotFoundError` si elle est introuvable."""
+        ...
+
+    def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
+        """Change le nom d'une personne et recalcule ses formes de nom (`compute_person_name_forms`). Rend le nom validé (`validated_name`).
+
+        Lève `ValidationError` sans patronyme, `NotFoundError` si la personne est introuvable.
+        """
         ...
 
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
@@ -75,6 +83,15 @@ class PersonRepository(Protocol):
 
     def update_identifier(self, ident: IdentifierAttribution) -> None:
         """Persiste les mutations d'un `IdentifierAttribution` existant (`person_id`, `status`, `source`) ; `id_type` et `id_value` sont immuables. Requiert `ident.id` posé."""
+        ...
+
+    def attribute_identifier(
+        self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
+    ) -> AttributionResult:
+        """Attribue l'identifiant à la personne selon `attribution_outcome` : insertion en `pending`, ou reprise d'une attribution `rejected`. Une attribution que détient une autre personne reste à elle.
+
+        La valeur est normalisée par `normalized_identifier_value`, qui lève `ValidationError` sur une valeur mal formée.
+        """
         ...
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:

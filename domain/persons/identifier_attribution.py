@@ -9,6 +9,7 @@ La logique métier touchant aux attributions d'identifiants (transitions de stat
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 from domain.errors import CannotAttributeConflict
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
@@ -69,6 +70,14 @@ class IdentifierAttribution:
             )
         self.person_id = new_person_id
         self.source = source
+
+
+class AttributionResult(NamedTuple):
+    """Résultat de l'attribution d'un identifiant à une personne : l'issue, la valeur normalisée, et l'attribution trouvée en base, à défaut `None`."""
+
+    outcome: AttributionOutcome
+    id_value: str
+    existing: IdentifierAttribution | None
 
 
 def attribution_outcome(
