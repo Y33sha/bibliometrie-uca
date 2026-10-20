@@ -36,7 +36,6 @@ from infrastructure.repositories import (
     person_repository,
 )
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.transformation.publications.authorships.authorships_queries import AuthorshipsBuild
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
@@ -64,7 +63,6 @@ _jean_dupont_signature = partial(insert_signature, author_name_normalized="jean 
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
 _notice = partial(insert_source_publication, source_id="hal-1", title="Test")
 
-_BUILD_QUERIES = AuthorshipsBuild()
 _PERIMETER = PublicationPerimeterRecompute()
 
 
@@ -611,7 +609,6 @@ class TestBatchAssignOrphanAuthorships:
                 repo=repo,
                 authorship_repo=authorship_repo,
                 conn=sa_sync_conn,
-                build_queries=_BUILD_QUERIES,
             )
             == 0
         )
@@ -631,7 +628,6 @@ class TestBatchAssignOrphanAuthorships:
             repo=repo,
             authorship_repo=authorship_repo,
             conn=sa_sync_conn,
-            build_queries=_BUILD_QUERIES,
         )
 
         assert assigned == 2
@@ -669,7 +665,6 @@ class TestBatchAssignOrphanAuthorships:
             repo=repo,
             authorship_repo=authorship_repo,
             conn=sa_sync_conn,
-            build_queries=_BUILD_QUERIES,
         )
 
         row = sa_sync_conn.execute(
@@ -703,7 +698,6 @@ class TestBatchAssignOrphanAuthorships:
             repo=repo,
             authorship_repo=authorship_repo,
             conn=sa_sync_conn,
-            build_queries=_BUILD_QUERIES,
         )
 
         assert assigned == 1
@@ -1203,7 +1197,6 @@ class TestReassignRejectedPairUnit:
                 repo=repo,
                 authorship_repo=authorship_repo,
                 conn=sa_sync_conn,
-                build_queries=_BUILD_QUERIES,
             )
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'assigné : on a levé avant la pose.
@@ -1229,7 +1222,6 @@ class TestReassignRejectedPairUnit:
             repo=repo,
             authorship_repo=authorship_repo,
             conn=sa_sync_conn,
-            build_queries=_BUILD_QUERIES,
             force=True,
         )
 

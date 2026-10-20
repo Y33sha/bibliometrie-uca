@@ -1,4 +1,4 @@
-"""SQL de construction de la table `authorships`, pour la phase `authorships` et pour les commandes d'administration des signatures (port `AuthorshipsBuildQueries`).
+"""SQL de construction de la table `authorships`, pour la phase `authorships`.
 
 Regroupe les étapes SQL pures (INSERT, UPDATE FROM CTE) qui promeuvent les `source_authorships` en `authorships` consolidées.
 """
@@ -51,21 +51,3 @@ class AuthorshipsBuild:
 
     def refresh_publications_perimeter_evidence(self, conn: Connection) -> int:
         return refresh_publications_perimeter_evidence(conn)
-
-    # ── Variantes par lot pour l'attribution admin d'orphelines ────
-
-    def assign_orphan_source_authorships_to_person(
-        self, conn: Connection, person_id: int, source_authorship_ids: list[int]
-    ) -> list[int]:
-        if not source_authorship_ids:
-            return []
-        return list(
-            conn.execute(
-                text("""
-                    UPDATE source_authorships SET person_id = :pid
-                    WHERE id = ANY(:ids) AND person_id IS NULL
-                    RETURNING id
-                """),
-                {"pid": person_id, "ids": source_authorship_ids},
-            ).scalars()
-        )
