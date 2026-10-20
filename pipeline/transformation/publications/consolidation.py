@@ -141,6 +141,26 @@ def journal_type_of(conn: Connection, journal_id: int) -> str | None:
     ).scalar_one_or_none()
 
 
+def _refresh_sources(conn: Connection, pub_id: int) -> None:
+    """Recalcule `publications.sources` par agrégation des `source_publications` rattachées."""
+    conn.execute(
+        text("""
+            UPDATE publications SET sources = COALESCE(sub.srcs, '{}'),
+                                    updated_at = now()
+            FROM (
+                SELECT array_agg(
+                    DISTINCT CAST(source AS source_type)
+                    ORDER BY CAST(source AS source_type)
+                ) AS srcs
+                FROM source_publications
+                WHERE publication_id = :id
+            ) sub
+            WHERE id = :id
+        """),
+        {"id": pub_id},
+    )
+
+
 class RefreshVerdict(StrEnum):
     """Issue du recalcul d'une publication depuis ses `source_publications`."""
 
@@ -189,7 +209,7 @@ def refresh_from_sources(conn: Connection, pub_id: int) -> RefreshVerdict:
         return RefreshVerdict.INADMISSIBLE_TYPE
 
     store.save(pub)
-    store.update_sources(pub_id)
+    _refresh_sources(conn, pub_id)
     return RefreshVerdict.SAVED
 
 
