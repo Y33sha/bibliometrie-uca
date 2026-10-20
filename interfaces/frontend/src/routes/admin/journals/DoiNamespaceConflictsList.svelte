@@ -100,7 +100,7 @@
 				{#each [[c.namespace_journal, c.record_journal], [c.record_journal, c.namespace_journal]] as [j, other] (j.id)}
 					<tr>
 						<td><a href="{base}/journals/{j.id}">{j.title}</a> <span class="muted">#{j.id}</span></td>
-						<td>{j.pub_name ?? '—'}</td>
+						<td>{j.publisher_name ?? '—'}</td>
 						<td>{issns(j)}</td>
 						<td class="num">{j.publication_count}</td>
 						<td class="action">

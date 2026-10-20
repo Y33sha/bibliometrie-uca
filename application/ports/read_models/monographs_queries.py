@@ -45,7 +45,7 @@ class MonographListItem(BaseModel):
     isbn: str | None
     eisbn: str | None
     publisher_id: int | None
-    pub_name: str | None
+    publisher_name: str | None
     journal_id: int | None
     journal_title: str | None
     publication_count: int

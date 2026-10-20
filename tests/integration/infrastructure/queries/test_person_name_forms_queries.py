@@ -10,7 +10,7 @@ from pipeline.transformation.persons.populate_person_name_forms import (
     sync_from_raw_forms,
 )
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def _fetch_pnf_for(conn, person_id):
@@ -64,9 +64,13 @@ class TestSyncFromRawForms:
         """Une forme observée à la fois en `_raw_forms` (source 'persons')
         et en `source_contributions` (source 'hal') aboutit à `sources` mergé."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        sd = insert_source_record(sa_sync_conn, source_id="h-1")
-        insert_signature(
-            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal"
+        source_record = insert_source_record(sa_sync_conn, source_id="h-1")
+        insert_source_contribution(
+            sa_sync_conn,
+            source_record,
+            person_id=pid,
+            author_name_normalized="dupond j",
+            source="hal",
         )
 
         create_temp_raw_forms_table(sa_sync_conn)
@@ -99,9 +103,13 @@ class TestSyncFromRawForms:
         """Une row existante dont `sources` diffère de l'attendu est UPDATE,
         pas DELETE/INSERT (et `updated` est incrémenté)."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        sd = insert_source_record(sa_sync_conn, source_id="h-1")
-        insert_signature(
-            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="openalex"
+        source_record = insert_source_record(sa_sync_conn, source_id="h-1")
+        insert_source_contribution(
+            sa_sync_conn,
+            source_record,
+            person_id=pid,
+            author_name_normalized="dupond j",
+            source="openalex",
         )
         # Base : sources = ['hal'] (obsolète vs source_contributions qui dit openalex)
         insert_person_name_form(sa_sync_conn, pid, name_form="dupond j", sources=["hal"])

@@ -128,11 +128,11 @@ class PgPublicationsQueries(PublicationsQueries):
             sort=sort,
         )
 
-    def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None:
-        return _get_publication_detail(self._conn, pub_id)
+    def get_publication_detail(self, publication_id: int) -> PublicationDetailResponse | None:
+        return _get_publication_detail(self._conn, publication_id)
 
-    def get_publication_sources(self, pub_id: int) -> PublicationSourcesResponse | None:
-        return _get_publication_sources(self._conn, pub_id)
+    def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
+        return _get_publication_sources(self._conn, publication_id)
 
     def suspect_merges_count(self) -> int:
         return _suspect_merges_count(self._conn)

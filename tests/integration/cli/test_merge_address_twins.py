@@ -7,8 +7,8 @@ from interfaces.cli.oneshot.merge_address_twins import StaleNormalizedTextError,
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
-    insert_signature,
-    insert_signature_address,
+    insert_source_contribution,
+    insert_source_contribution_address,
     insert_source_record,
 )
 from tests.integration.helpers.structures import insert_structure
@@ -27,8 +27,8 @@ def sa_sync_conn(sa_sync_conn_owner):
     return sa_sync_conn_owner
 
 
-def _signature(conn, source_id):
-    return insert_signature(
+def _source_contribution(conn, source_id):
+    return insert_source_contribution(
         conn, insert_source_record(conn, insert_publication(conn, "P"), source_id=source_id)
     )
 
@@ -52,9 +52,9 @@ def test_les_jumelles_rejoignent_l_adresse_la_plus_citee(sa_sync_conn):
         countries=["it"],
         publication_count=5,
     )
-    sa1, sa2 = _signature(sa_sync_conn, "h1"), _signature(sa_sync_conn, "h2")
-    insert_signature_address(sa_sync_conn, sa1, address_id=rare)
-    insert_signature_address(sa_sync_conn, sa2, address_id=frequent)
+    sa1, sa2 = _source_contribution(sa_sync_conn, "h1"), _source_contribution(sa_sync_conn, "h2")
+    insert_source_contribution_address(sa_sync_conn, sa1, address_id=rare)
+    insert_source_contribution_address(sa_sync_conn, sa2, address_id=frequent)
     sa_sync_conn.execute(
         text("INSERT INTO source_contribution_rors VALUES (:sa, 'https://ror.org/x', :a)"),
         {"sa": sa1, "a": rare},

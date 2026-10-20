@@ -18,29 +18,29 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _LOG = logging.getLogger("test")
 _IDREF = "109964128"  # IdRef réel (valide au regard du value object)
 
 
-def _seed(conn, *, sa_id, raw_name, name_norm, idref):
+def _seed(conn, *, source_contribution_id, raw_name, name_norm, idref):
     """Publication + signature in-périmètre non rattachée, portant l'identité
-    `(name_norm, {idref})`. `sa_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
-    insert_publication(conn, f"pub {sa_id}", row_id=sa_id)
+    `(name_norm, {idref})`. `source_contribution_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
+    insert_publication(conn, f"pub {source_contribution_id}", row_id=source_contribution_id)
     insert_source_record(
         conn,
-        sa_id,
-        source_id=f"hal-{sa_id}",
-        title=f"pub {sa_id}",
-        row_id=sa_id,
+        source_contribution_id,
+        source_id=f"hal-{source_contribution_id}",
+        title=f"pub {source_contribution_id}",
+        row_id=source_contribution_id,
         publication_year=2024,
         doc_type="ART",
     )
-    insert_signature(
+    insert_source_contribution(
         conn,
-        sa_id,
-        row_id=sa_id,
+        source_contribution_id,
+        row_id=source_contribution_id,
         raw_author_name=raw_name,
         author_name_normalized=name_norm,
         identifiers={"idref": idref},
@@ -72,12 +72,16 @@ def test_captured_identifier_recales_on_majority(sa_sync_conn):
     chanal » suivent. Le run 1 forme la capture (IdRef sur hervé) ; le run 2, par balayage
     frontal du snapshot, transfère l'IdRef à la personne majoritaire."""
     _seed(
-        sa_sync_conn, sa_id=96001, raw_name="Herve Chanal", name_norm="herve chanal", idref=_IDREF
+        sa_sync_conn,
+        source_contribution_id=96001,
+        raw_name="Herve Chanal",
+        name_norm="herve chanal",
+        idref=_IDREF,
     )
-    for sa_id in (96002, 96003, 96004):
+    for source_contribution_id in (96002, 96003, 96004):
         _seed(
             sa_sync_conn,
-            sa_id=sa_id,
+            source_contribution_id=source_contribution_id,
             raw_name="Helene Chanal",
             name_norm="helene chanal",
             idref=_IDREF,
@@ -92,12 +96,20 @@ def test_foreign_bearer_does_not_steal(sa_sync_conn):
     """Porteur étranger : trois « jean martin » (majorité) portent l'IdRef, un « pierre
     dupont » (minorité, contamination) aussi. Le consensus désigne le propriétaire → pas de
     transfert, l'IdRef reste sur « jean martin »."""
-    for sa_id in (96011, 96012, 96013):
+    for source_contribution_id in (96011, 96012, 96013):
         _seed(
-            sa_sync_conn, sa_id=sa_id, raw_name="Jean Martin", name_norm="jean martin", idref=_IDREF
+            sa_sync_conn,
+            source_contribution_id=source_contribution_id,
+            raw_name="Jean Martin",
+            name_norm="jean martin",
+            idref=_IDREF,
         )
     _seed(
-        sa_sync_conn, sa_id=96014, raw_name="Pierre Dupont", name_norm="pierre dupont", idref=_IDREF
+        sa_sync_conn,
+        source_contribution_id=96014,
+        raw_name="Pierre Dupont",
+        name_norm="pierre dupont",
+        idref=_IDREF,
     )
     _run(sa_sync_conn)
     _run(sa_sync_conn)  # deux passes : le balayage frontal confirme le propriétaire

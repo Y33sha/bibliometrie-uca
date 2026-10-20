@@ -1,4 +1,4 @@
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
 
 
@@ -21,7 +21,7 @@ class TestAggregateThesisPersons:
         assert a.is_author is True
         assert a.author_position == 0
         assert a.roles == ["author"]
-        assert a.name == SignatureName(last_name="Dupont", first_name="Jean")
+        assert a.name == ContributorName(last_name="Dupont", first_name="Jean")
         assert a.identifiers == {"idref": "111111111"}
 
     def test_two_authors_get_consecutive_positions(self):
@@ -106,7 +106,7 @@ class TestAggregateThesisPersons:
 
     def test_author_without_prenom(self):
         these = {"auteurs": [{"nom": "Dupont"}]}
-        assert aggregate_thesis_persons(these)[0].name == SignatureName(last_name="Dupont")
+        assert aggregate_thesis_persons(these)[0].name == ContributorName(last_name="Dupont")
 
     def test_raw_person_is_passed_through(self):
         person = {"nom": "Dupont", "prenom": "Jean", "ppn": "111111111"}

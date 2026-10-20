@@ -7,16 +7,16 @@ from pipeline.transformation.persons.persons import detach_copies
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def _original_and_copy(conn, source_id, *, person_id=None):
     """Signature d'origine et sa copie dans la même notice, du périmètre."""
-    notice = insert_source_record(conn, insert_publication(conn), source_id=source_id)
+    source_record = insert_source_record(conn, insert_publication(conn), source_id=source_id)
     original, copy = (
-        insert_signature(
+        insert_source_contribution(
             conn,
-            notice,
+            source_record,
             author_position=position,
             raw_author_name="Jean Martin",
             author_name_normalized="jean martin",
@@ -33,9 +33,9 @@ def _original_and_copy(conn, source_id, *, person_id=None):
     return original, copy
 
 
-def _person(conn, signature):
+def _person(conn, source_contribution):
     return conn.execute(
-        text("SELECT person_id FROM source_contributions WHERE id = :s"), {"s": signature}
+        text("SELECT person_id FROM source_contributions WHERE id = :s"), {"s": source_contribution}
     ).scalar_one()
 
 

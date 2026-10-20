@@ -11,14 +11,14 @@ from sqlalchemy import text
 from pipeline.ingestion.common.source_records import delete_disappeared_source_records
 from pipeline.ingestion.common.staging import StagingQueries
 from pipeline.transformation.publications.store import PublicationStore
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging HAL traitée.
 _staging = partial(insert_staging, processed=True)
 
 # Notice de titre « Titre », aux clés à jour.
-_notice = partial(insert_source_record, title="Titre", keys_dirty=False)
+_source_record = partial(insert_source_record, title="Titre", keys_dirty=False)
 
 
 def _publication(conn) -> int:
@@ -39,8 +39,8 @@ def _a_reconcilier(conn, source_record_id: int) -> bool:
     ).scalar_one()
 
 
-def _signature(conn, source_record_id: int) -> None:
-    insert_signature(
+def _source_contribution(conn, source_record_id: int) -> None:
+    insert_source_contribution(
         conn,
         source_record_id,
         raw_author_name="Dupont, Jean",
@@ -50,26 +50,30 @@ def _signature(conn, source_record_id: int) -> None:
 
 def test_le_document_disparu_perd_sa_publication_source(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-disparu", disappeared=True)
-    sp_id = _notice(sa_sync_conn_owner, source_id="hal-disparu", staging_id=staging_id)
+    source_record_id = _source_record(
+        sa_sync_conn_owner, source_id="hal-disparu", staging_id=staging_id
+    )
 
     assert delete_disappeared_source_records(sa_sync_conn_owner) == 1
 
     reste = sa_sync_conn_owner.execute(
-        text("SELECT count(*) FROM source_records WHERE id = :id"), {"id": sp_id}
+        text("SELECT count(*) FROM source_records WHERE id = :id"), {"id": source_record_id}
     ).scalar_one()
     assert reste == 0
 
 
-def test_les_signatures_suivent_par_cascade(sa_sync_conn_owner):
+def test_les_contributions_sources_suivent_par_cascade(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-avec-signature", disappeared=True)
-    sp_id = _notice(sa_sync_conn_owner, source_id="hal-avec-signature", staging_id=staging_id)
-    _signature(sa_sync_conn_owner, sp_id)
+    source_record_id = _source_record(
+        sa_sync_conn_owner, source_id="hal-avec-signature", staging_id=staging_id
+    )
+    _source_contribution(sa_sync_conn_owner, source_record_id)
 
     delete_disappeared_source_records(sa_sync_conn_owner)
 
     restantes = sa_sync_conn_owner.execute(
         text("SELECT count(*) FROM source_contributions WHERE source_record_id = :id"),
-        {"id": sp_id},
+        {"id": source_record_id},
     ).scalar_one()
     assert restantes == 0
 
@@ -78,25 +82,25 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
     """La publication perd une source : ses autres sources la font réconcilier et rafraîchir."""
     conn = sa_sync_conn_owner
     publication = _publication(conn)
-    _notice(
+    _source_record(
         conn,
         publication,
         source_id="hal-disparu",
         staging_id=_staging(conn, source_id="hal-disparu", disappeared=True),
     )
-    soeur = _notice(
+    soeur = _source_record(
         conn,
         publication,
         source_id="hal-soeur",
         staging_id=_staging(conn, source_id="hal-soeur"),
     )
-    etrangere = _notice(
+    etrangere = _source_record(
         conn,
         _publication(conn),
         source_id="hal-autre",
         staging_id=_staging(conn, source_id="hal-autre"),
     )
-    orpheline = _notice(
+    orpheline = _source_record(
         conn, source_id="hal-seule", staging_id=_staging(conn, source_id="hal-seule")
     )
 
@@ -107,17 +111,21 @@ def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
     assert _a_reconcilier(conn, orpheline) is False
 
 
-def test_la_publication_du_document_disparu_regroupe_ses_signatures(sa_sync_conn_owner):
+def test_la_publication_de_l_enregistrement_source_disparu_regroupe_ses_contributions_sources(
+    sa_sync_conn_owner,
+):
     conn = sa_sync_conn_owner
     publication = _publication(conn)
     autre = _publication(conn)
-    _notice(
+    _source_record(
         conn,
         publication,
         source_id="hal-disparu",
         staging_id=_staging(conn, source_id="hal-disparu", disappeared=True),
     )
-    _notice(conn, autre, source_id="hal-autre", staging_id=_staging(conn, source_id="hal-autre"))
+    _source_record(
+        conn, autre, source_id="hal-autre", staging_id=_staging(conn, source_id="hal-autre")
+    )
     conn.execute(text("UPDATE publications SET contributions_dirty = false"))
 
     delete_disappeared_source_records(conn)
@@ -129,19 +137,21 @@ def test_la_publication_du_document_disparu_regroupe_ses_signatures(sa_sync_conn
 
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-present")
-    sp_id = _notice(sa_sync_conn_owner, source_id="hal-present", staging_id=staging_id)
+    source_record_id = _source_record(
+        sa_sync_conn_owner, source_id="hal-present", staging_id=staging_id
+    )
 
     delete_disappeared_source_records(sa_sync_conn_owner)
 
     reste = sa_sync_conn_owner.execute(
-        text("SELECT count(*) FROM source_records WHERE id = :id"), {"id": sp_id}
+        text("SELECT count(*) FROM source_records WHERE id = :id"), {"id": source_record_id}
     ).scalar_one()
     assert reste == 1
 
 
 def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-trace", disappeared=True)
-    _notice(sa_sync_conn_owner, source_id="hal-trace", staging_id=staging_id)
+    _source_record(sa_sync_conn_owner, source_id="hal-trace", staging_id=staging_id)
 
     delete_disappeared_source_records(sa_sync_conn_owner)
 
@@ -154,26 +164,30 @@ def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
 def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
     """Balayage idempotent : rien ne subsiste à retirer au passage suivant."""
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-idempotent", disappeared=True)
-    _notice(sa_sync_conn_owner, source_id="hal-idempotent", staging_id=staging_id)
+    _source_record(sa_sync_conn_owner, source_id="hal-idempotent", staging_id=staging_id)
 
     assert delete_disappeared_source_records(sa_sync_conn_owner) == 1
     assert delete_disappeared_source_records(sa_sync_conn_owner) == 0
 
 
-def test_une_notice_sans_metadonnees_minimales_perd_son_enregistrement(sa_sync_conn_owner):
+def test_un_enregistrement_source_sans_metadonnees_minimales_est_supprime(sa_sync_conn_owner):
     """Une notice renormalisée sans année supprime l'enregistrement qu'elle avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
-    pub = _publication(sa_sync_conn_owner)
+    publication = _publication(sa_sync_conn_owner)
     staging_id = _staging(sa_sync_conn_owner, source_id="W3131333980")
-    sp_id = _notice(sa_sync_conn_owner, pub, source_id="W3131333980", staging_id=staging_id)
+    source_record_id = _source_record(
+        sa_sync_conn_owner, publication, source_id="W3131333980", staging_id=staging_id
+    )
     autre_staging = _staging(sa_sync_conn_owner, source_id="hal-soeur")
-    soeur = _notice(sa_sync_conn_owner, pub, source_id="hal-soeur", staging_id=autre_staging)
+    soeur = _source_record(
+        sa_sync_conn_owner, publication, source_id="hal-soeur", staging_id=autre_staging
+    )
 
     StagingQueries(raw_store=MagicMock()).discard_source_record(sa_sync_conn_owner, staging_id)
 
     restants = (
         sa_sync_conn_owner.execute(
             text("SELECT id FROM source_records WHERE id IN (:a, :b)"),
-            {"a": sp_id, "b": soeur},
+            {"a": source_record_id, "b": soeur},
         )
         .scalars()
         .all()

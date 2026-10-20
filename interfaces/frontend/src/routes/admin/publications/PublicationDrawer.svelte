@@ -38,7 +38,7 @@
   // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de signatures d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_records) : []);
   const rows = $derived(comparisonRows(records));
-  const authors = $derived(data ? authorRows(records, data.signatures) : []);
+  const authors = $derived(data ? authorRows(records, data.source_contributions) : []);
 </script>
 
 <Drawer width="1200px" {onclose}>

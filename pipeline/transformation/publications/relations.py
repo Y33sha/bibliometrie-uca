@@ -45,15 +45,17 @@ from pipeline.transformation.publications.relations_queries import (
 
 def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:
     edges: list[RelationEdge] = []
-    for sp in sources:
-        if sp.source == "datacite":
-            relations = extract_datacite_relations(sp.meta)
-        elif sp.source == "crossref":
-            relations = extract_crossref_relations(sp.meta)
+    for source_record in sources:
+        if source_record.source == "datacite":
+            relations = extract_datacite_relations(source_record.meta)
+        elif source_record.source == "crossref":
+            relations = extract_crossref_relations(source_record.meta)
         else:
             continue
         edges.extend(
-            RelationEdge(sp.publication_id, rel_type.value, target_doi, sp.source)
+            RelationEdge(
+                source_record.publication_id, rel_type.value, target_doi, source_record.source
+            )
             for rel_type, target_doi in relations
         )
     return edges
@@ -64,9 +66,11 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
     return sorted(
         {
             doi
-            for sp in sources
-            if sp.source == "datacite"
-            for doi in extract_datacite_distinct_works(sp.meta, sp.doi, sp.notice_doc_type)
+            for source_record in sources
+            if source_record.source == "datacite"
+            for doi in extract_datacite_distinct_works(
+                source_record.meta, source_record.doi, source_record.source_record_doc_type
+            )
         }
     )
 
@@ -79,12 +83,16 @@ def _build_distinct_work_edges(
     Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`. Une cible absente du corpus a un type inconnu : face à elle, un preprint donne `is_preprint_of`, les autres notices `is_related_to`.
     """
     edges: list[RelationEdge] = []
-    for sp in sources:
-        if sp.source != "datacite":
+    for source_record in sources:
+        if source_record.source != "datacite":
             continue
-        for target_doi in extract_datacite_distinct_works(sp.meta, sp.doi, sp.notice_doc_type):
+        for target_doi in extract_datacite_distinct_works(
+            source_record.meta, source_record.doi, source_record.source_record_doc_type
+        ):
             target = publications_by_doi.get(target_doi)
-            inferred = infer_shared_key_relation(sp.doc_type, target.doc_type if target else None)
+            inferred = infer_shared_key_relation(
+                source_record.doc_type, target.doc_type if target else None
+            )
             if inferred is None:
                 continue
             relation, subject = inferred
@@ -95,14 +103,16 @@ def _build_distinct_work_edges(
                     RelationEdge(
                         target.id,
                         relation.value,
-                        sp.doi,
+                        source_record.doi,
                         "datacite",
-                        target_publication_id=sp.publication_id,
+                        target_publication_id=source_record.publication_id,
                     )
                 )
             else:
                 edges.append(
-                    RelationEdge(sp.publication_id, relation.value, target_doi, "datacite")
+                    RelationEdge(
+                        source_record.publication_id, relation.value, target_doi, "datacite"
+                    )
                 )
     return edges
 

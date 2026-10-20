@@ -36,7 +36,7 @@ def name_form(last_name: str, first_name: str | None) -> str:
     return " ".join(part for part in (first_name, last_name) if part)
 
 
-def signature_name_forms(last_name: str, first_name: str | None) -> tuple[str, ...]:
+def contributor_name_forms(last_name: str, first_name: str | None) -> tuple[str, ...]:
     """Formes cherchées pour une signature de nom et prénom normalisés : « prénom nom », puis « nom prénom » pour une signature au nom et prénom inversés."""
     forms = (name_form(last_name, first_name), name_form(first_name or "", last_name))
     return tuple(dict.fromkeys(form for form in forms if form))

@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, get_container_facts, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers (get_title, get_container_facts, extract_publication_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
 Pattern : `FakeSourceRecordQueries` + `FakeContributionsBatchQueries` + `MagicMock`, pas de DB.
 """
@@ -15,9 +15,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from domain.structures.identifiers import RorId
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
 from pipeline.ingestion.hal.normalize import (
     HalNormalizer,
@@ -25,7 +25,7 @@ from pipeline.ingestion.hal.normalize import (
     build_hal_author_records,
     build_hal_external_ids,
     extract_hal_author_block,
-    extract_pub_metadata,
+    extract_publication_metadata,
     get_container_facts,
     get_title,
     insert_hal_document,
@@ -162,12 +162,14 @@ class TestUpsertPublisher:
         assert captured["name"] == "Elsevier"
 
 
-# ── extract_pub_metadata ─────────────────────────────────────────
+# ── extract_publication_metadata ─────────────────────────────────────────
 
 
-class TestExtractPubMetadata:
+class TestExtractPublicationMetadata:
     def test_minimal(self):
-        meta = extract_pub_metadata({"title_s": ["T"], "producedDateY_i": 2024}, journal_id=42)
+        meta = extract_publication_metadata(
+            {"title_s": ["T"], "producedDateY_i": 2024}, journal_id=42
+        )
         assert meta.title == "T"
         assert meta.publication_year == 2024
         assert meta.journal_id == 42
@@ -175,30 +177,30 @@ class TestExtractPubMetadata:
         assert meta.container_title is None
 
     def test_book_title_fallback_when_no_journal(self):
-        meta = extract_pub_metadata({"bookTitle_s": "Book"}, journal_id=None)
+        meta = extract_publication_metadata({"bookTitle_s": "Book"}, journal_id=None)
         assert meta.container_title == "Book"
 
     def test_conference_title_fallback(self):
-        meta = extract_pub_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
+        meta = extract_publication_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
         assert meta.container_title == "Conf"
 
     def test_journal_title_fallback_when_no_journal(self):
         """Un chapitre sans ISSN n'a pas de revue : son titre de revue reste en container_title."""
-        meta = extract_pub_metadata(
+        meta = extract_publication_metadata(
             {"docType_s": "COUV", "journalTitle_s": "Handbook"}, journal_id=None
         )
         assert meta.container_title == "Handbook"
 
     def test_language_from_list(self):
-        meta = extract_pub_metadata({"language_s": ["fr", "en"]}, journal_id=None)
+        meta = extract_publication_metadata({"language_s": ["fr", "en"]}, journal_id=None)
         assert meta.language == "fr"
 
     def test_no_language(self):
-        meta = extract_pub_metadata({}, journal_id=None)
+        meta = extract_publication_metadata({}, journal_id=None)
         assert meta.language is None
 
     def test_nnt_normalized(self):
-        meta = extract_pub_metadata({"nntId_s": "  2024CLFAC001  "}, journal_id=None)
+        meta = extract_publication_metadata({"nntId_s": "  2024CLFAC001  "}, journal_id=None)
         assert meta.nnt == "2024CLFAC001"
 
 
@@ -209,7 +211,7 @@ def _embargo_tei(refs: str) -> str:
     return f'<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>{refs}</body></text></TEI>'
 
 
-def test_une_notice_n_est_analysee_qu_une_fois(monkeypatch):
+def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
     """Régression : les lecteurs du TEI (conteneur, identifiants, embargo, auteurs) partagent une seule analyse."""
     calls = []
     real = normalize_hal.ET.fromstring
@@ -221,7 +223,7 @@ def test_une_notice_n_est_analysee_qu_une_fois(monkeypatch):
     }
     get_container_facts(doc)
     build_hal_external_ids(doc, "hal-1", None)
-    extract_pub_metadata(doc, None)
+    extract_publication_metadata(doc, None)
     normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
     assert len(calls) == 1
 
@@ -292,19 +294,19 @@ class TestActiveEmbargoUntil:
 
 
 class TestInsertHalDocument:
-    def _call(self, queries, doc, *, pub_meta=None) -> dict:
-        # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
+    def _call(self, queries, doc, *, publication_meta=None) -> dict:
+        # Par défaut, publication_meta est dérivé via extract_publication_metadata pour rester
         # cohérent avec le flux réel (harvest → insert). Tests qui veulent
-        # forcer une valeur passent un pub_meta explicite.
-        if pub_meta is None:
-            pub_meta = extract_pub_metadata(doc, journal_id=None)
+        # forcer une valeur passent un publication_meta explicite.
+        if publication_meta is None:
+            publication_meta = extract_publication_metadata(doc, journal_id=None)
         insert_hal_document(
             MagicMock(),
             queries,
             doc,
             staging_id=1,
             hal_id="h1",
-            pub_meta=pub_meta,
+            publication_meta=publication_meta,
         )
         return queries.upserted_documents[-1]
 
@@ -415,12 +417,12 @@ class TestInsertHalDocument:
         captured = self._call(queries, {"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]
 
-    def test_pub_meta_propagates_journal_oa_lang(self):
+    def test_publication_meta_propagates_journal_oa_lang(self):
         queries = FakeSourceRecordQueries()
         captured = self._call(
             queries,
             {},
-            pub_meta=PublicationMetadata(
+            publication_meta=PublicationMetadata(
                 doi=None,
                 title=None,
                 publication_year=None,
@@ -461,7 +463,7 @@ class TestBuildHalAuthorRecords:
             }
         )
         assert len(records) == 1
-        assert records[0].name == SignatureName(raw="Marie Dupont")
+        assert records[0].name == ContributorName(raw="Marie Dupont")
 
     def test_composite_extracts_name_and_hal_person_id(self):
         # Le composite fournit le nom et le hal_person_id (2e segment). L'idhal
@@ -473,7 +475,7 @@ class TestBuildHalAuthorRecords:
         }
         record = build_hal_author_records(doc)[0]
         # Pas de TEI → nom Solr en chaîne brute, pas d'idhal (le 3e segment du composite est ignoré).
-        assert record.name == SignatureName(raw="Marie Dupont")
+        assert record.name == ContributorName(raw="Marie Dupont")
         assert record.identifiers == {"hal_person_id": 749496}
 
     def test_nom_et_prenom_viennent_du_tei(self):
@@ -488,7 +490,7 @@ class TestBuildHalAuthorRecords:
             ],
             "label_xml": label_xml,
         }
-        assert build_hal_author_records(extract_hal_author_block(doc))[0].name == SignatureName(
+        assert build_hal_author_records(extract_hal_author_block(doc))[0].name == ContributorName(
             last_name="Caldefie Chezet", first_name="Marie"
         )
 
@@ -592,7 +594,7 @@ class TestProcessAuthors:
 def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
     monkeypatch.setattr(
-        normalize_hal, "extract_pub_metadata", lambda d, j, m=None: {"journal_id": j}
+        normalize_hal, "extract_publication_metadata", lambda d, j, m=None: {"journal_id": j}
     )
     monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
     monkeypatch.setattr(normalize_hal, "process_contributions", lambda *a, **kw: None)
@@ -636,16 +638,16 @@ class TestProcessWork:
         """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
         captured = {"called": False}
 
-        def fake_upsert_pub(name, **kw):
+        def fake_upsert_publication(name, **kw):
             captured.called = True
             return 1
 
-        monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_pub)
+        monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_publication)
         monkeypatch.setattr(
             normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None)
         )
         monkeypatch.setattr(
-            normalize_hal, "extract_pub_metadata", lambda d, j, m=None: {"journal_id": j}
+            normalize_hal, "extract_publication_metadata", lambda d, j, m=None: {"journal_id": j}
         )
         monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_hal, "process_contributions", lambda *a, **kw: None)

@@ -81,7 +81,7 @@ def journal_filters(
     journal_type: str = Query(""),
     is_in_doaj: bool | None = Query(None),
     oa_model: str = Query(""),
-    with_pubs: bool = Query(False),
+    with_publications: bool = Query(False),
 ) -> JournalFilters:
     """Filtres communs à la liste des revues et à ses facettes.
 
@@ -95,7 +95,7 @@ def journal_filters(
         ),
         is_in_doaj=is_in_doaj,
         oa_models=parse_vocabulary_csv(oa_model, allowed=OA_MODELS, param="oa_model"),
-        with_pubs=with_pubs,
+        with_publications=with_publications,
     )
 
 
@@ -137,7 +137,7 @@ def list_journals(
 ) -> JournalListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
 
-    `with_pubs` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_publications` restreint aux revues portant au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_journals(filters=filters, sort=sort, page=page, per_page=per_page)
 

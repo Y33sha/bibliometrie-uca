@@ -61,7 +61,7 @@
 		<div class="meta-row">
 			{#if monograph.publisher_id}
 				<span class="meta-label">Éditeur</span>
-				<a href="{base}/publishers/{monograph.publisher_id}">{monograph.pub_name}</a>
+				<a href="{base}/publishers/{monograph.publisher_id}">{monograph.publisher_name}</a>
 			{/if}
 			{#if monograph.journal_id}
 				<span class="meta-label">Collection</span>

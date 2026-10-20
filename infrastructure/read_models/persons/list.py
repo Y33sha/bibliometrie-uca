@@ -31,7 +31,7 @@ from infrastructure.read_models.sql_fragments import other_name_form_holders
 from infrastructure.sql_fragments import has_author_role, in_clause
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux signatures de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
-_LAB_SCOPED_SIGNATURES = (
+_LAB_SCOPED_SOURCE_CONTRIBUTIONS = (
     " AND EXISTS (SELECT 1 FROM contribution_structures aus "
     "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
 )
@@ -72,15 +72,15 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonS
 # ── Liste admin ──────────────────────────────────────────────────
 
 
-def _signature_counts_sql(*, lab_scoped: bool) -> str:
+def _source_contribution_counts_sql(*, lab_scoped: bool) -> str:
     """Les deux dénombrements de signatures en tant qu'auteur, sous la même condition de scope."""
-    scope = _LAB_SCOPED_SIGNATURES if lab_scoped else ""
+    scope = _LAB_SCOPED_SOURCE_CONTRIBUTIONS if lab_scoped else ""
     return f"""
         (SELECT COUNT(*) FROM contributions a
-         WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS signature_count,
+         WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS source_contribution_count,
         (SELECT COUNT(*) FROM contributions a
          WHERE a.person_id = p.id AND {has_author_role("a")} AND a.in_perimeter = TRUE{scope}
-        ) AS in_perimeter_signature_count
+        ) AS in_perimeter_source_contribution_count
     """
 
 
@@ -124,7 +124,7 @@ def list_persons(
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.exclusion,
-                {_signature_counts_sql(lab_scoped=filters.lab_id is not None)}
+                {_source_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
             FROM persons p
             LEFT JOIN hr_records prh ON prh.person_id = p.id
             WHERE {where_sql}
@@ -152,8 +152,8 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
         end_date=row.end_date,
         has_rh=row.has_rh,
         exclusion=row.exclusion,
-        signature_count=row.signature_count,
-        in_perimeter_signature_count=row.in_perimeter_signature_count,
+        source_contribution_count=row.source_contribution_count,
+        in_perimeter_source_contribution_count=row.in_perimeter_source_contribution_count,
         identifiers=identifiers,
     )
 
@@ -204,7 +204,7 @@ def person_curation(conn: Connection, person_id: int) -> PersonOut | None:
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.exclusion,
-                {_signature_counts_sql(lab_scoped=False)}
+                {_source_contribution_counts_sql(lab_scoped=False)}
             FROM persons p
             LEFT JOIN hr_records prh ON prh.person_id = p.id
             WHERE p.id = :id

@@ -4,28 +4,30 @@ from sqlalchemy import text
 
 from interfaces.cli.oneshot.delete_placeholder_author_names import (
     delete,
-    placeholder_signatures,
+    placeholder_source_contributions,
 )
-from tests.integration.helpers.contributions import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def test_seules_les_signatures_au_nom_absent_sont_supprimees(sa_sync_conn):
+def test_seules_les_contributions_sources_au_nom_absent_sont_supprimees(sa_sync_conn):
     conn = sa_sync_conn
     publication = insert_publication(conn)
     conn.execute(
         text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
         {"p": publication},
     )
-    notice = insert_source_record(conn, publication, source="datacite", source_id="10.1/x")
-    signatures = [
-        insert_signature(
+    source_record = insert_source_record(conn, publication, source="datacite", source_id="10.1/x")
+    source_contributions = [
+        insert_source_contribution(
             conn,
-            notice,
+            source_record,
             source="datacite",
             author_position=position,
-            contributor_information_id=upsert_split_identity(conn, last.lower(), first.lower()),
+            contributor_information_id=upsert_split_contributor_information(
+                conn, last.lower(), first.lower()
+            ),
             roles=["author"],
             **name,
         )
@@ -39,14 +41,15 @@ def test_seules_les_signatures_au_nom_absent_sont_supprimees(sa_sync_conn):
         )
     ]
 
-    ids, notices = placeholder_signatures(conn)
-    assert sorted(ids) == sorted(signatures[:2])
-    delete(conn, ids, notices)
+    ids, source_records = placeholder_source_contributions(conn)
+    assert sorted(ids) == sorted(source_contributions[:2])
+    delete(conn, ids, source_records)
 
     remaining = conn.execute(
-        text("SELECT id FROM source_contributions WHERE source_record_id = :n"), {"n": notice}
+        text("SELECT id FROM source_contributions WHERE source_record_id = :n"),
+        {"n": source_record},
     ).scalars()
-    assert sorted(remaining) == sorted(signatures[2:])
+    assert sorted(remaining) == sorted(source_contributions[2:])
     assert conn.execute(
         text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
     ).scalar_one()

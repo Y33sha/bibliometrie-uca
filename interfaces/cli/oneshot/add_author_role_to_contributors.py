@@ -24,8 +24,8 @@ from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from interfaces.cli.oneshot.backfill_author_counts import backfill_notices
-from pipeline.ingestion.common.signatures import AuthorRecord
+from interfaces.cli.oneshot.backfill_author_counts import backfill_source_records
+from pipeline.ingestion.common.source_contributions import AuthorRecord
 from pipeline.ingestion.hal.normalize import build_hal_author_records
 from pipeline.ingestion.scanr.normalize import build_scanr_author_records
 
@@ -38,7 +38,7 @@ _BUILDERS: dict[str, Callable[[Mapping[str, JsonValue]], list[AuthorRecord]]] = 
 
 # (signature, position) des signatures `[contributor]`, par notice (identifiant, source, identifiant source).
 _CANDIDATES = f"""
-    SELECT sp.id AS notice, sp.source, sp.source_id, sa.id AS signature, sa.author_position AS position
+    SELECT sp.id AS source_record, sp.source, sp.source_id, sa.id AS source_contribution, sa.author_position AS position
     FROM source_contributions sa JOIN source_records sp ON sp.id = sa.source_record_id
     WHERE sp.source IN ('hal', 'scanr') AND sa.roles = ARRAY['{ContributionRole.CONTRIBUTOR.value}']
     ORDER BY sp.id
@@ -72,39 +72,39 @@ def author_roles(
     }
 
 
-def complete_notices(
+def complete_source_records(
     conn: Connection, candidates: list[Mapping[str, object]], load: PayloadLoader
 ) -> tuple[int, int]:
     """Complète les rôles des signatures de ces notices. Rend (signatures complétées, payloads manquants)."""
-    by_notice: dict[tuple[int, str, str], list[tuple[int, int | None]]] = defaultdict(list)
+    by_source_record: dict[tuple[int, str, str], list[tuple[int, int | None]]] = defaultdict(list)
     for c in candidates:
-        by_notice[(c["notice"], c["source"], c["source_id"])].append(
-            (c["signature"], c["position"])
+        by_source_record[(c["source_record"], c["source"], c["source_id"])].append(
+            (c["source_contribution"], c["position"])
         )
 
     updates: list[dict[str, object]] = []
     touched: list[int] = []
     missing = 0
-    for (notice, source, source_id), signatures in by_notice.items():
+    for (source_record, source, source_id), source_contributions in by_source_record.items():
         payload = load(source, source_id)
         if payload is None:
             missing += 1
             continue
-        roles = author_roles(source, payload, [p for _, p in signatures])
-        new = [{"id": s, "roles": roles[p]} for s, p in signatures if p in roles]
+        roles = author_roles(source, payload, [p for _, p in source_contributions])
+        new = [{"id": s, "roles": roles[p]} for s, p in source_contributions if p in roles]
         if new:
             updates.extend(new)
-            touched.append(notice)
+            touched.append(source_record)
     if updates:
         conn.execute(text("UPDATE source_contributions SET roles = :roles WHERE id = :id"), updates)
-        backfill_notices(conn, touched)
+        backfill_source_records(conn, touched)
         conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
                 FROM source_records sp
-                WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+                WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
             """),
-            {"notices": touched},
+            {"source_records": touched},
         )
     return len(updates), missing
 
@@ -119,12 +119,12 @@ def main() -> int:
     load = raw_store_loader()
     with get_sync_engine().connect() as conn:
         candidates = [dict(r) for r in conn.execute(text(_CANDIDATES)).mappings()]
-        notices = sorted({c["notice"] for c in candidates})
-        log.info("notices à examiner : %d", len(notices))
-        for i in range(0, len(notices), args.batch):
-            batch = set(notices[i : i + args.batch])
-            done, lost = complete_notices(
-                conn, [c for c in candidates if c["notice"] in batch], load
+        source_records = sorted({c["source_record"] for c in candidates})
+        log.info("notices à examiner : %d", len(source_records))
+        for i in range(0, len(source_records), args.batch):
+            batch = set(source_records[i : i + args.batch])
+            done, lost = complete_source_records(
+                conn, [c for c in candidates if c["source_record"] in batch], load
             )
             if args.dry_run:
                 conn.rollback()

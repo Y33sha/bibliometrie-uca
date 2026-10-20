@@ -60,86 +60,97 @@ class TestUpsertSubject:
 
 class TestLinkAndClear:
     def test_link_creates_row(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
-        _link(sa_sync_conn, pub, sid, "hal")
+        _link(sa_sync_conn, publication, sid, "hal")
         source = sa_sync_conn.execute(
             text(
                 "SELECT source FROM publication_subjects "
                 "WHERE publication_id = :p AND subject_id = :s"
             ),
-            {"p": pub, "s": sid},
+            {"p": publication, "s": sid},
         ).scalar_one()
         assert source == "hal"
 
     def test_link_same_subject_two_sources(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
-        _link(sa_sync_conn, pub, sid, "hal")
-        _link(sa_sync_conn, pub, sid, "openalex")
+        _link(sa_sync_conn, publication, sid, "hal")
+        _link(sa_sync_conn, publication, sid, "openalex")
         n = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM publication_subjects WHERE publication_id = :p"),
-            {"p": pub},
+            {"p": publication},
         ).scalar_one()
         assert n == 2
 
     def test_link_idempotent_same_source(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
-        _link(sa_sync_conn, pub, sid, "openalex")
-        _link(sa_sync_conn, pub, sid, "openalex")
+        _link(sa_sync_conn, publication, sid, "openalex")
+        _link(sa_sync_conn, publication, sid, "openalex")
         n = sa_sync_conn.execute(
             text(
                 "SELECT count(*) AS n FROM publication_subjects "
                 "WHERE publication_id = :p AND source = 'openalex'"
             ),
-            {"p": pub},
+            {"p": publication},
         ).scalar_one()
         assert n == 1
 
     def test_bulk_dedupes_within_a_batch(self, sa_sync_conn):
         """Deux annotations d'une même source visant le même sujet ne donnent qu'un lien."""
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         sent = _Q.link_publication_subjects_bulk(
             sa_sync_conn,
             source="hal",
-            rows=[PublicationSubjectLink(pub, sid), PublicationSubjectLink(pub, sid)],
+            rows=[
+                PublicationSubjectLink(publication, sid),
+                PublicationSubjectLink(publication, sid),
+            ],
         )
         assert sent == 1
 
     def test_bulk_counts_only_new_links(self, sa_sync_conn):
         """Le retour compte les liens réellement insérés, pas ceux déjà présents."""
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="x")
         sid2 = _Q.upsert_subject(sa_sync_conn, label="y")
         _Q.link_publication_subjects_bulk(
-            sa_sync_conn, source="hal", rows=[PublicationSubjectLink(pub, sid)]
+            sa_sync_conn, source="hal", rows=[PublicationSubjectLink(publication, sid)]
         )
         # Ré-insertion du lien existant + un nouveau : seul le nouveau est compté.
         n = _Q.link_publication_subjects_bulk(
             sa_sync_conn,
             source="hal",
-            rows=[PublicationSubjectLink(pub, sid), PublicationSubjectLink(pub, sid2)],
+            rows=[
+                PublicationSubjectLink(publication, sid),
+                PublicationSubjectLink(publication, sid2),
+            ],
         )
         assert n == 1
 
     def test_clear_preserves_rejected_links(self, sa_sync_conn):
         """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         kept = _Q.upsert_subject(sa_sync_conn, label="rejete")
         dropped = _Q.upsert_subject(sa_sync_conn, label="ordinaire")
-        _link(sa_sync_conn, pub, kept, "hal")
-        _link(sa_sync_conn, pub, dropped, "hal")
+        _link(sa_sync_conn, publication, kept, "hal")
+        _link(sa_sync_conn, publication, dropped, "hal")
         sa_sync_conn.execute(
             text("UPDATE publication_subjects SET rejected = TRUE WHERE subject_id = :s"),
             {"s": kept},
         )
-        assert _Q.clear_publication_subjects_for_pubs(sa_sync_conn, publication_ids=[pub]) == 1
+        assert (
+            _Q.clear_publication_subjects_for_publications(
+                sa_sync_conn, publication_ids=[publication]
+            )
+            == 1
+        )
         remaining = (
             sa_sync_conn.execute(
                 text("SELECT subject_id FROM publication_subjects WHERE publication_id = :p"),
-                {"p": pub},
+                {"p": publication},
             )
             .scalars()
             .all()
@@ -147,10 +158,10 @@ class TestLinkAndClear:
         assert remaining == [kept]
 
     def test_subject_survives_publication_delete(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         sid = _Q.upsert_subject(sa_sync_conn, label="orphan candidate")
-        _link(sa_sync_conn, pub, sid, "hal")
-        sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": pub})
+        _link(sa_sync_conn, publication, sid, "hal")
+        sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": publication})
         n_links = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM publication_subjects WHERE subject_id = :s"),
             {"s": sid},

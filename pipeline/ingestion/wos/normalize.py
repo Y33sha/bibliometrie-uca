@@ -9,8 +9,8 @@ from sqlalchemy import Connection
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import compact_identifiers
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_records.external_ids import ExternalIdType
@@ -18,9 +18,9 @@ from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
@@ -204,13 +204,13 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     static = at_path(raw, "static_data")
     dynamic = at_path(raw, "dynamic_data")
     summary = at_path(static, "summary")
-    pub_info = at_path(summary, "pub_info")
+    publication_info = at_path(summary, "pub_info")
 
     doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
     title = _get_api_title(static, "item") or "(sans titre)"
 
-    publication_year = as_int(pub_info.get("pubyear"))
-    if publication_year is None and (py := as_str(pub_info.get("pubyear"))):
+    publication_year = as_int(publication_info.get("pubyear"))
+    if publication_year is None and (py := as_str(publication_info.get("pubyear"))):
         try:
             publication_year = int(py)
         except ValueError:
@@ -226,18 +226,18 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
 
     # Publisher
     publishers = at_path(summary, "publishers")
-    pub_data = at_path(publishers, "publisher")
-    pub_names = at_path(pub_data, "names")
-    noms = _safe_list(pub_names.get("name"))
-    pub_name_obj = as_mapping(noms[0]) if noms else {}
-    publisher_name = as_str(pub_name_obj.get("unified_name")) or as_str(
-        pub_name_obj.get("full_name")
+    publisher_data = at_path(publishers, "publisher")
+    publisher_names = at_path(publisher_data, "names")
+    noms = _safe_list(publisher_names.get("name"))
+    publisher_name_obj = as_mapping(noms[0]) if noms else {}
+    publisher_name = as_str(publisher_name_obj.get("unified_name")) or as_str(
+        publisher_name_obj.get("full_name")
     )
 
     # Journal
     journal_title = _get_api_title(static, "source")
 
-    oa_status = derive_wos_api_oa_status(as_str(pub_info.get("journal_oas_gold")))
+    oa_status = derive_wos_api_oa_status(as_str(publication_info.get("journal_oas_gold")))
 
     # Language
     lang_data = at_path(static, "fullrecord_metadata", "languages")
@@ -247,14 +247,14 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
     # Biblio
-    page = at_path(pub_info, "page")
+    page = at_path(publication_info, "page")
     if isinstance(page, str):
         page = {}
     biblio: dict[str, JsonValue] = {}
-    vol = pub_info.get("vol")
+    vol = publication_info.get("vol")
     if vol:
         biblio["volume"] = str(vol)
-    issue_val = pub_info.get("issue")
+    issue_val = publication_info.get("issue")
     if issue_val:
         biblio["issue"] = str(issue_val)
     if isinstance(page, dict):
@@ -491,7 +491,7 @@ def upsert_containers(
 # =============================================================
 
 
-def extract_pub_metadata(
+def extract_publication_metadata(
     rec: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un record WoS.
@@ -522,13 +522,13 @@ def insert_wos_document(
     queries: SourceRecordQueries,
     rec: Mapping[str, JsonValue],
     staging_id: int,
-    pub_meta: PublicationMetadata,
+    publication_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_records pour WoS.
 
     Les métadonnées canoniques (doi, title, publication_year, doc_type, journal_id,
-    oa_status, language, container_title) viennent toutes de `pub_meta`,
-    construit en amont par `extract_pub_metadata`. `rec` ne sert ici
+    oa_status, language, container_title) viennent toutes de `publication_meta`,
+    construit en amont par `extract_publication_metadata`. `rec` ne sert ici
     que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
     keywords, topics, urls, external_ids non canoniques).
     """
@@ -538,20 +538,20 @@ def insert_wos_document(
             source="wos",
             source_id=as_str(rec.get("ut")) or "",
             staging_id=staging_id,
-            doi=pub_meta.doi,
+            doi=publication_meta.doi,
             external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
-            title=pub_meta.title or "",
-            publication_year=pub_meta.publication_year,
-            doc_type=pub_meta.doc_type,
-            journal_id=pub_meta.journal_id,
-            monograph_id=pub_meta.monograph_id,
-            container_title=pub_meta.container_title,
-            language=pub_meta.language,
+            title=publication_meta.title or "",
+            publication_year=publication_meta.publication_year,
+            doc_type=publication_meta.doc_type,
+            journal_id=publication_meta.journal_id,
+            monograph_id=publication_meta.monograph_id,
+            container_title=publication_meta.container_title,
+            language=publication_meta.language,
             biblio=dict(as_mapping(rec.get("biblio"))) or None,
             abstract=as_str(rec.get("abstract")),
             keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
             topics=dict(as_mapping(rec.get("topics"))) or None,
-            oa_status=pub_meta.oa_status,
+            oa_status=publication_meta.oa_status,
             urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
             impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
         ),
@@ -565,13 +565,13 @@ def insert_wos_document(
 # Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (contributor_information.identifiers).
 
 
-def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
+def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
     """`last_name` et `first_name` du payload, sinon `full_name`."""
     if as_str(author.get("last_name")):
-        return SignatureName.from_parts(
+        return ContributorName.from_parts(
             as_str(author.get("last_name")), as_str(author.get("first_name"))
         )
-    return SignatureName.from_raw(as_str(author.get("full_name")))
+    return ContributorName.from_raw(as_str(author.get("full_name")))
 
 
 def build_wos_author_records(
@@ -684,9 +684,11 @@ def process_record(
         as_str(rec.get("publisher_name")), publisher_store=publisher_store
     )
     containers = upsert_containers(rec, publisher_id, container_stores=container_stores)
-    pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
+    publication_meta = extract_publication_metadata(
+        rec, containers.journal_id, containers.monograph_id
+    )
 
-    source_record_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
+    source_record_id = insert_wos_document(conn, queries, rec, staging_id, publication_meta)
     process_contributions(conn, contribution_queries, logger, rec, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True

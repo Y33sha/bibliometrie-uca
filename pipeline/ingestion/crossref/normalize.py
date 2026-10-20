@@ -14,11 +14,11 @@ from sqlalchemy import Connection
 from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.journals.series import split_collection_and_volume
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
@@ -27,8 +27,8 @@ from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
@@ -259,8 +259,8 @@ def upsert_containers(
 # =============================================================
 
 
-def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
-    return SignatureName.from_parts(as_str(author.get("family")), as_str(author.get("given")))
+def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
+    return ContributorName.from_parts(as_str(author.get("family")), as_str(author.get("given")))
 
 
 def _author_affiliations(
@@ -311,12 +311,12 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
         name = _author_name(author)
         collective = name is None
         if name is None:
-            name = SignatureName.from_raw(as_str(author.get("name")))
+            name = ContributorName.from_raw(as_str(author.get("name")))
         if name is None:
             continue
 
         ids = ids_by_position[position]
-        addresses, signature_rors = _author_affiliations(author)
+        addresses, source_contribution_rors = _author_affiliations(author)
         records.append(
             AuthorRecord(
                 position=position,
@@ -325,7 +325,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
                 roles=[ContributionRole.AUTHOR],
                 identifiers=ids if ids else None,
                 addresses=addresses,
-                ror_ids=signature_rors,
+                ror_ids=source_contribution_rors,
             )
         )
     return records

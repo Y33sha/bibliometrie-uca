@@ -29,8 +29,8 @@ def main() -> int:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        rows, notices = decoded_names(conn, CANDIDATES_SQL, PARAMS)
-        log.info("signatures à réparer : %d, dans %d notices", len(rows), len(notices))
+        rows, source_records = decoded_names(conn, CANDIDATES_SQL, PARAMS)
+        log.info("signatures à réparer : %d, dans %d notices", len(rows), len(source_records))
         for row in rows[:5]:
             log.info(
                 "  %s / %s / %s",
@@ -41,7 +41,7 @@ def main() -> int:
         if args.dry_run or not rows:
             conn.rollback()
             return 0
-        orphans = decode(conn, rows, notices)
+        orphans = decode(conn, rows, source_records)
         conn.commit()
         log.info(
             "signatures réparées : %d ; identités orphelines supprimées : %d", len(rows), orphans

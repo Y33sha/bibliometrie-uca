@@ -437,9 +437,11 @@ class TestMergePersons:
 class TestNameFormContributions:
     def test_ok(self, client):
         pid = seed_person("Nameform", "Test")
-        nf = uniq("Nameform Test")
-        _persons_name_form(pid, name_form=nf)
-        r = client.get(f"/api/persons/{pid}/name-form-contributions", params={"name_form": nf})
+        name_form = uniq("Nameform Test")
+        _persons_name_form(pid, name_form=name_form)
+        r = client.get(
+            f"/api/persons/{pid}/name-form-contributions", params={"name_form": name_form}
+        )
         assert r.status_code == 200
 
 
@@ -469,15 +471,16 @@ class TestUpdateNameFormStatus:
 
     def test_reject_sets_status(self, auth_client):
         pid = seed_person("RejectForm", "Nf")
-        nf = uniq("RejectForm Nf")
-        seed_person_name_form(pid, name_form=nf, sources=["hal"])
+        name_form = uniq("RejectForm Nf")
+        seed_person_name_form(pid, name_form=name_form, sources=["hal"])
         r = auth_client.patch(
-            f"/api/persons/{pid}/name-forms/status", json={"name_form": nf, "status": "rejected"}
+            f"/api/persons/{pid}/name-forms/status",
+            json={"name_form": name_form, "status": "rejected"},
         )
         assert r.status_code == 200
         body = r.json()
         assert body["person_id"] == pid
-        assert body["name_form"] == nf
+        assert body["name_form"] == name_form
         assert body["status"] == "rejected"
 
     def test_unknown_form_404(self, auth_client):

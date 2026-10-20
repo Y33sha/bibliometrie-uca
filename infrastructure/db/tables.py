@@ -395,7 +395,7 @@ journals = Table(
     Column("doaj_imported_at", DateTime(timezone=True)),
     # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
-    # publications pour le filtre `with_pubs` / le tri / l'affichage.
+    # publications pour le filtre `with_publications` / le tri / l'affichage.
     Column("publication_count", Integer, nullable=False, server_default="0"),
     # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
@@ -837,7 +837,7 @@ contributor_information = Table(
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
-    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/signature_queries.py).
+    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_queries.py).
     Column(
         "key_hash",
         Text,

@@ -100,14 +100,14 @@ class OaStatusQueries:
             for r in rows
         ]
 
-    def update_oa_status(self, conn: Connection, pub_id: int, oa_status: str) -> None:
+    def update_oa_status(self, conn: Connection, publication_id: int, oa_status: str) -> None:
         """Écrit le statut OA d'une publication."""
         conn.execute(
             text(
                 "UPDATE publications SET oa_status = CAST(:os AS oa_type), updated_at = now()"
                 " WHERE id = :id"
             ),
-            {"os": oa_status, "id": pub_id},
+            {"os": oa_status, "id": publication_id},
         )
 
     def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:

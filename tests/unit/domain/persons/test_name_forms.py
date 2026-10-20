@@ -8,7 +8,7 @@ from domain.errors import ValidationError
 from domain.persons.name_forms import (
     PersonNameForm,
     compute_person_name_forms,
-    signature_name_forms,
+    contributor_name_forms,
 )
 
 
@@ -73,9 +73,9 @@ class TestComputePersonNameForms:
         assert compute_person_name_forms("", "Jean") == set()
 
 
-class TestSignatureNameForms:
+class TestContributorNameForms:
     def test_prenom_nom_puis_nom_prenom(self) -> None:
-        assert signature_name_forms("dupont", "marie") == ("marie dupont", "dupont marie")
+        assert contributor_name_forms("dupont", "marie") == ("marie dupont", "dupont marie")
 
     def test_sans_prenom(self) -> None:
-        assert signature_name_forms("dupont", None) == ("dupont",)
+        assert contributor_name_forms("dupont", None) == ("dupont",)

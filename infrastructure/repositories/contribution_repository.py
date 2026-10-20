@@ -6,12 +6,12 @@ from typing import cast
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.contribution_repository import (
-    AssignedSignatureRow,
+    AssignedSourceContributionRow,
     ContributionPersonRow,
     ContributionRepository,
 )
 from infrastructure.sql_fragments import (
-    DETACHED_SIGNATURE,
+    DETACHED_SOURCE_CONTRIBUTION,
     PERSON_PUBLICATIONS_SCOPE,
     REJECTED_PAIRS,
     insert_missing_contributions_sql,
@@ -19,7 +19,7 @@ from infrastructure.sql_fragments import (
 )
 
 
-def detach_rejected_signatures(
+def detach_rejected_source_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
     """Détache les signatures de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de signatures détachées.
@@ -42,7 +42,7 @@ def detach_rejected_signatures(
     return conn.execute(
         text(f"""
             UPDATE source_contributions sa
-            SET {DETACHED_SIGNATURE}
+            SET {DETACHED_SOURCE_CONTRIBUTION}
             FROM source_records sp, ({REJECTED_PAIRS}) r
             WHERE sa.source_record_id = sp.id
               AND r.publication_id = sp.publication_id
@@ -98,7 +98,7 @@ class PgContributionRepository(ContributionRepository):
 
     def assign_orphan_source_contribution(
         self, person_id: int, source_contribution_id: int
-    ) -> AssignedSignatureRow | None:
+    ) -> AssignedSourceContributionRow | None:
         row = self._conn.execute(
             text("""
                 UPDATE source_contributions sa SET person_id = :pid
@@ -109,7 +109,7 @@ class PgContributionRepository(ContributionRepository):
             """),
             {"pid": person_id, "aid": source_contribution_id},
         ).first()
-        return cast(AssignedSignatureRow, dict(row._mapping)) if row else None
+        return cast(AssignedSourceContributionRow, dict(row._mapping)) if row else None
 
     def assign_orphan_source_contributions(
         self, person_id: int, source_contribution_ids: list[int]
@@ -174,7 +174,7 @@ class PgContributionRepository(ContributionRepository):
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
         return self._conn.execute(
             text(
-                f"UPDATE source_contributions sa SET {DETACHED_SIGNATURE} "
+                f"UPDATE source_contributions sa SET {DETACHED_SOURCE_CONTRIBUTION} "
                 "FROM contributor_information aik "
                 "WHERE sa.person_id = :pid AND aik.id = sa.contributor_information_id "
                 "AND aik.author_name_normalized = :nf "
@@ -226,7 +226,7 @@ class PgContributionRepository(ContributionRepository):
         )
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        return detach_rejected_signatures(self._conn, person_id, publication_id)
+        return detach_rejected_source_contributions(self._conn, person_id, publication_id)
 
     def delete_orphan_contributions_for_person(self, person_id: int) -> int:
         return delete_orphan_contributions(self._conn, person_id)

@@ -2,22 +2,26 @@
 
 from interfaces.cli.oneshot.decode_latex_author_names import decoded_names
 from interfaces.cli.oneshot.repair_author_name_encoding import CANDIDATES_SQL, PARAMS
-from tests.integration.helpers.contributions import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
 def test_seuls_les_noms_a_l_encodage_errone_sont_repares(sa_sync_conn):
     conn = sa_sync_conn
-    notice = insert_source_record(conn, insert_publication(conn), source="openalex", source_id="W1")
-    signatures = {
-        raw: insert_signature(
+    source_record = insert_source_record(
+        conn, insert_publication(conn), source="openalex", source_id="W1"
+    )
+    source_contributions = {
+        raw: insert_source_contribution(
             conn,
-            notice,
+            source_record,
             source="openalex",
             author_position=position,
             raw_author_name=raw,
-            contributor_information_id=upsert_split_identity(conn, f"nom{position}", "prenom"),
+            contributor_information_id=upsert_split_contributor_information(
+                conn, f"nom{position}", "prenom"
+            ),
             roles=["author"],
         )
         for position, raw in enumerate(
@@ -35,7 +39,7 @@ def test_seuls_les_noms_a_l_encodage_errone_sont_repares(sa_sync_conn):
 
     repaired = {r["id"]: r["raw_author_name"] for r in rows}
     assert repaired == {
-        signatures["TÃ©lesphore Sime-Ngando"]: "Télesphore Sime-Ngando",
-        signatures["Fran鏾is Bouchon"]: "François Bouchon",
-        signatures["Lema{î}tre, A."]: "Lemaître, A.",
+        source_contributions["TÃ©lesphore Sime-Ngando"]: "Télesphore Sime-Ngando",
+        source_contributions["Fran鏾is Bouchon"]: "François Bouchon",
+        source_contributions["Lema{î}tre, A."]: "Lemaître, A.",
     }

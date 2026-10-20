@@ -2,11 +2,11 @@
 
 from unittest.mock import MagicMock
 
-from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.common.signatures import (
+from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorRecord,
-    signature_name_fields,
+    contributor_name_fields,
     write_source_contributions,
 )
 from tests.helpers.normalize_doubles import FakeContributionsBatchQueries
@@ -20,11 +20,11 @@ def _items_written(records: list[AuthorRecord]) -> list[dict]:
 
 def _record(position: int, raw: str, orcid: str) -> AuthorRecord:
     return AuthorRecord(
-        position=position, name=SignatureName(raw=raw), identifiers={"orcid": orcid}
+        position=position, name=ContributorName(raw=raw), identifiers={"orcid": orcid}
     )
 
 
-def test_identifiant_partage_neutralise_sur_chaque_signature():
+def test_identifiant_partage_neutralise_sur_chaque_contribution_source():
     items = _items_written(
         [_record(0, "S. Acharya", "X"), _record(1, "S. Das", "X"), _record(2, "A. Kim", "Y")]
     )
@@ -38,9 +38,9 @@ def test_identifiant_partage_neutralise_sur_chaque_signature():
 def test_collective_d_apres_la_source_ou_le_nom():
     items = _items_written(
         [
-            AuthorRecord(position=0, name=SignatureName(raw="Big Lab"), collective=True),
-            AuthorRecord(position=1, name=SignatureName(raw="ATLAS Collaboration")),
-            AuthorRecord(position=2, name=SignatureName(raw="Tony Affolder")),
+            AuthorRecord(position=0, name=ContributorName(raw="Big Lab"), collective=True),
+            AuthorRecord(position=1, name=ContributorName(raw="ATLAS Collaboration")),
+            AuthorRecord(position=2, name=ContributorName(raw="Tony Affolder")),
         ]
     )
     assert [i["collective"] for i in items] == [True, True, False]
@@ -51,9 +51,9 @@ def test_identifiants_bruts_conserves_sur_l_identite():
     assert [i["identifiers"] for i in items] == [{"orcid": "X"}, {"orcid": "X"}]
 
 
-class TestSignatureNameFields:
+class TestContributorNameFields:
     def test_nom_et_prenom_de_la_source(self):
-        assert signature_name_fields(SignatureName(last_name="Guérin", first_name="Katia")) == {
+        assert contributor_name_fields(ContributorName(last_name="Guérin", first_name="Katia")) == {
             "raw_author_name": None,
             "raw_last_name": "Guérin",
             "raw_first_name": "Katia",
@@ -62,7 +62,7 @@ class TestSignatureNameFields:
         }
 
     def test_chaine_brute_decoupee_par_le_parseur(self):
-        assert signature_name_fields(SignatureName(raw="Dupont, Marie")) == {
+        assert contributor_name_fields(ContributorName(raw="Dupont, Marie")) == {
             "raw_author_name": "Dupont, Marie",
             "raw_last_name": None,
             "raw_first_name": None,
@@ -71,7 +71,7 @@ class TestSignatureNameFields:
         }
 
     def test_sans_prenom(self):
-        fields = signature_name_fields(SignatureName(last_name="Dupont"))
+        fields = contributor_name_fields(ContributorName(last_name="Dupont"))
         assert (fields["last_name_normalized"], fields["first_name_normalized"]) == ("dupont", None)
 
 

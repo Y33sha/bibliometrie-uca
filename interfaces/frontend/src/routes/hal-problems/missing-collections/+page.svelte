@@ -13,7 +13,7 @@
 
 	import type { components } from '$lib/api/schema';
 	type Lab = components['schemas']['HalCollectionLab'];
-	type Pub = components['schemas']['HalMissingCollectionPub'];
+	type Pub = components['schemas']['HalMissingCollectionPublication'];
 
 	let labs: Lab[] = $state([]);
 	let labsLoaded = $state(false);

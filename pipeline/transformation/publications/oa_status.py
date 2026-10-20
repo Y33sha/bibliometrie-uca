@@ -215,10 +215,10 @@ def _apply_verdicts(
         else:
             progress["unchanged"] += 1
     queries.record_verdicts(conn, verdicts)
-    for pub in queries.fetch_oa_inputs(conn, list(by_doi)):
-        status = publication_oa_status(pub.signals, by_doi.get(pub.doi))
-        if status != pub.oa_status:
-            queries.update_oa_status(conn, pub.id, status)
+    for publication in queries.fetch_oa_inputs(conn, list(by_doi)):
+        status = publication_oa_status(publication.signals, by_doi.get(publication.doi))
+        if status != publication.oa_status:
+            queries.update_oa_status(conn, publication.id, status)
 
 
 # ── Câblage ───────────────────────────────────────────────────

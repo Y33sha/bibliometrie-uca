@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models._common import DashboardOa, PubYearCount
+from application.ports.read_models._common import DashboardOa, PublicationYearCount
 from application.ports.read_models.structures_queries import (
     NameFormOut,
     RelatedStructureOut,
@@ -28,7 +28,7 @@ from infrastructure.sql_fragments import has_author_role
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
 # Signature portée par la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure de contribution, et tenant le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
-AUTHOR_SIGNATURE = f"""
+AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}
     AND EXISTS (
@@ -41,7 +41,7 @@ AUTHOR_SIGNATURE = f"""
 AUTHORED_PUBLICATION = f"""
     EXISTS (
         SELECT 1 FROM contributions a
-        WHERE a.publication_id = p.id AND {AUTHOR_SIGNATURE}
+        WHERE a.publication_id = p.id AND {AUTHOR_SOURCE_CONTRIBUTION}
     )
 """
 
@@ -279,12 +279,12 @@ class PgStructuresQueries(StructuresQueries):
         """Agrégats d'une structure : publications par année sur sept ans, répartition des statuts d'accès ouvert, part de collaboration internationale et pays les plus fréquents."""
         current_year = today().year
 
-        pubs_year_rows = self._conn.execute(
+        publications_year_rows = self._conn.execute(
             text(f"""
                 SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
                 JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
                   AND p.publication_year IS NOT NULL
                   AND p.publication_year >= :min_year
                 GROUP BY p.publication_year
@@ -299,7 +299,7 @@ class PgStructuresQueries(StructuresQueries):
                     {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
                 JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
             """),
             {"structure_id": structure_id},
         ).one()
@@ -315,7 +315,7 @@ class PgStructuresQueries(StructuresQueries):
                     ) AS international
                 FROM publications p
                 JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SIGNATURE}
+                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
                   AND p.doc_type = '{DocType.ARTICLE.value}'
             """),
             {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
@@ -341,7 +341,10 @@ class PgStructuresQueries(StructuresQueries):
         ).all()
 
         return StructureDashboardResponse(
-            pubs_by_year=[PubYearCount(year=r.publication_year, count=r.n) for r in pubs_year_rows],
+            publications_by_year=[
+                PublicationYearCount(year=r.publication_year, count=r.n)
+                for r in publications_year_rows
+            ],
             oa=DashboardOa(
                 open_access=oa.open_access,
                 embargoed=oa.embargoed,

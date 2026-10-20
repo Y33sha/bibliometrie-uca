@@ -4,23 +4,23 @@ from sqlalchemy import text
 
 from interfaces.cli.oneshot.regroup_neutralized_identifiers import mark
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def _publication(conn, *, notices, neutralized):
+def _publication(conn, *, source_records, neutralized):
     """Publication de `notices` notices, non marquée ; sa première notice a une signature d'ORCID neutralisé si `neutralized`."""
     publication = insert_publication(conn)
     conn.execute(
         text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
         {"p": publication},
     )
-    for rank in range(notices):
-        notice = insert_source_record(
+    for rank in range(source_records):
+        source_record = insert_source_record(
             conn, publication, source="crossref", source_id=f"c-{publication}-{rank}"
         )
-        insert_signature(
+        insert_source_contribution(
             conn,
-            notice,
+            source_record,
             source="crossref",
             author_name_normalized="jean dupont",
             identifiers={"orcid": "0000-0001-2345-6789"},
@@ -35,17 +35,17 @@ def _dirty(conn, publication):
     ).scalar_one()
 
 
-def test_seules_les_publications_a_plusieurs_notices_et_identifiant_neutralise_sont_marquees(
+def test_seules_les_publications_a_plusieurs_enregistrements_sources_et_identifiant_neutralise_sont_marquees(
     sa_sync_conn,
 ):
-    visee = _publication(sa_sync_conn, notices=2, neutralized=True)
-    une_notice = _publication(sa_sync_conn, notices=1, neutralized=True)
-    sans_neutralisation = _publication(sa_sync_conn, notices=2, neutralized=False)
+    visee = _publication(sa_sync_conn, source_records=2, neutralized=True)
+    single_source_record = _publication(sa_sync_conn, source_records=1, neutralized=True)
+    sans_neutralisation = _publication(sa_sync_conn, source_records=2, neutralized=False)
 
     mark(sa_sync_conn)
 
     assert (
         _dirty(sa_sync_conn, visee),
-        _dirty(sa_sync_conn, une_notice),
+        _dirty(sa_sync_conn, single_source_record),
         _dirty(sa_sync_conn, sans_neutralisation),
     ) == (True, False, False)

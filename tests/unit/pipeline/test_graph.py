@@ -80,13 +80,13 @@ def test_la_fusion_des_revues_suit_le_typage_openalex():
     assert "publishers_journals.enrich_journals_from_openalex" in deps
 
 
-def test_le_nettoyage_des_identites_suit_la_suppression_des_notices_disparues():
+def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():
     """Supprimer une notice emporte ses signatures, et donc des identités d'auteur deviennent orphelines."""
-    deps = dependencies(TASKS)["normalize.cleanup_orphan_identities"]
+    deps = dependencies(TASKS)["normalize.cleanup_orphan_contributor_information"]
     assert "normalize.prune_disappeared" in deps
 
 
-def test_le_nettoyage_des_adresses_suit_la_normalisation_et_la_suppression_des_notices_disparues():
+def test_le_nettoyage_des_adresses_suit_la_normalisation_et_la_suppression_des_enregistrements_sources_disparus():
     """Réécrire ou supprimer des signatures rend des adresses orphelines."""
     deps = dependencies(TASKS)["normalize.cleanup_orphan_addresses"]
     assert {"normalize.hal", "normalize.prune_disappeared"} <= deps
@@ -118,7 +118,7 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}
 
 
-def test_les_statistiques_des_signatures_sont_rafraichies_apres_persons():
+def test_les_statistiques_des_contributions_sources_sont_rafraichies_apres_persons():
     """`normalize` et `persons` réécrivent en masse `source_contributions.person_id`, que la construction des contributions filtre ensuite."""
     purge = next(n for n in TASKS if n.name == "persons.purge")
     assert "ANALYZE source_contributions" in purge.maintenance

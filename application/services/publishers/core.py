@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.journal_recompute import JournalRecompute
-from application.ports.pipeline.publication_count import PubCountRecompute
+from application.ports.pipeline.publication_count import PublicationCountRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
@@ -67,7 +67,7 @@ def merge_publishers(
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
     recompute: JournalRecompute,
-    publication_count_recompute: PubCountRecompute,
+    publication_count_recompute: PublicationCountRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.

@@ -32,7 +32,7 @@ class TestPersonConstruction:
             id_value="0000-0000-0000-0001",
             status=AttributionStatus.CONFIRMED,
         )
-        nf = PersonNameForm("dupont jean")
+        name_form = PersonNameForm("dupont jean")
         p = Person(
             id=10,
             last_name="Dupont",
@@ -40,7 +40,7 @@ class TestPersonConstruction:
             last_name_normalized="dupont",
             first_name_normalized="jean",
             identifiers=(ident,),
-            name_forms=(nf,),
+            name_forms=(name_form,),
         )
         assert p.identifiers == (ident,)
-        assert p.name_forms == (nf,)
+        assert p.name_forms == (name_form,)

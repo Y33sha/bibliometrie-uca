@@ -10,7 +10,7 @@ def test_date_et_usage_ignores():
     assert change_detection_hash("wos", autre_export) == change_detection_hash("wos", _ROW)
 
 
-def test_notice_modifiee_detectee():
+def test_enregistrement_source_modifie_detecte():
     assert change_detection_hash("wos", {**_ROW, "TC": "4"}) != change_detection_hash("wos", _ROW)
 
 

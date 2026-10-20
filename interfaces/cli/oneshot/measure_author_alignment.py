@@ -54,7 +54,7 @@ _STRONG = tuple(str(t) for t in STRONG_PERSON_IDENTIFIER_TYPES)
 
 
 @dataclass(frozen=True, slots=True)
-class Signature:
+class SourceContribution:
     position: int
     last_name: str
     first_name: str
@@ -100,12 +100,12 @@ def _publication_ids(conn: Connection, full_max: int, sample_large: int, seed: i
     return small + sampled
 
 
-type NoticeKey = tuple[int, str, bool]
+type SourceRecordKey = tuple[int, str, bool]
 
 
-def _notices(
+def _source_records(
     conn: Connection, publication_ids: Sequence[int]
-) -> Iterator[tuple[int, dict[NoticeKey, list[Signature]]]]:
+) -> Iterator[tuple[int, dict[SourceRecordKey, list[SourceContribution]]]]:
     """Notices de chaque publication : `(id de notice, source, issue de HAL)` → signatures d'auteur individuelles triées par position.
 
     Une notice est issue de HAL quand elle recopie un dépôt HAL : notice scanR à identifiant `hal…`, notice OpenAlex dont la première URL, celle de la location principale, est une page HAL.
@@ -114,7 +114,7 @@ def _notices(
         ids = list(publication_ids[start : start + _BATCH])
         rows = conn.execute(
             text(r"""
-                SELECT sp.publication_id, sp.id AS notice_id, sp.source::text AS source,
+                SELECT sp.publication_id, sp.id AS source_record_id, sp.source::text AS source,
                        (sp.source = 'scanr' AND sp.source_id LIKE 'hal%')
                        OR (sp.source = 'openalex' AND coalesce(sp.urls[1], '') ~ '(hal\.science|archives-ouvertes\.fr)')
                            AS from_hal,
@@ -131,7 +131,9 @@ def _notices(
             """),
             {"ids": ids},
         )
-        by_pub: dict[int, dict[NoticeKey, list[Signature]]] = defaultdict(lambda: defaultdict(list))
+        by_publication: dict[int, dict[SourceRecordKey, list[SourceContribution]]] = defaultdict(
+            lambda: defaultdict(list)
+        )
         for r in rows:
             neutralized = set((r.neutralized_identifiers or {}).keys())
             identifiers = {
@@ -139,14 +141,19 @@ def _notices(
                 for t, v in (r.identifiers or {}).items()
                 if t in _STRONG and t not in neutralized and v
             }
-            by_pub[r.publication_id][(r.notice_id, r.source, bool(r.from_hal))].append(
-                Signature(r.author_position, r.ln, r.fn, r.raw_name or "", identifiers)
+            by_publication[r.publication_id][
+                (r.source_record_id, r.source, bool(r.from_hal))
+            ].append(
+                SourceContribution(r.author_position, r.ln, r.fn, r.raw_name or "", identifiers)
             )
-        for pub_id, notices in by_pub.items():
-            yield pub_id, {k: sorted(v, key=lambda s: s.position) for k, v in notices.items()}
+        for publication_id, source_records in by_publication.items():
+            yield (
+                publication_id,
+                {k: sorted(v, key=lambda s: s.position) for k, v in source_records.items()},
+            )
 
 
-def _words(s: Signature) -> set[str]:
+def _words(s: SourceContribution) -> set[str]:
     return {w for w in f"{s.first_name} {s.last_name}".split() if len(w) > 1}
 
 
@@ -154,7 +161,7 @@ def _words(s: Signature) -> set[str]:
 class Tally:
     pairs: int = 0
     same_length: int = 0
-    signatures: int = 0
+    source_contributions: int = 0
     same_position: int = 0
     shifted: int = 0
     shifted_ambiguous: int = 0
@@ -170,13 +177,13 @@ class Tally:
             setattr(self, name, getattr(self, name) + getattr(other, name))
 
 
-def _compatible(x: Signature, y: Signature) -> bool:
+def _compatible(x: SourceContribution, y: SourceContribution) -> bool:
     return names_compatible(x.last_name, x.first_name, y.last_name, y.first_name)
 
 
 def _compare(
-    a: list[Signature],
-    b: list[Signature],
+    a: list[SourceContribution],
+    b: list[SourceContribution],
     samples: list[dict[str, object]],
     context: dict[str, object],
 ) -> Tally:
@@ -185,13 +192,13 @@ def _compare(
     tally.pairs += 1
     tally.same_length += len(a) == len(b)
     by_position = {s.position: s for s in b}
-    by_word: dict[str, list[Signature]] = defaultdict(list)
+    by_word: dict[str, list[SourceContribution]] = defaultdict(list)
     for s in b:
         for w in _words(s):
             by_word[w].append(s)
     by_identifier = {(t, v): s for s in b for t, v in s.identifiers.items()}
     for s in a:
-        tally.signatures += 1
+        tally.source_contributions += 1
         other = by_position.get(s.position)
         if other is not None and _compatible(s, other):
             tally.same_position += 1
@@ -228,7 +235,7 @@ def _compare(
     return tally
 
 
-def _dependent(ka: NoticeKey, kb: NoticeKey) -> bool:
+def _dependent(ka: SourceRecordKey, kb: SourceRecordKey) -> bool:
     """Vrai quand une notice recopie l'autre, ou quand les deux recopient le même dépôt HAL."""
     return (ka[1] == "hal" and kb[2]) or (kb[1] == "hal" and ka[2]) or (ka[2] and kb[2])
 
@@ -242,20 +249,22 @@ class Outliers:
     no_majority: int = 0
 
 
-def _first_name_outliers(notices: dict[NoticeKey, list[Signature]], outliers: Outliers) -> None:
+def _first_name_outliers(
+    source_records: dict[SourceRecordKey, list[SourceContribution]], outliers: Outliers
+) -> None:
     """Pour chaque position commune à trois sources ou plus, au même nom de famille et aux noms pas tous compatibles : la source dont le nom s'écarte de tous les autres, eux compatibles entre eux.
 
     Une notice par source, la plus longue. Les notices recopiées d'un dépôt HAL sont écartées, pour que le vote compte des sources indépendantes.
     """
-    by_source: dict[str, list[Signature]] = {}
-    for (_, source, from_hal), sigs in notices.items():
-        if not from_hal and len(sigs) > len(by_source.get(source, [])):
-            by_source[source] = sigs
+    by_source: dict[str, list[SourceContribution]] = {}
+    for (_, source, from_hal), contributions in source_records.items():
+        if not from_hal and len(contributions) > len(by_source.get(source, [])):
+            by_source[source] = contributions
     if len(by_source) < 3:
         return
-    positions: dict[int, dict[str, Signature]] = defaultdict(dict)
-    for source, sigs in by_source.items():
-        for s in sigs:
+    positions: dict[int, dict[str, SourceContribution]] = defaultdict(dict)
+    for source, contributions in by_source.items():
+        for s in contributions:
             positions[s.position][source] = s
     for group in positions.values():
         if len(group) < 3 or len({s.last_name for s in group.values()}) > 1:
@@ -296,9 +305,13 @@ def measure(
     length_gaps: Counter[str] = Counter()
     outliers = Outliers(Counter(), Counter())
     samples: list[dict[str, object]] = []
-    for done, (pub_id, notices) in enumerate(_notices(conn, publication_ids), 1):
-        _first_name_outliers(notices, outliers)
-        for (ka, a), (kb, b) in combinations(sorted(notices.items(), key=lambda kv: kv[0][1]), 2):
+    for done, (publication_id, source_records) in enumerate(
+        _source_records(conn, publication_ids), 1
+    ):
+        _first_name_outliers(source_records, outliers)
+        for (ka, a), (kb, b) in combinations(
+            sorted(source_records.items(), key=lambda kv: kv[0][1]), 2
+        ):
             if ka[1] == kb[1]:
                 continue
             # La liste la plus courte se compare à la plus longue : une liste tronquée ne compte pas en auteurs absents.
@@ -310,7 +323,7 @@ def measure(
             dependent = _dependent(ka, kb)
             pair = "–".join(sorted((ka[1], kb[1]))) + (" (recopie de HAL)" if dependent else "")
             context = {
-                "publication_id": pub_id,
+                "publication_id": publication_id,
                 "sources": f"{ka[1]}→{kb[1]}",
                 "tranche": label,
                 "longueurs": f"{len(a)}/{len(b)}",
@@ -338,7 +351,7 @@ def _position_table(by_bucket: dict[str, Tally], labels: list[str]) -> list[str]
         t = by_bucket.get(label)
         if t:
             lines.append(
-                f"| {label} | {t.pairs} | {_pct(t.same_length, t.pairs)} | {t.signatures} | {_pct(t.same_position, t.signatures)} | {_pct(t.shifted, t.signatures)} | {_pct(t.shifted_ambiguous, t.shifted)} | {_pct(t.absent, t.signatures)} |"
+                f"| {label} | {t.pairs} | {_pct(t.same_length, t.pairs)} | {t.source_contributions} | {_pct(t.same_position, t.source_contributions)} | {_pct(t.shifted, t.source_contributions)} | {_pct(t.shifted_ambiguous, t.shifted)} | {_pct(t.absent, t.source_contributions)} |"
             )
     return lines
 
@@ -404,9 +417,9 @@ def report(
         "| Sources | Paires de notices | Signatures | Même position | Décalée | Absente |",
         "|---|---|---|---|---|---|",
     ]
-    for pair, t in sorted(by_sources.items(), key=lambda kv: -kv[1].signatures):
+    for pair, t in sorted(by_sources.items(), key=lambda kv: -kv[1].source_contributions):
         lines.append(
-            f"| {pair} | {t.pairs} | {t.signatures} | {_pct(t.same_position, t.signatures)} | {_pct(t.shifted, t.signatures)} | {_pct(t.absent, t.signatures)} |"
+            f"| {pair} | {t.pairs} | {t.source_contributions} | {_pct(t.same_position, t.source_contributions)} | {_pct(t.shifted, t.source_contributions)} | {_pct(t.absent, t.source_contributions)} |"
         )
     return "\n".join(lines) + "\n"
 

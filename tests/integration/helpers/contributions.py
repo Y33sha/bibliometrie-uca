@@ -3,7 +3,7 @@
 Le nom normalisé et les identifiants d'une signature vivent dans la table
 d'identités dédupliquée `contributor_information` ; `source_contributions` ne
 porte qu'une FK `contributor_information_id`. Les tests qui sèment des signatures passent par
-`upsert_identity` (connexion SQLAlchemy) ou `upsert_identity_on_cursor` (curseur
+`upsert_contributor_information` (connexion SQLAlchemy) ou `upsert_contributor_information_on_cursor` (curseur
 psycopg) pour obtenir l'`contributor_information_id` correspondant.
 """
 
@@ -43,18 +43,22 @@ def _upsert(conn, params: dict) -> int:
     return conn.exec_driver_sql(_SELECT_SQL, params).scalar_one()
 
 
-def upsert_identity(conn, author_name_normalized=None, identifiers=None) -> int:
+def upsert_contributor_information(conn, author_name_normalized=None, identifiers=None) -> int:
     """Upsert l'identité de forme normalisée `author_name_normalized` (« prénom nom ») et d'identifiants `identifiers` (dict ou `None`), sur une connexion SQLAlchemy, et renvoie son `id`."""
     return _upsert(conn, _form_params(author_name_normalized, identifiers))
 
 
-def upsert_split_identity(conn, last: str, first: str | None, identifiers=None) -> int:
-    """`upsert_identity` d'après un nom et un prénom normalisés explicites."""
+def upsert_split_contributor_information(
+    conn, last: str, first: str | None, identifiers=None
+) -> int:
+    """`upsert_contributor_information` d'après un nom et un prénom normalisés explicites."""
     return _upsert(conn, _params(last, first, identifiers))
 
 
-def upsert_identity_on_cursor(cur, author_name_normalized=None, identifiers=None) -> int:
-    """`upsert_identity` sur un curseur psycopg à lignes en dictionnaire."""
+def upsert_contributor_information_on_cursor(
+    cur, author_name_normalized=None, identifiers=None
+) -> int:
+    """`upsert_contributor_information` sur un curseur psycopg à lignes en dictionnaire."""
     params = _form_params(author_name_normalized, identifiers)
     cur.execute(_INSERT_SQL, params)
     cur.execute(_SELECT_SQL, params)

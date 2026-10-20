@@ -28,7 +28,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.contributions.address_publication_count import (
-    AddressPubCountQueries,
+    AddressPublicationCountQueries,
 )
 from pipeline.transformation.publications.contributions.build_contributions import (
     build as build_contributions,
@@ -44,7 +44,7 @@ from pipeline.transformation.publishing.monographs import delete_empty_monograph
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
-from pipeline.transformation.publishing.publication_counts import PgPubCountsQueries
+from pipeline.transformation.publishing.publication_counts import PgPublicationCountsQueries
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
@@ -79,8 +79,8 @@ def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> 
 @dataclass(frozen=True)
 class ContributionsPhase:
     build_queries: ContributionsBuild
-    publication_counts_queries: PgPubCountsQueries
-    address_publication_count_queries: AddressPubCountQueries
+    publication_counts_queries: PgPublicationCountsQueries
+    address_publication_count_queries: AddressPublicationCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
@@ -206,8 +206,8 @@ def _delete_empty_containers(
 
 def _refresh_publication_counts(
     open_tx: OpenTransaction,
-    publication_counts_queries: PgPubCountsQueries,
-    address_publication_count_queries: AddressPubCountQueries,
+    publication_counts_queries: PgPublicationCountsQueries,
+    address_publication_count_queries: AddressPublicationCountQueries,
     logger: logging.Logger,
 ) -> None:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
@@ -245,8 +245,8 @@ def _refresh_publication_counts(
 def build() -> Phase:
     return ContributionsPhase(
         ContributionsBuild(),
-        PgPubCountsQueries(),
-        AddressPubCountQueries(),
+        PgPublicationCountsQueries(),
+        AddressPublicationCountQueries(),
         empty_containers=(
             (delete_empty_monographs.LIBELLE, _run_delete_empty_monographs),
             (delete_empty_journals.LIBELLE, _run_delete_empty_journals),

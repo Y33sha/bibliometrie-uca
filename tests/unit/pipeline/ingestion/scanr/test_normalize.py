@@ -16,14 +16,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import JournalIssn
-from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
+from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.scanr import normalize as normalize_scanr
 from pipeline.ingestion.scanr.normalize import (
     ScanrNormalizer,
     build_scanr_author_records,
     extract_doi,
-    extract_pub_metadata,
+    extract_publication_metadata,
     get_container_facts,
     get_title,
     insert_scanr_document,
@@ -39,7 +39,7 @@ from tests.helpers.normalize_doubles import (
     staging_row,
 )
 
-_EMPTY_PUB_META = PublicationMetadata(
+_EMPTY_PUBLICATION_META = PublicationMetadata(
     doi=None,
     title=None,
     publication_year=None,
@@ -58,7 +58,7 @@ class TestInsertScanrDocumentLicense:
     def _call(self, evidence: dict) -> Any:
         queries = FakeSourceRecordQueries()
         insert_scanr_document(
-            MagicMock(), queries, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUB_META
+            MagicMock(), queries, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META
         )
         return queries.upserted_documents[-1]
 
@@ -82,7 +82,7 @@ class TestInsertScanrDocumentBiblio:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            pub_meta=_EMPTY_PUB_META,
+            publication_meta=_EMPTY_PUBLICATION_META,
         )
         return queries.upserted_documents[-1]
 
@@ -134,7 +134,7 @@ class TestInsertScanrDocumentBiblio:
 
 
 class TestInsertScanrDocumentExternalIds:
-    def _call(self, doc, pub_meta) -> dict[str, Any]:
+    def _call(self, doc, publication_meta) -> dict[str, Any]:
         queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
@@ -142,7 +142,7 @@ class TestInsertScanrDocumentExternalIds:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            pub_meta=pub_meta,
+            publication_meta=publication_meta,
         )
         return queries.upserted_documents[-1]
 
@@ -154,12 +154,12 @@ class TestInsertScanrDocumentExternalIds:
                 {"type": "hal", "id": "hal-1"},
             ]
         }
-        captured = self._call(doc, _remplacer(_EMPTY_PUB_META, doi="10.1/primary"))
+        captured = self._call(doc, _remplacer(_EMPTY_PUBLICATION_META, doi="10.1/primary"))
         assert captured.external_ids["related_dois"] == ["10.2/anie"]
 
     def test_related_dois_absent_when_only_primary(self):
         doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
-        captured = self._call(doc, _remplacer(_EMPTY_PUB_META, doi="10.1/primary"))
+        captured = self._call(doc, _remplacer(_EMPTY_PUBLICATION_META, doi="10.1/primary"))
         assert "related_dois" not in (captured.external_ids or {})
 
 
@@ -187,7 +187,7 @@ class TestBuildScanrAuthorRecords:
             ]
         }
         rec = build_scanr_author_records(doc)[0]
-        assert rec.name == SignatureName(raw="Marie Dupont")
+        assert rec.name == ContributorName(raw="Marie Dupont")
         assert rec.identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
         assert rec.roles == ["author"]
 
@@ -209,9 +209,9 @@ class TestBuildScanrAuthorRecords:
 
     def test_le_nom_de_l_affiliation_n_ecrase_pas_celui_de_l_auteur(self):
         doc = {"authors": [{"fullName": "Marie Dupont", "affiliations": [{"name": "Lab A"}]}]}
-        assert build_scanr_author_records(doc)[0].name == SignatureName(raw="Marie Dupont")
+        assert build_scanr_author_records(doc)[0].name == ContributorName(raw="Marie Dupont")
 
-    def test_une_personne_listee_pour_plusieurs_roles_forme_une_signature(self):
+    def test_une_personne_listee_pour_plusieurs_roles_forme_une_contribution_source(self):
         doc = {
             "authors": [
                 {"fullName": "Anis Limami", "role": "author"},
@@ -347,7 +347,7 @@ class TestUpsertPublisherEtJournal:
         assert facts.book_title is None
 
 
-class TestExtractPubMetadata:
+class TestExtractPublicationMetadata:
     def test_metadonnees_d_un_article(self):
         doc = {
             "title": {"default": "Un titre"},
@@ -357,7 +357,7 @@ class TestExtractPubMetadata:
             "isOa": False,
         }
 
-        meta = extract_pub_metadata(doc, journal_id=3, scanr_id="doi10.1/a")
+        meta = extract_publication_metadata(doc, journal_id=3, scanr_id="doi10.1/a")
 
         assert meta.title == "Un titre"
         assert meta.publication_year == 2024
@@ -370,19 +370,19 @@ class TestExtractPubMetadata:
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
 
-        meta = extract_pub_metadata(doc, journal_id=None)
+        meta = extract_publication_metadata(doc, journal_id=None)
 
         assert meta.container_title == "Actes du colloque"
 
     def test_these_reconnue_a_son_identifiant(self):
         """La source encode les thèses en préfixant leur numéro national."""
-        meta = extract_pub_metadata({}, journal_id=None, scanr_id="these2021CLFAC030")
+        meta = extract_publication_metadata({}, journal_id=None, scanr_id="these2021CLFAC030")
 
         assert meta.nnt == "2021CLFAC030"
 
 
 class TestInsertScanrDocumentIdentifiants:
-    def _call(self, doc, pub_meta=None) -> Any:
+    def _call(self, doc, publication_meta=None) -> Any:
         queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
@@ -390,12 +390,12 @@ class TestInsertScanrDocumentIdentifiants:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            pub_meta=pub_meta or _EMPTY_PUB_META,
+            publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
         )
         return queries.upserted_documents[-1]
 
     def test_numero_de_these_repris_des_metadonnees(self):
-        document = self._call({}, _remplacer(_EMPTY_PUB_META, nnt="2021CLFAC030"))
+        document = self._call({}, _remplacer(_EMPTY_PUBLICATION_META, nnt="2021CLFAC030"))
 
         assert document.external_ids == {"nnt": "2021CLFAC030"}
 
@@ -419,7 +419,7 @@ class TestInsertScanrDocumentIdentifiants:
 
 
 class TestInsertScanrDocumentChamps:
-    def _call(self, doc, pub_meta=None) -> Any:
+    def _call(self, doc, publication_meta=None) -> Any:
         queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
@@ -427,7 +427,7 @@ class TestInsertScanrDocumentChamps:
             doc,
             staging_id=1,
             scanr_id="sc-1",
-            pub_meta=pub_meta or _EMPTY_PUB_META,
+            publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
         )
         return queries.upserted_documents[-1]
 
@@ -503,7 +503,7 @@ class TestInsertScanrDocumentChamps:
 
 
 class TestProcessContributions:
-    def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
+    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_scanr,

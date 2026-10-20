@@ -79,7 +79,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
 # ── Lectures du recalcul ──────────────────────────────────────────────
 
 
-def source_records_of(conn: Connection, pub_id: int) -> list[SourceRecord]:
+def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
     # Le `doi` projeté est la colonne nue ; la substitution Zenodo (concept plutôt que version) est déjà persistée par `metadata_correction`.
     """Les `SourceRecord` attachées à une publication canonique, matière de l'agrégation."""
     result = conn.execute(
@@ -94,20 +94,20 @@ def source_records_of(conn: Connection, pub_id: int) -> list[SourceRecord]:
             FROM source_records sp
             WHERE sp.publication_id = :id
         """),
-        {"id": pub_id},
+        {"id": publication_id},
     )
     return [_source_record_from_row(vue) for vue in rows_as(_SourceRecordRow, result)]
 
 
-def converged_secondary_ids(conn: Connection, pub_id: int) -> frozenset[int]:
-    """Ids des `source_records` de `pub_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
+def converged_secondary_ids(conn: Connection, publication_id: int) -> frozenset[int]:
+    """Ids des `source_records` de `publication_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
     result = conn.execute(
         text(f"""
             SELECT id FROM source_records
             WHERE publication_id = :id
               AND {corrected_by("doi", "source_records")} = ANY(:cases)
         """),
-        {"id": pub_id, "cases": list(CONVERGENCE_CASES)},
+        {"id": publication_id, "cases": list(CONVERGENCE_CASES)},
     )
     return frozenset(row.id for row in result)
 
@@ -141,7 +141,7 @@ def journal_type_of(conn: Connection, journal_id: int) -> str | None:
     ).scalar_one_or_none()
 
 
-def _refresh_sources(conn: Connection, pub_id: int) -> None:
+def _refresh_sources(conn: Connection, publication_id: int) -> None:
     """Recalcule `publications.sources` par agrégation des `source_records` rattachées."""
     conn.execute(
         text("""
@@ -157,7 +157,7 @@ def _refresh_sources(conn: Connection, pub_id: int) -> None:
             ) sub
             WHERE id = :id
         """),
-        {"id": pub_id},
+        {"id": publication_id},
     )
 
 
@@ -170,7 +170,7 @@ class RefreshVerdict(StrEnum):
     INADMISSIBLE_TYPE = "inadmissible_type"
 
 
-def refresh_from_sources(conn: Connection, pub_id: int) -> RefreshVerdict:
+def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
 
     Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
@@ -180,20 +180,20 @@ def refresh_from_sources(conn: Connection, pub_id: int) -> RefreshVerdict:
     Ne touche que la publication reçue et ses sources : quelles `source_records` forment une même œuvre relève de la réconciliation. Laisse `notes` inchangé.
     """
     store = PublicationStore(conn)
-    pub = store.find_by_id(pub_id)
-    if pub is None:
+    publication = store.find_by_id(publication_id)
+    if publication is None:
         return RefreshVerdict.ABSENT
 
-    sources = source_records_of(conn, pub_id)
+    sources = source_records_of(conn, publication_id)
     if not sources:
         return RefreshVerdict.NO_SOURCE
 
-    secondary_ids = converged_secondary_ids(conn, pub_id)
+    secondary_ids = converged_secondary_ids(conn, publication_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
     dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
     _refresh_aggregate(
-        pub,
+        publication,
         sources,
         source_priority=SOURCE_PRIORITY,
         secondary_ids=secondary_ids,
@@ -201,19 +201,23 @@ def refresh_from_sources(conn: Connection, pub_id: int) -> RefreshVerdict:
         unpaywall=unpaywall_verdicts(conn, dois) if dois else {},
     )
     _apply_canonical_doc_type_correction(
-        pub,
-        journal_type=journal_type_of(conn, pub.journal_id) if pub.journal_id is not None else None,
+        publication,
+        journal_type=journal_type_of(conn, publication.journal_id)
+        if publication.journal_id is not None
+        else None,
     )
 
-    if pub.doc_type in OUT_OF_SCOPE_DOC_TYPES:
+    if publication.doc_type in OUT_OF_SCOPE_DOC_TYPES:
         return RefreshVerdict.INADMISSIBLE_TYPE
 
-    store.save(pub)
-    _refresh_sources(conn, pub_id)
+    store.save(publication)
+    _refresh_sources(conn, publication_id)
     return RefreshVerdict.SAVED
 
 
-def _apply_canonical_doc_type_correction(pub: Publication, *, journal_type: str | None) -> None:
+def _apply_canonical_doc_type_correction(
+    publication: Publication, *, journal_type: str | None
+) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
     L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication porte alors une combinaison — `doc_type` de l'une, `journal_id` de l'autre — qu'aucune `source_record` ne portait, et qu'aucune correction par source n'a pu voir. Le contrat reçoit les champs que l'agrégation arbitre, dont le `journal_type` du `journal_id` canonique.
@@ -224,10 +228,10 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, journal_type: str 
     """
     corrected = effective_doc_type_for_publication(
         MetadataForCorrection(
-            title=pub.title,
-            doc_type=pub.doc_type,
-            doi=str(pub.doi) if pub.doi else None,
-            journal_id=pub.journal_id,
+            title=publication.title,
+            doc_type=publication.doc_type,
+            doi=str(publication.doi) if publication.doi else None,
+            journal_id=publication.journal_id,
             oa_status=None,
             urls=None,
             journal_type=journal_type,
@@ -238,11 +242,11 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, journal_type: str 
             registrant_publisher_type=None,
         )
     )
-    if corrected is not None and corrected.value != pub.doc_type:
-        pub.doc_type = corrected.value
-        meta = dict(pub.meta or {})
+    if corrected is not None and corrected.value != publication.doc_type:
+        publication.doc_type = corrected.value
+        meta = dict(publication.meta or {})
         existing_corrections = meta.get("corrections")
         corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
         corrections["doc_type"] = corrected.rule.value
         meta["corrections"] = corrections
-        pub.meta = meta
+        publication.meta = meta

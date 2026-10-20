@@ -21,13 +21,13 @@ PublisherSort = Literal[
 class PublisherFilters:
     """Filtres que la liste des éditeurs et ses facettes honorent toutes deux.
 
-    `publisher_types` et `countries` sont multi-valués. `with_pubs` restreint aux éditeurs dont le décompte de publications du périmètre est non nul.
+    `publisher_types` et `countries` sont multi-valués. `with_publications` restreint aux éditeurs dont le décompte de publications du périmètre est non nul.
     """
 
     search: str = ""
     publisher_types: list[str] = field(default_factory=list)
     countries: list[str] = field(default_factory=list)
-    with_pubs: bool = False
+    with_publications: bool = False
 
 
 class DoiPrefixInfo(BaseModel):

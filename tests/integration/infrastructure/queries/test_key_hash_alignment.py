@@ -5,7 +5,10 @@ Un désalignement ferait échouer silencieusement la résolution d'identité par
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.signature_queries import IDENTITY_KEY_COLUMNS, key_hash_sql
+from pipeline.ingestion.common.source_contribution_queries import (
+    CONTRIBUTOR_INFORMATION_KEY_COLUMNS,
+    key_hash_sql,
+)
 
 
 def test_key_hash_sql_matches_generated_column(sa_sync_conn):
@@ -24,7 +27,7 @@ def test_key_hash_sql_matches_generated_column(sa_sync_conn):
     mismatches = conn.execute(
         text(
             "SELECT count(*) FROM contributor_information "
-            "WHERE key_hash IS DISTINCT FROM " + key_hash_sql(IDENTITY_KEY_COLUMNS)
+            "WHERE key_hash IS DISTINCT FROM " + key_hash_sql(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
         )
     ).scalar_one()
     assert mismatches == 0

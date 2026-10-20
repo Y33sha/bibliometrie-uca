@@ -4,7 +4,7 @@ from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import (
     DashboardOa,
-    PubYearCount,
+    PublicationYearCount,
     StructureRef,
     page_count,
 )
@@ -247,7 +247,7 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
     """Dashboard personne : publis/an + répartition Open Access."""
     current_year = today().year
 
-    pubs_year_rows = conn.execute(
+    publications_year_rows = conn.execute(
         text(f"""
             SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
             FROM publications p
@@ -261,7 +261,9 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
         """),
         {"pid": person_id, "min_year": current_year - 6},
     ).all()
-    pubs_by_year = [PubYearCount(year=r.publication_year, count=r.n) for r in pubs_year_rows]
+    publications_by_year = [
+        PublicationYearCount(year=r.publication_year, count=r.n) for r in publications_year_rows
+    ]
 
     oa = conn.execute(
         text(f"""
@@ -276,7 +278,7 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
     ).one()
 
     return PersonDashboardResponse(
-        pubs_by_year=pubs_by_year,
+        publications_by_year=publications_by_year,
         oa=DashboardOa(
             open_access=oa.open_access,
             embargoed=oa.embargoed,

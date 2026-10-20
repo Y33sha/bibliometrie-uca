@@ -16,7 +16,7 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
     conn = sa_sync_conn
     staging_id = insert_staging(conn, "openalex", source_id="W_title_norm")
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
-    sp_id = _Q.upsert_source_record(
+    source_record_id = _Q.upsert_source_record(
         conn,
         SourceRecordUpsert(
             source="openalex",
@@ -29,7 +29,7 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
     )
     stored = conn.execute(
         text("SELECT title, title_normalized FROM source_records WHERE id = :id"),
-        {"id": sp_id},
+        {"id": source_record_id},
     ).one()
     assert stored.title == raw_title  # le titre brut est conservé tel quel
     assert stored.title_normalized == normalized_title(raw_title)

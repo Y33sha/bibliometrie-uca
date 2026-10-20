@@ -18,7 +18,11 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sql_fragments import DETACHED_SIGNATURE, identifier_neutralized, pinned
+from infrastructure.sql_fragments import (
+    DETACHED_SOURCE_CONTRIBUTION,
+    identifier_neutralized,
+    pinned,
+)
 
 log = setup_logger("detach_rejected_identifier_signatures", os.path.dirname(__file__))
 
@@ -51,12 +55,12 @@ _TARGETS = f"""
 """
 
 _COUNT_SQL = text(f"""
-    SELECT count(*) AS signatures, count(DISTINCT sa.person_id) AS personnes
+    SELECT count(*) AS source_contributions, count(DISTINCT sa.person_id) AS personnes
     FROM source_contributions sa WHERE sa.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 
 _DETACH_SQL = text(f"""
-    UPDATE source_contributions sa SET {DETACHED_SIGNATURE}
+    UPDATE source_contributions sa SET {DETACHED_SOURCE_CONTRIBUTION}
     WHERE sa.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 
@@ -73,8 +77,10 @@ def main() -> int:
 
     with get_sync_engine().connect() as conn:
         counts = conn.execute(_COUNT_SQL).one()
-        log.info("signatures visées : %d, de %d personnes", counts.signatures, counts.personnes)
-        if args.dry_run or not counts.signatures:
+        log.info(
+            "signatures visées : %d, de %d personnes", counts.source_contributions, counts.personnes
+        )
+        if args.dry_run or not counts.source_contributions:
             conn.rollback()
             return 0
         detached = detach(conn)

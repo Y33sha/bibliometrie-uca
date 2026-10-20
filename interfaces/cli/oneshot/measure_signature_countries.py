@@ -36,16 +36,16 @@ _MEASURES = Path("data/measures")
 _BATCH = 20_000
 _SAMPLE = 40
 
-_SIGNATURE_TABLES = """
+_SOURCE_CONTRIBUTION_TABLES = """
     CREATE TEMP TABLE sig_addr AS
-    SELECT saa.source_contribution_id AS sa_id, array_agg(DISTINCT c ORDER BY c) AS countries
+    SELECT saa.source_contribution_id AS source_contribution_id, array_agg(DISTINCT c ORDER BY c) AS countries
     FROM source_contribution_addresses saa
     JOIN addr_retained r ON r.address_id = saa.address_id
     CROSS JOIN LATERAL unnest(r.countries) c
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_ror AS
-    SELECT sar.source_contribution_id AS sa_id,
+    SELECT sar.source_contribution_id AS source_contribution_id,
            array_agg(DISTINCT ro.country_code::text ORDER BY ro.country_code::text) AS countries
     FROM source_contribution_rors sar
     JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
@@ -53,7 +53,7 @@ _SIGNATURE_TABLES = """
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_hal AS
-    SELECT h.source_contribution_id AS sa_id,
+    SELECT h.source_contribution_id AS source_contribution_id,
            array_agg(DISTINCT hs.country_code::text ORDER BY hs.country_code::text) AS countries
     FROM source_contribution_hal_structures h
     JOIN hal_structures hs ON hs.hal_structure_id = h.hal_structure_id
@@ -61,14 +61,14 @@ _SIGNATURE_TABLES = """
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_all AS
-    SELECT s.sa_id, sp.source::text AS source, sp.publication_id,
+    SELECT s.source_contribution_id, sp.source::text AS source, sp.publication_id,
            a.countries AS addr, r.countries AS ror, h.countries AS hal
-    FROM (SELECT sa_id FROM sig_addr UNION SELECT sa_id FROM sig_ror UNION SELECT sa_id FROM sig_hal) s
-    JOIN source_contributions sa ON sa.id = s.sa_id
+    FROM (SELECT source_contribution_id FROM sig_addr UNION SELECT source_contribution_id FROM sig_ror UNION SELECT source_contribution_id FROM sig_hal) s
+    JOIN source_contributions sa ON sa.id = s.source_contribution_id
     JOIN source_records sp ON sp.id = sa.source_record_id
-    LEFT JOIN sig_addr a ON a.sa_id = s.sa_id
-    LEFT JOIN sig_ror r ON r.sa_id = s.sa_id
-    LEFT JOIN sig_hal h ON h.sa_id = s.sa_id;
+    LEFT JOIN sig_addr a ON a.source_contribution_id = s.source_contribution_id
+    LEFT JOIN sig_ror r ON r.source_contribution_id = s.source_contribution_id
+    LEFT JOIN sig_hal h ON h.source_contribution_id = s.source_contribution_id;
 """
 
 _COVERAGE = """
@@ -110,26 +110,26 @@ _PUBLICATIONS = """
 """
 
 _DISAGREEMENTS = """
-    SELECT s.sa_id, s.source, s.addr, s.{other} AS other,
+    SELECT s.source_contribution_id, s.source, s.addr, s.{other} AS other,
            (SELECT string_agg(a.raw_text, ' | ') FROM source_contribution_addresses saa
-              JOIN addresses a ON a.id = saa.address_id WHERE saa.source_contribution_id = s.sa_id) AS addresses,
+              JOIN addresses a ON a.id = saa.address_id WHERE saa.source_contribution_id = s.source_contribution_id) AS addresses,
            {names} AS other_names,
            p.title
     FROM sig_all s
     LEFT JOIN publications p ON p.id = s.publication_id
     WHERE s.addr IS NOT NULL AND s.{other} IS NOT NULL AND NOT s.addr && s.{other}
-    ORDER BY md5(s.sa_id::text)
+    ORDER BY md5(s.source_contribution_id::text)
     LIMIT :limit
 """
 
 _OTHER_NAMES = {
     "ror": """(SELECT string_agg(ro.name || ' (' || ro.country_code || ')', ' | ')
                FROM source_contribution_rors sar JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
-               WHERE sar.source_contribution_id = s.sa_id AND sar.address_id IS NULL)""",
+               WHERE sar.source_contribution_id = s.source_contribution_id AND sar.address_id IS NULL)""",
     "hal": """(SELECT string_agg(hs.name || ' (' || coalesce(hs.country_code, '?') || ')', ' | ')
                FROM source_contribution_hal_structures h
                JOIN hal_structures hs ON hs.hal_structure_id = h.hal_structure_id
-               WHERE h.source_contribution_id = s.sa_id)""",
+               WHERE h.source_contribution_id = s.source_contribution_id)""",
 }
 
 
@@ -191,7 +191,7 @@ def main() -> int:
     sections: list[str] = ["# Pays des signatures\n"]
     with get_sync_engine().connect() as conn:
         log.info("adresses à pays retenu : %d", load_retained(conn, args.candidates))
-        conn.execute(text(_SIGNATURE_TABLES))
+        conn.execute(text(_SOURCE_CONTRIBUTION_TABLES))
         log.info(
             "signatures à pays : %d", conn.execute(text("SELECT count(*) FROM sig_all")).scalar()
         )
@@ -248,7 +248,16 @@ def main() -> int:
         with sample.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(
-                ("kind", "sa_id", "source", "addr", "other", "addresses", "other_names", "title")
+                (
+                    "kind",
+                    "source_contribution_id",
+                    "source",
+                    "addr",
+                    "other",
+                    "addresses",
+                    "other_names",
+                    "title",
+                )
             )
             for other, names in _OTHER_NAMES.items():
                 for r in conn.execute(
@@ -257,7 +266,7 @@ def main() -> int:
                     writer.writerow(
                         (
                             f"addr/{other}",
-                            r.sa_id,
+                            r.source_contribution_id,
                             r.source,
                             ",".join(r.addr),
                             ",".join(r.other),

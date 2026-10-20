@@ -47,7 +47,7 @@ class OpenalexPersonHarvester(PersonSearchHarvester[OpenalexClient]):
         following = as_str(at_path(data, "meta").get("next_cursor"))
         return PersonSearchPage(records=records, next_token=following if records else None)
 
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         openalex_id = extract_openalex_id(record) if record.get("id") else None
         return (openalex_id, extract_doi(record)) if openalex_id else None
 

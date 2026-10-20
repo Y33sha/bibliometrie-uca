@@ -52,8 +52,8 @@ def run(
 
     if rebuild:
         queries.mark_all_publications_to_reingest(conn)
-    pub_ids = queries.select_publications_to_reingest(conn)
-    if not pub_ids:
+    publication_ids = queries.select_publications_to_reingest(conn)
+    if not publication_ids:
         queries.purge_orphan_subjects(conn)
         rien_a_faire(logger)
         subjects_after = queries.count_all_subjects(conn)
@@ -65,15 +65,15 @@ def run(
         }
         return metrics
 
-    queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
-    rows = queries.select_source_records_for_pubs(conn, publication_ids=pub_ids)
+    queries.clear_publication_subjects_for_publications(conn, publication_ids=publication_ids)
+    rows = queries.select_source_records_for_publications(conn, publication_ids=publication_ids)
     logger.info(
         "%s%s à traiter (%s), soit %s",
         BRANCHE,
-        accord(len(pub_ids), "publication"),
+        accord(len(publication_ids), "publication"),
         "reconstruction complète"
         if rebuild
-        else f"{forme(len(pub_ids), 'nouvelle')} ou {forme(len(pub_ids), 'modifiée')}",
+        else f"{forme(len(publication_ids), 'nouvelle')} ou {forme(len(publication_ids), 'modifiée')}",
         accord(len(rows), "document source", "documents sources"),
     )
 
@@ -95,7 +95,7 @@ def run(
             ]
             n_links += cache.link_bulk(conn, source=r.source, rows=links)
 
-    queries.mark_subjects_ingested(conn, publication_ids=pub_ids)
+    queries.mark_subjects_ingested(conn, publication_ids=publication_ids)
     queries.purge_orphan_subjects(conn)
     subjects_after = queries.count_all_subjects(conn)
 
@@ -104,6 +104,6 @@ def run(
     metrics.details["summary"] = {
         "subjects_added": subjects_after - subjects_before,
         "subjects_total": subjects_after,
-        "publications_updated": len(pub_ids),
+        "publications_updated": len(publication_ids),
     }
     return metrics

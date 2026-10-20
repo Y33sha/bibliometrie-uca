@@ -307,7 +307,7 @@
 					<td>{o.full_name}</td>
 					<td>
 						<a href="{base}/publications/{o.publication_id}" class="pub-link">
-							{o.publication_year ?? '?'} — {o.pub_title?.slice(0, 80)}{(o.pub_title?.length ?? 0) > 80 ? '…' : ''}
+							{o.publication_year ?? '?'} — {o.publication_title?.slice(0, 80)}{(o.publication_title?.length ?? 0) > 80 ? '…' : ''}
 						</a>
 					</td>
 					<td>

@@ -7,13 +7,13 @@ from enum import StrEnum
 from typing import Literal, NamedTuple
 
 from domain.normalize import normalize_name
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.name_matching import (
     first_name_initials,
     initials_extend,
     names_compatible,
 )
-from domain.persons.signature_name import SignatureName
 
 
 class IdentifiedPerson(NamedTuple):
@@ -116,22 +116,28 @@ def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> 
     ]
 
 
-def compatible_namesakes(signature_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
+def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
     """Personnes de même nom de famille qu'une signature désigne par la compatibilité des initiales, quand sa forme de nom exacte est inconnue.
 
     - Signature au prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la signature (« Abdul-Majeed », « A. M. »).
     - Signature au prénom plein (« Abdellah ») : toute personne au prénom réduit dont les initiales commencent celles de la signature (« A. »), et qu'aucun autre prénom ne revendique : ni une personne de même nom au prénom plein compatible, ni plusieurs prénoms pleins distincts donnés par ses signatures (`conflicting`).
     - Signature sans prénom : aucune.
     """
-    signature_initials = first_name_initials(signature_first_name)
-    if signature_initials is not None:
-        return [n.person_id for n in namesakes if initials_extend(signature_initials, n.first_name)]
-    if not normalize_name(signature_first_name):
+    contributor_initials = first_name_initials(contributor_first_name)
+    if contributor_initials is not None:
+        return [
+            n.person_id for n in namesakes if initials_extend(contributor_initials, n.first_name)
+        ]
+    if not normalize_name(contributor_first_name):
         return []
     candidates = []
     for n in namesakes:
         initials = first_name_initials(n.first_name)
-        if initials is None or n.conflicting or not initials_extend(initials, signature_first_name):
+        if (
+            initials is None
+            or n.conflicting
+            or not initials_extend(initials, contributor_first_name)
+        ):
             continue
         if not full_namesakes(initials, namesakes):
             candidates.append(n.person_id)
@@ -139,14 +145,14 @@ def compatible_namesakes(signature_first_name: str, namesakes: Sequence[Namesake
 
 
 def compatible_persons(
-    signature: SignatureName, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
+    source_contribution: ContributorName, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
 ) -> list[int]:
-    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`SignatureName.splits`).
+    """Personnes que la signature désigne par ses initiales (`compatible_namesakes`), sur tous ses découpages (`ContributorName.splits`).
 
     `namesakes_by_last_name` indexe les personnes par nom de famille normalisé. Chaque personne figure une fois, dans l'ordre de découverte.
     """
     found: list[int] = []
-    for last, first in signature.splits():
+    for last, first in source_contribution.splits():
         namesakes = namesakes_by_last_name.get(normalize_name(last), ())
         for person_id in compatible_namesakes(first, namesakes):
             if person_id not in found:
@@ -155,20 +161,25 @@ def compatible_persons(
 
 
 def attested_full_first_names(
-    last_name: str, initials: tuple[str, ...], signature_names: Iterable[SignatureName]
+    last_name: str, initials: tuple[str, ...], contributor_names: Iterable[ContributorName]
 ) -> dict[str, str]:
     """Prénoms pleins que des signatures donnent à une personne au prénom réduit, indexés par leur forme normalisée.
 
-    Retient les signatures dont un découpage donne le même nom de famille (`SignatureName.first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
+    Retient les signatures dont un découpage donne le même nom de famille (`ContributorName.first_name_for`) et un prénom plein qui prolonge `initials`. Chaque prénom est rendu dans sa graphie la plus fréquente, la plus petite dans l'ordre alphabétique en cas d'égalité.
     """
     spellings: dict[str, Counter[str]] = {}
-    for name in signature_names:
-        sig_first = name.first_name_for(last_name)
-        if sig_first is None or first_name_initials(sig_first) is not None:
+    for name in contributor_names:
+        contributor_first_name = name.first_name_for(last_name)
+        if (
+            contributor_first_name is None
+            or first_name_initials(contributor_first_name) is not None
+        ):
             continue
-        if not initials_extend(initials, sig_first):
+        if not initials_extend(initials, contributor_first_name):
             continue
-        spellings.setdefault(normalize_name(sig_first), Counter())[sig_first] += 1
+        spellings.setdefault(normalize_name(contributor_first_name), Counter())[
+            contributor_first_name
+        ] += 1
     return {
         norm: min(counter, key=lambda s: (-counter[s], s)) for norm, counter in spellings.items()
     }
@@ -277,8 +288,8 @@ class IdentifierMatch:
 def decide_match_by_identifier(
     value: str | None,
     identifier_map: Mapping[str, IdentifiedPerson],
-    signature: SignatureName,
-    signature_forms: Sequence[str],
+    source_contribution: ContributorName,
+    contributor_name_forms: Sequence[str],
     name_form_status: Mapping[tuple[str, int], str],
 ) -> IdentifierMatch:
     """Résout un identifiant (IdRef, ORCID…) vers une `person_id`, corroboré par le nom.
@@ -287,7 +298,7 @@ def decide_match_by_identifier(
 
     Corroboration par le nom, du verdict humain au test heuristique :
 
-    1. Le statut du couple (forme de la signature, `person_id`) dans `person_name_forms` (`name_form_status`), pour la première des `signature_forms` qui en porte un, tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
+    1. Le statut du couple (forme de la signature, `person_id`) dans `person_name_forms` (`name_form_status`), pour la première des `contributor_name_forms` qui en porte un, tranche en priorité — `confirmed` corrobore le match sans test (la forme appartient à la personne, y compris un changement de nom), `rejected` le refuse sans test.
     2. À défaut de verdict (`pending` ou forme inconnue), on teste la compatibilité via `names_compatible`, tolérante à la graphie : un identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) ou par un homonyme de patronyme est refusé, mais une **variante de graphie du propriétaire lui-même** (« toufic » pour « toufik ») corrobore et se rattache — ce qui évite de la rejeter puis d'en créer un doublon au canal nominal. Une signature trop pauvre (réduite au nom de famille) reste compatible (sous-ensemble de tokens), sans être refusée.
 
     Un refus est matérialisé dans `rejection` pour journalisation.
@@ -302,7 +313,7 @@ def decide_match_by_identifier(
     verdict = next(
         (
             name_form_status[(f, person_id)]
-            for f in signature_forms
+            for f in contributor_name_forms
             if (f, person_id) in name_form_status
         ),
         None,
@@ -314,8 +325,10 @@ def decide_match_by_identifier(
             rejection=(person_id, f"{target.first_name} {target.last_name}".strip())
         )
 
-    sig_last, sig_first = signature.split()
-    if names_compatible(sig_last, sig_first, target.last_name, target.first_name):
+    contributor_last_name, contributor_first_name = source_contribution.split()
+    if names_compatible(
+        contributor_last_name, contributor_first_name, target.last_name, target.first_name
+    ):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
 
@@ -350,9 +363,9 @@ def consensus_name(votes: Mapping[str, int]) -> str | None:
     return max(votes, key=votes.__getitem__)
 
 
-def identifier_misplaced(signature_form: str, consensus: str | None) -> bool:
+def identifier_misplaced(contributor_name_form: str, consensus: str | None) -> bool:
     """Vrai quand le consensus d'une valeur d'identifiant désigne une autre personne que le nom de la signature qui la porte. Sans consensus, aucun identifiant n'est mal placé."""
-    return consensus is not None and not names_compatible(signature_form, "", consensus, "")
+    return consensus is not None and not names_compatible(contributor_name_form, "", consensus, "")
 
 
 @dataclass(frozen=True)

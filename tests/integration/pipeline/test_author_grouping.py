@@ -12,10 +12,10 @@ from infrastructure.read_models.publications.suspect_merges import (
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
 from pipeline.transformation.publications.author_grouping.queries import AuthorGroupingQueries
-from tests.integration.helpers.contributions import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 logger = logging.getLogger("test_author_grouping")
 
@@ -30,12 +30,12 @@ def _source_record(conn, publication_id, source, source_id, names, roles=None, p
     """Enregistrement source et ses contributions sources, à partir de couples (patronyme, prénom). Rend les identifiants des contributions sources."""
     source_record = insert_source_record(conn, publication_id, source=source, source_id=source_id)
     return [
-        insert_signature(
+        insert_source_contribution(
             conn,
             source_record,
             source=source,
             author_position=pos if positions else None,
-            contributor_information_id=upsert_split_identity(conn, last, first),
+            contributor_information_id=upsert_split_contributor_information(conn, last, first),
             roles=roles,
         )
         for pos, (last, first) in enumerate(names)
@@ -65,7 +65,7 @@ def _run(conn):
 def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
     publication = insert_publication(conn)
     source_record = insert_source_record(conn, publication, source="crossref", source_id="c-neutre")
-    source_contribution = insert_signature(
+    source_contribution = insert_source_contribution(
         conn,
         source_record,
         source="crossref",
@@ -224,14 +224,14 @@ def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
     [suspect] = suspect_merges(conn, page=1, per_page=10).publications
     assert (
         suspect.publication_id,
-        suspect.signatures,
+        suspect.source_contributions,
         suspect.matched_source_contributions,
     ) == (
         merged,
         4,
         0,
     )
-    assert sorted((n.source, n.matched_source_contributions) for n in suspect.notices) == [
+    assert sorted((n.source, n.matched_source_contributions) for n in suspect.source_records) == [
         ("hal", 0),
         ("openalex", 0),
     ]
@@ -317,9 +317,9 @@ def _homonyms_with_orcid(conn, status):
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("xu", "zhihao"), ("xu", "zehua")])
     source_record = insert_source_record(conn, publication, source="openalex", source_id="W1")
-    identity = upsert_split_identity(conn, "xu", "z", {"orcid": _ORCID})
-    oa = insert_signature(
-        conn, source_record, source="openalex", contributor_information_id=identity
+    information_id = upsert_split_contributor_information(conn, "xu", "z", {"orcid": _ORCID})
+    oa = insert_source_contribution(
+        conn, source_record, source="openalex", contributor_information_id=information_id
     )
     person = insert_person(conn, "Xu", first_name="Zehua")
     insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status=status)

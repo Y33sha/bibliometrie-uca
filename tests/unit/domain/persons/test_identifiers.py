@@ -238,6 +238,6 @@ class TestSharedIdentifierNeutralizations:
         """Le partage se compte par couple (type, valeur) : un orcid 'X' et un idref 'X' sont distincts."""
         assert shared_identifier_neutralizations([{"orcid": "X"}, {"idref": "X"}]) == [None, None]
 
-    def test_signature_without_identifier(self):
+    def test_source_contribution_without_identifier(self):
         out = shared_identifier_neutralizations([{"orcid": "X"}, None, {"orcid": "X"}])
         assert out == [{"orcid": "shared"}, None, {"orcid": "shared"}]

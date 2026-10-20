@@ -13,7 +13,7 @@ from application.ports.read_models._common import (
     DashboardOa,
     FacetOption,
     PaginatedResponse,
-    PubYearCount,
+    PublicationYearCount,
     StructureRef,
     YesNoCount,
 )
@@ -122,9 +122,9 @@ class PersonOut(BaseModel):
     end_date: date | None
     has_rh: bool
     exclusion: PersonExclusion | None
-    signature_count: int
+    source_contribution_count: int
     """Signatures où la personne tient le rôle d'auteur."""
-    in_perimeter_signature_count: int
+    in_perimeter_source_contribution_count: int
     """Celles de ces signatures que le périmètre retient."""
     identifiers: list[PersonIdentifierOut]
 
@@ -213,7 +213,7 @@ class PersonAddressesResponse(PaginatedResponse):
 
 
 class PersonDashboardResponse(BaseModel):
-    pubs_by_year: list[PubYearCount]
+    publications_by_year: list[PublicationYearCount]
     oa: DashboardOa
 
 
@@ -280,7 +280,7 @@ class CurationPersonOut(BaseModel):
     first_name: str
     last_name: str
     has_rh: bool
-    signature_count: int
+    source_contribution_count: int
     """Signatures où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
     labs: list[str]
 
@@ -306,7 +306,7 @@ class OverlapCountsOut(BaseModel):
     """Recouvrements de réseau entre deux personnes d'une paire candidate par nom."""
 
     coauthors: int
-    shared_pubs: int
+    shared_publications: int
     labs: int
     journals: int
 

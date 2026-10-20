@@ -60,6 +60,6 @@ class HalPersonHarvester(PersonSearchHarvester[HalClient]):
         done = not records or not following or following == cursor
         return PersonSearchPage(records=records, next_token=None if done else following)
 
-    def record_identity(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
+    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
         hal_id = extract_id(record)
         return (hal_id, extract_doi(record)) if hal_id else None

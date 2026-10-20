@@ -31,7 +31,7 @@ from infrastructure.repositories.person_repository import (
     PgPersonRepository,
 )
 from infrastructure.sql_fragments import (
-    DETACHED_SIGNATURE,
+    DETACHED_SOURCE_CONTRIBUTION,
     pinned,
 )
 from pipeline.runtime.context import Phase, PhaseContext
@@ -65,7 +65,7 @@ def detach_copies(conn: Connection) -> int:
     return conn.execute(
         text(f"""
             UPDATE source_contributions sa
-            SET {DETACHED_SIGNATURE}
+            SET {DETACHED_SOURCE_CONTRIBUTION}
             WHERE sa.duplicate_of IS NOT NULL AND sa.person_id IS NOT NULL
               AND NOT {pinned("sa.id")}
         """)
@@ -141,7 +141,7 @@ class PersonsPhase:
             stale = sorted(
                 cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
             )
-            cross_source_detached = PersonsStore(conn).detach_signatures(stale)
+            cross_source_detached = PersonsStore(conn).detach_source_contributions(stale)
 
         return build_metrics(
             cascade_result,

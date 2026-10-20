@@ -26,7 +26,7 @@ from infrastructure.read_models.entity_facet import entity_name_clause
 
 _COLUMNS = """
     m.id, m.title, m.proceedings, m.year, m.isbn, m.eisbn,
-    m.publisher_id, p.name AS pub_name, m.journal_id, j.title AS journal_title,
+    m.publisher_id, p.name AS publisher_name, m.journal_id, j.title AS journal_title,
     (SELECT count(*) FROM publications pu WHERE pu.monograph_id = m.id) AS publication_count
 """
 

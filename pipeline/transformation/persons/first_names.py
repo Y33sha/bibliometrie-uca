@@ -7,16 +7,16 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
-from domain.persons.signature_name import SignatureName
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.store import PersonsStore
 
 
-def fetch_linked_signature_names(
+def fetch_linked_contributor_names(
     conn: Connection, person_ids: list[int]
-) -> dict[int, list[SignatureName]]:
+) -> dict[int, list[ContributorName]]:
     """`{person_id: [nom, ...]}` — les noms des signatures rattachées à chacune des personnes, tels que les sources les donnent."""
     if not person_ids:
         return {}
@@ -28,10 +28,10 @@ def fetch_linked_signature_names(
         """),
         {"ids": person_ids},
     ).all()
-    names: dict[int, list[SignatureName]] = {}
+    names: dict[int, list[ContributorName]] = {}
     for r in rows:
         names.setdefault(r.person_id, []).append(
-            SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name)
+            ContributorName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name)
         )
     return names
 
@@ -52,7 +52,7 @@ def complete_reduced_first_names(
         initials = first_name_initials(namesake.first_name)
         if initials is not None:
             reduced[namesake.person_id] = (namesake, initials)
-    names = fetch_linked_signature_names(conn, sorted(reduced))
+    names = fetch_linked_contributor_names(conn, sorted(reduced))
 
     completed = 0
     conflicting: set[int] = set()

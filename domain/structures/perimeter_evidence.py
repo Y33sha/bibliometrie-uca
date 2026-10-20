@@ -9,7 +9,7 @@ class PerimeterEvidence(StrEnum):
     # Une adresse de la signature est rattachée à une structure du périmètre.
     ADDRESS = "address"
     # La signature contient l'identifiant fort d'une personne RH, et le document paraît pendant son contrat.
-    RH_IDENTITY = "hr_record"
+    HR_RECORD = "hr_record"
     # Une structure HAL directe de la signature, ou un de ses parents HAL, correspond à une structure du périmètre.
     HAL_STRUCTURE = "hal_structure"
     # Un ROR de la signature est celui d'une structure du périmètre.

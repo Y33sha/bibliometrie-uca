@@ -14,7 +14,7 @@ Des tests vérifient les tables d'`extract` et de `normalize`. Une source absent
 Les politiques de source sont des littéraux dans les orchestrateurs :
 
 - WoS sur option : `modes.py`, `extract.py`, `signals.py` ;
-- theses.fr hors fenêtre d'années : `theses/harvest.py`, `extract.py`, `fetch_stale.py`, `delete_notices_out_of_window.py` ;
+- theses.fr hors fenêtre d'années : `theses/harvest.py`, `extract.py`, `fetch_stale.py`, `delete_source_records_out_of_window.py` ;
 - mode `daily` réduit à HAL : `modes.py` et `extract.py` ;
 - agence d'enregistrement de Crossref et de DataCite : `fetch_missing.py` et `graph.py`.
 

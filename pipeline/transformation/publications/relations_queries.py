@@ -20,7 +20,7 @@ from infrastructure.sql_fragments import raw_column
 class DeclaredRelationSource(NamedTuple):
     """Une `source_record` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
 
-    Son DOI d'origine et son `notice_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
+    Son DOI d'origine et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
 
     publication_id: int
@@ -28,7 +28,7 @@ class DeclaredRelationSource(NamedTuple):
     meta: dict[str, JsonValue]
     doi: str | None = None
     doc_type: str | None = None
-    notice_doc_type: str | None = None
+    source_record_doc_type: str | None = None
 
 
 class DoiPublication(NamedTuple):
@@ -181,7 +181,7 @@ class PublicationRelationsQueries:
             text(f"""
                 SELECT sp.publication_id, sp.source::text AS source, sp.meta,
                        lower({raw_column("doi")}) AS doi,
-                       p.doc_type::text AS doc_type, sp.doc_type AS notice_doc_type
+                       p.doc_type::text AS doc_type, sp.doc_type AS source_record_doc_type
                 FROM source_records sp
                 JOIN publications p ON p.id = sp.publication_id
                 WHERE (sp.source = '{Source.DATACITE.value}' AND sp.meta ? 'related_identifiers')
@@ -190,7 +190,7 @@ class PublicationRelationsQueries:
         ).all()
         return [
             DeclaredRelationSource(
-                r.publication_id, r.source, r.meta, r.doi, r.doc_type, r.notice_doc_type
+                r.publication_id, r.source, r.meta, r.doi, r.doc_type, r.source_record_doc_type
             )
             for r in rows
         ]

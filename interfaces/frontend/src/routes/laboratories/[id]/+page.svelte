@@ -93,7 +93,7 @@
 	async function loadDashboard() {
 		const [data, subjects] = await Promise.all([
 			api<{
-				pubs_by_year: { year: number; count: number }[];
+				publications_by_year: { year: number; count: number }[];
 				oa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number };
 				collab: { total_articles: number; international: number; domestic: number };
 				top_countries: { code: string; name: string; count: number }[];
@@ -102,7 +102,7 @@
 				key: 'lab-subjects',
 			}),
 		]);
-		dashPubsByYear = data.pubs_by_year;
+		dashPubsByYear = data.publications_by_year;
 		dashOa = data.oa;
 		dashCollab = data.collab;
 		dashTopCountries = data.top_countries;

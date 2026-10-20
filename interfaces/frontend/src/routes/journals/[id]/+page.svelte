@@ -150,12 +150,12 @@
 				{/each}
 			</div>
 			<div class="meta-row">
-				{#if journal.pub_name}
+				{#if journal.publisher_name}
 					<span class="meta-label">Éditeur</span>
 					{#if journal.publisher_id}
-						<a href="{base}/publishers/{journal.publisher_id}" class="publisher-link">{journal.pub_name}</a>
+						<a href="{base}/publishers/{journal.publisher_id}" class="publisher-link">{journal.publisher_name}</a>
 					{:else}
-						<span class="publisher-link">{journal.pub_name}</span>
+						<span class="publisher-link">{journal.publisher_name}</span>
 					{/if}
 				{/if}
 				{#if journal.journal_type}

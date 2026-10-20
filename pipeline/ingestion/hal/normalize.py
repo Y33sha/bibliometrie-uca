@@ -13,11 +13,11 @@ from sqlalchemy import Connection
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
@@ -32,9 +32,9 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
     sync_source_contributions,
@@ -118,7 +118,7 @@ def upsert_containers(
 # =============================================================
 
 
-def extract_pub_metadata(
+def extract_publication_metadata(
     doc: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un document HAL.
@@ -199,20 +199,20 @@ def insert_hal_document(
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
-    pub_meta: PublicationMetadata,
+    publication_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_records pour HAL.
 
     Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt,
     journal_id, oa_status, language, container_title) viennent toutes de
-    `pub_meta`, construit en amont par `extract_pub_metadata`. `doc`
+    `publication_meta`, construit en amont par `extract_publication_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
     keywords, domaines, biblio, meta, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
 
-    external_ids = build_hal_external_ids(doc, hal_id, pub_meta.nnt)
+    external_ids = build_hal_external_ids(doc, hal_id, publication_meta.nnt)
 
     # Abstract
     abstract = hal_text_field(doc.get("abstract_s"))
@@ -264,24 +264,24 @@ def insert_hal_document(
             source="hal",
             source_id=hal_id,
             staging_id=staging_id,
-            doi=pub_meta.doi,
+            doi=publication_meta.doi,
             external_ids=external_ids,
-            title=pub_meta.title or "",
-            publication_year=pub_meta.publication_year,
-            doc_type=pub_meta.doc_type,
-            journal_id=pub_meta.journal_id,
-            monograph_id=pub_meta.monograph_id,
-            container_title=pub_meta.container_title,
-            language=pub_meta.language,
+            title=publication_meta.title or "",
+            publication_year=publication_meta.publication_year,
+            doc_type=publication_meta.doc_type,
+            journal_id=publication_meta.journal_id,
+            monograph_id=publication_meta.monograph_id,
+            container_title=publication_meta.container_title,
+            language=publication_meta.language,
             biblio=biblio_json,
             meta=extract_hal_meta(doc),
             abstract=abstract,
             keywords=keywords,
             topics=topics,
-            oa_status=pub_meta.oa_status,
+            oa_status=publication_meta.oa_status,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             urls=urls,
-            embargo_until=pub_meta.embargo_until,
+            embargo_until=publication_meta.embargo_until,
             hal_collections=collections_array,
         ),
     )
@@ -558,14 +558,14 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
         if not name:
             continue
-        signature_name = (
-            SignatureName.from_parts(*tei_names[position][:2])
+        contributor_name = (
+            ContributorName.from_parts(*tei_names[position][:2])
             if position < len(tei_names)
             and len(tei_names[position]) >= 2
             and tei_names[position][0]
-            else SignatureName.from_raw(name)
+            else ContributorName.from_raw(name)
         )
-        if signature_name is None:
+        if contributor_name is None:
             continue
 
         identifiers = ids_by_position[position]
@@ -573,7 +573,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
         records.append(
             AuthorRecord(
                 position=position,
-                name=signature_name,
+                name=contributor_name,
                 is_corresponding=is_corresponding,
                 roles=roles or None,
                 identifiers=identifiers,
@@ -636,7 +636,9 @@ def process_work(
         else None
     )
     containers = upsert_containers(doc, publisher_id, container_stores=container_stores)
-    pub_meta = extract_pub_metadata(doc, containers.journal_id, containers.monograph_id)
+    publication_meta = extract_publication_metadata(
+        doc, containers.journal_id, containers.monograph_id
+    )
 
     source_record_id = insert_hal_document(
         conn,
@@ -644,7 +646,7 @@ def process_work(
         doc,
         staging_id,
         hal_id,
-        pub_meta,
+        publication_meta,
     )
     process_contributions(conn, contribution_queries, doc, source_record_id)
     staging_queries.mark_done(conn, staging_id)

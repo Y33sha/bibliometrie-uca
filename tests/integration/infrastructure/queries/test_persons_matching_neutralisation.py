@@ -9,15 +9,15 @@ from pipeline.transformation.persons.identifier_arbitration import (
     write_misplaced_neutralizations,
 )
 from pipeline.transformation.persons.loading import fetch_unlinked_contributions
-from tests.integration.helpers.contributions import upsert_identity
+from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _ORCID = "0000-0001-2345-6789"
 
 
-def _signature(
+def _source_contribution(
     conn,
     neutralized,
     *,
@@ -27,12 +27,12 @@ def _signature(
     resolution_mode=None,
 ):
     """Signature crossref du périmètre portant un ORCID et la carte `neutralized`. Retourne `(signature, identité)`."""
-    sd = insert_source_record(
+    source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
-    signature_id = insert_signature(
+    source_contribution_id = insert_source_contribution(
         conn,
-        sd,
+        source_record,
         source="crossref",
         raw_author_name="Jean Neutralisation",
         author_name_normalized=name,
@@ -42,13 +42,13 @@ def _signature(
         resolution_mode=resolution_mode,
         neutralized_identifiers=neutralized,
     )
-    return signature_id, upsert_identity(conn, name, {"orcid": _ORCID})
+    return source_contribution_id, upsert_contributor_information(conn, name, {"orcid": _ORCID})
 
 
-def _carte(conn, signature_id):
+def _carte(conn, source_contribution_id):
     return conn.execute(
         text("SELECT neutralized_identifiers FROM source_contributions WHERE id = :id"),
-        {"id": signature_id},
+        {"id": source_contribution_id},
     ).scalar_one()
 
 
@@ -59,27 +59,31 @@ def _orcid_projete(conn):
 
 
 def test_orcid_neutralise_absent_de_la_projection(sa_sync_conn):
-    _signature(sa_sync_conn, {"orcid": "shared"})
+    _source_contribution(sa_sync_conn, {"orcid": "shared"})
     assert _orcid_projete(sa_sync_conn) is None
 
 
 def test_orcid_non_neutralise_present_dans_la_projection(sa_sync_conn):
-    _signature(sa_sync_conn, None)
+    _source_contribution(sa_sync_conn, None)
     assert _orcid_projete(sa_sync_conn) == _ORCID
 
 
-def test_vote_sans_les_signatures_neutralisees_pour_partage(sa_sync_conn):
+def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_conn):
     """Une signature qui partage la valeur dans son document ne vote pas ; une signature qui la porte par erreur vote."""
-    _signature(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
-    _signature(sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2")
-    _signature(sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3")
+    _source_contribution(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
+    _source_contribution(
+        sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2"
+    )
+    _source_contribution(
+        sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3"
+    )
     votes = fetch_identifier_votes(sa_sync_conn, "orcid")
     assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
 
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand l'identité est désignée, effacée sinon. Une signature résolue par identifiant qui la gagne est rendue pour détachement."""
-    signature_id, contributor_information_id = _signature(
+    source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn,
         None,
         name="t dado",
@@ -90,18 +94,18 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
 
     assert write_misplaced_neutralizations(
         sa_sync_conn, {contributor_information_id: ["orcid"]}
-    ) == MisplacedNeutralizations(neutralized=1, to_detach=[signature_id])
-    assert _carte(sa_sync_conn, signature_id) == {"orcid": "misplaced"}
+    ) == MisplacedNeutralizations(neutralized=1, to_detach=[source_contribution_id])
+    assert _carte(sa_sync_conn, source_contribution_id) == {"orcid": "misplaced"}
 
     assert write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
         neutralized=0, to_detach=[]
     )
-    assert _carte(sa_sync_conn, signature_id) is None
+    assert _carte(sa_sync_conn, source_contribution_id) is None
 
 
 def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
     """Les groupes d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
-    signature_id, contributor_information_id = _signature(
+    source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn, None, source_id="c-regroupe"
     )
     publication_id = sa_sync_conn.execute(
@@ -109,7 +113,7 @@ def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
             "SELECT sp.publication_id FROM source_contributions sa "
             "JOIN source_records sp ON sp.id = sa.source_record_id WHERE sa.id = :id"
         ),
-        {"id": signature_id},
+        {"id": source_contribution_id},
     ).scalar_one()
     sa_sync_conn.execute(
         text("UPDATE publications SET contributions_dirty = false WHERE id = :id"),
@@ -124,8 +128,8 @@ def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
 
 
 def test_shared_prime_sur_misplaced(sa_sync_conn):
-    signature_id, contributor_information_id = _signature(
+    source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn, {"orcid": "shared"}, source_id="c-shared-prime"
     )
     write_misplaced_neutralizations(sa_sync_conn, {contributor_information_id: ["orcid"]})
-    assert _carte(sa_sync_conn, signature_id) == {"orcid": "shared"}
+    assert _carte(sa_sync_conn, source_contribution_id) == {"orcid": "shared"}

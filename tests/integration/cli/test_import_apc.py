@@ -47,7 +47,7 @@ def _count(conn) -> int:
 
 
 def test_seuls_les_doi_de_la_base_sont_importes(sa_sync_conn):
-    pub = _publication(sa_sync_conn, "10.9/apc-a")
+    publication = _publication(sa_sync_conn, "10.9/apc-a")
 
     stats = import_payments(
         sa_sync_conn, [_payment("10.9/apc-a"), _payment("10.9/hors-base"), _payment(None)], "f.csv"
@@ -58,7 +58,7 @@ def test_seuls_les_doi_de_la_base_sont_importes(sa_sync_conn):
         sa_sync_conn.execute(
             text("SELECT publication_id FROM apc_payments WHERE doi = '10.9/apc-a'")
         ).scalar_one()
-        == pub
+        == publication
     )
 
 
@@ -141,13 +141,13 @@ def test_paiements_de_l_etablissement_hors_de_la_base(sa_sync_conn):
     assert sa_sync_conn.execute(text("SELECT doi FROM apc_payments")).scalars().all() == [
         "10.9/hors-base-ours"
     ]
-    pub = _publication(sa_sync_conn, "10.9/hors-base-ours")
+    publication = _publication(sa_sync_conn, "10.9/hors-base-ours")
     import_payments(sa_sync_conn, [], "f.csv")
     assert (
         sa_sync_conn.execute(
             text("SELECT publication_id FROM apc_payments WHERE doi = '10.9/hors-base-ours'")
         ).scalar_one()
-        == pub
+        == publication
     )
 
 

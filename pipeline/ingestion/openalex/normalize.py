@@ -9,11 +9,11 @@ from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -31,9 +31,9 @@ from domain.types import (
     as_strs,
 )
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
@@ -225,7 +225,7 @@ def upsert_containers(
 # =============================================================
 
 
-def extract_pub_metadata(
+def extract_publication_metadata(
     work: Mapping[str, JsonValue],
     journal_id: int | None,
     primary: OpenalexLocation | None = None,
@@ -267,13 +267,13 @@ def insert_openalex_document(  # noqa: C901
     queries: SourceRecordQueries,
     work: Mapping[str, JsonValue],
     staging_id: int,
-    pub_meta: PublicationMetadata,
+    publication_meta: PublicationMetadata,
     primary: OpenalexLocation | None = None,
 ) -> int:
     """Crée/retrouve l'entrée source_records pour OpenAlex.
 
     Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt,
-    journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
+    journal_id, oa_status, language, container_title) viennent toutes de `publication_meta`, construit en amont par `extract_publication_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
@@ -281,12 +281,12 @@ def insert_openalex_document(  # noqa: C901
 
     # URLs et identifiants extraits des locations
     urls, external_ids = extract_locations_data(work)
-    if nnt := pub_meta.nnt:
+    if nnt := publication_meta.nnt:
         external_ids[ExternalIdType.NNT] = nnt
     # related_dois (collecté depuis les locations) = DOI secondaires : on retire
     # le DOI primaire de la publication, qui vit sur la colonne `doi`.
     if related_dois := as_sequence(external_ids.get(ExternalIdType.RELATED_DOIS)):
-        if remaining := [d for d in related_dois if d != pub_meta.doi]:
+        if remaining := [d for d in related_dois if d != publication_meta.doi]:
             external_ids[ExternalIdType.RELATED_DOIS] = remaining
         else:
             del external_ids[ExternalIdType.RELATED_DOIS]
@@ -353,20 +353,20 @@ def insert_openalex_document(  # noqa: C901
             source="openalex",
             source_id=openalex_id,
             staging_id=staging_id,
-            doi=pub_meta.doi,
+            doi=publication_meta.doi,
             external_ids=external_ids or None,
-            title=pub_meta.title or "",
-            publication_year=pub_meta.publication_year,
-            doc_type=pub_meta.doc_type,
-            journal_id=pub_meta.journal_id,
-            monograph_id=pub_meta.monograph_id,
-            container_title=pub_meta.container_title,
-            language=pub_meta.language,
+            title=publication_meta.title or "",
+            publication_year=publication_meta.publication_year,
+            doc_type=publication_meta.doc_type,
+            journal_id=publication_meta.journal_id,
+            monograph_id=publication_meta.monograph_id,
+            container_title=publication_meta.container_title,
+            language=publication_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
             topics=topics_json,
-            oa_status=pub_meta.oa_status,
+            oa_status=publication_meta.oa_status,
             license=normalize_license(publisher_license),
             urls=urls or None,
             impact=extract_impact(work).to_json(),
@@ -433,7 +433,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
 
     records: list[AuthorRecord] = []
     for position, authorship in enumerate(authorships):
-        name = SignatureName.from_raw(as_str(authorship.get("raw_author_name")))
+        name = ContributorName.from_raw(as_str(authorship.get("raw_author_name")))
         if name is None:
             # Sans nom, l'authorship est inexploitable pour le matching personnes.
             continue
@@ -531,11 +531,13 @@ def process_work(
     else:
         publisher_id = upsert_publisher(work, publisher_store=publisher_store)
         containers = upsert_containers(work, publisher_id, container_stores=container_stores)
-    pub_meta = extract_pub_metadata(
+    publication_meta = extract_publication_metadata(
         work, containers.journal_id, primary, monograph_id=containers.monograph_id
     )
 
-    source_record_id = insert_openalex_document(conn, queries, work, staging_id, pub_meta, primary)
+    source_record_id = insert_openalex_document(
+        conn, queries, work, staging_id, publication_meta, primary
+    )
     process_contributions(conn, contribution_queries, work, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True

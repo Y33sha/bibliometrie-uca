@@ -78,14 +78,18 @@ class TestVerdicts:
 
 
 class TestPublicationsOfDois:
-    def test_statuts_des_notices(self, sa_sync_conn):
-        pub = insert_publication(sa_sync_conn, doi="10.1/p", oa_status="closed")
-        insert_source_record(sa_sync_conn, pub, source="hal", source_id="hal-oa", oa_status="green")
-        insert_source_record(sa_sync_conn, pub, source="openalex", source_id="W-oa", oa_status=None)
+    def test_statuts_des_enregistrements_sources(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn, doi="10.1/p", oa_status="closed")
+        insert_source_record(
+            sa_sync_conn, publication, source="hal", source_id="hal-oa", oa_status="green"
+        )
+        insert_source_record(
+            sa_sync_conn, publication, source="openalex", source_id="W-oa", oa_status=None
+        )
 
         [inputs] = _Q.fetch_oa_inputs(sa_sync_conn, ["10.1/p"])
 
-        assert (inputs.id, inputs.doi, inputs.oa_status) == (pub, "10.1/p", "closed")
+        assert (inputs.id, inputs.doi, inputs.oa_status) == (publication, "10.1/p", "closed")
         assert inputs.signals == [OaSignal("hal", "green"), OaSignal("openalex", None)]
 
 

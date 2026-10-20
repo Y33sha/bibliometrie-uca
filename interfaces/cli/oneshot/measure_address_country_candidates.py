@@ -35,7 +35,7 @@ from domain.countries import PlaceNameKind, normalize_country_code
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
-from pipeline.ingestion.common.signatures import AuthorRecord
+from pipeline.ingestion.common.source_contributions import AuthorRecord
 from pipeline.ingestion.openalex.normalize import build_openalex_author_records
 from pipeline.ingestion.scanr.normalize import build_scanr_author_records
 from pipeline.transformation.countries.detect_by_country_name import (

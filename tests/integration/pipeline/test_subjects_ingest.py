@@ -92,7 +92,7 @@ def queries():
     return SubjectsIngestionQueries()
 
 
-def _subjects_of(conn, pub_id):
+def _subjects_of(conn, publication_id):
     """Sujets liés à une publication, triés par label."""
     return conn.execute(
         text(
@@ -104,7 +104,7 @@ def _subjects_of(conn, pub_id):
             ORDER BY lower(s.label)
             """
         ),
-        {"p": pub_id},
+        {"p": publication_id},
     ).all()
 
 
@@ -115,26 +115,26 @@ def _publications_updated(metrics):
 
 class TestRunOrchestrator:
     def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
 
         # Jamais ingérée → ingérée.
         m1 = run(sa_sync_conn, queries, logger)
         assert m1.new == 1
-        assert len(_subjects_of(sa_sync_conn, pub)) == 1
+        assert len(_subjects_of(sa_sync_conn, publication)) == 1
 
         # Déjà ingérée : `subjects_ingested_at` est posé → ignorée.
         m2 = run(sa_sync_conn, queries, logger)
         assert m2.new == 0
-        assert len(_subjects_of(sa_sync_conn, pub)) == 1
+        assert len(_subjects_of(sa_sync_conn, publication)) == 1
 
     def test_reingests_on_content_change(self, sa_sync_conn, queries):
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
@@ -146,18 +146,18 @@ class TestRunOrchestrator:
             {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
         )
         repo = PublicationStore(sa_sync_conn)
-        repo.save(repo.find_by_id(pub))
+        repo.save(repo.find_by_id(publication))
 
         m2 = run(sa_sync_conn, queries, logger)
         assert m2.new == 1
-        rows = _subjects_of(sa_sync_conn, pub)
+        rows = _subjects_of(sa_sync_conn, publication)
         assert len(rows) == 1
         assert rows[0].label == "Physique"
 
     def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
         # Une publication sans sujet est datée comme les autres : elle ne revient pas.
-        pub = insert_publication(sa_sync_conn)
-        insert_source_record(sa_sync_conn, pub)
+        publication = insert_publication(sa_sync_conn)
+        insert_source_record(sa_sync_conn, publication)
         logger = logging.getLogger("test")
 
         assert _publications_updated(run(sa_sync_conn, queries, logger)) == 1
@@ -165,41 +165,45 @@ class TestRunOrchestrator:
 
     def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
         # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)
 
         sa_sync_conn.execute(
             text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
-            {"id": pub},
+            {"id": publication},
         )
         assert _publications_updated(run(sa_sync_conn, queries, logger)) == 0
 
-    def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
+    def test_reingests_all_sources_of_changed_publication(self, sa_sync_conn, queries):
         # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         insert_source_record(
-            sa_sync_conn, pub, source="openalex", source_id="oa1", topics=[{"topic": "Physics"}]
+            sa_sync_conn,
+            publication,
+            source="openalex",
+            source_id="oa1",
+            topics=[{"topic": "Physics"}],
         )
         run(sa_sync_conn, queries, logging.getLogger("test"))
-        labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
+        labels = {r.label for r in _subjects_of(sa_sync_conn, publication)}
         assert labels == {"Informatique", "Physics"}
 
     def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
         # Un même label depuis deux sources → un seul subject, deux liens (un par source).
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         insert_source_record(
             sa_sync_conn,
-            pub,
+            publication,
             source="theses",
             source_id="t1",
             topics={"discipline": "Informatique"},
@@ -209,15 +213,15 @@ class TestRunOrchestrator:
             text("SELECT id FROM subjects WHERE lower(label) = 'informatique'")
         ).all()
         assert len(subjects) == 1
-        rows = _subjects_of(sa_sync_conn, pub)
+        rows = _subjects_of(sa_sync_conn, publication)
         assert len(rows) == 2
         assert {r.id for r in rows} == {subjects[0].id}
 
     def test_rebuild_reingests_all(self, sa_sync_conn, queries):
         # `rebuild=True` ré-ingère même une publication non modifiée.
-        pub = insert_publication(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, pub, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
+            sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(sa_sync_conn, queries, logger)

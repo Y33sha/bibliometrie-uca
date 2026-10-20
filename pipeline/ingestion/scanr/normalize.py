@@ -7,11 +7,11 @@ from sqlalchemy import Connection
 from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import (
     compact_identifiers,
     normalize_orcid,
 )
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
@@ -20,9 +20,9 @@ from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.signatures import (
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
@@ -117,7 +117,7 @@ def upsert_containers(
     )
 
 
-def extract_pub_metadata(
+def extract_publication_metadata(
     doc: Mapping[str, JsonValue],
     journal_id: int | None,
     scanr_id: str | None = None,
@@ -159,14 +159,14 @@ def insert_scanr_document(  # noqa: C901
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
-    pub_meta: PublicationMetadata,
+    publication_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_records pour ScanR.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `publication_meta`, construit en amont par `extract_publication_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
-    if nnt := pub_meta.nnt:
+    if nnt := publication_meta.nnt:
         ext[ExternalIdType.NNT] = nnt
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
@@ -188,7 +188,7 @@ def insert_scanr_document(  # noqa: C901
         ext[ExternalIdType.HAL_ID] = hal_ids
     # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
     # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
-    if related_dois := [d for d in dois if d != pub_meta.doi]:
+    if related_dois := [d for d in dois if d != publication_meta.doi]:
         ext[ExternalIdType.RELATED_DOIS] = related_dois
     external_ids = ext if ext else None
 
@@ -249,20 +249,20 @@ def insert_scanr_document(  # noqa: C901
             source="scanr",
             source_id=scanr_id,
             staging_id=staging_id,
-            doi=pub_meta.doi,
+            doi=publication_meta.doi,
             external_ids=external_ids,
-            title=pub_meta.title or "",
-            publication_year=pub_meta.publication_year,
-            doc_type=pub_meta.doc_type,
-            journal_id=pub_meta.journal_id,
-            monograph_id=pub_meta.monograph_id,
-            container_title=pub_meta.container_title,
-            language=pub_meta.language,
+            title=publication_meta.title or "",
+            publication_year=publication_meta.publication_year,
+            doc_type=publication_meta.doc_type,
+            journal_id=publication_meta.journal_id,
+            monograph_id=publication_meta.monograph_id,
+            container_title=publication_meta.container_title,
+            language=publication_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
             topics=topics,
-            oa_status=pub_meta.oa_status,
+            oa_status=publication_meta.oa_status,
             license=normalize_license(publisher_license),
             urls=urls or None,
             impact=Impact(cited_by_count=cited_by_count).to_json(),
@@ -296,15 +296,15 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
 
     records: list[AuthorRecord] = []
     for position, author_data in enumerate(authors):
-        signature_name = SignatureName.from_raw(as_str(author_data.get("fullName")))
-        if signature_name is None:
+        contributor_name = ContributorName.from_raw(as_str(author_data.get("fullName")))
+        if contributor_name is None:
             continue
 
         ids = ids_by_position[position]
         roles, _ = map_role("scanr", as_str(author_data.get("role")))
 
         addresses: list[AddressRecord] = []
-        signature_rors: set[RorId] = set()
+        source_contribution_rors: set[RorId] = set()
         affiliations = [as_mapping(a) for a in as_sequence(author_data.get("affiliations"))]
         leaves = select_leaf_affiliations(affiliations)
         hal_structure_ids = frozenset(
@@ -317,7 +317,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
             name = (as_str(aff.get("name")) or "").strip()
             is_address = name and not aff.get("structId") and any(aff is leaf for leaf in leaves)
             if not is_address:
-                signature_rors |= rors
+                source_contribution_rors |= rors
                 continue
             countries = {
                 pays
@@ -331,11 +331,11 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
         records.append(
             AuthorRecord(
                 position=position,
-                name=signature_name,
+                name=contributor_name,
                 roles=roles or None,
                 identifiers=ids if ids else None,
                 addresses=addresses,
-                ror_ids=frozenset(signature_rors),
+                ror_ids=frozenset(source_contribution_rors),
                 hal_structure_ids=hal_structure_ids,
             )
         )
@@ -410,11 +410,13 @@ def process_work(
     publisher_id = upsert_publisher(doc, publisher_store=publisher_store)
     containers = upsert_containers(doc, publisher_id, container_stores=container_stores)
 
-    pub_meta = extract_pub_metadata(
+    publication_meta = extract_publication_metadata(
         doc, containers.journal_id, scanr_id, monograph_id=containers.monograph_id
     )
 
-    source_record_id = insert_scanr_document(conn, queries, doc, staging_id, scanr_id, pub_meta)
+    source_record_id = insert_scanr_document(
+        conn, queries, doc, staging_id, scanr_id, publication_meta
+    )
     process_contributions(conn, contribution_queries, doc, source_record_id)
     staging_queries.mark_done(conn, staging_id)
 

@@ -18,7 +18,7 @@ from domain.persons.matching import (
 )
 from infrastructure.repositories.person_repository import person_without_decision_sql
 from infrastructure.sql_fragments import (
-    DETACHED_SIGNATURE,
+    DETACHED_SOURCE_CONTRIBUTION,
     active_name_form,
     identifier_neutralized,
     pinned,
@@ -51,7 +51,7 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
                   )
             )
             UPDATE source_contributions sa
-            SET {DETACHED_SIGNATURE}
+            SET {DETACHED_SOURCE_CONTRIBUTION}
             FROM candidates c
             JOIN source_records sp ON sp.id = c.source_record_id
             WHERE sa.id = c.id

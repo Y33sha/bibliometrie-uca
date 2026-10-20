@@ -586,7 +586,7 @@ def test_identifiants_restaures_quand_la_divergence_disparait():
     ]
 
 
-def test_identifiant_propre_d_une_notice_qui_garde_le_doi_reste_en_place():
+def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en_place():
     """Le chapitre OpenAlex recopie le dépôt HAL de la notice qui garde le DOI : ce dépôt reste à elle."""
     book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
     hal = _row(
@@ -609,7 +609,7 @@ def test_sans_divergence_aucun_retrait():
 # ── dépôt HAL au DOI d'une autre œuvre ────────────────────────────────────
 
 
-def _notice(member_id, source, title, authors, doc_type="article"):
+def _source_record(member_id, source, title, authors, doc_type="article"):
     return DoiClusterMember(
         member_id, doc_type, title, source=source, author_names=frozenset(authors)
     )
@@ -617,9 +617,13 @@ def _notice(member_id, source, title, authors, doc_type="article"):
 
 def test_depot_hal_d_une_autre_oeuvre_perd_le_doi():
     group = [
-        _notice(1, "crossref", "a brief history of oleds emitter development", {"zhang", "li"}),
-        _notice(2, "hal", "synthesis of aromatic luminescent molecules", {"martin", "dupont"}),
-        _notice(3, "openalex", "a brief history of oleds emitter development", {"zhang"}),
+        _source_record(
+            1, "crossref", "a brief history of oleds emitter development", {"zhang", "li"}
+        ),
+        _source_record(
+            2, "hal", "synthesis of aromatic luminescent molecules", {"martin", "dupont"}
+        ),
+        _source_record(3, "openalex", "a brief history of oleds emitter development", {"zhang"}),
     ]
     assert _resoudre(group) == [
         DoiClusterDecision(2, None, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
@@ -629,13 +633,13 @@ def test_depot_hal_d_une_autre_oeuvre_perd_le_doi():
 def test_depot_hal_au_titre_proche_garde_le_doi():
     """Liste d'auteurs réduite à la collaboration dans Crossref, titre au balisage près : même œuvre."""
     group = [
-        _notice(
+        _source_record(
             1,
             "crossref",
             "search for rm b s 0 oscillations using inclusive lepton events",
             {"collaboration"},
         ),
-        _notice(
+        _source_record(
             2,
             "hal",
             "search for b 0 s oscillations using inclusive lepton events",
@@ -647,15 +651,15 @@ def test_depot_hal_au_titre_proche_garde_le_doi():
 
 def test_depot_hal_avec_un_auteur_commun_garde_le_doi():
     group = [
-        _notice(1, "crossref", "l encampement du monde", {"agier"}),
-        _notice(2, "hal", "sociopoetique des migrations introduction", {"agier", "durand"}),
+        _source_record(1, "crossref", "l encampement du monde", {"agier"}),
+        _source_record(2, "hal", "sociopoetique des migrations introduction", {"agier", "durand"}),
     ]
     assert _resoudre(group) == []
 
 
-def test_notice_crossref_sans_auteur_aucune_decision():
+def test_enregistrement_source_crossref_sans_auteur_aucune_decision():
     group = [
-        _notice(1, "crossref", "comptes rendus de lecture", set()),
-        _notice(2, "hal", "jean chateauvert et gilles delavaud", {"martin"}),
+        _source_record(1, "crossref", "comptes rendus de lecture", set()),
+        _source_record(2, "hal", "jean chateauvert et gilles delavaud", {"martin"}),
     ]
     assert _resoudre(group) == []

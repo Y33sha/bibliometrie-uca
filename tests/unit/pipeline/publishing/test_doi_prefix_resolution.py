@@ -185,7 +185,7 @@ def _run_ra(contexte, repo, ras_fn):
     return ResolveRaPhase(lambda conn: repo, ras_fn).run(contexte())  # noqa: ARG005
 
 
-def _run_pub(repo, pubrepo, cr=None, dc=None):
+def _run_publication(repo, pubrepo, cr=None, dc=None):
     """Étape Crossref puis étape DataCite, dans l'ordre de la phase ; rend les métriques des deux."""
     crossref = run_resolve_crossref_publishers(
         MagicMock(),
@@ -294,7 +294,7 @@ def test_publishers_crossref_match():
     cr = StubCrossref(answers={"10.1038": ("Nature Publishing Group", 297)})
     dc = StubDataCite()
 
-    metrics = _run_pub(repo, pubrepo, cr, dc)
+    metrics = _run_publication(repo, pubrepo, cr, dc)
 
     assert cr.calls == ["10.1038"] and dc.calls == []  # routé par RA
     row = repo.rows["10.1038"]
@@ -310,7 +310,7 @@ def test_publishers_crossref_create_when_no_match():
     pubrepo = FakePublisherRepo()
     cr = StubCrossref(answers={"10.99999": ("Obscure Publisher", 12345)})
 
-    metrics = _run_pub(repo, pubrepo, cr)
+    metrics = _run_publication(repo, pubrepo, cr)
 
     assert len(pubrepo.created) == 1
     assert repo.rows["10.99999"].publisher_id == pubrepo.created[0]["id"]
@@ -332,7 +332,7 @@ def test_publishers_datacite_provider_and_client():
         }
     )
 
-    _run_pub(repo, pubrepo, cr, dc)
+    _run_publication(repo, pubrepo, cr, dc)
 
     assert cr.calls == [] and dc.calls == ["10.5281"]  # routé par RA
     row = repo.rows["10.5281"]
@@ -351,7 +351,7 @@ def test_publishers_unknown_tries_both_and_corrects_ra():
     cr = StubCrossref()
     dc = StubDataCite(answers={"10.14758": ("INRAE", "INRAE Repo", "inist.inra")})
 
-    _run_pub(repo, pubrepo, cr, dc)
+    _run_publication(repo, pubrepo, cr, dc)
 
     assert cr.calls == ["10.14758"] and dc.calls == ["10.14758"]
     row = repo.rows["10.14758"]
@@ -368,7 +368,7 @@ def test_publishers_unknown_both_muet_marks_checked_no_publisher():
     cr = StubCrossref()
     dc = StubDataCite()
 
-    metrics = _run_pub(repo, pubrepo, cr, dc)
+    metrics = _run_publication(repo, pubrepo, cr, dc)
 
     row = repo.rows["10.9012"]
     assert row.publisher_id is None
@@ -389,7 +389,7 @@ def test_publishers_skips_already_checked_and_unmanaged_ra():
     pubrepo = FakePublisherRepo()
     cr = StubCrossref(answers={"10.9011": ("X", 1), "10.9013": ("Y", 2)})
 
-    metrics = _run_pub(repo, pubrepo, cr)
+    metrics = _run_publication(repo, pubrepo, cr)
 
     assert cr.calls == []  # ni la row déjà vérifiée, ni la RA non gérée
     assert metrics.total == 0
@@ -411,7 +411,7 @@ def test_publishers_name_present_attaches_without_fetch():
     pubrepo = FakePublisherRepo(name_to_id={"acme publishing": 777})
     cr = StubCrossref()
 
-    _run_pub(repo, pubrepo, cr)
+    _run_publication(repo, pubrepo, cr)
 
     assert cr.calls == []  # pas de fetch, nom déjà là
     assert repo.rows["10.1234"].publisher_id == 777
@@ -424,7 +424,7 @@ def test_publishers_dedup_same_name_one_creation():
     pubrepo = FakePublisherRepo()
     cr = StubCrossref(answers={"10.9008": ("Wiley", 311), "10.9009": ("Wiley", 311)})
 
-    metrics = _run_pub(repo, pubrepo, cr)
+    metrics = _run_publication(repo, pubrepo, cr)
 
     assert len(pubrepo.created) == 1
     cid = pubrepo.created[0]["id"]
@@ -441,7 +441,7 @@ def test_publishers_crossref_sample_doi_read_before_call():
     )
     cr = StubCrossref(answers={"10.1038": ("Nature", 297)})
 
-    _run_pub(repo, FakePublisherRepo(), cr)
+    _run_publication(repo, FakePublisherRepo(), cr)
 
     assert cr.sample_dois == ["10.1038/temoin"]
 
@@ -451,7 +451,7 @@ def test_publishers_crossref_unavailable_leaves_prefix_pending():
     repo = FakeDoiPrefixRepo(rows={"10.1038": _Row("10.1038", "Crossref")})
     cr = StubCrossref(answers={"10.1038": UNAVAILABLE})
 
-    metrics = _run_pub(repo, FakePublisherRepo(), cr)
+    metrics = _run_publication(repo, FakePublisherRepo(), cr)
 
     row = repo.rows["10.1038"]
     assert row.crossref_checked is False
@@ -466,7 +466,7 @@ def test_publishers_unknown_crossref_unavailable_does_not_ask_datacite():
     cr = StubCrossref(answers={"10.14758": UNAVAILABLE})
     dc = StubDataCite(answers={"10.14758": ("INRAE", "INRAE Repo", "inist.inra")})
 
-    _run_pub(repo, FakePublisherRepo(), cr, dc)
+    _run_publication(repo, FakePublisherRepo(), cr, dc)
 
     assert dc.calls == []
     row = repo.rows["10.14758"]
@@ -478,6 +478,6 @@ def test_publishers_datacite_unavailable_leaves_prefix_pending():
     repo = FakeDoiPrefixRepo(rows={"10.5281": _Row("10.5281", "DataCite")})
     dc = StubDataCite(answers={"10.5281": UNAVAILABLE})
 
-    _run_pub(repo, FakePublisherRepo(), dc=dc)
+    _run_publication(repo, FakePublisherRepo(), dc=dc)
 
     assert repo.rows["10.5281"].datacite_checked is False

@@ -3,7 +3,7 @@
 Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `extract_pub_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
+- `extract_publication_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
 - `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → contributions), staging mark_done.
 - `WosNormalizer.process_work` : wiring de la classe.
@@ -20,8 +20,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
-from domain.persons.signature_name import SignatureName
-from pipeline.ingestion.common.pub_metadata import PublicationMetadata
+from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.wos import normalize as normalize_wos
 from pipeline.ingestion.wos.normalize import (
     WosNormalizer,
@@ -34,7 +34,7 @@ from pipeline.ingestion.wos.normalize import (
     build_wos_author_records,
     extract_from_api,
     extract_from_export,
-    extract_pub_metadata,
+    extract_publication_metadata,
     extract_record,
     get_container_facts,
     insert_wos_document,
@@ -421,17 +421,17 @@ def _make_api_record(  # noqa: C901
     if page_end:
         page_obj["end"] = page_end
 
-    pub_info: dict[str, Any] = {}
+    publication_info: dict[str, Any] = {}
     if publication_year is not None:
-        pub_info["pubyear"] = publication_year
+        publication_info["pubyear"] = publication_year
     if vol:
-        pub_info["vol"] = vol
+        publication_info["vol"] = vol
     if issue:
-        pub_info["issue"] = issue
+        publication_info["issue"] = issue
     if page_obj:
-        pub_info["page"] = page_obj
+        publication_info["page"] = page_obj
     if journal_oas_gold is not None:
-        pub_info["journal_oas_gold"] = journal_oas_gold
+        publication_info["journal_oas_gold"] = journal_oas_gold
 
     abstracts_value: dict[str, Any] = {}
     if abstract:
@@ -458,7 +458,7 @@ def _make_api_record(  # noqa: C901
     static: dict[str, Any] = {
         "summary": {
             "titles": {"title": titles_list},
-            "pub_info": pub_info,
+            "pub_info": publication_info,
             "doctypes": doctypes_value,
             "publishers": publishers,
             "names": {"name": authors or []},
@@ -720,7 +720,7 @@ class TestExtractFromApi:
         assert rec["cited_by_count"] == 7
 
 
-# ── extract_pub_metadata ─────────────────────────────────────────
+# ── extract_publication_metadata ─────────────────────────────────────────
 
 
 def _export_row(**surcharges: str) -> dict[str, str]:
@@ -796,7 +796,7 @@ class TestExtractFromExport:
         assert extract_record(_make_api_record(), None)["ut"] == "WOS:000123"
 
 
-class TestExtractPubMetadata:
+class TestExtractPublicationMetadata:
     def test_basic_with_journal_id(self):
         rec = {
             "title": "T",
@@ -807,7 +807,7 @@ class TestExtractPubMetadata:
             "language": "en",
             "journal_title": "J Name",
         }
-        meta = extract_pub_metadata(rec, journal_id=42)
+        meta = extract_publication_metadata(rec, journal_id=42)
         assert meta.title == "T"
         assert meta.journal_id == 42
         assert meta.container_title is None  # journal_id résout, pas besoin du title
@@ -823,7 +823,7 @@ class TestExtractPubMetadata:
             "language": None,
             "journal_title": "Container Title",
         }
-        meta = extract_pub_metadata(rec, journal_id=None)
+        meta = extract_publication_metadata(rec, journal_id=None)
         assert meta.container_title == "Container Title"
 
 
@@ -878,7 +878,7 @@ class TestUpsertWrappers:
 
 
 class TestInsertWosDocument:
-    def test_forwards_pub_meta_and_rec_extras_to_queries(self):
+    def test_forwards_publication_meta_and_rec_extras_to_queries(self):
         queries = MagicMock()
         queries.upsert_source_record.return_value = 555
         rec = {
@@ -891,7 +891,7 @@ class TestInsertWosDocument:
             "urls": ["https://x"],
             "external_ids": {"pmid": "12345"},
         }
-        pub_meta = PublicationMetadata(
+        publication_meta = PublicationMetadata(
             doi="10.1/x",
             title="T",
             publication_year=2024,
@@ -903,7 +903,9 @@ class TestInsertWosDocument:
             container_title=None,
         )
 
-        result = insert_wos_document(None, queries, rec, staging_id=10, pub_meta=pub_meta)
+        result = insert_wos_document(
+            None, queries, rec, staging_id=10, publication_meta=publication_meta
+        )
 
         assert result == 555
         row_arg = queries.upsert_source_record.call_args.args[1]
@@ -919,11 +921,11 @@ class TestInsertWosDocument:
         assert row_arg.impact == {"cited_by_count": 9}
         assert row_arg.staging_id == 10
 
-    def test_none_pub_meta_values_propagate(self):
+    def test_none_publication_meta_values_propagate(self):
         queries = MagicMock()
         queries.upsert_source_record.return_value = 1
         rec = {"ut": "WOS:1"}
-        pub_meta = PublicationMetadata(
+        publication_meta = PublicationMetadata(
             doi=None,
             title="T",
             publication_year=None,
@@ -934,7 +936,7 @@ class TestInsertWosDocument:
             language=None,
             container_title=None,
         )
-        insert_wos_document(None, queries, rec, staging_id=5, pub_meta=pub_meta)
+        insert_wos_document(None, queries, rec, staging_id=5, publication_meta=publication_meta)
 
         row_arg = queries.upsert_source_record.call_args.args[1]
         assert row_arg.journal_id is None
@@ -982,7 +984,7 @@ class TestBuildWosAuthorRecords:
                 },
             ],
         }
-        assert build_wos_author_records(rec, logger)[0].name == SignatureName(
+        assert build_wos_author_records(rec, logger)[0].name == ContributorName(
             last_name="Doe", first_name="Jane"
         )
 
@@ -1004,7 +1006,7 @@ class TestBuildWosAuthorRecords:
         }
         rec0 = build_wos_author_records(rec, logger)[0]
         assert rec0.position == 0
-        assert rec0.name == SignatureName(raw="Jane Doe")
+        assert rec0.name == ContributorName(raw="Jane Doe")
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
         # `researcher_id` porté ; l'ORCID WoS en entrée est ignoré (non moissonné).

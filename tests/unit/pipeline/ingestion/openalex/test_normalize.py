@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.journals.issns import JournalIssn
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.openalex import normalize as normalize_openalex
 from pipeline.ingestion.openalex.normalize import (
     OpenalexNormalizer,
@@ -23,7 +23,7 @@ from pipeline.ingestion.openalex.normalize import (
     build_openalex_author_records,
     extract_impact,
     extract_locations_data,
-    extract_pub_metadata,
+    extract_publication_metadata,
     extract_topics,
     get_container_facts,
     insert_openalex_document,
@@ -316,12 +316,14 @@ class TestContainerDescription:
         assert (facts.book_title, facts.collection_title) == ("2021 ICCAS", None)
 
 
-# ── extract_pub_metadata ─────────────────────────────────────────
+# ── extract_publication_metadata ─────────────────────────────────────────
 
 
-class TestExtractPubMetadata:
+class TestExtractPublicationMetadata:
     def test_minimal_work(self):
-        meta = extract_pub_metadata({"title": "T", "publication_year": 2024}, journal_id=None)
+        meta = extract_publication_metadata(
+            {"title": "T", "publication_year": 2024}, journal_id=None
+        )
         assert meta.title == "T"
         assert meta.publication_year == 2024
         assert meta.doi is None
@@ -329,7 +331,7 @@ class TestExtractPubMetadata:
         assert meta.journal_id is None
 
     def test_display_name_fallback(self):
-        meta = extract_pub_metadata({"display_name": "DN"}, journal_id=None)
+        meta = extract_publication_metadata({"display_name": "DN"}, journal_id=None)
         assert meta.title == "DN"
 
     def test_with_journal_id_no_container_title(self):
@@ -338,7 +340,7 @@ class TestExtractPubMetadata:
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
-        meta = extract_pub_metadata(work, journal_id=42)
+        meta = extract_publication_metadata(work, journal_id=42)
         assert meta.container_title is None
 
 
@@ -347,14 +349,16 @@ class TestExtractPubMetadata:
 
 class TestInsertOpenalexDocument:
     def _call(
-        self, queries: FakeSourceRecordQueries, work: dict, *, pub_meta: dict | None = None
+        self, queries: FakeSourceRecordQueries, work: dict, *, publication_meta: dict | None = None
     ) -> dict:
-        # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
+        # Par défaut, publication_meta est dérivé via extract_publication_metadata pour rester
         # cohérent avec le flux réel (harvest → insert). Tests qui veulent
-        # forcer une valeur passent un pub_meta explicite.
-        if pub_meta is None:
-            pub_meta = extract_pub_metadata(work, journal_id=None)
-        insert_openalex_document(MagicMock(), queries, work, staging_id=1, pub_meta=pub_meta)
+        # forcer une valeur passent un publication_meta explicite.
+        if publication_meta is None:
+            publication_meta = extract_publication_metadata(work, journal_id=None)
+        insert_openalex_document(
+            MagicMock(), queries, work, staging_id=1, publication_meta=publication_meta
+        )
         return queries.upserted_documents[-1]
 
     def test_keywords_list_of_strings(self):
@@ -470,12 +474,14 @@ class TestInsertOpenalexDocument:
         captured = self._call(queries, work)
         assert captured.biblio is None
 
-    def test_pub_meta_nnt_passed_through_to_external_ids(self):
-        """insert lit pub_meta["nnt"] et le pose dans external_ids."""
+    def test_publication_meta_nnt_passed_through_to_external_ids(self):
+        """insert lit publication_meta["nnt"] et le pose dans external_ids."""
         queries = FakeSourceRecordQueries()
         work = {"id": "https://openalex.org/W1"}
-        pub_meta = replace(extract_pub_metadata(work, journal_id=None), nnt="2024CLFAC001")
-        captured = self._call(queries, work, pub_meta=pub_meta)
+        publication_meta = replace(
+            extract_publication_metadata(work, journal_id=None), nnt="2024CLFAC001"
+        )
+        captured = self._call(queries, work, publication_meta=publication_meta)
         assert captured.external_ids is not None
         assert captured.external_ids["nnt"] == "2024CLFAC001"
 
@@ -526,7 +532,7 @@ class TestBuildOpenalexAuthorRecords:
             ]
         }
         rec = build_openalex_author_records(work)[0]
-        assert rec.name == SignatureName(raw="DUPONT Marie")
+        assert rec.name == ContributorName(raw="DUPONT Marie")
         assert rec.is_corresponding is True
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]
@@ -640,7 +646,7 @@ def stub_orchestration_deps(monkeypatch):
     """Stub les helpers internes pour ne tester que la boucle process_work."""
     monkeypatch.setattr(
         normalize_openalex,
-        "extract_pub_metadata",
+        "extract_publication_metadata",
         lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
     )
     monkeypatch.setattr(
@@ -684,7 +690,7 @@ class TestProcessWork:
         )
         monkeypatch.setattr(
             normalize_openalex,
-            "extract_pub_metadata",
+            "extract_publication_metadata",
             lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
         )
         monkeypatch.setattr(normalize_openalex, "insert_openalex_document", lambda *a, **kw: 555)

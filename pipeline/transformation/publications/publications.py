@@ -53,10 +53,10 @@ class PublicationsPhase:
         )
         metrics = by_task["publications.reconcile"]
         with ctx.open_tx() as conn:
-            pub_total = count_publications(conn)
+            publication_total = count_publications(conn)
         summary = metrics.details["summary"]
         if isinstance(summary, dict):
-            summary["pub_total"] = pub_total
+            summary["publication_total"] = publication_total
         return metrics
 
 
@@ -76,7 +76,7 @@ def _reconcile(open_tx: OpenTransaction, logger: logging.Logger, *, rebuild: boo
 
     metrics = PhaseMetrics()
     metrics.add(seen=stats.processed, new=stats.created)
-    # Chiffres du run ; `run` y ajoute `pub_total`, compté après la suppression des publications sans source.
+    # Chiffres du run ; `run` y ajoute `publication_total`, compté après la suppression des publications sans source.
     metrics.details["summary"] = {
         "processed": stats.processed,
         "publications": stats.publications,

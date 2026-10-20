@@ -88,7 +88,7 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
 
     partitions: list[list[ReconcileMember]] = []
     for component in components:
-        comp = [by_id[sp_id] for sp_id in component]
+        comp = [by_id[source_record_id] for source_record_id in component]
         distinct_dois = sorted({m.effective_doi for m in comp if m.effective_doi})
         if len(distinct_dois) <= 1:
             partitions.append(comp)
@@ -99,11 +99,13 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
     return partitions
 
 
-# Revendication d'une partition : (pub préféré | None pour create, force, min_sp, sp_ids).
+# Revendication d'une partition : (pub préféré | None pour create, force, min_source_record, source_record_ids).
 type _Claim = tuple[int | None, bool, int, tuple[int, ...]]
 
 
-def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> _Claim | None:
+def _claim(
+    part: list[ReconcileMember], existing_publication_by_doi: dict[str, int]
+) -> _Claim | None:
     """Revendication d'ancre d'une partition, ou `None` si **skip** (orphelins dont aucun ne peut fonder une publication).
 
     - Partition contenant ≥1 SP matérialisée → revendique un pub existant : porteur du DOI
@@ -115,16 +117,16 @@ def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> 
       `has_minimal_publication_metadata`, sinon `publication_year NOT NULL` ferait échouer la création) ;
       sinon `None` (**skip**, les SP restent orphelines).
 
-    Porteur du DOI **hors voisinage** (`existing_pub_by_doi`) : une publication existante porte
+    Porteur du DOI **hors voisinage** (`existing_publication_by_doi`) : une publication existante porte
     déjà le DOI de la partition sans qu'aucune SP du voisinage n'y soit rattachée (orpheline après
     un TRUNCATE + réimport, ou dérive du `publications.doi`). Elle reste l'ancre — sinon la création
     d'une pub neuve au même DOI heurterait la contrainte unique. Honore la doctrine « ancre = porteur
     du DOI » pour les porteurs qu'aucun membre ne représente.
     """
-    sp_ids = tuple(sorted(m.source_record_id for m in part))
-    min_sp = min(m.source_record_id for m in part)
+    source_record_ids = tuple(sorted(m.source_record_id for m in part))
+    min_source_record = min(m.source_record_id for m in part)
     doi = next((m.effective_doi for m in part if m.effective_doi), None)
-    external_carrier = existing_pub_by_doi.get(doi) if doi else None
+    external_carrier = existing_publication_by_doi.get(doi) if doi else None
     materialized = [m for m in part if m.publication_id is not None]
     if materialized:
         carriers = sorted(
@@ -135,16 +137,16 @@ def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> 
             }
         )
         if carriers:
-            return carriers[0], True, min_sp, sp_ids
+            return carriers[0], True, min_source_record, source_record_ids
         if external_carrier is not None:
-            return external_carrier, True, min_sp, sp_ids
-        anchor_pub = min(materialized, key=lambda m: m.source_record_id).publication_id
-        return anchor_pub, False, min_sp, sp_ids
+            return external_carrier, True, min_source_record, source_record_ids
+        anchor_publication = min(materialized, key=lambda m: m.source_record_id).publication_id
+        return anchor_publication, False, min_source_record, source_record_ids
     if external_carrier is not None:
-        return external_carrier, True, min_sp, sp_ids
+        return external_carrier, True, min_source_record, source_record_ids
     creatable = any(m.title_normalized and m.publication_year for m in part)
     if creatable and any(_can_found_publication(m) for m in part):
-        return None, False, min_sp, sp_ids  # create
+        return None, False, min_source_record, source_record_ids  # create
     return None  # skip
 
 
@@ -156,7 +158,7 @@ def _can_found_publication(member: ReconcileMember) -> bool:
 def plan_reconciliation(
     members: Iterable[ReconcileMember],
     *,
-    existing_pub_by_doi: dict[str, int] | None = None,
+    existing_publication_by_doi: dict[str, int] | None = None,
     publication_sizes: Mapping[int, int] | None = None,
 ) -> ReconcilePlan:
     """Calcule les assignations SP → publication sur le voisinage `members` (pur, sans I/O).
@@ -168,25 +170,25 @@ def plan_reconciliation(
     `source_record_id` ; les perdantes prennent un nouveau pub. Les pubs vidées de toutes leurs
     SP sont listées dans `dissolved` avec leur successeur.
 
-    `existing_pub_by_doi` (map `lower(doi) → id`) sert d'ancre de repli pour une partition dont le
+    `existing_publication_by_doi` (map `lower(doi) → id`) sert d'ancre de repli pour une partition dont le
     DOI est porté par une publication existante qu'aucun membre du voisinage ne représente (pub
     orpheline, ou dérive). Vide par défaut (aucun porteur hors voisinage connu).
 
     `publication_sizes` (map `publication_id → nombre total de SP`) signale les publications qui gardent des SP hors du voisinage : elles ne sont pas dissoutes. Sans entrée, une publication a les seules SP du voisinage.
     """
     members = list(members)
-    by_doi = existing_pub_by_doi or {}
+    by_doi = existing_publication_by_doi or {}
     claims = [c for part in _partitions(members) if (c := _claim(part, by_doi)) is not None]
 
-    # Attribution gloutonne : revendications de pub existant d'abord (forte, puis min_sp), puis
+    # Attribution gloutonne : revendications de pub existant d'abord (forte, puis min_source_record), puis
     # les créations (`preferred=None`). La première à revendiquer un pub le garde ; les suivantes,
     # comme les créations, prennent un nouveau pub (`target=None`).
     by_id = {m.source_record_id: m for m in members}
     awarded: set[int] = set()
     groups: list[WorkGroup] = []
     detached: list[int] = []
-    target_of_sp: dict[int, int | None] = {}
-    for preferred, _strong, _min_sp, sp_ids in sorted(
+    target_of_source_record: dict[int, int | None] = {}
+    for preferred, _strong, _min_source_record, source_record_ids in sorted(
         claims, key=lambda c: (c[0] is None, not c[1], c[2])
     ):
         if preferred is not None and preferred not in awarded:
@@ -194,35 +196,45 @@ def plan_reconciliation(
             target: int | None = preferred
         else:
             target = None  # création, ou pub existant déjà pris → nouveau pub
-            if not any(by_id[sp_id].publication_year for sp_id in sp_ids):
-                detached.extend(sp_ids)
+            if not any(
+                by_id[source_record_id].publication_year for source_record_id in source_record_ids
+            ):
+                detached.extend(source_record_ids)
                 continue
-        groups.append(WorkGroup(target, sp_ids))
-        for sp_id in sp_ids:
-            target_of_sp[sp_id] = target
+        groups.append(WorkGroup(target, source_record_ids))
+        for source_record_id in source_record_ids:
+            target_of_source_record[source_record_id] = target
 
     # Pubs dissoutes : pub courant qui ne survit comme ancre d'aucun groupe et ne retient aucune
     # SP résiduelle. Successeur = l'ancre où la partition de son plus petit SP a abouti. (Les
     # orphelins n'ont pas de pub → ignorés ici.)
-    assigned = {sp_id for _, _, _, sp_ids in claims for sp_id in sp_ids}
-    universe_pub_ids = {m.publication_id for m in members if m.publication_id is not None}
-    residual_pub_ids = {
+    assigned = {
+        source_record_id
+        for _, _, _, source_record_ids in claims
+        for source_record_id in source_record_ids
+    }
+    universe_publication_ids = {m.publication_id for m in members if m.publication_id is not None}
+    residual_publication_ids = {
         m.publication_id
         for m in members
         if m.source_record_id not in assigned and m.publication_id is not None
     }
     # Une publication qui garde des SP hors du voisinage survit à ses SP réassignées.
-    members_per_pub = Counter(m.publication_id for m in members if m.publication_id is not None)
+    members_per_publication = Counter(
+        m.publication_id for m in members if m.publication_id is not None
+    )
     sizes = publication_sizes or {}
-    residual_pub_ids |= {p for p, n in members_per_pub.items() if sizes.get(p, n) > n}
+    residual_publication_ids |= {
+        p for p, n in members_per_publication.items() if sizes.get(p, n) > n
+    }
     dissolved: list[DissolvedPublication] = []
-    for pub_id in sorted(universe_pub_ids - awarded - residual_pub_ids):
-        anchor_sp = min(
-            (m for m in members if m.publication_id == pub_id),
+    for publication_id in sorted(universe_publication_ids - awarded - residual_publication_ids):
+        anchor_source_record = min(
+            (m for m in members if m.publication_id == publication_id),
             key=lambda m: m.source_record_id,
         ).source_record_id
-        successor = target_of_sp.get(anchor_sp)
-        if successor is not None and successor != pub_id:
-            dissolved.append(DissolvedPublication(pub_id, successor))
+        successor = target_of_source_record.get(anchor_source_record)
+        if successor is not None and successor != publication_id:
+            dissolved.append(DissolvedPublication(publication_id, successor))
 
     return ReconcilePlan(groups=tuple(groups), dissolved=tuple(dissolved), detached=tuple(detached))

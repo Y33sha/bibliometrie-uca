@@ -70,7 +70,7 @@
 		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
 		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
 		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
-		if (withPubs) params.set('with_pubs', 'true');
+		if (withPubs) params.set('with_publications', 'true');
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
@@ -259,11 +259,11 @@
 				<td class="issn-cell">{formatIssns(j)}</td>
 				{#if !publisherFixed}
 					<td class="muted">
-						{#if j.pub_name}
+						{#if j.publisher_name}
 							{#if j.publisher_id}
-								<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.pub_name}</a>
+								<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.publisher_name}</a>
 							{:else}
-								{j.pub_name}
+								{j.publisher_name}
 							{/if}
 						{/if}
 					</td>

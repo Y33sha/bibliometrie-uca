@@ -12,7 +12,7 @@ La phase `contributions` supprime aussi les monographies, revues et éditeurs vi
 
 Les écrivains posent à la main les drapeaux de recalcul :
 
-- `contributions_dirty` : `staging.py`, `signature_queries.py`, `metadata_correction_queries.py`, `reconciliation.py` et cinq scripts de `interfaces/cli/oneshot/`, chaque fois par la même requête ;
+- `contributions_dirty` : `staging.py`, `source_contribution_queries.py`, `metadata_correction_queries.py`, `reconciliation.py` et cinq scripts de `interfaces/cli/oneshot/`, chaque fois par la même requête ;
 - `keys_dirty` : `source_records.py`, `staging.py`, `perimeter_evidence.py`, `metadata_correction_queries.py`, `reconciliation.py`.
 
 La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'ordre des requêtes :
@@ -47,7 +47,7 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 
 - [ ] Fonction de marquage de `keys_dirty`.
 - [ ] Fonction de marquage de `contributions_dirty`.
-- [ ] Fonctions de marquage de `countries_dirty` et `candidates_dirty`, posés par `ror.py`, `hal_structures.py` et `signature_queries.py`.
+- [ ] Fonctions de marquage de `countries_dirty` et `candidates_dirty`, posés par `ror.py`, `hal_structures.py` et `source_contribution_queries.py`.
 
 ### Phase 4 — Documentation
 

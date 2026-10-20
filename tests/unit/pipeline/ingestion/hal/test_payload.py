@@ -28,7 +28,7 @@ class TestExtractHalMeta:
         doc = {"licence_s": "https://creativecommons.org/licenses/by/4.0/"}
         assert extract_hal_meta(doc) == {"licence": "https://creativecommons.org/licenses/by/4.0/"}
 
-    def test_notice_muette(self):
+    def test_enregistrement_source_muet(self):
         assert extract_hal_meta({"title_s": ["Titre"]}) is None
 
 

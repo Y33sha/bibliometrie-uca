@@ -92,11 +92,11 @@ class TestListPublishers:
         r = client.get("/api/publishers", params={"sort": "journals_desc"})
         assert r.status_code == 200
 
-    def test_sort_pubs(self, client):
+    def test_sort_publications(self, client):
         r = client.get("/api/publishers", params={"sort": "pubs_asc"})
         assert r.status_code == 200
 
-    def test_sort_pubs_desc(self, client):
+    def test_sort_publications_desc(self, client):
         r = client.get("/api/publishers", params={"sort": "pubs_desc"})
         assert r.status_code == 200
 
@@ -123,21 +123,21 @@ class TestListPublishers:
         countries = {p["country"] for p in r.json()["publishers"]}
         assert countries == {country}
 
-    def test_with_pubs_excludes_orphan_publishers(self, client):
-        # Éditeur sans aucune publi rattachée → exclu si with_pubs=true.
+    def test_with_publications_excludes_orphan_publishers(self, client):
+        # Éditeur sans aucune publi rattachée → exclu si with_publications=true.
         seed_publisher("OrphanPub")
         # Éditeur avec une revue et une publi → inclus.
         with_data = seed_publisher("WithPubsPub")
         jid = seed_journal(publisher_id=with_data)
         _publication("p1", journal_id=jid)
         seed_in_perimeter_contributions(jid)
-        r = client.get("/api/publishers", params={"with_pubs": "true", "per_page": 200})
+        r = client.get("/api/publishers", params={"with_publications": "true", "per_page": 200})
         assert r.status_code == 200
         names = {p["name"] for p in r.json()["publishers"]}
         assert "WithPubsPub" in names
         assert "OrphanPub" not in names
 
-    def test_with_pubs_default_false_includes_orphans(self, client):
+    def test_with_publications_default_false_includes_orphans(self, client):
         # Sans le flag, on liste tout comme avant.
         seed_publisher("OrphanDefault")
         r = client.get("/api/publishers", params={"per_page": 200})
@@ -194,11 +194,11 @@ class TestGetPublisher:
             seed_doi_prefix(prefix, ra="Crossref", publisher_id=pid, crossref_member_id=42)
         r = client.get(f"/api/publishers/{pid}")
         assert r.status_code == 200
-        pub = r.json()
-        prefixes = {p["prefix"] for p in pub["doi_prefixes"]}
+        publication = r.json()
+        prefixes = {p["prefix"] for p in publication["doi_prefixes"]}
         assert prefixes == {"10.9008", "10.9009"}
-        assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
-        assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
+        assert all(p["ra"] == "Crossref" for p in publication["doi_prefixes"])
+        assert all(p["crossref_member_id"] == 42 for p in publication["doi_prefixes"])
 
     def test_doi_prefixes_in_list(self, client):
         """Régression : la colonne « Préfixes DOI » du tableau des éditeurs restait vide, la liste ne les renvoyant pas."""
@@ -265,7 +265,7 @@ class TestPublisherDashboard:
 
 
 class TestPublisherSubjects:
-    def test_returns_empty_for_publisher_without_pubs(self, client):
+    def test_returns_empty_for_publisher_without_publications(self, client):
         pid = seed_publisher()
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200
@@ -274,17 +274,17 @@ class TestPublisherSubjects:
     def test_returns_top_subjects_excluding_generic(self, client):
         pid = seed_publisher()
         jid = seed_journal(publisher_id=pid)
-        pub_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
+        publication_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
         specific_label = uniq("specific_subject")
         spec_id = seed_subject(specific_label, usage_count=100)
         generic_label = uniq("generic_subject")
         gen_id = seed_subject(generic_label, usage_count=9999)
-        for pub_id, subject_id in (
-            (pub_ids[0], spec_id),
-            (pub_ids[1], spec_id),
-            (pub_ids[0], gen_id),
+        for publication_id, subject_id in (
+            (publication_ids[0], spec_id),
+            (publication_ids[1], spec_id),
+            (publication_ids[0], gen_id),
         ):
-            seed_publication_subject(pub_id, subject_id=subject_id)
+            seed_publication_subject(publication_id, subject_id=subject_id)
         seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/publishers/{pid}/subjects")
         assert r.status_code == 200

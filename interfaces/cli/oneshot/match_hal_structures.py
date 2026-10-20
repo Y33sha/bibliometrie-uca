@@ -49,7 +49,7 @@ _UNMATCHED = """
 
 _CANDIDATES = text(f"""
     WITH cited AS (
-        SELECT coalesce(al.hal_structure_id, sah.hal_structure_id) AS hal_structure_id, count(*) AS signatures
+        SELECT coalesce(al.hal_structure_id, sah.hal_structure_id) AS hal_structure_id, count(*) AS source_contributions
         FROM source_contribution_hal_structures sah
         LEFT JOIN hal_structure_aliases al ON al.alias_id = sah.hal_structure_id
         GROUP BY 1
@@ -115,7 +115,7 @@ def _scanr_candidates(conn: Connection) -> list[dict]:
             "hal_structure_id": hal_structure_id,
             "hal_name": eligible[hal_structure_id].name,
             "status": eligible[hal_structure_id].status,
-            "signatures": n,
+            "source_contributions": n,
             "structure_id": structure_id,
             "code": labs[structure_id],
             "voie": "scanR",
@@ -165,7 +165,7 @@ def main() -> None:
                 "%s : %d structures HAL, %d signatures",
                 rs[0]["code"],
                 len(rs),
-                sum(r["signatures"] for r in rs),
+                sum(r["source_contributions"] for r in rs),
             )
         log.info("%d structures HAL pour %d structures internes", len(kept), len(by_structure))
         if args.dry_run:

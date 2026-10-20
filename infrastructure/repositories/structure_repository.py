@@ -133,7 +133,7 @@ class PgStructureRepository(StructureRepository):
         ).first()
         if row is None:
             return None
-        nf_result = self._conn.execute(
+        name_form_result = self._conn.execute(
             select(
                 structure_name_forms.c.form_text,
                 structure_name_forms.c.is_word_boundary,
@@ -142,7 +142,8 @@ class PgStructureRepository(StructureRepository):
             ).where(structure_name_forms.c.structure_id == structure_id)
         )
         name_forms = tuple(
-            _structure_name_form_from_row(nf) for nf in rows_as(_StructureNameFormRow, nf_result)
+            _structure_name_form_from_row(name_form)
+            for name_form in rows_as(_StructureNameFormRow, name_form_result)
         )
         return _structure_from_row(row_as(_StructureRow, row), name_forms)
 

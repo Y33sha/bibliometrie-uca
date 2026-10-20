@@ -230,7 +230,7 @@
 			>
 				{#snippet item(r)}
 					{r.title}
-					{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
+					{#if r.publisher_name}<span class="muted"> — {r.publisher_name}</span>{/if}
 					<span class="muted"> ({r.publication_count} publis)</span>
 				{/snippet}
 			</Picker>

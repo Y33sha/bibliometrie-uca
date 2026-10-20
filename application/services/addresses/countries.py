@@ -104,7 +104,7 @@ def propagate_countries_to_publications(
         return
 
     docs = country_recompute.refresh_source_records_countries_for_addresses(conn, address_ids)
-    pubs = country_recompute.refresh_publications_countries_for_addresses(conn, address_ids)
+    publications = country_recompute.refresh_publications_countries_for_addresses(conn, address_ids)
 
-    if docs or pubs:
-        logger.info("Propagation pays : %s docs source, %s publications", docs, pubs)
+    if docs or publications:
+        logger.info("Propagation pays : %s docs source, %s publications", docs, publications)

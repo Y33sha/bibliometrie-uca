@@ -49,7 +49,7 @@
 		const params = new URLSearchParams();
 		if (selectedPublisherTypes.length) params.set('publisher_type', selectedPublisherTypes.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		if (withPubs) params.set('with_pubs', 'true');
+		if (withPubs) params.set('with_publications', 'true');
 		return params;
 	}
 

@@ -13,14 +13,14 @@ _RAW_METADATA = {
 }
 
 
-def _read(conn, expression, notice):
+def _read(conn, expression, source_record):
     return conn.execute(
-        text(f"SELECT {expression} FROM source_records sp WHERE sp.id = :id"), {"id": notice}
+        text(f"SELECT {expression} FROM source_records sp WHERE sp.id = :id"), {"id": source_record}
     ).scalar_one()
 
 
 def test_les_fragments_lisent_raw_metadata_comme_raw_value(sa_sync_conn):
-    notice = insert_source_record(
+    source_record = insert_source_record(
         sa_sync_conn,
         insert_publication(sa_sync_conn),
         source="crossref",
@@ -32,12 +32,12 @@ def test_les_fragments_lisent_raw_metadata_comme_raw_value(sa_sync_conn):
     )
 
     for field, column in (("doc_type", "article"), ("doi", "10.1/raw"), ("language", "fr")):
-        assert _read(sa_sync_conn, raw_column(field), notice) == raw_value(
+        assert _read(sa_sync_conn, raw_column(field), source_record) == raw_value(
             _RAW_METADATA, field, column
         )
-    assert _read(sa_sync_conn, corrected("doc_type"), notice) is True
-    assert _read(sa_sync_conn, corrected("doi"), notice) is False
-    assert _read(sa_sync_conn, corrected_by("doc_type"), notice) == "MAP_DOC_TYPE"
-    assert _read(sa_sync_conn, corrected_by("doi"), notice) is None
-    assert _read(sa_sync_conn, stashed_raw("doc_type"), notice) == "journal-article"
-    assert _read(sa_sync_conn, stashed_raw("doi"), notice) is None
+    assert _read(sa_sync_conn, corrected("doc_type"), source_record) is True
+    assert _read(sa_sync_conn, corrected("doi"), source_record) is False
+    assert _read(sa_sync_conn, corrected_by("doc_type"), source_record) == "MAP_DOC_TYPE"
+    assert _read(sa_sync_conn, corrected_by("doi"), source_record) is None
+    assert _read(sa_sync_conn, stashed_raw("doc_type"), source_record) == "journal-article"
+    assert _read(sa_sync_conn, stashed_raw("doi"), source_record) is None

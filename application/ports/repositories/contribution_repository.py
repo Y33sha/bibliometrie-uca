@@ -15,7 +15,7 @@ class ContributionPersonRow(TypedDict):
     publication_id: int
 
 
-class AssignedSignatureRow(TypedDict):
+class AssignedSourceContributionRow(TypedDict):
     """Ligne renvoyée par `assign_orphan_source_contribution` : source et forme de nom de la signature rattachée."""
 
     source: str
@@ -31,7 +31,7 @@ class ContributionRepository(Protocol):
         self,
         person_id: int,
         source_contribution_id: int,
-    ) -> AssignedSignatureRow | None:
+    ) -> AssignedSourceContributionRow | None:
         """Pose `person_id` sur une signature source orpheline. Retourne `{source, author_name_normalized}`, ou `None` si la signature n'existe pas ou porte déjà un `person_id` — `find_source_contribution_owner` départage."""
         ...
 

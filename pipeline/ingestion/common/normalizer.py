@@ -14,7 +14,7 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
-from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.source_records import SourceRecordQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.runtime.observability.libelles import (

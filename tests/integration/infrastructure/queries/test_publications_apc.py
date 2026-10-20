@@ -9,13 +9,13 @@ from tests.integration.helpers.structures import insert_structure
 def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
     inside = insert_structure(sa_sync_conn, "apc_inside", structure_type="universite")
     outside = insert_structure(sa_sync_conn, "apc_outside", structure_type="universite")
-    pub_id = insert_publication(
+    publication_id = insert_publication(
         sa_sync_conn, "APC", normalize_title=False, doc_type=None, in_perimeter=True
     )
     for budget in (inside, outside, None):
         insert_apc_payment(
             sa_sync_conn,
-            publication_id=pub_id,
+            publication_id=publication_id,
             amount_eur_ht=100,
             budget_structure_id=budget,
             open_access_fee=True,
@@ -30,7 +30,7 @@ def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
         sort="year_desc",
     )
 
-    item = next(p for p in response.publications if p.id == pub_id)
+    item = next(p for p in response.publications if p.id == publication_id)
     assert item.apc is not None
     assert {a.budget_structure_id: a.in_perimeter for a in item.apc} == {
         inside: True,

@@ -58,7 +58,7 @@ class TestListLabScope:
         ids = {p.id for p in res.persons}
         assert {p_in, p_out} <= ids
 
-    def test_signature_counts_scoped_to_lab(self, sa_sync_conn):
+    def test_source_contribution_counts_scoped_to_lab(self, sa_sync_conn):
         """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
         lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
@@ -72,10 +72,10 @@ class TestListLabScope:
         unscoped = q.list_persons(
             filters=PersonFilters(search="counted"), page=1, per_page=50, sort="name_asc"
         )
-        assert next(p for p in scoped.persons if p.id == person).signature_count == 1
-        assert next(p for p in unscoped.persons if p.id == person).signature_count == 2
+        assert next(p for p in scoped.persons if p.id == person).source_contribution_count == 1
+        assert next(p for p in unscoped.persons if p.id == person).source_contribution_count == 2
 
-    def test_signature_counts_author_role_only(self, sa_sync_conn):
+    def test_source_contribution_counts_author_role_only(self, sa_sync_conn):
         """Les dénombrements comptent seulement les signatures en tant qu'auteur, dans la liste comme dans la fiche de curation."""
         person = insert_person(sa_sync_conn, "Juror")
         _contribution_in_lab(sa_sync_conn, person, in_perimeter=True)
@@ -92,8 +92,8 @@ class TestListLabScope:
         curated = q.person_curation(person)
         assert curated is not None
         for p in (listed, curated):
-            assert p.signature_count == 1
-            assert p.in_perimeter_signature_count == 1
+            assert p.source_contribution_count == 1
+            assert p.in_perimeter_source_contribution_count == 1
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-FAC")

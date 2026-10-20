@@ -3,7 +3,7 @@ import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labe
 import { SOURCE_ORDER } from '$lib/sources';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
-export type SourceSignature = components['schemas']['SourceSignatureOut'];
+export type SourceSignature = components['schemas']['SourceContributionOut'];
 
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
 export type CellLink = { kind: 'doi'; doi: string } | { kind: 'journals' | 'publishers'; id: number };

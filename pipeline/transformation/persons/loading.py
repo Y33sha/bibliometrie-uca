@@ -8,6 +8,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, Row, text
 
+from domain.persons.contributor_name import ContributorName
 from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import (
     AttributionStatus,
@@ -17,12 +18,11 @@ from domain.persons.matching import (
     STRONG_PERSON_IDENTIFIER_TYPES,
     ResolutionMode,
 )
-from domain.persons.name_forms import signature_name_forms
-from domain.persons.signature_name import SignatureName
+from domain.persons.name_forms import contributor_name_forms
 from infrastructure.sql_fragments import (
-    person_signature,
+    person_source_contribution,
     pinned,
-    strong_identifier_signatures,
+    strong_identifier_source_contributions,
     usable_identifier,
 )
 
@@ -37,7 +37,7 @@ class BareUnlinkedContribution(NamedTuple):
 
     source_contribution_id: int
     source: str
-    name: SignatureName
+    name: ContributorName
     author_name_normalized: str | None
     # `{id_type: valeur}` des identifiants de l'identité, pour chaque type de `PersonIdentifierType` présent et non neutralisé par la signature.
     identifiers: dict[str, str]
@@ -55,13 +55,13 @@ class LinkedContributionRow(NamedTuple):
 
     person_id: int
     group_id: int
-    name: SignatureName
+    name: ContributorName
     source: str
 
 
 def _usable(id_type: str) -> str:
     """Valeur de l'identifiant `id_type` de la signature `sa_auth`, NULL quand elle le neutralise."""
-    return usable_identifier(f"'{id_type}'", signature="sa_auth")
+    return usable_identifier(f"'{id_type}'", source_contribution="sa_auth")
 
 
 def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedContribution:
@@ -69,7 +69,7 @@ def _to_bare(r: Row[tuple[object, ...]]) -> BareUnlinkedContribution:
     return BareUnlinkedContribution(
         source_contribution_id=r.source_contribution_id,
         source=r.source,
-        name=SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
+        name=ContributorName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
         author_name_normalized=r.author_name_normalized,
         identifiers=r.identifiers,
         roles=r.roles,
@@ -107,14 +107,14 @@ _OOP_PROJECTION = f"""{_BARE_PROJECTION_HEAD},
 _OOP_COMMON_WHERE = f"""
     sa_auth.person_id IS NULL
     AND sa_auth.in_perimeter = FALSE
-    AND {person_signature("sa_auth")}
+    AND {person_source_contribution("sa_auth")}
     AND sd.publication_id IS NOT NULL
 """
 
 
 def _oop_identifier_branch(id_type: PersonIdentifierType) -> str:
     """Branche « identifiant-ancré » : signature hors-périmètre dont l'identifiant fort `id_type` est déjà celui d'une personne connue (non rejeté)."""
-    return strong_identifier_signatures(
+    return strong_identifier_source_contributions(
         id_type,
         identifiers="person_identifiers",
         select=_OOP_PROJECTION,
@@ -138,7 +138,7 @@ _OOP_CROSS_SOURCE_BRANCH = f"""
     JOIN contributor_information aik ON aik.id = sa_auth.contributor_information_id
     JOIN publications pub ON pub.id = sd.publication_id
     WHERE linked.person_id IS NOT NULL
-      AND {person_signature("linked")}
+      AND {person_source_contribution("linked")}
       AND {_OOP_COMMON_WHERE}
 """
 
@@ -163,7 +163,7 @@ def fetch_unlinked_contributions(conn: Connection) -> list[BareUnlinkedContribut
             JOIN publications pub ON pub.id = sd.publication_id
             WHERE sa_auth.person_id IS NULL
               AND sa_auth.in_perimeter = TRUE
-              AND {person_signature("sa_auth")}
+              AND {person_source_contribution("sa_auth")}
               AND sd.publication_id IS NOT NULL
             ORDER BY sa_auth.id
         """)
@@ -191,14 +191,14 @@ def fetch_linked_contributions(conn: Connection) -> list[LinkedContributionRow]:
             JOIN source_contribution_group_members gs ON gs.source_contribution_id = sa_auth.id
             WHERE sa_auth.person_id IS NOT NULL
               AND sa_auth.resolution_mode IS DISTINCT FROM '{ResolutionMode.CROSS_SOURCE.value}'
-              AND {person_signature("sa_auth")}
+              AND {person_source_contribution("sa_auth")}
         """)
     ).all()
     return [
         LinkedContributionRow(
             person_id=r.person_id,
             group_id=r.group_id,
-            name=SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
+            name=ContributorName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name),
             source=r.source,
         )
         for r in rows
@@ -216,7 +216,7 @@ def fetch_cross_source_linked(conn: Connection) -> list[BareUnlinkedContribution
             JOIN contributor_information aik ON aik.id = sa_auth.contributor_information_id
             JOIN source_records sd ON sd.id = sa_auth.source_record_id
             WHERE sa_auth.resolution_mode = '{ResolutionMode.CROSS_SOURCE.value}'
-              AND {person_signature("sa_auth")}
+              AND {person_source_contribution("sa_auth")}
               AND sd.publication_id IS NOT NULL
               AND NOT {pinned("sa_auth.id")}
             ORDER BY sa_auth.id
@@ -230,9 +230,9 @@ class EnrichedContribution(NamedTuple):
 
     source_contribution_id: int
     source: str
-    name: SignatureName
+    name: ContributorName
     author_name_normalized: str | None
-    # Formes cherchées dans `person_name_forms`, ordre inversé compris (`signature_name_forms`).
+    # Formes cherchées dans `person_name_forms`, ordre inversé compris (`contributor_name_forms`).
     name_forms: tuple[str, ...]
     identifiers: dict[str, str]
     publication_id: int | None
@@ -258,7 +258,7 @@ def _enrich(row: BareUnlinkedContribution) -> EnrichedContribution:
         source=row.source,
         name=row.name,
         author_name_normalized=row.author_name_normalized,
-        name_forms=signature_name_forms(last_norm, first_norm),
+        name_forms=contributor_name_forms(last_norm, first_norm),
         identifiers=row.identifiers,
         publication_id=row.publication_id,
         in_perimeter=row.in_perimeter,

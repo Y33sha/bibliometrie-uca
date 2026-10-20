@@ -25,7 +25,7 @@ def is_placeholder_name(name: str) -> bool:
 
 
 @dataclass(frozen=True, slots=True)
-class SignatureName:
+class ContributorName:
     """Nom d'auteur d'une signature (VO) : nom et prénom séparés, ou chaîne brute.
 
     La forme suit la source : Crossref, DataCite, WoS, HAL et theses.fr séparent nom et prénom, OpenAlex et ScanR donnent une chaîne. Les fabriques `from_parts` et `from_raw` nettoient les valeurs (`clean_raw_author_name`).
@@ -37,9 +37,9 @@ class SignatureName:
 
     def __post_init__(self) -> None:
         if (self.last_name is None) == (self.raw is None):
-            raise ValidationError("SignatureName : nom de famille ou chaîne brute, exclusivement")
+            raise ValidationError("ContributorName : nom de famille ou chaîne brute, exclusivement")
         if self.first_name is not None and self.last_name is None:
-            raise ValidationError("SignatureName : prénom sans nom de famille")
+            raise ValidationError("ContributorName : prénom sans nom de famille")
 
     @property
     def split_by_source(self) -> bool:
@@ -47,7 +47,7 @@ class SignatureName:
         return self.raw is None
 
     @classmethod
-    def from_parts(cls, last_name: str | None, first_name: str | None) -> "SignatureName | None":
+    def from_parts(cls, last_name: str | None, first_name: str | None) -> "ContributorName | None":
         """Nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. `None` sans aucun nom, ou pour un nom absent (`is_placeholder_name`)."""
         last = clean_raw_author_name(last_name or "").strip()
         first = clean_raw_author_name(first_name or "").strip()
@@ -58,7 +58,7 @@ class SignatureName:
         return cls(last_name=last, first_name=first or None)
 
     @classmethod
-    def from_raw(cls, raw: str | None) -> "SignatureName | None":
+    def from_raw(cls, raw: str | None) -> "ContributorName | None":
         """Chaîne brute. `None` pour une chaîne vide ou un nom absent (`is_placeholder_name`)."""
         cleaned = clean_raw_author_name(raw or "").strip()
         return cls(raw=cleaned) if cleaned and not is_placeholder_name(cleaned) else None
@@ -66,7 +66,7 @@ class SignatureName:
     @classmethod
     def from_columns(
         cls, raw: str | None, last_name: str | None, first_name: str | None
-    ) -> "SignatureName":
+    ) -> "ContributorName":
         """Nom stocké d'une signature (`raw_author_name`, `raw_last_name`, `raw_first_name`), déjà nettoyé."""
         if last_name is not None:
             return cls(last_name=last_name, first_name=first_name)

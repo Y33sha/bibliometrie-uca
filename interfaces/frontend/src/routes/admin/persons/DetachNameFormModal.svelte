@@ -75,7 +75,7 @@
               <span class="detach-year">{p.publication_year ?? "?"}</span>
               <a
                 class="detach-title"
-                href="{base}/publications/{p.pub_id}"
+                href="{base}/publications/{p.publication_id}"
                 target="_blank"
                 rel="noopener"
               ><PublicationTitle titre={p.title} /></a>

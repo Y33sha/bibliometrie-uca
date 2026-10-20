@@ -3,7 +3,7 @@
 from sqlalchemy import Connection, text
 
 
-class AddressPubCountQueries:
+class AddressPublicationCountQueries:
     """Recalcul du nombre de publications distinctes rattachées à chaque adresse."""
 
     def recompute_publication_count(self, conn: Connection) -> int:

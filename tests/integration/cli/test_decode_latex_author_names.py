@@ -5,30 +5,32 @@ from sqlalchemy import text
 from interfaces.cli.oneshot.decode_latex_author_names import decode, decoded_names
 from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
-    upsert_split_identity,
+    upsert_split_contributor_information,
 )
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def test_le_nom_decode_change_d_identite_et_perd_sa_personne_sauf_epinglage(sa_sync_conn):
+def test_le_nom_decode_change_d_informations_du_contributeur_et_perd_sa_personne_sauf_epinglage(
+    sa_sync_conn,
+):
     conn = sa_sync_conn
     publication = insert_publication(conn)
     conn.execute(
         text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
         {"p": publication},
     )
-    notice = insert_source_record(conn, publication, source="openalex", source_id="W1")
+    source_record = insert_source_record(conn, publication, source="openalex", source_id="W1")
     garbled = insert_person(conn, "Bayart", first_name="Fr\\'ed\\'eric")
     latex, pinned = (
-        insert_signature(
+        insert_source_contribution(
             conn,
-            notice,
+            source_record,
             source="openalex",
             author_position=position,
             raw_author_name=raw,
-            contributor_information_id=upsert_split_identity(conn, last, first),
+            contributor_information_id=upsert_split_contributor_information(conn, last, first),
             person_id=garbled,
             resolution_mode="name",
             roles=["author"],
@@ -40,9 +42,9 @@ def test_le_nom_decode_change_d_identite_et_perd_sa_personne_sauf_epinglage(sa_s
     )
     insert_confirmed_source_contribution(conn, pinned, person_id=garbled)
 
-    rows, notices = decoded_names(conn)
+    rows, source_records = decoded_names(conn)
     assert {r["id"] for r in rows} == {latex, pinned}
-    decode(conn, rows, notices)
+    decode(conn, rows, source_records)
 
     names = {
         r.id: (r.raw_author_name, r.last_name_normalized, r.first_name_normalized, r.person_id)

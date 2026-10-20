@@ -17,25 +17,25 @@ from sqlalchemy import Connection
 from domain.country_detection import SOURCE_COUNTRY_METHODS
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import shared_identifier_neutralizations
-from domain.persons.signature_name import SignatureName
 from domain.publications.contribution_roles import ContributionRole, is_individual_author
-from domain.source_records.signature_sync import (
-    IncomingSignature,
-    StoredSignature,
-    plan_signature_sync,
-    signature_content,
+from domain.source_records.source_contribution_sync import (
+    IncomingSourceContribution,
+    StoredSourceContribution,
+    plan_source_contribution_sync,
+    source_contribution_content,
 )
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.common.signature_queries import (
+from pipeline.ingestion.common.source_contribution_queries import (
     ContributionAddressItem,
     ContributionRorItem,
     ContributionsBatchQueries,
-    SignatureNameFields,
+    ContributorNameFields,
     SourceContributionItem,
-    StoredSourceContribution,
+    StoredSourceContributionRow,
 )
 
 
@@ -64,7 +64,7 @@ class AuthorRecord:
     """
 
     position: int | None
-    name: SignatureName
+    name: ContributorName
     is_corresponding: bool = False
     collective: bool = False
     roles: list[ContributionRole] | None = None
@@ -88,7 +88,7 @@ def sync_source_contributions(
 ) -> None:
     """Synchronise les signatures d'une notice depuis le bloc auteurs de son payload.
 
-    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_signatures_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
+    Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_source_contributions_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
     block_hash = fingerprint(dict(block))
     if queries.fetch_authors_hash(conn, source_record_id) == block_hash:
@@ -104,7 +104,7 @@ def write_source_contributions(
     source_record_id: int,
     records: list[AuthorRecord],
 ) -> None:
-    """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
+    """Synchronise les signatures d'une notice avec `records` (`plan_source_contribution_sync`).
 
     Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `contributions_dirty` sur la publication de la notice. La notice reçoit son nombre de signatures d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
@@ -119,14 +119,14 @@ def write_source_contributions(
                 "source": source,
                 "source_record_id": source_record_id,
                 "author_position": rec.position,
-                **signature_name_fields(rec.name),
+                **contributor_name_fields(rec.name),
                 "is_corresponding": rec.is_corresponding,
                 "collective": collective,
                 "roles": rec.roles,
                 "identifiers": rec.identifiers,
                 "neutralized_identifiers": neutralized,
                 "content_hash": fingerprint(
-                    signature_content(
+                    source_contribution_content(
                         position=rec.position,
                         name=(rec.name.raw, rec.name.last_name, rec.name.first_name),
                         is_corresponding=rec.is_corresponding,
@@ -145,18 +145,22 @@ def write_source_contributions(
         )
 
     stored = queries.fetch_stored_source_contributions(conn, source_record_id)
-    plan = plan_signature_sync(
+    plan = plan_source_contribution_sync(
         [
-            StoredSignature(
-                s.id, s.author_position, _stored_identity(s), s.content_hash, _roles(s.roles)
+            StoredSourceContribution(
+                s.id,
+                s.author_position,
+                _stored_contributor_information(s),
+                s.content_hash,
+                _roles(s.roles),
             )
             for s in stored
         ],
         [
-            IncomingSignature(
+            IncomingSourceContribution(
                 key,
                 item["author_position"],
-                _item_identity(item),
+                _item_contributor_information(item),
                 item["content_hash"] or "",
                 _roles(item["roles"]),
             )
@@ -174,16 +178,28 @@ def write_source_contributions(
 
     queries.delete_source_contributions(conn, list(plan.deletes))
     queries.update_source_contributions_batch(
-        conn, [{**items[key], "id": sa_id} for sa_id, key in plan.updates]
+        conn,
+        [
+            {**items[key], "id": source_contribution_id}
+            for source_contribution_id, key in plan.updates
+        ],
     )
-    queries.delete_source_contribution_addresses(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.delete_source_contribution_rors(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.delete_source_contribution_hal_structures(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.delete_source_contribution_addresses(
+        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    )
+    queries.delete_source_contribution_rors(
+        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    )
+    queries.delete_source_contribution_hal_structures(
+        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    )
     queries.upsert_source_contributions_batch(conn, [items[key] for key in plan.inserts])
 
-    sa_id_by_key = {key: sa_id for sa_id, key in plan.updates}
+    source_contribution_id_by_key = {
+        key: source_contribution_id for source_contribution_id, key in plan.updates
+    }
     if plan.inserts:
-        sa_id_by_key |= _inserted_ids(
+        source_contribution_id_by_key |= _inserted_ids(
             queries.fetch_stored_source_contributions(conn, source_record_id),
             known_ids={s.id for s in stored},
             inserted={key: items[key] for key in plan.inserts},
@@ -192,10 +208,13 @@ def write_source_contributions(
         conn,
         queries,
         source,
-        [(sa_id_by_key[key], records[key].addresses) for key in sorted(sa_id_by_key)],
+        [
+            (source_contribution_id_by_key[key], records[key].addresses)
+            for key in sorted(source_contribution_id_by_key)
+        ],
     )
     ror_items: dict[tuple[int, str, int | None], ContributionRorItem] = {}
-    for key, sa_id in sorted(sa_id_by_key.items()):
+    for key, source_contribution_id in sorted(source_contribution_id_by_key.items()):
         # Un ROR que porte une adresse de la signature n'est pas répété sur la signature seule.
         on_addresses = frozenset().union(*(a.ror_ids for a in records[key].addresses))
         rors_by_address: list[tuple[frozenset[RorId], int | None]] = [
@@ -204,22 +223,24 @@ def write_source_contributions(
         ]
         for ror_ids, addr_id in rors_by_address:
             for ror_id in sorted(ror_ids, key=str):
-                ror_items[(sa_id, ror_id.value, addr_id)] = ContributionRorItem(
-                    sa_id=sa_id, ror_id=ror_id.value, addr_id=addr_id
+                ror_items[(source_contribution_id, ror_id.value, addr_id)] = ContributionRorItem(
+                    source_contribution_id=source_contribution_id,
+                    ror_id=ror_id.value,
+                    addr_id=addr_id,
                 )
     queries.insert_source_contribution_rors_batch(conn, list(ror_items.values()))
     queries.insert_source_contribution_hal_structures_batch(
         conn,
         [
-            (sa_id, hal_structure_id)
-            for key, sa_id in sorted(sa_id_by_key.items())
+            (source_contribution_id, hal_structure_id)
+            for key, source_contribution_id in sorted(source_contribution_id_by_key.items())
             for hal_structure_id in sorted(records[key].hal_structure_ids)
         ],
     )
 
 
 def _inserted_ids(
-    rows: list[StoredSourceContribution],
+    rows: list[StoredSourceContributionRow],
     *,
     known_ids: set[int],
     inserted: Mapping[int, SourceContributionItem],
@@ -228,14 +249,14 @@ def _inserted_ids(
     new_ids: dict[Hashable, list[int]] = defaultdict(list)
     for row in sorted(rows, key=lambda r: r.id):
         if row.id not in known_ids:
-            new_ids[(row.author_position, _stored_identity(row))].append(row.id)
+            new_ids[(row.author_position, _stored_contributor_information(row))].append(row.id)
     return {
-        key: new_ids[(item["author_position"], _item_identity(item))].pop(0)
+        key: new_ids[(item["author_position"], _item_contributor_information(item))].pop(0)
         for key, item in inserted.items()
     }
 
 
-def signature_name_fields(name: SignatureName) -> SignatureNameFields:
+def contributor_name_fields(name: ContributorName) -> ContributorNameFields:
     """Colonnes de nom d'une signature : nom fourni par la source, et découpage retenu normalisé."""
     last, first = name.normalized()
     return {
@@ -247,7 +268,7 @@ def signature_name_fields(name: SignatureName) -> SignatureNameFields:
     }
 
 
-def _identity(
+def _contributor_information(
     last_name_normalized: str | None,
     first_name_normalized: str | None,
     identifiers: object,
@@ -262,14 +283,14 @@ def _roles(roles: Sequence[str] | None) -> tuple[str, ...] | None:
     return tuple(roles) if roles is not None else None
 
 
-def _stored_identity(row: StoredSourceContribution) -> Hashable:
-    return _identity(
+def _stored_contributor_information(row: StoredSourceContributionRow) -> Hashable:
+    return _contributor_information(
         row.last_name_normalized, row.first_name_normalized, row.identifiers, row.collective
     )
 
 
-def _item_identity(item: SourceContributionItem) -> Hashable:
-    return _identity(
+def _item_contributor_information(item: SourceContributionItem) -> Hashable:
+    return _contributor_information(
         item["last_name_normalized"],
         item["first_name_normalized"],
         item["identifiers"],
@@ -281,15 +302,15 @@ def write_addresses(
     conn: Connection,
     queries: ContributionsBatchQueries,
     source: str,
-    sa_addresses: list[tuple[int | None, list[AddressRecord]]],
+    source_contribution_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
     """Écrit les `addresses` d'un document, leurs pays candidats et leurs liens `source_contribution_addresses`, et rend l'identifiant de chaque adresse par son texte.
 
-    `sa_addresses` : les couples `(sa_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe. Les pays que la source donne deviennent des candidats du moyen de `source`. Les liens sont insérés en une requête. Un `sa_id` None est ignoré.
+    `source_contribution_addresses` : les couples `(source_contribution_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe. Les pays que la source donne deviennent des candidats du moyen de `source`. Les liens sont insérés en une requête. Un `source_contribution_id` None est ignoré.
     """
     norm_by_text: dict[str, str] = {}
     addr_countries: dict[str, set[str]] = {}
-    for _sa_id, addresses in sa_addresses:
+    for _source_contribution_id, addresses in source_contribution_addresses:
         for addr in addresses:
             if not addr.text:
                 continue
@@ -324,8 +345,8 @@ def write_addresses(
         )
 
     link_values: list[ContributionAddressItem] = []
-    for sa_id, addresses in sa_addresses:
-        if not sa_id:
+    for source_contribution_id, addresses in source_contribution_addresses:
+        if not source_contribution_id:
             continue
         seen: set[int] = set()
         for addr in addresses:
@@ -333,6 +354,8 @@ def write_addresses(
             if not addr_id or addr_id in seen:
                 continue
             seen.add(addr_id)
-            link_values.append({"sa_id": sa_id, "addr_id": addr_id})
+            link_values.append(
+                {"source_contribution_id": source_contribution_id, "addr_id": addr_id}
+            )
     queries.insert_source_contribution_addresses_batch(conn, link_values)
     return addr_id_by_text

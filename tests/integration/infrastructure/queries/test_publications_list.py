@@ -22,14 +22,14 @@ from tests.integration.helpers.subjects import insert_publication_subject, inser
 _lab = partial(insert_structure, code="LAB")
 
 # Notice de titre « T ».
-_notice = partial(insert_source_record, title="T")
+_source_record = partial(insert_source_record, title="T")
 
 
-def _attach(conn, pub_id, lab_id):
+def _attach(conn, publication_id, lab_id):
     """Contribution reliant la publi à un labo via la matview contribution_structures
     (semée par la chaîne source minimale)."""
     aid = insert_contribution(
-        conn, pub_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
+        conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
     add_contribution_structure(conn, aid, lab_id)
 
@@ -57,13 +57,13 @@ class TestSearch:
         """Une publi dont le titre ne contient pas le terme mais qui est
         annotée par un sujet matchant doit remonter dans les résultats."""
         lab = _lab(sa_sync_conn)
-        pub = insert_publication(sa_sync_conn, "Foo bar baz")
+        publication = insert_publication(sa_sync_conn, "Foo bar baz")
         unrelated = insert_publication(sa_sync_conn, "Hello world")
-        _attach(sa_sync_conn, pub, lab)
+        _attach(sa_sync_conn, publication, lab)
         _attach(sa_sync_conn, unrelated, lab)
 
         sid = insert_subject(sa_sync_conn, "Quantum mechanics")
-        insert_publication_subject(sa_sync_conn, pub, subject_id=sid)
+        insert_publication_subject(sa_sync_conn, publication, subject_id=sid)
 
         res = list_publications(
             sa_sync_conn,
@@ -74,7 +74,7 @@ class TestSearch:
             sort="year_desc",
         )
         ids = [p.id for p in res.publications]
-        assert pub in ids and unrelated not in ids
+        assert publication in ids and unrelated not in ids
 
     def test_title_match_ranks_before_subject_only_match(self, sa_sync_conn):
         """Les publis dont le titre matche remontent avant celles qui ne
@@ -103,10 +103,10 @@ class TestSearch:
     def test_search_unaccented_matches_accented_label(self, sa_sync_conn):
         """Les accents ne doivent pas bloquer le match (ILIKE + unaccent)."""
         lab = _lab(sa_sync_conn)
-        pub = insert_publication(sa_sync_conn, "Foo")
-        _attach(sa_sync_conn, pub, lab)
+        publication = insert_publication(sa_sync_conn, "Foo")
+        _attach(sa_sync_conn, publication, lab)
         sid = insert_subject(sa_sync_conn, "Économétrie")
-        insert_publication_subject(sa_sync_conn, pub, subject_id=sid)
+        insert_publication_subject(sa_sync_conn, publication, subject_id=sid)
 
         res = list_publications(
             sa_sync_conn,
@@ -117,7 +117,7 @@ class TestSearch:
             sort="year_desc",
         )
         ids = [p.id for p in res.publications]
-        assert pub in ids
+        assert publication in ids
 
     def test_facets_respect_search(self, sa_sync_conn):
         """Régression : les comptes de facettes suivent la recherche titre, pas
@@ -147,17 +147,21 @@ class TestHalStatusMultipleHalEntries:
     une de ses entrées HAL contient la collection du labo. Et le champ
     `hal_collections` renvoyé doit fusionner les collections des entrées."""
 
-    def test_pub_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
+    def test_publication_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
         non. Doit être exclue du filtre `hors_collection`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
-        pub = insert_publication(sa_sync_conn, "Two HAL deposits")
-        _attach(sa_sync_conn, pub, lab)
-        _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
-        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT", "SHS"])
+        publication = insert_publication(sa_sync_conn, "Two HAL deposits")
+        _attach(sa_sync_conn, publication, lab)
+        _source_record(
+            sa_sync_conn, publication, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"]
+        )
+        _source_record(
+            sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT", "SHS"]
+        )
         sa_sync_conn.execute(
             text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
-            {"id": pub},
+            {"id": publication},
         )
 
         res = list_publications(
@@ -168,16 +172,20 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        assert pub not in [p.id for p in res.publications]
+        assert publication not in [p.id for p in res.publications]
 
     def test_hal_collections_unions_all_hal_entries(self, sa_sync_conn):
         """`hal_collections` renvoyé par l'API = union des collections des
         entrées HAL (pas une entrée arbitraire prise au hasard)."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
-        pub = insert_publication(sa_sync_conn, "Two HAL deposits")
-        _attach(sa_sync_conn, pub, lab)
-        _notice(sa_sync_conn, pub, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"])
-        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT"])
+        publication = insert_publication(sa_sync_conn, "Two HAL deposits")
+        _attach(sa_sync_conn, publication, lab)
+        _source_record(
+            sa_sync_conn, publication, source_id="hal-CMH", hal_collections=["CMH", "AO-DROIT"]
+        )
+        _source_record(
+            sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT"]
+        )
 
         res = list_publications(
             sa_sync_conn,
@@ -187,16 +195,18 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        match = next(p for p in res.publications if p.id == pub)
+        match = next(p for p in res.publications if p.id == publication)
         assert set(match.hal_collections or []) == {"CMH", "AO-DROIT", "UPPA-DROIT"}
 
-    def test_pub_only_outside_collection_is_hors_collection(self, sa_sync_conn):
+    def test_publication_only_outside_collection_is_hors_collection(self, sa_sync_conn):
         """Cas symétrique : si aucune entrée HAL n'est dans la collection,
         la publi tombe bien dans `hors_collection`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
-        pub = insert_publication(sa_sync_conn, "Outside only")
-        _attach(sa_sync_conn, pub, lab)
-        _notice(sa_sync_conn, pub, source_id="hal-PAU", hal_collections=["UPPA-DROIT"])
+        publication = insert_publication(sa_sync_conn, "Outside only")
+        _attach(sa_sync_conn, publication, lab)
+        _source_record(
+            sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT"]
+        )
 
         res = list_publications(
             sa_sync_conn,
@@ -206,18 +216,18 @@ class TestHalStatusMultipleHalEntries:
             per_page=50,
             sort="year_desc",
         )
-        assert pub in [p.id for p in res.publications]
+        assert publication in [p.id for p in res.publications]
 
     def test_ok_without_declared_collection_matches_nothing(self, sa_sync_conn):
         """Labo dont la collection HAL est absente : le filtre `ok` (en collection + accès
         ouvert) rend zéro publication."""
         lab = insert_structure(sa_sync_conn, "LABNC")
-        pub = insert_publication(sa_sync_conn, "Open in HAL")
-        _attach(sa_sync_conn, pub, lab)
-        _notice(sa_sync_conn, pub, source_id="hal-x", hal_collections=["SOME-COL"])
+        publication = insert_publication(sa_sync_conn, "Open in HAL")
+        _attach(sa_sync_conn, publication, lab)
+        _source_record(sa_sync_conn, publication, source_id="hal-x", hal_collections=["SOME-COL"])
         sa_sync_conn.execute(
             text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
-            {"id": pub},
+            {"id": publication},
         )
 
         res = list_publications(
@@ -236,15 +246,15 @@ class TestThesesExport:
 
     def test_renders_a_thesis_with_each_source_url(self, sa_sync_conn):
         lab = _lab(sa_sync_conn)
-        pub = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
-        _attach(sa_sync_conn, pub, lab)
+        publication = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
+        _attach(sa_sync_conn, publication, lab)
         for src, sid in (
             ("hal", "hal-1"),
             ("openalex", "W1"),
             ("scanr", "sc-1"),
             ("theses", "2024NNT"),
         ):
-            _notice(sa_sync_conn, pub, source=src, source_id=sid)
+            _source_record(sa_sync_conn, publication, source=src, source_id=sid)
 
         csv_text = "".join(
             export_theses_csv(
@@ -269,13 +279,13 @@ class TestExcludedPersonLab:
         lab_excluded, lab_kept = (
             insert_structure(sa_sync_conn, code) for code in ("LAB-EXCLUE", "LAB-RETENUE")
         )
-        pub = insert_publication(sa_sync_conn, "Copublication")
+        publication = insert_publication(sa_sync_conn, "Copublication")
         for exclusion, lab in (("out_of_perimeter", lab_excluded), (None, lab_kept)):
             person = insert_person(
                 sa_sync_conn, "X", first_name="Y", exclusion=exclusion, normalizer="lower"
             )
             aid = insert_contribution(
-                sa_sync_conn, pub, person_id=person, in_perimeter=True, roles=["author"]
+                sa_sync_conn, publication, person_id=person, in_perimeter=True, roles=["author"]
             )
             add_contribution_structure(sa_sync_conn, aid, lab)
 
@@ -288,7 +298,7 @@ class TestExcludedPersonLab:
                 per_page=50,
                 sort="year_desc",
             )
-            return pub in {p.id for p in res.publications}
+            return publication in {p.id for p in res.publications}
 
         assert not listed(lab_excluded)
         assert listed(lab_kept)
@@ -334,8 +344,8 @@ class TestLicense:
         conn.execute(
             text("UPDATE publications SET license = 'cc-by' WHERE id = :id"), {"id": cc_by}
         )
-        for pub in (cc_by, unlicensed):
-            _attach(conn, pub, lab)
+        for publication in (cc_by, unlicensed):
+            _attach(conn, publication, lab)
         return lab, cc_by, unlicensed
 
     def _ids(self, conn, lab, license):  # noqa: A002

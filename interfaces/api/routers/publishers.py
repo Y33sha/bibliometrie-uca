@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
 from application.ports.pipeline.journal_recompute import JournalRecompute
-from application.ports.pipeline.publication_count import PubCountRecompute
+from application.ports.pipeline.publication_count import PublicationCountRecompute
 from application.ports.read_models.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
@@ -64,7 +64,7 @@ def publisher_filters(
     search: SearchTerm = "",
     publisher_type: str = Query(""),
     country: str = Query(""),
-    with_pubs: bool = Query(False),
+    with_publications: bool = Query(False),
 ) -> PublisherFilters:
     """Filtres communs à la liste des éditeurs et à ses facettes.
 
@@ -76,7 +76,7 @@ def publisher_filters(
             publisher_type, allowed=PUBLISHER_TYPES, param="publisher_type"
         ),
         countries=parse_str_csv(country),
-        with_pubs=with_pubs,
+        with_publications=with_publications,
     )
 
 
@@ -102,7 +102,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `with_pubs` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `pubs`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 
@@ -179,7 +179,7 @@ def merge(
     journals: JournalRepository = Depends(journal_repo),
     audit: AuditRepository = Depends(audit_repo),
     recompute: JournalRecompute = Depends(journal_recompute),
-    publication_count_recompute: PubCountRecompute = Depends(publication_count_recompute),
+    publication_count_recompute: PublicationCountRecompute = Depends(publication_count_recompute),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 

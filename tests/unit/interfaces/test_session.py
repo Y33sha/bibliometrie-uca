@@ -22,11 +22,11 @@ class TestReadSession:
     def test_rejects_a_tampered_payload(self):
         """Le nom est en clair dans le jeton : seule la signature interdit de le réécrire."""
         token = issue_token("admin")
-        payload, signature = token.rsplit(".", 1)
-        forged = payload.replace("admin", "pirate", 1) + "." + signature
+        payload, source_contribution = token.rsplit(".", 1)
+        forged = payload.replace("admin", "pirate", 1) + "." + source_contribution
         assert read_session(forged) is None
 
-    def test_rejects_a_foreign_signature(self, monkeypatch):
+    def test_rejects_a_foreign_source_contribution(self, monkeypatch):
         token = issue_token("admin")
         monkeypatch.setattr(session_module.settings, "session_secret", SecretStr("autre-secret"))
         assert read_session(token) is None

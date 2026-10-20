@@ -25,7 +25,7 @@ class TestStructureConstruction:
         assert s.api_ids is None
 
     def test_accepts_full_args(self):
-        nf = StructureNameForm("lab x")
+        name_form = StructureNameForm("lab x")
         s = Structure(
             id=1,
             code="UMR-1234",
@@ -35,13 +35,13 @@ class TestStructureConstruction:
             ror_id=RorId("02feahw73"),
             hal_collection=HalCollection("LIMOS"),
             api_ids={"hal_struct_id": ["1", "2"]},
-            name_forms=(nf,),
+            name_forms=(name_form,),
         )
         assert s.acronym == "LAB"
         assert s.ror_id == RorId("02feahw73")
         assert s.hal_collection == HalCollection("LIMOS")
         assert s.api_ids == {"hal_struct_id": ["1", "2"]}
-        assert s.name_forms == (nf,)
+        assert s.name_forms == (name_form,)
 
 
 class TestStructureCreate:

@@ -411,11 +411,11 @@ class TestNormalizeNnt:
 
 from pipeline.ingestion.theses.normalize import (
     _build_source_meta,
-    extract_pub_metadata,
+    extract_publication_metadata,
 )
 
 
-class TestThesesExtractPubMetadata:
+class TestThesesExtractPublicationMetadata:
     def test_soutenue(self):
         these = {
             "titrePrincipal": "Titre de la thèse",
@@ -423,7 +423,7 @@ class TestThesesExtractPubMetadata:
             "doi": "10.1234/test",
             "nnt": "2023ucfa0069",
         }
-        meta = extract_pub_metadata(these)
+        meta = extract_publication_metadata(these)
         assert meta.title == "Titre de la thèse"
         assert meta.doc_type == "thesis"
         assert meta.publication_year == 2023
@@ -437,24 +437,26 @@ class TestThesesExtractPubMetadata:
             "titrePrincipal": "Thèse en cours",
             "datePremiereInscriptionDoctorat": "01/09/2022",
         }
-        meta = extract_pub_metadata(these)
+        meta = extract_publication_metadata(these)
         assert meta.doc_type == "ongoing_thesis"
         assert meta.publication_year == 2022
         assert meta.doi is None
         assert meta.nnt is None
 
     def test_no_dates(self):
-        meta = extract_pub_metadata({"titrePrincipal": "X"})
+        meta = extract_publication_metadata({"titrePrincipal": "X"})
         assert meta.doc_type == "ongoing_thesis"
         assert meta.publication_year is None
 
     def test_malformed_date(self):
         """Date non parseable → publication_year reste None."""
-        meta = extract_pub_metadata({"titrePrincipal": "X", "dateSoutenance": "date-invalide"})
+        meta = extract_publication_metadata(
+            {"titrePrincipal": "X", "dateSoutenance": "date-invalide"}
+        )
         assert meta.publication_year is None
 
     def test_no_title(self):
-        meta = extract_pub_metadata({})
+        meta = extract_publication_metadata({})
         assert meta.title is None
 
 

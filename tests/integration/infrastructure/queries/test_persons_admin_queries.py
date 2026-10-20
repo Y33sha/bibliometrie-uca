@@ -22,7 +22,7 @@ from tests.integration.helpers.persons import (
     insert_person_name_form,
 )
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 # Forme de nom de source HAL.
 _hal_name_form = partial(insert_person_name_form, sources=["hal"])
@@ -35,10 +35,14 @@ class TestNameFormContributions:
     def test_returns_contributions_and_other_persons(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "Dupond")
         other = insert_person(sa_sync_conn, "Martin")
-        pub = insert_publication(sa_sync_conn)
-        sd = insert_source_record(sa_sync_conn, pub)
-        insert_signature(
-            sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", in_perimeter=True
+        publication = insert_publication(sa_sync_conn)
+        source_record = insert_source_record(sa_sync_conn, publication)
+        insert_source_contribution(
+            sa_sync_conn,
+            source_record,
+            person_id=pid,
+            author_name_normalized="dupond j",
+            in_perimeter=True,
         )
         _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
         _hal_name_form(sa_sync_conn, other, name_form="dupond j")
@@ -102,14 +106,14 @@ class TestIdentifierConflicts:
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
         p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
-        sd = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
-        insert_signature(
-            sa_sync_conn, sd, identifiers={"orcid": "0000-0001-2345-6789"}, person_id=p1
+        insert_source_contribution(
+            sa_sync_conn, source_record, identifiers={"orcid": "0000-0001-2345-6789"}, person_id=p1
         )
-        insert_signature(
+        insert_source_contribution(
             sa_sync_conn,
-            sd,
+            source_record,
             author_position=1,
             identifiers={"orcid": "0000-0001-2345-6789"},
             person_id=p2,
@@ -128,12 +132,12 @@ class TestIdentifierConflicts:
         """Une valeur que chaque signature neutralise ne fait pas de conflit, même en attente de validation."""
         p1 = insert_person(sa_sync_conn, "Brown", first_name="Anne")
         p2 = insert_person(sa_sync_conn, "Brown", first_name="A")
-        sd = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
-            insert_signature(
+            insert_source_contribution(
                 sa_sync_conn,
-                sd,
+                source_record,
                 author_position=position,
                 identifiers={"orcid": "0000-0009-9999-9999"},
                 person_id=person,
@@ -147,14 +151,14 @@ class TestIdentifierConflicts:
         """Une attribution tranchée clôt le conflit, même si des signatures d'une autre personne portent la valeur."""
         p1 = insert_person(sa_sync_conn, "Veyssiere", first_name="Hugo")
         p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
-        sd = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
-        insert_signature(
-            sa_sync_conn, sd, identifiers={"orcid": "0000-0003-2202-7362"}, person_id=p1
+        insert_source_contribution(
+            sa_sync_conn, source_record, identifiers={"orcid": "0000-0003-2202-7362"}, person_id=p1
         )
-        insert_signature(
+        insert_source_contribution(
             sa_sync_conn,
-            sd,
+            source_record,
             author_position=1,
             identifiers={"orcid": "0000-0003-2202-7362"},
             person_id=p2,
@@ -165,13 +169,13 @@ class TestIdentifierConflicts:
     def test_unattributed_value_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A")
-        sd = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
-        insert_signature(
-            sa_sync_conn, sd, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        insert_source_contribution(
+            sa_sync_conn, source_record, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
         )
-        insert_signature(
+        insert_source_contribution(
             sa_sync_conn,
-            sd,
+            source_record,
             author_position=1,
             identifiers={"orcid": "0000-0002-1111-2222"},
             person_id=p2,
@@ -182,14 +186,14 @@ class TestIdentifierConflicts:
     def test_excluded_person_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A", exclusion="out_of_perimeter")
-        sd = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
-        insert_signature(
-            sa_sync_conn, sd, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
+        insert_source_contribution(
+            sa_sync_conn, source_record, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
         )
-        insert_signature(
+        insert_source_contribution(
             sa_sync_conn,
-            sd,
+            source_record,
             author_position=1,
             identifiers={"orcid": "0000-0002-1111-2222"},
             person_id=p2,
@@ -225,7 +229,7 @@ class TestNameDuplicates:
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
         assert (
             pair.overlaps.coauthors,
-            pair.overlaps.shared_pubs,
+            pair.overlaps.shared_publications,
             pair.overlaps.labs,
             pair.overlaps.journals,
         ) == (0, 0, 0, 0)

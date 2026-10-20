@@ -4,7 +4,7 @@
 Les notices sœurs sont marquées à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
 Usage :
-    python -m interfaces.cli.maintenance.delete_notices_out_of_window [--dry-run]
+    python -m interfaces.cli.maintenance.delete_source_records_out_of_window [--dry-run]
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.source_records import delete_source_records_before
 
-log = setup_logger("delete_notices_out_of_window", os.path.dirname(__file__))
+log = setup_logger("delete_source_records_out_of_window", os.path.dirname(__file__))
 
 EXEMPT_SOURCES = ("theses",)
 

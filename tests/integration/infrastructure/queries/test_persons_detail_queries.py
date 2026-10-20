@@ -24,10 +24,10 @@ class TestPersonTheses:
         jury = insert_person(sa_sync_conn, "Jury", first_name="Jean")
         alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
         bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")
-        pub = insert_publication(sa_sync_conn, doc_type="thesis")
-        _in_perimeter_contribution(sa_sync_conn, pub, person_id=jury, roles=["jury_member"])
-        _in_perimeter_contribution(sa_sync_conn, pub, person_id=alice, roles=["author"])
-        _in_perimeter_contribution(sa_sync_conn, pub, person_id=bruno, roles=["author"])
+        publication = insert_publication(sa_sync_conn, doc_type="thesis")
+        _in_perimeter_contribution(sa_sync_conn, publication, person_id=jury, roles=["jury_member"])
+        _in_perimeter_contribution(sa_sync_conn, publication, person_id=alice, roles=["author"])
+        _in_perimeter_contribution(sa_sync_conn, publication, person_id=bruno, roles=["author"])
 
         theses = _theses(sa_sync_conn, jury)
 

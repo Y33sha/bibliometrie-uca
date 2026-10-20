@@ -100,7 +100,7 @@
 			api<DashboardResponse>(`/api/persons/${personId}/dashboard`, { key: 'person-detail-dashboard' }),
 			api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, { key: 'person-detail-subjects' }),
 		]);
-		dashPubsByYear = data.pubs_by_year;
+		dashPubsByYear = data.publications_by_year;
 		dashOa = data.oa;
 		dashSubjects = subjects;
 		dashboardLoaded = true;

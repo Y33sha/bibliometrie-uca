@@ -6,12 +6,12 @@ from domain.publications.publication import Publication
 
 class TestPublicationConstruction:
     def test_accepts_minimal_args(self):
-        pub = Publication(id=None, title="A paper", publication_year=2024)
-        assert pub.id is None
-        assert pub.title == "A paper"
-        assert pub.publication_year == 2024
-        assert pub.doi is None
+        publication = Publication(id=None, title="A paper", publication_year=2024)
+        assert publication.id is None
+        assert publication.title == "A paper"
+        assert publication.publication_year == 2024
+        assert publication.doi is None
 
     def test_accepts_doi_vo(self):
-        pub = Publication(id=1, title="t", publication_year=2024, doi=DOI("10.1234/test"))
-        assert pub.doi == DOI("10.1234/test")
+        publication = Publication(id=1, title="t", publication_year=2024, doi=DOI("10.1234/test"))
+        assert publication.doi == DOI("10.1234/test")

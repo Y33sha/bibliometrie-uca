@@ -3,15 +3,15 @@
 from domain.persons.identifiers import AttributionStatus
 
 
-def signature_display_name(signature: str = "sa") -> str:
-    """Nom de la signature aliasée `signature` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`SignatureName.display`)."""
+def contributor_display_name(source_contribution: str = "sa") -> str:
+    """Nom de la signature aliasée `signature` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`ContributorName.display`)."""
     return (
-        f"coalesce({signature}.raw_author_name,"
-        f" concat_ws(' ', {signature}.raw_first_name, {signature}.raw_last_name))"
+        f"coalesce({source_contribution}.raw_author_name,"
+        f" concat_ws(' ', {source_contribution}.raw_first_name, {source_contribution}.raw_last_name))"
     )
 
 
-def contribution_has_signature_from(source: str, contribution: str = "a") -> str:
+def contribution_has_source(source: str, contribution: str = "a") -> str:
     """Condition vraie quand la contribution aliasée `contribution` est attestée par une signature de `source` : même publication par sa notice, même personne."""
     return (
         "EXISTS (SELECT 1 FROM source_contributions sa_src"

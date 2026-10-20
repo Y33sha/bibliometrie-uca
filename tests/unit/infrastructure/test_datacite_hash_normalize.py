@@ -53,7 +53,7 @@ def test_les_deux_routes_donnent_la_meme_empreinte():
     )
 
 
-def test_un_changement_de_notice_change_l_empreinte():
+def test_un_changement_d_enregistrement_source_change_l_empreinte():
     retitled = copy.deepcopy(_LISTED)
     retitled["attributes"]["titles"] = [{"title": "Mesures de pluie, version corrigée"}]
     assert change_detection_hash("datacite", retitled) != change_detection_hash("datacite", _LISTED)

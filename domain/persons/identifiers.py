@@ -322,14 +322,14 @@ class IdentifierNeutralization(StrEnum):
 
 
 def shared_identifier_neutralizations(
-    ids_by_signature: Sequence[Mapping[str, JsonValue] | None],
+    ids_by_source_contribution: Sequence[Mapping[str, JsonValue] | None],
 ) -> list[dict[str, IdentifierNeutralization] | None]:
     """Identifiants neutralisés de chaque signature d'un document, pour cause de partage.
 
     Une valeur d'identifiant, quel que soit son type, portée par plusieurs signatures d'un même document est une corruption : un identifiant désigne une seule signature par document. Toute signature portant une valeur partagée voit tous ses identifiants neutralisés, y compris celle du vrai propriétaire, que rien ne distingue des autres. `None` pour une signature sans identifiant neutralisé.
     """
     counts: Counter[tuple[str, JsonValue]] = Counter()
-    for ids in ids_by_signature:
+    for ids in ids_by_source_contribution:
         if ids:
             counts.update(ids.items())
     shared = {kv for kv, n in counts.items() if n >= 2}
@@ -337,5 +337,5 @@ def shared_identifier_neutralizations(
         dict.fromkeys(ids, IdentifierNeutralization.SHARED)
         if ids and any(kv in shared for kv in ids.items())
         else None
-        for ids in ids_by_signature
+        for ids in ids_by_source_contribution
     ]

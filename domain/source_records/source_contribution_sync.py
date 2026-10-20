@@ -11,28 +11,28 @@ from typing import NamedTuple
 from domain.types import JsonValue
 
 
-class StoredSignature(NamedTuple):
+class StoredSourceContribution(NamedTuple):
     """Signature en base : identifiant, position, identité (nom normalisé et identifiants), empreinte et rôles."""
 
     id: int
     position: int | None
-    identity: Hashable
+    contributor_key: Hashable
     content_hash: str | None
     roles: tuple[str, ...] | None = None
 
 
-class IncomingSignature(NamedTuple):
+class IncomingSourceContribution(NamedTuple):
     """Signature issue de la notice renormalisée : clé (rang dans la notice), position d'auteur, identité, empreinte et rôles. Une signature sans rôle d'auteur n'a pas de position."""
 
     key: int
     position: int | None
-    identity: Hashable
+    contributor_key: Hashable
     content_hash: str
     roles: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
-class SignatureSyncPlan:
+class SourceContributionSyncPlan:
     """Ce que la renormalisation fait des signatures d'une notice.
 
     `updates` : couples (identifiant en base, clé entrante) dont l'empreinte change. `kept` : identifiants en base rapprochés et inchangés. `inserts` : clés entrantes sans correspondant. `deletes` : identifiants en base sans correspondant. `regroup` : une signature est insérée ou supprimée, ou change de position ou de rôles. Les signatures de la publication sont alors à regrouper.
@@ -45,23 +45,27 @@ class SignatureSyncPlan:
     regroup: bool
 
 
-def plan_signature_sync(
-    stored: Sequence[StoredSignature], incoming: Sequence[IncomingSignature]
-) -> SignatureSyncPlan:
+def plan_source_contribution_sync(
+    stored: Sequence[StoredSourceContribution], incoming: Sequence[IncomingSourceContribution]
+) -> SourceContributionSyncPlan:
     """Rapproche les signatures entrantes de celles en base.
 
     Une identité portée par une seule signature de chaque côté rapproche les deux. Une identité répétée rapproche les signatures de même position d'auteur. Une identité absente d'un côté, ou répétée sans position commune, ne rapproche rien.
     """
-    stored_by_identity: dict[Hashable, list[StoredSignature]] = defaultdict(list)
+    stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
+        list
+    )
     for s in stored:
-        stored_by_identity[s.identity].append(s)
-    incoming_by_identity: dict[Hashable, list[IncomingSignature]] = defaultdict(list)
+        stored_by_contributor_information[s.contributor_key].append(s)
+    incoming_by_contributor_information: dict[Hashable, list[IncomingSourceContribution]] = (
+        defaultdict(list)
+    )
     for i in incoming:
-        incoming_by_identity[i.identity].append(i)
+        incoming_by_contributor_information[i.contributor_key].append(i)
 
-    pairs: list[tuple[StoredSignature, IncomingSignature]] = []
-    for identity, candidates in incoming_by_identity.items():
-        existing = stored_by_identity.get(identity, [])
+    pairs: list[tuple[StoredSourceContribution, IncomingSourceContribution]] = []
+    for contributor_key, candidates in incoming_by_contributor_information.items():
+        existing = stored_by_contributor_information.get(contributor_key, [])
         if len(existing) == 1 and len(candidates) == 1:
             pairs.append((existing[0], candidates[0]))
             continue
@@ -76,7 +80,7 @@ def plan_signature_sync(
     matched_incoming = {i.key for _, i in pairs}
     inserts = tuple(sorted(i.key for i in incoming if i.key not in matched_incoming))
     deletes = tuple(sorted(s.id for s in stored if s.id not in matched_stored))
-    return SignatureSyncPlan(
+    return SourceContributionSyncPlan(
         updates=tuple(sorted((s.id, i.key) for s, i in pairs if s.content_hash != i.content_hash)),
         kept=tuple(sorted(s.id for s, i in pairs if s.content_hash == i.content_hash)),
         inserts=inserts,
@@ -86,7 +90,7 @@ def plan_signature_sync(
     )
 
 
-def signature_content(
+def source_contribution_content(
     *,
     position: int | None,
     name: tuple[str | None, str | None, str | None],

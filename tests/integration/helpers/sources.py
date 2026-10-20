@@ -5,7 +5,7 @@ import json
 
 from sqlalchemy import Connection
 
-from tests.integration.helpers.contributions import upsert_identity
+from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
@@ -81,7 +81,7 @@ def insert_source_record(
     )
 
 
-def insert_signature(
+def insert_source_contribution(
     conn: Connection,
     source_record_id: int,
     *,
@@ -118,7 +118,7 @@ def insert_signature(
             "contributor_information_id": (
                 contributor_information_id
                 if contributor_information_id is not None
-                else upsert_identity(conn, author_name_normalized, identifiers)
+                else upsert_contributor_information(conn, author_name_normalized, identifiers)
             ),
             "raw_author_name": raw_author_name,
             "raw_last_name": raw_last_name,
@@ -140,7 +140,7 @@ def insert_signature(
     )
 
 
-def insert_signature_address(
+def insert_source_contribution_address(
     conn: Connection, source_contribution_id: int, *, address_id: int
 ) -> int:
     """Lie la signature `source_contribution_id` à l'adresse `address_id` et renvoie l'`id` du lien."""

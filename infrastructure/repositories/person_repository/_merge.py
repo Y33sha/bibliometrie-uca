@@ -9,7 +9,7 @@ from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories.contribution_repository import (
     delete_orphan_contributions,
-    detach_rejected_signatures,
+    detach_rejected_source_contributions,
 )
 from infrastructure.repositories.merge_steps import (
     MergeStep,
@@ -68,7 +68,7 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
     _name_forms.refresh_name_forms(conn, target_id, forms)
 
 
-def _merge_signature_groups(conn: Connection, target_id: int, source_id: int) -> None:
+def _merge_source_contribution_groups(conn: Connection, target_id: int, source_id: int) -> None:
     """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text("""
@@ -108,7 +108,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "signatures": transfer("source_contributions", "person_id"),
     "contributions": transfer_unique("contributions", "person_id", "publication_id"),
     "signature_groups": MergeStep(
-        (("source_contribution_groups", "person_id"),), _merge_signature_groups
+        (("source_contribution_groups", "person_id"),), _merge_source_contribution_groups
     ),
     "rejected_contributions": transfer_unique(
         "rejected_contributions", "person_id", "source_record_id"
@@ -143,7 +143,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
-    detach_rejected_signatures(conn, target_id)
+    detach_rejected_source_contributions(conn, target_id)
     delete_orphan_contributions(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
     record_redirect(conn, MergedEntity.PERSON, target_id, source_id)

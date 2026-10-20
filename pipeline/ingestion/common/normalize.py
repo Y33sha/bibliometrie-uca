@@ -26,11 +26,11 @@ from pipeline.ingestion.common.normalizer import (
     NormalizeStats,
     SourceNormalizer,
 )
-from pipeline.ingestion.common.signature_queries import (
+from pipeline.ingestion.common.source_contribution_queries import (
     ContributionsBatchQueries,
     delete_orphan_addresses,
-    delete_orphan_identities,
-    mark_signatures_to_resync,
+    delete_orphan_contributor_information,
+    mark_source_contributions_to_resync,
 )
 from pipeline.ingestion.common.source_records import (
     SourceRecordQueries,
@@ -69,7 +69,7 @@ class NormalizePhase:
 
     normalize_one: NormalizeOne
     prune_disappeared: Callable[[PhaseContext], int]
-    cleanup_orphan_identities: Callable[[PhaseContext], int]
+    cleanup_orphan_contributor_information: Callable[[PhaseContext], int]
     cleanup_orphan_addresses: Callable[[PhaseContext], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -85,7 +85,7 @@ class NormalizePhase:
             for source in sources
         }
         steps["normalize.prune_disappeared"] = TaskStep(self._prune)
-        steps["normalize.cleanup_orphan_identities"] = TaskStep(
+        steps["normalize.cleanup_orphan_contributor_information"] = TaskStep(
             self._cleanup, section="Maintenance des tables", label="Identités d'auteur orphelines"
         )
         steps["normalize.cleanup_orphan_addresses"] = TaskStep(
@@ -140,7 +140,7 @@ class NormalizePhase:
         return PhaseMetrics(extras={"disappeared": disparues})
 
     def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        supprimees = self.cleanup_orphan_identities(ctx)
+        supprimees = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
         if supprimees:
             metrics.report = f"{accord(supprimees, 'identité supprimée', 'identités supprimées')}"
@@ -176,20 +176,20 @@ class _NormalizeSelonOptions:
 
         def normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
             if options.normalize_full:
-                _run_mark_signatures_to_resync(ctx, source)
+                _run_mark_source_contributions_to_resync(ctx, source)
             return _run_normalize(ctx, registry[source])
 
         return NormalizePhase(
             normalize_one=normalize_one,
             prune_disappeared=_run_prune_disappeared,
-            cleanup_orphan_identities=_run_cleanup_orphan_identities,
+            cleanup_orphan_contributor_information=_run_cleanup_orphan_contributor_information,
             cleanup_orphan_addresses=_run_cleanup_orphan_addresses,
         ).run(ctx)
 
 
-def _run_mark_signatures_to_resync(ctx: PhaseContext, source: str) -> None:
+def _run_mark_source_contributions_to_resync(ctx: PhaseContext, source: str) -> None:
     with ctx.open_tx() as conn:
-        mark_signatures_to_resync(conn, source)
+        mark_source_contributions_to_resync(conn, source)
 
 
 def _run_prune_disappeared(ctx: PhaseContext) -> int:
@@ -197,9 +197,9 @@ def _run_prune_disappeared(ctx: PhaseContext) -> int:
         return delete_disappeared_source_records(conn)
 
 
-def _run_cleanup_orphan_identities(ctx: PhaseContext) -> int:
+def _run_cleanup_orphan_contributor_information(ctx: PhaseContext) -> int:
     with ctx.open_tx() as conn:
-        return delete_orphan_identities(conn)
+        return delete_orphan_contributor_information(conn)
 
 
 def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:

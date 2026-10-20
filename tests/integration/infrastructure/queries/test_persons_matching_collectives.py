@@ -3,19 +3,19 @@
 from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
 from pipeline.transformation.persons.loading import fetch_unlinked_contributions
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _ORCID = "0000-0002-9876-5432"
 
 
-def _signature(conn, raw_name, *, collective, source_id, orcid=None):
+def _source_contribution(conn, raw_name, *, collective, source_id, orcid=None):
     """Signature crossref du périmètre, seule dans sa notice. Retourne son identifiant."""
-    sd = insert_source_record(
+    source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
-    return insert_signature(
+    return insert_source_contribution(
         conn,
-        sd,
+        source_record,
         source="crossref",
         raw_author_name=raw_name,
         author_name_normalized=raw_name.lower(),
@@ -25,9 +25,9 @@ def _signature(conn, raw_name, *, collective, source_id, orcid=None):
     )
 
 
-def test_signature_collective_absente_des_candidates(sa_sync_conn):
-    _signature(sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-1")
-    _signature(sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-2")
+def test_contribution_source_collective_absente_des_candidates(sa_sync_conn):
+    _source_contribution(sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-1")
+    _source_contribution(sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-2")
 
     names = {r.name.display() for r in fetch_unlinked_contributions(sa_sync_conn)}
 
@@ -35,9 +35,11 @@ def test_signature_collective_absente_des_candidates(sa_sync_conn):
     assert "Zeta Consortium" not in names
 
 
-def test_signature_collective_ne_vote_pas(sa_sync_conn):
-    _signature(sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-6", orcid=_ORCID)
-    _signature(
+def test_contribution_source_collective_ne_vote_pas(sa_sync_conn):
+    _source_contribution(
+        sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-6", orcid=_ORCID
+    )
+    _source_contribution(
         sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-7", orcid=_ORCID
     )
 

@@ -94,11 +94,11 @@ def propagate_in_perimeter_for_addresses(
     if not perimeter_ids:
         return
 
-    affected_sa_ids = repo.find_source_contributions_by_addresses(address_ids)
-    if not affected_sa_ids:
+    affected_source_contribution_ids = repo.find_source_contributions_by_addresses(address_ids)
+    if not affected_source_contribution_ids:
         return
 
-    perimeter_recompute.recompute_perimeter(conn, affected_sa_ids, perimeter_ids)
+    perimeter_recompute.recompute_perimeter(conn, affected_source_contribution_ids, perimeter_ids)
 
 
 def delete_orphan_contributions(person_id: int, *, repo: ContributionRepository) -> int:

@@ -4,7 +4,7 @@
 Les décomptes d'auteurs des notices touchées sont recalculés et leurs publications sont à regrouper. La phase `persons` suivante détache les signatures marquées de leur personne, sauf épinglage, puis supprime les personnes vidées. Une interruption perd seulement le lot en cours. `--from-id` reprend après le dernier lot validé. `--contains` restreint l'examen aux noms bruts qui contiennent un texte.
 
 Usage :
-    python -m interfaces.cli.oneshot.mark_collective_signatures [--dry-run] [--contains "et al"] [--from-id N] [--batch 1000000]
+    python -m interfaces.cli.oneshot.mark_collective_source_contributions [--dry-run] [--contains "et al"] [--from-id N] [--batch 1000000]
 """
 
 from __future__ import annotations
@@ -16,12 +16,12 @@ import time
 from sqlalchemy import Connection, text
 
 from domain.persons.collective_names import is_collective_name
-from domain.persons.signature_name import SignatureName
+from domain.persons.contributor_name import ContributorName
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from interfaces.cli.oneshot.backfill_author_counts import backfill_notices
+from interfaces.cli.oneshot.backfill_author_counts import backfill_source_records
 
-log = setup_logger("mark_collective_signatures", os.path.dirname(__file__))
+log = setup_logger("mark_collective_source_contributions", os.path.dirname(__file__))
 
 
 def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = None) -> list[int]:
@@ -40,7 +40,7 @@ def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = N
         r.id
         for r in rows
         if is_collective_name(
-            SignatureName.from_columns(
+            ContributorName.from_columns(
                 r.raw_author_name, r.raw_last_name, r.raw_first_name
             ).display()
         )
@@ -49,7 +49,7 @@ def _collective_ids(conn: Connection, lo: int, hi: int, contains: str | None = N
 
 def mark_collective(conn: Connection, ids: list[int]) -> None:
     """Marque collectives les signatures `ids`, recalcule les décomptes d'auteurs de leurs notices et met leurs publications à regrouper."""
-    notice_ids = list(
+    source_record_ids = list(
         conn.execute(
             text("""
                 UPDATE source_contributions SET collective = true WHERE id = ANY(:ids)
@@ -58,14 +58,14 @@ def mark_collective(conn: Connection, ids: list[int]) -> None:
             {"ids": ids},
         ).scalars()
     )
-    backfill_notices(conn, sorted(set(notice_ids)))
+    backfill_source_records(conn, sorted(set(source_record_ids)))
     conn.execute(
         text("""
             UPDATE publications p SET contributions_dirty = true
             FROM source_records sp
-            WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
+            WHERE sp.id = ANY(:source_records) AND p.id = sp.publication_id AND NOT p.contributions_dirty
         """),
-        {"notices": notice_ids},
+        {"source_records": source_record_ids},
     )
 
 

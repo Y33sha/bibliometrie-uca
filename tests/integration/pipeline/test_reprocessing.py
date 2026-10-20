@@ -47,7 +47,7 @@ def _insert_hal_staging(conn, doc):
 def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
 
-    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
     from pipeline.ingestion.common.source_records import (
         SourceRecordQueries,
     )
@@ -91,7 +91,7 @@ def _run_normalize_hal(conn):
     return processed
 
 
-def _get_pub_oa_status(conn, hal_id):
+def _get_publication_oa_status(conn, hal_id):
     """Retourne le oa_status de la publication liée à un source_document HAL."""
     return conn.execute(
         text("""
@@ -133,7 +133,7 @@ class TestHalReprocessingUpdatesOaStatus:
         _run_normalize_hal(sa_sync_conn)
         create_all_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "closed"
 
         # 2. Re-traitement : un fileMain_s apparaît (dépôt effectif en HAL)
         #    → green. `openAccess_bool=True` seul ne suffit plus depuis la
@@ -145,7 +145,7 @@ class TestHalReprocessingUpdatesOaStatus:
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
     def test_closed_replaces_green_on_reprocessing(self, sa_sync_conn):
         """Un re-traitement où le dépôt HAL disparaît met à jour le statut.
@@ -164,7 +164,7 @@ class TestHalReprocessingUpdatesOaStatus:
         _run_normalize_hal(sa_sync_conn)
         create_all_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
         # 2. Re-traitement : fileMain_s retiré, openAccess_bool = false
         #    → refresh_from_sources recalcule en closed.
@@ -172,7 +172,7 @@ class TestHalReprocessingUpdatesOaStatus:
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "closed"
 
     def test_deposit_floor_reopens_frozen_closed(self, sa_sync_conn):
         """Unpaywall donne closed pour le DOI, sans voir le dépôt, mais HAL détient le fichier (green) : la phase publications garde green."""
@@ -184,7 +184,7 @@ class TestHalReprocessingUpdatesOaStatus:
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
         create_all_publications(sa_sync_conn)
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
         # Unpaywall ne voit pas le dépôt HAL sous le DOI.
         sa_sync_conn.execute(
@@ -204,4 +204,4 @@ class TestHalReprocessingUpdatesOaStatus:
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
+        assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
