@@ -56,7 +56,7 @@ def audit(year: int) -> int:
 
     while True:
         params = {
-            **build_params(institution_ids, year=year, cursor=cursor),
+            **build_params(institution_ids, years=[year], cursor=cursor),
             "select": SELECT_FIELDS,
         }
         page = _get(works_url, params, f"page {pages + 1}")
