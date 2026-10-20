@@ -1,4 +1,4 @@
-"""Tests d'intégration de `JournalGatewayQueries` : files d'enrichissement et index DOAJ."""
+"""Tests d'intégration du SQL des revues : store et étapes de `publishers_journals`."""
 
 from __future__ import annotations
 
@@ -11,7 +11,36 @@ from sqlalchemy import text
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
+    find_journals_to_check_in_sudoc,
+    find_titles_of_journals_with_issn,
+    record_sudoc_check,
+)
+from pipeline.transformation.publishing.journals.delete_empty_journals import delete_empty_journals
+from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
+    find_journals_of_unknown_type,
+)
+from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
+    doaj_last_import_at,
+    find_journal_issn_index,
+    reset_is_in_doaj,
+)
+from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
+    find_doi_journal_pairs,
+    store_doi_namespaces,
+)
+from pipeline.transformation.publishing.journals.merge_duplicate_journals import (
+    find_journals_sharing_a_publication,
+    find_journals_sharing_active_issn,
+    find_journals_sharing_an_inactive_issn,
+    find_journals_sharing_issnl,
+    find_same_title_duplicates,
+)
+from pipeline.transformation.publishing.journals.store import JournalStore
+from pipeline.transformation.publishing.journals.type_proceedings_journals import (
+    find_record_types_of_unknown_journals,
+    find_titles_of_non_proceedings_journals,
+)
 from tests.integration.helpers.journals import (
     insert_journal,
     insert_journal_issn,
@@ -29,7 +58,7 @@ _article = partial(insert_source_publication, title="Article")
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return JournalGatewayQueries(sa_sync_conn)
+    return JournalStore(sa_sync_conn)
 
 
 def _issns(conn, journal_id):
@@ -54,7 +83,7 @@ class TestSudocCheck:
             sa_sync_conn, malformed_only, issn="1950-2051", status=IssnStatus.MALFORMED
         )
         checked = _journal(sa_sync_conn, issn="1476-4687", sudoc_checked=True)
-        rows = {r.id: r for r in repo.find_journals_to_check_in_sudoc()}
+        rows = {r.id: r for r in find_journals_to_check_in_sudoc(sa_sync_conn)}
         assert with_issn in rows
         assert rows[malformed_only].issns == (
             JournalIssn(issn="1950-2051", status=IssnStatus.MALFORMED),
@@ -78,7 +107,7 @@ class TestSudocCheck:
             journal_id=journal_id,
             biblio={"journal": {"issn": "1234-5678"}},
         )
-        rows = {r.id: r for r in repo.find_journals_to_check_in_sudoc()}
+        rows = {r.id: r for r in find_journals_to_check_in_sudoc(sa_sync_conn)}
         assert rows[journal_id].document_issns == ("1935-5548",)
 
     def test_queue_ignores_records_whose_issns_the_journal_carries(self, sa_sync_conn, repo):
@@ -90,7 +119,7 @@ class TestSudocCheck:
             journal_id=journal_id,
             biblio={"journal": {"issn": "01495992"}},
         )
-        assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
+        assert journal_id not in {r.id for r in find_journals_to_check_in_sudoc(sa_sync_conn)}
 
     def test_queue_ignores_record_issns_checked_without_journal(self, sa_sync_conn, repo):
         """Un ISSN d'une autre publication, déjà vérifié et gardé sans revue, ne ramène pas la revue dans la file."""
@@ -104,7 +133,7 @@ class TestSudocCheck:
             journal_id=journal_id,
             biblio={"journal": {"issn": "2750-6185"}},
         )
-        assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
+        assert journal_id not in {r.id for r in find_journals_to_check_in_sudoc(sa_sync_conn)}
 
     def test_find_by_issn_reaches_inactive_issns(self, sa_sync_conn, repo):
         """Un ISSN inactif sert au rapprochement ; une revue où il est actif passe avant ; une valeur mal formée n'en sert pas."""
@@ -126,7 +155,7 @@ class TestSudocCheck:
         sa_sync_conn.execute(
             text("UPDATE journals SET pub_count = 3 WHERE id = :id"), {"id": keeper}
         )
-        groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_issnl()}
+        groups = {g.key: g.journal_ids for g in find_journals_sharing_issnl(sa_sync_conn)}
         assert groups["2999-0001"] == (keeper, absorbed)
         assert unchecked not in groups["2999-0001"]
 
@@ -138,7 +167,7 @@ class TestSudocCheck:
         sa_sync_conn.execute(
             text("UPDATE journals SET pub_count = 4 WHERE id = :id"), {"id": keeper}
         )
-        groups = {g.issn: g.journals for g in repo.find_journals_sharing_active_issn()}
+        groups = {g.issn: g.journals for g in find_journals_sharing_active_issn(sa_sync_conn)}
         assert [j.id for j in groups["2999-0002"]] == [keeper, other]
         assert [j.title for j in groups["2999-0002"]] == ["BMJ", "BMJ British Medical Journal"]
 
@@ -171,7 +200,7 @@ class TestSudocCheck:
         _article(
             sa_sync_conn, source_id=f"sp-{active_b}-10.2222/y", doi="10.2222/y", journal_id=active_b
         )
-        groups = {g.key: g.journal_ids for g in repo.find_same_title_duplicates()}
+        groups = {g.key: g.journal_ids for g in find_same_title_duplicates(sa_sync_conn)}
         assert set(groups["revue test même préfixe"]) == {with_issn, without_issn}
         assert "revue test doublon vide" not in groups
         assert "revue test homonymes à issn" not in groups
@@ -187,7 +216,7 @@ class TestSudocCheck:
                 doi=f"10.9999/vide-{journal_id}",
                 journal_id=journal_id,
             )
-        assert "" not in {g.key for g in repo.find_same_title_duplicates()}
+        assert "" not in {g.key for g in find_same_title_duplicates(sa_sync_conn)}
 
     def test_journals_sharing_an_inactive_issn(self, sa_sync_conn, repo):
         """L'ISSN inactif de l'une est actif dans l'autre ; la revue dont le premier document est le plus tardif vient en tête, même quand l'ancien titre reçoit encore des documents récents. Une revue non vérifiée reste hors de la règle."""
@@ -219,7 +248,9 @@ class TestSudocCheck:
                 pub_year=year,
                 journal_id=journal_id,
             )
-        groups = {g.key: g.journal_ids for g in repo.find_journals_sharing_an_inactive_issn()}
+        groups = {
+            g.key: g.journal_ids for g in find_journals_sharing_an_inactive_issn(sa_sync_conn)
+        }
         assert groups["2999-0013"] == (later, earlier)
         assert "2999-0014" not in groups
         assert unchecked not in {i for ids in groups.values() for i in ids}
@@ -240,7 +271,7 @@ class TestSudocCheck:
             )
         pairs = [
             p
-            for p in repo.find_journals_sharing_a_publication()
+            for p in find_journals_sharing_a_publication(sa_sync_conn)
             if {p.first.id, p.second.id} & {full, abbreviated}
         ]
         assert [(p.first.id, p.second.id, p.publications) for p in pairs] == [
@@ -265,7 +296,7 @@ class TestSudocCheck:
         )
         with_payment = _journal(sa_sync_conn, title="Revue test avec paiement")
         insert_apc_payment(sa_sync_conn, journal_id=with_payment, open_access_fee=True)
-        deleted = {j.id: j for j in repo.delete_empty_journals()}
+        deleted = {j.id: j for j in delete_empty_journals(sa_sync_conn)}
         assert deleted[empty].title == "Revue test vide"
         assert deleted[empty].issns == ("2999-0007", "2999-0015")
         assert with_record not in deleted
@@ -288,7 +319,8 @@ class TestSudocCheck:
         journal_id = _journal(sa_sync_conn, issn="1476-4687", issnl="0028-0836")
         insert_journal_issn(sa_sync_conn, journal_id, issn="0007-0920")
         at = datetime(2026, 9, 15, tzinfo=UTC)
-        repo.record_sudoc_check(
+        record_sudoc_check(
+            sa_sync_conn,
             journal_id,
             issns=(
                 JournalIssn(issn="0028-0836", support=IssnSupport.PRINT, linking=True),
@@ -305,7 +337,8 @@ class TestSudocCheck:
 
     def test_record_writes_reference_title_and_its_name_form(self, sa_sync_conn, repo):
         journal_id = _journal(sa_sync_conn, title="ICORES 2023", issn="2184-4372")
-        repo.record_sudoc_check(
+        record_sudoc_check(
+            sa_sync_conn,
             journal_id,
             issns=(JournalIssn(issn="2184-4372", support=IssnSupport.PRINT),),
             released=(),
@@ -325,10 +358,12 @@ class TestSudocCheck:
         journal_id = _journal(
             sa_sync_conn, title="ICORES 2023", issn="2184-4372", sudoc_checked=True
         )
-        assert journal_id not in {r.id for r in repo.find_journals_to_check_in_sudoc()}
-        assert journal_id in {r.id for r in repo.find_journals_to_check_in_sudoc(also=[journal_id])}
+        assert journal_id not in {r.id for r in find_journals_to_check_in_sudoc(sa_sync_conn)}
+        assert journal_id in {
+            r.id for r in find_journals_to_check_in_sudoc(sa_sync_conn, also=[journal_id])
+        }
         assert (journal_id, "ICORES 2023", JournalType.UNKNOWN) in (
-            repo.find_titles_of_journals_with_issn()
+            find_titles_of_journals_with_issn(sa_sync_conn)
         )
 
 
@@ -367,7 +402,7 @@ class TestAddJournalIssns:
 class TestFindJournalsOfUnknownType:
     def test_returns_id_and_openalex_id(self, sa_sync_conn, repo):
         _journal(sa_sync_conn, openalex_id="S1")  # journal_type 'unknown' par défaut
-        rows = repo.find_journals_of_unknown_type()
+        rows = find_journals_of_unknown_type(sa_sync_conn)
         assert rows
         for journal_id, oa_id in rows:
             assert isinstance(journal_id, int)
@@ -381,19 +416,19 @@ class TestFindJournalsOfUnknownType:
         )
         _journal(sa_sync_conn)  # pas d'openalex_id
 
-        ids = [jid for jid, _ in repo.find_journals_of_unknown_type()]
+        ids = [jid for jid, _ in find_journals_of_unknown_type(sa_sync_conn)]
         assert needs in ids
         assert typed not in ids  # déjà typé → sorti de la file
 
     def test_respects_limit(self, sa_sync_conn, repo):
         for i in range(3):
             _journal(sa_sync_conn, openalex_id=f"S{i}")
-        assert len(repo.find_journals_of_unknown_type(limit=2)) == 2
+        assert len(find_journals_of_unknown_type(sa_sync_conn, limit=2)) == 2
 
     def test_limit_zero_is_unlimited(self, sa_sync_conn, repo):
         for i in range(2):
             _journal(sa_sync_conn, openalex_id=f"S{i}")
-        assert len(repo.find_journals_of_unknown_type(limit=0)) >= 2
+        assert len(find_journals_of_unknown_type(sa_sync_conn, limit=0)) >= 2
 
 
 class TestTitlesOfNonProceedingsJournals:
@@ -405,7 +440,7 @@ class TestTitlesOfNonProceedingsJournals:
             {"id": proceedings},
         )
 
-        rows = {r.id: r for r in repo.find_titles_of_non_proceedings_journals()}
+        rows = {r.id: r for r in find_titles_of_non_proceedings_journals(sa_sync_conn)}
 
         assert rows[with_issnl].has_issn is True
         assert proceedings not in rows
@@ -428,7 +463,9 @@ class TestRecordTypesOfUnknownJournals:
             sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid
         )
 
-        rows = [r for r in repo.find_record_types_of_unknown_journals() if r.journal_id == jid]
+        rows = [
+            r for r in find_record_types_of_unknown_journals(sa_sync_conn) if r.journal_id == jid
+        ]
 
         assert rows[0].records == (("crossref", "book-chapter"), ("hal", "COMM"))
 
@@ -440,7 +477,7 @@ class TestRecordTypesOfUnknownJournals:
             text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": typed}
         )
 
-        ids = {r.journal_id for r in repo.find_record_types_of_unknown_journals()}
+        ids = {r.journal_id for r in find_record_types_of_unknown_journals(sa_sync_conn)}
 
         assert typed not in ids
         assert empty not in ids
@@ -467,13 +504,13 @@ class TestDoiNamespaces:
             ),
             {"raw": '{"journal_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
         )
-        pairs = [p for p in repo.find_doi_journal_pairs() if p.journal_id == journal_id]
+        pairs = [p for p in find_doi_journal_pairs(sa_sync_conn) if p.journal_id == journal_id]
         assert [(p.doi, p.journal_type) for p in pairs] == [("10.9001/abc.1", JournalType.UNKNOWN)]
 
     def test_store_vide_puis_ecrit(self, sa_sync_conn, repo):
         journal_id = _journal(sa_sync_conn)
-        repo.store_doi_namespaces([DoiNamespace("10.9001/old.", journal_id, 5, 1.0)])
-        repo.store_doi_namespaces([DoiNamespace("10.9001/abc.", journal_id, 8, 0.95)])
+        store_doi_namespaces(sa_sync_conn, [DoiNamespace("10.9001/old.", journal_id, 5, 1.0)])
+        store_doi_namespaces(sa_sync_conn, [DoiNamespace("10.9001/abc.", journal_id, 8, 0.95)])
         rows = sa_sync_conn.execute(
             text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
         ).all()
@@ -485,12 +522,12 @@ class TestJournalIssnIndex:
         jid = _journal(sa_sync_conn, issn="1111-1111", eissn="2222-2222")
         insert_journal_issn(sa_sync_conn, jid, issn="3333-3333", status=IssnStatus.RELATED_TITLE)
         insert_journal_issn(sa_sync_conn, jid, issn="(Internet)", status=IssnStatus.MALFORMED)
-        ours = [r.issn for r in repo.find_journal_issn_index() if r.journal_id == jid]
+        ours = [r.issn for r in find_journal_issn_index(sa_sync_conn) if r.journal_id == jid]
         assert ours == ["1111-1111", "2222-2222", "3333-3333"]
 
     def test_excludes_journals_with_no_issn(self, sa_sync_conn, repo):
         jid = _journal(sa_sync_conn)
-        assert jid not in [r.journal_id for r in repo.find_journal_issn_index()]
+        assert jid not in [r.journal_id for r in find_journal_issn_index(sa_sync_conn)]
 
 
 class TestDoajImport:
@@ -499,7 +536,7 @@ class TestDoajImport:
         sa_sync_conn.execute(
             text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
-        assert repo.reset_is_in_doaj() >= 1
+        assert reset_is_in_doaj(sa_sync_conn) >= 1
         assert (
             sa_sync_conn.execute(
                 text("SELECT is_in_doaj FROM journals WHERE id = :id"), {"id": jid}
@@ -510,5 +547,5 @@ class TestDoajImport:
     def test_last_import_at_returns_a_value_when_imported(self, sa_sync_conn, repo):
         d = datetime.now(UTC) - timedelta(days=3)
         _journal(sa_sync_conn, issn="4444-4444", doaj_imported_at=d)
-        last = repo.doaj_last_import_at()
+        last = doaj_last_import_at(sa_sync_conn)
         assert last is not None and last >= d - timedelta(seconds=1)

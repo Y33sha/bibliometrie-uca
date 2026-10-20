@@ -6,22 +6,26 @@ Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local
 """
 
 import logging
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import NamedTuple
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, func, select, update
 
 from domain.dates import date_to_french
+from domain.journals.issns import IssnStatus
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
+from domain.types import JsonValue
+from infrastructure.db.scalars import scalar_datetime_or_none
+from infrastructure.db.tables import journal_issns, journals
 from pipeline.http.dump_download import DumpUnavailableError
 from pipeline.runtime.observability.libelles import BRANCHE, accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import attente
 from pipeline.runtime.observability.signals import signal_source_unavailable
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 
 LIBELLE = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -44,6 +48,56 @@ class DoajImportStats:
     no_issn_rows: int = 0  # rows du dump sans aucun ISSN valide
     orphan_rows: int = 0  # rows du dump dont l'ISSN est inconnu côté UCA
     matched: int = 0  # journaux UCA mis à is_in_doaj = TRUE
+
+
+class JournalIssnRow(NamedTuple):
+    """Un ISSN valide d'une revue, pour l'index par ISSN."""
+
+    journal_id: int
+    issn: str
+
+
+def find_journal_issn_index(conn: Connection) -> list[JournalIssnRow]:
+    """Les ISSN valides des revues, quel que soit leur statut : matière de l'index ISSN → revue à l'import du dump DOAJ."""
+    return [
+        JournalIssnRow(r.journal_id, r.issn)
+        for r in conn.execute(
+            select(journal_issns.c.journal_id, journal_issns.c.issn)
+            .where(
+                journal_issns.c.journal_id.is_not(None),
+                journal_issns.c.status != IssnStatus.MALFORMED,
+            )
+            .order_by(journal_issns.c.id)
+        ).all()
+    ]
+
+
+def update_journal_doaj(
+    conn: Connection,
+    journal_id: int,
+    *,
+    payload: Mapping[str, JsonValue] | None,
+    imported_at: datetime,
+    is_in_doaj: bool,
+) -> None:
+    """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` d'une revue présente dans le dump."""
+    conn.execute(
+        update(journals)
+        .where(journals.c.id == journal_id)
+        .values(doaj_payload=payload, doaj_imported_at=imported_at, is_in_doaj=is_in_doaj)
+    )
+
+
+def reset_is_in_doaj(conn: Connection) -> int:
+    """Efface le drapeau `is_in_doaj` de toutes les revues où il est posé, le dump DOAJ faisant autorité — l'import le re-pose ensuite sur les revues matchées. Retourne le nombre de drapeaux effacés."""
+    return conn.execute(
+        update(journals).where(journals.c.is_in_doaj).values(is_in_doaj=False)
+    ).rowcount
+
+
+def doaj_last_import_at(conn: Connection) -> datetime | None:
+    """Date du dernier import DOAJ (`max(doaj_imported_at)`), `None` si jamais importé. Commande la staleness du téléchargement du dump."""
+    return scalar_datetime_or_none(conn.execute(select(func.max(journals.c.doaj_imported_at))))
 
 
 def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
@@ -72,7 +126,6 @@ def run_import_doaj_dump(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalGatewayQueries,
     rows: Iterable[dict[str, str]],
     dry_run: bool = False,
     commit: bool = True,
@@ -85,7 +138,7 @@ def run_import_doaj_dump(
     """
     # Index ISSN normalisé → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
-    for indexed_journal_id, issn in journal_repo.find_journal_issn_index():
+    for indexed_journal_id, issn in find_journal_issn_index(conn):
         issn_to_journal_id.setdefault(issn, indexed_journal_id)
 
     stats = DoajImportStats()
@@ -111,11 +164,11 @@ def run_import_doaj_dump(
     if dry_run or not matches:
         return stats
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
-    journal_repo.reset_is_in_doaj()
+    reset_is_in_doaj(conn)
     now = datetime.now(UTC)
     for written, (journal_id, row) in enumerate(matches, 1):
-        journal_repo.update_journal_doaj(
-            journal_id, payload=clean_doaj_row(row), imported_at=now, is_in_doaj=True
+        update_journal_doaj(
+            conn, journal_id, payload=clean_doaj_row(row), imported_at=now, is_in_doaj=True
         )
         if commit and written % COMMIT_EVERY == 0:
             conn.commit()
@@ -128,7 +181,6 @@ def run_enrich_journals_from_doaj(
     conn: Connection,
     logger: logging.Logger,
     *,
-    journal_repo: JournalGatewayQueries,
     refresh_after_days: int,
     download_dump: DownloadDump,
 ) -> PhaseMetrics:
@@ -136,7 +188,7 @@ def run_enrich_journals_from_doaj(
 
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
-    last = journal_repo.doaj_last_import_at()
+    last = doaj_last_import_at(conn)
     delai = timedelta(days=refresh_after_days)
     if last is not None and last > datetime.now(UTC) - delai:
         metrics = PhaseMetrics(extras={"skipped": 1})
@@ -150,7 +202,7 @@ def run_enrich_journals_from_doaj(
         with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
             ligne.efface()
             with download_dump() as rows:
-                stats = run_import_doaj_dump(conn, logger, journal_repo=journal_repo, rows=rows)
+                stats = run_import_doaj_dump(conn, logger, rows=rows)
     except DumpUnavailableError as e:
         # Le téléchargement précède toute écriture : le référentiel reste celui du dernier import.
         metrics = PhaseMetrics()

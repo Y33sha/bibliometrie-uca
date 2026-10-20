@@ -5,17 +5,18 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.journals.delete_empty_journals import delete_empty_journals
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
+from pipeline.transformation.publishing.monographs.store import MonographStore
 from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.sources import insert_source_publication
 
 
 @pytest.fixture
 def repo(sa_sync_conn):
-    return ContainerGatewayQueries(sa_sync_conn)
+    return MonographStore(sa_sync_conn)
 
 
 def _volume(conn, repo, title: str, source_id: str) -> int:
@@ -64,5 +65,5 @@ def test_serie_creee_puis_retrouvee(sa_sync_conn, repo):
     second_run = run_link_monographs_to_collections(sa_sync_conn, logger)
     assert second_run.extras.get("monographs_linked", 0) == 0
 
-    deleted = {j.id for j in repo.delete_empty_journals()}
+    deleted = {j.id for j in delete_empty_journals(sa_sync_conn)}
     assert rows[0].series_id not in deleted

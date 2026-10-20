@@ -98,7 +98,7 @@ def _run_normalize_crossref(conn):
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-    from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+    from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
     queries = SourcePublicationQueries()
@@ -111,7 +111,7 @@ def _run_normalize_crossref(conn):
         logger,
         staging_queries,
         queries,
-        container_repo=ContainerGatewayQueries(conn),
+        container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
         authorship_queries=authorship_queries,
     )

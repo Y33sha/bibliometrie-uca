@@ -1,8 +1,19 @@
-"""Accès PostgreSQL du pipeline aux conteneurs d'un document : revues et monographies, sur une même connexion."""
+"""Stores des conteneurs d'un document : revues et monographies, sur une même connexion."""
 
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from typing import NamedTuple, Self
+
+from sqlalchemy import Connection
+
+from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.monographs.store import MonographStore
 
 
-class ContainerGatewayQueries(JournalGatewayQueries, MonographStore):
-    """Accès PostgreSQL à `journals` et `monographs`, sur une même connexion."""
+class ContainerStores(NamedTuple):
+    """Revues et monographies, sur une même connexion."""
+
+    journals: JournalStore
+    monographs: MonographStore
+
+    @classmethod
+    def of(cls, conn: Connection) -> Self:
+        return cls(JournalStore(conn), MonographStore(conn))

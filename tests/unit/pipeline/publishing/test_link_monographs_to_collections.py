@@ -33,7 +33,7 @@ def _run(monkeypatch, logger, repo: _Repo):
     monkeypatch.setattr(
         mod, "set_monograph_journal", lambda conn, m, j: repo.set_monograph_journal(m, j)
     )
-    monkeypatch.setattr(mod, "JournalGatewayQueries", lambda conn: repo)
+    monkeypatch.setattr(mod, "JournalStore", lambda conn: repo)
     return mod.run_link_monographs_to_collections(None, logger)
 
 

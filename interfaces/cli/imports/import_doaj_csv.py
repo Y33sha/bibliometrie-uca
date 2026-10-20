@@ -20,7 +20,6 @@ from pipeline.runtime.observability.libelles import accord
 from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 
 log = setup_logger("import_doaj_csv", os.path.dirname(__file__))
 
@@ -38,7 +37,6 @@ def main() -> None:
         stats = run_import_doaj_dump(
             conn,
             log,
-            journal_repo=JournalGatewayQueries(conn),
             rows=read_doaj_dump_rows(args.csv_file),
             dry_run=args.dry_run,
         )

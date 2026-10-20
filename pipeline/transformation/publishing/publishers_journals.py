@@ -60,7 +60,6 @@ from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump 
     run_enrich_journals_from_doaj,
 )
 from pipeline.transformation.publishing.journals.journal_merge import merge_journals
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
     run_learn_journal_doi_namespaces,
 )
@@ -287,7 +286,6 @@ def _run_enrich_journals_from_openalex(
         return run_enrich_journals_from_openalex(
             conn,
             ctx.logger,
-            journal_repo=JournalGatewayQueries(conn),
             fetch_batch=lambda oa_ids: fetch_sources_batch(
                 oa_ids, openalex_sources_api=sources_api
             ),
@@ -308,7 +306,6 @@ def _run_check_journals_in_sudoc(
             run_check_journals_in_sudoc(
                 conn,
                 ctx.logger,
-                journal_repo=JournalGatewayQueries(conn),
                 fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
                 fetch_record=lambda client, ppn: fetch_serial_record(
                     client, ppn, base_url=base_url
@@ -329,9 +326,7 @@ def _run_merge_duplicate_journals(
             merge_journals(conn, target_id, source_id)
             conn.commit()
 
-        return run_merge_duplicate_journals(
-            ctx.logger, journal_repo=JournalGatewayQueries(conn), merge=merge
-        )
+        return run_merge_duplicate_journals(conn, ctx.logger, merge=merge)
 
 
 def _run_merge_duplicate_monographs(
@@ -359,16 +354,14 @@ def _run_type_proceedings_journals(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_type_proceedings_journals(ctx.logger, journal_repo=JournalGatewayQueries(conn))
+        return run_type_proceedings_journals(conn, ctx.logger)
 
 
 def _run_learn_journal_doi_namespaces(
     ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_learn_journal_doi_namespaces(
-            ctx.logger, journal_repo=JournalGatewayQueries(conn)
-        )
+        return run_learn_journal_doi_namespaces(conn, ctx.logger)
 
 
 def _run_enrich_journals_from_doaj(
@@ -379,7 +372,6 @@ def _run_enrich_journals_from_doaj(
         return run_enrich_journals_from_doaj(
             conn,
             ctx.logger,
-            journal_repo=JournalGatewayQueries(conn),
             refresh_after_days=get_doaj_refresh_after_days(conn),
             download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=ctx.logger),
         )

@@ -248,7 +248,7 @@ class TestUpsertPublisher:
 class TestContainerDescription:
     def test_sans_source_aucun_conteneur(self):
         repo = MagicMock()
-        assert upsert_containers({}, None, container_repo=repo) == Containers(None, None)
+        assert upsert_containers({}, None, container_stores=repo) == Containers(None, None)
         repo.create_journal.assert_not_called()
 
     def test_repository_source_oa_model(self):
@@ -657,7 +657,7 @@ class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
             "queries": queries or FakeSourcePublicationQueries(),
-            "container_repo": MagicMock(),
+            "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": MagicMock(),
@@ -715,7 +715,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
@@ -740,7 +740,7 @@ class TestOpenalexNormalizerClass:
         assert result is True
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {
-            "container_repo",
+            "container_stores",
             "publisher_store",
             "staging_queries",
             "authorship_queries",

@@ -29,8 +29,18 @@ from infrastructure.repositories import (
     journal_repository,
     publisher_repository,
 )
+from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
+    find_journals_to_check_in_sudoc,
+    record_sudoc_check,
+)
+from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
+    update_journal_apc,
+)
 from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.store import JournalStore
+from pipeline.transformation.publishing.journals.type_proceedings_journals import (
+    find_titles_of_non_proceedings_journals,
+)
 from pipeline.transformation.publishing.pub_counts import PubCountRecompute
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from tests.integration.helpers.journals import (
@@ -62,7 +72,7 @@ def repo(sa_sync_conn):
 
 @pytest.fixture
 def gateway(sa_sync_conn):
-    return JournalGatewayQueries(sa_sync_conn)
+    return JournalStore(sa_sync_conn)
 
 
 @pytest.fixture
@@ -207,7 +217,7 @@ class TestUpdateJournal:
         j = _journal(sa_sync_conn, title="2024 IEEE SENSORS")
         update_journal(j, update=JournalUpdate(journal_type=JournalType.JOURNAL), repo=repo)
 
-        assert j not in {r.id for r in gateway.find_titles_of_non_proceedings_journals()}
+        assert j not in {r.id for r in find_titles_of_non_proceedings_journals(sa_sync_conn)}
         gateway.set_journal_type(j, JournalType.PROCEEDINGS)
         row = _fetch_one(
             sa_sync_conn,
@@ -233,7 +243,7 @@ class TestUpdateJournal:
         j = _journal(sa_sync_conn, apc_amount=1000, apc_currency="USD")
         update_journal(j, update=JournalUpdate(apc_amount=2499.99), repo=repo)
 
-        gateway.update_journal_apc(j, apc_amount=3000, apc_currency="GBP")
+        update_journal_apc(sa_sync_conn, j, apc_amount=3000, apc_currency="GBP")
 
         row = _fetch_one(
             sa_sync_conn,
@@ -258,9 +268,9 @@ class TestUpdateJournal:
             repo=repo,
         )
 
-        assert j not in {r.id for r in gateway.find_journals_to_check_in_sudoc(also=[j])}
+        assert j not in {r.id for r in find_journals_to_check_in_sudoc(sa_sync_conn, also=[j])}
         gateway.add_journal_issns(j, [JournalIssn(issn="0028-0836", support=IssnSupport.PRINT)])
-        gateway.record_sudoc_check(j, issns=[], released=[], checked_at=_NOW, title="Sudoc")
+        record_sudoc_check(sa_sync_conn, j, issns=[], released=[], checked_at=_NOW, title="Sudoc")
 
         row = _fetch_one(
             sa_sync_conn, "SELECT title, manual_fields FROM journals WHERE id = :id", id=j

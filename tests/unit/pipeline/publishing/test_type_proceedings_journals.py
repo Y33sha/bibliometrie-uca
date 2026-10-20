@@ -1,16 +1,17 @@
 """Tests du typage en recueil d'actes (`pipeline.transformation.publishing.journals.type_proceedings_journals`)."""
 
+import contextlib
 import logging
 from collections.abc import Sequence
 
+import pytest
+
 from domain.journals.journal import JournalType
-from pipeline.transformation.publishing.journals.journals import (
-    JournalRecordTypes,
-    JournalSummary,
-    JournalTitleIssnRow,
-)
+from pipeline.transformation.publishing.journals import type_proceedings_journals as step
+from pipeline.transformation.publishing.journals.store import JournalSummary
 from pipeline.transformation.publishing.journals.type_proceedings_journals import (
-    run_type_proceedings_journals,
+    JournalRecordTypes,
+    JournalTitleIssnRow,
 )
 
 
@@ -35,6 +36,24 @@ class _Repo:
         self.types[journal_id] = journal_type
 
 
+@contextlib.contextmanager
+def _bound(repo):
+    """Branche les fonctions SQL du module, et son store des revues, sur le faux `repo`."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            step,
+            "find_record_types_of_unknown_journals",
+            lambda conn, *a, **k: repo.find_record_types_of_unknown_journals(*a, **k),
+        )
+        mp.setattr(
+            step,
+            "find_titles_of_non_proceedings_journals",
+            lambda conn, *a, **k: repo.find_titles_of_non_proceedings_journals(*a, **k),
+        )
+        mp.setattr(step, "JournalStore", lambda conn: repo)
+        yield
+
+
 def test_revue_d_articles_de_congres_typee_et_journalisee(caplog):
     """Cas réel : actes IEEE ROBIO 2018, quatre articles de congrès Crossref."""
     logger = logging.getLogger("test_recueils")
@@ -45,7 +64,8 @@ def test_revue_d_articles_de_congres_typee_et_journalisee(caplog):
         ]
     )
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_type_proceedings_journals(logger, journal_repo=repo)
+        with _bound(repo):
+            metrics = step.run_type_proceedings_journals(None, logger)
 
     assert repo.types == {95637: JournalType.PROCEEDINGS}
     assert metrics.extras["journals_typed_proceedings"] == 1
@@ -56,7 +76,8 @@ def test_sans_recueil_rien_n_est_journalise(caplog):
     logger = logging.getLogger("test_recueils_aucun")
     repo = _Repo([JournalRecordTypes(12, (("hal", "ART"),))])
     with caplog.at_level(logging.INFO, logger=logger.name):
-        metrics = run_type_proceedings_journals(logger, journal_repo=repo)
+        with _bound(repo):
+            metrics = step.run_type_proceedings_journals(None, logger)
 
     assert repo.types == {}
     assert metrics.total == 0
@@ -74,7 +95,8 @@ def test_revue_au_titre_date_typee_quel_que_soit_son_type(caplog):
         ],
     )
     with caplog.at_level(logging.INFO, logger=logger.name):
-        run_type_proceedings_journals(logger, journal_repo=repo)
+        with _bound(repo):
+            step.run_type_proceedings_journals(None, logger)
 
     assert repo.types == {83215: JournalType.PROCEEDINGS}
     assert "(titre daté)" in caplog.text
@@ -95,6 +117,7 @@ def test_revue_au_titre_d_actes_typee():
             ),
         ],
     )
-    run_type_proceedings_journals(logging.getLogger("test_recueils_actes"), journal_repo=repo)
+    with _bound(repo):
+        step.run_type_proceedings_journals(None, logging.getLogger("test_recueils_actes"))
 
     assert repo.types == {83470: JournalType.PROCEEDINGS}

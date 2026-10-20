@@ -1,14 +1,15 @@
 """Tests du calcul des espaces de noms DOI des revues (`pipeline.transformation.publishing.journals.learn_journal_doi_namespaces`)."""
 
+import contextlib
 import logging
 from collections.abc import Sequence
 
+import pytest
+
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.journals.journal import JournalType
-from pipeline.transformation.publishing.journals.journals import DoiJournalRow
-from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
-    run_learn_journal_doi_namespaces,
-)
+from pipeline.transformation.publishing.journals import learn_journal_doi_namespaces as step
+from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import DoiJournalRow
 
 
 class _Repo:
@@ -23,6 +24,21 @@ class _Repo:
         self.stored = list(namespaces)
 
 
+@contextlib.contextmanager
+def _bound(repo):
+    """Branche les fonctions SQL du module, et son store des revues, sur le faux `repo`."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            step,
+            "find_doi_journal_pairs",
+            lambda conn, *a, **k: repo.find_doi_journal_pairs(*a, **k),
+        )
+        mp.setattr(
+            step, "store_doi_namespaces", lambda conn, *a, **k: repo.store_doi_namespaces(*a, **k)
+        )
+        yield
+
+
 def _pairs(prefix: str, journal_id: int, journal_type: JournalType) -> list[DoiJournalRow]:
     return [DoiJournalRow(f"{prefix}{i:05d}", journal_id, journal_type) for i in range(10)]
 
@@ -32,6 +48,7 @@ def test_une_plateforme_n_obtient_aucun_espace():
         _pairs("10.64628/aak.", 1, JournalType.MEDIA)
         + _pairs("10.2139/ssrn.", 2, JournalType.REPOSITORY)
     )
-    metrics = run_learn_journal_doi_namespaces(logging.getLogger("test"), journal_repo=repo)
+    with _bound(repo):
+        metrics = step.run_learn_journal_doi_namespaces(None, logging.getLogger("test"))
     assert [(ns.namespace, ns.journal_id) for ns in repo.stored] == [("10.64628/aak.", 1)]
     assert metrics.extras["journal_doi_namespaces"] == 1

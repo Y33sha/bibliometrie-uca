@@ -39,7 +39,7 @@ from pipeline.ingestion.wos.payload import (
     parse_export_researcher_ids,
     split_export_list,
 )
-from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
@@ -478,11 +478,11 @@ def upsert_containers(
     rec: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerGatewayQueries,
+    container_stores: ContainerStores,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
-        get_container_facts(rec), publisher_id=publisher_id, repo=container_repo
+        get_container_facts(rec), publisher_id=publisher_id, stores=container_stores
     )
 
 
@@ -664,7 +664,7 @@ def process_record(
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerGatewayQueries,
+    container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
@@ -683,7 +683,7 @@ def process_record(
     publisher_id = upsert_publisher(
         as_str(rec.get("publisher_name")), publisher_store=publisher_store
     )
-    containers = upsert_containers(rec, publisher_id, container_repo=container_repo)
+    containers = upsert_containers(rec, publisher_id, container_stores=container_stores)
     pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
 
     source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
@@ -701,13 +701,13 @@ class WosNormalizer(BibliographicNormalizer):
         return as_str(rec.get("title")), as_int(rec.get("pub_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_store = self._container_repo, self._publisher_repo
+        container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_record(
             conn,
             self._queries,
             self.logger,
             row,
-            container_repo=container_repo,
+            container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,

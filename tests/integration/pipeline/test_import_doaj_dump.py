@@ -7,7 +7,6 @@ from sqlalchemy import text
 from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
     run_import_doaj_dump,
 )
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
 from tests.integration.helpers.journals import insert_journal, insert_journal_issn
 
 
@@ -33,7 +32,6 @@ def _run(conn, rows, *, dry_run=False):
     return run_import_doaj_dump(
         conn,
         logging.getLogger("test"),
-        journal_repo=JournalGatewayQueries(conn),
         rows=rows,
         dry_run=dry_run,
         commit=False,

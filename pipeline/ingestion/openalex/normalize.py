@@ -54,7 +54,7 @@ from pipeline.ingestion.openalex.payload import (
     short_openalex_id,
     should_skip_publisher_journal,
 )
-from pipeline.transformation.publishing.containers import ContainerGatewayQueries
+from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
     find_or_create_containers,
@@ -212,11 +212,11 @@ def upsert_containers(
     work: Mapping[str, JsonValue],
     publisher_id: int | None,
     *,
-    container_repo: ContainerGatewayQueries,
+    container_stores: ContainerStores,
 ) -> Containers:
     """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
     return find_or_create_containers(
-        get_container_facts(work), publisher_id=publisher_id, repo=container_repo
+        get_container_facts(work), publisher_id=publisher_id, stores=container_stores
     )
 
 
@@ -515,7 +515,7 @@ def process_work(
     queries: SourcePublicationQueries,
     staging_row: StagingRow,
     *,
-    container_repo: ContainerGatewayQueries,
+    container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
@@ -530,7 +530,7 @@ def process_work(
         containers = Containers(None, None)
     else:
         publisher_id = upsert_publisher(work, publisher_store=publisher_store)
-        containers = upsert_containers(work, publisher_id, container_repo=container_repo)
+        containers = upsert_containers(work, publisher_id, container_stores=container_stores)
     pub_meta = extract_pub_metadata(
         work, containers.journal_id, primary, monograph_id=containers.monograph_id
     )
@@ -553,12 +553,12 @@ class OpenalexNormalizer(BibliographicNormalizer):
         return title, as_int(work.get("publication_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
-        container_repo, publisher_store = self._container_repo, self._publisher_repo
+        container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
             conn,
             self._queries,
             row,
-            container_repo=container_repo,
+            container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,

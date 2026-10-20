@@ -145,7 +145,7 @@ class TestContainerDescription:
         assert facts.book_title == "IC 2024"
 
     def test_sans_conteneur_aucun(self):
-        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
+        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
 
 
 class TestUpsertPublisher:
@@ -604,7 +604,7 @@ class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
             "queries": queries or FakeSourcePublicationQueries(),
-            "container_repo": MagicMock(),
+            "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "authorship_queries": FakeAuthorshipsBatchQueries(),
@@ -690,7 +690,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=FakeAuthorshipsBatchQueries(),
     )

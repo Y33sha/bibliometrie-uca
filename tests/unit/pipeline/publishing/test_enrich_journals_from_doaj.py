@@ -1,14 +1,15 @@
 """Rafraîchissement du référentiel DOAJ (`run_enrich_journals_from_doaj`) : le dump est téléchargé seulement quand le dernier import date de plus que le délai."""
 
+import contextlib
 import logging
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
+import pytest
+
 from pipeline.http.dump_download import DumpUnavailableError
-from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
-    run_enrich_journals_from_doaj,
-)
+from pipeline.transformation.publishing.journals import import_journals_from_doaj_dump as step
 
 
 class _FakeJournalRepo:
@@ -29,6 +30,25 @@ class _FakeJournalRepo:
         self.updated.append(journal_id)
 
 
+@contextlib.contextmanager
+def _bound(repo):
+    """Branche les fonctions SQL du module, et son store des revues, sur le faux `repo`."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            step, "doaj_last_import_at", lambda conn, *a, **k: repo.doaj_last_import_at(*a, **k)
+        )
+        mp.setattr(
+            step,
+            "find_journal_issn_index",
+            lambda conn, *a, **k: repo.find_journal_issn_index(*a, **k),
+        )
+        mp.setattr(step, "reset_is_in_doaj", lambda conn, *a, **k: repo.reset_is_in_doaj(*a, **k))
+        mp.setattr(
+            step, "update_journal_doaj", lambda conn, *a, **k: repo.update_journal_doaj(*a, **k)
+        )
+        yield
+
+
 def _run(repo: _FakeJournalRepo) -> tuple[dict, list[bool]]:
     downloads: list[bool] = []
 
@@ -37,13 +57,13 @@ def _run(repo: _FakeJournalRepo) -> tuple[dict, list[bool]]:
         downloads.append(True)
         yield [{"Journal ISSN (print version)": "0028-0836"}]
 
-    metrics = run_enrich_journals_from_doaj(
-        MagicMock(),
-        logging.getLogger("test"),
-        journal_repo=repo,
-        refresh_after_days=30,
-        download_dump=download_dump,
-    )
+    with _bound(repo):
+        metrics = step.run_enrich_journals_from_doaj(
+            MagicMock(),
+            logging.getLogger("test"),
+            refresh_after_days=30,
+            download_dump=download_dump,
+        )
     return metrics.extras, downloads
 
 
@@ -76,13 +96,13 @@ def test_dump_without_recognized_journal_is_signaled():
         yield [{"Colonne renommée": "0028-0836"}]
 
     repo = _FakeJournalRepo(None)
-    metrics = run_enrich_journals_from_doaj(
-        MagicMock(),
-        logging.getLogger("test"),
-        journal_repo=repo,
-        refresh_after_days=30,
-        download_dump=download_dump,
-    )
+    with _bound(repo):
+        metrics = step.run_enrich_journals_from_doaj(
+            MagicMock(),
+            logging.getLogger("test"),
+            refresh_after_days=30,
+            download_dump=download_dump,
+        )
     assert repo.updated == []
     assert [s["code"] for s in metrics.signals] == ["dump_unrecognized"]
 
@@ -103,13 +123,13 @@ def test_unavailable_dump_leaves_referential_unchanged():
         yield []
 
     repo = _Repo(None)
-    metrics = run_enrich_journals_from_doaj(
-        MagicMock(),
-        logging.getLogger("test"),
-        journal_repo=repo,
-        refresh_after_days=30,
-        download_dump=download_dump,
-    )
+    with _bound(repo):
+        metrics = step.run_enrich_journals_from_doaj(
+            MagicMock(),
+            logging.getLogger("test"),
+            refresh_after_days=30,
+            download_dump=download_dump,
+        )
     assert _Repo.resets == 0
     assert repo.updated == []
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

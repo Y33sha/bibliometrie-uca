@@ -1,5 +1,6 @@
 """Enrichissement des revues par OpenAlex Sources : écriture de l'APC et du type."""
 
+import contextlib
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -8,6 +9,24 @@ import pytest
 from pipeline.transformation.publishing.journals import (
     enrich_journals_from_openalex as journals_mod,
 )
+
+
+@contextlib.contextmanager
+def _bound(repo):
+    """Branche les fonctions SQL du module, et son store des revues, sur le faux `repo`."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            journals_mod,
+            "find_journals_of_unknown_type",
+            lambda conn, *a, **k: repo.find_journals_of_unknown_type(*a, **k),
+        )
+        mp.setattr(
+            journals_mod,
+            "update_journal_apc",
+            lambda conn, *a, **k: repo.update_journal_apc(*a, **k),
+        )
+        mp.setattr(journals_mod, "JournalStore", lambda conn: repo)
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -19,13 +38,13 @@ class TestJournalsApc:
     def _run(self, answer):
         journal_repo = MagicMock()
         journal_repo.find_journals_of_unknown_type.return_value = [(1, "S1")]
-        journals_mod.run_enrich_journals_from_openalex(
-            MagicMock(),
-            MagicMock(),
-            journal_repo=journal_repo,
-            fetch_batch=lambda _oa_ids: {"S1": answer},
-            breaker=SimpleNamespace(tripped=False),
-        )
+        with _bound(journal_repo):
+            journals_mod.run_enrich_journals_from_openalex(
+                MagicMock(),
+                MagicMock(),
+                fetch_batch=lambda _oa_ids: {"S1": answer},
+                breaker=SimpleNamespace(tripped=False),
+            )
         return journal_repo
 
     def test_apc_found_is_written(self):
@@ -46,13 +65,13 @@ class TestJournalsWorkerStopsOnTrippedBreaker:
         # row = (journal_id, oa_id) ; BATCH_SIZE journaux par batch.
         rows = [(i, f"S{i}") for i in range(n_batches * journals_mod.BATCH_SIZE)]
         journal_repo.find_journals_of_unknown_type.return_value = rows
-        journals_mod.run_enrich_journals_from_openalex(
-            conn,
-            MagicMock(),
-            journal_repo=journal_repo,
-            fetch_batch=fetch_batch,
-            breaker=breaker,
-        )
+        with _bound(journal_repo):
+            journals_mod.run_enrich_journals_from_openalex(
+                conn,
+                MagicMock(),
+                fetch_batch=fetch_batch,
+                breaker=breaker,
+            )
         return conn
 
     def test_stops_when_breaker_trips(self):

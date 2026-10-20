@@ -11,7 +11,10 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_journal,
     find_or_create_publisher,
 )
-from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
+    update_journal_apc,
+)
+from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from tests.integration.helpers.journals import (
     insert_journal_with_issns,
@@ -26,7 +29,7 @@ _journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
 
 @pytest.fixture
 def gateway(sa_sync_conn):
-    return JournalGatewayQueries(sa_sync_conn)
+    return JournalStore(sa_sync_conn)
 
 
 @pytest.fixture
@@ -260,13 +263,13 @@ class TestFindOrCreateJournal:
         assert row.sudoc_checked_at is None
 
 
-# ── JournalGatewayQueries.update_journal_apc ─────────────────────────────────────────────
+# ── JournalStore.update_journal_apc ─────────────────────────────────────────────
 
 
 class TestUpdateJournalApc:
     def test_updates_fields(self, sa_sync_conn, gateway):
         j_id = _journal(sa_sync_conn)
-        gateway.update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR")
+        update_journal_apc(sa_sync_conn, j_id, apc_amount=3000.0, apc_currency="EUR")
         row = _fetch_one(
             sa_sync_conn,
             "SELECT apc_amount, apc_currency FROM journals WHERE id = :id",
@@ -279,7 +282,7 @@ class TestUpdateJournalApc:
         """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
         DOAJ) n'est jamais touché par l'enrichissement APC."""
         j_id = _journal(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
-        gateway.update_journal_apc(j_id, apc_currency="EUR")
+        update_journal_apc(sa_sync_conn, j_id, apc_currency="EUR")
         row = _fetch_one(
             sa_sync_conn,
             "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = :id",

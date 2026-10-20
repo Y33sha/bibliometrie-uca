@@ -449,7 +449,7 @@ class TestUpsertPublisherEtJournal:
 
     def test_sans_titre_de_contenant_aucune_revue(self):
         """Un document sans revue ni série qui le porte ne crée pas d'entrée au référentiel."""
-        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
+        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
 
     def test_article_revue_et_ses_deux_issn(self):
         facts = get_container_facts(
@@ -626,7 +626,7 @@ class TestProcessWork:
             MagicMock(),
             queries,
             staging_row(staging_id=42, raw=raw),
-            container_repo=MagicMock(),
+            container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
             authorship_queries=MagicMock(),
@@ -672,7 +672,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )

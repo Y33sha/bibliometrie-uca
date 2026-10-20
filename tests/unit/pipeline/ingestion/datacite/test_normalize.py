@@ -320,7 +320,7 @@ class TestUpsertPublisher:
 class TestContainers:
     def test_sans_titre_de_contenant_aucun_conteneur(self):
         """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
-        assert upsert_containers({}, None, container_repo=MagicMock()) == Containers(None, None)
+        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
 
     def test_revue_identifiee_par_son_issn(self):
         attrs = {
@@ -352,7 +352,7 @@ class TestContainers:
             "container": {"title": "ATeM Archiv für Textmusikforschung", "type": "Series"},
         }
 
-        assert upsert_containers(attrs, 7, container_repo=MagicMock()) == Containers(3, None)
+        assert upsert_containers(attrs, 7, container_stores=MagicMock()) == Containers(3, None)
 
     def test_copie_d_entrepot_sans_revue(self):
         """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
@@ -397,7 +397,7 @@ def _attributs(**surcharges) -> dict:
 class TestProcessWork:
     def _kwargs(self, queries, staging_queries):
         return {
-            "container_repo": MagicMock(),
+            "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries,
             "authorship_queries": MagicMock(),
@@ -491,7 +491,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
@@ -507,7 +507,7 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        container_repo=MagicMock(),
+        container_stores=MagicMock(),
         publisher_store=MagicMock(),
         authorship_queries=MagicMock(),
     )
