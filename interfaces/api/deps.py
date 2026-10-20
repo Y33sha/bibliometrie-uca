@@ -12,7 +12,7 @@ from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.ports.pipeline.build_authorships import AuthorshipsBuildQueries
-from application.ports.pipeline.countries import CountryRecompute
+from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
 from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
@@ -86,7 +86,7 @@ from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
     AuthorshipsBuild,
-    CountryQueries,
+    CountryRecompute,
     JournalRecompute,
     PerimeterStructures,
     PubCountRecompute,
@@ -337,10 +337,10 @@ def pub_count_recompute() -> PubCountRecomputePort:
 
 
 # Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_country_recompute_singleton: CountryRecompute = CountryQueries()
+_country_recompute_singleton: CountryRecomputePort = CountryRecompute()
 
 
-def country_recompute() -> CountryRecompute:
+def country_recompute() -> CountryRecomputePort:
     """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
     return _country_recompute_singleton
 

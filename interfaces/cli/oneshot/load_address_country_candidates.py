@@ -22,7 +22,7 @@ from sqlalchemy import text
 from domain.country_detection import CountryDetectionMethod
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.countries.store import CountryCandidatesStore
 
 log = setup_logger("load_address_country_candidates", os.path.dirname(__file__))
 
@@ -38,7 +38,6 @@ def main() -> int:
         "--dry-run", action="store_true", help="Rapport seul : n'écrit rien (défaut : applique)."
     )
     args = parser.parse_args()
-    queries = CountryQueries()
     with get_sync_engine().connect() as conn:
         existing = set(conn.execute(text("SELECT id FROM addresses")).scalars())
         by_method: dict[CountryDetectionMethod, defaultdict[int, list[str]]] = {
@@ -56,7 +55,7 @@ def main() -> int:
             added = 0
             if not args.dry_run:
                 for start in range(0, len(rows), _BATCH):
-                    added += queries.insert_candidates(conn, method, rows[start : start + _BATCH])
+                    added += CountryCandidatesStore(conn).add(method, rows[start : start + _BATCH])
             log.info("%s : %d adresses, %d candidats ajoutés", method.value, len(rows), added)
         if args.dry_run:
             log.info("DRY-RUN — aucune écriture")

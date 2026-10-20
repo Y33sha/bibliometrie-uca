@@ -16,7 +16,7 @@ from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.countries.store import CountryCandidatesStore
 
 log = setup_logger("redetect_address_countries", os.path.dirname(__file__))
 
@@ -35,7 +35,7 @@ def main() -> int:
             ).scalar_one()
             log.info("adresses à marquer : %d", count)
             return 0
-        marked = CountryQueries().mark_all_addresses_for_detection(conn)
+        marked = CountryCandidatesStore(conn).mark_all_for_detection()
     log.info("adresses marquées : %d ; lancer run_pipeline --only countries", marked)
     return 0
 

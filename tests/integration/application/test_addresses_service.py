@@ -17,7 +17,8 @@ from application.services.addresses.structure_links import (
 from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories import address_repository, authorship_repository
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.countries.refresh_publication_countries import CountryRecompute
+from pipeline.transformation.countries.store import CountryCandidatesStore
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from tests.integration.helpers.addresses import (
     ensure_country,
@@ -35,7 +36,7 @@ from tests.integration.helpers.structures import (
     insert_structure_name_form,
 )
 
-_GATEWAY = CountryQueries()
+_GATEWAY = CountryRecompute()
 
 
 @pytest.fixture
@@ -196,8 +197,8 @@ class TestSetCountry:
         addr = insert_address(
             sa_sync_conn, "Department of Neurology, University of Mainz (Denmark)"
         )
-        _GATEWAY.insert_candidates(
-            sa_sync_conn, CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
+        CountryCandidatesStore(sa_sync_conn).add(
+            CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
         )
 
         set_country(sa_sync_conn, addr, ["DE"], repo=repo, country_recompute=_GATEWAY)
@@ -227,8 +228,8 @@ class TestSetCountry:
         ensure_country(sa_sync_conn, "FR")
         ensure_country(sa_sync_conn, "DE")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne, France")
-        _GATEWAY.insert_candidates(
-            sa_sync_conn, CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
+        CountryCandidatesStore(sa_sync_conn).add(
+            CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
         )
         set_country(sa_sync_conn, addr, ["DE"], repo=repo, country_recompute=_GATEWAY)
 

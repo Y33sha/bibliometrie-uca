@@ -38,11 +38,11 @@ from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
 from pipeline.ingestion.common.signatures import AuthorRecord
 from pipeline.ingestion.openalex.normalize import build_openalex_author_records
 from pipeline.ingestion.scanr.normalize import build_scanr_author_records
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
-from pipeline.transformation.structures.countries.detect_by_country_name import (
+from pipeline.transformation.countries.detect_by_country_name import (
     _match_trailing_country,
+    load_country_forms,
 )
-from pipeline.transformation.structures.countries.place_name_detector import PlaceNameDetector
+from pipeline.transformation.countries.place_name_detector import PlaceNameDetector
 
 log = setup_logger("measure_address_country_candidates", os.path.dirname(__file__))
 
@@ -76,7 +76,7 @@ def load_addresses(conn: Connection) -> list[Address]:
 
 
 def country_name_candidates(conn: Connection, addresses: list[Address]) -> Iterator[Candidate]:
-    forms = CountryQueries().load_country_forms(conn)
+    forms = load_country_forms(conn)
     max_tokens = max((form.count(" ") + 1 for form in forms), default=1)
     for address in addresses:
         iso = _match_trailing_country(address.normalized_text, forms, max_tokens)

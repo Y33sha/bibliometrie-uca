@@ -1,9 +1,16 @@
-"""Tests d'intégration pour `pipeline.transformation.structures.countries.countries_queries`."""
+"""Tests d'intégration du SQL de la phase `countries` : candidats, résolution, recopie en cascade."""
 
 from sqlalchemy import text
 
 from domain.country_detection import CountryDetectionMethod
-from pipeline.transformation.structures.countries.countries_queries import CountryQueries
+from pipeline.transformation.countries.refresh_publication_countries import (
+    clear_countries_dirty,
+    refresh_publication_countries,
+    refresh_source_contribution_countries,
+    refresh_source_publication_countries,
+)
+from pipeline.transformation.countries.resolution import resolve_address_countries
+from pipeline.transformation.countries.store import CountryCandidatesStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -12,15 +19,13 @@ from tests.integration.helpers.sources import (
     insert_source_publication,
 )
 
-_Q = CountryQueries()
-
 
 def _resolve(conn, address_id: int, codes: list[str]) -> None:
     """Donne à l'adresse le candidat `country_name` `codes`, puis la résout."""
     for code in codes:
         ensure_country(conn, code)
-    _Q.insert_candidates(conn, CountryDetectionMethod.COUNTRY_NAME, [(address_id, codes)])
-    _Q.resolve_address_countries(conn, [address_id])
+    CountryCandidatesStore(conn).add(CountryDetectionMethod.COUNTRY_NAME, [(address_id, codes)])
+    resolve_address_countries(conn, [address_id])
 
 
 def _candidates(conn, address_id: int) -> set[tuple[str, str]]:
@@ -50,8 +55,8 @@ class TestCandidatesAndResolution:
             text("UPDATE addresses SET candidates_dirty = false WHERE id = :a"), {"a": addr}
         )
 
-        added = _Q.insert_candidates(
-            sa_sync_conn, CountryDetectionMethod.COUNTRY_NAME, [(addr, ["fr", "zz"])]
+        added = CountryCandidatesStore(sa_sync_conn).add(
+            CountryDetectionMethod.COUNTRY_NAME, [(addr, ["fr", "zz"])]
         )
 
         assert added == 1
@@ -75,8 +80,8 @@ class TestCandidatesAndResolution:
             text("UPDATE addresses SET candidates_dirty = (id = :d)"), {"d": dirty}
         )
 
-        _Q.replace_candidates_of_dirty_addresses(
-            sa_sync_conn, CountryDetectionMethod.INSTITUTION, []
+        CountryCandidatesStore(sa_sync_conn).replace_for_dirty_addresses(
+            CountryDetectionMethod.INSTITUTION, []
         )
 
         assert _candidates(sa_sync_conn, dirty) == {("fr", "city")}
@@ -86,11 +91,15 @@ class TestCandidatesAndResolution:
         for code in ("ca", "ma"):
             ensure_country(sa_sync_conn, code)
         addr = insert_address(sa_sync_conn, "Univ Cadi Ayyad, Marrakech, Canada")
-        _Q.insert_candidates(sa_sync_conn, CountryDetectionMethod.COUNTRY_NAME, [(addr, ["ca"])])
-        _Q.insert_candidates(sa_sync_conn, CountryDetectionMethod.INSTITUTION, [(addr, ["ma"])])
-        _Q.insert_candidates(sa_sync_conn, CountryDetectionMethod.CITY, [(addr, ["ma"])])
+        CountryCandidatesStore(sa_sync_conn).add(
+            CountryDetectionMethod.COUNTRY_NAME, [(addr, ["ca"])]
+        )
+        CountryCandidatesStore(sa_sync_conn).add(
+            CountryDetectionMethod.INSTITUTION, [(addr, ["ma"])]
+        )
+        CountryCandidatesStore(sa_sync_conn).add(CountryDetectionMethod.CITY, [(addr, ["ma"])])
 
-        assert _Q.resolve_address_countries(sa_sync_conn) >= 1
+        assert resolve_address_countries(sa_sync_conn) >= 1
 
         assert _field(sa_sync_conn, addr, "countries") == ["ma"]
         assert _field(sa_sync_conn, addr, "countries_dirty") is True
@@ -99,7 +108,7 @@ class TestCandidatesAndResolution:
     def test_une_adresse_sans_candidat_perd_son_pays(self, sa_sync_conn):
         addr = insert_address(sa_sync_conn, "Centre hospitalier universitaire", countries=["fr"])
 
-        _Q.resolve_address_countries(sa_sync_conn, [addr])
+        resolve_address_countries(sa_sync_conn, [addr])
 
         assert _field(sa_sync_conn, addr, "countries") is None
 
@@ -119,7 +128,7 @@ class TestCandidatesAndResolution:
             {"sa": sa, "a": addr},
         )
 
-        assert _Q.insert_ror_candidates(sa_sync_conn) == 1
+        assert CountryCandidatesStore(sa_sync_conn).add_ror() == 1
         assert _candidates(sa_sync_conn, addr) == {("fr", "ror")}
 
 
@@ -134,8 +143,8 @@ class TestRefreshAddressSourceCountries:
         )
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
-        _Q.refresh_signature_countries(sa_sync_conn)
-        updated = _Q.refresh_address_source_countries(sa_sync_conn)
+        refresh_source_contribution_countries(sa_sync_conn)
+        updated = refresh_source_publication_countries(sa_sync_conn)
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -151,7 +160,7 @@ class TestRefreshAddressSourceCountries:
         addr = insert_address(sa_sync_conn, "X", countries=None, normalized_text="X")
         insert_signature_address(sa_sync_conn, sa, address_id=addr)
 
-        updated = _Q.refresh_address_source_countries(sa_sync_conn)
+        updated = refresh_source_publication_countries(sa_sync_conn)
         assert updated == 0
 
 
@@ -168,7 +177,7 @@ class TestRefreshPublicationCountries:
         insert_signature(sa_sync_conn, sd1, source="hal")
         insert_signature(sa_sync_conn, sd2, source="openalex")
 
-        updated = _Q.refresh_publication_countries(sa_sync_conn)
+        updated = refresh_publication_countries(sa_sync_conn)
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -181,7 +190,7 @@ class TestRefreshPublicationCountries:
         insert_source_publication(
             sa_sync_conn, None, source="hal", source_id="hal-orphan", countries=["FR"]
         )
-        updated = _Q.refresh_publication_countries(sa_sync_conn)
+        updated = refresh_publication_countries(sa_sync_conn)
         assert updated == 0
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
@@ -195,7 +204,7 @@ class TestRefreshPublicationCountries:
             {"pid": pub_id},
         )
 
-        updated = _Q.refresh_publication_countries(sa_sync_conn)
+        updated = refresh_publication_countries(sa_sync_conn)
         assert updated == 0
 
 
@@ -249,8 +258,8 @@ class TestDirtyDrivenSourceCountries:
             ),
         )
 
-        _Q.refresh_signature_countries(sa_sync_conn)
-        _Q.refresh_address_source_countries(sa_sync_conn)
+        refresh_source_contribution_countries(sa_sync_conn)
+        refresh_source_publication_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, dirty_sd) == ["FR"]
         assert _sp_countries(sa_sync_conn, clean_sd) is None  # aucun sa dirty → pas recalculé
 
@@ -266,7 +275,7 @@ class TestDirtyDrivenSourceCountries:
             address_id=insert_address(sa_sync_conn, "X", countries=None, normalized_text="X"),
         )
 
-        _Q.refresh_address_source_countries(sa_sync_conn)
+        refresh_source_publication_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) is None  # orphelin → NULL
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
@@ -283,8 +292,8 @@ class TestDirtyDrivenSourceCountries:
         # La résolution pose addresses.countries_dirty sur la ligne changée.
         _resolve(sa_sync_conn, addr, ["FR"])
         assert _addr_dirty(sa_sync_conn, addr) is True
-        _Q.refresh_signature_countries(sa_sync_conn)
-        _Q.refresh_address_source_countries(sa_sync_conn)
+        refresh_source_contribution_countries(sa_sync_conn)
+        refresh_source_publication_countries(sa_sync_conn)
         assert _sp_countries(sa_sync_conn, sd) == ["FR"]  # recalculé via l'adresse dirty
 
     def test_le_pays_d_une_signature_sans_adresse_vient_de_sa_structure_hal(self, sa_sync_conn):
@@ -302,8 +311,8 @@ class TestDirtyDrivenSourceCountries:
             text("INSERT INTO source_authorship_hal_structures VALUES (:sa, 1)"), {"sa": sa}
         )
 
-        _Q.refresh_signature_countries(sa_sync_conn)
-        _Q.refresh_address_source_countries(sa_sync_conn)
+        refresh_source_contribution_countries(sa_sync_conn)
+        refresh_source_publication_countries(sa_sync_conn)
 
         assert _sp_countries(sa_sync_conn, sd) == ["fr"]
 
@@ -322,7 +331,7 @@ class TestDirtyDrivenSourceCountries:
             text("INSERT INTO source_authorship_hal_structures VALUES (:sa, 7)"), {"sa": sa}
         )
 
-        _Q.refresh_signature_countries(sa_sync_conn)
+        refresh_source_contribution_countries(sa_sync_conn)
 
         assert sa_sync_conn.execute(
             text("SELECT countries FROM source_authorships WHERE id = :sa"), {"sa": sa}
@@ -344,7 +353,7 @@ class TestDirtyDrivenSourceCountries:
             {"a": first, "b": second},
         )
 
-        changed = _Q.refresh_signature_countries(sa_sync_conn, id_range=(first, first))
+        changed = refresh_source_contribution_countries(sa_sync_conn, id_range=(first, first))
 
         assert changed == 1
         countries = sa_sync_conn.execute(
@@ -359,6 +368,6 @@ class TestDirtyDrivenSourceCountries:
         sa = insert_signature(sa_sync_conn, sd, source="openalex")  # sa dirty par défaut
         addr = insert_address(sa_sync_conn, "Paris", countries=None, normalized_text="Paris")
         _resolve(sa_sync_conn, addr, ["FR"])  # addr dirty
-        _Q.clear_countries_dirty(sa_sync_conn)
+        clear_countries_dirty(sa_sync_conn)
         assert _sa_dirty(sa_sync_conn, sa) is False
         assert _addr_dirty(sa_sync_conn, addr) is False

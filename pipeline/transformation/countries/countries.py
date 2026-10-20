@@ -5,7 +5,7 @@ Quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
 1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
 2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
 3. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
-4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (signatures, source_publications, publications).
+4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (contributions sources, source_publications, publications).
 
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
@@ -13,56 +13,75 @@ L'état pays des adresses est relevé avant et après le passage : l'entonnoir q
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import NamedTuple
+
+from sqlalchemy import Connection, text
 
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.structures.countries import (
+from pipeline.transformation.countries import (
     detect_by_country_name,
     detect_by_place_name,
     refresh_publication_countries,
 )
-from pipeline.transformation.structures.countries.countries_queries import (
-    AddressCountryStatus,
-    CountryQueries,
-)
+from pipeline.transformation.countries.resolution import resolve_address_countries
+from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
-def _etat_des_adresses(open_tx: OpenTransaction, queries: CountryQueries) -> AddressCountryStatus:
+class AddressCountryStatus(NamedTuple):
+    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
+
+    total: int
+    with_country: int
+
+
+def count_address_country_status(conn: Connection) -> AddressCountryStatus:
+    """Bilan de la résolution des pays sur les adresses utiles (`pub_count > 0`)."""
+    row = conn.execute(
+        text("""
+            SELECT
+                count(*) AS total,
+                count(*) FILTER (WHERE countries IS NOT NULL) AS with_country
+            FROM addresses
+            WHERE pub_count > 0
+        """)
+    ).one()
+    return AddressCountryStatus(row.total, row.with_country)
+
+
+def _etat_des_adresses(open_tx: OpenTransaction) -> AddressCountryStatus:
     """Relève combien d'adresses ont un pays."""
     with open_tx() as conn:
-        return queries.count_address_country_status(conn)
+        return count_address_country_status(conn)
 
 
 @dataclass(frozen=True)
 class CountriesPhase:
-    queries: CountryQueries
-
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les tâches, borne l'entonnoir par les deux relevés et assemble les métriques."""
-        open_tx, queries = ctx.open_tx, self.queries
-        initial = _etat_des_adresses(open_tx, queries)
+        initial = _etat_des_adresses(ctx.open_tx)
 
         def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             etape(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
             with ctx.open_tx() as conn:
-                added = queries.insert_ror_candidates(conn)
+                added = CountryCandidatesStore(conn).add_ror()
             ctx.logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
             return PhaseMetrics(new=added)
 
         def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             metrics = PhaseMetrics()
             with ctx.open_tx() as conn:
-                metrics.merge(detect_by_country_name.run(conn, queries, ctx.logger))
+                metrics.merge(detect_by_country_name.run(conn, ctx.logger))
             with ctx.open_tx() as conn:
-                metrics.merge(detect_by_place_name.run(conn, queries, ctx.logger))
+                metrics.merge(detect_by_place_name.run(conn, ctx.logger))
             return metrics
 
         def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             etape(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
             with ctx.open_tx() as conn:
-                changed = queries.resolve_address_countries(conn)
+                changed = resolve_address_countries(conn)
             ctx.logger.info(
                 "%s%s",
                 DERNIERE_BRANCHE,
@@ -72,7 +91,7 @@ class CountriesPhase:
 
         def refresh(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                refresh_publication_countries.refresh(conn, queries, ctx.logger)
+                refresh_publication_countries.refresh(conn, ctx.logger)
             return PhaseMetrics()
 
         by_task = run_tasks(
@@ -86,10 +105,10 @@ class CountriesPhase:
             ctx,
         )
         metrics = PhaseMetrics()
-        for node_metrics in by_task.values():
-            metrics.merge(node_metrics)
+        for task_metrics in by_task.values():
+            metrics.merge(task_metrics)
 
-        final = _etat_des_adresses(open_tx, queries)
+        final = _etat_des_adresses(ctx.open_tx)
         total = final.total
         without_initial = total - initial.with_country
         metrics.details["summary"] = {
@@ -106,6 +125,4 @@ class CountriesPhase:
 
 
 def build() -> Phase:
-    from pipeline.transformation.structures.countries.countries_queries import CountryQueries
-
-    return CountriesPhase(CountryQueries())
+    return CountriesPhase()

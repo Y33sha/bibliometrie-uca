@@ -1,6 +1,6 @@
 """Port : résolution, par le pipeline, des pays d'un lot d'adresses, puis recalcul des pays de leurs notices et publications, après une saisie manuelle.
 
-Implémenté par `pipeline.transformation.structures.countries.countries_queries.CountryQueries`.
+Implémenté par `pipeline.transformation.countries.refresh_publication_countries.CountryRecompute`.
 """
 
 from typing import Protocol
