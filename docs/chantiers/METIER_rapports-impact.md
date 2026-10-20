@@ -30,6 +30,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 - **Citations d'une publication.** Le maximum des `cited_by_count` de ses notices. Un écart suspect entre sources donne lieu à une vérification ciblée sur d'autres sources en ligne. 40 publications ont au moins 10 citations et un maximum supérieur au double du compte OpenAlex.
 - **Calcul à la requête**, dans le script de rapport. La consolidation des indicateurs dans `publications.publications`, nécessaire aux filtres de l'interface, relève d'un chantier ultérieur.
 - **FWCI et top 10 % d'OpenAlex conservés quand le compte OpenAlex est aberrant.** OpenAlex sous-compte les citations de certaines publications : 0 citation pour un article de la collaboration ATLAS cité 59 fois dans le WoS, avec la même valeur dans l'API. 68 publications ont un compte OpenAlex inférieur à la moitié du maximum des autres sources, ce maximum étant d'au moins 5 (0,38 %). Les écarter fait passer le FWCI moyen de 1,652 à 1,656 et la part dans le top 10 % de 16,48 % à 16,51 %. Le laboratoire le plus touché, de physique des particules, en compte 45 : son FWCI moyen passe de 2,16 à 2,21.
+- **Groupes de publications.** Articles originaux : type `article`, qui comprend les short communications dans toutes les sources. Autres publications : articles de synthèse et conference papers. Publications non anglophones : publications des deux premiers groupes dont la langue est connue et autre que l'anglais.
 - **Rôles clés.** Ceux du rapport, choisis par unité. Le tableau InCites vient de l'Inserm : ses rôles PDC conviennent à la médecine.
 - **Présentation.** Lignes par année. La mise en forme PDF décide des agrégations éventuelles.
 
@@ -53,7 +54,5 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 ## Questions ouvertes
 
-- **Articles originaux.** Type `article` seul, ou avec `review`. Le prototype retient `article` seul.
-- **Publications non anglophones.** Le prototype les prend dans tous les types, langue renseignée.
 - **FWCI d'une publication à plusieurs notices OpenAlex.** Maximum, moyenne ou notice unique. Le prototype retient le maximum, comme pour les citations et le top 10 %.
 - **Publications sans FWCI** (926). Le prototype les exclut de la moyenne.
