@@ -5,7 +5,6 @@ Chaque source interroge des lots de personnes, page après page, sur la plage d'
 
 from __future__ import annotations
 
-import argparse
 from abc import abstractmethod
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -117,8 +117,8 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
             raise HarvestConfigError("aucune personne RH à identifiant confirmé ou authentifié")
         return PersonSearchConfig(persons=persons)
 
-    def harvest_all(self, args: argparse.Namespace, config: PersonSearchConfig) -> PhaseMetrics:
-        all_years = self._years(args)
+    def harvest_all(self, window: HarvestWindow, config: PersonSearchConfig) -> PhaseMetrics:
+        all_years = self._years(window)
         years = (min(all_years), max(all_years))
         persons = config.persons
         batches = [

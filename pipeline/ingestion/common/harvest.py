@@ -11,14 +11,13 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 Les dépendances techniques sont injectées par le composition-root :
 
 - `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
-- `harvest_one(ctx, source, args, breaker)` : ouvre la connexion, câble le moissonneur et l'exécute sous le circuit-breaker de la source ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
+- `harvest_one(ctx, source, window, breaker)` : ouvre la connexion, câble le moissonneur et l'exécute sous le circuit-breaker de la source ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_harvest_date` : la date du dernier moissonnage quotidien réussi (branche incrémentale).
 """
 
 from __future__ import annotations
 
-import argparse
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,6 +33,7 @@ from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     Harvester,
     HarvesterFactory,
+    HarvestWindow,
 )
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE
@@ -47,20 +47,11 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-HarvestOne = Callable[
-    [PhaseContext, str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics
-]
+HarvestOne = Callable[[PhaseContext, str, HarvestWindow, SourceCircuitBreaker | None], PhaseMetrics]
 GetLastDailyHarvestDate = Callable[[], date | None]
 
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
 _YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr", "datacite"})
-
-
-def _harvest_window(
-    *, start_year: int | None = None, year: int | None = None, since: str | None = None
-) -> argparse.Namespace:
-    """Construit le `args` consommé par `SourceHarvester.run` (start_year, year, since). HAL et OpenAlex exploitent `since` (incrémental)."""
-    return argparse.Namespace(start_year=start_year, year=year, since=since)
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -105,13 +96,13 @@ class HarvestPhase:
                         date_to_french(depuis[0]),
                         depuis[1],
                     )
-                args = _harvest_window(
+                window = HarvestWindow(
                     start_year=options.start_year if source in _YEAR_BOUNDED_SOURCES else None,
                     year=options.year,
                     since=since,
                 )
                 try:
-                    return self.harvest_one(ctx, source, args, breaker)
+                    return self.harvest_one(ctx, source, window, breaker)
                 except HarvestConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
@@ -175,10 +166,10 @@ def build() -> Phase:
     def harvest_one(
         ctx: PhaseContext,
         source: str,
-        args: argparse.Namespace,
+        window: HarvestWindow,
         breaker: SourceCircuitBreaker | None,
     ) -> PhaseMetrics:
-        return _run_harvest(ctx, source, registry[source], args, breaker)
+        return _run_harvest(ctx, source, registry[source], window, breaker)
 
     return HarvestPhase(
         count_extraction_structures=_extraction_structure_count,
@@ -258,10 +249,10 @@ def _run_harvest(
     ctx: PhaseContext,
     source: str,
     make_harvester: HarvesterFactory,
-    args: argparse.Namespace,
+    window: HarvestWindow,
     breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:
     """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous le circuit-breaker de la source, fermeture. `make_harvester` contient le câblage propre à la source."""
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     with ctx.open_tx() as conn:
-        return make_harvester(conn, source_log).run(args, breaker=breaker)
+        return make_harvester(conn, source_log).run(window, breaker=breaker)

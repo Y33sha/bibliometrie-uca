@@ -7,7 +7,6 @@ Les paramètres de requête comprennent `RECORD_PARAMS` (`api.py`), comme ceux d
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -17,6 +16,7 @@ from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -87,10 +87,10 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
             )
         return DataciteHarvestConfig(keywords=keywords)
 
-    def harvest_all(self, args: argparse.Namespace, config: DataciteHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: DataciteHarvestConfig) -> PhaseMetrics:
         keywords = config.keywords
         client = self._client
-        years = self._years(args)
+        years = self._years(window)
 
         def compte(annee: int) -> int:
             try:

@@ -5,7 +5,6 @@ Interroge en une seule requête l'ensemble des PPN d'établissement du périmèt
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -15,6 +14,7 @@ from domain.types import as_int, as_mapping, as_sequence
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -110,11 +110,11 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
             )
         return ThesesHarvestConfig(ppns=ppns)
 
-    def harvest_all(self, args: argparse.Namespace, config: ThesesHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: ThesesHarvestConfig) -> PhaseMetrics:
         # La colonne du périmètre reste vide sans `--year` : la barre s'aligne sur celles des autres sources.
-        portee = str(args.year) if args.year is not None else ""
+        portee = str(window.year) if window.year is not None else ""
         with progression(
-            None, self._libelle(portee), self.logger, compte_retenus=args.year is not None
+            None, self._libelle(portee), self.logger, compte_retenus=window.year is not None
         ) as avancement:
             metrics = harvest_theses(
                 self._client,
@@ -122,10 +122,10 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
                 config.ppns,
                 scoped_logger(self.logger, self.SOURCE),
                 avancement,
-                year=args.year,
+                year=window.year,
                 breaker_tripped=self._breaker_tripped,
             )
-        if args.year is None:
+        if window.year is None:
             self._ecrit_bilan(metrics)
         else:
             # Le filtre par année retient une partie des thèses parcourues ; le bilan porte sur celles-là.

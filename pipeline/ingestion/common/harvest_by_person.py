@@ -7,7 +7,6 @@ Les identifiants de personne que chaque source accepte sont dans `domain/sources
 
 from __future__ import annotations
 
-import argparse
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +21,7 @@ from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     Harvester,
     HarvesterFactory,
+    HarvestWindow,
 )
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
@@ -34,9 +34,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-SearchOne = Callable[
-    [PhaseContext, str, argparse.Namespace, SourceCircuitBreaker | None], PhaseMetrics
-]
+SearchOne = Callable[[PhaseContext, str, HarvestWindow, SourceCircuitBreaker | None], PhaseMetrics]
 
 
 @dataclass(frozen=True)
@@ -54,9 +52,9 @@ class HarvestByPersonPhase:
 
         def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                args = argparse.Namespace(start_year=options.start_year, year=options.year)
+                window = HarvestWindow(start_year=options.start_year, year=options.year)
                 try:
-                    return self.search_one(ctx, source, args, breaker)
+                    return self.search_one(ctx, source, window, breaker)
                 except HarvestConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
@@ -101,12 +99,12 @@ def build() -> Phase:
     def search_one(
         ctx: PhaseContext,
         source: str,
-        args: argparse.Namespace,
+        window: HarvestWindow,
         breaker: SourceCircuitBreaker | None,
     ) -> PhaseMetrics:
         source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
         with ctx.open_tx() as conn:
-            return registry[source](conn, source_log).run(args, breaker=breaker)
+            return registry[source](conn, source_log).run(window, breaker=breaker)
 
     return HarvestByPersonPhase(search_one=search_one, run_parallel=run_parallel)
 

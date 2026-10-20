@@ -5,7 +5,6 @@ Interroge l'index Elasticsearch de ScanR sur les affiliations du périmètre, an
 
 from __future__ import annotations
 
-import argparse
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -16,6 +15,7 @@ from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
+    HarvestWindow,
     SourceHarvester,
     stage_document,
 )
@@ -122,10 +122,10 @@ class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
             )
         return ScanrHarvestConfig(affiliation_ids=affiliation_ids)
 
-    def harvest_all(self, args: argparse.Namespace, config: ScanrHarvestConfig) -> PhaseMetrics:
+    def harvest_all(self, window: HarvestWindow, config: ScanrHarvestConfig) -> PhaseMetrics:
         ids = config.affiliation_ids
         client = self._client
-        years = self._years(args)
+        years = self._years(window)
         return self._extrait_par_annee(
             years,
             lambda annee: client.count(build_query(annee, ids)),
