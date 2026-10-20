@@ -67,7 +67,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - `transformation/` est organisé par entité. Le graphe déclare des nœuds ; une phase regroupe des nœuds pour l'affichage dans les journaux et l'administration.
 - Les identifiants du code sont en anglais. Les textes affichés sont en français.
 - Une notion, un mot. Le niveau source décrit une entité telle qu'une source la donne, le niveau consolidé réunit les sources :
-  - `source_publications` devient `source_records`, `publications` garde son nom ;
+  - `source_publications` devient `source_records` (« enregistrement source » dans les textes), `publications` garde son nom ;
   - `source_authorships` devient `source_contributions` (« contribution source » dans les textes), `authorships` devient `contributions` ;
   - `author_identifying_keys` devient `contributor_information` ; « identité » sort du vocabulaire ;
   - « Signature » désigne seulement la chaîne d'adresse, au sens du glossaire ; « notice » sort du vocabulaire.
@@ -157,6 +157,5 @@ D'autres modules réunissent des connaissances sans rapport :
 ## Questions ouvertes
 
 - Nom du module qui expose `build()`, puisque la phase regroupe des nœuds pour l'affichage.
-- Mot des textes pour une ligne de `source_records`.
 - `source_contribution_group_members`, table à côté de `source_contributions`, au même grain : nom d'attente, et raison de la table distincte. `source_contribution_groups` prendra le nom `contributions` quand il remplacera la table consolidée.
 - Vérification des lectures et écritures que `graph.py` déclare pour chaque nœud. Les tests en tirent l'ordre des phases, mais rien ne les confronte au SQL. Piste : sur un run audité, capturer les requêtes du pipeline par les événements de SQLAlchemy, les attribuer au nœud en cours et les analyser par `sqlglot`, au niveau de la colonne. `sqlglot` se limite aux dépendances de développement.
