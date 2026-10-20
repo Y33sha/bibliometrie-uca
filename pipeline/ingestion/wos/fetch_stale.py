@@ -11,7 +11,7 @@ from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common.fetch_stale import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
 from pipeline.ingestion.credentials import get_wos_api_key
 from pipeline.ingestion.wos.fields import extract_doi, get_records
 

@@ -130,6 +130,27 @@ forbidden_modules = ["pipeline.ingestion", "pipeline.transformation"]
 # Seul l'orchestrateur `pipeline/run.py` assemble les phases.
 
 [[tool.importlinter.contracts]]
+name = "Sources : les orchestrateurs de phase les importent, jamais l'inverse"
+type = "forbidden"
+source_modules = [
+    "pipeline.ingestion.crossref",
+    "pipeline.ingestion.datacite",
+    "pipeline.ingestion.hal",
+    "pipeline.ingestion.openalex",
+    "pipeline.ingestion.scanr",
+    "pipeline.ingestion.theses",
+    "pipeline.ingestion.wos",
+]
+forbidden_modules = [
+    "pipeline.ingestion.common.extract",
+    "pipeline.ingestion.common.extract_by_person",
+    "pipeline.ingestion.common.fetch_missing",
+    "pipeline.ingestion.common.fetch_stale",
+    "pipeline.ingestion.common.normalize",
+]
+# Une source implémente les contrats de `normalizer`, `doi_search` et `stale_refetch` ; l'orchestrateur la câble dans sa phase.
+
+[[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"
 type = "forbidden"
 source_modules = ["interfaces.api.routers"]

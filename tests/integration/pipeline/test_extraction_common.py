@@ -7,9 +7,9 @@ from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
 from pipeline.ingestion.common.change_detection import change_detection_hash
-from pipeline.ingestion.common.fetch_missing import get_missing_dois
-from pipeline.ingestion.common.fetch_stale import get_stale_source_ids, set_disappeared
+from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
+from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_disappeared
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation

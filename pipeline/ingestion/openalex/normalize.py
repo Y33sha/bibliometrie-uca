@@ -41,7 +41,7 @@ from domain.types import (
     as_str,
     as_strs,
 )
-from pipeline.ingestion.common.normalize import BibliographicNormalizer
+from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (

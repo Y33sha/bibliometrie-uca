@@ -7,7 +7,8 @@ import dataclasses
 import logging
 
 from domain.sources.registry import ALL_SOURCES_SET, SOURCE_PRIORITY
-from pipeline.ingestion.common.normalize import NormalizePhase, NormalizeStats
+from pipeline.ingestion.common.normalize import NormalizePhase
+from pipeline.ingestion.common.normalizer import NormalizeStats
 
 
 def _run(

@@ -36,7 +36,7 @@ from domain.sources.crossref import (
 )
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.normalize import BibliographicNormalizer
+from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,

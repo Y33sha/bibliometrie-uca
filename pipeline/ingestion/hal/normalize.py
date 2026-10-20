@@ -33,7 +33,7 @@ from domain.source_publications.external_ids import ExternalIdType
 from domain.sources.hal import derive_hal_oa_status, extract_hal_meta, hal_text_field
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.normalize import BibliographicNormalizer
+from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
 from pipeline.ingestion.common.signatures import (

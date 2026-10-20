@@ -2,7 +2,7 @@
 
 - `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-ids portés par des documents OpenAlex et ScanR, absents du staging HAL ; requête Solr `halId_s`.
 - `fetch_missing_hal_by_nnt` (tâche `fetch_missing.hal_by_nnt`) : NNT de thèses soutenues sans document HAL ; requête Solr `nntId_s`. Réservé au mode `full`.
-- `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.fetch_missing`.
+- `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 
 Les deux premières tournent sur un pool de `HAL_MAX_CONCURRENT` workers, avec des écritures séquentielles et un commit tous les `_COMMIT_EVERY` identifiants.
 """
@@ -23,13 +23,13 @@ from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
+from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
     forget_failed_doi_lookups,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.fetch_missing import DoiBatchResult
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.hal.fields import HAL_FIELDS_STR, extract_doi, extract_id
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
