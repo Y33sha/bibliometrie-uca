@@ -91,9 +91,9 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
 
 _HAL = PersonIdentifierType.HAL_PERSON_ID.value
 
-# Comptes HAL d'un identifiant : `hal_person_id` des signatures HAL de sa personne qui le portent.
-# Groupe : identifiants que portent les signatures HAL de la personne sous ces comptes.
-# Un identifiant neutralisé par sa signature n'entre ni dans l'un ni dans l'autre.
+# Comptes HAL d'un identifiant : `hal_person_id` des contributions sources HAL de sa personne qui le contiennent.
+# Groupe : identifiants des contributions sources HAL de la personne sous ces comptes.
+# Un identifiant neutralisé par sa contribution source reste hors de l'un et de l'autre.
 _HAL_ACCOUNT_PEERS_SQL = text(f"""
     WITH src AS (
         SELECT id AS src_id, person_id, id_type, id_value

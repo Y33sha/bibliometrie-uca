@@ -164,7 +164,7 @@ def ambiguous_name_forms(
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes non exclues au même identifiant brut, hors identifiants que la signature neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
+# Paires de personnes non exclues au même identifiant brut, hors identifiants que la contribution source neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH pending AS (
         SELECT DISTINCT id_type::text AS id_type, id_value
@@ -177,7 +177,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = ci.identifiers ->> k.k
     ),
-    -- Couples (personne, identité) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
+    -- Couples (personne, informations du contributeur) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
     person_identities AS MATERIALIZED (
         SELECT DISTINCT sc.person_id, sc.contributor_information_id
         FROM source_contributions sc
@@ -188,7 +188,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         SELECT DISTINCT pi.person_id, p.id_type, p.id_value
         FROM person_identities pi
         JOIN pending_identities p ON p.id = pi.contributor_information_id
-        -- Une signature du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
+        -- Une contribution source du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
         CROSS JOIN LATERAL (
             SELECT 1 FROM source_contributions sc
             WHERE sc.person_id = pi.person_id AND sc.contributor_information_id = pi.contributor_information_id
@@ -240,8 +240,8 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
                        WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
-                           SELECT sas.structure_id FROM source_contribution_structures sas
-                           JOIN source_contributions sc ON sc.id = sas.source_contribution_id
+                           SELECT scs.structure_id FROM source_contribution_structures scs
+                           JOIN source_contributions sc ON sc.id = scs.source_contribution_id
                            WHERE sc.person_id = p.id
                        )
                    ), ARRAY[]::text[]) AS labs

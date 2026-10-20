@@ -576,7 +576,7 @@ identifier_status_enum = PgEnum(
     create_type=False,
 )
 
-# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les signatures. Le
+# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Le
 # vocabulaire vit ici, le domaine ne le déclarant pas.
 identifier_origin_enum = PgEnum(
     "manual",
@@ -807,13 +807,13 @@ source_contribution_group_members = Table(
 )
 
 # `publication_author_alignment` (MATERIALIZED VIEW, migration 5c1d8e3a7f20) : recouvrement des
-# listes d'auteurs de chaque publication à plusieurs notices, dérivé des groupes de signatures.
+# listes d'auteurs de chaque publication à plusieurs enregistrements sources, dérivé des groupes de contributions sources.
 # Sert la file des fusions suspectes. SQL brut + REFRESH en fin de phase `author_grouping`.
 
 
-# Identités d'auteur dédupliquées : la clé (nom et prénom normalisés,
-# identifiants) est extraite des signatures `source_contributions` (une identité
-# pour ~35 signatures). L'unique est `NULLS NOT DISTINCT` : les signatures sans
+# Informations du contributeur dédupliquées : la clé (nom et prénom normalisés,
+# identifiants) est extraite des contributions sources (une ligne
+# pour ~35 contributions sources). L'unique est `NULLS NOT DISTINCT` : les lignes sans
 # identifiant collapsent sur leur seul nom, sans recourir à un sentinel `'{}'`.
 contributor_information = Table(
     "contributor_information",
@@ -833,7 +833,7 @@ contributor_information = Table(
             persisted=True,
         ),
     ),
-    # Hash de la clé d'identité, chemin de lookup indexé et NULL-safe (un `=` ne
+    # Hash de la clé des informations du contributeur, chemin de lookup indexé et NULL-safe (un `=` ne
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
@@ -859,7 +859,7 @@ contributor_information = Table(
 )
 
 
-# Arbitrages admin au grain de la signature : la paire (signature, personne) que la
+# Arbitrages admin au grain de la contribution source : la paire (contribution source, personne) que la
 # cascade de la phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
 confirmed_source_contributions = Table(
     "confirmed_source_contributions",
@@ -936,8 +936,8 @@ source_contributions = Table(
     Column("raw_author_name", Text),
     Column("raw_last_name", Text),
     Column("raw_first_name", Text),
-    # FK vers `contributor_information` (identité dédupliquée : nom normalisé +
-    # identifiants observés de la signature). La contrainte FK n'est pas
+    # FK vers `contributor_information` (informations dédupliquées : nom normalisé +
+    # identifiants observés de la contribution source). La contrainte FK n'est pas
     # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
     # MetaData).
     Column("contributor_information_id", Integer, nullable=False),
@@ -960,7 +960,7 @@ source_contributions = Table(
         " AND (raw_first_name IS NULL OR raw_last_name IS NOT NULL)",
         name="source_contributions_name_form",
     ),
-    # Vérifiée en fin d'instruction : la mise à jour des signatures d'une notice permute des positions en une seule instruction.
+    # Vérifiée en fin d'instruction : la mise à jour des contributions sources d'un enregistrement source permute des positions en une seule instruction.
     UniqueConstraint(
         "source_record_id",
         "author_position",
@@ -1167,7 +1167,7 @@ publications = Table(
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
     # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
     # composantes ne produit jamais deux publications au même DOI (assignation à
-    # l'unique pub-ancre de la partition `(composante ∩ DOI)`). Partiel : les
+    # l'unique publication ancre de la partition `(composante ∩ DOI)`). Partiel : les
     # publications sans DOI (NULL) ne sont pas contraintes.
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
     schema="publications",
@@ -1222,7 +1222,7 @@ source_records = Table(
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("oa_status", Text),
-    # Licence normalisée de la notice ; la forme brute reste dans `meta`.
+    # Licence normalisée de l'enregistrement source ; la forme brute reste dans `meta`.
     Column("license", license_type_enum),
     Column("embargo_until", Date),
     Column("language", Text),

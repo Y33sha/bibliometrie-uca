@@ -34,13 +34,13 @@ from infrastructure.read_models.perimeters import (
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import usable_identifier
 
-# Identifiants d'une signature `sa`, hors ceux qu'elle neutralise.
+# Identifiants d'une contribution source `sc`, hors ceux qu'elle neutralise.
 _HAL_PERSON_ID = usable_identifier("'hal_person_id'")
 _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
+# Contributions sources HAL rattachées à une personne, avec la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
     FROM source_contributions sc
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
@@ -121,7 +121,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
-        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_contributions` HAL devraient être constantes (ces champs sont attachés au compte HAL, pas à la signature). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_contributions` n'a pas de `created_at`.
+        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_contributions` HAL devraient être constantes (ces champs sont attachés au compte HAL, et non à la contribution source). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_contributions` n'a pas de `created_at`.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS}) sub")
@@ -184,7 +184,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         self, *, page: int, per_page: int
     ) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
-        # Un même DOI (insensible à la casse) déposé sur au moins deux notices HAL de la même publication.
+        # Un même DOI (insensible à la casse) déposé sur au moins deux enregistrements sources HAL de la même publication.
         dup_query = """
             FROM source_records sr
             WHERE sr.source = 'hal' AND sr.doi IS NOT NULL AND sr.doi != ''
@@ -391,9 +391,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
-        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à porter des adresses) non. `base_cte` agrège les drapeaux par SP avant de filtrer.
+        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à donner des adresses) non. `base_cte` agrège les drapeaux par enregistrement source avant de filtrer.
         base_cte = """
-        WITH wos_oa_sps AS (
+        WITH wos_oa_records AS (
             SELECT id, publication_id
             FROM source_records
             WHERE source IN ('wos', 'openalex')
@@ -401,19 +401,19 @@ class PgHalProblemsQueries(HalProblemsQueries):
         ),
         wos_oa_pub_summary AS (
             SELECT
-                sps.publication_id,
+                srs.publication_id,
                 bool_or(EXISTS (
-                    SELECT 1 FROM source_contribution_addresses saa
-                    JOIN source_contributions sc ON sc.id = saa.source_contribution_id
-                    WHERE sc.source_record_id = sps.id
+                    SELECT 1 FROM source_contribution_addresses sca
+                    JOIN source_contributions sc ON sc.id = sca.source_contribution_id
+                    WHERE sc.source_record_id = srs.id
                 )) AS any_addressed,
                 bool_or(EXISTS (
                     SELECT 1 FROM source_contributions sc
-                    WHERE sc.source_record_id = sps.id
+                    WHERE sc.source_record_id = srs.id
                       AND sc.in_perimeter = TRUE
                 )) AS any_in_perimeter
-            FROM wos_oa_sps sps
-            GROUP BY sps.publication_id
+            FROM wos_oa_records srs
+            GROUP BY srs.publication_id
         ),
         hal_in_perimeter_pubs AS (
             SELECT DISTINCT sr.publication_id

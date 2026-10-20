@@ -179,9 +179,9 @@ def person_addresses(
 ) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les contributions sources de cette personne."""
     base_where = """a.id IN (
-            SELECT DISTINCT saa.address_id
-            FROM source_contribution_addresses saa
-            JOIN source_contributions sc ON sc.id = saa.source_contribution_id
+            SELECT DISTINCT sca.address_id
+            FROM source_contribution_addresses sca
+            JOIN source_contributions sc ON sc.id = sca.source_contribution_id
             WHERE sc.person_id = :pid
         )"""
     count_row = conn.execute(

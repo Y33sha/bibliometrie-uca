@@ -109,7 +109,7 @@ def _count_affiliations(conn) -> dict:
         counts[f"{src}_with_structs"] = conn.execute(
             text(
                 "SELECT COUNT(DISTINCT sc.id) AS cnt FROM source_contributions sc "
-                "JOIN source_contribution_structures sas ON sas.source_contribution_id = sc.id "
+                "JOIN source_contribution_structures scs ON scs.source_contribution_id = sc.id "
                 "WHERE sc.source = :src"
             ),
             {"src": src},

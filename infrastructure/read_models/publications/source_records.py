@@ -1,4 +1,4 @@
-"""Enregistrements sources d'une publication et leurs signatures, confrontés dans le volet de l'administration."""
+"""Enregistrements sources d'une publication et leurs contributions sources, confrontés dans le volet de l'administration."""
 
 from collections.abc import Mapping
 
@@ -75,19 +75,19 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
 
 
 def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
-    """Signatures des enregistrements de la publication, avec leur groupe et leur entrée dans le groupe."""
+    """Contributions sources des enregistrements sources de la publication, avec leur groupe et leur entrée dans le groupe."""
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
                    {contributor_display_name()} AS full_name, sc.roles, sc.person_id,
                    sc.in_perimeter, sc.collective, sc.countries,
-                   (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
-                    FROM source_contribution_structures sas
-                    WHERE sas.source_contribution_id = sc.id) AS structure_ids,
+                   (SELECT array_agg(scs.structure_id ORDER BY scs.structure_id)
+                    FROM source_contribution_structures scs
+                    WHERE scs.source_contribution_id = sc.id) AS structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
-                    FROM source_contribution_addresses saa
-                    JOIN addresses addr ON addr.id = saa.address_id
-                    WHERE saa.source_contribution_id = sc.id) AS raw_affiliation,
+                    FROM source_contribution_addresses sca
+                    JOIN addresses addr ON addr.id = sca.address_id
+                    WHERE sca.source_contribution_id = sc.id) AS raw_affiliation,
                    gs.group_id, g.reference_position AS group_position, gs.method::text AS method,
                    gs.score, gs.margin
             FROM source_records sr
@@ -125,7 +125,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
 def get_publication_sources(
     conn: Connection, publication_id: int
 ) -> PublicationSourcesResponse | None:
-    """Métadonnées et signatures de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
+    """Métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
     title = conn.execute(
         text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
     ).scalar_one_or_none()

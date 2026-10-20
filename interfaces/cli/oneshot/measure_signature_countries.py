@@ -38,18 +38,18 @@ _SAMPLE = 40
 
 _SOURCE_CONTRIBUTION_TABLES = """
     CREATE TEMP TABLE sig_addr AS
-    SELECT saa.source_contribution_id AS source_contribution_id, array_agg(DISTINCT c ORDER BY c) AS countries
-    FROM source_contribution_addresses saa
-    JOIN addr_retained r ON r.address_id = saa.address_id
+    SELECT sca.source_contribution_id AS source_contribution_id, array_agg(DISTINCT c ORDER BY c) AS countries
+    FROM source_contribution_addresses sca
+    JOIN addr_retained r ON r.address_id = sca.address_id
     CROSS JOIN LATERAL unnest(r.countries) c
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_ror AS
-    SELECT sar.source_contribution_id AS source_contribution_id,
+    SELECT scr.source_contribution_id AS source_contribution_id,
            array_agg(DISTINCT ro.country_code::text ORDER BY ro.country_code::text) AS countries
-    FROM source_contribution_rors sar
-    JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
-    WHERE sar.address_id IS NULL
+    FROM source_contribution_rors scr
+    JOIN ror_organizations ro ON ro.ror_id = scr.ror_id
+    WHERE scr.address_id IS NULL
     GROUP BY 1;
 
     CREATE TEMP TABLE sig_hal AS
@@ -111,8 +111,8 @@ _PUBLICATIONS = """
 
 _DISAGREEMENTS = """
     SELECT s.source_contribution_id, s.source, s.addr, s.{other} AS other,
-           (SELECT string_agg(a.raw_text, ' | ') FROM source_contribution_addresses saa
-              JOIN addresses a ON a.id = saa.address_id WHERE saa.source_contribution_id = s.source_contribution_id) AS addresses,
+           (SELECT string_agg(a.raw_text, ' | ') FROM source_contribution_addresses sca
+              JOIN addresses a ON a.id = sca.address_id WHERE sca.source_contribution_id = s.source_contribution_id) AS addresses,
            {names} AS other_names,
            p.title
     FROM sig_all s
@@ -124,8 +124,8 @@ _DISAGREEMENTS = """
 
 _OTHER_NAMES = {
     "ror": """(SELECT string_agg(ro.name || ' (' || ro.country_code || ')', ' | ')
-               FROM source_contribution_rors sar JOIN ror_organizations ro ON ro.ror_id = sar.ror_id
-               WHERE sar.source_contribution_id = s.source_contribution_id AND sar.address_id IS NULL)""",
+               FROM source_contribution_rors scr JOIN ror_organizations ro ON ro.ror_id = scr.ror_id
+               WHERE scr.source_contribution_id = s.source_contribution_id AND scr.address_id IS NULL)""",
     "hal": """(SELECT string_agg(hs.name || ' (' || coalesce(hs.country_code, '?') || ')', ' | ')
                FROM source_contribution_hal_structures h
                JOIN hal_structures hs ON hs.hal_structure_id = h.hal_structure_id

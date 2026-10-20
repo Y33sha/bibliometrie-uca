@@ -75,7 +75,7 @@ _PUBLICATIONS = text("""
 _ADDRESSES = text("""
     SELECT count(*) AS total,
            count(*) FILTER (WHERE NOT EXISTS (
-               SELECT 1 FROM source_contribution_addresses saa WHERE saa.address_id = a.id
+               SELECT 1 FROM source_contribution_addresses sca WHERE sca.address_id = a.id
            )) AS orphans
     FROM addresses a
 """)
