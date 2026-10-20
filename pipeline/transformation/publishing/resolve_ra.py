@@ -17,6 +17,8 @@ from sqlalchemy import Connection
 
 from domain.publications.identifiers import DoiPrefix
 from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.polite_pool import default_user_agent
+from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
@@ -114,9 +116,6 @@ def _resolve(
 
 
 def build() -> Phase:
-    from pipeline.http.polite_pool import default_user_agent
-    from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
-    from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.
     user_agent = default_user_agent()

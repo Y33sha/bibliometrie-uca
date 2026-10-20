@@ -30,8 +30,12 @@ def _called_targets(stack) -> MagicMock:
         patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
     )
     # Fenêtre d'années : évite tout accès base (get_years lit la config).
-    stack.enter_context(patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock()))
-    stack.enter_context(patch("pipeline.runtime.config.get_years", return_value=[2024]))
+    stack.enter_context(
+        patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
+    )
+    stack.enter_context(
+        patch("pipeline.ingestion.common.fetch_stale.get_years", return_value=[2024])
+    )
     return run_one
 
 
@@ -98,9 +102,11 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
             )
         )
         stack.enter_context(
-            patch("infrastructure.db.engine.get_sync_engine", return_value=MagicMock())
+            patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
         )
-        stack.enter_context(patch("pipeline.runtime.config.get_years", return_value=[2024]))
+        stack.enter_context(
+            patch("pipeline.ingestion.common.fetch_stale.get_years", return_value=[2024])
+        )
         stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))
         _run_phase(RunOptions(sources={"hal"}))
 

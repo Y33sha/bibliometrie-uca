@@ -8,7 +8,11 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING
 
+from sqlalchemy import text
+
 from infrastructure import PROJECT_ROOT
+from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.transaction import managed_transaction
 from infrastructure.observability.log import setup_logger
 from pipeline.runtime.context import CredentialsMissing, PhaseContext, RunOptions
 
@@ -21,17 +25,12 @@ log = setup_logger("pipeline", str(PROJECT_ROOT / "logs"))
 
 def open_tx() -> AbstractContextManager[Connection]:
     """Fabrique de transaction gérée (port `OpenTransaction`) : commit sur succès, rollback sur erreur, fermeture, et tolérance aux commits par lots."""
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.transaction import managed_transaction
 
     return managed_transaction(get_sync_engine())
 
 
 def maintain(operation: str) -> None:
     """Exécute une opération de maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, en autocommit."""
-    from sqlalchemy import text
-
-    from infrastructure.db.engine import get_sync_engine
 
     with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
         conn.execute(text(operation))

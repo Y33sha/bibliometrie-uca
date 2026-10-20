@@ -34,7 +34,22 @@ from pipeline.transformation.publications.authorships.authorships_queries import
 from pipeline.transformation.publications.authorships.build_authorships import (
     build as build_authorships,
 )
+from pipeline.transformation.publishing.journals import delete_empty_journals
+from pipeline.transformation.publishing.journals.delete_empty_journals import (
+    run_delete_empty_journals,
+)
+from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
+from pipeline.transformation.publishing.monographs import delete_empty_monographs
+from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
+    run_delete_empty_monographs,
+)
+from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
 from pipeline.transformation.publishing.pub_counts import PgPubCountsQueries
+from pipeline.transformation.publishing.publishers import delete_empty_publishers
+from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
+    run_delete_empty_publishers,
+)
+from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
 
 _PURGE_BATCH_SIZE = 5000
 
@@ -224,16 +239,6 @@ def _refresh_pub_counts(
 
 
 def build() -> Phase:
-    from pipeline.transformation.publications.authorships.address_pub_count import (
-        AddressPubCountQueries,
-    )
-    from pipeline.transformation.publications.authorships.authorships_queries import (
-        AuthorshipsBuild,
-    )
-    from pipeline.transformation.publishing.journals import delete_empty_journals
-    from pipeline.transformation.publishing.monographs import delete_empty_monographs
-    from pipeline.transformation.publishing.publishers import delete_empty_publishers
-
     return AuthorshipsPhase(
         AuthorshipsBuild(),
         PgPubCountsQueries(),
@@ -247,30 +252,15 @@ def build() -> Phase:
 
 
 def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
-    from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
-        run_delete_empty_monographs,
-    )
-    from pipeline.transformation.publishing.monographs.monographs import MonographGatewayQueries
-
     with ctx.open_tx() as conn:
         return run_delete_empty_monographs(ctx.logger, monograph_repo=MonographGatewayQueries(conn))
 
 
 def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
-    from pipeline.transformation.publishing.journals.delete_empty_journals import (
-        run_delete_empty_journals,
-    )
-    from pipeline.transformation.publishing.journals.journals import JournalGatewayQueries
-
     with ctx.open_tx() as conn:
         return run_delete_empty_journals(ctx.logger, journal_repo=JournalGatewayQueries(conn))
 
 
 def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:
-    from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
-        run_delete_empty_publishers,
-    )
-    from pipeline.transformation.publishing.publishers.publishers import PublisherGatewayQueries
-
     with ctx.open_tx() as conn:
         return run_delete_empty_publishers(ctx.logger, publisher_repo=PublisherGatewayQueries(conn))

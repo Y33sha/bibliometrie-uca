@@ -17,17 +17,19 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     Harvester,
     HarvesterFactory,
     HarvestWindow,
 )
+from pipeline.ingestion.credentials import get_scanr_credentials
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
-from pipeline.runtime.parallel import RunParallel
+from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 if TYPE_CHECKING:
@@ -92,8 +94,6 @@ class HarvestByPersonPhase:
 
 
 def build() -> Phase:
-    from pipeline.runtime.parallel import run_parallel
-
     registry = _harvesters()
 
     def search_one(
@@ -111,7 +111,6 @@ def build() -> Phase:
 
 def _harvesters() -> dict[str, HarvesterFactory]:
     """Constructeur du moissonneur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
-    from pipeline.ingestion.api_params import API_BASE_URLS
 
     def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.datacite.api import DataciteClient
@@ -138,7 +137,6 @@ def _harvesters() -> dict[str, HarvesterFactory]:
         return HalPersonHarvester(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.api import ScanrClient
         from pipeline.ingestion.scanr.person_search import ScanrPersonHarvester
 

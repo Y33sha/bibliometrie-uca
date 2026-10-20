@@ -86,8 +86,4 @@ class MetadataCorrectionPhase:
 
 
 def build() -> Phase:
-    from pipeline.transformation.publications.correction.metadata_correction_queries import (
-        PgMetadataCorrectionQueries,
-    )
-
     return MetadataCorrectionPhase(PgMetadataCorrectionQueries())

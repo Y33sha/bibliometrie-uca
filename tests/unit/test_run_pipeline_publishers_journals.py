@@ -18,7 +18,7 @@ def test_phase_aggregates_substep_counters():
     doaj = PhaseMetrics()  # sous-étape sautée (dump récent)
 
     with (
-        patch("infrastructure.db.engine.get_sync_engine"),
+        patch("pipeline.runtime.execution.get_sync_engine"),
         patch.object(
             publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
         ),
@@ -51,7 +51,7 @@ def test_phase_propagates_substep_signals():
     )
 
     with (
-        patch("infrastructure.db.engine.get_sync_engine"),
+        patch("pipeline.runtime.execution.get_sync_engine"),
         patch.object(
             publishers_journals, "_run_resolve_crossref_publishers", return_value=publishers
         ),
@@ -80,10 +80,8 @@ def test_phase_propagates_substep_signals():
 def test_enrichissement_openalex_au_debit_d_openalex():
     from pipeline.ingestion.api_params import OPENALEX_DELAY
 
-    with patch(
-        "pipeline.transformation.publishing.journals.enrich_journals_from_openalex"
-        ".run_enrich_journals_from_openalex",
-        return_value=PhaseMetrics(),
+    with patch.object(
+        publishers_journals, "run_enrich_journals_from_openalex", return_value=PhaseMetrics()
     ) as run:
         # Le contexte est une doublure : sa transaction aussi.
         publishers_journals._run_enrich_journals_from_openalex(MagicMock(), MagicMock())

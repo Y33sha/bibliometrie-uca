@@ -34,7 +34,7 @@ from infrastructure.observability.log import (
     set_console_writer,
     set_log_phase,
 )
-from infrastructure.observability.phase_executions import PhaseExecutionRecorder
+from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
 from pipeline.graph import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
 from pipeline.ingestion.common import (
     fetch_missing,
@@ -45,6 +45,7 @@ from pipeline.ingestion.common import (
 )
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex import fetch_truncated
+from pipeline.runtime.config import get_fetch_stale_after_days
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
@@ -63,6 +64,7 @@ from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
+from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
 set_console_writer(ecrire_hors_barre)
 set_flux_barres(console_stream())
@@ -262,8 +264,6 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 
 def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    from pipeline.runtime.config import get_fetch_stale_after_days
-
     return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
 
 
@@ -450,8 +450,6 @@ def _execute_phases(
     args: argparse.Namespace, phases_to_run: list[tuple[str, PhaseBuilder]]
 ) -> None:
     """Déroule la séquence des phases avec observabilité par run, puis le récapitulatif de fin."""
-    from infrastructure.observability.phase_executions import start_run
-
     sources = {s.strip() for s in args.sources.split(",") if s.strip()}
 
     # Enregistre le run et chacune de ses phases : identifiant de séquence, entrées, sorties, statut.
@@ -464,7 +462,6 @@ def _execute_phases(
 
     # Matérialise `perimeter_structures` avant toute phase, même avec `--only` ou `--from` :
     # les phases qui suivent lisent le périmètre sans le recalculer.
-    from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
     with open_tx() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)
