@@ -100,11 +100,11 @@ class TestOADocTypeMap:
 
 # ── HAL ──────────────────────────────────────────────────────────
 
-from domain.sources.hal import hal_text_field
 from pipeline.ingestion.hal.normalize import (
     build_hal_external_ids,
     get_title,
 )
+from pipeline.ingestion.hal.payload import hal_text_field
 
 
 class TestBuildHalExternalIds:

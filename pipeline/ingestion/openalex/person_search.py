@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.person_search import (
     Identifiers,
@@ -18,6 +17,7 @@ from pipeline.ingestion.common.person_search import (
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
+from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:

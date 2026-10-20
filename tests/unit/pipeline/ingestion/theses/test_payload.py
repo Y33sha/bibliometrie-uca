@@ -1,8 +1,5 @@
 from domain.persons.signature_name import SignatureName
-from domain.sources.theses import (
-    aggregate_thesis_persons,
-    derive_theses_doc_type,
-)
+from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
 
 
 class TestDeriveThesesDocType:

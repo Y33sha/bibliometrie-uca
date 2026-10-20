@@ -18,12 +18,6 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.scanr import (
-    derive_scanr_oa_status,
-    extract_nnt_from_scanr_id,
-    select_leaf_affiliations,
-    split_scanr_concepts,
-)
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
@@ -40,6 +34,12 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.scanr.payload import (
+    derive_scanr_oa_status,
+    extract_nnt_from_scanr_id,
+    select_leaf_affiliations,
+    split_scanr_concepts,
+)
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

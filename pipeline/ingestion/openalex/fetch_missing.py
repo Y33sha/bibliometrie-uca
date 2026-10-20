@@ -10,7 +10,6 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection
 
-from domain.sources.openalex import authors_may_be_truncated
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.lookup import NotFound, Unavailable
@@ -19,6 +18,7 @@ from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.openalex.api import search_doi
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
+from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 
 
 class OpenalexDoiSearch:

@@ -1,6 +1,6 @@
-"""Règles métier pures spécifiques à la source theses.fr.
+"""Lecture des notices theses.fr par la normalisation.
 
-Interprétation des champs propres au schéma theses.fr — prédicats et extracteurs qui encapsulent la connaissance de la sémantique theses.fr pour le reste du pipeline.
+Interprétation des champs propres au schéma theses.fr — prédicats et extracteurs qui encapsulent la connaissance de la sémantique theses.fr.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller.
 """

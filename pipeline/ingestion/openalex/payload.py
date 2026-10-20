@@ -1,6 +1,6 @@
-"""Règles métier pures spécifiques à la source OpenAlex.
+"""Lecture des notices OpenAlex par la normalisation.
 
-Interprétation des champs propres au schéma OpenAlex — prédicats et extracteurs qui encapsulent la connaissance de la sémantique OpenAlex pour le reste du pipeline.
+Interprétation des champs propres au schéma OpenAlex — prédicats et extracteurs qui encapsulent la connaissance de la sémantique OpenAlex.
 
 Les payloads reçus de l'API sont décrits par `JsonValue` : leur forme est celle qu'ils ont, non celle que le schéma annonce, et chaque champ lu passe par un accesseur qui la contrôle.
 """
@@ -89,7 +89,7 @@ class OpenalexLocation:
     source_id: str | None  # location.source.id (URL OpenAlex)
     source_type: str | None  # 'journal' | 'repository' | 'ebook platform' | …
     source_display_name: str | None  # ex. 'HAL Archive ouverte', 'theses.fr'
-    source_homepage_url: str | None  # ex. 'https://hal.science'
+    source_homepage_url: str | None  # ex. la page d'accueil de HAL
 
 
 def _parse_one_location(loc: JsonValue) -> OpenalexLocation | None:
@@ -191,10 +191,7 @@ def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
     return None
 
 
-# Statuts OA exposés par OpenAlex (`open_access.oa_status`). OpenAlex
-# utilise les mêmes labels que notre enum canonique, plus `diamond`
-# qu'ils ont commencé à exposer en 2023. Le set est utilisé pour
-# valider/dispatcher dans `map_openalex_oa_status`.
+# Statuts open access qu'OpenAlex expose (`open_access.oa_status`), reconnus par `map_openalex_oa_status`.
 _KNOWN_OA_STATUSES = frozenset(
     {
         OaStatus.GOLD,
@@ -208,7 +205,7 @@ _KNOWN_OA_STATUSES = frozenset(
 
 
 def map_openalex_oa_status(raw: str | None) -> str | None:
-    """Mapping OpenAlex `open_access.oa_status` → enum oa_status canonique.
+    """Statut open access (`OaStatus`) d'un `open_access.oa_status` d'OpenAlex.
 
     OpenAlex utilise les mêmes labels que notre enum (gold, diamond, hybrid, bronze, green, closed). Mapping identitaire pour les valeurs connues, plus :
 

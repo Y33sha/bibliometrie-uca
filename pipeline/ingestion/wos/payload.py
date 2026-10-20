@@ -1,6 +1,6 @@
-"""Règles métier pures spécifiques à la source WoS.
+"""Lecture des notices Web of Science par la normalisation.
 
-Interprétation des champs propres au schéma WoS Expanded API — prédicats et extracteurs qui encapsulent la connaissance de la sémantique WoS pour le reste du pipeline.
+Interprétation des champs propres au schéma WoS Expanded API — prédicats et extracteurs qui encapsulent la connaissance de la sémantique WoS.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API WoS (frontière dynamique avec une source externe, schéma non typé).
 

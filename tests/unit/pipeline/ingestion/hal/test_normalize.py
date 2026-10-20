@@ -16,7 +16,6 @@ import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.signature_name import SignatureName
-from domain.sources.hal import hal_text_field
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
@@ -35,6 +34,7 @@ from pipeline.ingestion.hal.normalize import (
     upsert_containers,
     upsert_publisher,
 )
+from pipeline.ingestion.hal.payload import hal_text_field
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeAuthorshipsBatchQueries,

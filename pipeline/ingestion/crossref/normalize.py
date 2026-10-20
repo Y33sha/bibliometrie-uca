@@ -25,15 +25,6 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
 from domain.source_publications.external_ids import ExternalIdType
 from domain.source_publications.impact import Impact
-from domain.sources.crossref import (
-    crossref_issns,
-    crossref_raw_doc_type,
-    extract_crossref_conference,
-    extract_crossref_meta,
-    extract_crossref_pub_year,
-    parse_crossref_issns,
-    strip_jats_tags,
-)
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
@@ -49,6 +40,15 @@ from pipeline.ingestion.common.source_publications import (
     SourcePublicationUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.crossref.payload import (
+    crossref_issns,
+    crossref_raw_doc_type,
+    extract_crossref_conference,
+    extract_crossref_meta,
+    extract_crossref_pub_year,
+    parse_crossref_issns,
+    strip_jats_tags,
+)
 from pipeline.transformation.publishing.containers import ContainerGatewayQueries
 from pipeline.transformation.publishing.find_or_create import (
     Containers,

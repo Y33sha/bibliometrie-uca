@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.sources.openalex import authors_may_be_truncated
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
@@ -21,6 +20,7 @@ from pipeline.ingestion.common.harvester import (
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
 from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
+from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression

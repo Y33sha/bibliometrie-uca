@@ -1,8 +1,8 @@
-"""Règles métier pures spécifiques à la source DataCite.
+"""Lecture des notices DataCite par la normalisation.
 
-Interprétation des champs propres au schéma DataCite (réponse JSON:API `api.datacite.org/dois/{doi}`, nœud `data.attributes`). Extracteurs et nettoyeurs qui encapsulent les conventions DataCite pour le reste du pipeline.
+Interprétation des champs propres au schéma DataCite (réponse JSON:API `api.datacite.org/dois/{doi}`, nœud `data.attributes`). Extracteurs et nettoyeurs qui encapsulent les conventions DataCite.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API DataCite (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré, comme pour `domain.sources.crossref`.
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API DataCite (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré, comme pour Crossref.
 """
 
 from __future__ import annotations

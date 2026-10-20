@@ -1,6 +1,6 @@
-"""Règles métier pures spécifiques à la source CrossRef.
+"""Lecture des notices Crossref par la normalisation.
 
-Interprétation des champs propres au schéma CrossRef Works API — extracteurs et nettoyeurs qui encapsulent les conventions CrossRef pour le reste du pipeline.
+Interprétation des champs propres au schéma CrossRef Works API — extracteurs et nettoyeurs qui encapsulent les conventions CrossRef.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_publications.meta` (JSONB).
 """

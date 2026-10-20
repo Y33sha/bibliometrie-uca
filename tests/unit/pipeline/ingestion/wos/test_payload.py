@@ -1,4 +1,4 @@
-from domain.sources.wos import (
+from pipeline.ingestion.wos.payload import (
     derive_wos_api_oa_status,
     is_wos_author_exploitable,
     parse_export_addresses,
