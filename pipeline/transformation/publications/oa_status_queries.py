@@ -10,14 +10,14 @@ from infrastructure.db.scalars import scalar_int
 
 
 class OaSignal(NamedTuple):
-    """Source et statut OA d'une notice d'une publication."""
+    """Source et statut OA d'un enregistrement source d'une publication."""
 
     source: str
     oa_status: str | None
 
 
 class PublicationOaInputs(NamedTuple):
-    """Ce dont dépend le statut OA d'une publication : son DOI, son statut courant, les statuts de ses notices."""
+    """Ce dont dépend le statut OA d'une publication : son DOI, son statut courant, les statuts de ses enregistrements sources."""
 
     id: int
     doi: str
@@ -77,7 +77,7 @@ class OaStatusQueries:
         )
 
     def fetch_oa_inputs(self, conn: Connection, dois: Sequence[str]) -> list[PublicationOaInputs]:
-        """Publications de ces DOI, avec les statuts OA de leurs notices."""
+        """Publications de ces DOI, avec les statuts OA de leurs enregistrements sources."""
         rows = conn.execute(
             text("""
                 SELECT p.id, lower(p.doi) AS doi, p.oa_status::text AS oa_status,

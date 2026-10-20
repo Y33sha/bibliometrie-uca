@@ -2,7 +2,7 @@
 
 Le dump est importé seulement si sa version diffère de celle du dernier import. La version publiée se lit d'abord chez DataCite : Zenodo est interrogé seulement quand elle diffère, ou quand DataCite ne répond pas. Un dump inaccessible laisse le référentiel en l'état.
 
-Quand une organisation change de pays, l'import marque les signatures et les adresses qui la citent, pour la phase `countries`.
+Quand une organisation change de pays, l'import marque les contributions sources et les adresses qui la citent, pour la phase `countries`.
 """
 
 import logging
@@ -89,7 +89,7 @@ class RorDumpQueries:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque `countries_dirty` les signatures qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le tâche `countries.ror` recrée leurs candidats."""
+        """Pour les organisations `ror_ids` : marque `countries_dirty` les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le tâche `countries.ror` recrée leurs candidats."""
         if not ror_ids:
             return
         self._conn.execute(
@@ -98,7 +98,7 @@ class RorDumpQueries:
                     SELECT source_contribution_id, address_id
                     FROM source_contribution_rors WHERE ror_id = ANY(:ids)
                 ),
-                signatures AS (
+                marked_contributions AS (
                     UPDATE source_contributions SET countries_dirty = true
                     WHERE id IN (SELECT source_contribution_id FROM linked WHERE address_id IS NULL)
                       AND NOT countries_dirty

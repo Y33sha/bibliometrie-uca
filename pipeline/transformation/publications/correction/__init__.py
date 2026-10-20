@@ -1,1 +1,1 @@
-"""Corrections des métadonnées des notices, avant leur regroupement en publications."""
+"""Corrections des métadonnées des enregistrements sources, avant leur regroupement en publications."""

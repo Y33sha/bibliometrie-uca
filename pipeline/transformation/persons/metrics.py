@@ -29,7 +29,7 @@ class CascadeResult(NamedTuple):
     out_of_perimeter_matched: int
     in_perimeter_total: int
     out_of_perimeter_total: int
-    # Incrémental cross-source : les signatures cross-source re-jugées ce run, et celles réellement re-résolues. Le complément (candidates − résolues) est détaché par la phase.
+    # Incrémental cross-source : les contributions sources cross-source re-jugées ce run, et celles réellement re-résolues. Le complément (candidates − résolues) est détaché par la phase.
     cross_source_candidate_ids: set[int]
     resolved_cross_source_ids: set[int]
     # Personnes au prénom réduit à des initiales qui prennent un prénom plein, avant la cascade ou à un rattachement.

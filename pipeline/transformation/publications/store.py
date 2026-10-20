@@ -89,9 +89,11 @@ class PublicationStore:
         )
 
     def save(self, publication: Publication) -> None:
-        """Persiste l'état mutable de l'agrégat `Publication` (tous les champs éditables ; `publication_year` reste immuable après création). Requiert `pub.id` posé."""
+        """Persiste l'état mutable de l'agrégat `Publication` (tous les champs éditables ; `publication_year` reste immuable après création). Requiert `publication.id` posé."""
         if publication.id is None:
-            raise ValueError("save(pub) : pub.id doit être posé (utiliser create pour insérer)")
+            raise ValueError(
+                "save(publication) : publication.id doit être posé (utiliser create pour insérer)"
+            )
         self._conn.execute(
             text("""
                 UPDATE publications SET

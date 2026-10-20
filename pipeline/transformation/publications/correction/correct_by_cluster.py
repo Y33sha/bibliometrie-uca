@@ -5,9 +5,9 @@ Corrige le DOI de certaines source_records afin de provoquer leur fusion en phas
 - **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
-Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur toutes les notices qui le citent.
+Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur tous les enregistrements sources qui le citent.
 
-Après une divergence, les notices qui gardent le DOI perdent les clés de confirmation qu'elles partagent avec les notices qui le perdent, par exemple le dépôt HAL d'une communication recopié par la notice OpenAlex du volume d'actes. Les valeurs retirées sont notées sous `raw_metadata.removed_external_ids`, que la sous-étape unaire réapplique.
+Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Les valeurs retirées sont notées sous `raw_metadata.removed_external_ids`, que la sous-étape unaire réapplique.
 
 Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`raw_metadata.doi`) et des identifiants d'avant retrait, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
 """
@@ -48,7 +48,7 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 
 
 def _base_external_ids(row: DoiClusterRow) -> dict[str, JsonValue]:
-    """Identifiants externes de la notice avant le retrait par cluster : ceux que l'étape unaire a écrits, valeurs retirées au run précédent restaurées."""
+    """Identifiants externes de l'enregistrement source avant le retrait par cluster : ceux que l'étape unaire a écrits, valeurs retirées au run précédent restaurées."""
     return with_values_restored(row.external_ids, row.raw_metadata.get(REMOVED_EXTERNAL_IDS))
 
 
@@ -158,7 +158,7 @@ def run(
     logger.info(
         "%sidentifiants partagés avec une autre œuvre retirés de %s",
         BRANCHE,
-        accord(removals, "notice"),
+        accord(removals, "enregistrement source", "enregistrements sources"),
     )
     case_counts = tally_doi_corrections(updates)
 

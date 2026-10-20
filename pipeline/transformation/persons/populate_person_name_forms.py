@@ -4,7 +4,7 @@ Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(n
 
 Sources :
 1. `persons.last_name` + `persons.first_name` (source: `'persons'`) — inclut les personnes exclues, qui restent des ancres du matching.
-2. le nom normalisé de l'identité des signatures (`contributor_information.author_name_normalized`, toutes sources biblio).
+2. le nom normalisé des informations du contributeur des contributions sources (`contributor_information.author_name_normalized`, toutes sources biblio).
 
 L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
 """

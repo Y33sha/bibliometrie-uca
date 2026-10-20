@@ -283,7 +283,7 @@ TASKS: tuple[Task, ...] = (
                 "publications.contributions_dirty",
                 *_containers(source),
             ),
-            # Ses propres lignes de `staging`, notices et signatures, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
             previous_run=(
                 "staging",
                 "source_records",
@@ -304,7 +304,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.staging_id",
             "source_records.publication_id",
         ),
-        # La suppression d'une notice emporte ses signatures, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
+        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_records.id",
             "source_records.keys_dirty",
@@ -358,7 +358,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structures",
             "hal_structure_relations",
             "hal_structure_aliases",
-            # Signatures d'une structure qui change de pays.
+            # Contributions sources d'une structure qui change de pays.
             "source_contributions.countries_dirty",
         ),
         previous_run=("hal_structures", "hal_structure_aliases"),
@@ -410,7 +410,7 @@ TASKS: tuple[Task, ...] = (
             "idref_structures",
             "source_contributions.source_record_id",
             "source_records.publication_id",
-            # Identité des personnes RH : `hr_record_source_contributions`.
+            # Identifiants des personnes qui ont une fiche RH : `hr_record_source_contributions`.
             "hr_records",
             "person_identifiers",
             "rejected_contributions",
@@ -730,7 +730,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.raw_metadata",
             "source_records.keys_dirty",
         ),
-        # Les référentiels vides, supprimés plus loin, ne sont référencés par aucune notice : la correction ne les atteint pas.
+        # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
         previous_run=(
             "source_records",
             "journals.journal_type",
@@ -761,7 +761,7 @@ TASKS: tuple[Task, ...] = (
         )
         # DOI que doi.org ne connaît pas.
         + ("failed_lookups",)
-        # Noms des auteurs d'un dépôt HAL et de la notice Crossref de son DOI.
+        # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
         + (
             "source_contributions.source_record_id",
             "source_contributions.contributor_information_id",
@@ -830,7 +830,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.contributor_information_id",
             "source_contributions.neutralized_identifiers",
             "contributor_information",
-            # Prénom de la personne à laquelle un humain a rattaché l'identifiant d'une signature.
+            # Prénom de la personne à laquelle un humain a rattaché l'identifiant d'une contribution source.
             "person_identifiers",
             "persons",
             "source_contribution_groups",
@@ -878,13 +878,13 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.person_id",
             "source_contributions.resolution_mode",
             "source_contributions.neutralized_identifiers",
-            # Publications dont une signature change de neutralisation : leurs groupes sont à recalculer.
+            # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
             "publications.contributions_dirty",
             "persons",
             "person_identifiers",
             "person_name_forms",
         ),
-        # Formes de nom peuplées, signatures détachées et personnes supprimées par `populate_person_name_forms` et `purge`.
+        # Formes de nom peuplées, contributions sources détachées et personnes supprimées par `populate_person_name_forms` et `purge`.
         previous_run=(
             "person_name_forms",
             "persons",
@@ -904,7 +904,7 @@ TASKS: tuple[Task, ...] = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Signatures détachées et personnes supprimées par `purge`.
+        # Contributions sources détachées et personnes supprimées par `purge`.
         previous_run=("persons", "person_name_forms", "source_contributions.person_id"),
     ),
     _task(
@@ -1190,16 +1190,16 @@ PHASE_LIBELLES: dict[str, str] = {
     "fetch_stale": "Recherche des documents non revus depuis {delai}",
     "fetch_truncated": "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
     "normalize": "Normalisation des données brutes",
-    "affiliations": "Résolution des affiliations par signature",
+    "affiliations": "Résolution des affiliations par contribution source",
     "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
-    "author_grouping": "Alignement des auteurs liés aux notices de la même publication",
-    "persons": "Résolution de l'identité des personnes",
+    "author_grouping": "Alignement des auteurs des enregistrements sources d'une même publication",
+    "persons": "Résolution des personnes",
     "contributions": "Rafraîchissement des liens entre publications, personnes et structures",
     "relations": "Relations entre publications apparentées",
     "subjects": "Sujets des publications",
-    "countries": "Pays associés aux signatures",
+    "countries": "Pays associés aux contributions sources",
     "oa_status": "Statut open access des publications",
 }
 """Ce que chaque phase produit, en une ligne lisible sans connaître le schéma.

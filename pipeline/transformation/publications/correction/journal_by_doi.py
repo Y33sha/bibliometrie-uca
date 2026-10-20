@@ -77,8 +77,8 @@ def run(
     logger.info(
         "%s%s %s à %s%s",
         DERNIERE_BRANCHE,
-        accord(len(journals), "notice"),
-        forme(len(journals), "rattachée"),
+        accord(len(journals), "enregistrement source", "enregistrements sources"),
+        forme(len(journals), "rattaché"),
         accord(len(set(journals)), "revue"),
         f", {accord(detached, 'rattachement')} {forme(detached, 'retiré')}" if detached else "",
     )

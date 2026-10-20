@@ -1,4 +1,4 @@
-"""Indices de l'entrée des contributions sources dans le périmètre : synchronisation de `source_contributions.perimeter_evidence` sur la vue `source_contribution_structures` et l'identité des personnes RH. Partagée par la phase `affiliations` et le recalcul ciblé après une correction d'adresse (`SourceContributionPerimeterRecompute`)."""
+"""Indices de l'entrée des contributions sources dans le périmètre : synchronisation de `source_contributions.perimeter_evidence` sur la vue `source_contribution_structures` et les identifiants des personnes qui ont une fiche RH. Partagée par la phase `affiliations` et le recalcul ciblé après une correction d'adresse (`SourceContributionPerimeterRecompute`)."""
 
 from typing import NamedTuple
 
@@ -23,9 +23,9 @@ class InPerimeterSyncCounts(NamedTuple):
 
 
 def _sync_sql(scoped: bool) -> str:
-    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux signatures `:source_contribution_ids` quand `scoped` est vrai.
+    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux contributions sources `:source_contribution_ids` quand `scoped` est vrai.
 
-    Seules les signatures dont les indices changent sont écrites. Un enregistrement sans publication dont une signature entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
+    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement sans publication dont une contribution source entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
     """
     scope = "AND sc.id = ANY(:source_contribution_ids)" if scoped else ""
     return f"""
@@ -72,7 +72,7 @@ def refresh_source_contribution_structures(conn: Connection) -> None:
 def sync_perimeter_evidence(
     conn: Connection, *, perimeter_ids: list[int], source_contribution_ids: list[int] | None = None
 ) -> InPerimeterSyncCounts:
-    """Aligne `source_contributions.perimeter_evidence` sur les indices calculés (`source_contribution_perimeter_evidence`), pour toutes les signatures ou pour `source_contribution_ids`."""
+    """Aligne `source_contributions.perimeter_evidence` sur les indices calculés (`source_contribution_perimeter_evidence`), pour toutes les contributions sources ou pour `source_contribution_ids`."""
     if source_contribution_ids is None:
         row = conn.execute(_SYNC_ALL, {"perimeter_ids": perimeter_ids}).one()
     else:

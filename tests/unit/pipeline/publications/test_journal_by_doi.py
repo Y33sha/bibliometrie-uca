@@ -125,4 +125,4 @@ def test_le_bilan_compte_les_revues_distinctes(caplog):
     ]
     with caplog.at_level(logging.INFO, logger="test"):
         run(_Conn(), _Queries(rows), logging.getLogger("test"))  # type: ignore[arg-type]
-    assert "3 notices rattachées à 2 revues, 1 rattachement retiré" in caplog.text
+    assert "3 enregistrements sources rattachés à 2 revues, 1 rattachement retiré" in caplog.text

@@ -1,4 +1,4 @@
-"""Accès aux personnes et aux signatures que plusieurs tâches de la phase `persons` partagent."""
+"""Accès aux personnes et aux contributions sources que plusieurs tâches de la phase `persons` partagent."""
 
 from sqlalchemy import Connection, text
 
@@ -30,7 +30,7 @@ class PersonsStore:
         return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
 
     def detach_source_contributions(self, source_contribution_ids: list[int]) -> int:
-        """Sert aux liens cross-source devenus sans appui : une signature dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
+        """Sert aux liens cross-source devenus sans appui : une contribution source dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
         if not source_contribution_ids:
             return 0
         return self._conn.execute(

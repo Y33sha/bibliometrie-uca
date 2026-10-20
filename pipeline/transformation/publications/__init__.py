@@ -1,1 +1,1 @@
-"""Publications : corrections de métadonnées des notices, regroupement des notices en publications, signatures consolidées, relations, sujets et statut d'accès ouvert."""
+"""Publications : corrections de métadonnées des enregistrements sources, regroupement des enregistrements sources en publications, contributions, relations, sujets et statut open access."""

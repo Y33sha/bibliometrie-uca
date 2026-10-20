@@ -1,4 +1,4 @@
-"""Identifiants que la phase `persons` attribue à une personne d'après ses signatures.
+"""Identifiants que la phase `persons` attribue à une personne d'après ses contributions sources.
 
 L'attribution passe par le repository des personnes (`PgPersonRepository.attribute_identifier`), que l'API utilise aussi.
 """
@@ -20,7 +20,7 @@ def add_identifiers_from_contributions(
     *,
     repo: PgPersonRepository,
 ) -> None:
-    """Attribue en `pending` à la personne les identifiants observés dans ses signatures, donnés par `{id_type: valeur}`.
+    """Attribue en `pending` à la personne les identifiants observés dans ses contributions sources, donnés par `{id_type: valeur}`.
 
     Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` est laissée : l'arbitrage par consensus du run suivant la tranche.
     """

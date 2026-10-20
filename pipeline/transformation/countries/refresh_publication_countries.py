@@ -1,4 +1,4 @@
-"""Recalcule les pays des contributions sources, des notices et des publications à partir de `addresses.countries`.
+"""Recalcule les pays des contributions sources, des enregistrements sources et des publications à partir de `addresses.countries`.
 
 Trois caches dénormalisés, en cascade :
   1. `source_contributions.countries` — pays retenus des adresses de la contribution source, pays de ses organisations ROR sans adresse et de ses structures HAL.
@@ -179,8 +179,8 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
     """Recalcule les caches pays (source_contributions → source_records → publications), scopé aux `countries_dirty`, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
     etape(logger, "Rafraîchissement des pays associés aux publications")
     steps = (
-        ("signature", "signatures", refresh_source_contribution_countries),
-        ("notice", "notices", refresh_source_record_countries),
+        ("contribution source", "contributions sources", refresh_source_contribution_countries),
+        ("enregistrement source", "enregistrements sources", refresh_source_record_countries),
         ("publication", "publications", refresh_publication_countries),
     )
     updated = 0

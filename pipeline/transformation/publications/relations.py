@@ -62,7 +62,7 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
 
 
 def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
-    """DOI que les notices DataCite déclarent comme autre forme de leur œuvre, chez un autre registrant."""
+    """DOI que les enregistrements sources DataCite déclarent comme autre forme de leur œuvre, chez un autre registrant."""
     return sorted(
         {
             doi
@@ -78,9 +78,9 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
 def _build_distinct_work_edges(
     sources: list[DeclaredRelationSource], publications_by_doi: dict[str, DoiPublication]
 ) -> list[RelationEdge]:
-    """Relie une notice DataCite à la forme d'un autre registrant qu'elle déclare de la même œuvre.
+    """Relie un enregistrement source DataCite à la forme d'un autre registrant qu'il déclare de la même œuvre.
 
-    Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`. Une cible absente du corpus a un type inconnu : face à elle, un preprint donne `is_preprint_of`, les autres notices `is_related_to`.
+    Le type se déduit du couple de `doc_type`, comme pour une clé partagée : un preprint face à l'article publié donne `is_preprint_of`. Une cible absente du corpus a un type inconnu : face à elle, un preprint donne `is_preprint_of`, les autres enregistrements sources `is_related_to`.
     """
     edges: list[RelationEdge] = []
     for source_record in sources:

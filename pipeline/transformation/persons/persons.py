@@ -1,13 +1,13 @@
 """Orchestrateur unique de la phase personnes.
 
-Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des signatures, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
+Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'une notice (`duplicate_of`), non épinglés, perdent leur personne.
-2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les signatures rattachées par un identifiant neutralisé ou capté repassent à NULL.
+1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'un enregistrement source (`duplicate_of`), non épinglés, perdent leur personne.
+2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les contributions sources rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
-6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune signature ne porte, et supprime les personnes vidées.
+6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
 
 Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
 
@@ -48,7 +48,7 @@ from pipeline.transformation.persons.store import PersonsStore
 
 
 def enforce_confirmed_source_contributions(conn: Connection) -> int:
-    """Réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : pose `source_contributions.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de signatures recalées."""
+    """Réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : pose `source_contributions.person_id` sur la personne épinglée là où il diverge. Retourne le nombre de contributions sources recalées."""
     return conn.execute(
         text("""
             UPDATE source_contributions sc
@@ -80,7 +80,7 @@ class PersonsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les trois tâches de la phase personnes et rend ses métriques.
 
-        `orphans_log` reçoit le motif de chaque signature du périmètre restée sans personne (`run_cascade`).
+        `orphans_log` reçoit le motif de chaque contribution source du périmètre restée sans personne (`run_cascade`).
         """
         by_task = run_tasks(
             "persons",
@@ -117,12 +117,14 @@ class PersonsPhase:
                 logger.info(
                     "%s%s",
                     DERNIERE_BRANCHE,
-                    accord(n_enforced, "signature recalée", "signatures recalées"),
+                    accord(
+                        n_enforced, "contribution source recalée", "contributions sources recalées"
+                    ),
                 )
 
             n_copies = detach_copies(conn)
             if n_copies:
-                etape(logger, "Auteurs en double dans la liste d'une notice")
+                etape(logger, "Auteurs en double dans la liste d'un enregistrement source")
                 logger.info(
                     "%s%s de leur personne",
                     DERNIERE_BRANCHE,
@@ -137,7 +139,7 @@ class PersonsPhase:
                 orphans_log=self.orphans_log,
             )
 
-            # Les signatures cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
+            # Les contributions sources cross-source qu'aucune passe n'a re-résolues ont perdu leur ancre ferme → détachées.
             stale = sorted(
                 cascade_result.cross_source_candidate_ids - cascade_result.resolved_cross_source_ids
             )

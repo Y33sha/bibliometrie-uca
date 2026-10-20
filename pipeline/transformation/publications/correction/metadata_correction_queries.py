@@ -27,7 +27,7 @@ from infrastructure.sql_fragments import corrected, diamond_journal_sql, raw_col
 class UnaryCorrectionRow(NamedTuple):
     """Une `source_record` candidate à la correction unaire, jointe à son journal.
 
-    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'une notice ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'un enregistrement source ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
     L'adapter construit les lignes par appariement de noms : chaque champ a le nom de la colonne qui l'alimente.
     """
@@ -126,7 +126,7 @@ class DoiClusterRow(NamedTuple):
     external_ids: dict[str, JsonValue] = {}
     source: str = ""
     source_id: str = ""
-    # Noms de famille normalisés des signatures individuelles, renseignés pour les groupes où un dépôt HAL et la notice Crossref n'ont aucun nom commun.
+    # Noms de famille normalisés des contributions sources individuelles, renseignés pour les groupes où un dépôt HAL et l'enregistrement source Crossref n'ont aucun nom commun.
     author_names: tuple[str, ...] = ()
 
 
@@ -156,7 +156,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue, `author_count` le nombre de signatures. Chaque
+# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue, `author_count` le nombre de contributions sources. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source::text AS source, sr.source_id,
@@ -224,7 +224,7 @@ def _persist_updates(
     return len(rows)
 
 
-# La notice `{source_record}` a au moins une signature individuelle.
+# L'enregistrement source `{source_record}` a au moins une contribution source individuelle.
 _HAS_INDIVIDUAL_SOURCE_CONTRIBUTION = (
     "EXISTS (SELECT 1 FROM source_contributions s"
     " WHERE s.source_record_id = {source_record} AND NOT s.collective)"
@@ -259,7 +259,7 @@ class PgMetadataCorrectionQueries:
     def fetch_for_unary_correction_by_hal_ids(
         self, conn: Connection, hal_ids: list[str]
     ) -> list[UnaryCorrectionRow]:
-        """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des notices ScanR d'une correction ciblée."""
+        """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         rows = conn.execute(
@@ -315,7 +315,7 @@ class PgMetadataCorrectionQueries:
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref, et `source_records` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref, et `source_records` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sr_eff AS (
@@ -329,9 +329,9 @@ class PgMetadataCorrectionQueries:
                     FROM sr_eff
                     WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
                 ),
-                -- La cible reste attachée à la notice DataCite dont les `related_identifiers`
-                -- la mentionnent : la règle de même œuvre lit le type de cette notice, et les
-                -- autres notices au même DOI suivent la décision du groupe. Quand une notice
+                -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
+                -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
+                -- autres enregistrements au même DOI suivent la décision du groupe. Quand un enregistrement
                 -- mentionne plusieurs cibles, la version (concept) prime sur la variante.
                 same_work AS (
                     SELECT DISTINCT ON (declarant_id)
@@ -376,8 +376,8 @@ class PgMetadataCorrectionQueries:
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
                 ),
-                -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref,
-                -- les deux ayant des signatures individuelles.
+                -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
+                -- les deux ayant des contributions sources individuelles.
                 hal_crossref AS MATERIALIZED (
                     SELECT h.eff_doi AS d, h.id AS hal_id, c.id AS crossref_id
                     FROM sr_eff h
@@ -454,7 +454,7 @@ class PgMetadataCorrectionQueries:
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes `doi`, `external_ids` et `raw_metadata`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
 
-        La publication de chaque notice reçoit `contributions_dirty` : le groupement des signatures écarte une notice dont le DOI converge sur celui d'une autre œuvre.
+        La publication de chaque enregistrement source reçoit `contributions_dirty` : le groupement des contributions sources écarte un enregistrement source dont le DOI converge sur celui d'une autre œuvre.
         """
         conn.execute(
             text("""
