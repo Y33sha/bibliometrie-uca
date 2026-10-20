@@ -53,8 +53,4 @@ class SubjectsPhase:
 
 
 def build() -> Phase:
-    from pipeline.transformation.publications.subjects.subjects_queries import (
-        SubjectsIngestionQueries,
-    )
-
     return SubjectsPhase(SubjectsIngestionQueries())

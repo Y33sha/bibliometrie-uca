@@ -21,6 +21,9 @@ from infrastructure.read_models.perimeters import (
     get_extraction_structure_ids,
     get_persons_structure_ids_list,
 )
+from pipeline.http.polite_pool import default_user_agent
+from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
+from pipeline.ingestion.hal.api import HalStructuresClient
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -30,12 +33,17 @@ from pipeline.transformation.structures.address_resolution import (
     AddressResolutionQueries,
     run_resolution,
 )
+from pipeline.transformation.structures.hal_structures import (
+    HalStructuresQueries,
+    run_refresh_hal_structures,
+)
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_authorship_structures,
     sync_perimeter_evidence,
 )
+from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
 
 
 @dataclass(frozen=True)
@@ -127,11 +135,6 @@ def build() -> Phase:
 
 def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> PhaseMetrics:
     """Chargement du référentiel des structures HAL, sur sa propre connexion."""
-    from pipeline.ingestion.hal.api import HalStructuresClient
-    from pipeline.transformation.structures.hal_structures import (
-        HalStructuresQueries,
-        run_refresh_hal_structures,
-    )
 
     with ctx.open_tx() as conn:
         return run_refresh_hal_structures(
@@ -145,9 +148,6 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
 
 def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     """Rafraîchissement du référentiel ROR depuis le dump publié sur Zenodo, sur sa propre connexion."""
-    from pipeline.http.polite_pool import default_user_agent
-    from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
-    from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
 
     # Le dump est public : l'adresse du polite pool y est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)

@@ -253,15 +253,13 @@ class TestExecutePhases:
     def run_prepare(self, monkeypatch):
         """Neutralise l'ouverture de la base et le journal d'observabilité."""
         recorder = _FakeRecorder()
-        import infrastructure.observability.phase_executions as observabilite
-        import pipeline.transformation.structures.perimeter as perimetre
 
         def _start_run(**kw):
             recorder.demarrage = kw
             return recorder
 
-        monkeypatch.setattr(observabilite, "start_run", _start_run)
-        monkeypatch.setattr(perimetre, "refresh_perimeter_structures", lambda conn: None)
+        monkeypatch.setattr(run_pipeline, "start_run", _start_run)
+        monkeypatch.setattr(run_pipeline, "refresh_perimeter_structures", lambda conn: None)
         monkeypatch.setattr(run_pipeline, "open_tx", nullcontext)
         return recorder
 

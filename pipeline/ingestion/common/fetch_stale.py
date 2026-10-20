@@ -23,6 +23,14 @@ from pipeline.ingestion.common.stale_refetch import (
     StaleRefetch,
     refresh,
 )
+from pipeline.ingestion.crossref.fetch_stale import CrossrefStaleRefetch
+from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
+from pipeline.ingestion.hal.fetch_stale import HalStaleRefetch
+from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
+from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
+from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
+from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
+from pipeline.runtime.config import get_fetch_stale_after_days, get_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -115,21 +123,12 @@ def build() -> Phase:
 
 def _get_years_for_window(ctx: PhaseContext, start_year: int | None) -> list[int] | None:
     """Années de la fenêtre du run, de `start_year` à l'année courante."""
-    from pipeline.runtime.config import get_years
-
     with ctx.open_tx() as conn:
         return get_years(conn, start_year)
 
 
 def _make_refetch(source: str) -> StaleRefetch:
     """Construit la nouvelle lecture par identifiant natif d'une source."""
-    from pipeline.ingestion.crossref.fetch_stale import CrossrefStaleRefetch
-    from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
-    from pipeline.ingestion.hal.fetch_stale import HalStaleRefetch
-    from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
-    from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
-    from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
-    from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
 
     refetches: dict[str, type[StaleRefetch]] = {
         "hal": HalStaleRefetch,
@@ -150,8 +149,6 @@ def _run_fetch_stale(
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    from pipeline.runtime.config import get_fetch_stale_after_days
-
     refetch = _make_refetch(target)
     with ctx.open_tx() as conn:
         after_days = get_fetch_stale_after_days(conn)

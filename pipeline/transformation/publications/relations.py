@@ -267,6 +267,4 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
 
 
 def build() -> Phase:
-    from pipeline.transformation.publications.relations_queries import PublicationRelationsQueries
-
     return RelationsPhase(PublicationRelationsQueries())

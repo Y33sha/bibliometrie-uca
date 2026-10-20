@@ -61,7 +61,7 @@ def test_circuit_coupe_signale():
 
 def test_phase_oa_status_skips_without_email():
     with (
-        patch("infrastructure.db.engine.get_sync_engine"),
+        patch("pipeline.runtime.execution.get_sync_engine"),
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
     ):
         metrics = oa_status.build().run(
@@ -74,7 +74,7 @@ def test_phase_oa_status_skips_without_email():
 
 def test_phase_oa_status_runs_with_email():
     with (
-        patch("infrastructure.db.engine.get_sync_engine"),
+        patch("pipeline.runtime.execution.get_sync_engine"),
         patch("pipeline.http.polite_pool.get_polite_pool_email_optional", return_value="e@x"),
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):

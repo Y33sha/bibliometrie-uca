@@ -21,11 +21,21 @@ from pipeline.ingestion.common.doi_search import (
     DoiSearch,
     fetch_missing_doi,
 )
+from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
+from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
+from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
+from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
+from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
+from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
+from pipeline.runtime.config import (
+    get_fetch_missing_max_per_source,
+    get_fetch_missing_retry_after_days,
+)
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
-from pipeline.runtime.parallel import RunParallel
+from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
@@ -148,8 +158,6 @@ class FetchMissingPhase:
 
 
 def build() -> Phase:
-    from pipeline.runtime.parallel import run_parallel
-
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
@@ -162,7 +170,6 @@ def build() -> Phase:
 def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans HAL par hal-id (OpenAlex/ScanR) : documents absents du staging."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
-    from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
     with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
@@ -174,7 +181,6 @@ def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
 def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans HAL par NNT (theses.fr) : thèses soutenues sans document HAL."""
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
-    from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
     with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
@@ -186,7 +192,6 @@ def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
 def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     """Recherche dans theses.fr par NNT : thèses trouvées dans d'autres sources, absentes du staging theses.fr."""
     from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
-    from pipeline.runtime.config import get_fetch_missing_retry_after_days
 
     with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)
@@ -197,12 +202,6 @@ def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
 
 def _make_doi_search(target: str) -> DoiSearch:
     """Construit la recherche par DOI d'une source cible."""
-    from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
-    from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
-    from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
-    from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
-    from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
-    from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
 
     searches: dict[str, type[DoiSearch]] = {
         "hal": HalDoiSearch,
@@ -218,11 +217,6 @@ def _make_doi_search(target: str) -> DoiSearch:
 def _run_fetch_missing_doi(
     ctx: PhaseContext, target: str, breaker: SourceCircuitBreaker
 ) -> PhaseMetrics:
-    from pipeline.runtime.config import (
-        get_fetch_missing_max_per_source,
-        get_fetch_missing_retry_after_days,
-    )
-
     search = _make_doi_search(target)
     with ctx.open_tx() as conn:
         retry_after_days = get_fetch_missing_retry_after_days(conn)

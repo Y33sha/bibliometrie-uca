@@ -19,7 +19,11 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import publication_oa_status
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
+from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.complements.unpaywall import fetch_oa_status
+from pipeline.runtime.config import get_unpaywall_max_per_run, get_unpaywall_recheck_after_days
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
@@ -221,12 +225,6 @@ def _apply_verdicts(
 
 
 def build() -> Phase:
-    from pipeline.http.polite_pool import get_polite_pool_email_optional
-    from pipeline.ingestion.api_params import API_BASE_URLS
-    from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-    from pipeline.runtime.config import get_unpaywall_max_per_run, get_unpaywall_recheck_after_days
-    from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
-
     base_url = API_BASE_URLS["unpaywall"]
     email = get_polite_pool_email_optional() or ""
 

@@ -53,7 +53,7 @@ def test_refetch_not_called_in_normalize():
 
 def test_refetch_called_in_own_phase_when_openalex_present():
     with (
-        patch("infrastructure.db.engine.get_sync_engine"),
+        patch("pipeline.runtime.execution.get_sync_engine"),
         patch(_REFETCH, new_callable=AsyncMock, return_value=PhaseMetrics()) as refetch,
     ):
         fetch_truncated.build().run(

@@ -28,19 +28,22 @@ from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
+from infrastructure.observability.phase_executions import get_last_daily_harvest_date
 from infrastructure.read_models.perimeters import get_extraction_structure_ids
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     Harvester,
     HarvesterFactory,
     HarvestWindow,
 )
+from pipeline.ingestion.credentials import get_scanr_credentials, get_wos_api_key
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
-from pipeline.runtime.parallel import RunParallel
+from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
@@ -159,9 +162,6 @@ class HarvestPhase:
 
 
 def build() -> Phase:
-    from infrastructure.observability.phase_executions import get_last_daily_harvest_date
-    from pipeline.runtime.parallel import run_parallel
-
     registry = _harvesters()
 
     def harvest_one(
@@ -192,7 +192,6 @@ def _harvesters() -> dict[str, HarvesterFactory]:
     `wos` et `scanr` lisent leurs identifiants d'API en configuration.
 
     Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
-    from pipeline.ingestion.api_params import API_BASE_URLS
 
     def hal(conn: Connection, source_log: logging.Logger) -> Harvester:
         from pipeline.ingestion.hal.api import HalClient
@@ -207,7 +206,6 @@ def _harvesters() -> dict[str, HarvesterFactory]:
         return OpenalexHarvester(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
     def wos(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.credentials import get_wos_api_key
         from pipeline.ingestion.wos.api import WosClient
         from pipeline.ingestion.wos.harvest import WosHarvester
 
@@ -215,7 +213,6 @@ def _harvesters() -> dict[str, HarvesterFactory]:
         return WosHarvester(conn, source_log, client)
 
     def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.api import ScanrClient
         from pipeline.ingestion.scanr.harvest import ScanrHarvester
 

@@ -20,14 +20,30 @@ from typing import cast
 from sqlalchemy import Connection
 
 from domain.sources.registry import SOURCE_PRIORITY, source_label
+from infrastructure.raw_store import NullRawStore, get_raw_store
 from pipeline.ingestion.common.normalizer import (
     BibliographicNormalizer,
     NormalizeStats,
     SourceNormalizer,
 )
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-from pipeline.ingestion.common.source_publications import SourcePublicationQueries
+from pipeline.ingestion.common.signature_queries import (
+    AuthorshipsBatchQueries,
+    delete_orphan_addresses,
+    delete_orphan_identities,
+    mark_signatures_to_resync,
+)
+from pipeline.ingestion.common.source_publications import (
+    SourcePublicationQueries,
+    delete_disappeared_source_publications,
+)
 from pipeline.ingestion.common.staging import StagingQueries
+from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
+from pipeline.ingestion.datacite.normalize import DataciteNormalizer
+from pipeline.ingestion.hal.normalize import HalNormalizer
+from pipeline.ingestion.openalex.normalize import OpenalexNormalizer
+from pipeline.ingestion.scanr.normalize import ScanrNormalizer
+from pipeline.ingestion.theses.normalize import ThesesNormalizer
+from pipeline.ingestion.wos.normalize import WosNormalizer
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     DERNIERE_BRANCHE,
@@ -155,7 +171,6 @@ class _NormalizeSelonOptions:
     """
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-
         options = ctx.options
         registry = _normalize_builders(archive=options.raw_store)
 
@@ -173,43 +188,27 @@ class _NormalizeSelonOptions:
 
 
 def _run_mark_signatures_to_resync(ctx: PhaseContext, source: str) -> None:
-    from pipeline.ingestion.common.signature_queries import mark_signatures_to_resync
-
     with ctx.open_tx() as conn:
         mark_signatures_to_resync(conn, source)
 
 
 def _run_prune_disappeared(ctx: PhaseContext) -> int:
-    from pipeline.ingestion.common.source_publications import delete_disappeared_source_publications
-
     with ctx.open_tx() as conn:
         return delete_disappeared_source_publications(conn)
 
 
 def _run_cleanup_orphan_identities(ctx: PhaseContext) -> int:
-    from pipeline.ingestion.common.signature_queries import delete_orphan_identities
-
     with ctx.open_tx() as conn:
         return delete_orphan_identities(conn)
 
 
 def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
-    from pipeline.ingestion.common.signature_queries import delete_orphan_addresses
-
     with ctx.open_tx() as conn:
         return delete_orphan_addresses(conn)
 
 
 def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
     """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
-    from infrastructure.raw_store import NullRawStore, get_raw_store
-    from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-    from pipeline.ingestion.datacite.normalize import DataciteNormalizer
-    from pipeline.ingestion.hal.normalize import HalNormalizer
-    from pipeline.ingestion.openalex.normalize import OpenalexNormalizer
-    from pipeline.ingestion.scanr.normalize import ScanrNormalizer
-    from pipeline.ingestion.theses.normalize import ThesesNormalizer
-    from pipeline.ingestion.wos.normalize import WosNormalizer
 
     raw_store = get_raw_store() if archive else NullRawStore()
 
