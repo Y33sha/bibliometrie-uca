@@ -64,7 +64,7 @@ D'autres modules réunissent des connaissances sans rapport :
 ## Décisions
 
 - Le SQL propre à un module vit dans ce module. Le SQL partagé par plusieurs modules est l'accès à une entité : il vit dans le *store* de l'entité, une classe qui reçoit la connexion à sa construction et rend un agrégat ou des lignes. *Repository* désigne seulement les adaptateurs d'`infrastructure/`. Pas de préfixe `Pg` ni de suffixe `Gateway` ou `Queries`.
-- `transformation/` est organisé par entité. Le graphe déclare des nœuds ; une phase regroupe des nœuds pour l'affichage dans les journaux et l'administration.
+- `transformation/` est organisé par entité. Le graphe déclare des tâches ; une phase regroupe des tâches pour l'affichage dans les journaux et l'administration.
 - Les identifiants du code sont en anglais. Les textes affichés sont en français.
 - Une notion, un mot. Le niveau source décrit une entité telle qu'une source la donne, le niveau consolidé réunit les sources :
   - `source_publications` devient `source_records` (« enregistrement source » dans les textes), `publications` garde son nom ;
@@ -156,6 +156,6 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ## Questions ouvertes
 
-- Nom du module qui expose `build()`, puisque la phase regroupe des nœuds pour l'affichage.
+- Nom du module qui expose `build()`, puisque la phase regroupe des tâches pour l'affichage.
 - `source_contribution_group_members`, table à côté de `source_contributions`, au même grain : nom d'attente, et raison de la table distincte. `source_contribution_groups` prendra le nom `contributions` quand il remplacera la table consolidée.
-- Vérification des lectures et écritures que `graph.py` déclare pour chaque nœud. Les tests en tirent l'ordre des phases, mais rien ne les confronte au SQL. Piste : sur un run audité, capturer les requêtes du pipeline par les événements de SQLAlchemy, les attribuer au nœud en cours et les analyser par `sqlglot`, au niveau de la colonne. `sqlglot` se limite aux dépendances de développement.
+- Vérification des lectures et écritures que `graph.py` déclare pour chaque tâche. Les tests en tirent l'ordre des phases, mais rien ne les confronte au SQL. Piste : sur un run audité, capturer les requêtes du pipeline par les événements de SQLAlchemy, les attribuer à la tâche en cours et les analyser par `sqlglot`, au niveau de la colonne. `sqlglot` se limite aux dépendances de développement.
