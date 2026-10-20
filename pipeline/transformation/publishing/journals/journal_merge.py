@@ -14,11 +14,11 @@ from infrastructure.repositories.merge_steps import (
     untouched,
 )
 from pipeline.transformation.publications import lifecycle
-from pipeline.transformation.publications.correction.requalify_journal import (
+from pipeline.transformation.publications.store import PublicationStore
+from pipeline.transformation.publishing.journals.requalify_journal import (
     correct_journal_records,
     requalify_journal_publications,
 )
-from pipeline.transformation.publications.store import PublicationStore
 from pipeline.transformation.publishing.pub_counts import (
     refresh_journal_pub_count,
     refresh_publisher_pub_count,
