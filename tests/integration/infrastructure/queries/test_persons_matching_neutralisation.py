@@ -3,10 +3,12 @@
 from sqlalchemy import text
 
 from domain.persons.matching import ResolutionMode
-from pipeline.transformation.persons.matching import (
+from pipeline.transformation.persons.identifier_arbitration import (
     MisplacedNeutralizations,
-    PersonsMatchingQueries,
+    fetch_identifier_votes,
+    write_misplaced_neutralizations,
 )
+from pipeline.transformation.persons.loading import fetch_unlinked_authorships
 from tests.integration.helpers.authorships import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -51,7 +53,7 @@ def _carte(conn, signature_id):
 
 
 def _orcid_projete(conn):
-    rows = PersonsMatchingQueries().fetch_unlinked_authorships(conn)
+    rows = fetch_unlinked_authorships(conn)
     [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
     return row.identifiers.get("orcid")
 
@@ -71,7 +73,7 @@ def test_vote_sans_les_signatures_neutralisees_pour_partage(sa_sync_conn):
     _signature(sa_sync_conn, None, name="dupont jean", source_id="c-vote-1")
     _signature(sa_sync_conn, {"orcid": "shared"}, name="martin pierre", source_id="c-vote-2")
     _signature(sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3")
-    votes = PersonsMatchingQueries().fetch_identifier_votes(sa_sync_conn, "orcid")
+    votes = fetch_identifier_votes(sa_sync_conn, "orcid")
     assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
 
 
@@ -85,14 +87,13 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
         person_id=insert_person(sa_sync_conn, "Dado", first_name="T"),
         resolution_mode=ResolutionMode.IDENTIFIER.value,
     )
-    queries = PersonsMatchingQueries()
 
-    assert queries.write_misplaced_neutralizations(
+    assert write_misplaced_neutralizations(
         sa_sync_conn, {identity_id: ["orcid"]}
     ) == MisplacedNeutralizations(neutralized=1, to_detach=[signature_id])
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "misplaced"}
 
-    assert queries.write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
+    assert write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
         neutralized=0, to_detach=[]
     )
     assert _carte(sa_sync_conn, signature_id) is None
@@ -113,7 +114,7 @@ def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
         {"id": publication_id},
     )
 
-    PersonsMatchingQueries().write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
+    write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
 
     assert sa_sync_conn.execute(
         text("SELECT authorships_dirty FROM publications WHERE id = :id"), {"id": publication_id}
@@ -124,5 +125,5 @@ def test_shared_prime_sur_misplaced(sa_sync_conn):
     signature_id, identity_id = _signature(
         sa_sync_conn, {"orcid": "shared"}, source_id="c-shared-prime"
     )
-    PersonsMatchingQueries().write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
+    write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "shared"}

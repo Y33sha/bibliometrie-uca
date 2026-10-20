@@ -1,10 +1,14 @@
-"""Tests d'intégration pour `pipeline.transformation.persons.name_forms`."""
+"""Tests d'intégration des requêtes de `pipeline.transformation.persons.populate_person_name_forms`."""
 
 from sqlalchemy import text
 
-from pipeline.transformation.persons.name_forms import PersonNameFormsQueries
-
-_Q = PersonNameFormsQueries()
+from pipeline.transformation.persons.populate_person_name_forms import (
+    create_temp_raw_forms_table,
+    drop_temp_raw_forms_table,
+    fetch_persons_names,
+    insert_raw_forms_batch,
+    sync_from_raw_forms,
+)
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.sources import insert_signature, insert_source_publication
 
@@ -29,12 +33,12 @@ class TestFetchPersonsNames:
             sa_sync_conn, "C", first_name="Jean", exclusion="out_of_perimeter"
         )
 
-        ids = [r.id for r in _Q.fetch_persons_names(sa_sync_conn)]
+        ids = [r.id for r in fetch_persons_names(sa_sync_conn)]
         assert {active, not_a_person, out_of_perimeter} <= set(ids)
 
     def test_trims_names(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "  Dupond", first_name="Jean  ")
-        rows = _Q.fetch_persons_names(sa_sync_conn)
+        rows = fetch_persons_names(sa_sync_conn)
         row = next(r for r in rows if r.id == pid)
         assert row.last_name == "Dupond"
         assert row.first_name == "Jean"
@@ -45,13 +49,13 @@ class TestSyncFromRawForms:
         """Une forme `'persons'` poussée en `_raw_forms` apparaît en base après sync, avec `sources = ['persons']`."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
 
-        _Q.create_temp_raw_forms_table(sa_sync_conn)
-        _Q.insert_raw_forms_batch(
+        create_temp_raw_forms_table(sa_sync_conn)
+        insert_raw_forms_batch(
             sa_sync_conn,
             [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
         )
-        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
-        _Q.drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
+        drop_temp_raw_forms_table(sa_sync_conn)
 
         assert _fetch_pnf_for(sa_sync_conn, pid) == [("dupond j", ["persons"])]
         assert inserted == 1 and updated == 0 and deleted == 0
@@ -65,13 +69,13 @@ class TestSyncFromRawForms:
             sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j", source="hal"
         )
 
-        _Q.create_temp_raw_forms_table(sa_sync_conn)
-        _Q.insert_raw_forms_batch(
+        create_temp_raw_forms_table(sa_sync_conn)
+        insert_raw_forms_batch(
             sa_sync_conn,
             [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
         )
-        _Q.sync_from_raw_forms(sa_sync_conn)
-        _Q.drop_temp_raw_forms_table(sa_sync_conn)
+        sync_from_raw_forms(sa_sync_conn)
+        drop_temp_raw_forms_table(sa_sync_conn)
 
         rows = _fetch_pnf_for(sa_sync_conn, pid)
         assert ("dupond j", ["hal", "persons"]) in rows
@@ -82,10 +86,10 @@ class TestSyncFromRawForms:
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         insert_person_name_form(sa_sync_conn, pid, name_form="obsolete", sources=["persons"])
 
-        _Q.create_temp_raw_forms_table(sa_sync_conn)
+        create_temp_raw_forms_table(sa_sync_conn)
         # _raw_forms vide + aucune source_authorship → l'attendu est vide
-        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
-        _Q.drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
+        drop_temp_raw_forms_table(sa_sync_conn)
 
         assert deleted >= 1
         rows = _fetch_pnf_for(sa_sync_conn, pid)
@@ -102,9 +106,9 @@ class TestSyncFromRawForms:
         # Base : sources = ['hal'] (obsolète vs source_authorships qui dit openalex)
         insert_person_name_form(sa_sync_conn, pid, name_form="dupond j", sources=["hal"])
 
-        _Q.create_temp_raw_forms_table(sa_sync_conn)
-        inserted, updated, deleted = _Q.sync_from_raw_forms(sa_sync_conn)
-        _Q.drop_temp_raw_forms_table(sa_sync_conn)
+        create_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
+        drop_temp_raw_forms_table(sa_sync_conn)
 
         assert updated >= 1
         rows = _fetch_pnf_for(sa_sync_conn, pid)

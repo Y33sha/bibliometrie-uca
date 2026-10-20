@@ -4,6 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 from domain.persons.matching import PersonNameForms
+from pipeline.transformation.persons import identifier_arbitration
 from pipeline.transformation.persons.identifier_arbitration import (
     IdentifierConflict,
     resolve_identifier_transfers,
@@ -13,7 +14,7 @@ _ORCID = "0000-0001-2345-6789"
 _OWNER, _CANDIDATE = 1, 2
 
 
-def _transferred(consensus: str | None) -> int:
+def _transferred(monkeypatch, consensus: str | None) -> int:
     """Nombre de transferts pour un conflit : ORCID attribué en `pending` à Dupont, porté par une signature d'Aubert."""
     queries = MagicMock()
     queries.fetch_person_name_forms.return_value = {
@@ -21,29 +22,30 @@ def _transferred(consensus: str | None) -> int:
         _CANDIDATE: PersonNameForms("aubert", "pierre", []),
     }
     queries.null_identifier_signatures.return_value = 0
+    for name in ("fetch_person_name_forms", "null_identifier_signatures"):
+        monkeypatch.setattr(identifier_arbitration, name, getattr(queries, name))
     repo = MagicMock()
     repo.find_identifier.return_value.person_id = _OWNER
     result = resolve_identifier_transfers(
         MagicMock(),
         [IdentifierConflict("orcid", _ORCID, _CANDIDATE, _OWNER, "pending")],
         consensus={} if consensus is None else {("orcid", _ORCID): consensus},
-        queries=queries,
         repo=repo,
         logger=logging.getLogger(__name__),
     )
     return result["transferred"]
 
 
-def test_consensus_du_candidat_transfere():
-    assert _transferred("aubert p") == 1
+def test_consensus_du_candidat_transfere(monkeypatch):
+    assert _transferred(monkeypatch, "aubert p") == 1
 
 
-def test_consensus_du_proprietaire_ne_transfere_pas():
-    assert _transferred("dupont j") == 0
+def test_consensus_du_proprietaire_ne_transfere_pas(monkeypatch):
+    assert _transferred(monkeypatch, "dupont j") == 0
 
 
-def test_sans_consensus_rien_ne_transfere():
-    assert _transferred(None) == 0
+def test_sans_consensus_rien_ne_transfere(monkeypatch):
+    assert _transferred(monkeypatch, None) == 0
 
 
 def test_sans_conflit_a_arbitrer_l_etape_se_ferme(caplog):
@@ -53,7 +55,6 @@ def test_sans_conflit_a_arbitrer_l_etape_se_ferme(caplog):
             MagicMock(),
             [IdentifierConflict("orcid", _ORCID, _CANDIDATE, _OWNER, "confirmed")],
             consensus={},
-            queries=MagicMock(),
             repo=MagicMock(),
             logger=logging.getLogger(__name__),
         )

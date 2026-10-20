@@ -5,12 +5,35 @@ Une personne créée depuis une signature « Tnourji, A. » porte le prénom « 
 
 from typing import NamedTuple
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
+from domain.persons.signature_name import SignatureName
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
+from pipeline.transformation.persons.store import PersonsStore
+
+
+def fetch_linked_signature_names(
+    conn: Connection, person_ids: list[int]
+) -> dict[int, list[SignatureName]]:
+    """`{person_id: [nom, ...]}` — les noms des signatures rattachées à chacune des personnes, tels que les sources les donnent."""
+    if not person_ids:
+        return {}
+    rows = conn.execute(
+        text("""
+            SELECT person_id, raw_author_name, raw_last_name, raw_first_name
+            FROM source_authorships
+            WHERE person_id = ANY(:ids)
+        """),
+        {"ids": person_ids},
+    ).all()
+    names: dict[int, list[SignatureName]] = {}
+    for r in rows:
+        names.setdefault(r.person_id, []).append(
+            SignatureName.from_columns(r.raw_author_name, r.raw_last_name, r.raw_first_name)
+        )
+    return names
 
 
 class FirstNameCompletion(NamedTuple):
@@ -21,15 +44,15 @@ class FirstNameCompletion(NamedTuple):
 
 
 def complete_reduced_first_names(
-    conn: Connection, queries: PersonsMatchingQueries, *, repo: PgPersonRepository
+    conn: Connection, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
     """Donne à chaque personne au prénom réduit le prénom plein que ses signatures attestent seul."""
     reduced = {}
-    for namesake in queries.fetch_namesakes(conn):
+    for namesake in PersonsStore(conn).namesakes():
         initials = first_name_initials(namesake.first_name)
         if initials is not None:
             reduced[namesake.person_id] = (namesake, initials)
-    names = queries.fetch_linked_signature_names(conn, sorted(reduced))
+    names = fetch_linked_signature_names(conn, sorted(reduced))
 
     completed = 0
     conflicting: set[int] = set()

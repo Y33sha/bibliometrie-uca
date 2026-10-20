@@ -4,9 +4,9 @@ forme de nom devenue ambiguë, puis GC des personnes vidées.
 
 from sqlalchemy import text
 
-from pipeline.transformation.persons.matching import PersonsMatchingQueries
-
-_Q = PersonsMatchingQueries()
+from pipeline.transformation.persons.identifier_arbitration import null_identifier_signatures
+from pipeline.transformation.persons.purge import delete_empty_persons, reorphan_ambiguous_nominal
+from pipeline.transformation.persons.store import PersonsStore
 from tests.integration.helpers.authorships import insert_confirmed_authorship
 from tests.integration.helpers.persons import (
     insert_person,
@@ -62,7 +62,7 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     insert_confirmed_authorship(conn, pinned, person_id=a)
     by_identifier = _signature(conn, form="j martin", person_id=a, mode="identifier")
 
-    assert _Q.reorphan_ambiguous_nominal(conn) == 1
+    assert reorphan_ambiguous_nominal(conn) == 1
 
     assert _row(conn, ambiguous) == (None, None)  # forme ambiguë, nominale, non épinglée
     assert _row(conn, unambiguous).person_id == b  # forme non ambiguë
@@ -95,7 +95,7 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     insert_rejected_authorship(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
     sans_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
 
-    assert _Q.reorphan_ambiguous_nominal(conn) == 1
+    assert reorphan_ambiguous_nominal(conn) == 1
 
     assert _row(conn, avec_rejet).person_id == retenue  # un seul candidat pour sa publication
     assert _row(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
@@ -110,7 +110,7 @@ def test_detach_source_authorships_by_id_protects_confirmed(sa_sync_conn):
     insert_confirmed_authorship(conn, pinned_cross, person_id=p)
 
     # Détache le lot demandé, mais jamais un épinglage admin.
-    assert _Q.detach_source_authorships(conn, [cross, pinned_cross]) == 1
+    assert PersonsStore(conn).detach_signatures([cross, pinned_cross]) == 1
 
     assert _row(conn, cross) == (None, None)  # détachée
     assert _row(conn, pinned_cross).person_id == p  # épinglée admin, protégée
@@ -135,7 +135,7 @@ def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
         conn, form="jean martin", person_id=old, mode="identifier", identifiers={"idref": "222"}
     )
 
-    assert _Q.null_identifier_signatures(conn, "idref", "111", old) == 1
+    assert null_identifier_signatures(conn, "idref", "111", old) == 1
 
     assert _row(conn, affected) == (None, None)  # portée sur l'ancien propriétaire, identifiant
     assert _row(conn, nominal).person_id == old  # nominale : ne dépend pas de la valeur
@@ -152,7 +152,7 @@ def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     rh = insert_person(conn, "Prof", first_name="P")
     insert_person_rh(conn, rh)
 
-    _Q.delete_empty_persons(conn)
+    delete_empty_persons(conn)
 
     assert _person_exists(conn, empty) is False
     assert _person_exists(conn, signed) is True
@@ -179,7 +179,7 @@ def test_delete_empty_persons_spares_persons_with_a_decision(sa_sync_conn):
         conn, confirmed_orcid, id_type="orcid", id_value="0000-0002-1825-0097", status="confirmed"
     )
 
-    _Q.delete_empty_persons(conn)
+    delete_empty_persons(conn)
 
     for kept in (rejected, distinct_a, distinct_b, excluded):
         assert _person_exists(conn, kept) is True
