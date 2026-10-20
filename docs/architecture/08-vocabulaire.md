@@ -15,7 +15,6 @@ Le niveau source décrit une entité telle qu'une source la donne. Le niveau con
 | contribution source | `source_contributions` | Un contributeur sur un enregistrement source, avec ses rôles et ses adresses. |
 | contribution | `contributions` | Le lien consolidé entre une personne et une publication. |
 | informations du contributeur | `contributor_information` | Le nom et les identifiants qu'une source donne pour un contributeur, partagés par ses contributions sources. |
-| groupe de contributions sources | `source_contribution_groups` | Les contributions sources d'un même contributeur dans une publication, une par enregistrement source au plus. |
 
 ## Personnes
 
