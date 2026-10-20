@@ -11,7 +11,7 @@ Le niveau source décrit une entité telle qu'une source la donne. Le niveau con
 | Texte | Code | Ce que c'est |
 |---|---|---|
 | enregistrement source | `source_records` | Une publication telle qu'une source la décrit (HAL, OpenAlex, Crossref…). |
-| publication | `publications` | Les enregistrements sources d'une même œuvre, réunis. Couvre aussi les jeux de données, les logiciels et les thèses. |
+| publication | `publications` | Une publication du référentiel, construite à partir de ses enregistrements sources. Couvre aussi les jeux de données, les logiciels et les thèses. |
 | contribution source | `source_contributions` | Un contributeur sur un enregistrement source, avec ses rôles et ses adresses. |
 | contribution | `contributions` | Le lien consolidé entre une personne et une publication. |
 | informations du contributeur | `contributor_information` | Le nom et les identifiants qu'une source donne pour un contributeur, partagés par ses contributions sources. |
