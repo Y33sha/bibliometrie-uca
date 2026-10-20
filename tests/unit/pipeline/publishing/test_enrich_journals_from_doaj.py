@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.dump_download import DumpUnavailableError
-from pipeline.transformation.publishing.journals import import_journals_from_doaj_dump as step
+from pipeline.transformation.publishing.journals import enrich_journals_from_doaj as step
 
 
 class _FakeJournalRepo:

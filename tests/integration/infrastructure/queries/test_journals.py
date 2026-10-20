@@ -17,13 +17,13 @@ from pipeline.transformation.publishing.journals.check_journals_in_sudoc import 
     record_sudoc_check,
 )
 from pipeline.transformation.publishing.journals.delete_empty_journals import delete_empty_journals
-from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
-    find_journals_of_unknown_type,
-)
-from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
+from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
     doaj_last_import_at,
     find_journal_issn_index,
     reset_is_in_doaj,
+)
+from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
+    find_journals_of_unknown_type,
 )
 from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
     find_doi_journal_pairs,

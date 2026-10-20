@@ -57,9 +57,11 @@ class TestFindOrCreatePublisher:
         assert find_or_create_publisher("", repo=publisher_store) is None
 
     def test_creates_new_publisher(self, sa_sync_conn, publisher_store):
-        pub_id = find_or_create_publisher("Elsevier", repo=publisher_store)
-        assert pub_id is not None
-        row = _fetch_one(sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=pub_id)
+        publisher_id = find_or_create_publisher("Elsevier", repo=publisher_store)
+        assert publisher_id is not None
+        row = _fetch_one(
+            sa_sync_conn, "SELECT name FROM publishers WHERE id = :id", id=publisher_id
+        )
         assert row.name == "Elsevier"
 
     def test_finds_existing_by_openalex_id(self, sa_sync_conn, publisher_store):
@@ -171,12 +173,12 @@ class TestFindOrCreateJournal:
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
         """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
         existing = _journal(sa_sync_conn, issn="0028-0836")
-        pub_id = find_or_create_publisher("Springer", repo=publisher_store)
+        publisher_id = find_or_create_publisher("Springer", repo=publisher_store)
         _find_or_create(
             "Nature",
             issn="0028-0836",
             eissn="1476-4687",
-            publisher_id=pub_id,
+            publisher_id=publisher_id,
             repo=gateway,
         )
         row = issn_columns(sa_sync_conn, existing)
@@ -184,7 +186,7 @@ class TestFindOrCreateJournal:
             sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
         ).publisher_id
         assert row.eissn == "1476-4687"
-        assert row.publisher_id == pub_id
+        assert row.publisher_id == publisher_id
 
     def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
         j_id = _find_or_create("Nature", issn="00280836", eissn="1476-4687", repo=gateway)

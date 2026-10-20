@@ -31,12 +31,16 @@ def requalify_journal_publications(conn: Connection, journal_id: int) -> int:
     Retourne le nombre de publications dont le `doc_type` change. Une publication supprimée par le recalcul n'est pas comptée.
     """
     store = PublicationStore(conn)
-    pub_ids = store.find_ids_by_journal_id(journal_id)
-    if not pub_ids:
+    publication_ids = store.find_ids_by_journal_id(journal_id)
+    if not publication_ids:
         return 0
-    before = store.find_doc_types_by_ids(pub_ids)
+    before = store.find_doc_types_by_ids(publication_ids)
     correct_journal_records(conn, journal_id)
-    for pub_id in pub_ids:
-        lifecycle.refresh(conn, pub_id)
-    after = store.find_doc_types_by_ids(pub_ids)
-    return sum(1 for pub_id, doc_type in before.items() if after.get(pub_id, doc_type) != doc_type)
+    for publication_id in publication_ids:
+        lifecycle.refresh(conn, publication_id)
+    after = store.find_doc_types_by_ids(publication_ids)
+    return sum(
+        1
+        for publication_id, doc_type in before.items()
+        if after.get(publication_id, doc_type) != doc_type
+    )

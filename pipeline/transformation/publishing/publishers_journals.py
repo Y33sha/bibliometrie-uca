@@ -44,8 +44,8 @@ from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
+    enrich_journals_from_doaj,
     enrich_journals_from_openalex,
-    import_journals_from_doaj_dump,
     learn_journal_doi_namespaces,
     merge_duplicate_journals,
     type_proceedings_journals,
@@ -53,11 +53,11 @@ from pipeline.transformation.publishing.journals import (
 from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
     run_check_journals_in_sudoc,
 )
+from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
+    run_enrich_journals_from_doaj,
+)
 from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
     run_enrich_journals_from_openalex,
-)
-from pipeline.transformation.publishing.journals.import_journals_from_doaj_dump import (
-    run_enrich_journals_from_doaj,
 )
 from pipeline.transformation.publishing.journals.journal_merge import merge_journals
 from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
@@ -226,7 +226,7 @@ def build() -> Phase:
                 "enrich_journals_from_doaj": TaskStep(
                     _run_enrich_journals_from_doaj,
                     "Revues",
-                    import_journals_from_doaj_dump.LIBELLE,
+                    enrich_journals_from_doaj.LIBELLE,
                 ),
                 "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,

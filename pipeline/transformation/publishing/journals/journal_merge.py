@@ -152,11 +152,11 @@ def merge_journals(conn: Connection, target_id: int, source_id: int) -> None:
     Les corrections des `source_publications` de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
     """
     store = PublicationStore(conn)
-    absorbed_pub_ids = store.find_ids_by_journal_id(source_id)
+    absorbed_publication_ids = store.find_ids_by_journal_id(source_id)
     merge_journal_into(conn, target_id, source_id)
     correct_journal_records(conn, target_id)
-    for pub_id in absorbed_pub_ids:
-        lifecycle.refresh(conn, pub_id)
+    for publication_id in absorbed_publication_ids:
+        lifecycle.refresh(conn, publication_id)
 
 
 class JournalRecompute:
