@@ -7,14 +7,14 @@ reflétaient la sélection pendant que la liste montrait tout le monde.
 
 from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.list import list_persons
-from tests.integration.helpers.persons import insert_person, insert_person_rh
+from tests.integration.helpers.persons import insert_hr_record, insert_person
 
 
 def _create_person(conn, last, department=None, role=None):
     """Personne, avec sa fiche RH quand un département ou un rôle est donné."""
     person_id = insert_person(conn, last)
     if department or role:
-        insert_person_rh(
+        insert_hr_record(
             conn,
             person_id,
             email=f"{last.lower()}@uca.fr",

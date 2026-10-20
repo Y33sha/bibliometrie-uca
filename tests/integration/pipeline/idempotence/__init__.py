@@ -3,7 +3,7 @@
 Principe : insérer des données de staging, lancer la phase, compter les
 résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 
-Un fichier par phase (`normalize_<source>`, `persons`, `authorships`,
+Un fichier par phase (`normalize_<source>`, `persons`, `contributions`,
 `affiliations`), plus `normalize_inter_source` pour la combinatoire
 multi-sources. Les helpers vraiment partagés vivent dans `_helpers.py`.
 

@@ -1,6 +1,6 @@
 """Les adresses électroniques du référentiel des personnels ne sortent par aucune lecture.
 
-`persons_rh.email` est renseigné pour départager les homonymes au rattachement des signatures. Cet usage est interne au traitement : aucune réponse de l'API n'a à porter cette valeur. Le contrat d'API et les couches qui le servent sont confrontés à cette règle, plutôt que de la laisser tenir à l'attention de qui ajoute un champ.
+`hr_records.email` est renseigné pour départager les homonymes au rattachement des signatures. Cet usage est interne au traitement : aucune réponse de l'API n'a à porter cette valeur. Le contrat d'API et les couches qui le servent sont confrontés à cette règle, plutôt que de la laisser tenir à l'attention de qui ajoute un champ.
 """
 
 import re

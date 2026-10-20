@@ -1,6 +1,6 @@
-"""Writer batch partagé pour les `source_authorships` (toutes sources).
+"""Writer batch partagé pour les `source_contributions` (toutes sources).
 
-Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_publications` / `source_authorships` / `addresses` / `source_authorship_addresses` sont partagées. Chaque normaliseur isole le bloc auteurs de son payload et fournit la construction des `AuthorRecord` depuis ce bloc (`sync_source_authorships`).
+Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_records` / `source_contributions` / `addresses` / `source_contribution_addresses` sont partagées. Chaque normaliseur isole le bloc auteurs de son payload et fournit la construction des `AuthorRecord` depuis ce bloc (`sync_source_contributions`).
 
 Coût : un nombre constant d'allers-retours Python↔PG par document.
 """
@@ -19,8 +19,8 @@ from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.identifiers import shared_identifier_neutralizations
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole, is_individual_author
-from domain.source_publications.signature_sync import (
+from domain.publications.contribution_roles import ContributionRole, is_individual_author
+from domain.source_records.signature_sync import (
     IncomingSignature,
     StoredSignature,
     plan_signature_sync,
@@ -30,12 +30,12 @@ from domain.structures.identifiers import RorId
 from domain.types import JsonValue
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.signature_queries import (
-    AuthorshipAddressItem,
-    AuthorshipRorItem,
-    AuthorshipsBatchQueries,
+    ContributionAddressItem,
+    ContributionRorItem,
+    ContributionsBatchQueries,
     SignatureNameFields,
-    SourceAuthorshipItem,
-    StoredSourceAuthorship,
+    SourceContributionItem,
+    StoredSourceContribution,
 )
 
 
@@ -67,8 +67,8 @@ class AuthorRecord:
     name: SignatureName
     is_corresponding: bool = False
     collective: bool = False
-    roles: list[AuthorshipRole] | None = None
-    person_identifiers: dict[str, JsonValue] | None = None
+    roles: list[ContributionRole] | None = None
+    identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
     ror_ids: frozenset[RorId] = frozenset()
     hal_structure_ids: frozenset[int] = frozenset()
@@ -78,11 +78,11 @@ AuthorBlock = Mapping[str, JsonValue]
 """Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'une notice."""
 
 
-def sync_source_authorships(
+def sync_source_contributions(
     conn: Connection,
-    queries: AuthorshipsBatchQueries,
+    queries: ContributionsBatchQueries,
     source: str,
-    source_publication_id: int,
+    source_record_id: int,
     block: AuthorBlock,
     build: Callable[[AuthorBlock], list[AuthorRecord]],
 ) -> None:
@@ -91,39 +91,39 @@ def sync_source_authorships(
     Une empreinte de bloc égale à celle de la dernière synchronisation laisse les signatures en l'état. `mark_signatures_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
     block_hash = fingerprint(dict(block))
-    if queries.fetch_authors_hash(conn, source_publication_id) == block_hash:
+    if queries.fetch_authors_hash(conn, source_record_id) == block_hash:
         return
-    write_source_authorships(conn, queries, source, source_publication_id, build(block))
-    queries.set_authors_hash(conn, source_publication_id, block_hash)
+    write_source_contributions(conn, queries, source, source_record_id, build(block))
+    queries.set_authors_hash(conn, source_record_id, block_hash)
 
 
-def write_source_authorships(
+def write_source_contributions(
     conn: Connection,
-    queries: AuthorshipsBatchQueries,
+    queries: ContributionsBatchQueries,
     source: str,
-    source_publication_id: int,
+    source_record_id: int,
     records: list[AuthorRecord],
 ) -> None:
     """Synchronise les signatures d'une notice avec `records` (`plan_signature_sync`).
 
-    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `authorships_dirty` sur la publication de la notice. La notice reçoit son nombre de signatures d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une signature rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les signatures sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `contributions_dirty` sur la publication de la notice. La notice reçoit son nombre de signatures d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une signature entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
-    neutralizations = shared_identifier_neutralizations([rec.person_identifiers for rec in records])
-    items: list[SourceAuthorshipItem] = []
+    neutralizations = shared_identifier_neutralizations([rec.identifiers for rec in records])
+    items: list[SourceContributionItem] = []
     for rec, neutralized in zip(records, neutralizations, strict=True):
         collective = rec.collective or is_collective_name(rec.name.display())
         items.append(
             {
                 "source": source,
-                "source_publication_id": source_publication_id,
+                "source_record_id": source_record_id,
                 "author_position": rec.position,
                 **signature_name_fields(rec.name),
                 "is_corresponding": rec.is_corresponding,
                 "collective": collective,
                 "roles": rec.roles,
-                "person_identifiers": rec.person_identifiers,
+                "identifiers": rec.identifiers,
                 "neutralized_identifiers": neutralized,
                 "content_hash": fingerprint(
                     signature_content(
@@ -144,7 +144,7 @@ def write_source_authorships(
             }
         )
 
-    stored = queries.fetch_stored_source_authorships(conn, source_publication_id)
+    stored = queries.fetch_stored_source_contributions(conn, source_record_id)
     plan = plan_signature_sync(
         [
             StoredSignature(
@@ -164,27 +164,27 @@ def write_source_authorships(
         ],
     )
     if plan.regroup:
-        queries.mark_authorships_dirty(conn, source_publication_id)
+        queries.mark_contributions_dirty(conn, source_record_id)
     authors = [
         (item["last_name_normalized"], item["first_name_normalized"] or "")
         for item in items
         if is_individual_author(item["roles"], item["collective"])
     ]
-    queries.set_author_counts(conn, source_publication_id, len(authors), len(set(authors)))
+    queries.set_author_counts(conn, source_record_id, len(authors), len(set(authors)))
 
-    queries.delete_source_authorships(conn, list(plan.deletes))
-    queries.update_source_authorships_batch(
+    queries.delete_source_contributions(conn, list(plan.deletes))
+    queries.update_source_contributions_batch(
         conn, [{**items[key], "id": sa_id} for sa_id, key in plan.updates]
     )
-    queries.delete_source_authorship_addresses(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.delete_source_authorship_rors(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.delete_source_authorship_hal_structures(conn, [sa_id for sa_id, _ in plan.updates])
-    queries.upsert_source_authorships_batch(conn, [items[key] for key in plan.inserts])
+    queries.delete_source_contribution_addresses(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.delete_source_contribution_rors(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.delete_source_contribution_hal_structures(conn, [sa_id for sa_id, _ in plan.updates])
+    queries.upsert_source_contributions_batch(conn, [items[key] for key in plan.inserts])
 
     sa_id_by_key = {key: sa_id for sa_id, key in plan.updates}
     if plan.inserts:
         sa_id_by_key |= _inserted_ids(
-            queries.fetch_stored_source_authorships(conn, source_publication_id),
+            queries.fetch_stored_source_contributions(conn, source_record_id),
             known_ids={s.id for s in stored},
             inserted={key: items[key] for key in plan.inserts},
         )
@@ -194,7 +194,7 @@ def write_source_authorships(
         source,
         [(sa_id_by_key[key], records[key].addresses) for key in sorted(sa_id_by_key)],
     )
-    ror_items: dict[tuple[int, str, int | None], AuthorshipRorItem] = {}
+    ror_items: dict[tuple[int, str, int | None], ContributionRorItem] = {}
     for key, sa_id in sorted(sa_id_by_key.items()):
         # Un ROR que porte une adresse de la signature n'est pas répété sur la signature seule.
         on_addresses = frozenset().union(*(a.ror_ids for a in records[key].addresses))
@@ -204,11 +204,11 @@ def write_source_authorships(
         ]
         for ror_ids, addr_id in rors_by_address:
             for ror_id in sorted(ror_ids, key=str):
-                ror_items[(sa_id, ror_id.value, addr_id)] = AuthorshipRorItem(
+                ror_items[(sa_id, ror_id.value, addr_id)] = ContributionRorItem(
                     sa_id=sa_id, ror_id=ror_id.value, addr_id=addr_id
                 )
-    queries.insert_source_authorship_rors_batch(conn, list(ror_items.values()))
-    queries.insert_source_authorship_hal_structures_batch(
+    queries.insert_source_contribution_rors_batch(conn, list(ror_items.values()))
+    queries.insert_source_contribution_hal_structures_batch(
         conn,
         [
             (sa_id, hal_structure_id)
@@ -219,10 +219,10 @@ def write_source_authorships(
 
 
 def _inserted_ids(
-    rows: list[StoredSourceAuthorship],
+    rows: list[StoredSourceContribution],
     *,
     known_ids: set[int],
-    inserted: Mapping[int, SourceAuthorshipItem],
+    inserted: Mapping[int, SourceContributionItem],
 ) -> dict[int, int]:
     """Identifiants des signatures insérées, par clé entrante : chaque ligne nouvelle est rapprochée d'une signature insérée de même position et de même identité. Deux signatures de même position et de même identité sont indiscernables : l'ordre de leur rapprochement est indifférent."""
     new_ids: dict[Hashable, list[int]] = defaultdict(list)
@@ -250,11 +250,11 @@ def signature_name_fields(name: SignatureName) -> SignatureNameFields:
 def _identity(
     last_name_normalized: str | None,
     first_name_normalized: str | None,
-    person_identifiers: object,
+    identifiers: object,
     collective: bool,
 ) -> Hashable:
-    """Clé d'appariement d'une signature : nom et prénom normalisés, identifiants, comme `author_identifying_keys`, et marque collective. Une signature qui devient collective est donc réinsérée sans personne."""
-    ids = json.dumps(person_identifiers, sort_keys=True) if person_identifiers is not None else None
+    """Clé d'appariement d'une signature : nom et prénom normalisés, identifiants, comme `contributor_information`, et marque collective. Une signature qui devient collective est donc réinsérée sans personne."""
+    ids = json.dumps(identifiers, sort_keys=True) if identifiers is not None else None
     return (last_name_normalized, first_name_normalized, ids, collective)
 
 
@@ -262,28 +262,28 @@ def _roles(roles: Sequence[str] | None) -> tuple[str, ...] | None:
     return tuple(roles) if roles is not None else None
 
 
-def _stored_identity(row: StoredSourceAuthorship) -> Hashable:
+def _stored_identity(row: StoredSourceContribution) -> Hashable:
     return _identity(
-        row.last_name_normalized, row.first_name_normalized, row.person_identifiers, row.collective
+        row.last_name_normalized, row.first_name_normalized, row.identifiers, row.collective
     )
 
 
-def _item_identity(item: SourceAuthorshipItem) -> Hashable:
+def _item_identity(item: SourceContributionItem) -> Hashable:
     return _identity(
         item["last_name_normalized"],
         item["first_name_normalized"],
-        item["person_identifiers"],
+        item["identifiers"],
         item["collective"],
     )
 
 
 def write_addresses(
     conn: Connection,
-    queries: AuthorshipsBatchQueries,
+    queries: ContributionsBatchQueries,
     source: str,
     sa_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
-    """Écrit les `addresses` d'un document, leurs pays candidats et leurs liens `source_authorship_addresses`, et rend l'identifiant de chaque adresse par son texte.
+    """Écrit les `addresses` d'un document, leurs pays candidats et leurs liens `source_contribution_addresses`, et rend l'identifiant de chaque adresse par son texte.
 
     `sa_addresses` : les couples `(sa_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe. Les pays que la source donne deviennent des candidats du moyen de `source`. Les liens sont insérés en une requête. Un `sa_id` None est ignoré.
     """
@@ -323,7 +323,7 @@ def write_addresses(
             ],
         )
 
-    link_values: list[AuthorshipAddressItem] = []
+    link_values: list[ContributionAddressItem] = []
     for sa_id, addresses in sa_addresses:
         if not sa_id:
             continue
@@ -334,5 +334,5 @@ def write_addresses(
                 continue
             seen.add(addr_id)
             link_values.append({"sa_id": sa_id, "addr_id": addr_id})
-    queries.insert_source_authorship_addresses_batch(conn, link_values)
+    queries.insert_source_contribution_addresses_batch(conn, link_values)
     return addr_id_by_text

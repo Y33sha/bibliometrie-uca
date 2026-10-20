@@ -12,25 +12,25 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import map_role, merge_roles
+from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.impact import Impact
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.scanr.payload import (
@@ -125,7 +125,7 @@ def extract_pub_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées de publication d'un document ScanR.
 
-    Retourne un dict utilisable par `insert_scanr_document`. Toutes les valeurs sont brutes — pas de fallback (le brut de `source_publications.doc_type` est nullable text) ni de transformation de cohérence. `language` est posé à `None` : l'API ScanR ne l'expose pas.
+    Retourne un dict utilisable par `insert_scanr_document`. Toutes les valeurs sont brutes — pas de fallback (le brut de `source_records.doc_type` est nullable text) ni de transformation de cohérence. `language` est posé à `None` : l'API ScanR ne l'expose pas.
     """
     title = get_title(doc)
     container_title = None
@@ -134,7 +134,7 @@ def extract_pub_metadata(
     ouvert = doc.get("isOa")
     return PublicationMetadata(
         title=title,
-        pub_year=as_int(doc.get("year")),
+        publication_year=as_int(doc.get("year")),
         doc_type=as_str(doc.get("type")),
         doi=extract_doi(doc),
         nnt=extract_nnt_from_scanr_id(scanr_id),
@@ -155,15 +155,15 @@ def extract_pub_metadata(
 
 def insert_scanr_document(  # noqa: C901
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
     pub_meta: PublicationMetadata,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour ScanR.
+    """Crée/retrouve l'entrée source_records pour ScanR.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `doc` ne sert ici que pour les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
     if nnt := pub_meta.nnt:
@@ -243,16 +243,16 @@ def insert_scanr_document(  # noqa: C901
         biblio["journal"] = journal_obj
     biblio_json = biblio if biblio else None
 
-    return queries.upsert_source_publication(
+    return queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="scanr",
             source_id=scanr_id,
             staging_id=staging_id,
             doi=pub_meta.doi,
             external_ids=external_ids,
             title=pub_meta.title or "",
-            pub_year=pub_meta.pub_year,
+            publication_year=pub_meta.publication_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
             monograph_id=pub_meta.monograph_id,
@@ -272,7 +272,7 @@ def insert_scanr_document(  # noqa: C901
 
 
 # =============================================================
-# SCANR AUTHORSHIPS
+# SCANR CONTRIBUTIONS
 # =============================================================
 
 
@@ -333,7 +333,7 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 position=position,
                 name=signature_name,
                 roles=roles or None,
-                person_identifiers=ids if ids else None,
+                identifiers=ids if ids else None,
                 addresses=addresses,
                 ror_ids=frozenset(signature_rors),
                 hal_structure_ids=hal_structure_ids,
@@ -349,7 +349,7 @@ def merge_person_roles(records: list[AuthorRecord]) -> list[AuthorRecord]:
     for record in records:
         key = (
             record.name.normalized(),
-            tuple(sorted((k, str(v)) for k, v in (record.person_identifiers or {}).items())),
+            tuple(sorted((k, str(v)) for k, v in (record.identifiers or {}).items())),
         )
         first = by_person.get(key)
         if first is None or set(record.roles or ()) <= set(first.roles or ()):
@@ -371,18 +371,18 @@ def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"authors": doc.get("authors")}
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     doc: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures ScanR de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "scanr",
-        source_publication_id,
+        source_record_id,
         extract_scanr_author_block(doc),
         build_scanr_author_records,
     )
@@ -395,13 +395,13 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool:
     staging_id = staging_row.id
     scanr_id = staging_row.source_id
@@ -414,10 +414,8 @@ def process_work(
         doc, containers.journal_id, scanr_id, monograph_id=containers.monograph_id
     )
 
-    source_publication_id = insert_scanr_document(
-        conn, queries, doc, staging_id, scanr_id, pub_meta
-    )
-    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    source_record_id = insert_scanr_document(conn, queries, doc, staging_id, scanr_id, pub_meta)
+    process_contributions(conn, contribution_queries, doc, source_record_id)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -439,5 +437,5 @@ class ScanrNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

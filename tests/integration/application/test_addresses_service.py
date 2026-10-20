@@ -16,7 +16,7 @@ from application.services.addresses.structure_links import (
 )
 from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.repositories import address_repository, authorship_repository
+from infrastructure.repositories import address_repository, contribution_repository
 from pipeline.transformation.countries.refresh_publication_countries import CountryRecompute
 from pipeline.transformation.countries.store import CountryCandidatesStore
 from pipeline.transformation.structures.perimeter import PerimeterStructures
@@ -29,7 +29,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
-    insert_source_publication,
+    insert_source_record,
 )
 from tests.integration.helpers.structures import (
     insert_persons_perimeter,
@@ -50,8 +50,8 @@ def perimeter_structures():
 
 
 @pytest.fixture
-def authorship_repo(sa_sync_conn):
-    return authorship_repository(sa_sync_conn)
+def contribution_repo(sa_sync_conn):
+    return contribution_repository(sa_sync_conn)
 
 
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
@@ -369,10 +369,10 @@ class TestPropagateCountriesToPublications:
 
     def test_propagates_to_source_pub_and_publication(self, sa_sync_conn, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
-        une source_authorship, le pays doit remonter jusqu'à publications.countries."""
+        une source_contribution, le pays doit remonter jusqu'à publications.countries."""
         ensure_country(sa_sync_conn, "FR")
         pub_id = insert_publication(sa_sync_conn, "Test", normalize_title=False, doc_type=None)
-        sp_id = insert_source_publication(sa_sync_conn, pub_id, source_id="h-1", title="Test")
+        sp_id = insert_source_record(sa_sync_conn, pub_id, source_id="h-1", title="Test")
         sa_id = insert_signature(sa_sync_conn, sp_id)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         sa_sync_conn.execute(
@@ -383,9 +383,9 @@ class TestPropagateCountriesToPublications:
 
         propagate_countries_to_publications(sa_sync_conn, [addr], country_recompute=_GATEWAY)
 
-        # source_publications.countries mis à jour
+        # source_records.countries mis à jour
         sp_countries = sa_sync_conn.execute(
-            text("SELECT countries FROM source_publications WHERE id = :id"), {"id": sp_id}
+            text("SELECT countries FROM source_records WHERE id = :id"), {"id": sp_id}
         ).scalar_one()
         assert sp_countries == ["FR"]
         # publications.countries mis à jour

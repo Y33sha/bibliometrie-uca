@@ -4,7 +4,7 @@
 
 La résolution des personnes est une cascade de règles. Elle rattache chaque signature à une personne existante, sans comparer les signatures entre elles. C'est la forme de ReCiter. La réconciliation des publications regroupe les notices qui partagent une clé de confirmation.
 
-La phase `author_grouping` réunit en amont les signatures d'un même auteur d'une publication (`source_authorship_groups`). La cascade se sert des groupes seulement pour propager une personne d'une signature aux autres signatures du groupe. Une décision par groupe réunit les identifiants, les noms et les affiliations de toutes les sources avant de trancher.
+La phase `author_grouping` réunit en amont les signatures d'un même auteur d'une publication (`source_contribution_groups`). La cascade se sert des groupes seulement pour propager une personne d'une signature aux autres signatures du groupe. Une décision par groupe réunit les identifiants, les noms et les affiliations de toutes les sources avant de trancher.
 
 L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la signature sans personne. Les affiliations fausses des sources, qui créent de fausses personnes du périmètre, relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
 
@@ -30,8 +30,8 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 ### Phase 1 — Mesure
 
 - [x] Jeu d'évaluation tiré des verdicts humains, le 2026-10-19 (`build_evaluation_set.py`). Il compte 2 373 couples (signature, personne) justes, 523 couples (notice, personne) faux et 23 paires de personnes distinctes.
-  - Couples justes : 1 610 rattachements manuels (`confirmed_authorships`), et 763 signatures des groupes jugés « doublon de personnes », rattachées à la personne conservée par la fusion. 78 signatures sont hors groupe.
-  - Couples faux : rattachements détachés (`rejected_authorships`).
+  - Couples justes : 1 610 rattachements manuels (`confirmed_source_contributions`), et 763 signatures des groupes jugés « doublon de personnes », rattachées à la personne conservée par la fusion. 78 signatures sont hors groupe.
+  - Couples faux : rattachements détachés (`rejected_contributions`).
   - Le jeu est concentré : trois personnes ont 80 % des détachements, cinq personnes 45 % des rattachements manuels.
   - La cascade lit les rattachements manuels et les détachements. L'évaluation la fait tourner sans eux.
 - [x] Précision et rappel de la cascade actuelle sur ce jeu, le 2026-10-19. La phase `persons` reconstruit les rattachements dans une copie de la base (`reset_eval.sql`). La copie garde les personnes, les notices RH et les décisions humaines sur les identifiants et les formes de nom. Elle perd les rattachements, les épinglages, les détachements et les attributions déduites des rattachements. Les résultats sur le jeu d'évaluation varient peu après le deuxième passage (`evaluate.py`). Le tableau donne le troisième.
@@ -78,7 +78,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 ### Phase 4 — Intégration au pipeline
 
-- [ ] `person_id` et `resolution_mode` passent de `source_authorships` à `source_authorship_groups`. `source_authorship_groups` remplace `authorships`, matviews reportées.
+- [ ] `person_id` et `resolution_mode` passent de `source_contributions` à `source_contribution_groups`. `source_contribution_groups` remplace `contributions`, matviews reportées.
 - [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 signatures non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [ ] Correction du stock : doubles rattachements (une personne rattachée à deux signatures d'une même notice), personnes qui ont les identifiants de deux personnes, ORCID en attente rattachés à une autre personne que leur titulaire (21 groupes dans la relecture du 2026-10-19).
 

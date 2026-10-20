@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.source_publications.metadata_correction.shared_doi import DoiClusterCase
+from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
 from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
 
 # Notice dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
@@ -34,7 +34,7 @@ _SIGNATURES_SQL = text(f"""
     WITH notices AS (
         SELECT sp.id, sp.publication_id, sp.source::text AS source, sp.source_id,
                ({corrected_by("doi")}) = ANY(:converged) IS TRUE AS converged
-        FROM source_publications sp
+        FROM source_records sp
         WHERE sp.publication_id = ANY(:publications)
     ), kept AS (
         SELECT n.* FROM notices n
@@ -50,58 +50,58 @@ _SIGNATURES_SQL = text(f"""
            coalesce({usable_identifier("'idref'")}, '') AS idref,
            coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
     FROM kept k
-    JOIN source_authorships sa ON sa.source_publication_id = k.id
-    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    JOIN source_contributions sa ON sa.source_record_id = k.id
+    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
     WHERE NOT sa.collective
 """)
 
 _GROUPS_SQL = text("""
-    SELECT g.id, g.publication_id, gs.source_authorship_id, gs.source_publication_id,
+    SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
            gs.method::text AS method, gs.score, gs.margin
-    FROM source_authorship_groups g
-    LEFT JOIN grouped_source_authorships gs ON gs.group_id = g.id
+    FROM source_contribution_groups g
+    LEFT JOIN source_contribution_group_members gs ON gs.group_id = g.id
     WHERE g.publication_id = ANY(:publications)
 """)
 
 _DELETE_MEMBERSHIPS_SQL = text(
-    "DELETE FROM grouped_source_authorships WHERE source_authorship_id = ANY(:signatures)"
+    "DELETE FROM source_contribution_group_members WHERE source_contribution_id = ANY(:signatures)"
 )
 
-_DELETE_GROUPS_SQL = text("DELETE FROM source_authorship_groups WHERE id = ANY(:ids)")
+_DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
 
 _CLEAR_COPIES_SQL = text("""
-    UPDATE source_authorships sa SET duplicate_of = NULL
-    FROM source_publications sp
-    WHERE sa.source_publication_id = sp.id AND sp.publication_id = ANY(:publications)
+    UPDATE source_contributions sa SET duplicate_of = NULL
+    FROM source_records sp
+    WHERE sa.source_record_id = sp.id AND sp.publication_id = ANY(:publications)
       AND sa.duplicate_of IS NOT NULL AND sa.id <> ALL(CAST(:copies AS integer[]))
 """)
 
 _SET_COPIES_SQL = text("""
-    UPDATE source_authorships sa SET duplicate_of = u.original
+    UPDATE source_contributions sa SET duplicate_of = u.original
     FROM unnest(CAST(:copies AS integer[]), CAST(:originals AS integer[])) AS u(id, original)
     WHERE sa.id = u.id AND sa.duplicate_of IS DISTINCT FROM u.original
 """)
 
 _UPDATE_POSITIONS_SQL = text("""
-    UPDATE source_authorship_groups g SET reference_position = u.position
+    UPDATE source_contribution_groups g SET reference_position = u.position
     FROM unnest(CAST(:ids AS integer[]), CAST(:positions AS smallint[])) AS u(id, position)
     WHERE g.id = u.id
 """)
 
 _GROUP_IDS_SQL = text(
-    "SELECT nextval(pg_get_serial_sequence('publications.source_authorship_groups', 'id'))"
+    "SELECT nextval(pg_get_serial_sequence('publications.source_contribution_groups', 'id'))"
     " FROM generate_series(1, :n)"
 )
 
 _INSERT_GROUPS_SQL = text("""
-    INSERT INTO source_authorship_groups (id, publication_id, reference_position)
+    INSERT INTO source_contribution_groups (id, publication_id, reference_position)
     SELECT * FROM unnest(
         CAST(:ids AS integer[]), CAST(:publications AS integer[]), CAST(:positions AS smallint[]))
 """)
 
 _INSERT_MEMBERSHIPS_SQL = text("""
-    INSERT INTO grouped_source_authorships
-        (source_authorship_id, group_id, source_publication_id, method, score, margin)
+    INSERT INTO source_contribution_group_members
+        (source_contribution_id, group_id, source_record_id, method, score, margin)
     SELECT * FROM unnest(
         CAST(:signatures AS integer[]), CAST(:groups AS integer[]), CAST(:notices AS integer[]),
         CAST(:methods AS grouping_method[]), CAST(:scores AS real[]), CAST(:margins AS real[]))
@@ -170,13 +170,13 @@ class AuthorGroupingQueries:
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment"))
 
     def fetch_dirty_publications(self, conn: Connection) -> list[tuple[int, int]]:
-        """Publications marquées `authorships_dirty`, avec le nombre de signatures d'auteur de leurs notices (`author_count`)."""
+        """Publications marquées `contributions_dirty`, avec le nombre de signatures d'auteur de leurs notices (`author_count`)."""
         rows = conn.execute(
             text("""
                 SELECT p.id, coalesce(sum(sp.author_count), 0)::integer AS signatures
                 FROM publications p
-                LEFT JOIN source_publications sp ON sp.publication_id = p.id
-                WHERE p.authorships_dirty
+                LEFT JOIN source_records sp ON sp.publication_id = p.id
+                WHERE p.contributions_dirty
                 GROUP BY p.id
                 ORDER BY p.id
             """)
@@ -201,12 +201,12 @@ class AuthorGroupingQueries:
         memberships: dict[int, MembershipRow] = {}
         for row in conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
             members = groups.setdefault(row.publication_id, {}).setdefault(row.id, set())
-            if row.source_authorship_id is not None:
-                members.add(row.source_authorship_id)
-                memberships[row.source_authorship_id] = MembershipRow(
-                    row.source_authorship_id,
+            if row.source_contribution_id is not None:
+                members.add(row.source_contribution_id)
+                memberships[row.source_contribution_id] = MembershipRow(
+                    row.source_contribution_id,
                     row.id,
-                    row.source_publication_id,
+                    row.source_record_id,
                     row.method,
                     row.score,
                     row.margin,
@@ -220,7 +220,7 @@ class AuthorGroupingQueries:
         return list(conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
 
     def write(self, conn: Connection, plan: BatchPlan) -> None:
-        """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `authorships_dirty`.
+        """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `contributions_dirty`.
 
         Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres signatures des publications du lot perdent leur `duplicate_of`.
         """
@@ -266,6 +266,6 @@ class AuthorGroupingQueries:
                 },
             )
         conn.execute(
-            text("UPDATE publications SET authorships_dirty = false WHERE id = ANY(:ids)"),
+            text("UPDATE publications SET contributions_dirty = false WHERE id = ANY(:ids)"),
             {"ids": list(publication_ids)},
         )

@@ -1,13 +1,13 @@
 """Command handlers des écritures API sur les personnes : frontière transactionnelle de l'agrégat.
 
-Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des `source_authorships`, où le `person_id` matérialise le lien vers la personne.
+Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des `source_contributions`, où le `person_id` matérialise le lien vers la personne.
 """
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
@@ -15,7 +15,7 @@ from application.ports.repositories.person_repository import (
 from application.services.persons import core as persons_service
 from application.services.persons.core import (
     AddIdentifierResult,
-    AuthorshipRef,
+    ContributionRef,
     DetachResult,
     IdentifierStatusResult,
 )
@@ -139,26 +139,26 @@ def mark_distinct(
     conn.commit()
 
 
-# ── Formes de noms / détachement authorships ──────────────────────
+# ── Formes de noms / détachement contributions ──────────────────────
 
 
-def detach_authorships(
+def detach_contributions(
     conn: Connection,
     person_id: int,
-    authorships: list[AuthorshipRef],
+    contributions: list[ContributionRef],
     *,
     repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
+    contribution_repo: ContributionRepository,
     audit_repo: AuditRepository,
 ) -> DetachResult:
-    """Rejette durablement les paires (publication, personne) des authorships sélectionnées et nettoie les formes de noms orphelines.
+    """Rejette durablement les paires (publication, personne) des contributions sélectionnées et nettoie les formes de noms orphelines.
 
-    Retourne {"detached": N, "deleted_authorships": M, "cleaned_forms": K}."""
-    result = persons_service.detach_authorships(
+    Retourne {"detached": N, "deleted_contributions": M, "cleaned_forms": K}."""
+    result = persons_service.detach_contributions(
         person_id,
-        authorships,
+        contributions,
         repo=repo,
-        authorship_repo=authorship_repo,
+        contribution_repo=contribution_repo,
         audit_repo=audit_repo,
     )
     conn.commit()
@@ -172,7 +172,7 @@ def update_name_form_status(
     status: str,
     *,
     repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
+    contribution_repo: ContributionRepository,
     audit_repo: AuditRepository,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom. `rejected` détache aussi les signatures portant la forme. Retourne la ligne {person_id, name_form, status}."""
@@ -181,7 +181,7 @@ def update_name_form_status(
         name_form,
         status,
         repo=repo,
-        authorship_repo=authorship_repo,
+        contribution_repo=contribution_repo,
         audit_repo=audit_repo,
     )
     conn.commit()

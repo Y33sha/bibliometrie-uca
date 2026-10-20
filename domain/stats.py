@@ -128,7 +128,7 @@ assert all(d.groupable for d in DIMENSIONS.values() if d.comparable), (
 )
 
 MEASURES: dict[str, Measure] = {
-    "pub_count": Measure("pub_count", "Nombre de publications"),
+    "publication_count": Measure("publication_count", "Nombre de publications"),
     # Tous les frais de publication imputés au budget d'une structure du périmètre : APC et frais hors open access.
     "apc_amount": Measure("apc_amount", "Montant des APC", unit="€ HT"),
 }

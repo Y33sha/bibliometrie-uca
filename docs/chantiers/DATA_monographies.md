@@ -26,7 +26,7 @@ Le DOI porte souvent l'ISBN. Sa forme annonce alors la nature du document :
 
 ### Correction du DOI des chapitres
 
-La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent avec leur livre (`OUVRAGE_VS_CHAPITRE`) ou avec des chapitres de titres différents (`CHAPITRES_TITRES_DIFFERENTS`, `domain/source_publications/metadata_correction/shared_doi.py`). Elle a deux défauts :
+La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent avec leur livre (`OUVRAGE_VS_CHAPITRE`) ou avec des chapitres de titres différents (`CHAPITRES_TITRES_DIFFERENTS`, `domain/source_records/metadata_correction/shared_doi.py`). Elle a deux défauts :
 
 - **Titres presque identiques tenus pour distincts.** La comparaison procède par égalité stricte et inclusion. Sur `10.1016/b978-0-323-99643-3.00015-2`, HAL écrit « Green polymers filaments for 3D-printing » et les autres sources « Green polymer filaments for 3D printing » : les quatre enregistrements perdent le DOI de leur propre chapitre.
 - **Un type contredit suffit à opposer le livre au chapitre.** Sur `10.48611/isbn.978-2-406-17883-5.p.0071`, HAL type le document `book` et les autres sources `book_chapter`, sous le même titre. Les chapitres perdent un DOI dont le suffixe désigne pourtant la page 71.
@@ -42,7 +42,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - Chaque écriture d'un ISBN passe par le value object `ISBN` : forme ISBN-13 sans séparateur, ISBN-10 converti, clé de contrôle vérifiée. `normalize_external_ids` l'applique déjà aux identifiants externes.
 - Une zone qui porte plusieurs valeurs donne son premier ISBN. Rien n'indique l'ordre des supports.
 - Une monographie est retrouvée par ISBN, puis par titre normalisé chez le même éditeur : deux éditeurs publient des livres de même titre. Deux monographies de même titre qui portent chacune des ISBN restent distinctes.
-- La normalisation pose `source_publications.monograph_id`, que l'agrégation reporte sur `publications.monograph_id`, comme `journal_id`.
+- La normalisation pose `source_records.monograph_id`, que l'agrégation reporte sur `publications.monograph_id`, comme `journal_id`.
 
 ### Cible
 
@@ -76,7 +76,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 3. Remplissage
 
-- [x] Rattachement des enregistrements : `source_publications.monograph_id`, agrégé dans `publications.monograph_id`.
+- [x] Rattachement des enregistrements : `source_records.monograph_id`, agrégé dans `publications.monograph_id`.
 - [x] Trouve-ou-crée d'une monographie (`application/services/monographs/core.py`).
 - [x] Normalisation, sans rien retirer : l'enregistrement garde son `journal_id` selon la règle en place, et reçoit en outre sa monographie, dont le `journal_id` désigne la même entrée de `journals`. Chaque source décrit le conteneur du document (`ContainerFacts`). Crossref : `container-title` porte `[collection, livre]` pour un chapitre, le volume d'actes en tête pour un article de congrès. HAL : `bookTitle_s` ; le congrès (`conferenceTitle_s`) ne désigne pas un volume, une communication le nomme avec ou sans actes publiés. OpenAlex : source `conference` pour le volume, `book series` ou `journal` pour la collection. WoS : titre de la source, hors ISSN. ScanR : congrès d'une communication. DataCite : conteneur sans ISSN.
 - [x] Sous-étape `delete_empty_monographs` de `publishers_journals`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.

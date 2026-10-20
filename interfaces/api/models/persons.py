@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.person import PersonExclusion
-from interfaces.api.models.authorships import SourceAuthorshipRef
+from interfaces.api.models.contributions import SourceContributionRef
 
 # ----- Corps des requêtes -----
 
@@ -42,8 +42,8 @@ class MarkDistinctPersons(BaseModel):
     person_id_b: int
 
 
-class DetachAuthorships(BaseModel):
-    authorships: list[SourceAuthorshipRef]
+class DetachContributions(BaseModel):
+    contributions: list[SourceContributionRef]
 
 
 class UpdateNameFormStatus(BaseModel):
@@ -95,9 +95,9 @@ class IdentifierReassignResponse(BaseModel):
     status: str
 
 
-class DetachAuthorshipsResponse(BaseModel):
-    """Décompte d'un détachement de signatures : signatures détachées, authorships supprimées, formes de nom nettoyées."""
+class DetachContributionsResponse(BaseModel):
+    """Décompte d'un détachement de signatures : signatures détachées, contributions supprimées, formes de nom nettoyées."""
 
     detached: int
-    deleted_authorships: int
+    deleted_contributions: int
     cleaned_forms: int

@@ -1,7 +1,7 @@
 """Helper de tests : exécute la vraie phase « publications » du pipeline.
 
 Partagé par les tests d'idempotence et de re-traitement, qui ont besoin de
-créer/rattacher les publications de leurs source_publications orphelins sans
+créer/rattacher les publications de leurs source_records orphelins sans
 réimplémenter l'assignation.
 """
 
@@ -46,17 +46,17 @@ def apply_metadata_corrections(conn: Connection) -> None:
 
 
 def create_all_publications(conn: Connection) -> None:
-    """Crée/rattache les publications des source_publications orphelins via la
+    """Crée/rattache les publications des source_records orphelins via la
     vraie passe d'assignation+réconciliation du pipeline (`reconcile`), pas une
     cascade réimplémentée.
 
     Joue d'abord `metadata_correction` (unaire puis cluster), comme l'ordre réel
     du pipeline : l'assignation lit le `doc_type`/`journal_id`/`oa_status` canonique
-    corrigé écrit en place sur la `source_publication`, elle ne re-mappe ni ne
+    corrigé écrit en place sur la `source_record`, elle ne re-mappe ni ne
     re-corrige. Sans cette passe, une SP porterait sa nomenclature source brute
     (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.
 
-    Ces tests ne jouent pas la phase affiliations : aucun `source_authorship`
+    Ces tests ne jouent pas la phase affiliations : aucun `source_contribution`
     n'est in_perimeter, or l'assignation ne *crée* une publication que pour un
     orphelin in_perimeter. On sème donc le périmètre à la main (indice `address`)
     — équivalent de ce que pose la phase affiliations en prod.
@@ -64,7 +64,7 @@ def create_all_publications(conn: Connection) -> None:
     `reconcile` ne commit pas (à la charge du caller), ce qui préserve l'isolation
     transactionnelle du fixture `sa_sync_conn`.
     """
-    conn.execute(text("UPDATE source_authorships SET perimeter_evidence = '{address}'"))
+    conn.execute(text("UPDATE source_contributions SET perimeter_evidence = '{address}'"))
 
     apply_metadata_corrections(conn)
 

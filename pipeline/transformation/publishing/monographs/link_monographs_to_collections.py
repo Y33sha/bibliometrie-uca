@@ -37,7 +37,7 @@ _JOURNAL_CANDIDATES = text(f"""
     WITH entrees AS (
         SELECT DISTINCT s.monograph_id, s.journal_id,
                {has_active_issn("s.journal_id")} AS a_issn
-        FROM source_publications s
+        FROM source_records s
         WHERE s.monograph_id IS NOT NULL
     )
     SELECT m.id, m.title, m.publisher_id, m.proceedings, m.journal_id,

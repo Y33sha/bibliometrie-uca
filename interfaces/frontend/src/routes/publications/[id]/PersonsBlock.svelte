@@ -2,15 +2,15 @@
   import { base } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
   import { titleCase } from "$lib/utils";
-  import type { Authorship } from "./types";
+  import type { Contribution } from "./types";
 
-  let { authorships }: { authorships: Authorship[] } = $props();
+  let { contributions }: { contributions: Contribution[] } = $props();
 
   // Une personne par lien, dédupliquée (un même `person_id` peut apparaître sur deux signatures), ordre d'apparition conservé.
   const persons = $derived.by(() => {
     const seen = new Set<number>();
-    const out: Authorship[] = [];
-    for (const a of authorships) {
+    const out: Contribution[] = [];
+    for (const a of contributions) {
       if (a.person_id != null && !seen.has(a.person_id)) {
         seen.add(a.person_id);
         out.push(a);
@@ -19,7 +19,7 @@
     return out;
   });
 
-  function personName(a: Authorship): string {
+  function personName(a: Contribution): string {
     return `${titleCase(a.first_name)} ${titleCase(a.last_name)}`.trim();
   }
 </script>

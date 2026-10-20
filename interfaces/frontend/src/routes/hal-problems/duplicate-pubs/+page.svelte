@@ -93,7 +93,7 @@
 			{#each doi.items as pair}
 				<div class="doi-card">
 					<div class="pub-meta-line">
-						{#if pair.publication.pub_year}<span class="meta-badge">{pair.publication.pub_year}</span>{/if}
+						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
 						<a href="{base}/publications/{pair.publication.id}" class="pub-link"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
@@ -101,7 +101,7 @@
 						{#each pair.publication.hal_docs as hd}
 							<div class="hal-row">
 								<a href={halUrl(hd.halid)} target="_blank" rel="noopener" class="hal-badge">{hd.halid}</a>
-								{#if hd.hal_pub_year}<span class="meta-badge">{hd.hal_pub_year}</span>{/if}
+								{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
 								<span class="author-count">{hd.author_count} aut.</span>
 							</div>
@@ -134,7 +134,7 @@
 							<td>
 								<a href="{base}/publications/{pub.id}" class="pub-link"><PublicationTitle titre={pub.title} /></a>
 								<div class="pub-meta-line">
-									{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
+									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
 								</div>
@@ -142,7 +142,7 @@
 									{#each pub.hal_docs as hd}
 										<div class="hal-row">
 											<a href={halUrl(hd.halid)} target="_blank" rel="noopener" class="hal-badge">{hd.halid}</a>
-											{#if hd.hal_pub_year}<span class="meta-badge">{hd.hal_pub_year}</span>{/if}
+											{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
 											<span class="author-count">{hd.author_count} aut.</span>
 										</div>

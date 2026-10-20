@@ -18,7 +18,7 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import map_role
+from domain.publications.contribution_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
     find_isbns,
@@ -28,20 +28,20 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
@@ -123,7 +123,7 @@ def extract_pub_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un document HAL.
 
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_publications`.
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_records`.
     """
     title = get_title(doc)
     raw_type = hal_text_field(doc.get("docType_s")) or ""
@@ -145,7 +145,7 @@ def extract_pub_metadata(
     ouvert = doc.get("openAccess_bool")
     return PublicationMetadata(
         title=title,
-        pub_year=as_int(doc.get("producedDateY_i")),
+        publication_year=as_int(doc.get("producedDateY_i")),
         doc_type=doc_type,
         doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
         nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
@@ -173,7 +173,7 @@ def build_hal_external_ids(
 ) -> dict[str, JsonValue]:
     """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
-    `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
@@ -195,15 +195,15 @@ def build_hal_external_ids(
 
 def insert_hal_document(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
     pub_meta: PublicationMetadata,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour HAL.
+    """Crée/retrouve l'entrée source_records pour HAL.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt,
     journal_id, oa_status, language, container_title) viennent toutes de
     `pub_meta`, construit en amont par `extract_pub_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
@@ -258,16 +258,16 @@ def insert_hal_document(
     uri = hal_text_field(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return queries.upsert_source_publication(
+    return queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="hal",
             source_id=hal_id,
             staging_id=staging_id,
             doi=pub_meta.doi,
             external_ids=external_ids,
             title=pub_meta.title or "",
-            pub_year=pub_meta.pub_year,
+            publication_year=pub_meta.publication_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
             monograph_id=pub_meta.monograph_id,
@@ -469,7 +469,7 @@ def parse_tei_author_structures(label_xml: str | None) -> list[list[int]]:
 
 
 # =============================================================
-# HAL AUTHORSHIPS
+# HAL CONTRIBUTIONS
 # =============================================================
 
 
@@ -576,7 +576,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                 name=signature_name,
                 is_corresponding=is_corresponding,
                 roles=roles or None,
-                person_identifiers=identifiers,
+                identifiers=identifiers,
                 ror_ids=tei_rors[position] if position < len(tei_rors) else frozenset(),
                 hal_structure_ids=(
                     tei_structures[position] if position < len(tei_structures) else frozenset()
@@ -587,18 +587,18 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     return records
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     doc: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures HAL de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "hal",
-        source_publication_id,
+        source_record_id,
         extract_hal_author_block(doc),
         build_hal_author_records,
     )
@@ -611,13 +611,13 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     staging_id = staging_row.id
@@ -638,7 +638,7 @@ def process_work(
     containers = upsert_containers(doc, publisher_id, container_stores=container_stores)
     pub_meta = extract_pub_metadata(doc, containers.journal_id, containers.monograph_id)
 
-    source_publication_id = insert_hal_document(
+    source_record_id = insert_hal_document(
         conn,
         queries,
         doc,
@@ -646,7 +646,7 @@ def process_work(
         hal_id,
         pub_meta,
     )
-    process_authorships(conn, authorship_queries, doc, source_publication_id)
+    process_contributions(conn, contribution_queries, doc, source_record_id)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -668,5 +668,5 @@ class HalNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

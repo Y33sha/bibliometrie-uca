@@ -269,7 +269,7 @@
 					</td>
 				{/if}
 				<td class="muted">{journalTypeLabel(j.journal_type)}</td>
-				<td class="num">{j.pub_count.toLocaleString('fr-FR')}</td>
+				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
 				{#if actionCell}<td class="actions">{@render actionCell(j)}</td>{/if}
 			</tr>
 		{/each}

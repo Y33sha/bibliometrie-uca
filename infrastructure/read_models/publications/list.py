@@ -63,7 +63,7 @@ _SOURCE_URL = {
 }
 
 
-# Pivot des identifiants source (alias `sd` sur `source_publications`) : une colonne `<source>_id`
+# Pivot des identifiants source (alias `sd` sur `source_records`) : une colonne `<source>_id`
 # par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
 # thèses n'en expose que quatre (pas `wos`) et garde son pivot en clair.
 _SOURCE_ID_COLUMNS = ",\n                    ".join(
@@ -154,8 +154,8 @@ _APC_SORT = (
 )
 
 _ORDER_MAP = {
-    "year_desc": "p.pub_year DESC, p.title",
-    "year_asc": "p.pub_year ASC, p.title",
+    "year_desc": "p.publication_year DESC, p.title",
+    "year_asc": "p.publication_year ASC, p.title",
     "title_asc": "p.title ASC",
     "title_desc": "p.title DESC",
     "apc_desc": f"{_APC_SORT} DESC, p.title",
@@ -195,7 +195,7 @@ def list_publications(
     ).one()
     total = count_row.total
 
-    # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux portés par l'authorship de cette personne.
+    # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux portés par la contribution de cette personne.
     if filters.person_id:
         person_lab_filter_a4 = "AND a4.person_id = :person_lab_a4"
     else:
@@ -204,7 +204,7 @@ def list_publications(
     rows = conn.execute(
         text(f"""
             SELECT
-                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
                 p.license::text AS license,
                 j.id AS journal_id,
@@ -217,7 +217,7 @@ def list_publications(
                 p.meta->>'date_inscription' AS date_inscription,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT pe.first_name || ' ' || pe.last_name
-                     FROM authorships ath
+                     FROM contributions ath
                      JOIN persons pe ON pe.id = ath.person_id
                      WHERE ath.publication_id = p.id
                        AND {has_author_role("ath")}
@@ -225,22 +225,22 @@ def list_publications(
                  END) AS thesis_author_name,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT ath.person_id
-                     FROM authorships ath
+                     FROM contributions ath
                      WHERE ath.publication_id = p.id
                        AND {has_author_role("ath")}
                      LIMIT 1)
                  END) AS thesis_author_person_id,
-                (SELECT a.is_corresponding FROM authorships a
+                (SELECT a.is_corresponding FROM contributions a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS is_corresponding,
-                (SELECT a.id FROM authorships a
+                (SELECT a.id FROM contributions a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                 LIMIT 1) AS authorship_id,
+                 LIMIT 1) AS contribution_id,
                 (SELECT json_agg(sub ORDER BY sub.label)
                  FROM (
                     SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
-                    FROM authorships a4
-                    JOIN authorship_structures aus4 ON aus4.authorship_id = a4.id
+                    FROM contributions a4
+                    JOIN contribution_structures aus4 ON aus4.contribution_id = a4.id
                     JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                     WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
                       AND {has_author_role("a4")}
@@ -267,10 +267,10 @@ def list_publications(
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS},
-                    (SELECT array_agg(DISTINCT col) FROM source_publications sd2,
+                    (SELECT array_agg(DISTINCT col) FROM source_records sd2,
                             unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
                      WHERE sd2.publication_id = p.id AND sd2.source = '{Source.HAL.value}') AS hal_collections
-                FROM source_publications sd WHERE sd.publication_id = p.id
+                FROM source_records sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -291,7 +291,7 @@ def list_publications(
         PublicationListItem(
             id=r.id,
             title=r.title,
-            pub_year=r.pub_year,
+            publication_year=r.publication_year,
             doi=r.doi,
             doc_type=r.doc_type,
             oa_status=r.oa_status,
@@ -312,7 +312,7 @@ def list_publications(
             lab_items=r.lab_items,
             apc=r.apc_details,
             is_corresponding=r.is_corresponding,
-            authorship_id=r.authorship_id,
+            contribution_id=r.contribution_id,
             hal_collections=r.hal_collections,
         )
         for r in rows
@@ -463,7 +463,7 @@ def export_publications_csv(
     rows = conn.execute(
         text(f"""
             SELECT
-                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
                 p.license::text AS license,
                 j.title AS journal_title,
@@ -473,13 +473,13 @@ def export_publications_csv(
                 src_ids.wos_id, src_ids.theses_id,
                 (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
                  WHERE ap.publication_id = p.id) AS apc_total,
-                (SELECT a.is_corresponding FROM authorships a
+                (SELECT a.is_corresponding FROM contributions a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS is_corresponding,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
-                 FROM authorships a3
-                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
+                 FROM contributions a3
+                 JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                       AND {has_author_role("a3")}
@@ -491,7 +491,7 @@ def export_publications_csv(
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS}
-                FROM source_publications sd WHERE sd.publication_id = p.id
+                FROM source_records sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -554,7 +554,7 @@ def _publication_lines(
         )
         cell = {
             "Type": row.doc_type or "",
-            "Année": row.pub_year or "",
+            "Année": row.publication_year or "",
             "Titre": _plain_text(row.title),
             "Revue": row.journal_title or "",
             "Éditeur": row.publisher_name or "",
@@ -605,15 +605,15 @@ def export_theses_csv(
     rows = conn.execute(
         text(f"""
             SELECT
-                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
                 p.meta->>'date_soutenance' AS date_soutenance,
                 p.meta->>'date_inscription' AS date_inscription,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
-                 FROM authorships a3
-                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
+                 FROM contributions a3
+                 JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                       AND {has_author_role("a3")}
@@ -625,7 +625,7 @@ def export_theses_csv(
                     max(CASE WHEN sd.source = '{Source.OPENALEX.value}' THEN sd.source_id END) AS openalex_id,
                     max(CASE WHEN sd.source = '{Source.SCANR.value}' THEN sd.source_id END) AS scanr_id,
                     max(CASE WHEN sd.source = '{Source.THESES.value}' THEN sd.source_id END) AS theses_id
-                FROM source_publications sd WHERE sd.publication_id = p.id
+                FROM source_records sd WHERE sd.publication_id = p.id
             ) src_ids ON TRUE
             WHERE {where_clause}
             ORDER BY {order}
@@ -675,7 +675,7 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
             [
                 row.date_inscription or "",
                 row.date_soutenance or "",
-                row.pub_year or "",
+                row.publication_year or "",
                 _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
                 _plain_text(row.title),
                 doi_url,

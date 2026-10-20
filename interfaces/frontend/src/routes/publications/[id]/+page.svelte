@@ -19,12 +19,12 @@
   let error = $state(false);
 
   const pub = $derived(data?.publication);
-  const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
+  const hasTruthTable = $derived((data?.contributions.length ?? 0) > 0);
   // Structures liées : union des structures des signatures consolidées, ordre d'apparition.
   const structureIds = $derived.by(() => {
     const seen = new Set<number>();
     const out: number[] = [];
-    for (const a of data?.authorships ?? [])
+    for (const a of data?.contributions ?? [])
       for (const sid of a.structure_ids ?? [])
         if (!seen.has(sid)) {
           seen.add(sid);
@@ -32,10 +32,10 @@
         }
     return out;
   });
-  const thesesAuth = $derived(data?.theses_authorships ?? []);
+  const thesesAuth = $derived(data?.theses_contributions ?? []);
   const thesisMeta = $derived(data?.thesis_meta);
   const thesisAuthorStructures = $derived(
-    data?.authorships.find((a) => a.in_perimeter)?.structure_ids ?? [],
+    data?.contributions.find((a) => a.in_perimeter)?.structure_ids ?? [],
   );
 
   const thesesSource = $derived(data?.sources.find((s) => s.source === "theses"));
@@ -98,7 +98,7 @@
 
       <div class="detail-body">
         {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
-          <PersonsBlock authorships={data!.authorships} />
+          <PersonsBlock contributions={data!.contributions} />
         {/if}
 
         <StructuresBlock {structureIds} structures={data!.structures} />

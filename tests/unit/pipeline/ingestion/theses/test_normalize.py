@@ -1,8 +1,8 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `extract_pub_metadata` (cascade pub_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_authorships` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
+Couvre `extract_pub_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_contributions` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
-Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourceRecordQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -22,12 +22,12 @@ from pipeline.ingestion.theses.normalize import (
     extract_pub_metadata,
     extract_theses_author_block,
     insert_source_document,
-    process_authorships,
+    process_contributions,
     process_work,
 )
 from tests.helpers.normalize_doubles import (
-    FakeAuthorshipsBatchQueries,
-    FakeSourcePublicationQueries,
+    FakeContributionsBatchQueries,
+    FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
 )
@@ -39,23 +39,23 @@ class TestExtractPubMetadata:
     def test_minimal(self):
         meta = extract_pub_metadata({"titrePrincipal": "T"})
         assert meta.title == "T"
-        assert meta.pub_year is None
+        assert meta.publication_year is None
         assert meta.nnt is None
         assert meta.oa_status == "closed"
         assert meta.journal_id is None
 
-    def test_pub_year_from_soutenance(self):
+    def test_publication_year_from_soutenance(self):
         meta = extract_pub_metadata({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"})
-        assert meta.pub_year == 2024
+        assert meta.publication_year == 2024
 
-    def test_pub_year_fallback_to_inscription(self):
+    def test_publication_year_fallback_to_inscription(self):
         """Si pas de date_soutenance, on prend date_inscription."""
         meta = extract_pub_metadata(
             {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
         )
-        assert meta.pub_year == 2020
+        assert meta.publication_year == 2020
 
-    def test_pub_year_soutenance_wins_over_inscription(self):
+    def test_publication_year_soutenance_wins_over_inscription(self):
         meta = extract_pub_metadata(
             {
                 "titrePrincipal": "T",
@@ -63,7 +63,7 @@ class TestExtractPubMetadata:
                 "datePremiereInscriptionDoctorat": "10/09/2020",
             }
         )
-        assert meta.pub_year == 2024
+        assert meta.publication_year == 2024
 
     def test_no_title(self):
         meta = extract_pub_metadata({})
@@ -144,7 +144,7 @@ class TestInsertSourceDocument:
     def _pub_meta(self, **overrides) -> PublicationMetadata:
         base: dict[str, Any] = {
             "title": "T",
-            "pub_year": 2024,
+            "publication_year": 2024,
             "doc_type": "thesis",
             "doi": None,
             "nnt": None,
@@ -158,7 +158,7 @@ class TestInsertSourceDocument:
 
     def _call(
         self,
-        queries: FakeSourcePublicationQueries,
+        queries: FakeSourceRecordQueries,
         these: dict,
         *,
         pub_meta: PublicationMetadata | None = None,
@@ -174,33 +174,33 @@ class TestInsertSourceDocument:
         return queries.upserted_documents[-1]
 
     def test_nnt_goes_in_external_ids(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(nnt="2024CLFAC001"))
         assert captured.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {})
         assert captured.external_ids is None
 
     def test_keywords_from_sujets(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         these = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
         captured = self._call(queries, these)
         assert captured.keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {})
         assert captured.keywords is None
 
     def test_topics_discipline_only(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"discipline": "Informatique"})
         assert captured.topics == {"discipline": "Informatique"}
 
     def test_topics_with_rameau(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         these = {
             "discipline": "Informatique",
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
@@ -212,22 +212,22 @@ class TestInsertSourceDocument:
         }
 
     def test_no_topics(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {})
         assert captured.topics is None
 
     def test_source_meta_passed(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"dateSoutenance": "15/03/2024"})
         assert captured.meta == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         captured = self._call(queries, {}, pub_meta=self._pub_meta(title=None))
         assert captured.title == ""
 
 
-# ── process_authorships ──────────────────────────────────────────────
+# ── process_contributions ──────────────────────────────────────────────
 
 
 def _these(**fields):
@@ -242,7 +242,7 @@ def _these(**fields):
 class TestBuildThesesAuthorRecords:
     def test_seuls_les_auteurs_ont_une_position(self):
         records = build_theses_author_records(extract_theses_author_block(_these()))
-        assert [(r.position, r.roles, r.person_identifiers) for r in records] == [
+        assert [(r.position, r.roles, r.identifiers) for r in records] == [
             (0, ["author"], {"idref": "123"}),
             (None, ["thesis_director"], None),
         ]
@@ -257,19 +257,19 @@ class TestBuildThesesAuthorRecords:
         assert all(r.addresses == [] for r in records)
 
 
-class TestProcessAuthorships:
+class TestProcessContributions:
     def test_signatures_ecrites_par_le_writer_partage(self):
-        batch = FakeAuthorshipsBatchQueries()
-        process_authorships(MagicMock(), _these(), 10, batch_queries=batch)
+        batch = FakeContributionsBatchQueries()
+        process_contributions(MagicMock(), _these(), 10, batch_queries=batch)
         assert batch.synced_for == [10]
         assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
 
     def test_renormalisation_garde_les_signatures(self):
         """Une thèse modifiée garde l'identifiant des signatures dont l'identité ne change pas, directeur compris."""
-        batch = FakeAuthorshipsBatchQueries()
-        process_authorships(MagicMock(), _these(), 10, batch_queries=batch)
+        batch = FakeContributionsBatchQueries()
+        process_contributions(MagicMock(), _these(), 10, batch_queries=batch)
         modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
-        process_authorships(MagicMock(), modified, 10, batch_queries=batch)
+        process_contributions(MagicMock(), modified, 10, batch_queries=batch)
         assert [len(b) for b in batch.upserted_batches] == [2, 1]
         assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
 
@@ -280,7 +280,7 @@ class TestProcessAuthorships:
 class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
-            "queries": queries or FakeSourcePublicationQueries(),
+            "queries": queries or FakeSourceRecordQueries(),
             "staging_queries": staging_queries or FakeStagingQueries(),
             "batch_queries": MagicMock(),
         }
@@ -313,7 +313,7 @@ def _make_normalizer():
         conn=MagicMock(),
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
-        queries=FakeSourcePublicationQueries(),
+        queries=FakeSourceRecordQueries(),
         batch_queries=MagicMock(),
     )
 

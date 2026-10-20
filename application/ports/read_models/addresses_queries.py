@@ -79,7 +79,7 @@ class AddressOut(BaseModel):
     is_confirmed: bool | None
     is_detected: bool
     structures: list[AddressStructureSummary]
-    pub_count: int
+    publication_count: int
 
 
 class AddressListResponse(PaginatedResponse):
@@ -95,7 +95,7 @@ class AddressListResponse(PaginatedResponse):
 class AddressPublicationItem(BaseModel):
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doi: str | None
     doc_type: str
     journal_title: str | None
@@ -117,7 +117,7 @@ class AddressForCountryAttribution(BaseModel):
     raw_text: str
     countries: list[str] | None
     found_countries: list[FoundCountry]
-    pub_count: int
+    publication_count: int
 
 
 class AddressesCountriesResponse(PaginatedResponse):

@@ -40,7 +40,7 @@ class RhImportOutcome(StrEnum):
 
 _RH_DUPLICATE = text("""
     SELECT p.id FROM persons p
-    LEFT JOIN persons_rh prh ON prh.person_id = p.id
+    LEFT JOIN hr_records prh ON prh.person_id = p.id
     WHERE p.last_name_normalized = :ln
       AND p.first_name_normalized = :fn
       AND prh.department_name IS NOT DISTINCT FROM :dept
@@ -48,7 +48,7 @@ _RH_DUPLICATE = text("""
 """)
 
 _INSERT_RH = text("""
-    INSERT INTO persons_rh
+    INSERT INTO hr_records
         (person_id, email, role_title, department_name, start_date, end_date, hr_export_date)
     VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
 """)
@@ -66,7 +66,7 @@ def import_rh_person(
     end_date: str | None = None,
     export_date: str | None = None,
 ) -> RhImportOutcome:
-    """Crée la personne et sa fiche `persons_rh`, sauf doublon : même nom normalisé, même service et même fonction.
+    """Crée la personne et sa fiche `hr_records`, sauf doublon : même nom normalisé, même service et même fonction.
 
     La création passe par `create_person`, qui dérive les formes de nom.
     """

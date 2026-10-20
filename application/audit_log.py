@@ -69,7 +69,7 @@ def emit_event(
         event_type: notation pointée, ex. "person.merged",
             "publication.excluded", "structure.deleted".
         aggregate_type: type de l'entité affectée
-            (person, publication, structure, journal, publisher, authorship).
+            (person, publication, structure, journal, publisher, contribution).
         aggregate_id: id de l'entité affectée. NULL accepté si l'entité
             n'existe plus après l'opération (cas rare).
         payload: dict JSON-sérialisable de données utiles

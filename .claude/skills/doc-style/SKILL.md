@@ -38,7 +38,7 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 
 ## Style
 
-- **Jargon.** Le jargon technique usuel est normal. Eviter le jargon interne au projet et les abréviations maison qu'un nouveau venu ne peut pas comprendre sans traduction (`SP` pour source_publication, `pub` pour publication...).
+- **Jargon.** Le jargon technique usuel est normal. Eviter le jargon interne au projet et les abréviations maison qu'un nouveau venu ne peut pas comprendre sans traduction (`sp` pour source_record, `pub` pour publication...).
 - **Anglicismes.** Toujours utiliser les termes les plus usuels, anglais ou français. Ne pas sur-franciser par purisme (on dit *repository* et non "dépôt" quand on parle des classes d'accès aux données).
 - **Pronoms « y » et « en ».** Ne les employer que si l'antécédent est le groupe nominal qui précède immédiatement, dans la même phrase. Sinon, répéter le nom.
 - **Phrases négatives.** Les remplacer chaque fois que possible par des phrases positives. Si une phrase décrit ce que le code ne fait pas ou plus, la supprimer. Eviter les négations multiples.

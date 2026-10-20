@@ -2,9 +2,9 @@
 
 ## Contexte
 
-Une publication réunit les notices de plusieurs sources. Chaque notice a ses signatures (`source_authorships`). Aucune table ne dit quelles signatures de notices différentes désignent le même auteur.
+Une publication réunit les notices de plusieurs sources. Chaque notice a ses signatures (`source_contributions`). Aucune table ne dit quelles signatures de notices différentes désignent le même auteur.
 
-Le rapprochement passe aujourd'hui par la personne. La phase `persons` rattache chaque signature à une personne, puis `authorships` consolide par paire (publication, personne). Le rattachement cross-source reconnaît une personne déjà liée à la même position d'auteur dans une autre notice, si le nom est compatible.
+Le rapprochement passe aujourd'hui par la personne. La phase `persons` rattache chaque signature à une personne, puis `contributions` consolide par paire (publication, personne). Le rattachement cross-source reconnaît une personne déjà liée à la même position d'auteur dans une autre notice, si le nom est compatible.
 
 La position est un indice faible. Au-delà d'un certain nombre d'auteurs, les écarts de position entre sources sont la règle : ordres différents, listes partielles, noms de collectifs.
 
@@ -85,24 +85,24 @@ La renormalisation d'une notice rapproche ses signatures de celles en base par i
 
 Les verdicts manuels sur les signatures ont deux ancrages :
 
-- le détachement (`rejected_authorships`) vise un couple (notice, personne) et s'applique à toute la publication : il résiste à la resynchronisation des signatures ;
-- le rattachement manuel d'une signature orpheline (`confirmed_authorships`) vise l'identifiant de la signature, en `ON DELETE CASCADE` : il disparaît quand les identifiants de la signature changent.
+- le détachement (`rejected_contributions`) vise un couple (notice, personne) et s'applique à toute la publication : il résiste à la resynchronisation des signatures ;
+- le rattachement manuel d'une signature orpheline (`confirmed_source_contributions`) vise l'identifiant de la signature, en `ON DELETE CASCADE` : il disparaît quand les identifiants de la signature changent.
 
 ## Décisions
 
 - L'alignement se fait par publication, avant la phase `persons`.
 - Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux signatures qui le partagent.
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
-- `source_authorship_groups` réunit les signatures d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_authorships` dans le chantier de [résolution des personnes](DATA_resolution-personnes.md).
-- `grouped_source_authorships` relie chaque signature à son groupe : `source_authorship_id` (clé primaire), `group_id`, `source_publication_id`, `method`, `score`, `margin`.
+- `source_contribution_groups` réunit les signatures d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_contributions` dans le chantier de [résolution des personnes](DATA_resolution-personnes.md).
+- `source_contribution_group_members` relie chaque signature à son groupe : `source_contribution_id` (clé primaire), `group_id`, `source_record_id`, `method`, `score`, `margin`.
   - `method` : `reference` (la signature fonde le groupe), `name`, `identifier`, `order`, `model`.
   - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
 - Un groupe réunit au plus une signature par notice. Une personne correspond au plus à un groupe par publication.
-- Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices. `publications.authorships_dirty` marque les publications à recalculer. La réconciliation de `publications` le pose sur les publications touchées : celles qui reçoivent une notice réexaminée, et celles qu'une notice quitte. Une notice réécrite par `normalize`, signatures comprises, est réexaminée. La phase des groupes retire le drapeau.
+- Les groupes d'une publication se recalculent entièrement quand une de ses notices arrive, part ou change ses signatures : le résultat ne dépend pas de l'ordre d'arrivée des notices. `publications.contributions_dirty` marque les publications à recalculer. La réconciliation de `publications` le pose sur les publications touchées : celles qui reçoivent une notice réexaminée, et celles qu'une notice quitte. Une notice réécrite par `normalize`, signatures comprises, est réexaminée. La phase des groupes retire le drapeau.
 - La phase des groupes, entre `publications` et `persons`, écrit seulement les deux tables des groupes. La phase `persons` garde sa cascade, à une exception : le rattachement `cross_source` devient une propagation dans le groupe. La résolution des personnes par groupe relève d'un chantier à part.
 - Après le recalcul, chaque groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de signatures, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `person_id` et `resolution_mode` suivent l'identifiant. Un ancien groupe sans correspondant est supprimé.
 - Les verdicts restent ancrés sur les données sources : une signature dont les identifiants changent est supprimée puis réinsérée.
-- Les groupes rattachés à une personne forment les couples (publication, personne) de `authorships`. `source_authorship_groups` remplace `authorships`, matviews comprises, dans le chantier de résolution des personnes.
+- Les groupes rattachés à une personne forment les couples (publication, personne) de `contributions`. `source_contribution_groups` remplace `contributions`, matviews comprises, dans le chantier de résolution des personnes.
 
 ## Phasage
 
@@ -178,7 +178,7 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - Fellegi-Sunter seul confond les homonymes des grandes listes (Kim, Zhang). Sans filtre d'ordre, l'étape du patronyme unique lie des auteurs éloignés quand les sources découpent autrement nom et prénom (« A. Ferrer » en position 757, « J. A. Valls Ferrer » en position 2579).
   - Erreurs restantes sur les 326 paires : auteur en double dans une notice HAL, prénom faux dans HAL, noms différents à la même position, un auteur déplacé, une variante de nom.
   - Limite : trois « Y. Zhang » consécutifs, dans l'ordre inverse chez Crossref et chez HAL. Seuls les noms déclarés dans le registre ORCID les départagent.
-- [x] Modèle : `source_authorship_groups` et `grouped_source_authorships`, contraintes d'unicité.
+- [x] Modèle : `source_contribution_groups` et `source_contribution_group_members`, contraintes d'unicité.
 - [x] Temps de calcul de l'essai, en Python sur un cœur : 36 minutes pour le stock (18,6 millions de signatures), de 0,4 à 2,2 secondes pour une collaboration d'environ 11 700 signatures en 5 notices.
 - [x] Réconciliation des identifiants de groupes après recalcul.
 - [x] Phase `author_grouping`, entre `publications` et `persons`.
@@ -230,8 +230,8 @@ Les verdicts manuels sur les signatures ont deux ancrages :
   - La longueur ne détecte pas la copie, qui se retrouve dans d'autres sources. Une notice plus longue que la médiane des autres manque 15 copies sur 51 ; un écart avec une autre notice égal au nombre de répétitions confirme 26 copies sur 51.
   - Conséquence : seule la première occurrence de chaque nom s'aligne. Les répétitions restent hors des groupes, donc hors du rattachement aux personnes.
 - [x] Liste doublée sur place (A A B B…) : une suite d'au moins 4 paires côte à côte, de noms différents.
-- [x] Copies notées dans `source_authorships.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 578 notices, 21 971 doublons d'auteur.
-- [x] Décomptes d'auteurs de chaque notice : `source_publications.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
+- [x] Copies notées dans `source_contributions.duplicate_of` par la phase `author_grouping`, vers la première occurrence du nom. La phase `persons` détache les copies de leur personne, sauf épinglage. Sur les 64 notices relues, 44 des 45 copies qui ont encore des noms répétés sont détectées, et aucun des 5 cas d'homonymes. Sur le stock : 578 notices, 21 971 doublons d'auteur.
+- [x] Décomptes d'auteurs de chaque notice : `source_records.author_count` (signatures d'auteur individuelles) et `distinct_author_count` (noms complets distincts parmi elles).
 - [x] Noms de collectifs : une signature dont le nom entier est « et al. » est collective, ainsi qu'un nom d'organisme ou de rédaction (« Die Redaktion », « Editorial Office »). Accents LaTeX décodés dans les noms d'auteur à la normalisation ; un oneshot corrige les 1 421 signatures du stock. Encodage réparé de la même façon (UTF-8 lu comme du Latin-1 ou du Windows-1252, Windows-1252 lu comme du GBK) : 2 487 signatures du stock, surtout chez OpenAlex.
 - [x] Un contributeur HAL ou scanR (`ctb`) est aussi auteur : dans 510 dépôts HAL sur 840 comparables, la longueur des autres notices égale le nombre d'auteurs et de contributeurs réunis.
 - [x] Classement des écarts de longueur entre les notices d'une publication, le 2026-10-18 (`measure_list_gaps.py`). La longueur de référence est la plus fréquente parmi les notices. Une notice scanR issue d'un dépôt HAL est ignorée quand la notice HAL de ce dépôt est présente. Sur 69 428 publications à plusieurs notices, 62 807 ont des listes de même longueur, 4 091 des écarts expliqués, 88 une fusion erronée probable et 2 441 un écart inexpliqué.

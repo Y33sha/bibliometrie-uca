@@ -9,10 +9,10 @@ La cellule Science ouverte produit chaque année un bilan par laboratoire : prod
 Une publication appartient au laboratoire si une adresse d'auteur est rattachée à la structure (`publication_structures`).
 
 - Typologie, revues, éditeurs, conférences, thèses : `publications`, `journals`, `publishers`.
-- Open access : `publications.oa_status`. Le texte intégral dans HAL se lit sur la source HAL (`source_publications.oa_status` `green` ou `embargoed`, dérivé de `fileMain_s`).
+- Open access : `publications.oa_status`. Le texte intégral dans HAL se lit sur la source HAL (`source_records.oa_status` `green` ou `embargoed`, dérivé de `fileMain_s`).
 - Modèle de la revue : `journals.oa_model` (abonnement ou open access), `is_in_doaj`. Le statut diamant vient de `publications.oa_status`.
 - APC payées : `apc_payments`, rattachées à la publication. APC catalogue : `journals.apc_amount` et `apc_currency`.
-- Auteur correspondant : `authorships.is_corresponding`.
+- Auteur correspondant : `contributions.is_corresponding`.
 - Pays des coauteurs : `publications.countries`.
 - ORCID : `person_identifiers`, sur les auteurs du laboratoire.
 
@@ -26,7 +26,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 ### Pistes d'enrichissement
 
 - **Montants d'APC.** Les paiements recensés sont rares et tardifs. Une extraction de l'enquête APC couvre l'année 2025. Le prix catalogue est en devise d'origine. Il ignore les accords transformants.
-- **Lien ORCID–idHAL.** Déductible de `author_identifying_keys` : un `hal_person_id` associé à un ORCID (40 631 clés sur 55 559 clés HAL).
+- **Lien ORCID–idHAL.** Déductible de `contributor_information` : un `hal_person_id` associé à un ORCID (40 631 clés sur 55 559 clés HAL).
 - **Revues diamant.** Une revue est diamant quand `journals.oa_model` vaut `diamond`, ou quand le payload DOAJ (`journals.doaj_payload`) n'indique ni APC (`APC`) ni autres frais (`Has other fees`).
 - **Thèses.** L'ouverture d'une thèse se mesure sur plusieurs années : les thèses récentes sont en traitement ou sous embargo.
 - **Licences.** Chantier [Licences](archived/2026-10-15_DATA_licences.md) : `publications.license` (version éditeur) et `publications.deposit_license` (fichier déposé dans HAL).
@@ -72,5 +72,5 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 
 - Types de documents comptés dans le taux d'open access.
 - Source de l'effectif du laboratoire.
-- **Laboratoire d'un frais d'open access.** OpenAPC ne nomme pas le laboratoire. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `authorships`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
+- **Laboratoire d'un frais d'open access.** OpenAPC ne nomme pas le laboratoire. Règle mesurée : la seule structure de type laboratoire parmi celles des auteurs correspondants (592 paiements sur 1 217). Le rattachement dépend de `contributions`, que le pipeline reconstruit : le calcul a sa place dans une étape du pipeline.
 - **Suppléments d'articles sur figshare.** Les éditeurs déposent sur figshare les suppléments de leurs articles. Les règles de correction des métadonnées les typent en jeux de données (titre « Additional file… », collection figshare). Les pièces d'un même article sont des jeux de données distincts, que seul le titre relie.

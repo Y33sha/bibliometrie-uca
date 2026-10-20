@@ -106,7 +106,7 @@ LAB_PUBLICATIONS = f"SELECT p.* FROM publications p WHERE {AUTHORED_PUBLICATION}
 # Texte intégral déposé dans HAL, ou lien HAL vers une archive ouverte, pour la publication `p`.
 HAL_FULL_TEXT = f"""
     EXISTS (
-        SELECT 1 FROM source_publications sp
+        SELECT 1 FROM source_records sp
         WHERE sp.publication_id = p.id AND sp.source = 'hal'
           AND sp.oa_status IN ('{OaStatus.GREEN.value}', '{OaStatus.EMBARGOED.value}')
     )
@@ -159,7 +159,7 @@ class OpenScienceReport:
     def typology(self) -> str:
         rows = self._rows(f"""
             SELECT p.doc_type, COUNT(*) AS n FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year = :year GROUP BY 1 ORDER BY 2 DESC, 1
+            WHERE p.publication_year = :year GROUP BY 1 ORDER BY 2 DESC, 1
         """)
         n_oa = sum(r.n for r in rows if r.doc_type in OA_RATE_TYPES)
         return (
@@ -174,11 +174,11 @@ class OpenScienceReport:
     def oa_evolution(self) -> tuple[str, SqlRow | None]:
         rows = self._rows(
             f"""
-            SELECT p.pub_year AS year, COUNT(*) AS total,
+            SELECT p.publication_year AS year, COUNT(*) AS total,
                    COUNT(*) FILTER (WHERE {HAL_FULL_TEXT}) AS hal,
                    COUNT(*) FILTER (WHERE NOT {HAL_FULL_TEXT} AND p.oa_status = ANY(:open)) AS elsewhere
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type::text = ANY(:types)
+            WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type::text = ANY(:types)
             GROUP BY 1 ORDER BY 1
             """,
             span=EVOLUTION_YEARS,
@@ -229,7 +229,7 @@ class OpenScienceReport:
                    COUNT(*) FILTER (WHERE j.oa_model IS NULL OR j.oa_model NOT IN ('full_oa', 'diamond', 'subscription')) AS unknown
             FROM ({LAB_PUBLICATIONS}) p
             LEFT JOIN publishing.journals j ON j.id = p.journal_id
-            WHERE p.pub_year = :year AND p.doc_type::text = ANY(:types)
+            WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             """,
             types=_values(JOURNAL_TYPES),
             open=_values(OPEN_STATUSES),
@@ -257,10 +257,10 @@ class OpenScienceReport:
 
     def apc(self) -> str:
         paid = self._rows(f"""
-            SELECT p.pub_year AS year, ap.open_access_fee, COUNT(*) AS n, SUM(ap.amount_eur_ht) AS amount
+            SELECT p.publication_year AS year, ap.open_access_fee, COUNT(*) AS n, SUM(ap.amount_eur_ht) AS amount
             FROM publishing.apc_payments ap
             JOIN ({LAB_PUBLICATIONS}) p ON p.id = ap.publication_id
-            WHERE p.pub_year IN (:year, :year - 1)
+            WHERE p.publication_year IN (:year, :year - 1)
             GROUP BY 1, 2
         """)
 
@@ -272,12 +272,12 @@ class OpenScienceReport:
             f"""
             SELECT j.apc_amount, j.apc_currency,
                    EXISTS (
-                       SELECT 1 FROM authorships a
+                       SELECT 1 FROM contributions a
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.journals j ON j.id = p.journal_id
-            WHERE p.pub_year = :year AND p.doc_type::text = ANY(:types) AND p.oa_status IN ('gold', 'hybrid')
+            WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types) AND p.oa_status IN ('gold', 'hybrid')
             """,
             types=_values(JOURNAL_TYPES),
         )
@@ -302,7 +302,7 @@ class OpenScienceReport:
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.journals j ON j.id = p.journal_id
             LEFT JOIN publishing.publishers pb ON pb.id = j.publisher_id
-            WHERE p.pub_year = :year AND p.doc_type::text = ANY(:types)
+            WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             GROUP BY j.id, pb.name ORDER BY n DESC, j.title
             """,
             types=_values(JOURNAL_TYPES),
@@ -331,7 +331,7 @@ class OpenScienceReport:
             f"""
             SELECT COALESCE(p.container_title, 'Conférence non renseignée') AS conference, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year = :year AND p.doc_type::text = ANY(:types)
+            WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             GROUP BY 1 ORDER BY 2 DESC, 1
             """,
             types=_values(CONFERENCE_TYPES),
@@ -346,7 +346,7 @@ class OpenScienceReport:
         r = self._one(f"""
             SELECT COUNT(*) FILTER (WHERE p.doc_type = 'book') AS books,
                    COUNT(*) FILTER (WHERE p.doc_type = 'book_chapter') AS chapters
-            FROM ({LAB_PUBLICATIONS}) p WHERE p.pub_year = :year
+            FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
         """)
         if not (r.books or r.chapters):
             return f"## Ouvrages et chapitres\n\nAucun ouvrage ni chapitre en {self.year}."
@@ -355,12 +355,12 @@ class OpenScienceReport:
     def theses(self) -> str:
         rows = self._rows(
             f"""
-            SELECT p.pub_year AS year,
+            SELECT p.publication_year AS year,
                    COUNT(*) FILTER (WHERE p.doc_type = 'thesis') AS defended,
                    COUNT(*) FILTER (WHERE p.doc_type = 'thesis' AND p.oa_status = ANY(:open)) AS open,
                    COUNT(*) FILTER (WHERE p.doc_type = 'thesis' AND p.oa_status = 'embargoed') AS embargoed
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'thesis'
+            WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'thesis'
             GROUP BY 1 ORDER BY 1
             """,
             span=THESIS_YEARS,
@@ -393,7 +393,7 @@ class OpenScienceReport:
             SELECT COALESCE(rc.name, upper(c)) AS country, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p, unnest(p.countries) AS c
             LEFT JOIN ref.countries rc ON rc.code = c
-            WHERE p.pub_year = :year AND c <> ALL(:domestic)
+            WHERE p.publication_year = :year AND c <> ALL(:domestic)
             GROUP BY 1 ORDER BY 2 DESC, 1
             """,
             **binds,
@@ -402,7 +402,7 @@ class OpenScienceReport:
             f"""
             WITH lab AS (
                 SELECT p.*, {INTERNATIONAL} AS international
-                FROM ({LAB_PUBLICATIONS}) p WHERE p.pub_year = :year
+                FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
             )
             SELECT COUNT(*) AS total,
                    COUNT(*) FILTER (WHERE international) AS international,
@@ -429,15 +429,15 @@ class OpenScienceReport:
         return self._one(f"""
             WITH lab_authors AS (
                 SELECT DISTINCT a.person_id
-                FROM publications p JOIN authorships a ON a.publication_id = p.id
-                WHERE p.pub_year = :year AND a.person_id IS NOT NULL AND {AUTHOR_SIGNATURE}
+                FROM publications p JOIN contributions a ON a.publication_id = p.id
+                WHERE p.publication_year = :year AND a.person_id IS NOT NULL AND {AUTHOR_SIGNATURE}
             ),
             hal_accounts AS (
-                SELECT la.person_id, bool_or(k.person_identifiers ? 'orcid') AS has_orcid
+                SELECT la.person_id, bool_or(k.identifiers ? 'orcid') AS has_orcid
                 FROM lab_authors la
-                JOIN source_authorships sa ON sa.person_id = la.person_id AND sa.source = 'hal'
-                JOIN author_identifying_keys k ON k.id = sa.identity_id
-                WHERE k.person_identifiers ? 'hal_person_id'
+                JOIN source_contributions sa ON sa.person_id = la.person_id AND sa.source = 'hal'
+                JOIN contributor_information k ON k.id = sa.contributor_information_id
+                WHERE k.identifiers ? 'hal_person_id'
                 GROUP BY la.person_id
             )
             SELECT (SELECT COUNT(*) FROM lab_authors) AS authors,
@@ -459,11 +459,11 @@ class OpenScienceReport:
     def datasets(self) -> str:
         counts = self._rows(
             f"""
-            SELECT p.pub_year AS year,
+            SELECT p.publication_year AS year,
                    COUNT(*) FILTER (WHERE p.doc_type = 'dataset') AS datasets,
                    COUNT(*) FILTER (WHERE p.doc_type = 'data_paper') AS data_papers
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type IN ('dataset', 'data_paper')
+            WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type IN ('dataset', 'data_paper')
             GROUP BY 1 ORDER BY 1
             """,
             span=EVOLUTION_YEARS,
@@ -474,7 +474,7 @@ class OpenScienceReport:
                    p.license::text AS license, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
             LEFT JOIN publishing.journals j ON j.id = p.journal_id
-            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'dataset'
+            WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'dataset'
             GROUP BY 1, 2 ORDER BY 3 DESC, 1, 2
             """,
             span=EVOLUTION_YEARS,
@@ -499,7 +499,7 @@ class OpenScienceReport:
         rows = self._rows(f"""
             SELECT p.deposit_license::text AS license, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year = :year AND {HAL_FULL_TEXT}
+            WHERE p.publication_year = :year AND {HAL_FULL_TEXT}
             GROUP BY 1 ORDER BY 2 DESC
         """)
         total = sum(r.n for r in rows)
@@ -519,17 +519,17 @@ class OpenScienceReport:
     def preprints(self) -> str:
         rows = self._rows(
             f"""
-            SELECT p.pub_year AS year, p.license::text AS license,
+            SELECT p.publication_year AS year, p.license::text AS license,
                    ARRAY(
-                       SELECT DISTINCT split_part(sp.doi, '/', 1) FROM source_publications sp
+                       SELECT DISTINCT split_part(sp.doi, '/', 1) FROM source_records sp
                        WHERE sp.publication_id = p.id AND sp.doi IS NOT NULL
                    ) AS prefixes,
                    ARRAY(
-                       SELECT DISTINCT regexp_replace(sp.container_title, '\\s*\\(.*\\)$', '') FROM source_publications sp
+                       SELECT DISTINCT regexp_replace(sp.container_title, '\\s*\\(.*\\)$', '') FROM source_records sp
                        WHERE sp.publication_id = p.id AND sp.source = 'openalex' AND sp.container_title IS NOT NULL
                    ) AS openalex_sources
             FROM ({LAB_PUBLICATIONS}) p
-            WHERE p.pub_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
+            WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
             """,
             span=EVOLUTION_YEARS,
         )
@@ -557,7 +557,7 @@ class OpenScienceReport:
         rows = self._rows(f"""
             SELECT s AS source, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p, unnest(p.sources) AS s
-            WHERE p.pub_year = :year GROUP BY 1 ORDER BY 2 DESC
+            WHERE p.publication_year = :year GROUP BY 1 ORDER BY 2 DESC
         """)
         return "## Sources\n\n" + _table(
             ["Source", f"Publications {self.year}"],
@@ -570,17 +570,17 @@ class OpenScienceReport:
             SELECT COUNT(*) AS total,
                    COUNT(*) FILTER (WHERE {INTERNATIONAL}) AS international,
                    COUNT(*) FILTER (WHERE EXISTS (
-                       SELECT 1 FROM authorships a
+                       SELECT 1 FROM contributions a
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SIGNATURE}
                    )) AS corresponding
-            FROM ({LAB_PUBLICATIONS}) p WHERE p.pub_year = :year
+            FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
             """,
             domestic=sorted(NON_INTERNATIONAL_COUNTRY_CODES),
         )
         n_countries = self._one(
             f"""
             SELECT COUNT(DISTINCT c) AS n FROM ({LAB_PUBLICATIONS}) p, unnest(p.countries) AS c
-            WHERE p.pub_year = :year AND c <> ALL(:domestic)
+            WHERE p.publication_year = :year AND c <> ALL(:domestic)
             """,
             domestic=sorted(NON_INTERNATIONAL_COUNTRY_CODES),
         ).n

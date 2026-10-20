@@ -3,7 +3,7 @@
 
 Le fichier — sans en-tête, une ligne `email,orcid` par chercheur — liste les ORCID que leur
 titulaire a lui-même authentifiés en se connectant à son compte ORCID. Chaque ligne est
-rattachée à la personne via son email (`persons_rh.email`, comparaison insensible à la casse)
+rattachée à la personne via son email (`hr_records.email`, comparaison insensible à la casse)
 et reçoit le statut `authenticated`.
 
 Cet import est **l'unique** contexte autorisé à écrire ce statut : un trigger Postgres
@@ -122,11 +122,11 @@ class AuthenticateOrcidOutcome(StrEnum):
 
 
 def rh_emails_to_person_ids(conn: Connection) -> dict[str, list[int]]:
-    """`{email en minuscules: [person_id, ...]}` des fiches `persons_rh` qui ont un email."""
+    """`{email en minuscules: [person_id, ...]}` des fiches `hr_records` qui ont un email."""
     rows = conn.execute(
         text(
             "SELECT lower(email) AS email, array_agg(DISTINCT person_id) AS pids "
-            "FROM persons_rh WHERE email IS NOT NULL GROUP BY lower(email)"
+            "FROM hr_records WHERE email IS NOT NULL GROUP BY lower(email)"
         )
     )
     return {r.email: list(r.pids) for r in rows}

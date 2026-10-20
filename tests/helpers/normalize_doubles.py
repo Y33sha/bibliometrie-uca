@@ -1,10 +1,10 @@
 """Doublures des requêtes d'écriture, communes aux tests des normaliseurs.
 
-Un normalizer verse ses documents dans `source_publications`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
+Un normalizer verse ses documents dans `source_records`, écrit leurs signatures, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
-from pipeline.ingestion.common.signature_queries import StoredSourceAuthorship
-from pipeline.ingestion.common.source_publications import SourcePublicationUpsert
+from pipeline.ingestion.common.signature_queries import StoredSourceContribution
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
 
 
@@ -18,13 +18,13 @@ def staging_row(
     return StagingRow(id=staging_id, source_id=source_id, doi=doi, raw_data=raw or {})
 
 
-class FakeSourcePublicationQueries:
-    """`SourcePublicationQueries` : retient les documents versés."""
+class FakeSourceRecordQueries:
+    """`SourceRecordQueries` : retient les documents versés."""
 
     def __init__(self) -> None:
-        self.upserted_documents: list[SourcePublicationUpsert] = []
+        self.upserted_documents: list[SourceRecordUpsert] = []
 
-    def upsert_source_publication(self, conn, row: SourcePublicationUpsert) -> int:
+    def upsert_source_record(self, conn, row: SourceRecordUpsert) -> int:
         self.upserted_documents.append(row)
         return 999
 
@@ -39,8 +39,8 @@ class FakeStagingQueries:
         self.marked_done.append(staging_id)
 
 
-class FakeAuthorshipsBatchQueries:
-    """`AuthorshipsBatchQueries` : retient les signatures insérées, et les restitue comme signatures en base.
+class FakeContributionsBatchQueries:
+    """`ContributionsBatchQueries` : retient les signatures insérées, et les restitue comme signatures en base.
 
     `synced_for` retient les documents dont les signatures sont synchronisées. Les adresses ne sont pas retenues : leurs lectures rendent des tables vides.
     """
@@ -48,47 +48,47 @@ class FakeAuthorshipsBatchQueries:
     def __init__(self) -> None:
         self.synced_for: list[int] = []
         self.upserted_batches: list[list] = []
-        self._rows: list[StoredSourceAuthorship] = []
+        self._rows: list[StoredSourceContribution] = []
 
-    def fetch_stored_source_authorships(self, conn, source_publication_id: int) -> list:
+    def fetch_stored_source_contributions(self, conn, source_record_id: int) -> list:
         return list(self._rows)
 
-    def delete_source_authorships(self, conn, ids) -> None: ...
+    def delete_source_contributions(self, conn, ids) -> None: ...
 
-    def update_source_authorships_batch(self, conn, values) -> None: ...
+    def update_source_contributions_batch(self, conn, values) -> None: ...
 
-    def delete_source_authorship_addresses(self, conn, ids) -> None: ...
+    def delete_source_contribution_addresses(self, conn, ids) -> None: ...
 
-    def delete_source_authorship_rors(self, conn, ids) -> None: ...
+    def delete_source_contribution_rors(self, conn, ids) -> None: ...
 
-    def delete_source_authorship_hal_structures(self, conn, ids) -> None: ...
+    def delete_source_contribution_hal_structures(self, conn, ids) -> None: ...
 
-    def fetch_authors_hash(self, conn, source_publication_id: int) -> None:
+    def fetch_authors_hash(self, conn, source_record_id: int) -> None:
         return None
 
-    def set_authors_hash(self, conn, source_publication_id: int, authors_hash: str) -> None:
-        self.synced_for.append(source_publication_id)
+    def set_authors_hash(self, conn, source_record_id: int, authors_hash: str) -> None:
+        self.synced_for.append(source_record_id)
 
-    def upsert_source_authorships_batch(self, conn, values) -> None:
+    def upsert_source_contributions_batch(self, conn, values) -> None:
         self.upserted_batches.append(list(values))
         for v in values:
             self._rows.append(
-                StoredSourceAuthorship(
+                StoredSourceContribution(
                     100 + len(self._rows),
                     v["author_position"],
                     v["last_name_normalized"],
                     v["first_name_normalized"],
-                    v["person_identifiers"],
+                    v["identifiers"],
                     v["content_hash"],
                     v["collective"],
                     v["roles"],
                 )
             )
 
-    def mark_authorships_dirty(self, conn, source_publication_id: int) -> None: ...
+    def mark_contributions_dirty(self, conn, source_record_id: int) -> None: ...
 
     def set_author_counts(
-        self, conn, source_publication_id: int, author_count: int, distinct: int
+        self, conn, source_record_id: int, author_count: int, distinct: int
     ) -> None: ...
 
     def upsert_addresses_batch(self, conn, values) -> None: ...
@@ -98,8 +98,8 @@ class FakeAuthorshipsBatchQueries:
 
     def insert_address_country_candidates(self, conn, method, rows) -> None: ...
 
-    def insert_source_authorship_addresses_batch(self, conn, values) -> None: ...
+    def insert_source_contribution_addresses_batch(self, conn, values) -> None: ...
 
-    def insert_source_authorship_rors_batch(self, conn, values) -> None: ...
+    def insert_source_contribution_rors_batch(self, conn, values) -> None: ...
 
-    def insert_source_authorship_hal_structures_batch(self, conn, values) -> None: ...
+    def insert_source_contribution_hal_structures_batch(self, conn, values) -> None: ...

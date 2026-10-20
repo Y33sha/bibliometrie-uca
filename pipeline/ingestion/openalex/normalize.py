@@ -14,11 +14,11 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.impact import Impact
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import (
     JsonValue,
@@ -32,16 +32,16 @@ from domain.types import (
 )
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.openalex.payload import (
@@ -245,7 +245,7 @@ def extract_pub_metadata(
 
     return PublicationMetadata(
         title=title,
-        pub_year=as_int(work.get("publication_year")),
+        publication_year=as_int(work.get("publication_year")),
         doc_type=as_str(work.get("type")),
         doi=clean_doi(as_str(work.get("doi"))),
         nnt=nnt,
@@ -264,15 +264,15 @@ def extract_pub_metadata(
 
 def insert_openalex_document(  # noqa: C901
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     work: Mapping[str, JsonValue],
     staging_id: int,
     pub_meta: PublicationMetadata,
     primary: OpenalexLocation | None = None,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour OpenAlex.
+    """Crée/retrouve l'entrée source_records pour OpenAlex.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt,
     journal_id, oa_status, language, container_title) viennent toutes de `pub_meta`, construit en amont par `extract_pub_metadata`. `work` ne sert ici que pour les extras OpenAlex-spécifiques (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
@@ -347,16 +347,16 @@ def insert_openalex_document(  # noqa: C901
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
     publisher_license = None if should_skip_publisher_journal(primary) else raw_license
 
-    return queries.upsert_source_publication(
+    return queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="openalex",
             source_id=openalex_id,
             staging_id=staging_id,
             doi=pub_meta.doi,
             external_ids=external_ids or None,
             title=pub_meta.title or "",
-            pub_year=pub_meta.pub_year,
+            publication_year=pub_meta.publication_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
             monograph_id=pub_meta.monograph_id,
@@ -377,9 +377,9 @@ def insert_openalex_document(  # noqa: C901
 
 
 # =============================================================
-# OPENALEX AUTHORS — identifiants sur source_authorships
+# OPENALEX AUTHORS — identifiants sur source_contributions
 # =============================================================
-# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, sur l'identité de la signature (author_identifying_keys.person_identifiers).
+# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, sur l'identité de la signature (contributor_information.identifiers).
 
 
 def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
@@ -422,7 +422,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
 
     - nom brut : `raw_author_name`, le nom tel qu'imprimé, `author.display_name` étant celui de l'auteur désambiguïsé ;
-    - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
+    - ORCID déposé (`raw_orcid`) sur `identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
     - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte ;
     - ROR des institutions : sur l'adresse dont le texte les désigne, sur la signature pour les autres ;
@@ -465,8 +465,8 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 position=position,
                 name=name,
                 is_corresponding=bool(authorship.get("is_corresponding")),
-                roles=[AuthorshipRole.AUTHOR],
-                person_identifiers=ids if ids else None,
+                roles=[ContributionRole.AUTHOR],
+                identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(
                         text=texte,
@@ -488,18 +488,18 @@ def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"authorships": work.get("authorships")}
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     work: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures OpenAlex de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "openalex",
-        source_publication_id,
+        source_record_id,
         extract_openalex_author_block(work),
         build_openalex_author_records,
     )
@@ -512,13 +512,13 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
@@ -535,10 +535,8 @@ def process_work(
         work, containers.journal_id, primary, monograph_id=containers.monograph_id
     )
 
-    source_publication_id = insert_openalex_document(
-        conn, queries, work, staging_id, pub_meta, primary
-    )
-    process_authorships(conn, authorship_queries, work, source_publication_id)
+    source_record_id = insert_openalex_document(conn, queries, work, staging_id, pub_meta, primary)
+    process_contributions(conn, contribution_queries, work, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -561,5 +559,5 @@ class OpenalexNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

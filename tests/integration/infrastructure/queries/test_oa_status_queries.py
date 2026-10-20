@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from pipeline.transformation.publications.oa_status_queries import OaSignal, OaStatusQueries
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 _Q = OaStatusQueries()
 
@@ -80,12 +80,8 @@ class TestVerdicts:
 class TestPublicationsOfDois:
     def test_statuts_des_notices(self, sa_sync_conn):
         pub = insert_publication(sa_sync_conn, doi="10.1/p", oa_status="closed")
-        insert_source_publication(
-            sa_sync_conn, pub, source="hal", source_id="hal-oa", oa_status="green"
-        )
-        insert_source_publication(
-            sa_sync_conn, pub, source="openalex", source_id="W-oa", oa_status=None
-        )
+        insert_source_record(sa_sync_conn, pub, source="hal", source_id="hal-oa", oa_status="green")
+        insert_source_record(sa_sync_conn, pub, source="openalex", source_id="W-oa", oa_status=None)
 
         [inputs] = _Q.fetch_oa_inputs(sa_sync_conn, ["10.1/p"])
 

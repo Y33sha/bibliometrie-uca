@@ -1,6 +1,6 @@
 """Génère le graphe illustratif de réconciliation des publications.
 
-Nœuds = source_publications anonymes ; arêtes pleines = clés de confirmation
+Nœuds = source_records anonymes ; arêtes pleines = clés de confirmation
 partagées ; pointillé = rattachement à une publication. Trois cas remarquables :
 coupe DOI (2 DOI ≠ → 2 publications), fusion (2 publications reliées par une clé
 → collision → 1 seule), sans suite (composante orpheline hors-périmètre → aucune

@@ -226,7 +226,7 @@
 					{/each}
 				</td>
 				<td class="num">{p.journal_count.toLocaleString('fr-FR')}</td>
-				<td class="num">{p.pub_count.toLocaleString('fr-FR')}</td>
+				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
 				{#if actionCell}<td class="actions">{@render actionCell(p)}</td>{/if}
 			</tr>
 		{/each}

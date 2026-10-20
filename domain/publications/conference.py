@@ -7,7 +7,7 @@ import re
 
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
 
 # Types qu'une source désignant explicitement une communication supplante : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
@@ -25,7 +25,7 @@ _PAGE_RANGE = re.compile(r"\d+\s*[-–]\s*\d+")
 _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 
 
-def _hal_titles(source: SourcePublication) -> list[str]:
+def _hal_titles(source: SourceRecord) -> list[str]:
     """Titre de la source et collections qu'une notice HAL associe à une communication."""
     meta = source.meta or {}
     titles = as_strs(meta.get("series"))
@@ -34,14 +34,14 @@ def _hal_titles(source: SourcePublication) -> list[str]:
     return titles
 
 
-def names_abstracts(source: SourcePublication) -> bool:
+def names_abstracts(source: SourceRecord) -> bool:
     """La notice HAL range la communication dans un recueil de résumés."""
     return source.source == "hal" and any(
         _ABSTRACTS.search(normalize_text(t)) for t in _hal_titles(source)
     )
 
 
-def _hal_editorial_fields(source: SourcePublication) -> bool:
+def _hal_editorial_fields(source: SourceRecord) -> bool:
     """La notice HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
     meta = source.meta or {}
     biblio = source.biblio or {}
@@ -56,7 +56,7 @@ def _hal_editorial_fields(source: SourcePublication) -> bool:
     return any(normalize_text(t) not in ("", congress) for t in _hal_titles(source))
 
 
-def attests_publication(source: SourcePublication) -> bool:
+def attests_publication(source: SourceRecord) -> bool:
     """L'enregistrement atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'une notice HAL."""
     if source.doi or source.journal_id or source.monograph_id:
         return True
@@ -65,7 +65,7 @@ def attests_publication(source: SourcePublication) -> bool:
     return source.source == "hal" and _hal_editorial_fields(source)
 
 
-def arbitrate_conference(doc_type: str, sources: list[SourcePublication]) -> str:
+def arbitrate_conference(doc_type: str, sources: list[SourceRecord]) -> str:
     """Type d'une publication qui relève d'un congrès, au vu de tous ses enregistrements.
 
     Un enregistrement qui désigne une communication (`conference`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper` et `preprint`. Une `conference_paper` qu'aucun enregistrement n'atteste devient une `conference`. Les autres types restent inchangés.

@@ -9,7 +9,7 @@ def test_licences_enregistrees_puis_relues(sa_sync_conn):
         title="t",
         title_normalized="t",
         doc_type="article",
-        pub_year=2024,
+        publication_year=2024,
         doi=None,
         oa_status="gold",
     )

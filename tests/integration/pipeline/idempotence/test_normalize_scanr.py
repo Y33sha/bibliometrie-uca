@@ -146,11 +146,11 @@ def _count_tables(conn) -> dict:
     counts = {}
     for t in ("publications", "journals", "publishers"):
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
-    counts["scanr_authorships"] = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
+    counts["scanr_contributions"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_contributions WHERE source = 'scanr'")
     ).scalar_one()
     counts["scanr_documents"] = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'scanr'")
+        text("SELECT COUNT(*) AS cnt FROM source_records WHERE source = 'scanr'")
     ).scalar_one()
     return counts
 
@@ -161,18 +161,18 @@ def run_normalize_scanr(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.common.source_publications import (
-        SourcePublicationQueries,
+    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_records import (
+        SourceRecordQueries,
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.scanr.normalize import ScanrNormalizer
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourcePublicationQueries()
+    queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    authorship_queries = AuthorshipsBatchQueries()
+    contribution_queries = ContributionsBatchQueries()
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = ScanrNormalizer(
@@ -182,7 +182,7 @@ def run_normalize_scanr(conn):
         queries,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
-        authorship_queries=authorship_queries,
+        contribution_queries=contribution_queries,
     )
 
     rows = conn.execute(
@@ -234,7 +234,7 @@ class TestNormalizeScanrIdempotence:
         )
 
     def test_author_dedup_by_idref(self, sa_sync_conn):
-        """Un même idref sur deux documents → idref porté sur les 2 authorships."""
+        """Un même idref sur deux documents → idref porté sur les 2 contributions."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
@@ -242,19 +242,19 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text(
-                "SELECT count(*) AS cnt FROM source_authorships sa "
-                "JOIN author_identifying_keys aik ON aik.id = sa.identity_id "
-                "WHERE sa.source = 'scanr' AND aik.person_identifiers->>'idref' = '000000001'"
+                "SELECT count(*) AS cnt FROM source_contributions sa "
+                "JOIN contributor_information aik ON aik.id = sa.contributor_information_id "
+                "WHERE sa.source = 'scanr' AND aik.identifiers->>'idref' = '000000001'"
             )
         ).scalar_one()
-        assert cnt == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
+        assert cnt == 2, "Alice devrait avoir 2 contributions (article + chapitre)"
 
     def test_author_without_idref(self, sa_sync_conn):
         """Un auteur sans idref : son identité ne porte pas de clé `idref`.
 
         Charlie Noid et Diana Durand n'ont pas d'idref ; leur signature pointe
-        vers une identité (`author_identifying_keys`) sans `idref` dans
-        `person_identifiers`. La personne sera reconstruite au pipeline
+        vers une identité (`contributor_information`) sans `idref` dans
+        `identifiers`. La personne sera reconstruite au pipeline
         `personnes` via les name_forms.
         """
         from sqlalchemy import text
@@ -264,10 +264,10 @@ class TestNormalizeScanrIdempotence:
 
         cnt = sa_sync_conn.execute(
             text("""
-                SELECT count(*) AS cnt FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                SELECT count(*) AS cnt FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sa.source = 'scanr'
-                  AND (aik.person_identifiers->>'idref') IS NULL
+                  AND (aik.identifiers->>'idref') IS NULL
                   AND sa.raw_author_name IN ('Charlie Noid', 'Diana Durand')
             """)
         ).scalar_one()
@@ -304,7 +304,7 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 1, "Le DOI devrait être dédupliqué"
 
         cnt = sa_sync_conn.execute(
-            text("SELECT count(*) AS cnt FROM source_publications WHERE source = 'scanr'")
+            text("SELECT count(*) AS cnt FROM source_records WHERE source = 'scanr'")
         ).scalar_one()
         assert cnt == 4, "4 scanr_documents (3 originaux + 1 bis)"
 

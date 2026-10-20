@@ -54,7 +54,7 @@ class TestPivot:
         assert r.status_code == 200
 
     def test_single_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"measure": "pub_count", "group": "year"})
+        r = client.get("/api/stats/pivot", params={"measure": "publication_count", "group": "year"})
         assert r.status_code == 200
 
     def test_double_grouping(self, client):

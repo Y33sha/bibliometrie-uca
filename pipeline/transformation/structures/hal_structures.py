@@ -1,6 +1,6 @@
 """Référentiel des structures HAL (`hal_structures`, `hal_structure_relations`, `hal_structure_aliases`) : chargement en tête de la phase `affiliations`.
 
-La tâche charge les structures citées par les signatures (`source_authorship_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les signatures qui la citent sont marquées pour la phase `countries`. En mode `full`, la tâche relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
+La tâche charge les structures citées par les signatures (`source_contribution_hal_structures`) ou comme parent (`hal_structures.parent_ids`), et absentes du référentiel. Un identifiant absent de `ref/structure` se cherche parmi les alias. Chaque lot lu est enregistré aussitôt : un run interrompu reprend au lot suivant. Les relations parent/enfant se reconstruisent ensuite depuis `parent_ids`. Quand une structure change de pays, les signatures qui la citent sont marquées pour la phase `countries`. En mode `full`, la tâche relit aussi les structures chargées depuis plus de `STALE_AFTER_DAYS` jours.
 """
 
 import logging
@@ -40,7 +40,7 @@ class HalStructuresQueries:
         ids = set(
             self._conn.execute(
                 text("""
-                    SELECT hal_structure_id FROM source_authorship_hal_structures
+                    SELECT hal_structure_id FROM source_contribution_hal_structures
                     UNION
                     SELECT unnest(parent_ids) FROM hal_structures
                     EXCEPT
@@ -151,9 +151,9 @@ class HalStructuresQueries:
             return
         self._conn.execute(
             text("""
-                UPDATE source_authorships SET countries_dirty = true
+                UPDATE source_contributions SET countries_dirty = true
                 WHERE id IN (
-                    SELECT source_authorship_id FROM source_authorship_hal_structures
+                    SELECT source_contribution_id FROM source_contribution_hal_structures
                     WHERE hal_structure_id IN (
                         SELECT unnest(CAST(:structures AS int[]) || CAST(:aliases AS int[]))
                         UNION

@@ -1,4 +1,4 @@
-"""Le lookup `key_hash` (Python) doit rester aligné sur la colonne générée `author_identifying_keys.key_hash`.
+"""Le lookup `key_hash` (Python) doit rester aligné sur la colonne générée `contributor_information.key_hash`.
 
 Un désalignement ferait échouer silencieusement la résolution d'identité par `key_hash`.
 """
@@ -13,8 +13,8 @@ def test_key_hash_sql_matches_generated_column(sa_sync_conn):
     conn = sa_sync_conn
     conn.execute(
         text(
-            "INSERT INTO author_identifying_keys"
-            " (last_name_normalized, first_name_normalized, person_identifiers) VALUES "
+            "INSERT INTO contributor_information"
+            " (last_name_normalized, first_name_normalized, identifiers) VALUES "
             "('dupont', 'jean', '{\"orcid\": \"0000\"}'::jsonb), "
             "('curie', NULL, NULL), "
             "('', NULL, '{\"idref\": \"42\"}'::jsonb), "
@@ -23,7 +23,7 @@ def test_key_hash_sql_matches_generated_column(sa_sync_conn):
     )
     mismatches = conn.execute(
         text(
-            "SELECT count(*) FROM author_identifying_keys "
+            "SELECT count(*) FROM contributor_information "
             "WHERE key_hash IS DISTINCT FROM " + key_hash_sql(IDENTITY_KEY_COLUMNS)
         )
     ).scalar_one()
@@ -34,13 +34,13 @@ def test_forme_prenom_nom_calculee(sa_sync_conn):
     """`author_name_normalized` : prénom et nom, parties vides omises."""
     sa_sync_conn.execute(
         text(
-            "INSERT INTO author_identifying_keys (last_name_normalized, first_name_normalized) "
+            "INSERT INTO contributor_information (last_name_normalized, first_name_normalized) "
             "VALUES ('dupont', 'jean'), ('curie', NULL), ('', 'z bardacova')"
         )
     )
     formes = (
         sa_sync_conn.execute(
-            text("SELECT author_name_normalized FROM author_identifying_keys ORDER BY id")
+            text("SELECT author_name_normalized FROM contributor_information ORDER BY id")
         )
         .scalars()
         .all()

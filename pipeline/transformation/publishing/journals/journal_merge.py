@@ -19,9 +19,9 @@ from pipeline.transformation.publishing.journals.requalify_journal import (
     correct_journal_records,
     requalify_journal_publications,
 )
-from pipeline.transformation.publishing.pub_counts import (
-    refresh_journal_pub_count,
-    refresh_publisher_pub_count,
+from pipeline.transformation.publishing.publication_counts import (
+    refresh_journal_publication_count,
+    refresh_publisher_publication_count,
 )
 
 
@@ -97,7 +97,7 @@ def _merge_is_in_doaj(conn: Connection, target_id: int, source_id: int) -> None:
 
 MERGE_STEPS: dict[str, MergeStep] = {
     "publications": transfer("publications", "journal_id"),
-    "source_publications": transfer("source_publications", "journal_id"),
+    "source_records": transfer("source_records", "journal_id"),
     "apc_payments": transfer("apc_payments", "journal_id"),
     "monographs": transfer("monographs", "journal_id"),
     "issns": MergeStep((("journal_issns", "journal_id"),), _merge_issns, DataNature.MIXED),
@@ -121,7 +121,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "is_academic": untouched("journals", "is_academic").of_nature(DataNature.MIXED),
     "is_in_doaj": MergeStep((("journals", "is_in_doaj"),), _merge_is_in_doaj, DataNature.MIXED),
     "doaj_record": untouched("journals", "doaj_payload", "doaj_imported_at"),
-    "pub_count": untouched("journals", "pub_count"),
+    "publication_count": untouched("journals", "publication_count"),
     # Un champ repris de l'absorbée y apporte son marqueur (`_fill_empty_with_marker`).
     "manual_fields": untouched("journals", "manual_fields").of_nature(DataNature.DECISION),
 }
@@ -137,19 +137,19 @@ def merge_journal_into(conn: Connection, target_id: int, source_id: int) -> None
     conn.execute(text("DELETE FROM journals WHERE id = :s"), {"s": source_id})
     record_redirect(conn, MergedEntity.JOURNAL, target_id, source_id)
 
-    refresh_journal_pub_count(conn, target_id)
+    refresh_journal_publication_count(conn, target_id)
     target_publisher_id = conn.execute(
         text("SELECT publisher_id FROM journals WHERE id = :t"), {"t": target_id}
     ).scalar()
     for publisher_id in {target_publisher_id, source_publisher_id}:
         if publisher_id is not None:
-            refresh_publisher_pub_count(conn, publisher_id)
+            refresh_publisher_publication_count(conn, publisher_id)
 
 
 def merge_journals(conn: Connection, target_id: int, source_id: int) -> None:
     """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées contre le `journal_type` de la cible.
 
-    Les corrections des `source_publications` de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
+    Les corrections des `source_records` de la cible sont rejouées, absorbées comprises, puis les publications absorbées sont recalculées. Fusionner une revue dans un média donne à ses publications le type `media`.
     """
     store = PublicationStore(conn)
     absorbed_publication_ids = store.find_ids_by_journal_id(source_id)

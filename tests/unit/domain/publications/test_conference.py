@@ -1,16 +1,16 @@
 """Communication ou texte publié dans des actes (`domain.publications.conference`)."""
 
 from domain.publications.conference import arbitrate_conference, attests_publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_records.source_record import SourceRecord
 
 
-def _sp(**overrides) -> SourcePublication:
+def _sp(**overrides) -> SourceRecord:
     defaults = {
         "id": 1,
         "source": "hal",
         "source_id": "hal-1",
         "title": "Titre",
-        "pub_year": 2020,
+        "publication_year": 2020,
         "doc_type": "conference_paper",
         "doi": None,
         "journal_id": None,
@@ -28,7 +28,7 @@ def _sp(**overrides) -> SourcePublication:
         "meta": None,
     }
     defaults.update(overrides)
-    return SourcePublication(**defaults)  # type: ignore[arg-type]
+    return SourceRecord(**defaults)  # type: ignore[arg-type]
 
 
 class TestAttestsPublication:

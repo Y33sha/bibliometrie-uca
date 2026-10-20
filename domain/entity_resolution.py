@@ -2,7 +2,7 @@
 
 Primitive pure du sous-domaine *entity resolution* : étant donné des *records* identifiés par un entier et porteurs d'un jeu de *clés* (tokens), `connected_components` regroupe en une même entité tous les records reliés par un chemin de clés partagées (composante connexe). Deux records qui partagent une clé sont la même entité ; la relation est transitive.
 
-Générique et sans I/O : aucune connaissance de l'entité métier résolue. L'interprétation « un record = une `source_publication`, une clé = une clé de confirmation, une composante = une publication » vit côté `domain/publications/reconciliation.py` (et `domain/source_publications/keys.py` pour l'extraction des clés). Le caller applique le résultat (assignation / merge / split).
+Générique et sans I/O : aucune connaissance de l'entité métier résolue. L'interprétation « un record = une `source_record`, une clé = une clé de confirmation, une composante = une publication » vit côté `domain/publications/reconciliation.py` (et `domain/source_records/keys.py` pour l'extraction des clés). Le caller applique le résultat (assignation / merge / split).
 """
 
 from collections.abc import Iterable

@@ -7,27 +7,27 @@ from sqlalchemy import text
 from pipeline.transformation.persons.identifier_arbitration import null_identifier_signatures
 from pipeline.transformation.persons.purge import delete_empty_persons, reorphan_ambiguous_nominal
 from pipeline.transformation.persons.store import PersonsStore
-from tests.integration.helpers.authorships import insert_confirmed_authorship
+from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import (
+    insert_hr_record,
     insert_person,
     insert_person_identifier,
     insert_person_name_form,
-    insert_person_rh,
-    insert_rejected_authorship,
+    insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def _signature(conn, *, form, person_id, mode, identifiers=None):
     pub = insert_publication(conn, "t")
-    sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
+    sp = insert_source_record(conn, pub, source_id=f"hal-{pub}", title="t")
     return insert_signature(
         conn,
         sp,
         raw_author_name=form,
         author_name_normalized=form,
-        person_identifiers=identifiers,
+        identifiers=identifiers,
         person_id=person_id,
         in_perimeter=True,
         resolution_mode=mode,
@@ -36,7 +36,7 @@ def _signature(conn, *, form, person_id, mode, identifiers=None):
 
 def _row(conn, sa_id):
     return conn.execute(
-        text("SELECT person_id, resolution_mode FROM source_authorships WHERE id = :i"),
+        text("SELECT person_id, resolution_mode FROM source_contributions WHERE id = :i"),
         {"i": sa_id},
     ).one()
 
@@ -59,7 +59,7 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
     ambiguous = _signature(conn, form="j martin", person_id=a, mode="name")
     unambiguous = _signature(conn, form="jean martin", person_id=b, mode="name")
     pinned = _signature(conn, form="j martin", person_id=a, mode="name")
-    insert_confirmed_authorship(conn, pinned, person_id=a)
+    insert_confirmed_source_contribution(conn, pinned, person_id=a)
     by_identifier = _signature(conn, form="j martin", person_id=a, mode="identifier")
 
     assert reorphan_ambiguous_nominal(conn) == 1
@@ -73,8 +73,8 @@ def test_reorphan_only_ambiguous_unpinned_nominal(sa_sync_conn):
 def _publication_of(conn, sa_id):
     return conn.execute(
         text(
-            "SELECT sp.publication_id FROM source_authorships sa "
-            "JOIN source_publications sp ON sp.id = sa.source_publication_id WHERE sa.id = :i"
+            "SELECT sp.publication_id FROM source_contributions sa "
+            "JOIN source_records sp ON sp.id = sa.source_record_id WHERE sa.id = :i"
         ),
         {"i": sa_id},
     ).scalar_one()
@@ -92,7 +92,7 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     insert_person_name_form(conn, retenue, name_form="l tixier")
 
     avec_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
-    insert_rejected_authorship(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
+    insert_rejected_contribution(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
     sans_rejet = _signature(conn, form="l tixier", person_id=retenue, mode="name")
 
     assert reorphan_ambiguous_nominal(conn) == 1
@@ -101,13 +101,13 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     assert _row(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
 
 
-def test_detach_source_authorships_by_id_protects_confirmed(sa_sync_conn):
+def test_detach_source_contributions_by_id_protects_confirmed(sa_sync_conn):
     conn = sa_sync_conn
     p = insert_person(conn, "Zhang", first_name="Wei")
     cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
     nominal = _signature(conn, form="wei zhang", person_id=p, mode="name")
     pinned_cross = _signature(conn, form="wei zhang", person_id=p, mode="cross_source")
-    insert_confirmed_authorship(conn, pinned_cross, person_id=p)
+    insert_confirmed_source_contribution(conn, pinned_cross, person_id=p)
 
     # Détache le lot demandé, mais jamais un épinglage admin.
     assert PersonsStore(conn).detach_signatures([cross, pinned_cross]) == 1
@@ -127,7 +127,7 @@ def test_null_identifier_signatures_targets_old_owner_only(sa_sync_conn):
     )
     nominal = _signature(conn, form="jean martin", person_id=old, mode="name", identifiers=ids)
     pinned = _signature(conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids)
-    insert_confirmed_authorship(conn, pinned, person_id=old)
+    insert_confirmed_source_contribution(conn, pinned, person_id=old)
     other_owner = _signature(
         conn, form="marie dupont", person_id=other, mode="identifier", identifiers=ids
     )
@@ -150,7 +150,7 @@ def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):
     signed = insert_person(conn, "Real", first_name="R")
     _signature(conn, form="real r", person_id=signed, mode="name")
     rh = insert_person(conn, "Prof", first_name="P")
-    insert_person_rh(conn, rh)
+    insert_hr_record(conn, rh)
 
     delete_empty_persons(conn)
 
@@ -163,7 +163,7 @@ def test_delete_empty_persons_spares_persons_with_a_decision(sa_sync_conn):
     """Rejet, non-doublon ou exclusion conservent une personne vide ; une confirmation d'identifiant non."""
     conn = sa_sync_conn
     rejected = insert_person(conn, "Rejet", first_name="R")
-    insert_rejected_authorship(conn, insert_publication(conn), person_id=rejected)
+    insert_rejected_contribution(conn, insert_publication(conn), person_id=rejected)
     distinct_a = insert_person(conn, "Distinct", first_name="A")
     distinct_b = insert_person(conn, "Distinct", first_name="B")
     conn.execute(

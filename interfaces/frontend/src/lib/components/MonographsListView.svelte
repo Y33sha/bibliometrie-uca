@@ -215,7 +215,7 @@
 							{#if m.journal_id}<a href="{base}/journals/{m.journal_id}">{m.journal_title}</a>{/if}
 						</td>
 					{/if}
-					<td class="num">{m.pub_count.toLocaleString('fr-FR')}</td>
+					<td class="num">{m.publication_count.toLocaleString('fr-FR')}</td>
 				</tr>
 			{/each}
 			{#if monographs.items.length === 0}

@@ -30,7 +30,7 @@ _CARRIES_IDENTIFIER = """
         SELECT 1 FROM person_identifiers pi
         WHERE pi.person_id = sa.person_id
           AND pi.status {op} '{rejected}'
-          AND aik.person_identifiers ->> pi.id_type::text = pi.id_value
+          AND aik.identifiers ->> pi.id_type::text = pi.id_value
           {extra}
     )
 """
@@ -42,8 +42,8 @@ _CARRIES_VALID = _CARRIES_IDENTIFIER.format(
 
 _TARGETS = f"""
     SELECT sa.id
-    FROM source_authorships sa
-    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    FROM source_contributions sa
+    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
     WHERE sa.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
       AND {_CARRIES_REJECTED}
       AND NOT {_CARRIES_VALID}
@@ -52,11 +52,11 @@ _TARGETS = f"""
 
 _COUNT_SQL = text(f"""
     SELECT count(*) AS signatures, count(DISTINCT sa.person_id) AS personnes
-    FROM source_authorships sa WHERE sa.id IN ({_TARGETS})
+    FROM source_contributions sa WHERE sa.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 
 _DETACH_SQL = text(f"""
-    UPDATE source_authorships sa SET {DETACHED_SIGNATURE}
+    UPDATE source_contributions sa SET {DETACHED_SIGNATURE}
     WHERE sa.id IN ({_TARGETS})
 """)  # noqa: S608 — fragments SQL constants
 

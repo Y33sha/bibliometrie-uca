@@ -6,14 +6,14 @@ from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
 def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None:
-    """Crée un source_publication `source` rattaché à `publication_id`, avec sa ligne staging."""
+    """Crée un source_record `source` rattaché à `publication_id`, avec sa ligne staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
-    insert_source_publication(
+    insert_source_record(
         conn,
         publication_id,
         source=source,
@@ -25,9 +25,9 @@ def _insert_sp(conn, source, source_id, external_ids, *, publication_id) -> None
 
 
 class TestFindMissingHalIds:
-    """Récupère les hal-ids référencés par des source_publications OpenAlex ou ScanR in-périmètre.
+    """Récupère les hal-ids référencés par des source_records OpenAlex ou ScanR in-périmètre.
 
-    Le hal-id doit être porté par un `source_publications` OpenAlex ou ScanR rattaché à une publication `in_perimeter`, et absent du staging HAL.
+    Le hal-id doit être porté par un `source_records` OpenAlex ou ScanR rattaché à une publication `in_perimeter`, et absent du staging HAL.
     """
 
     @staticmethod

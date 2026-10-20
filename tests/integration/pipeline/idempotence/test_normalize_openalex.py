@@ -104,18 +104,18 @@ def run_normalize_oa(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
-    from pipeline.ingestion.common.source_publications import (
-        SourcePublicationQueries,
+    from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_records import (
+        SourceRecordQueries,
     )
     from pipeline.ingestion.common.staging import StagingQueries, StagingRow
     from pipeline.ingestion.openalex.normalize import process_work
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourcePublicationQueries()
+    queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    authorship_queries = AuthorshipsBatchQueries()
+    contribution_queries = ContributionsBatchQueries()
     container_stores = ContainerStores.of(conn)
     publisher_store = PublisherStore(conn)
 
@@ -137,7 +137,7 @@ def run_normalize_oa(conn):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=staging_queries,
-            authorship_queries=authorship_queries,
+            contribution_queries=contribution_queries,
         ):
             processed += 1
     return processed
@@ -149,11 +149,11 @@ def _count_oa_tables(conn) -> dict:
     counts = {}
     for t in ["publications"]:
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
-    counts["openalex_authorships"] = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'openalex'")
+    counts["openalex_contributions"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_contributions WHERE source = 'openalex'")
     ).scalar_one()
     counts["openalex_documents"] = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'openalex'")
+        text("SELECT COUNT(*) AS cnt FROM source_records WHERE source = 'openalex'")
     ).scalar_one()
     return counts
 

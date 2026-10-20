@@ -26,9 +26,9 @@ log = setup_logger("delete_placeholder_author_names", os.path.dirname(__file__))
 CANDIDATES_SQL = candidates_sql("n.names ~* '(:|none|null)'")
 
 _MARK_DIRTY_SQL = text("""
-    UPDATE publications p SET authorships_dirty = true
-    FROM source_publications sp
-    WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+    UPDATE publications p SET contributions_dirty = true
+    FROM source_records sp
+    WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
 """)
 
 
@@ -50,7 +50,7 @@ def placeholder_signatures(conn: Connection) -> tuple[list[int], list[int]]:
 
 def delete(conn: Connection, ids: list[int], notices: list[int]) -> int:
     """Supprime les signatures, met à jour les notices et les publications. Rend le nombre d'identités orphelines supprimées."""
-    conn.execute(text("DELETE FROM source_authorships WHERE id = ANY(:ids)"), {"ids": ids})
+    conn.execute(text("DELETE FROM source_contributions WHERE id = ANY(:ids)"), {"ids": ids})
     backfill_notices(conn, notices)
     conn.execute(_MARK_DIRTY_SQL, {"notices": notices})
     return delete_orphan_identities(conn)

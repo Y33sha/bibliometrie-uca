@@ -10,21 +10,21 @@ Aucun objet de domaine ne lui correspond : elle vit comme texte normalisé et li
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `addresses` | L'adresse normalisée | `raw_text`, `normalized_text`, `countries CHAR(2)[]`, `candidates_dirty`, `countries_dirty`, `pub_count` |
+| `addresses` | L'adresse normalisée | `raw_text`, `normalized_text`, `countries CHAR(2)[]`, `candidates_dirty`, `countries_dirty`, `publication_count` |
 | `address_country_candidates` | Pays proposé pour une adresse par un moyen de détection | `address_id`, `country_code`, `method` |
 | `address_structures` | Rattachement d'une adresse à une structure | `address_id`, `structure_id`, `matched_form_id` (NULL : confirmé à la main sans détection), `is_confirmed` (NULL en attente, TRUE confirmé, FALSE rejeté) |
-| `source_authorship_addresses` | Table de liaison entre signature et adresse | `source_authorship_id`, `address_id` |
+| `source_contribution_addresses` | Table de liaison entre signature et adresse | `source_contribution_id`, `address_id` |
 | `place_name_forms` | Formes de noms de lieux et code ISO correspondant | `iso_code`, `form_normalized`, `kind` (`country`, `institution`, `city`) |
 
-Une adresse est unique par `md5(normalized_text)`, un rattachement par `(address_id, structure_id)`, un candidat par `(address_id, country_code, method)`. La vue matérialisée `source_authorship_structures` joint la table de liaison aux rattachements et aux structures du périmètre. La vue matérialisée `authorship_structures` en dérive.
+Une adresse est unique par `md5(normalized_text)`, un rattachement par `(address_id, structure_id)`, un candidat par `(address_id, country_code, method)`. La vue matérialisée `source_contribution_structures` joint la table de liaison aux rattachements et aux structures du périmètre. La vue matérialisée `contribution_structures` en dérive.
 
 ## Écriture par le pipeline
 
 | Phase | Ce qu'elle écrit |
 |---|---|
-| `normalize` | `addresses`, `source_authorship_addresses`, candidats des sources |
+| `normalize` | `addresses`, `source_contribution_addresses`, candidats des sources |
 | `affiliations` | `address_structures` ; marques `candidates_dirty` après un changement de pays dans le référentiel ROR |
-| `publications` | `addresses.pub_count` |
+| `publications` | `addresses.publication_count` |
 | `countries` | candidats des autres moyens, `addresses.countries` |
 
 ### `normalize` — création des adresses
@@ -49,9 +49,9 @@ Après une modification de `place_name_forms`, `interfaces/cli/maintenance/redet
 
 ## Propagation
 
-**Appartenance au périmètre** : `address_structures` → vue matérialisée → `source_authorships.perimeter_evidence`. Dernière étape d'`affiliations` (`populate`, dans `pipeline/transformation/structures/affiliations.py`) : la vue matérialisée est rafraîchie, puis les indices des signatures (`perimeter_evidence`) sont synchronisés sur elle. Seul l'écart est écrit.
+**Appartenance au périmètre** : `address_structures` → vue matérialisée → `source_contributions.perimeter_evidence`. Dernière étape d'`affiliations` (`populate`, dans `pipeline/transformation/structures/affiliations.py`) : la vue matérialisée est rafraîchie, puis les indices des signatures (`perimeter_evidence`) sont synchronisés sur elle. Seul l'écart est écrit.
 
-**Pays** : `addresses.countries` → `source_authorships.countries` → `source_publications.countries` → `publications.countries`. Étape finale de `countries` (`refresh_publication_countries.py`). Le pays d'une signature réunit les pays retenus de ses adresses, ceux de ses organisations ROR sans adresse et ceux de ses structures HAL. Sont recalculées les signatures marquées `countries_dirty` (par `normalize`, ou par un changement de pays dans les référentiels ROR et HAL) et celles d'une adresse marquée. Suivent leurs publications sources, puis les publications. Les marqueurs sont ensuite remis à zéro.
+**Pays** : `addresses.countries` → `source_contributions.countries` → `source_records.countries` → `publications.countries`. Étape finale de `countries` (`refresh_publication_countries.py`). Le pays d'une signature réunit les pays retenus de ses adresses, ceux de ses organisations ROR sans adresse et ceux de ses structures HAL. Sont recalculées les signatures marquées `countries_dirty` (par `normalize`, ou par un changement de pays dans les référentiels ROR et HAL) et celles d'une adresse marquée. Suivent leurs publications sources, puis les publications. Les marqueurs sont ensuite remis à zéro.
 
 ## Écriture par l'API — édition manuelle
 
@@ -63,7 +63,7 @@ Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans 
 
 ## Lecture par le pipeline
 
-La résolution lit `addresses(id, normalized_text)` et `structure_name_forms`. La détection de pays lit `addresses`, `place_name_forms` et `source_authorship_rors`. Le recompte de `pub_count`, en fin de phase `publications`, joint la table de liaison aux signatures et à leurs publications sources.
+La résolution lit `addresses(id, normalized_text)` et `structure_name_forms`. La détection de pays lit `addresses`, `place_name_forms` et `source_contribution_rors`. Le recompte de `publication_count`, en fin de phase `publications`, joint la table de liaison aux signatures et à leurs publications sources.
 
 ## Lecture par l'API
 
@@ -82,4 +82,4 @@ Le filtre des adresses par pays est un seul fragment SQL (`address_country_condi
 
 **Le recalcul des pays des publications est déclenché depuis les adresses.** Il appartient au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`), qui l'expose à l'API par le port `CountryRecompute` : une saisie de pays d'adresse le lance en tâche de fond.
 
-**`authorship_structures` peut être en retard.** L'édition manuelle rafraîchit `source_authorship_structures` et recalcule les indices des signatures touchées, de leurs authorships et de leurs publications. `authorship_structures` attend le prochain passage du pipeline.
+**`contribution_structures` peut être en retard.** L'édition manuelle rafraîchit `source_contribution_structures` et recalcule les indices des signatures touchées, de leurs contributions et de leurs publications. `contribution_structures` attend le prochain passage du pipeline.

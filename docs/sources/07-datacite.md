@@ -95,7 +95,7 @@ DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous d
 
 ### `doc_type` à deux niveaux
 
-DataCite déclare le type dans deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_publications.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_publications/doc_types.py).
+DataCite déclare le type dans deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_records.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_records/doc_types.py).
 
 ### Revue hôte
 
@@ -108,13 +108,13 @@ Les deux champs de type viennent du déposant du DOI : logiciel de l'entrepôt, 
 
 ### Affiliations textuelles
 
-Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_authorship_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` DataCite dans la cascade de résolution des personnes.
+Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_contributions` DataCite dans la cascade de résolution des personnes.
 
 ### DOI liés et concept/version
 
 Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour faire converger versions et concept vers une seule publication.
 
-Les `relatedIdentifiers` contiennent aussi d'autres liens entre documents (un supplément et son article, un chapitre et son ouvrage, des citations). Le sous-ensemble « même œuvre ou œuvre étroitement liée » alimente le pool de DOI à rapatrier (`external_ids.related_dois`) ; la liste complète et typée est conservée dans `source_publications.meta` pour un usage ultérieur (relations entre publications).
+Les `relatedIdentifiers` contiennent aussi d'autres liens entre documents (un supplément et son article, un chapitre et son ouvrage, des citations). Le sous-ensemble « même œuvre ou œuvre étroitement liée » alimente le pool de DOI à rapatrier (`external_ids.related_dois`) ; la liste complète et typée est conservée dans `source_records.meta` pour un usage ultérieur (relations entre publications).
 
 ### `oa_status` non dérivé
 

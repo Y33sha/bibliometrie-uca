@@ -11,24 +11,24 @@ from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole, map_role
+from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.impact import Impact
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.pub_metadata import PublicationMetadata
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.wos.payload import (
@@ -209,10 +209,10 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     doi = _get_api_doi(dynamic) or clean_doi(staging_doi)
     title = _get_api_title(static, "item") or "(sans titre)"
 
-    pub_year = as_int(pub_info.get("pubyear"))
-    if pub_year is None and (py := as_str(pub_info.get("pubyear"))):
+    publication_year = as_int(pub_info.get("pubyear"))
+    if publication_year is None and (py := as_str(pub_info.get("pubyear"))):
         try:
-            pub_year = int(py)
+            publication_year = int(py)
         except ValueError:
             pass
 
@@ -325,7 +325,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "ut": raw.get("UID", ""),
         "doi": doi,
         "title": title,
-        "pub_year": pub_year,
+        "publication_year": publication_year,
         "doc_type": raw_doc_type or "other",
         "language": language,
         "oa_status": oa_status,
@@ -418,7 +418,7 @@ def extract_from_export(
         "ut": field("UT") or "",
         "doi": clean_doi(field("DI")) or clean_doi(staging_doi),
         "title": field("TI") or "(sans titre)",
-        "pub_year": int(py) if (py := field("PY")) and py.isdigit() else None,
+        "publication_year": int(py) if (py := field("PY")) and py.isdigit() else None,
         "doc_type": doc_types[0] if doc_types else "other",
         "language": languages[0] if languages else None,
         "oa_status": None,
@@ -470,7 +470,7 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
         issns=source_issns(print_issn=issn, electronic_issn=eissn),
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
-        year=as_int(rec.get("pub_year")),
+        year=as_int(rec.get("publication_year")),
     )
 
 
@@ -500,7 +500,7 @@ def extract_pub_metadata(
     """
     return PublicationMetadata(
         title=as_str(rec.get("title")),
-        pub_year=as_int(rec.get("pub_year")),
+        publication_year=as_int(rec.get("publication_year")),
         doc_type=as_str(rec.get("doc_type")),
         doi=as_str(rec.get("doi")),
         nnt=None,
@@ -519,29 +519,29 @@ def extract_pub_metadata(
 
 def insert_wos_document(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     rec: Mapping[str, JsonValue],
     staging_id: int,
     pub_meta: PublicationMetadata,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour WoS.
+    """Crée/retrouve l'entrée source_records pour WoS.
 
-    Les métadonnées canoniques (doi, title, pub_year, doc_type, journal_id,
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, journal_id,
     oa_status, language, container_title) viennent toutes de `pub_meta`,
     construit en amont par `extract_pub_metadata`. `rec` ne sert ici
     que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
     keywords, topics, urls, external_ids non canoniques).
     """
-    return queries.upsert_source_publication(
+    return queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="wos",
             source_id=as_str(rec.get("ut")) or "",
             staging_id=staging_id,
             doi=pub_meta.doi,
             external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
             title=pub_meta.title or "",
-            pub_year=pub_meta.pub_year,
+            publication_year=pub_meta.publication_year,
             doc_type=pub_meta.doc_type,
             journal_id=pub_meta.journal_id,
             monograph_id=pub_meta.monograph_id,
@@ -559,10 +559,10 @@ def insert_wos_document(
 
 
 # =============================================================
-# WOS AUTHORSHIPS — identifiants sur source_authorships
+# WOS CONTRIBUTIONS — identifiants sur source_contributions
 # =============================================================
 # Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas conservé.
-# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (author_identifying_keys.person_identifiers).
+# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — vit sur l'identité de la signature (contributor_information.identifiers).
 
 
 def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
@@ -577,16 +577,16 @@ def _author_name(author: Mapping[str, JsonValue]) -> SignatureName | None:
 def build_wos_author_records(
     rec: Mapping[str, JsonValue], logger: logging.Logger
 ) -> list[AuthorRecord]:
-    """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
+    """Parse les contributions d'un record WoS en `AuthorRecord` (sans I/O).
 
-    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `person_identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes, chacune avec les ROR de ses organisations. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_publication_id, author_position)` interdisant les doublons en base.
+    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes, chacune avec les ROR de ses organisations. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_record_id, author_position)` interdisant les doublons en base.
     """
     authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     if not authors_kept:
         if found := as_int(rec.get("authors_found")):
             logger.warning(
                 "WoS record %s : %d auteurs présents mais aucun exploitable "
-                "(filtre is_wos_author_exploitable) — authorships ignorés",
+                "(filtre is_wos_author_exploitable) — contributions ignorés",
                 as_str(rec.get("ut")) or "?",
                 found,
             )
@@ -608,12 +608,12 @@ def build_wos_author_records(
                 name=name,
                 is_corresponding=bool(author.get("is_corresponding")),
                 roles=[
-                    AuthorshipRole(role)
+                    ContributionRole(role)
                     for e in as_sequence(author.get("roles"))
                     if (role := as_str(e))
                 ]
                 or None,
-                person_identifiers=ids if ids else None,
+                identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(
                         text=as_str(a.get("text")) or "",
@@ -635,19 +635,19 @@ def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"ut": rec.get("ut"), "authors": rec.get("authors")}
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     logger: logging.Logger,
     rec: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures WoS de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "wos",
-        source_publication_id,
+        source_record_id,
         extract_wos_author_block(rec),
         partial(build_wos_author_records, logger=logger),
     )
@@ -660,14 +660,14 @@ def process_authorships(
 
 def process_record(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     staging_id = staging_row.id
@@ -686,8 +686,8 @@ def process_record(
     containers = upsert_containers(rec, publisher_id, container_stores=container_stores)
     pub_meta = extract_pub_metadata(rec, containers.journal_id, containers.monograph_id)
 
-    source_publication_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
-    process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
+    source_record_id = insert_wos_document(conn, queries, rec, staging_id, pub_meta)
+    process_contributions(conn, contribution_queries, logger, rec, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -698,7 +698,7 @@ class WosNormalizer(BibliographicNormalizer):
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         rec = extract_record(row.raw_data, row.doi)
-        return as_str(rec.get("title")), as_int(rec.get("pub_year"))
+        return as_str(rec.get("title")), as_int(rec.get("publication_year"))
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
@@ -710,5 +710,5 @@ class WosNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

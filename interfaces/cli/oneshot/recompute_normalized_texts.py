@@ -62,7 +62,7 @@ class _Column:
 
 
 _COLUMNS = (
-    _Column("source_publications", "id", "title", "title_normalized", normalized_title),
+    _Column("source_records", "id", "title", "title_normalized", normalized_title),
     _Column("publications", "id", "title", "title_normalized", normalize_text),
     _Column("journals", "id", "title", "title_normalized", normalize_text),
     _Column(
@@ -150,28 +150,28 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
 
 _SIGNATURES_SQL = text("""
     SELECT sa.id, sa.raw_author_name, sa.raw_last_name, sa.raw_first_name,
-           aik.last_name_normalized, aik.first_name_normalized, aik.person_identifiers
-    FROM source_authorships sa
-    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+           aik.last_name_normalized, aik.first_name_normalized, aik.identifiers
+    FROM source_contributions sa
+    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
     WHERE sa.raw_author_name ~ :pattern OR sa.raw_last_name ~ :pattern
        OR sa.raw_first_name ~ :pattern
 """)
 
 _UPSERT_IDENTITIES_SQL = text(f"""
-    INSERT INTO author_identifying_keys ({", ".join(IDENTITY_KEY_COLUMNS)})
-    SELECT DISTINCT t.last_name_normalized, t.first_name_normalized, t.person_identifiers
+    INSERT INTO contributor_information ({", ".join(IDENTITY_KEY_COLUMNS)})
+    SELECT DISTINCT t.last_name_normalized, t.first_name_normalized, t.identifiers
     FROM jsonb_to_recordset(:payload) AS t(
-        last_name_normalized text, first_name_normalized text, person_identifiers jsonb)
+        last_name_normalized text, first_name_normalized text, identifiers jsonb)
     ON CONFLICT ({", ".join(IDENTITY_KEY_COLUMNS)}) DO NOTHING
 """).bindparams(bindparam("payload", type_=Jsonb))
 
 _REPOINT_SQL = text(
     """
-    UPDATE source_authorships sa SET identity_id = aik.id
+    UPDATE source_contributions sa SET contributor_information_id = aik.id
     FROM jsonb_to_recordset(:payload) AS t(
         sa_id integer, last_name_normalized text, first_name_normalized text,
-        person_identifiers jsonb)
-    JOIN author_identifying_keys aik ON aik.key_hash = """
+        identifiers jsonb)
+    JOIN contributor_information aik ON aik.key_hash = """
     + key_hash_sql([f"t.{c}" for c in IDENTITY_KEY_COLUMNS])
     + """
     WHERE sa.id = t.sa_id
@@ -201,7 +201,7 @@ def _repoint_signatures(conn: Connection, *, apply: bool) -> int:
                 "sa_id": row.id,
                 "last_name_normalized": split[0],
                 "first_name_normalized": split[1],
-                "person_identifiers": row.person_identifiers,
+                "identifiers": row.identifiers,
             }
         )
     if apply and payload:

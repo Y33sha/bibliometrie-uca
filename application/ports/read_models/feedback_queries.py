@@ -40,7 +40,7 @@ class FeedbackAddressItem(BaseModel):
 
     id: int
     raw_text: str
-    pub_count: int
+    publication_count: int
     structures: list[AddressStructureSummary]
     matched_forms: list[FeedbackMatchedForm] | None = None
 

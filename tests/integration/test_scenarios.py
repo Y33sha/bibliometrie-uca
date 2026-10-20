@@ -15,15 +15,15 @@ from pipeline.transformation.publications.consolidation import refresh_from_sour
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.persons import (
+    insert_hr_record,
     insert_person,
     insert_person_name_form,
-    insert_person_rh,
 )
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 # Fiche RH du département « Test » par défaut.
-_rh = partial(insert_person_rh, department_name="Test")
+_rh = partial(insert_hr_record, department_name="Test")
 
 # Personne normalisée par `lower`.
 _person = partial(insert_person, normalizer="lower")
@@ -73,7 +73,7 @@ def _seed_pub(
     repo,
     title: str,
     *,
-    pub_year: int = 2024,
+    publication_year: int = 2024,
     doi: str | None = None,
     doc_type: str = "article",
     oa_status: str = "unknown",
@@ -83,7 +83,7 @@ def _seed_pub(
         title=title,
         title_normalized=title.lower(),
         doc_type=doc_type,
-        pub_year=pub_year,
+        publication_year=publication_year,
         doi=doi,
         oa_status=oa_status,
     )
@@ -91,16 +91,16 @@ def _seed_pub(
 
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
-        """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
+        """refresh_from_sources enrichit les métadonnées depuis les source_records."""
         journal_id = insert_journal(sa_sync_conn, "Science")
         pub_id = _seed_pub(publication_repo, "Pub", doi="10.5555/enrich-test")
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             pub_id,
             source="openalex",
             source_id="W999enrich",
             title="Pub",
-            pub_year=2024,
+            publication_year=2024,
             journal_id=journal_id,
             oa_status="gold",
         )
@@ -202,7 +202,7 @@ class TestMergePersons:
         ):
             groups[key] = conn.execute(
                 text(
-                    "INSERT INTO source_authorship_groups (publication_id, person_id)"
+                    "INSERT INTO source_contribution_groups (publication_id, person_id)"
                     " VALUES (:p, :person) RETURNING id"
                 ),
                 {"p": publication, "person": person},
@@ -211,7 +211,7 @@ class TestMergePersons:
         merge_person(target, source, repo=person_repo)
 
         persons = dict(
-            conn.execute(text("SELECT id, person_id FROM source_authorship_groups")).all()
+            conn.execute(text("SELECT id, person_id FROM source_contribution_groups")).all()
         )
         assert persons[groups["target"]] == target
         assert persons[groups["source_shared"]] is None
@@ -266,7 +266,7 @@ class TestMergePersons:
         assert list(remaining) == [with_rh]
         assert (
             sa_sync_conn.execute(
-                text("SELECT person_id FROM persons_rh WHERE person_id = :id"), {"id": with_rh}
+                text("SELECT person_id FROM hr_records WHERE person_id = :id"), {"id": with_rh}
             ).scalar()
             == with_rh
         )

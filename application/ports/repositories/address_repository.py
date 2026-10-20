@@ -24,7 +24,7 @@ class AddressCountryFilter:
 
 
 class AddressRepository(Protocol):
-    """Contrat d'accès aux tables addresses, address_structures, et propagations vers source_publications/publications.countries."""
+    """Contrat d'accès aux tables addresses, address_structures, et propagations vers source_records/publications.countries."""
 
     # ── Liens adresse ↔ structure ──────────────────────────────────
 

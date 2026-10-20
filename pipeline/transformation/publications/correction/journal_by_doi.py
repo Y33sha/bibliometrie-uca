@@ -13,10 +13,10 @@ from sqlalchemy import Connection
 
 from domain.journals.containers import is_book_or_chapter
 from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
-from domain.source_publications.metadata_correction.journal_by_doi import (
+from domain.source_records.metadata_correction.journal_by_doi import (
     JOURNAL_BY_DOI_NAMESPACE,
 )
-from domain.source_publications.raw_metadata import raw_value, stash_entry
+from domain.source_records.raw_metadata import raw_value, stash_entry
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
@@ -29,7 +29,7 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 def _compute_update(
     row: JournalCorrectionRow, namespaces: Mapping[str, DoiNamespace]
 ) -> JournalCorrectionUpdate | None:
-    """État cible d'une `source_publication`, ou `None` s'il est l'état courant. La clé `raw_metadata.journal_id` appartient à cette sous-étape ; les autres clés sont préservées."""
+    """État cible d'une `source_record`, ou `None` s'il est l'état courant. La clé `raw_metadata.journal_id` appartient à cette sous-étape ; les autres clés sont préservées."""
     raw_journal_id = raw_value(row.raw_metadata, "journal_id", row.journal_id)
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k != "journal_id"}
 
@@ -55,7 +55,7 @@ def compute_updates(
 
 @dataclass
 class JournalByDoiStats:
-    """Bilan de la passe : `source_publications` examinées, et `source_publications` qui reçoivent une revue."""
+    """Bilan de la passe : `source_records` examinées, et `source_records` qui reçoivent une revue."""
 
     examined: int
     attached: int
@@ -64,7 +64,7 @@ class JournalByDoiStats:
 def run(
     conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> JournalByDoiStats:
-    """Rattache leur revue aux `source_publications` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
+    """Rattache leur revue aux `source_records` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
     etape(logger, "Revues non renseignées, identifiables par le DOI du document")
     namespaces = queries.fetch_journal_doi_namespaces(conn)
     rows = queries.fetch_journal_by_doi_candidates(conn)

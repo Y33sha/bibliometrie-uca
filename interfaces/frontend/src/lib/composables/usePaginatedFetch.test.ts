@@ -164,8 +164,8 @@ describe('usePaginatedFetch', () => {
 	});
 
 	it('une page au-delà de la dernière ramène à la page 1 et retire le paramètre de l’URL', async () => {
-		// Cas réel : la page 27 des authorships orphelines, vidée par son traitement.
-		window.history.replaceState({}, '', '/admin/orphan-authorships?page=27&search=x');
+		// Cas réel : la page 27 des contributions orphelines, vidée par son traitement.
+		window.history.replaceState({}, '', '/admin/orphan-contributions?page=27&search=x');
 		gotoSpy.mockClear();
 		apiSpy
 			.mockImplementationOnce(async () => ({ items: [], total: 1300, page: 27, pages: 26 }))
@@ -181,7 +181,7 @@ describe('usePaginatedFetch', () => {
 		expect(apiSpy.mock.calls[1][0]).toContain('page=1');
 		expect(f.page).toBe(1);
 		expect(f.items).toEqual([1]);
-		expect(gotoSpy).toHaveBeenCalledWith('/admin/orphan-authorships?search=x', expect.anything());
+		expect(gotoSpy).toHaveBeenCalledWith('/admin/orphan-contributions?search=x', expect.anything());
 	});
 
 	it('une liste dont la page reste hors de l’URL ne touche pas l’URL', async () => {

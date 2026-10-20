@@ -55,11 +55,11 @@ class StaleRefetch(ABC):
     ) -> FetchOutcome: ...
 
 
-# Filtre année (`{year_clause}`) : `pub_year` vient de `source_publications` (LEFT JOIN ; NULL si absent, conservé).
+# Filtre année (`{year_clause}`) : `publication_year` vient de `source_records` (LEFT JOIN ; NULL si absent, conservé).
 _STALE_ROWS_SQL_TEMPLATE = """
     SELECT s.source_id
     FROM staging s
-    LEFT JOIN source_publications sp
+    LEFT JOIN source_records sp
       ON sp.source = s.source AND sp.source_id = s.source_id
     WHERE s.source = CAST(:source AS source_type)
       AND s.disappeared_at IS NULL
@@ -82,14 +82,14 @@ def get_stale_source_ids(
 ) -> list[str]:
     """Identifiants natifs des documents de `source` dont `last_seen_at` date de plus de `after_days` jours, hors documents disparus.
 
-    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_publications.pub_year` : un run sur une période glissante relit seulement les documents de ses propres années. `None` = aucune borne.
+    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années. `None` = aucune borne.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        year_clause = "AND (sp.pub_year IS NULL OR sp.pub_year = ANY(:years))"
+        year_clause = "AND (sp.publication_year IS NULL OR sp.publication_year = ANY(:years))"
         params["years"] = list(years)
     sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
     return list(conn.execute(sql, params).scalars())
@@ -111,7 +111,7 @@ async def refresh(
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
 
-    `years` borne la sélection à la fenêtre d'années du run (via `source_publications.pub_year`) ; `None` = tous les documents anciens de la source.
+    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source.
 
     `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
     """

@@ -65,7 +65,7 @@
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Mesure agrégée par le pivot : nombre de publications, ou montant des APC payées par l'établissement. Le taux d'open access se lit via le découpage par accès.
-	let measure = $state('pub_count');
+	let measure = $state('publication_count');
 	const measureDef = $derived(pivotSchema?.measures.find((m) => m.key === measure));
 	// Valeur affichée d'une barre ou d'un total : entier pour un nombre de publications, montant arrondi à l'euro suivi de l'unité pour une somme.
 	function formatValue(value: number): string {
@@ -245,7 +245,7 @@
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			journalId: { type: 'single', urlKey: 'journal_id' },
-			measure: { type: 'single', urlKey: 'measure', defaultValue: 'pub_count' },
+			measure: { type: 'single', urlKey: 'measure', defaultValue: 'publication_count' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },

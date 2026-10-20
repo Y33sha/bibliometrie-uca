@@ -1,6 +1,6 @@
 """Router du référentiel des entités organisationnelles et de leurs liens. Sert `/api/structures/*`.
 
-Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_tutelles` en exprime le rattachement hiérarchique, qui décide de la clôture d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_parents` en exprime le rattachement hiérarchique, qui décide de la clôture d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
 
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
@@ -217,7 +217,7 @@ def get_structure(
 ) -> StructureDetailResponse:
     """Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
 
-    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_tutelles` ; les enfants inversement. 404 si la structure n'existe pas.
+    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_parents` ; les enfants inversement. 404 si la structure n'existe pas.
     """
     detail = queries.get_structure_detail(structure_id)
     if detail is None:

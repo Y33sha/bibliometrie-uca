@@ -1,4 +1,4 @@
-"""Tests des règles pures de matching d'authorships à des personnes."""
+"""Tests des règles pures de matching de contributions à des personnes."""
 
 from domain.persons.matching import (
     IdentifiedPerson,
@@ -113,7 +113,7 @@ class TestDecideCrossSourceMatch:
     def test_no_candidates_returns_none(self):
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=[],
@@ -125,7 +125,7 @@ class TestDecideCrossSourceMatch:
         candidates = [(42, "dupont", "jean", "hal")]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
@@ -134,12 +134,12 @@ class TestDecideCrossSourceMatch:
         )
 
     def test_same_source_candidates_skipped(self):
-        """Les candidats portant la même source que l'authorship sont
+        """Les candidats portant la même source que la contribution sont
         ignorés (ils ne portent aucun signal nouveau)."""
         candidates = [(42, "dupont", "jean", "openalex")]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
@@ -151,7 +151,7 @@ class TestDecideCrossSourceMatch:
         candidates = [(42, "martin", "paul", "hal")]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
@@ -163,7 +163,7 @@ class TestDecideCrossSourceMatch:
         candidates = [(17, "dupont", "jean", "openalex"), (42, "dupont", "jean", "hal")]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
@@ -174,7 +174,7 @@ class TestDecideCrossSourceMatch:
     def test_same_first_name_other_last_name_skipped(self):
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=[(42, "martin", "jean", "hal")],
@@ -185,7 +185,7 @@ class TestDecideCrossSourceMatch:
     def test_same_last_name_other_first_name_skipped(self):
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=[(42, "dupont", "pierre", "hal")],
@@ -202,7 +202,7 @@ class TestDecideCrossSourceMatch:
         ]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,
@@ -218,7 +218,7 @@ class TestDecideCrossSourceMatch:
         ]
         assert (
             decide_cross_source_match(
-                authorship_source="openalex",
+                contribution_source="openalex",
                 last_norm="dupont",
                 first_norm="jean",
                 candidates=candidates,

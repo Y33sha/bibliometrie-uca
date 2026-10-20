@@ -7,7 +7,7 @@ Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `_author_affiliations`.
 
 Les délégations vers `domain.sources.crossref` (`extract_crossref_meta`,
-`extract_crossref_pub_year`, `parse_crossref_issns`, `strip_jats_tags`)
+`extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`)
 sont testées directement dans `tests/unit/domain/sources/test_crossref.py` ;
 ici on ne fait que vérifier le wiring (1-2 cas par délégation).
 """
@@ -37,17 +37,17 @@ from pipeline.ingestion.crossref.normalize import (
     get_keywords,
     get_language,
     get_meta,
-    get_pub_year,
+    get_publication_year,
     get_publisher_name,
     get_title,
-    process_authorships,
+    process_contributions,
     process_work,
     upsert_containers,
     upsert_publisher,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourcePublicationQueries,
+    FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
 )
@@ -98,10 +98,10 @@ class TestGetPubYear:
     def test_delegates_to_domain(self):
         # Délégation : on s'assure que la borne max est bien appliquée.
         # Plus de cas détaillés dans test_crossref.py côté domain.
-        assert get_pub_year({"published": {"date-parts": [[2024]]}}) == 2024
+        assert get_publication_year({"published": {"date-parts": [[2024]]}}) == 2024
 
     def test_none_when_unparseable(self):
-        assert get_pub_year({}) is None
+        assert get_publication_year({}) is None
 
 
 class TestGetContainerTitle:
@@ -395,13 +395,13 @@ class TestBuildCrossrefAuthorRecords:
         assert rec.name == SignatureName(last_name="Dupont", first_name="Jean")
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]
-        assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
+        assert rec.identifiers == {"orcid": "0000-0001-2345-6789"}
         assert [a.text for a in rec.addresses] == ["UCA"]
         assert rec.addresses[0].countries is None
 
     def test_bare_author_no_identifiers(self):
         rec = build_crossref_author_records({"author": [{"family": "Dupont"}]})[0]
-        assert rec.person_identifiers is None
+        assert rec.identifiers is None
 
     def test_name_seul_est_collectif(self):
         """Une entrée à `name` seul est une signature collective, à sa position dans la source."""
@@ -426,7 +426,7 @@ class TestBuildCrossrefAuthorRecords:
             ]
         }
         recs = build_crossref_author_records(msg)
-        assert [r.person_identifiers for r in recs] == [
+        assert [r.identifiers for r in recs] == [
             {"orcid": "0000-0001-2345-6789"},
             {"orcid": "0000-0001-2345-6789"},
         ]
@@ -569,18 +569,18 @@ class TestAuteursIllisibles:
         assert [r.name.display() for r in recs] == ["Roe"]
 
 
-class TestProcessAuthorships:
+class TestProcessContributions:
     def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_crossref,
-            "sync_source_authorships",
+            "sync_source_contributions",
             lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
 
-        process_authorships(
+        process_contributions(
             MagicMock(),
             MagicMock(),
             {"author": [{"family": "Dupont"}]},
@@ -611,11 +611,11 @@ class TestProcessWork:
         monkeypatch.setattr(
             normalize_crossref, "upsert_containers", lambda m, p, **kw: Containers(None, None)
         )
-        monkeypatch.setattr(normalize_crossref, "process_authorships", lambda *a, **kw: None)
+        monkeypatch.setattr(normalize_crossref, "process_contributions", lambda *a, **kw: None)
 
     @pytest.fixture
-    def queries(self) -> FakeSourcePublicationQueries:
-        return FakeSourcePublicationQueries()
+    def queries(self) -> FakeSourceRecordQueries:
+        return FakeSourceRecordQueries()
 
     @pytest.fixture
     def staging(self) -> FakeStagingQueries:
@@ -629,7 +629,7 @@ class TestProcessWork:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
-            authorship_queries=MagicMock(),
+            contribution_queries=MagicMock(),
         )
 
     def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
@@ -640,7 +640,7 @@ class TestProcessWork:
         (document,) = queries.upserted_documents
         assert document.source == "crossref"
         assert document.doi == "10.1000/abc"
-        assert document.pub_year == 2024
+        assert document.publication_year == 2024
         assert document.doc_type == "journal-article"
         assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
 
@@ -674,7 +674,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        authorship_queries=MagicMock(),
+        contribution_queries=MagicMock(),
     )
     row = staging_row()
 

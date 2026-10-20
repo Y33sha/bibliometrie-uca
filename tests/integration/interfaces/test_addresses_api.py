@@ -32,7 +32,7 @@ def _seed_addresses_api(client):
     Teardown : TRUNCATE des tables touchées + suppression du périmètre
     'uca' et de la config `perimeter_persons` pour ne pas polluer les
     suites application qui réinsèrent ces mêmes clés via leurs propres
-    fixtures (test_addresses_service, test_authorships_service,
+    fixtures (test_addresses_service, test_contributions_service,
     test_persons_service).
     """
     seed_country("FR", "France")
@@ -56,8 +56,8 @@ def _seed_addresses_api(client):
     # autoincrémentés ne soient consultés par des tests ultérieurs.
     with owner_pool() as cur:
         cur.execute(
-            "TRUNCATE TABLE address_structures, source_authorship_addresses, addresses, "
-            "structure_name_forms, structure_tutelles, structures, perimeters, "
+            "TRUNCATE TABLE address_structures, source_contribution_addresses, addresses, "
+            "structure_name_forms, structure_parents, structures, perimeters, "
             "audit_log RESTART IDENTITY CASCADE"
         )
         cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")

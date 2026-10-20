@@ -26,7 +26,7 @@ from application.ports.read_models.hal_problems_queries import (
     HalPubDetail,
     NoMissingCollections,
 )
-from domain.source_publications.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 from infrastructure.read_models.perimeters import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
@@ -42,8 +42,8 @@ _IDREF = usable_identifier("'idref'")
 
 # Signatures HAL rattachées à une personne et portant la référence d'un compte HAL.
 _HAL_ACCOUNT_SIGNATURES = f"""
-    FROM source_authorships sa
-    JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+    FROM source_contributions sa
+    JOIN contributor_information aik ON aik.id = sa.contributor_information_id
     WHERE sa.source = 'hal'
       AND sa.person_id IS NOT NULL
       AND {_HAL_PERSON_ID} IS NOT NULL
@@ -73,7 +73,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             return {}
         pub_rows = self._conn.execute(
             text("""
-                SELECT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type,
+                SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
                        p.doi, p.container_title
                 FROM publications p WHERE p.id = ANY(:pids)
             """).bindparams(bindparam("pids")),
@@ -83,10 +83,10 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text("""
                 SELECT sd.publication_id, sd.source_id AS halid, sd.hal_collections,
                        sd.doc_type AS hal_doc_type,
-                       sd.pub_year AS hal_pub_year, sd.title AS hal_title,
-                       (SELECT COUNT(*) FROM source_authorships sa2
-                        WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id) AS author_count
-                FROM source_publications sd
+                       sd.publication_year AS hal_publication_year, sd.title AS hal_title,
+                       (SELECT COUNT(*) FROM source_contributions sa2
+                        WHERE sa2.source = 'hal' AND sa2.source_record_id = sd.id) AS author_count
+                FROM source_records sd
                 WHERE sd.publication_id = ANY(:pids) AND sd.source = 'hal'
                 ORDER BY sd.source_id
             """).bindparams(bindparam("pids")),
@@ -100,7 +100,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                     halid=r.halid,
                     hal_collections=list(r.hal_collections) if r.hal_collections else None,
                     hal_doc_type=r.hal_doc_type,
-                    hal_pub_year=r.hal_pub_year,
+                    hal_publication_year=r.hal_publication_year,
                     hal_title=r.hal_title,
                     author_count=r.author_count,
                 )
@@ -109,7 +109,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             r.id: HalPubDetail(
                 id=r.id,
                 title=r.title,
-                pub_year=r.pub_year,
+                publication_year=r.publication_year,
                 doc_type=r.doc_type,
                 doi=r.doi,
                 container_title=r.container_title,
@@ -119,7 +119,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
-        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_authorships` HAL devraient être constantes (ces champs sont attachés au compte HAL, pas à la signature). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_authorships` n'a pas de `created_at`.
+        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_contributions` HAL devraient être constantes (ces champs sont attachés au compte HAL, pas à la signature). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_contributions` n'a pas de `created_at`.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS}) sub")
@@ -136,7 +136,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         MIN({_ORCID}) AS orcid,
                         MIN({_IDHAL}) AS idhal,
                         MIN({_IDREF}) AS idref,
-                        COUNT(*) AS pub_count
+                        COUNT(*) AS publication_count
                     {_HAL_ACCOUNT_SIGNATURES}
                     GROUP BY sa.person_id, {_HAL_PERSON_ID}
                 )
@@ -148,12 +148,12 @@ class PgHalProblemsQueries(HalProblemsQueries):
                            'idhal', ha.idhal,
                            'orcid', ha.orcid,
                            'idref', ha.idref,
-                           'pub_count', ha.pub_count
+                           'publication_count', ha.publication_count
                        ) ORDER BY ha.hal_person_id)
                         FROM hal_accounts ha WHERE ha.person_id = p.id
                        ) AS hal_accounts
                 FROM persons p
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
+                LEFT JOIN hr_records prh ON prh.person_id = p.id
                 WHERE p.id IN ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS})
                 ORDER BY LOWER(p.last_name), LOWER(p.first_name)
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -182,7 +182,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         offset = (page - 1) * per_page
         # Un même DOI (insensible à la casse) déposé sur au moins deux notices HAL de la même publication.
         dup_query = """
-            FROM source_publications sd
+            FROM source_records sd
             WHERE sd.source = 'hal' AND sd.doi IS NOT NULL AND sd.doi != ''
             GROUP BY sd.publication_id, LOWER(sd.doi)
             HAVING COUNT(*) >= 2
@@ -225,20 +225,20 @@ class PgHalProblemsQueries(HalProblemsQueries):
             FROM publications p1
             JOIN publications p2
               ON p1.title_normalized = p2.title_normalized AND p1.id < p2.id
-            JOIN source_publications hd1
+            JOIN source_records hd1
               ON hd1.publication_id = p1.id AND hd1.source = 'hal'
-            JOIN source_publications hd2
+            JOIN source_records hd2
               ON hd2.publication_id = p2.id AND hd2.source = 'hal'
             WHERE LENGTH(p1.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
-              AND p1.pub_year = p2.pub_year
+              AND p1.publication_year = p2.publication_year
               AND p1.doc_type = p2.doc_type
               AND NOT (p1.doi IS NOT NULL AND p2.doi IS NOT NULL
                        AND LOWER(p1.doi) <> LOWER(p2.doi))
               AND ABS(
-                  (SELECT COUNT(*) FROM source_authorships sa1
-                   WHERE sa1.source = 'hal' AND sa1.source_publication_id = hd1.id)
-                  - (SELECT COUNT(*) FROM source_authorships sa2
-                     WHERE sa2.source = 'hal' AND sa2.source_publication_id = hd2.id)
+                  (SELECT COUNT(*) FROM source_contributions sa1
+                   WHERE sa1.source = 'hal' AND sa1.source_record_id = hd1.id)
+                  - (SELECT COUNT(*) FROM source_contributions sa2
+                     WHERE sa2.source = 'hal' AND sa2.source_record_id = hd2.id)
               ) <= 2
         """
 
@@ -324,13 +324,13 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         base_where = """
             FROM publications p
-            JOIN authorships a ON a.publication_id = p.id
-            WHERE EXISTS (SELECT 1 FROM authorship_structures aus
-                          WHERE aus.authorship_id = a.id
+            JOIN contributions a ON a.publication_id = p.id
+            WHERE EXISTS (SELECT 1 FROM contribution_structures aus
+                          WHERE aus.contribution_id = a.id
                             AND aus.structure_id = ANY(:lab_arr))
-              AND EXISTS (SELECT 1 FROM source_publications sd
+              AND EXISTS (SELECT 1 FROM source_records sd
                           WHERE sd.publication_id = p.id AND sd.source = 'hal')
-              AND NOT EXISTS (SELECT 1 FROM source_publications sd
+              AND NOT EXISTS (SELECT 1 FROM source_records sd
                               WHERE sd.publication_id = p.id AND sd.source = 'hal'
                                 AND :col = ANY(sd.hal_collections))
         """
@@ -342,16 +342,16 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT DISTINCT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type,
+                SELECT DISTINCT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
                        p.doi,
-                       (SELECT array_agg(sd2.source_id) FROM source_publications sd2
+                       (SELECT array_agg(sd2.source_id) FROM source_records sd2
                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
-                       NOT EXISTS (SELECT 1 FROM source_publications sd2
+                       NOT EXISTS (SELECT 1 FROM source_records sd2
                                    WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
                                      AND sd2.hal_collections && :root_cols
                                   ) AS outside_perimeter_collections
                 {base_where}
-                ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
+                ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             binds,
@@ -360,7 +360,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             HalMissingCollectionPub(
                 id=r.id,
                 title=r.title,
-                pub_year=r.pub_year,
+                publication_year=r.publication_year,
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
@@ -386,7 +386,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
         base_cte = """
         WITH wos_oa_sps AS (
             SELECT id, publication_id
-            FROM source_publications
+            FROM source_records
             WHERE source IN ('wos', 'openalex')
               AND publication_id IS NOT NULL
         ),
@@ -394,13 +394,13 @@ class PgHalProblemsQueries(HalProblemsQueries):
             SELECT
                 sps.publication_id,
                 bool_or(EXISTS (
-                    SELECT 1 FROM source_authorship_addresses saa
-                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                    WHERE sa.source_publication_id = sps.id
+                    SELECT 1 FROM source_contribution_addresses saa
+                    JOIN source_contributions sa ON sa.id = saa.source_contribution_id
+                    WHERE sa.source_record_id = sps.id
                 )) AS any_addressed,
                 bool_or(EXISTS (
-                    SELECT 1 FROM source_authorships sa
-                    WHERE sa.source_publication_id = sps.id
+                    SELECT 1 FROM source_contributions sa
+                    WHERE sa.source_record_id = sps.id
                       AND sa.in_perimeter = TRUE
                 )) AS any_in_perimeter
             FROM wos_oa_sps sps
@@ -408,8 +408,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
         ),
         hal_in_perimeter_pubs AS (
             SELECT DISTINCT sp.publication_id
-            FROM source_publications sp
-            JOIN source_authorships sa ON sa.source_publication_id = sp.id
+            FROM source_records sp
+            JOIN source_contributions sa ON sa.source_record_id = sp.id
             WHERE sp.source = 'hal'
               AND sa.in_perimeter = TRUE
               AND sp.publication_id IS NOT NULL
@@ -430,14 +430,14 @@ class PgHalProblemsQueries(HalProblemsQueries):
         rows = self._conn.execute(
             text(f"""
                 {base_cte}
-                SELECT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type, p.doi,
-                       (SELECT array_agg(sd2.source_id) FROM source_publications sd2
+                SELECT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type, p.doi,
+                       (SELECT array_agg(sd2.source_id) FROM source_records sd2
                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                        (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
                                         ORDER BY COALESCE(l.acronym, l.name))
                         FROM (SELECT DISTINCT s.acronym, s.name
-                              FROM authorships a2
-                              JOIN authorship_structures aus2 ON aus2.authorship_id = a2.id
+                              FROM contributions a2
+                              JOIN contribution_structures aus2 ON aus2.contribution_id = a2.id
                               JOIN structures s ON s.id = aus2.structure_id
                               WHERE a2.publication_id = p.id
                                 AND a2.in_perimeter = TRUE
@@ -446,7 +446,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        ) AS laboratories
                 FROM conflict_pubs cp
                 JOIN publications p ON p.id = cp.publication_id
-                ORDER BY p.pub_year DESC NULLS LAST, p.id DESC
+                ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {
@@ -459,7 +459,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             HalAffiliationConflictPub(
                 id=r.id,
                 title=r.title,
-                pub_year=r.pub_year,
+                publication_year=r.publication_year,
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,

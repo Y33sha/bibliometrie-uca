@@ -20,7 +20,7 @@ class EmptyExtractionPerimeterError(RuntimeError):
 def refresh_perimeter_structures(conn: Connection) -> None:
     """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
 
-    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_tutelles`.
+    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_parents`.
     """
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
@@ -33,7 +33,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
                 UNION
                 SELECT d.perimeter_id, sr.child_id
                 FROM descendants d
-                JOIN structure_tutelles sr ON sr.parent_id = d.structure_id
+                JOIN structure_parents sr ON sr.parent_id = d.structure_id
             )
             SELECT DISTINCT d.perimeter_id, d.structure_id
             FROM descendants d

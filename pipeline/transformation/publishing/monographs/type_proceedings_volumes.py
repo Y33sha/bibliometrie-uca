@@ -44,7 +44,7 @@ _PROCEEDINGS_FACTS = text(f"""
            ) AS declares
     FROM monographs m
     LEFT JOIN journals j ON j.id = m.journal_id
-    LEFT JOIN source_publications sp ON sp.monograph_id = m.id
+    LEFT JOIN source_records sp ON sp.monograph_id = m.id
     GROUP BY m.id, j.journal_type
     ORDER BY m.id
 """)

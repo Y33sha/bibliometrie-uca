@@ -47,13 +47,13 @@ from tests.integration.helpers.journals import (
     insert_journal_with_issns,
 )
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
-from tests.integration.helpers.sources import insert_source_publication
+from tests.integration.helpers.sources import insert_source_record
 
 # Revue « J » par défaut.
 _journal = partial(insert_journal_with_issns, title="J")
 
 # Notice de titre « Article ».
-_article = partial(insert_source_publication, title="Article")
+_article = partial(insert_source_record, title="Article")
 
 
 @pytest.fixture
@@ -153,7 +153,7 @@ class TestSudocCheck:
         absorbed = _journal(sa_sync_conn, issnl="2999-0001", sudoc_checked=True)
         unchecked = _journal(sa_sync_conn, issnl="2999-0001")
         sa_sync_conn.execute(
-            text("UPDATE journals SET pub_count = 3 WHERE id = :id"), {"id": keeper}
+            text("UPDATE journals SET publication_count = 3 WHERE id = :id"), {"id": keeper}
         )
         groups = {g.key: g.journal_ids for g in find_journals_sharing_issnl(sa_sync_conn)}
         assert groups["2999-0001"] == (keeper, absorbed)
@@ -165,7 +165,7 @@ class TestSudocCheck:
             sa_sync_conn, title="BMJ British Medical Journal", issn="2999-0002", sudoc_checked=True
         )
         sa_sync_conn.execute(
-            text("UPDATE journals SET pub_count = 4 WHERE id = :id"), {"id": keeper}
+            text("UPDATE journals SET publication_count = 4 WHERE id = :id"), {"id": keeper}
         )
         groups = {g.issn: g.journals for g in find_journals_sharing_active_issn(sa_sync_conn)}
         assert [j.id for j in groups["2999-0002"]] == [keeper, other]
@@ -245,7 +245,7 @@ class TestSudocCheck:
             _article(
                 sa_sync_conn,
                 source_id=f"sp-rejete-{journal_id}-{year}",
-                pub_year=year,
+                publication_year=year,
                 journal_id=journal_id,
             )
         groups = {
@@ -450,7 +450,7 @@ class TestRecordTypesOfUnknownJournals:
     def test_type_brut_avant_correction(self, sa_sync_conn, repo):
         """Un document retypé par la correction est compté avec son type de source."""
         jid = _journal(sa_sync_conn)
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             source="crossref",
             source_id="10.1/a",
@@ -459,7 +459,7 @@ class TestRecordTypesOfUnknownJournals:
             journal_id=jid,
             raw_metadata={"doc_type": {"raw": "book-chapter", "corrected_by": "X"}},
         )
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid
         )
 
@@ -499,9 +499,7 @@ class TestDoiNamespaces:
             journal_id=journal_id,
         )
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_publications SET raw_metadata = CAST(:raw AS jsonb) WHERE doi = :doi"
-            ),
+            text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE doi = :doi"),
             {"raw": '{"journal_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
         )
         pairs = [p for p in find_doi_journal_pairs(sa_sync_conn) if p.journal_id == journal_id]

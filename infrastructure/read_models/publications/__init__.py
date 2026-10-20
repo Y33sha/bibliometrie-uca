@@ -4,7 +4,7 @@ Le package est organisé par thème :
 - `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
-- `source_publications` : `get_publication_sources`
+- `source_records` : `get_publication_sources`
 - `suspect_merges` : `suspect_merges`, `suspect_merges_count`
 
 `PgPublicationsQueries` agrège ces lectures sous le port `application.ports.read_models.publications_queries.PublicationsQueries`.
@@ -43,7 +43,7 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv as _export_theses_csv,
     list_publications as _list_publications,
 )
-from infrastructure.read_models.publications.source_publications import (
+from infrastructure.read_models.publications.source_records import (
     get_publication_sources as _get_publication_sources,
 )
 from infrastructure.read_models.publications.suspect_merges import (

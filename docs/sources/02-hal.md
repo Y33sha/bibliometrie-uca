@@ -105,4 +105,4 @@ Une absence complète de ce champ dans le payload est traitée comme une erreur 
 
 Seul champ où ORCID, IdRef et idHAL sont attachés à chaque auteur via les `<idno type="ORCID|IDREF|idhal">` à l'intérieur de chaque `<author>`. Voir l'extrait XML ci-dessus.
 
-Chaque `<author>` désigne aussi ses structures directes par `<affiliation ref="#struct-<identifiant>"/>`. Le `listOrg` du TEI donne le ROR de chaque structure. Les structures vont dans `source_authorship_hal_structures`, leurs ROR dans `source_authorship_rors`.
+Chaque `<author>` désigne aussi ses structures directes par `<affiliation ref="#struct-<identifiant>"/>`. Le `listOrg` du TEI donne le ROR de chaque structure. Les structures vont dans `source_contribution_hal_structures`, leurs ROR dans `source_contribution_rors`.

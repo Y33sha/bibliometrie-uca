@@ -6,7 +6,7 @@ Le package est organisé par thème :
 - `facets` : `persons_facets`
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
-- `admin` : authorships par forme de nom, files de triage des formes et des identifiants
+- `admin` : contributions par forme de nom, files de triage des formes et des identifiants
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
 sous le port `application.ports.read_models.persons_queries.PersonsQueries` et se
@@ -25,7 +25,7 @@ from application.ports.read_models.persons_queries import (
     AmbiguousNameFormsResponse,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
-    NameFormAuthorshipsResponse,
+    NameFormContributionsResponse,
     NameFormSummaryOut,
     PersonAddressesResponse,
     PersonDashboardResponse,
@@ -47,7 +47,7 @@ from infrastructure.read_models.persons.admin import (
     identifier_conflicts_count as _identifier_conflicts_count,
     name_duplicates as _name_duplicates,
     name_duplicates_count as _name_duplicates_count,
-    name_form_authorships as _name_form_authorships,
+    name_form_contributions as _name_form_contributions,
     persons_sharing_name_form as _persons_sharing_name_form,
 )
 from infrastructure.read_models.persons.detail import (
@@ -116,8 +116,10 @@ class PgPersonsQueries(PersonsQueries):
 
     # ── Admin : name forms ─────────────────────────────────────────
 
-    def name_form_authorships(self, person_id: int, name_form: str) -> NameFormAuthorshipsResponse:
-        return _name_form_authorships(self._conn, person_id, name_form)
+    def name_form_contributions(
+        self, person_id: int, name_form: str
+    ) -> NameFormContributionsResponse:
+        return _name_form_contributions(self._conn, person_id, name_form)
 
     def ambiguous_name_forms_count(self) -> int:
         return _ambiguous_name_forms_count(self._conn)

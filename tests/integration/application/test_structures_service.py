@@ -1,6 +1,6 @@
 """Tests de caractérisation pour application/services/structures/core.py.
 
-Couvre create/update/delete sur structures, structure_tutelles,
+Couvre create/update/delete sur structures, structure_parents,
 structure_name_forms.
 """
 
@@ -220,7 +220,7 @@ class TestDeleteStructure:
         assert result.first() is None
 
 
-# ── structure_tutelles ───────────────────────────────────────────
+# ── structure_parents ───────────────────────────────────────────
 
 
 class TestCreateTutelle:
@@ -303,7 +303,7 @@ class TestDeleteTutelle:
         )
         delete_tutelle(rel["id"], repo=repo)
         result = sa_sync_conn.execute(
-            text("SELECT id FROM structure_tutelles WHERE id = :id"), {"id": rel["id"]}
+            text("SELECT id FROM structure_parents WHERE id = :id"), {"id": rel["id"]}
         )
         assert result.first() is None
 

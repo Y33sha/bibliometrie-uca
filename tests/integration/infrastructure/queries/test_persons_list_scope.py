@@ -1,6 +1,6 @@
 """Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `authorship_structures`, et le filtre d'exclusion.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une signature de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
 """
 
 from sqlalchemy import text
@@ -8,18 +8,18 @@ from sqlalchemy import text
 from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons import PgPersonsQueries
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
     insert_person_name_form,
 )
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.structures import add_authorship_structure, insert_structure
+from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 
 
-def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perimeter=False):
-    aid = insert_authorship(
+def _contribution_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perimeter=False):
+    aid = insert_contribution(
         conn,
         insert_publication(conn),
         person_id=person_id,
@@ -27,16 +27,16 @@ def _authorship_in_lab(conn, person_id, lab_id=None, roles=("author",), in_perim
         roles=list(roles),
     )
     if lab_id is not None:
-        add_authorship_structure(conn, aid, lab_id)
+        add_contribution_structure(conn, aid, lab_id)
 
 
 class TestListLabScope:
     def test_list_restricted_to_lab(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-DIR")
         p_in = insert_person(sa_sync_conn, "Inlab")
-        _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
-        _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
+        _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(
@@ -49,9 +49,9 @@ class TestListLabScope:
     def test_list_unscoped_includes_both(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-DIR2")
         p_in = insert_person(sa_sync_conn, "Inlab")
-        _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
-        _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
+        _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
         res = q.list_persons(filters=PersonFilters(), page=1, per_page=50, sort="name_asc")
@@ -62,8 +62,8 @@ class TestListLabScope:
         """Sous scope labo, les dénombrements ne comptent que les signatures du labo."""
         lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
-        _authorship_in_lab(sa_sync_conn, person, lab_id=lab)
-        _authorship_in_lab(sa_sync_conn, person, lab_id=None)
+        _contribution_in_lab(sa_sync_conn, person, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, person, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
         scoped = q.list_persons(
@@ -78,8 +78,8 @@ class TestListLabScope:
     def test_signature_counts_author_role_only(self, sa_sync_conn):
         """Les dénombrements comptent seulement les signatures en tant qu'auteur, dans la liste comme dans la fiche de curation."""
         person = insert_person(sa_sync_conn, "Juror")
-        _authorship_in_lab(sa_sync_conn, person, in_perimeter=True)
-        _authorship_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
+        _contribution_in_lab(sa_sync_conn, person, in_perimeter=True)
+        _contribution_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
 
         q = PgPersonsQueries(sa_sync_conn)
         listed = next(
@@ -98,9 +98,9 @@ class TestListLabScope:
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-FAC")
         p_in = insert_person(sa_sync_conn, "Inlab")
-        _authorship_in_lab(sa_sync_conn, p_in, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p_in, lab_id=lab)
         p_out = insert_person(sa_sync_conn, "Outlab")
-        _authorship_in_lab(sa_sync_conn, p_out, lab_id=None)
+        _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
         q = PgPersonsQueries(sa_sync_conn)
         scoped = q.persons_facets(filters=PersonFilters(lab_id=lab))
@@ -114,9 +114,9 @@ class TestListLabScope:
         """Régression : les comptes de facettes suivent la recherche par nom."""
         lab = insert_structure(sa_sync_conn, "LAB-SRCH")
         p1 = insert_person(sa_sync_conn, "Dupont")
-        _authorship_in_lab(sa_sync_conn, p1, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p1, lab_id=lab)
         p2 = insert_person(sa_sync_conn, "Martin")
-        _authorship_in_lab(sa_sync_conn, p2, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p2, lab_id=lab)
 
         q = PgPersonsQueries(sa_sync_conn)
         both = q.persons_facets(filters=PersonFilters(lab_id=lab))
@@ -173,13 +173,13 @@ class TestExclusionFilter:
         """Une personne exclue n'appartient à aucun laboratoire, dès que les matviews de structures sont rafraîchies."""
         lab = insert_structure(sa_sync_conn, "LAB-EXCL")
         p_ok = insert_person(sa_sync_conn, "Active")
-        _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p_ok, lab_id=lab)
         p_excl = insert_person(sa_sync_conn, "Exclue")
         sa_sync_conn.execute(
             text("UPDATE persons SET exclusion = 'out_of_perimeter' WHERE id = :id"),
             {"id": p_excl},
         )
-        _authorship_in_lab(sa_sync_conn, p_excl, lab_id=lab)
+        _contribution_in_lab(sa_sync_conn, p_excl, lab_id=lab)
 
         res = PgPersonsQueries(sa_sync_conn).list_persons(
             filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"

@@ -9,9 +9,9 @@ from functools import partial
 from sqlalchemy import bindparam, text
 
 from domain.merge import MergedEntity
-from domain.source_publications.keys import project_confirmation_keys
+from domain.source_records.keys import project_confirmation_keys
 from pipeline.transformation.publications.reconciliation import (
-    fetch_dirty_source_publication_ids,
+    fetch_dirty_source_record_ids,
     fetch_reconciliation_universe,
     mark_keys_dirty,
     mark_publication_siblings_dirty,
@@ -19,11 +19,11 @@ from pipeline.transformation.publications.reconciliation import (
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.redirects import redirect_of
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 # Notice OpenAlex de 2024, de titre « T », article par défaut.
 _notice = partial(
-    insert_source_publication, source="openalex", title="T", pub_year=2024, doc_type="article"
+    insert_source_record, source="openalex", title="T", publication_year=2024, doc_type="article"
 )
 
 logger = logging.getLogger("test_reconcile_components")
@@ -34,7 +34,7 @@ def _seed_pub(conn, doi=None) -> int:
         title="T",
         title_normalized="t",
         doc_type="article",
-        pub_year=2024,
+        publication_year=2024,
         doi=doi,
         oa_status="unknown",
     )
@@ -49,7 +49,7 @@ def _pub_exists(conn, pub_id) -> bool:
 
 def _sp_state(conn, sp_id) -> tuple:
     return conn.execute(
-        text("SELECT publication_id, keys_dirty FROM source_publications WHERE id = :id"),
+        text("SELECT publication_id, keys_dirty FROM source_records WHERE id = :id"),
         {"id": sp_id},
     ).one()
 
@@ -59,7 +59,7 @@ class TestUniverse:
         """Le voisinage = SP dirty + SP non-dirty partageant une clé ; ignore les non-liées.
 
         DOI porté par les SP, pas par les publications (`UNIQUE(lower(doi))` interdit deux pubs
-        au même DOI) ; le voisinage par DOI joint sur `source_publications.doi`."""
+        au même DOI) ; le voisinage par DOI joint sur `source_records.doi`."""
         conn = sa_sync_conn
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
@@ -119,14 +119,14 @@ class TestUniverse:
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
         orphan = _notice(conn, source_id="orphan", doi="10.1/x")
-        assert fetch_dirty_source_publication_ids(conn) == [orphan]
+        assert fetch_dirty_source_record_ids(conn) == [orphan]
 
 
 class TestEndToEnd:
     def test_two_pubs_sharing_doi_merged(self, sa_sync_conn):
         """Deux pubs dont les SP partagent un DOI → fusion. Les pubs n'ont pas (encore) le DOI en
         colonne (`UNIQUE(lower(doi))` interdit deux pubs au même DOI) : aucune ne le porte, donc
-        l'ancre tombe sur le `min(source_publication_id)`."""
+        l'ancre tombe sur le `min(source_record_id)`."""
         conn = sa_sync_conn
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
@@ -135,7 +135,7 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_publication_id.
+        # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_record_id.
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
         assert not _pub_exists(conn, absorbed)
@@ -170,11 +170,11 @@ class TestEndToEnd:
         _notice(conn, pub_b, source_id="b", doi="10.1/x", keys_dirty=False)
         _notice(conn, pub_b, source_id="c", doi="10.1/y", keys_dirty=False)
         _notice(conn, untouched, source_id="d", doi="10.9/z")
-        conn.execute(text("UPDATE publications SET authorships_dirty = false"))
+        conn.execute(text("UPDATE publications SET contributions_dirty = false"))
 
         reconcile(conn, logger)
 
-        dirty = dict(conn.execute(text("SELECT id, authorships_dirty FROM publications")).all())
+        dirty = dict(conn.execute(text("SELECT id, contributions_dirty FROM publications")).all())
         assert dirty[pub_a] and dirty[pub_b]
         assert not dirty[untouched]
 
@@ -440,15 +440,15 @@ class TestUniverseMatchesPythonTokens:
             r.id: r
             for r in conn.execute(
                 text(
-                    "SELECT id, doi, external_ids, doc_type, title_normalized, pub_year "
-                    "FROM source_publications WHERE id = ANY(:ids)"
+                    "SELECT id, doi, external_ids, doc_type, title_normalized, publication_year "
+                    "FROM source_records WHERE id = ANY(:ids)"
                 ).bindparams(bindparam("ids")),
                 {"ids": ids},
             )
         }
         toks = {
             i: project_confirmation_keys(
-                r.doi, r.external_ids, r.doc_type, r.title_normalized, r.pub_year
+                r.doi, r.external_ids, r.doc_type, r.title_normalized, r.publication_year
             ).tokens()
             for i, r in rows.items()
         }
@@ -456,7 +456,7 @@ class TestUniverseMatchesPythonTokens:
         for i in ids:
             conn.execute(
                 text(
-                    "UPDATE source_publications SET keys_dirty = (id = :i) WHERE id = ANY(:ids)"
+                    "UPDATE source_records SET keys_dirty = (id = :i) WHERE id = ANY(:ids)"
                 ).bindparams(bindparam("ids")),
                 {"i": i, "ids": ids},
             )
@@ -496,7 +496,7 @@ def _distinct_dois(conn, pub_id) -> set[str]:
     return set(
         conn.execute(
             text(
-                "SELECT DISTINCT doi FROM source_publications "
+                "SELECT DISTINCT doi FROM source_records "
                 "WHERE publication_id = :id AND doi IS NOT NULL"
             ),
             {"id": pub_id},
@@ -505,13 +505,13 @@ def _distinct_dois(conn, pub_id) -> set[str]:
 
 
 class TestStaleMembership:
-    """Régression : une source_publication rattachée par une clé de confirmation qui disparaît
+    """Régression : une source_record rattachée par une clé de confirmation qui disparaît
     ensuite doit être détachée, pas laissée sur une publication que plus rien ne lui associe.
 
     Cas typique : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex
     porte le DOI de la préversion, puis la source bascule sur le DOI de la version publiée. Le
     voisinage 1-hop se calcule sur les clés d'après : la préversion n'y figure dans aucun bras, et
-    seule la propagation de `keys_dirty` aux source_publications co-rattachées la ramène dans la
+    seule la propagation de `keys_dirty` aux source_records co-rattachées la ramène dans la
     passe. Sans elle, la publication porte deux DOI distincts.
     """
 
@@ -533,7 +533,7 @@ class TestStaleMembership:
         published = _notice(conn, pub, source_id="published", doi=self.PUBLISHED_DOI)
         return pub, preprint, published
 
-    def test_siblings_of_a_dirty_source_publication_are_marked(self, sa_sync_conn):
+    def test_siblings_of_a_dirty_source_record_are_marked(self, sa_sync_conn):
         """La propagation marque les co-rattachées, et elles seules : ni les SP d'une autre
         publication, ni les orphelines."""
         conn = sa_sync_conn
@@ -546,7 +546,7 @@ class TestStaleMembership:
         assert _sp_state(conn, other)[1] is False
         assert _sp_state(conn, orphan)[1] is False
 
-    def test_source_publication_without_shared_key_is_split_off(self, sa_sync_conn):
+    def test_source_record_without_shared_key_is_split_off(self, sa_sync_conn):
         conn = sa_sync_conn
         pub, preprint, published = self._seed_drifted_pair(conn)
 

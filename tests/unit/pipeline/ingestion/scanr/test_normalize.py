@@ -4,7 +4,7 @@ Couvre la construction de `biblio` dans `insert_scanr_document` et le parsing
 auteurs pur `build_scanr_author_records` (orcid/idref, roles, affiliations →
 adresses + pays détectés).
 
-Pattern : `FakeSourcePublicationQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourceRecordQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -27,14 +27,14 @@ from pipeline.ingestion.scanr.normalize import (
     get_container_facts,
     get_title,
     insert_scanr_document,
-    process_authorships,
+    process_contributions,
     process_work,
     upsert_containers,
     upsert_publisher,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourcePublicationQueries,
+    FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
 )
@@ -42,7 +42,7 @@ from tests.helpers.normalize_doubles import (
 _EMPTY_PUB_META = PublicationMetadata(
     doi=None,
     title=None,
-    pub_year=None,
+    publication_year=None,
     doc_type=None,
     nnt=None,
     journal_id=None,
@@ -56,7 +56,7 @@ class TestInsertScanrDocumentLicense:
     """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
 
     def _call(self, evidence: dict) -> Any:
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(), queries, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUB_META
         )
@@ -87,16 +87,16 @@ class TestInsertScanrDocumentBiblio:
         return queries.upserted_documents[-1]
 
     def test_biblio_none_when_no_source_fields(self):
-        captured = self._call(FakeSourcePublicationQueries(), {})
+        captured = self._call(FakeSourceRecordQueries(), {})
         assert captured.biblio is None
 
     def test_biblio_publisher_only(self):
-        captured = self._call(FakeSourcePublicationQueries(), {"source": {"publisher": "Elsevier"}})
+        captured = self._call(FakeSourceRecordQueries(), {"source": {"publisher": "Elsevier"}})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_and_journal_issns(self):
         captured = self._call(
-            FakeSourcePublicationQueries(),
+            FakeSourceRecordQueries(),
             {
                 "source": {
                     "title": "Journal of Physics",
@@ -114,7 +114,7 @@ class TestInsertScanrDocumentBiblio:
 
     def test_biblio_publisher_and_journal_together(self):
         captured = self._call(
-            FakeSourcePublicationQueries(),
+            FakeSourceRecordQueries(),
             {
                 "source": {
                     "publisher": "Elsevier",
@@ -129,13 +129,13 @@ class TestInsertScanrDocumentBiblio:
         }
 
     def test_biblio_journal_title_only(self):
-        captured = self._call(FakeSourcePublicationQueries(), {"source": {"title": "J. Phys."}})
+        captured = self._call(FakeSourceRecordQueries(), {"source": {"title": "J. Phys."}})
         assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
 
 class TestInsertScanrDocumentExternalIds:
     def _call(self, doc, pub_meta) -> dict[str, Any]:
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
             queries,
@@ -188,7 +188,7 @@ class TestBuildScanrAuthorRecords:
         }
         rec = build_scanr_author_records(doc)[0]
         assert rec.name == SignatureName(raw="Marie Dupont")
-        assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
+        assert rec.identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
         assert rec.roles == ["author"]
 
     def test_affiliation_becomes_address_with_detected_countries(self):
@@ -360,7 +360,7 @@ class TestExtractPubMetadata:
         meta = extract_pub_metadata(doc, journal_id=3, scanr_id="doi10.1/a")
 
         assert meta.title == "Un titre"
-        assert meta.pub_year == 2024
+        assert meta.publication_year == 2024
         assert meta.doi == "10.1/a"
         assert meta.oa_status == "closed"
         assert meta.nnt is None
@@ -383,7 +383,7 @@ class TestExtractPubMetadata:
 
 class TestInsertScanrDocumentIdentifiants:
     def _call(self, doc, pub_meta=None) -> Any:
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
             queries,
@@ -420,7 +420,7 @@ class TestInsertScanrDocumentIdentifiants:
 
 class TestInsertScanrDocumentChamps:
     def _call(self, doc, pub_meta=None) -> Any:
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         insert_scanr_document(
             MagicMock(),
             queries,
@@ -502,18 +502,18 @@ class TestInsertScanrDocumentChamps:
         assert self._call({"summary": {"default": "Un résumé"}}).abstract == "Un résumé"
 
 
-class TestProcessAuthorships:
+class TestProcessContributions:
     def test_confie_les_signatures_au_writer_partage(self, monkeypatch):
         vus: dict[str, object] = {}
         monkeypatch.setattr(
             normalize_scanr,
-            "sync_source_authorships",
+            "sync_source_contributions",
             lambda conn, queries, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
 
-        process_authorships(MagicMock(), MagicMock(), {"authors": []}, 555)
+        process_contributions(MagicMock(), MagicMock(), {"authors": []}, 555)
 
         assert (vus["source"], vus["spid"]) == ("scanr", 555)
 
@@ -525,10 +525,10 @@ class TestProcessWork:
         monkeypatch.setattr(
             normalize_scanr, "upsert_containers", lambda d, p, **kw: Containers(None, None)
         )
-        monkeypatch.setattr(normalize_scanr, "process_authorships", lambda *a, **kw: None)
+        monkeypatch.setattr(normalize_scanr, "process_contributions", lambda *a, **kw: None)
 
     def _run(self, raw, logger):
-        queries = FakeSourcePublicationQueries()
+        queries = FakeSourceRecordQueries()
         staging = FakeStagingQueries()
         rendu = process_work(
             MagicMock(),
@@ -537,7 +537,7 @@ class TestProcessWork:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
-            authorship_queries=MagicMock(),
+            contribution_queries=MagicMock(),
         )
         return rendu, queries, staging
 
@@ -565,7 +565,7 @@ class TestProcessWork:
             queries=MagicMock(),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            authorship_queries=MagicMock(),
+            contribution_queries=MagicMock(),
         )
         assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
 
@@ -585,7 +585,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        authorship_queries=MagicMock(),
+        contribution_queries=MagicMock(),
     )
     row = staging_row()
 

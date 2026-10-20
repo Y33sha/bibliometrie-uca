@@ -1,6 +1,6 @@
 """Phase `relations` — population de `publication_relations` depuis les relations déclarées.
 
-Tourne après `publications` : les `source_publications` sont rattachées à leur publication canonique, et les DOI cibles sont résolus en `publication_id` quand ils sont au corpus.
+Tourne après `publications` : les `source_records` sont rattachées à leur publication canonique, et les DOI cibles sont résolus en `publication_id` quand ils sont au corpus.
 
 Trois signaux peuplent la table :
 

@@ -8,11 +8,11 @@ from pipeline.transformation.persons.identifier_arbitration import (
     fetch_identifier_votes,
     write_misplaced_neutralizations,
 )
-from pipeline.transformation.persons.loading import fetch_unlinked_authorships
-from tests.integration.helpers.authorships import upsert_identity
+from pipeline.transformation.persons.loading import fetch_unlinked_contributions
+from tests.integration.helpers.contributions import upsert_identity
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 _ORCID = "0000-0001-2345-6789"
 
@@ -27,7 +27,7 @@ def _signature(
     resolution_mode=None,
 ):
     """Signature crossref du périmètre portant un ORCID et la carte `neutralized`. Retourne `(signature, identité)`."""
-    sd = insert_source_publication(
+    sd = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
     signature_id = insert_signature(
@@ -36,7 +36,7 @@ def _signature(
         source="crossref",
         raw_author_name="Jean Neutralisation",
         author_name_normalized=name,
-        person_identifiers={"orcid": _ORCID},
+        identifiers={"orcid": _ORCID},
         person_id=person_id,
         in_perimeter=True,
         resolution_mode=resolution_mode,
@@ -47,13 +47,13 @@ def _signature(
 
 def _carte(conn, signature_id):
     return conn.execute(
-        text("SELECT neutralized_identifiers FROM source_authorships WHERE id = :id"),
+        text("SELECT neutralized_identifiers FROM source_contributions WHERE id = :id"),
         {"id": signature_id},
     ).scalar_one()
 
 
 def _orcid_projete(conn):
-    rows = fetch_unlinked_authorships(conn)
+    rows = fetch_unlinked_contributions(conn)
     [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
     return row.identifiers.get("orcid")
 
@@ -79,7 +79,7 @@ def test_vote_sans_les_signatures_neutralisees_pour_partage(sa_sync_conn):
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand l'identité est désignée, effacée sinon. Une signature résolue par identifiant qui la gagne est rendue pour détachement."""
-    signature_id, identity_id = _signature(
+    signature_id, contributor_information_id = _signature(
         sa_sync_conn,
         None,
         name="t dado",
@@ -89,7 +89,7 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     )
 
     assert write_misplaced_neutralizations(
-        sa_sync_conn, {identity_id: ["orcid"]}
+        sa_sync_conn, {contributor_information_id: ["orcid"]}
     ) == MisplacedNeutralizations(neutralized=1, to_detach=[signature_id])
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "misplaced"}
 
@@ -101,29 +101,31 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
 
 def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
     """Les groupes d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
-    signature_id, identity_id = _signature(sa_sync_conn, None, source_id="c-regroupe")
+    signature_id, contributor_information_id = _signature(
+        sa_sync_conn, None, source_id="c-regroupe"
+    )
     publication_id = sa_sync_conn.execute(
         text(
-            "SELECT sp.publication_id FROM source_authorships sa "
-            "JOIN source_publications sp ON sp.id = sa.source_publication_id WHERE sa.id = :id"
+            "SELECT sp.publication_id FROM source_contributions sa "
+            "JOIN source_records sp ON sp.id = sa.source_record_id WHERE sa.id = :id"
         ),
         {"id": signature_id},
     ).scalar_one()
     sa_sync_conn.execute(
-        text("UPDATE publications SET authorships_dirty = false WHERE id = :id"),
+        text("UPDATE publications SET contributions_dirty = false WHERE id = :id"),
         {"id": publication_id},
     )
 
-    write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
+    write_misplaced_neutralizations(sa_sync_conn, {contributor_information_id: ["orcid"]})
 
     assert sa_sync_conn.execute(
-        text("SELECT authorships_dirty FROM publications WHERE id = :id"), {"id": publication_id}
+        text("SELECT contributions_dirty FROM publications WHERE id = :id"), {"id": publication_id}
     ).scalar_one()
 
 
 def test_shared_prime_sur_misplaced(sa_sync_conn):
-    signature_id, identity_id = _signature(
+    signature_id, contributor_information_id = _signature(
         sa_sync_conn, {"orcid": "shared"}, source_id="c-shared-prime"
     )
-    write_misplaced_neutralizations(sa_sync_conn, {identity_id: ["orcid"]})
+    write_misplaced_neutralizations(sa_sync_conn, {contributor_information_id: ["orcid"]})
     assert _carte(sa_sync_conn, signature_id) == {"orcid": "shared"}

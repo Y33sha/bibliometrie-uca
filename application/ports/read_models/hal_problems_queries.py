@@ -21,7 +21,7 @@ class HalDocSummary(BaseModel):
     halid: str
     hal_collections: list[str] | None
     hal_doc_type: str | None
-    hal_pub_year: int | None
+    hal_publication_year: int | None
     hal_title: str | None
     author_count: int
 
@@ -31,7 +31,7 @@ class HalPubDetail(BaseModel):
 
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doc_type: str
     doi: str | None
     container_title: str | None
@@ -69,7 +69,7 @@ class HalCollectionLab(BaseModel):
 class HalMissingCollectionPub(BaseModel):
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doc_type: str
     doi: str | None
     halids: list[str] | None
@@ -96,7 +96,7 @@ class NoMissingCollections(StrEnum):
 class HalAffiliationConflictPub(BaseModel):
     id: int
     title: str
-    pub_year: int | None
+    publication_year: int | None
     doc_type: str
     doi: str | None
     halids: list[str] | None
@@ -114,7 +114,7 @@ class HalAccountSummary(BaseModel):
     idhal: str | None
     orcid: str | None
     idref: str | None
-    pub_count: int
+    publication_count: int
 
 
 class HalDuplicateAccountPerson(BaseModel):

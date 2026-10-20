@@ -19,11 +19,11 @@ La normalisation garde seulement le texte des affiliations, dans `addresses`.
 
 Types des institutions OpenAlex : `education` 54 %, `facility` 32 %, `government` 9 %, `healthcare` 4 %. Les nœuds du réseau sont donc des établissements et des laboratoires.
 
-Les relations parent/enfant du ROR coïncident avec `structure_tutelles` sur le périmètre, à quelques écarts près (dump ROR v2.14).
+Les relations parent/enfant du ROR coïncident avec `structure_parents` sur le périmètre, à quelques écarts près (dump ROR v2.14).
 
 ## Décisions
 
-**Deux référentiels.** `structures` et `structure_tutelles` restent le référentiel interne : elles définissent le périmètre et servent à la phase `affiliations`. Une partie des tutelles concerne des structures internes absentes du ROR. Le ROR est un référentiel externe en lecture seule, chargé depuis le dump publié sur Zenodo. `structures.ror_id` relie les deux, avec une contrainte d'unicité.
+**Deux référentiels.** `structures` et `structure_parents` restent le référentiel interne : elles définissent le périmètre et servent à la phase `affiliations`. Une partie des tutelles concerne des structures internes absentes du ROR. Le ROR est un référentiel externe en lecture seule, chargé depuis le dump publié sur Zenodo. `structures.ror_id` relie les deux, avec une contrainte d'unicité.
 
 ```
 ror_organizations
@@ -41,7 +41,7 @@ ror_relations
 
 **Rafraîchissement du référentiel par le pipeline.** En tête de la phase `affiliations`, le pipeline compare le nom de la dernière archive publiée sur Zenodo au nom de la dernière archive importée. Il télécharge et importe seulement une version plus récente. La table `ror_dump_imports (version, imported_at)` garde une ligne par import.
 
-**ROR des sources par signature.** La phase `normalize` remplit la table de liens `source_authorship_rors (source_authorship_id, ror_id, address_id)`. `address_id` désigne l'adresse dont l'affiliation porte le ROR ; il est vide pour un ROR donné sans texte d'affiliation. Ces liens entrent dans `content_hash`. `ror_id` est sans clé étrangère vers `ror_organizations` : une source peut citer un ROR plus récent que le dump importé, et l'import remplace tout le référentiel.
+**ROR des sources par signature.** La phase `normalize` remplit la table de liens `source_contribution_rors (source_contribution_id, ror_id, address_id)`. `address_id` désigne l'adresse dont l'affiliation porte le ROR ; il est vide pour un ROR donné sans texte d'affiliation. Ces liens entrent dans `content_hash`. `ror_id` est sans clé étrangère vers `ror_organizations` : une source peut citer un ROR plus récent que le dump importé, et l'import remplace tout le référentiel.
 
 Lecture par source :
 
@@ -52,9 +52,9 @@ Lecture par source :
 - HAL : ROR des structures du TEI auxquelles l'auteur est affilié.
 - DataCite : `affiliationIdentifier` de schéma ROR. Les trois adaptateurs qui interrogent `/dois` (extraction, `fetch_missing`, `fetch_stale`) partagent le paramètre `affiliation=true`.
 
-**Périmètre résolu par la phase `affiliations`.** Une vue matérialisée associe chaque signature consolidée à ses ROR, sur le modèle de `authorship_structures`. Dans le périmètre, ce sont les ROR des structures résolues par `affiliations`. Hors périmètre, ce sont les ROR des sources, moins ceux du périmètre.
+**Périmètre résolu par la phase `affiliations`.** Une vue matérialisée associe chaque signature consolidée à ses ROR, sur le modèle de `contribution_structures`. Dans le périmètre, ce sont les ROR des structures résolues par `affiliations`. Hors périmètre, ce sont les ROR des sources, moins ceux du périmètre.
 
-**Cohérence des référentiels.** Un rapport compare `structure_tutelles` à `ror_relations` dans les deux sens, par clôture transitive. Un parent ROR est couvert s'il est un ancêtre dans `structure_tutelles`. Une tutelle est couverte si son parent est un ancêtre dans le ROR. Chaque écart se corrige dans `structure_tutelles` ou se signale au ROR.
+**Cohérence des référentiels.** Un rapport compare `structure_parents` à `ror_relations` dans les deux sens, par clôture transitive. Un parent ROR est couvert s'il est un ancêtre dans `structure_parents`. Une tutelle est couverte si son parent est un ancêtre dans le ROR. Chaque écart se corrige dans `structure_parents` ou se signale au ROR.
 
 ## Phasage
 
@@ -62,13 +62,13 @@ Lecture par source :
 
 - [x] Migration : tables `ror_organizations` et `ror_relations`.
 - [x] Script de chargement du dump ROR : `interfaces/cli/imports/import_ror_dump.py`.
-- [x] Rapport de cohérence entre `structure_tutelles` et `ror_relations` : `interfaces/cli/maintenance/report_ror_coherence.py`.
+- [x] Rapport de cohérence entre `structure_parents` et `ror_relations` : `interfaces/cli/maintenance/report_ror_coherence.py`.
 - [x] Contrainte d'unicité sur `structures.ror_id`.
 
 ### 2. ROR des sources
 
 - [x] DataCite : paramètre `affiliation=true` partagé par les trois adaptateurs.
-- [x] Migration : tables `source_authorship_rors` et `ror_dump_imports`.
+- [x] Migration : tables `source_contribution_rors` et `ror_dump_imports`.
 - [x] Writer partagé : ROR des signatures, dans `content_hash`.
 - [x] Normalisation OpenAlex, WoS, Crossref, ScanR, HAL et DataCite : lecture des ROR.
 - [x] Rafraîchissement du référentiel ROR en tête de la phase `affiliations`.

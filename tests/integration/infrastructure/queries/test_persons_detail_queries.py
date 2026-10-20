@@ -3,12 +3,12 @@
 from functools import partial
 
 from infrastructure.read_models.persons.detail import person_theses
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 
-# Authorship du périmètre.
-_in_perimeter_authorship = partial(insert_authorship, in_perimeter=True)
+# Contribution du périmètre.
+_in_perimeter_contribution = partial(insert_contribution, in_perimeter=True)
 
 
 def _theses(conn, person_id):
@@ -25,9 +25,9 @@ class TestPersonTheses:
         alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
         bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")
         pub = insert_publication(sa_sync_conn, doc_type="thesis")
-        _in_perimeter_authorship(sa_sync_conn, pub, person_id=jury, roles=["jury_member"])
-        _in_perimeter_authorship(sa_sync_conn, pub, person_id=alice, roles=["author"])
-        _in_perimeter_authorship(sa_sync_conn, pub, person_id=bruno, roles=["author"])
+        _in_perimeter_contribution(sa_sync_conn, pub, person_id=jury, roles=["jury_member"])
+        _in_perimeter_contribution(sa_sync_conn, pub, person_id=alice, roles=["author"])
+        _in_perimeter_contribution(sa_sync_conn, pub, person_id=bruno, roles=["author"])
 
         theses = _theses(sa_sync_conn, jury)
 
@@ -41,8 +41,8 @@ class TestPersonTheses:
         person = insert_person(sa_sync_conn, "Rapporteur")
         these = insert_publication(sa_sync_conn, "Thèse soutenue ailleurs", doc_type="thesis")
         ouvrage = insert_publication(sa_sync_conn, "Ouvrage dirigé", doc_type="book")
-        insert_authorship(sa_sync_conn, these, person_id=person, roles=["rapporteur"])
-        insert_authorship(sa_sync_conn, ouvrage, person_id=person, roles=["editor"])
+        insert_contribution(sa_sync_conn, these, person_id=person, roles=["rapporteur"])
+        insert_contribution(sa_sync_conn, ouvrage, person_id=person, roles=["editor"])
 
         assert [thesis.title for thesis in _theses(sa_sync_conn, person)] == [
             "Thèse soutenue ailleurs"

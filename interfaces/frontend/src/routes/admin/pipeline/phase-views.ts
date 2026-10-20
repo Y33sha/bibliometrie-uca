@@ -128,7 +128,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   publications: {
     lines: [
-      "{processed} source_publications examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
+      "{processed} source_records examinées, résolues en {publications} publications (dont {existing} déjà existantes)",
       "{created} nouvelles publications, dont {splits} par scission",
       "{merges} doublons fusionnés",
       "nouveau total : {pub_total} publications",
@@ -155,7 +155,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   metadata_correction: {
     matrix: {
       columns: [
-        { key: "examined", label: "source_publications examinées" },
+        { key: "examined", label: "source_records examinées" },
         { key: "corrected", label: "corrigées" },
       ],
       rows: [
@@ -224,10 +224,10 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  authorships: {
+  contributions: {
     summary: [
-      { key: "created", label: "Authorships créées" },
-      { key: "pruned", label: "Authorships orphelines supprimées" },
+      { key: "created", label: "Contributions créées" },
+      { key: "pruned", label: "Contributions orphelines supprimées" },
       { key: "publications_purged", label: "Publications orphelines supprimées" },
       { key: "total_in_perimeter", label: "Total dans le périmètre" },
     ],

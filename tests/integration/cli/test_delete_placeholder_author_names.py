@@ -6,25 +6,26 @@ from interfaces.cli.oneshot.delete_placeholder_author_names import (
     delete,
     placeholder_signatures,
 )
-from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_identity
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 
 def test_seules_les_signatures_au_nom_absent_sont_supprimees(sa_sync_conn):
     conn = sa_sync_conn
     publication = insert_publication(conn)
     conn.execute(
-        text("UPDATE publications SET authorships_dirty = false WHERE id = :p"), {"p": publication}
+        text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
+        {"p": publication},
     )
-    notice = insert_source_publication(conn, publication, source="datacite", source_id="10.1/x")
+    notice = insert_source_record(conn, publication, source="datacite", source_id="10.1/x")
     signatures = [
         insert_signature(
             conn,
             notice,
             source="datacite",
             author_position=position,
-            identity_id=upsert_split_identity(conn, last.lower(), first.lower()),
+            contributor_information_id=upsert_split_identity(conn, last.lower(), first.lower()),
             roles=["author"],
             **name,
         )
@@ -43,9 +44,9 @@ def test_seules_les_signatures_au_nom_absent_sont_supprimees(sa_sync_conn):
     delete(conn, ids, notices)
 
     remaining = conn.execute(
-        text("SELECT id FROM source_authorships WHERE source_publication_id = :n"), {"n": notice}
+        text("SELECT id FROM source_contributions WHERE source_record_id = :n"), {"n": notice}
     ).scalars()
     assert sorted(remaining) == sorted(signatures[2:])
     assert conn.execute(
-        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication}
+        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
     ).scalar_one()

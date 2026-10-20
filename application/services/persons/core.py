@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_authorships`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des signatures (`source_contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging
@@ -11,13 +11,13 @@ from sqlalchemy import Connection
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
 from application.services._merge import load_merge_pair
-from application.services.authorships.core import reject_pair
+from application.services.contributions.core import reject_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
@@ -36,18 +36,18 @@ from domain.sources.registry import require_known_source
 logger = logging.getLogger(__name__)
 
 
-class AuthorshipRef(TypedDict):
-    """Référence d'une signature source (entrée de `detach_authorships`)."""
+class ContributionRef(TypedDict):
+    """Référence d'une signature source (entrée de `detach_contributions`)."""
 
     source: str
-    source_authorship_id: int
+    source_contribution_id: int
 
 
 class DetachResult(TypedDict):
-    """Résultat de `detach_authorships` : compteurs de l'opération."""
+    """Résultat de `detach_contributions` : compteurs de l'opération."""
 
     detached: int
-    deleted_authorships: int
+    deleted_contributions: int
     cleaned_forms: int
 
 
@@ -277,20 +277,20 @@ def update_name_form_status(
     status: str,
     *,
     repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
+    contribution_repo: ContributionRepository,
     audit_repo: AuditRepository | None = None,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des signatures portant cette forme : leurs `source_authorships` sont nullées et les `authorships` consolidées devenues sans source sont supprimées. Les signatures que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des signatures portant cette forme : leurs `source_contributions` sont nullées et les `contributions` consolidées devenues sans source sont supprimées. Les signatures que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        detached = authorship_repo.null_person_id_for_name_form(person_id, name_form)
+        detached = contribution_repo.null_person_id_for_name_form(person_id, name_form)
         if detached:
-            authorship_repo.delete_orphan_authorships_for_person(person_id)
+            contribution_repo.delete_orphan_contributions_for_person(person_id)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",
@@ -301,25 +301,25 @@ def update_name_form_status(
     return row
 
 
-def detach_authorships(
+def detach_contributions(
     person_id: int,
-    authorships: list[AuthorshipRef],
+    contributions: list[ContributionRef],
     *,
     repo: PersonRepository,
-    authorship_repo: AuthorshipRepository,
+    contribution_repo: ContributionRepository,
     audit_repo: AuditRepository | None = None,
 ) -> DetachResult:
-    """Rejette durablement les paires (publication, personne) couvertes par un lot d'authorships sources sélectionnées.
+    """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
     Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de toutes les sources de la paire, suppression de la ligne consolidée). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Retourne {"detached": N, "deleted_authorships": M, "cleaned_forms": K}.
+    Retourne {"detached": N, "deleted_contributions": M, "cleaned_forms": K}.
     """
     publication_ids: set[int] = set()
-    for a in authorships:
+    for a in contributions:
         require_known_source(a["source"])
-        pub_id = authorship_repo.find_publication_id_for_source_authorship(
-            a["source_authorship_id"]
+        pub_id = contribution_repo.find_publication_id_for_source_contribution(
+            a["source_contribution_id"]
         )
         if pub_id is not None:
             publication_ids.add(pub_id)
@@ -327,15 +327,15 @@ def detach_authorships(
     detached = 0
     deleted = 0
     for pub_id in publication_ids:
-        result = reject_pair(pub_id, person_id, repo=authorship_repo, audit_repo=audit_repo)
+        result = reject_pair(pub_id, person_id, repo=contribution_repo, audit_repo=audit_repo)
         detached += result["detached"]
-        deleted += result["deleted_authorships"]
+        deleted += result["deleted_contributions"]
 
     cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
 
     return {
         "detached": detached,
-        "deleted_authorships": deleted,
+        "deleted_contributions": deleted,
         "cleaned_forms": cleaned_forms,
     }
 

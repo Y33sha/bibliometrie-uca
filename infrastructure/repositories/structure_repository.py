@@ -23,7 +23,7 @@ from infrastructure.db.rows import row_as, rows_as
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.tables import (
     structure_name_forms,
-    structure_tutelles,
+    structure_parents,
     structures,
 )
 from infrastructure.jsonb_models.structure import StructureApiIds
@@ -199,9 +199,9 @@ class PgStructureRepository(StructureRepository):
                          FROM structure_name_forms f WHERE f.structure_id = s.id),
                         '[]'::jsonb),
                     'parent_ids', ARRAY(
-                        SELECT parent_id FROM structure_tutelles WHERE child_id = s.id),
+                        SELECT parent_id FROM structure_parents WHERE child_id = s.id),
                     'child_ids', ARRAY(
-                        SELECT child_id FROM structure_tutelles WHERE parent_id = s.id),
+                        SELECT child_id FROM structure_parents WHERE parent_id = s.id),
                     'confirmed_address_ids', ARRAY(
                         SELECT address_id FROM address_structures
                         WHERE structure_id = s.id AND is_confirmed),
@@ -223,17 +223,17 @@ class PgStructureRepository(StructureRepository):
         self._conn.execute(delete(structures).where(structures.c.id == structure_id))
         return cast(dict[str, JsonValue], snapshot)
 
-    # ── structure_tutelles ─────────────────────────────────────────
+    # ── structure_parents ─────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        # Remontée récursive `child → parent` à travers `structure_tutelles`. `structure_id` lui-même est exclu du résultat.
+        # Remontée récursive `child → parent` à travers `structure_parents`. `structure_id` lui-même est exclu du résultat.
         stmt = text(
             """
             WITH RECURSIVE ancestors(id) AS (
-                SELECT parent_id FROM structure_tutelles
+                SELECT parent_id FROM structure_parents
                 WHERE child_id = :sid
                 UNION
-                SELECT sr.parent_id FROM structure_tutelles sr
+                SELECT sr.parent_id FROM structure_parents sr
                 JOIN ancestors a ON a.id = sr.child_id
             )
             SELECT id FROM ancestors
@@ -249,13 +249,13 @@ class PgStructureRepository(StructureRepository):
         child_id: int,
     ) -> StructureTutelleRow | None:
         stmt = (
-            pg_insert(structure_tutelles)
+            pg_insert(structure_parents)
             .values(parent_id=parent_id, child_id=child_id)
             .on_conflict_do_nothing(index_elements=["parent_id", "child_id"])
             .returning(
-                structure_tutelles.c.id,
-                structure_tutelles.c.parent_id,
-                structure_tutelles.c.child_id,
+                structure_parents.c.id,
+                structure_parents.c.parent_id,
+                structure_parents.c.child_id,
             )
         )
         result = self._conn.execute(stmt)
@@ -264,11 +264,11 @@ class PgStructureRepository(StructureRepository):
 
     def delete_tutelle(self, tutelle_id: int) -> StructureTutelleDeletedRow | None:
         stmt = (
-            delete(structure_tutelles)
-            .where(structure_tutelles.c.id == tutelle_id)
+            delete(structure_parents)
+            .where(structure_parents.c.id == tutelle_id)
             .returning(
-                structure_tutelles.c.parent_id,
-                structure_tutelles.c.child_id,
+                structure_parents.c.parent_id,
+                structure_parents.c.child_id,
             )
         )
         result = self._conn.execute(stmt)

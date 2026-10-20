@@ -127,7 +127,7 @@ def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, ob
 def year_clause(years: list[int]) -> WhereClause | None:
     if not years:
         return None
-    return WhereClause("p.pub_year = ANY(:flt_years)", {"flt_years": years})
+    return WhereClause("p.publication_year = ANY(:flt_years)", {"flt_years": years})
 
 
 def lab_clause(lab_ids: list[int]) -> WhereClause | None:
@@ -261,7 +261,7 @@ def source_clause(source_values: list[str]) -> WhereClause | None:
 def _authored_by(person_id: int, bind: str) -> WhereClause:
     """La personne est auteur (rôle 'author') de la publication ; son id est lié sous `:bind`."""
     return WhereClause(
-        f"""EXISTS (SELECT 1 FROM authorships a
+        f"""EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND a.person_id = :{bind}
                   AND {has_author_role("a")})""",
         {bind: person_id},
@@ -308,7 +308,7 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
         return None
     return _toggle_clause(
         corr_filter,
-        """EXISTS (SELECT 1 FROM authorships a
+        """EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
                   AND a.is_corresponding = TRUE)""",
         {"flt_corr_person": person_id},
@@ -316,11 +316,11 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
 
 
 _SQL_HAS_HAL_SA = (
-    "EXISTS (SELECT 1 FROM source_publications sd "
+    "EXISTS (SELECT 1 FROM source_records sd "
     f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}')"
 )
 _SQL_IN_COLLECTION_SA = (
-    "EXISTS (SELECT 1 FROM source_publications sd "
+    "EXISTS (SELECT 1 FROM source_records sd "
     f"WHERE sd.publication_id = p.id AND sd.source = '{Source.HAL.value}' "
     "AND sd.hal_collections @> ARRAY[:flt_hal_collection])"
 )
@@ -381,7 +381,7 @@ def in_perimeter_person_clause(
         return None
     return _toggle_clause(
         in_perimeter,
-        """EXISTS (SELECT 1 FROM authorships a
+        """EXISTS (SELECT 1 FROM contributions a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person
                   AND a.in_perimeter = TRUE)""",
         {"flt_in_per_person": person_id},
@@ -526,10 +526,12 @@ def person_has_rh_clause(value: bool | None) -> WhereClause | None:
 
 
 def person_active_clause(value: bool | None) -> WhereClause | None:
-    """Filtre : la personne a (ou n'a pas) une authorship ou une fiche RH."""
+    """Filtre : la personne a (ou n'a pas) une contribution ou une fiche RH."""
     if value is None:
         return None
-    active = "(prh.id IS NOT NULL OR EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id))"
+    active = (
+        "(prh.id IS NOT NULL OR EXISTS (SELECT 1 FROM contributions a WHERE a.person_id = p.id))"
+    )
     return WhereClause(active if value else f"NOT {active}", {})
 
 
@@ -545,7 +547,7 @@ def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereCl
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
-    """Filtre : la personne (alias `p`) a un authorship rôle author rattaché au labo.
+    """Filtre : la personne (alias `p`) a une contribution rôle author rattaché au labo.
 
     Sert à scoper l'annuaire/les facettes personnes à un laboratoire — même
     sémantique que le scope publications `lab_clause`, transposée sur `person_id`.
@@ -554,8 +556,8 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
         return None
     return WhereClause(
         f"""EXISTS (
-            SELECT 1 FROM authorships a
-            JOIN authorship_structures aus ON aus.authorship_id = a.id
+            SELECT 1 FROM contributions a
+            JOIN contribution_structures aus ON aus.contribution_id = a.id
             WHERE a.person_id = p.id
               AND aus.structure_id = :flt_person_lab_id
               AND {has_author_role("a")}

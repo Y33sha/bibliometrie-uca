@@ -1,4 +1,4 @@
-"""Phase `publications` : assignation des `source_publications` aux publications, en une seule passe.
+"""Phase `publications` : assignation des `source_records` aux publications, en une seule passe.
 
 Les documents sources modifiés et leur voisinage sont regroupés par composante connexe de leurs clés de confirmation — DOI, NNT, hal_id, PMID, et pour les thèses le couple titre-année (`reconciliation`). Chaque document rejoint la publication qui ancre sa partition. Rattacher un document, fusionner deux publications ou en scinder une sont trois lectures du même regroupement.
 

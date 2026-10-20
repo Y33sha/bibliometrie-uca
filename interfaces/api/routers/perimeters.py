@@ -1,6 +1,6 @@
 """Router des ensembles de structures que les phases du pipeline consomment. Sert `/api/perimeters/*`.
 
-Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants dans `structure_tutelles`. Cet ensemble est matérialisé dans `perimeter_structures` par `PerimeterStructures.refresh` ; les lectures le restituent sans le recalculer.
+Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne `structure_ids`. L'ensemble effectif y ajoute leurs descendants dans `structure_parents`. Cet ensemble est matérialisé dans `perimeter_structures` par `PerimeterStructures.refresh` ; les lectures le restituent sans le recalculer.
 """
 
 from fastapi import APIRouter, Depends

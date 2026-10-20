@@ -7,7 +7,7 @@ from sqlalchemy import text
 from pipeline.transformation.persons.purge import delete_unsupported_identifier_attributions
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 _ORCID = "0000-0001-2345-6789"
 
@@ -18,13 +18,13 @@ _attribution = partial(insert_person_identifier, id_type="orcid", id_value=_ORCI
 
 def _signature(conn, person_id, name, *, neutralized=None):
     pub = insert_publication(conn, "t")
-    sp = insert_source_publication(conn, pub, source_id=f"hal-{pub}", title="t")
+    sp = insert_source_record(conn, pub, source_id=f"hal-{pub}", title="t")
     insert_signature(
         conn,
         sp,
         raw_author_name=name,
         author_name_normalized=name,
-        person_identifiers={"orcid": _ORCID},
+        identifiers={"orcid": _ORCID},
         person_id=person_id,
         in_perimeter=True,
         resolution_mode="name",

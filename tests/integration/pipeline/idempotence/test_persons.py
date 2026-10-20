@@ -3,11 +3,11 @@
 
 def setup_persons_test_data(conn):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → source_publications (hal) → source_authorships (in_perimeter=TRUE).
+    publications → source_records (hal) → source_contributions (in_perimeter=TRUE).
     """
 
     from tests.integration.helpers.publications import insert_publication
-    from tests.integration.helpers.sources import insert_signature, insert_source_publication
+    from tests.integration.helpers.sources import insert_signature, insert_source_record
 
     # Publications
     insert_publication(conn, "Test Pub Alpha", row_id=90001)
@@ -18,17 +18,17 @@ def setup_persons_test_data(conn):
         (90001, "hal-90000001", "Test Pub Alpha", "ART"),
         (90002, "hal-90000002", "Test Pub Beta", "THESE"),
     ):
-        insert_source_publication(
+        insert_source_record(
             conn,
             row_id,
             source_id=source_id,
             title=title,
             row_id=row_id,
-            pub_year=2024,
+            publication_year=2024,
             doc_type=doc_type,
         )
 
-    # HAL authorships — les identifiants observés (orcid + hal_person_id) vivent
+    # HAL contributions — les identifiants observés (orcid + hal_person_id) vivent
     # sur l'identité. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
     # sur les 2 pubs et partage donc une seule identité. Frank Moreau
     # (hal_person_id=900002) sur la pub 90001. Grace Petit (sans identifiant) sur
@@ -36,7 +36,7 @@ def setup_persons_test_data(conn):
     eve = ("Eve Leroy", "eve leroy", {"orcid": "0000-0001-9999-0001", "hal_person_id": 900001})
     frank = ("Frank Moreau", "frank moreau", {"hal_person_id": 900002})
     grace = ("Grace Petit", "grace petit", None)
-    for row_id, source_publication_id, position, (raw, normalized, identifiers) in (
+    for row_id, source_record_id, position, (raw, normalized, identifiers) in (
         (90001, 90001, 0, eve),
         (90002, 90001, 1, frank),
         (90003, 90002, 0, eve),
@@ -44,19 +44,19 @@ def setup_persons_test_data(conn):
     ):
         insert_signature(
             conn,
-            source_publication_id,
+            source_record_id,
             row_id=row_id,
             author_position=position,
             raw_author_name=raw,
             author_name_normalized=normalized,
-            person_identifiers=identifiers,
+            identifiers=identifiers,
             in_perimeter=True,
         )
 
 
 def run_create_persons(conn):
     """Exécute create_persons sur la Connection SA de test, retourne le
-    nombre d'authorships HAL rattachées à l'issue du run."""
+    nombre de contributions HAL rattachées à l'issue du run."""
     import logging
 
     from sqlalchemy import text
@@ -73,7 +73,7 @@ def run_create_persons(conn):
 
     return conn.execute(
         text(
-            "SELECT COUNT(*) FROM source_authorships WHERE source = 'hal' AND person_id IS NOT NULL"
+            "SELECT COUNT(*) FROM source_contributions WHERE source = 'hal' AND person_id IS NOT NULL"
         )
     ).scalar_one()
 
@@ -86,7 +86,7 @@ def _count_persons_tables(conn) -> dict:
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["hal_as_linked"] = conn.execute(
         text(
-            "SELECT COUNT(*) AS cnt FROM source_authorships "
+            "SELECT COUNT(*) AS cnt FROM source_contributions "
             "WHERE source = 'hal' AND person_id IS NOT NULL"
         )
     ).scalar_one()
@@ -105,12 +105,12 @@ class TestCreatePersonsIdempotence:
         linked_1 = run_create_persons(sa_sync_conn)
         counts_1 = _count_persons_tables(sa_sync_conn)
 
-        assert linked_1 == 4, f"4 authorships à rattacher, got {linked_1}"
+        assert linked_1 == 4, f"4 contributions à rattacher, got {linked_1}"
         assert counts_1["hal_as_linked"] == 4
 
-        # Reset : remettre person_id à NULL sur les authorships
+        # Reset : remettre person_id à NULL sur les contributions
         sa_sync_conn.execute(
-            text("UPDATE source_authorships SET person_id = NULL WHERE source = 'hal'")
+            text("UPDATE source_contributions SET person_id = NULL WHERE source = 'hal'")
         )
 
         # Passe 2
@@ -122,7 +122,7 @@ class TestCreatePersonsIdempotence:
         )
 
     def test_same_hal_person_id_one_person(self, sa_sync_conn):
-        """Deux authorships avec le même hal_person_id → une seule personne."""
+        """Deux contributions avec le même hal_person_id → une seule personne."""
         from sqlalchemy import text
 
         setup_persons_test_data(sa_sync_conn)
@@ -131,10 +131,10 @@ class TestCreatePersonsIdempotence:
         # Eve Leroy (hal_person_id=900001) apparaît sur 2 documents
         rows = sa_sync_conn.execute(
             text("""
-                SELECT DISTINCT sa.person_id FROM source_authorships sa
-                JOIN author_identifying_keys aik ON aik.id = sa.identity_id
+                SELECT DISTINCT sa.person_id FROM source_contributions sa
+                JOIN contributor_information aik ON aik.id = sa.contributor_information_id
                 WHERE sa.source = 'hal'
-                  AND aik.person_identifiers->>'hal_person_id' = '900001'
+                  AND aik.identifiers->>'hal_person_id' = '900001'
                   AND sa.person_id IS NOT NULL
             """)
         ).all()

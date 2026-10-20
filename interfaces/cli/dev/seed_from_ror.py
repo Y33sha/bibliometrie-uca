@@ -240,7 +240,7 @@ def build_institution_seed(
 
     rows_by_table = {
         "structures": structures,
-        "structure_tutelles": tutelles,
+        "structure_parents": tutelles,
         "perimeters": perimeters,
         "structure_name_forms": forms,
         "config": config,

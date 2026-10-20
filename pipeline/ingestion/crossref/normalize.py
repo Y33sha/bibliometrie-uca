@@ -1,7 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 Particularités CrossRef :
-- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_publications.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
+- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; le mapping taxonomie CrossRef → enum canonique vit dans `domain.source_records.doc_types._SOURCE_MAPS["crossref"]` et est appliqué par `arbitrate_doc_type_with_article_subtype` au moment du refresh. Le cas `journal-article` indistinct est arbitré contre les sous-types plus précis exposés par HAL/OA (review, conference_paper, etc.) — cf. `ARTICLE_SUBTYPES`.
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 
@@ -19,24 +19,24 @@ from domain.persons.identifiers import (
     normalize_orcid,
 )
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
-from domain.source_publications.external_ids import ExternalIdType
-from domain.source_publications.impact import Impact
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
+from pipeline.ingestion.common.signature_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
-    sync_source_authorships,
+    sync_source_contributions,
 )
-from pipeline.ingestion.common.source_publications import (
-    SourcePublicationQueries,
-    SourcePublicationUpsert,
+from pipeline.ingestion.common.source_records import (
+    SourceRecordQueries,
+    SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.crossref.payload import (
@@ -44,7 +44,7 @@ from pipeline.ingestion.crossref.payload import (
     crossref_raw_doc_type,
     extract_crossref_conference,
     extract_crossref_meta,
-    extract_crossref_pub_year,
+    extract_crossref_publication_year,
     parse_crossref_issns,
     strip_jats_tags,
 )
@@ -77,8 +77,8 @@ def get_title(msg: Mapping[str, JsonValue]) -> str | None:
     return None
 
 
-def get_pub_year(msg: Mapping[str, JsonValue]) -> int | None:
-    return extract_crossref_pub_year(msg, max_year=today().year + 1)
+def get_publication_year(msg: Mapping[str, JsonValue]) -> int | None:
+    return extract_crossref_publication_year(msg, max_year=today().year + 1)
 
 
 def get_container_title(msg: Mapping[str, JsonValue]) -> str | None:
@@ -238,7 +238,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
         issns=issns,
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
-        year=get_pub_year(msg),
+        year=get_publication_year(msg),
     )
 
 
@@ -287,8 +287,8 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
 
     - nom et prénom séparés (`family`, `given`) ;
     - entrée à `name` seul : signature collective ;
-    - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
-    - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_authorships crossref ;
+    - ORCID (seul identifiant exploitable côté CrossRef) sur `identifiers` ;
+    - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_contributions crossref ;
     - identifiants ROR de chaque affiliation : sur son adresse, sur la signature pour une affiliation sans nom ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
     """
@@ -322,8 +322,8 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
                 position=position,
                 name=name,
                 collective=collective,
-                roles=[AuthorshipRole.AUTHOR],
-                person_identifiers=ids if ids else None,
+                roles=[ContributionRole.AUTHOR],
+                identifiers=ids if ids else None,
                 addresses=addresses,
                 ror_ids=signature_rors,
             )
@@ -336,18 +336,18 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"author": msg.get("author")}
 
 
-def process_authorships(
+def process_contributions(
     conn: Connection,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
     msg: Mapping[str, JsonValue],
-    source_publication_id: int,
+    source_record_id: int,
 ) -> None:
     """Synchronise les signatures Crossref de la notice depuis son bloc auteurs."""
-    sync_source_authorships(
+    sync_source_contributions(
         conn,
-        authorship_queries,
+        contribution_queries,
         "crossref",
-        source_publication_id,
+        source_record_id,
         extract_crossref_author_block(msg),
         build_crossref_author_records,
     )
@@ -360,13 +360,13 @@ def process_authorships(
 
 def process_work(
     conn: Connection,
-    queries: SourcePublicationQueries,
+    queries: SourceRecordQueries,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    authorship_queries: AuthorshipsBatchQueries,
+    contribution_queries: ContributionsBatchQueries,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -376,9 +376,9 @@ def process_work(
         return False
 
     title = get_title(msg)
-    pub_year = get_pub_year(msg)
+    publication_year = get_publication_year(msg)
     # Garanti par `SourceNormalizer.process_work`, qui filtre les notices sans titre ou sans année.
-    assert isinstance(title, str) and isinstance(pub_year, int)
+    assert isinstance(title, str) and isinstance(publication_year, int)
 
     publisher_id = upsert_publisher(msg, publisher_store=publisher_store)
     containers = upsert_containers(msg, publisher_id, container_stores=container_stores)
@@ -387,16 +387,16 @@ def process_work(
     biblio = get_biblio(msg)
     meta = get_meta(msg)
 
-    source_publication_id = queries.upsert_source_publication(
+    source_record_id = queries.upsert_source_record(
         conn,
-        SourcePublicationUpsert(
+        SourceRecordUpsert(
             source="crossref",
             source_id=doi,
             staging_id=staging_id,
             doi=doi,
             external_ids=external_ids,
             title=title,
-            pub_year=pub_year,
+            publication_year=publication_year,
             doc_type=crossref_raw_doc_type(msg),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
@@ -411,7 +411,7 @@ def process_work(
             meta=meta,
         ),
     )
-    process_authorships(conn, authorship_queries, msg, source_publication_id)
+    process_contributions(conn, contribution_queries, msg, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -421,7 +421,7 @@ class CrossrefNormalizer(BibliographicNormalizer):
     DEFAULT_BATCH_SIZE = 100
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return get_title(row.raw_data), get_pub_year(row.raw_data)
+        return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
@@ -432,5 +432,5 @@ class CrossrefNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            authorship_queries=self._authorship_queries,
+            contribution_queries=self._contribution_queries,
         )

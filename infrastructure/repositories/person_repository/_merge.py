@@ -7,8 +7,8 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
-from infrastructure.repositories.authorship_repository import (
-    delete_orphan_authorships,
+from infrastructure.repositories.contribution_repository import (
+    delete_orphan_contributions,
     detach_rejected_signatures,
 )
 from infrastructure.repositories.merge_steps import (
@@ -72,16 +72,16 @@ def _merge_signature_groups(conn: Connection, target_id: int, source_id: int) ->
     """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text("""
-            UPDATE source_authorship_groups s SET person_id = NULL, resolution_mode = NULL
+            UPDATE source_contribution_groups s SET person_id = NULL, resolution_mode = NULL
             WHERE s.person_id = :s AND EXISTS (
-                SELECT 1 FROM source_authorship_groups t
+                SELECT 1 FROM source_contribution_groups t
                 WHERE t.person_id = :t AND t.publication_id = s.publication_id
             )
         """),
         {"t": target_id, "s": source_id},
     )
     conn.execute(
-        text("UPDATE source_authorship_groups SET person_id = :t WHERE person_id = :s"),
+        text("UPDATE source_contribution_groups SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )
 
@@ -105,15 +105,15 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 
 # Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
-    "signatures": transfer("source_authorships", "person_id"),
-    "authorships": transfer_unique("authorships", "person_id", "publication_id"),
+    "signatures": transfer("source_contributions", "person_id"),
+    "contributions": transfer_unique("contributions", "person_id", "publication_id"),
     "signature_groups": MergeStep(
-        (("source_authorship_groups", "person_id"),), _merge_signature_groups
+        (("source_contribution_groups", "person_id"),), _merge_signature_groups
     ),
-    "rejected_authorships": transfer_unique(
-        "rejected_authorships", "person_id", "source_publication_id"
+    "rejected_contributions": transfer_unique(
+        "rejected_contributions", "person_id", "source_record_id"
     ).of_nature(DataNature.DECISION),
-    "confirmed_signatures": transfer("confirmed_authorships", "person_id").of_nature(
+    "confirmed_signatures": transfer("confirmed_source_contributions", "person_id").of_nature(
         DataNature.DECISION
     ),
     "distinct_persons": MergeStep(
@@ -126,7 +126,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
         (("person_name_forms", "person_id"),), _merge_name_forms, DataNature.MIXED
     ),
     # L'absorbée n'a jamais de fiche RH : celle qui en a une est conservée (`merge_roles`).
-    "rh_record": untouched("persons_rh", "person_id"),
+    "rh_record": untouched("hr_records", "person_id"),
     # Les formes de nom de l'absorbée restent (`name_forms`).
     "name": untouched(
         "persons", "last_name", "first_name", "last_name_normalized", "first_name_normalized"
@@ -144,7 +144,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
     detach_rejected_signatures(conn, target_id)
-    delete_orphan_authorships(conn, target_id)
+    delete_orphan_contributions(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
     record_redirect(conn, MergedEntity.PERSON, target_id, source_id)
 

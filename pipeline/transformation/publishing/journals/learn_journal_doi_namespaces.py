@@ -31,7 +31,7 @@ class DoiJournalRow(NamedTuple):
 # Une revue posée par son espace de noms laisse sa trace dans `raw_metadata.journal_id`.
 _DOI_JOURNAL_PAIRS = text(f"""
     SELECT s.doi, s.journal_id, j.journal_type
-    FROM source_publications s
+    FROM source_records s
     JOIN journals j ON j.id = s.journal_id
     WHERE s.doi IS NOT NULL AND NOT {corrected("journal_id", "s")}
 """)

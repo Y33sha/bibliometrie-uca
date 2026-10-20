@@ -15,7 +15,7 @@ La requête a ouvert sa transaction avant l'appel. Le router construit les repos
 
 Un port est un `Protocol` déclaré par `application/` et implémenté par un adaptateur d'`infrastructure/` ou par le pipeline. Trois familles :
 
-- **Repositories** (`ports/repositories/`) — chargent et persistent un agrégat du domaine quand il y en a un. Quatre n'en ont pas : `Address`, `Authorship`, `AuditLog` et `Config` font du CRUD simple.
+- **Repositories** (`ports/repositories/`) — chargent et persistent un agrégat du domaine quand il y en a un. Quatre n'en ont pas : `Address`, `Contribution`, `AuditLog` et `Config` font du CRUD simple.
 - **Read models** (`ports/read_models/`) — projections plates que l'API sert aux pages.
 - **Recalculs du pipeline** (`ports/pipeline/`) — recalculs ciblés que les services déclenchent après une édition. `interfaces/api/deps.py` les remplit depuis `pipeline/public.py`.
 

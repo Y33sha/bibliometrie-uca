@@ -9,7 +9,7 @@ from domain.journals.journal import OaModel
 from domain.journals.series import ContainerLevel, container_level, series_title
 from domain.journals.titles import names_a_dated_event, names_proceedings
 from domain.normalize import normalize_text, to_plain_text
-from domain.source_publications.doc_types import map_doc_type
+from domain.source_records.doc_types import map_doc_type
 
 _BOOK = "book"
 _BOOK_CHAPTER = "book_chapter"

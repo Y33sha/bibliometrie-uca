@@ -18,7 +18,7 @@ def _payment(
         "doi": doi,
         "amount_eur_ht": amount,
         "billing_year": 2022,
-        "pub_year": 2022,
+        "publication_year": 2022,
         "publisher_name": None,
         "journal_name": None,
         "issn": None,
@@ -36,7 +36,7 @@ def _publication(conn, doi: str) -> int:
         title="t",
         title_normalized="t",
         doc_type="article",
-        pub_year=2022,
+        publication_year=2022,
         doi=doi,
         oa_status="unknown",
     )

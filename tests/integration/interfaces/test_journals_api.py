@@ -20,14 +20,14 @@ import pytest
 
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
-    seed_in_perimeter_authorships,
+    seed_in_perimeter_contributions,
     seed_journal,
     seed_journal_doi_namespace,
     seed_journal_issn,
     seed_publication,
     seed_publication_subject,
     seed_publisher,
-    seed_source_publication,
+    seed_source_record,
     seed_subject,
     uniq,
 )
@@ -36,7 +36,7 @@ from tests.integration.helpers.seeds import (
 _publication = partial(seed_publication, normalize_title=False)
 
 # Notice de titre « Doc », sans année.
-_seed_record = partial(seed_source_publication, title="Doc", pub_year=None)
+_seed_record = partial(seed_source_record, title="Doc", publication_year=None)
 
 
 _cleanup_after_module = truncate_after_module(
@@ -140,7 +140,7 @@ class TestListJournals:
         seed_journal("OrphanJournal")
         with_data = seed_journal("WithPubsJournal")
         _publication("p1", journal_id=with_data)
-        seed_in_perimeter_authorships(with_data)
+        seed_in_perimeter_contributions(with_data)
         r = client.get("/api/journals", params={"with_pubs": "true", "per_page": 200})
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
@@ -356,9 +356,9 @@ class TestGetJournal:
         # Champs ajoutés par la promotion vers JournalDetailResponse.
         assert "doaj_payload" in body
         assert "doaj_imported_at" in body
-        assert "pub_count" in body
+        assert "publication_count" in body
         assert body["doaj_payload"] is None
-        assert body["pub_count"] == 0
+        assert body["publication_count"] == 0
 
     def test_doaj_payload_exposed_when_present(self, client):
         jid = seed_journal()
@@ -454,7 +454,7 @@ class TestJournalDashboard:
         _publication("p1", doc_type="article", oa_status="gold", journal_id=jid)
         _publication("p2", doc_type="article", oa_status="closed", journal_id=jid)
         _publication("p3", doc_type="preprint", oa_status=None, journal_id=jid)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         assert r.status_code == 200
         body = r.json()
@@ -471,7 +471,7 @@ class TestJournalDashboard:
             cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
             _publication("p1", doc_type="article", journal_id=jid)
             _publication("p2", doc_type="conference_paper", journal_id=jid)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         by_dt = {d["doc_type"]: d for d in body["doc_types"]}
@@ -486,7 +486,7 @@ class TestJournalDashboard:
             _publication("p1", oa_status="closed", journal_id=jid)
             _publication("p2", oa_status="gold", journal_id=jid)
             _publication("p3", oa_status="unknown", journal_id=jid)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         by_oa = {o["oa_status"]: o for o in body["oa_statuses"]}
@@ -502,7 +502,7 @@ class TestJournalDashboard:
         jid = seed_journal()
         _publication("p1", oa_status="gold", journal_id=jid)
         _publication("p2", oa_status="closed", journal_id=jid)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         assert body["expected_oa_statuses"] == []
@@ -532,7 +532,7 @@ class TestJournalSubjects:
             (pub_ids[0], gen_id),
         ):
             seed_publication_subject(pub_id, subject_id=subject_id)
-        seed_in_perimeter_authorships(jid)
+        seed_in_perimeter_contributions(jid)
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200
         body = r.json()

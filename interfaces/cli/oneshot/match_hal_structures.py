@@ -50,7 +50,7 @@ _UNMATCHED = """
 _CANDIDATES = text(f"""
     WITH cited AS (
         SELECT coalesce(al.hal_structure_id, sah.hal_structure_id) AS hal_structure_id, count(*) AS signatures
-        FROM source_authorship_hal_structures sah
+        FROM source_contribution_hal_structures sah
         LEFT JOIN hal_structure_aliases al ON al.alias_id = sah.hal_structure_id
         GROUP BY 1
     ),

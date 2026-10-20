@@ -7,20 +7,20 @@ from pipeline.ingestion.common.signatures import (
     AddressRecord,
     AuthorRecord,
     signature_name_fields,
-    write_source_authorships,
+    write_source_contributions,
 )
-from tests.helpers.normalize_doubles import FakeAuthorshipsBatchQueries
+from tests.helpers.normalize_doubles import FakeContributionsBatchQueries
 
 
 def _items_written(records: list[AuthorRecord]) -> list[dict]:
-    queries = FakeAuthorshipsBatchQueries()
-    write_source_authorships(MagicMock(), queries, "crossref", 1, records)
+    queries = FakeContributionsBatchQueries()
+    write_source_contributions(MagicMock(), queries, "crossref", 1, records)
     return queries.upserted_batches[0]
 
 
 def _record(position: int, raw: str, orcid: str) -> AuthorRecord:
     return AuthorRecord(
-        position=position, name=SignatureName(raw=raw), person_identifiers={"orcid": orcid}
+        position=position, name=SignatureName(raw=raw), identifiers={"orcid": orcid}
     )
 
 
@@ -48,7 +48,7 @@ def test_collective_d_apres_la_source_ou_le_nom():
 
 def test_identifiants_bruts_conserves_sur_l_identite():
     items = _items_written([_record(0, "S. Acharya", "X"), _record(1, "S. Das", "X")])
-    assert [i["person_identifiers"] for i in items] == [{"orcid": "X"}, {"orcid": "X"}]
+    assert [i["identifiers"] for i in items] == [{"orcid": "X"}, {"orcid": "X"}]
 
 
 class TestSignatureNameFields:

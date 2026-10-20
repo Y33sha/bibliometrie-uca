@@ -7,13 +7,13 @@ from sqlalchemy import text
 
 from domain.errors import ValidationError
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.cascade import link_authorship
+from pipeline.transformation.persons.cascade import link_contribution
 from pipeline.transformation.persons.person_writes import (
-    add_identifiers_from_authorships,
+    add_identifiers_from_contributions,
 )
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 # Personne « Dupont Jean » par défaut, normalisée par `lower`.
 _person = partial(insert_person, last_name="Dupont", first_name="Jean", normalizer="lower")
@@ -22,7 +22,7 @@ _person = partial(insert_person, last_name="Dupont", first_name="Jean", normaliz
 _jean_dupont_signature = partial(insert_signature, author_name_normalized="jean dupont")
 
 # Notice de titre « Test », d'identifiant « hal-1 » par défaut.
-_notice = partial(insert_source_publication, source_id="hal-1", title="Test")
+_notice = partial(insert_source_record, source_id="hal-1", title="Test")
 
 
 @pytest.fixture
@@ -34,42 +34,44 @@ def _scalar(conn, sql_text: str, **params):
     return conn.execute(text(sql_text), params).scalar_one_or_none()
 
 
-class TestLinkAuthorship:
+class TestLinkContribution:
     def test_rejects_unknown_source(self, sa_sync_conn, repo):
         """Source hors registre → `ValidationError` (mappée en 400 côté API)."""
         with pytest.raises(ValidationError):
-            link_authorship(sa_sync_conn, 1, "invalid", 1, "name")
+            link_contribution(sa_sync_conn, 1, "invalid", 1, "name")
 
-    def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo):
+    def test_sets_person_id_on_source_contribution(self, sa_sync_conn, repo):
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
         sp_id = _notice(sa_sync_conn, pub_id)
         sa_id = _jean_dupont_signature(sa_sync_conn, sp_id)
 
-        link_authorship(sa_sync_conn, person_id, "hal", sa_id, "name")
+        link_contribution(sa_sync_conn, person_id, "hal", sa_id, "name")
 
         assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
+            _scalar(
+                sa_sync_conn, "SELECT person_id FROM source_contributions WHERE id = :i", i=sa_id
+            )
             == person_id
         )
         assert (
             _scalar(
                 sa_sync_conn,
-                "SELECT resolution_mode FROM source_authorships WHERE id = :i",
+                "SELECT resolution_mode FROM source_contributions WHERE id = :i",
                 i=sa_id,
             )
             == "name"
         )
 
 
-class TestAddIdentifiersFromAuthorships:
+class TestAddIdentifiersFromContributions:
     def test_adds_orcid_idhal_idref_once(self, sa_sync_conn, repo):
         person_id = _person(sa_sync_conn)
-        authorships = [
+        contributions = [
             {"source": "hal", "orcid": "0000-0001-2345-6789", "idhal": "jdupont"},
             {"source": "scanr", "orcid": "0000-0001-2345-6789", "idref": "252404955"},
         ]
-        add_identifiers_from_authorships(person_id, authorships, repo=repo)
+        add_identifiers_from_contributions(person_id, contributions, repo=repo)
 
         rows = sa_sync_conn.execute(
             text(
@@ -85,10 +87,10 @@ class TestAddIdentifiersFromAuthorships:
         """Un identifiant source mal formé est ignoré (log, pas d'exception) ; la
         promotion continue pour les identifiants valides du même lot."""
         person_id = _person(sa_sync_conn)
-        authorships = [
+        contributions = [
             {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},
         ]
-        add_identifiers_from_authorships(person_id, authorships, repo=repo)
+        add_identifiers_from_contributions(person_id, contributions, repo=repo)
 
         rows = sa_sync_conn.execute(
             text("SELECT id_type FROM person_identifiers WHERE person_id = :pid ORDER BY id_type"),

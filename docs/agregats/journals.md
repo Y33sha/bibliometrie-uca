@@ -8,12 +8,12 @@ Un `journal` est un support de publication : revue, conférence, dépôt ou autr
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `journals` | La revue | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `journal_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `pub_count` |
+| `journals` | La revue | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `journal_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `publication_count` |
 | `journal_issns` | ISSN des revues ; sans revue, ISSN vérifié d'une publication absente de la base | `issn`, `journal_id`, `support`, `linking` (ISSN-L), `status`, `replaced_by`, `sudoc_checked_at`, unicité `(issn, journal_id)` |
 | `journal_name_forms` | Formes de nom permettant de reconnaître une revue par son titre | `journal_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
 | `journal_doi_namespaces` | Espaces de noms DOI qui désignent une revue, recalculés par `publishers_journals` | `namespace` (clé), `journal_id`, `dois`, `share` (part des DOI de l'espace qui portent la revue) |
 
-Les tables qui référencent une revue ont des politiques de suppression différentes : `journal_name_forms` et `journal_doi_namespaces` disparaissent avec elle, `apc_payments.journal_id` repasse à nul, tandis que `publications.journal_id` et `source_publications.journal_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
+Les tables qui référencent une revue ont des politiques de suppression différentes : `journal_name_forms` et `journal_doi_namespaces` disparaissent avec elle, `apc_payments.journal_id` repasse à nul, tandis que `publications.journal_id` et `source_records.journal_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
 
 ## Écriture par le pipeline
 
@@ -27,13 +27,13 @@ Routeur `interfaces/api/routers/journals.py`, commandes dans `application/servic
 
 **Éditer une revue** (`PUT /api/journals/{id}`). Le repository re-dérive `title_normalized` à l'enregistrement. Si le type de revue change, `requalify_publications_for_journal` rejoue immédiatement le type de document de toutes ses publications et consigne un événement `journal.type_requalified`.
 
-**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_publications`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. Les ISSN de la source rejoignent la cible, à revérifier dans le Sudoc. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
+**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_records`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. Les ISSN de la source rejoignent la cible, à revérifier dans le Sudoc. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
 
 **Prévisualiser un changement de type** (`GET /api/journals/{id}/type-change-impact`). Le chemin d'écriture réel est exécuté puis annulé, ce qui donne l'impact exact sans rien modifier.
 
 ## Lecture par le pipeline
 
-**Compteur de publications.** `pipeline/transformation/publishing/pub_counts.py` recalcule `journals.pub_count`, puis celui des éditeurs. La phase `authorships` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
+**Compteur de publications.** `pipeline/transformation/publishing/publication_counts.py` recalcule `journals.publication_count`, puis celui des éditeurs. La phase `contributions` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
 
 **Type de revue.** `refresh_from_sources` lit `get_journal_type` pour rejouer les règles de type de document qui en dépendent.
 
@@ -43,7 +43,7 @@ Port `application/ports/read_models/journals_queries.py`, adaptateur `PgJournalQ
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|
-| `GET /api/journals`, `/facets` | Liste filtrable et facettes ; la recherche porte sur le titre et sur tous les ISSN, et le filtre « avec publications » s'appuie sur le compteur `pub_count` |
+| `GET /api/journals`, `/facets` | Liste filtrable et facettes ; la recherche porte sur le titre et sur tous les ISSN, et le filtre « avec publications » s'appuie sur le compteur `publication_count` |
 | `GET /api/journals/facets/entities` | Facette éditeur : les premiers éditeurs sous les filtres actifs, décomptés en revues, cherchables par nom — ils sont trop nombreux pour être tous proposés |
 | `GET /api/journals/{id}`, `/{id}/dashboard` | Détail de la revue ; le tableau de bord signale les publications hors du cadre annoncé par la revue (`domain/journals/expected.py`) et recompte l'appartenance au périmètre en direct |
 | `GET /api/journals/types`, `/oa-models` | Libellés des vocabulaires de type de revue et de modèle *open access*, définis dans `domain/journals/journal.py` |

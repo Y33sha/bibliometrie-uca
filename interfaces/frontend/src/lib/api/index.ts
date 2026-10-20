@@ -11,7 +11,7 @@ export { api, apiDetail, cancel, latestRequest, post, put, patch, del, ApiError 
 
 export * as auth from './auth';
 export * as persons from './persons';
-export * as authorships from './authorships';
+export * as contributions from './contributions';
 export * as journals from './journals';
 export * as publishers from './publishers';
 export * as structures from './structures';
@@ -19,4 +19,4 @@ export * as perimeters from './perimeters';
 export * as config from './config';
 export * as nameForms from './nameForms';
 export * as addresses from './addresses';
-export * as orphanAuthorships from './orphanAuthorships';
+export * as orphanContributions from './orphanContributions';

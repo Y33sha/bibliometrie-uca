@@ -8,8 +8,8 @@ from domain.journals.journal import OaModel
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from domain.publications.authorship_roles import AuthorshipRole
-from domain.source_publications.raw_metadata import CORRECTED_BY, RAW
+from domain.publications.contribution_roles import ContributionRole
+from domain.source_records.raw_metadata import CORRECTED_BY, RAW
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -32,8 +32,8 @@ def person_signature(signature: str = "sa") -> str:
 
 
 def pinned(signature_id: str) -> str:
-    """Condition vraie quand l'administration a épinglé la signature d'identifiant `signature_id` à une personne (`confirmed_authorships`)."""
-    return f"EXISTS (SELECT 1 FROM confirmed_authorships ca WHERE ca.source_authorship_id = {signature_id})"
+    """Condition vraie quand l'administration a épinglé la signature d'identifiant `signature_id` à une personne (`confirmed_source_contributions`)."""
+    return f"EXISTS (SELECT 1 FROM confirmed_source_contributions ca WHERE ca.source_contribution_id = {signature_id})"
 
 
 def active_name_form(form: str) -> str:
@@ -45,7 +45,7 @@ def active_name_form(form: str) -> str:
 
 
 DETACHED_SIGNATURE = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE source_authorships` qui détache une signature de sa personne."""
+"""Affectations d'un `UPDATE source_contributions` qui détache une signature de sa personne."""
 
 
 def diamond_journal_sql(journal: str = "j") -> str:
@@ -58,8 +58,8 @@ def diamond_journal_sql(journal: str = "j") -> str:
 
 
 def has_author_role(signature: str = "sa") -> str:
-    """Condition vraie quand la signature ou l'authorship aliasée `signature` tient le rôle d'auteur."""
-    return f"{signature}.roles && ARRAY['{AuthorshipRole.AUTHOR.value}']::text[]"
+    """Condition vraie quand la signature ou la contribution aliasée `signature` tient le rôle d'auteur."""
+    return f"{signature}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
 def identifier_neutralized(
@@ -78,7 +78,7 @@ def usable_identifier(id_type: str, *, signature: str = "sa", identity: str = "a
     """Valeur de l'identifiant `id_type` dans l'identité d'une signature, NULL quand la signature le neutralise."""
     return (
         f"CASE WHEN {identifier_neutralized(id_type, signature)} THEN NULL"
-        f" ELSE {identity}.person_identifiers ->> {id_type} END"
+        f" ELSE {identity}.identifiers ->> {id_type} END"
     )
 
 
@@ -99,16 +99,16 @@ def strong_identifier_signatures(
 ) -> str:
     """Requête des signatures `sa_auth` dont l'identité contient l'identifiant `id_type` d'une ligne de `identifiers`.
 
-    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les signatures par `identity_id` après un rapprochement sur `author_identifying_keys`.
+    `identifiers` : table ou sous-requête, aliasée `pi`, de colonnes `person_id`, `id_type`, `id_value`. L'identifiant que la signature neutralise est écarté, et celui que sa source rend non fiable (`trusted_identifier_sql`). La requête rejoint les signatures par `contributor_information_id` après un rapprochement sur `contributor_information`.
     """
     return f"""
         SELECT {select}
         FROM {identifiers} pi
-        JOIN author_identifying_keys aik ON aik.person_identifiers->>'{id_type}' = pi.id_value
-        JOIN source_authorships sa_auth ON sa_auth.identity_id = aik.id
+        JOIN contributor_information aik ON aik.identifiers->>'{id_type}' = pi.id_value
+        JOIN source_contributions sa_auth ON sa_auth.contributor_information_id = aik.id
         {joins}
         WHERE pi.id_type = '{id_type}'
-          AND aik.person_identifiers ? '{id_type}'
+          AND aik.identifiers ? '{id_type}'
           AND NOT {identifier_neutralized(f"'{id_type}'", "sa_auth")}
           AND {trusted_identifier_sql(id_type, "sa_auth")}
           {f"AND {where}" if where else ""}
@@ -121,21 +121,21 @@ _RH_IDENTIFIERS = f"""(
            coalesce(extract(year FROM r.start_date)::int + 1, 0) AS first_year,
            coalesce(extract(year FROM r.end_date)::int, 9999) AS last_year
     FROM person_identifiers pi
-    JOIN persons_rh r ON r.person_id = pi.person_id
+    JOIN hr_records r ON r.person_id = pi.person_id
     WHERE pi.status::text IN {in_clause(tuple(sorted(SEARCHED_IDENTIFIER_STATUSES)))}
 )"""
 
 
-def rh_identity_signatures(signature_filter: str = "") -> str:
+def hr_record_signatures(signature_filter: str = "") -> str:
     """Requête des ids des signatures qui entrent dans le périmètre par l'identité : identifiant fort d'une personne RH, document paru entre l'année qui suit son arrivée et l'année de fin de son contrat, sans rejet de la personne pour la notice.
 
     `signature_filter` : condition supplémentaire sur la signature `sa_auth`.
     """
     conditions = [
-        "sp_rh.pub_year BETWEEN pi.first_year AND pi.last_year",
+        "sp_rh.publication_year BETWEEN pi.first_year AND pi.last_year",
         (
-            "NOT EXISTS (SELECT 1 FROM rejected_authorships rej"
-            " WHERE rej.source_publication_id = sa_auth.source_publication_id"
+            "NOT EXISTS (SELECT 1 FROM rejected_contributions rej"
+            " WHERE rej.source_record_id = sa_auth.source_record_id"
             " AND rej.person_id = pi.person_id)"
         ),
     ]
@@ -146,7 +146,7 @@ def rh_identity_signatures(signature_filter: str = "") -> str:
             id_type,
             identifiers=_RH_IDENTIFIERS,
             select="sa_auth.id",
-            joins="JOIN source_publications sp_rh ON sp_rh.id = sa_auth.source_publication_id",
+            joins="JOIN source_records sp_rh ON sp_rh.id = sa_auth.source_record_id",
             where=" AND ".join(conditions),
         )
         for id_type in STRONG_PERSON_IDENTIFIER_TYPES
@@ -155,16 +155,16 @@ def rh_identity_signatures(signature_filter: str = "") -> str:
 
 # Paires (publication, personne) rejetées : une publication est rejetée pour une personne dès qu'une de ses notices l'est.
 REJECTED_PAIRS = (
-    "SELECT sp_rej.publication_id, rej.person_id FROM rejected_authorships rej"
-    " JOIN source_publications sp_rej ON sp_rej.id = rej.source_publication_id"
+    "SELECT sp_rej.publication_id, rej.person_id FROM rejected_contributions rej"
+    " JOIN source_records sp_rej ON sp_rej.id = rej.source_record_id"
 )
 
 
 def publication_rejected_for(publication_id: str, person_id: str) -> str:
     """Condition vraie quand la publication `publication_id` est rejetée pour la personne `person_id` (expressions SQL) : une de ses notices l'est."""
     return (
-        "EXISTS (SELECT 1 FROM rejected_authorships rej"
-        " JOIN source_publications sp_rej ON sp_rej.id = rej.source_publication_id"
+        "EXISTS (SELECT 1 FROM rejected_contributions rej"
+        " JOIN source_records sp_rej ON sp_rej.id = rej.source_record_id"
         f" WHERE sp_rej.publication_id = {publication_id} AND rej.person_id = {person_id})"
     )
 
@@ -176,29 +176,29 @@ NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 def signature_perimeter_evidence(signature_ids: str | None = None) -> str:
     """Requête des indices de l'entrée dans le périmètre de chaque signature qui en a : colonnes `id` et `evidence`, tableau trié.
 
-    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_authorship_structures`. `signature_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les signatures.
+    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_contribution_structures`. `signature_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les signatures.
     """
     by_structure = "sas.structure_id = ANY(:perimeter_ids)"
     by_identity = ""
     if signature_ids:
-        by_structure += f" AND sas.source_authorship_id = ANY(:{signature_ids})"
+        by_structure += f" AND sas.source_contribution_id = ANY(:{signature_ids})"
         by_identity = f"sa_auth.id = ANY(:{signature_ids})"
     return f"""
         SELECT id, array_agg(evidence ORDER BY evidence) AS evidence
         FROM (
-            SELECT sas.source_authorship_id AS id, sas.evidence
-            FROM source_authorship_structures sas
+            SELECT sas.source_contribution_id AS id, sas.evidence
+            FROM source_contribution_structures sas
             WHERE {by_structure}
             UNION
             SELECT rh.id, '{PerimeterEvidence.RH_IDENTITY}'::perimeter_evidence
-            FROM ({rh_identity_signatures(by_identity)}) rh
+            FROM ({hr_record_signatures(by_identity)}) rh
         ) e
         GROUP BY id
     """
 
 
 def corrected(field: str, notice: str = "sp") -> str:
-    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de la notice aliasée `notice` (`domain.source_publications.raw_metadata`)."""
+    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de la notice aliasée `notice` (`domain.source_records.raw_metadata`)."""
     return f"{notice}.raw_metadata ? '{field}'"
 
 
@@ -220,7 +220,7 @@ def raw_column(field: str, notice: str = "sp") -> str:
     )
 
 
-# Restrictions de `insert_missing_authorships_sql` et `propagate_authorship_attributes_sql`, sur la signature `sa` et sa notice `sp`.
+# Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la signature `sa` et sa notice `sp`.
 PERSON_PUBLICATIONS_SCOPE = (
     "AND sa.person_id = :person_id AND sp.publication_id = ANY(:publication_ids)"
 )
@@ -228,34 +228,34 @@ PERSON_PUBLICATIONS_SCOPE = (
 
 SIGNATURES_SCOPE = """AND (sp.publication_id, sa.person_id) IN (
     SELECT s_sp.publication_id, s.person_id
-    FROM source_authorships s JOIN source_publications s_sp ON s_sp.id = s.source_publication_id
+    FROM source_contributions s JOIN source_records s_sp ON s_sp.id = s.source_record_id
     WHERE s.id = ANY(:signature_ids)
 )"""
 """Paires (publication, personne) des signatures `:signature_ids`."""
 
 
-def insert_missing_authorships_sql(*, scope: str = "") -> str:
-    """Insère une authorship par paire (publication, personne) que lient des signatures, et absente de la table.
+def insert_missing_contributions_sql(*, scope: str = "") -> str:
+    """Insère une contribution par paire (publication, personne) que lient des signatures, et absente de la table.
 
     Une paire rejetée est écartée, sauf si une signature confirmée la relie : la confirmation vise la signature elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SIGNATURES_SCOPE`).
     """
     return f"""
         WITH all_pairs AS (
             SELECT sp.publication_id, sa.person_id,
-                   bool_or(ca.source_authorship_id IS NOT NULL) AS confirmed
-            FROM source_authorships sa
-            JOIN source_publications sp ON sp.id = sa.source_publication_id
+                   bool_or(ca.source_contribution_id IS NOT NULL) AS confirmed
+            FROM source_contributions sa
+            JOIN source_records sp ON sp.id = sa.source_record_id
             JOIN publications pub ON pub.id = sp.publication_id
-            LEFT JOIN confirmed_authorships ca
-              ON ca.source_authorship_id = sa.id AND ca.person_id = sa.person_id
+            LEFT JOIN confirmed_source_contributions ca
+              ON ca.source_contribution_id = sa.id AND ca.person_id = sa.person_id
             WHERE sa.person_id IS NOT NULL {scope}
             GROUP BY sp.publication_id, sa.person_id
         )
-        INSERT INTO authorships (publication_id, person_id)
+        INSERT INTO contributions (publication_id, person_id)
         SELECT ap.publication_id, ap.person_id
         FROM all_pairs ap
         WHERE NOT EXISTS (
-            SELECT 1 FROM authorships a
+            SELECT 1 FROM contributions a
             WHERE a.publication_id = ap.publication_id
               AND a.person_id = ap.person_id
         )
@@ -264,8 +264,8 @@ def insert_missing_authorships_sql(*, scope: str = "") -> str:
     """
 
 
-def propagate_authorship_attributes_sql(*, scope: str = "") -> str:
-    """Recompose les attributs de chaque authorship depuis ses signatures.
+def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
+    """Recompose les attributs de chaque contribution depuis ses signatures.
 
     La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une signature le dit. Les indices de périmètre et les rôles sont l'union de ceux des signatures. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SIGNATURES_SCOPE`).
     """
@@ -273,9 +273,9 @@ def propagate_authorship_attributes_sql(*, scope: str = "") -> str:
         WITH linked AS (
             SELECT a.id AS aid, sa.source, sa.author_position, sa.is_corresponding,
                    sa.perimeter_evidence, sa.roles
-            FROM source_authorships sa
-            JOIN source_publications sp ON sp.id = sa.source_publication_id
-            JOIN authorships a ON a.publication_id = sp.publication_id
+            FROM source_contributions sa
+            JOIN source_records sp ON sp.id = sa.source_record_id
+            JOIN contributions a ON a.publication_id = sp.publication_id
                               AND a.person_id = sa.person_id
             WHERE TRUE {scope}
         ),
@@ -298,7 +298,7 @@ def propagate_authorship_attributes_sql(*, scope: str = "") -> str:
             FROM linked l, LATERAL unnest(l.roles) AS r
             GROUP BY l.aid
         )
-        UPDATE authorships a
+        UPDATE contributions a
         SET author_position = scal.pos,
             is_corresponding = scal.is_corr,
             perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),

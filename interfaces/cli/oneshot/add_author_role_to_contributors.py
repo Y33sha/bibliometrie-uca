@@ -19,7 +19,7 @@ from collections.abc import Callable, Mapping
 
 from sqlalchemy import Connection, text
 
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.contribution_roles import ContributionRole
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -39,8 +39,8 @@ _BUILDERS: dict[str, Callable[[Mapping[str, JsonValue]], list[AuthorRecord]]] = 
 # (signature, position) des signatures `[contributor]`, par notice (identifiant, source, identifiant source).
 _CANDIDATES = f"""
     SELECT sp.id AS notice, sp.source, sp.source_id, sa.id AS signature, sa.author_position AS position
-    FROM source_authorships sa JOIN source_publications sp ON sp.id = sa.source_publication_id
-    WHERE sp.source IN ('hal', 'scanr') AND sa.roles = ARRAY['{AuthorshipRole.CONTRIBUTOR.value}']
+    FROM source_contributions sa JOIN source_records sp ON sp.id = sa.source_record_id
+    WHERE sp.source IN ('hal', 'scanr') AND sa.roles = ARRAY['{ContributionRole.CONTRIBUTOR.value}']
     ORDER BY sp.id
 """  # noqa: S608
 
@@ -68,7 +68,7 @@ def author_roles(
     return {
         p: [str(role) for role in roles]
         for p in positions
-        if p is not None and (roles := by_position.get(p)) and AuthorshipRole.AUTHOR in roles
+        if p is not None and (roles := by_position.get(p)) and ContributionRole.AUTHOR in roles
     }
 
 
@@ -96,13 +96,13 @@ def complete_notices(
             updates.extend(new)
             touched.append(notice)
     if updates:
-        conn.execute(text("UPDATE source_authorships SET roles = :roles WHERE id = :id"), updates)
+        conn.execute(text("UPDATE source_contributions SET roles = :roles WHERE id = :id"), updates)
         backfill_notices(conn, touched)
         conn.execute(
             text("""
-                UPDATE publications p SET authorships_dirty = true
-                FROM source_publications sp
-                WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+                UPDATE publications p SET contributions_dirty = true
+                FROM source_records sp
+                WHERE sp.id = ANY(:notices) AND p.id = sp.publication_id AND NOT p.contributions_dirty
             """),
             {"notices": touched},
         )

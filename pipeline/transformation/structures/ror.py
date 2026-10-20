@@ -95,12 +95,12 @@ class RorDumpQueries:
         self._conn.execute(
             text("""
                 WITH linked AS (
-                    SELECT source_authorship_id, address_id
-                    FROM source_authorship_rors WHERE ror_id = ANY(:ids)
+                    SELECT source_contribution_id, address_id
+                    FROM source_contribution_rors WHERE ror_id = ANY(:ids)
                 ),
                 signatures AS (
-                    UPDATE source_authorships SET countries_dirty = true
-                    WHERE id IN (SELECT source_authorship_id FROM linked WHERE address_id IS NULL)
+                    UPDATE source_contributions SET countries_dirty = true
+                    WHERE id IN (SELECT source_contribution_id FROM linked WHERE address_id IS NULL)
                       AND NOT countries_dirty
                 ),
                 candidates AS (

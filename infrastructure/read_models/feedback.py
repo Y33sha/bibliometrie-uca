@@ -130,12 +130,12 @@ class PgFeedbackQueries(FeedbackQueries):
         rows = self._conn.execute(
             text(f"""
                 SELECT
-                    a.id, a.raw_text, a.pub_count,
+                    a.id, a.raw_text, a.publication_count,
                     ({address_structures_json("a.id")}) AS structures{matched_forms_select}
                 FROM address_structures ast
                 JOIN addresses a ON a.id = ast.address_id
                 WHERE {where}
-                ORDER BY a.pub_count DESC, a.id
+                ORDER BY a.publication_count DESC, a.id
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             binds,
@@ -145,7 +145,7 @@ class PgFeedbackQueries(FeedbackQueries):
             FeedbackAddressItem(
                 id=r.id,
                 raw_text=r.raw_text,
-                pub_count=r.pub_count,
+                publication_count=r.publication_count,
                 structures=[
                     AddressStructureSummary.model_validate(s) for s in (r.structures or [])
                 ],

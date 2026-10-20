@@ -1,6 +1,6 @@
 """SQL de la phase `metadata_correction`, et du recalcul ciblé des corrections d'une revue.
 
-La phase persiste sur `source_publications` les valeurs corrigées par les règles de `domain.source_publications.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce module : la correction unaire, qui traite chaque `source_publication` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_publications` partageant un même DOI.
+La phase persiste sur `source_records` les valeurs corrigées par les règles de `domain.source_records.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce module : la correction unaire, qui traite chaque `source_record` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_records` partageant un même DOI.
 """
 
 from typing import NamedTuple
@@ -9,8 +9,8 @@ from sqlalchemy import Connection, bindparam, text
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
-from domain.source_publications.metadata_correction.rules import MetadataForCorrection
-from domain.source_publications.metadata_correction.shared_doi import (
+from domain.source_records.metadata_correction.rules import MetadataForCorrection
+from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
     REMOVED_EXTERNAL_IDS,
@@ -20,12 +20,12 @@ from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
-from infrastructure.db.tables import source_publications
+from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import corrected, diamond_journal_sql, raw_column
 
 
 class UnaryCorrectionRow(NamedTuple):
-    """Une `source_publication` candidate à la correction unaire, jointe à son journal.
+    """Une `source_record` candidate à la correction unaire, jointe à son journal.
 
     Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'une notice ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
@@ -90,7 +90,7 @@ class CorrectionUpdate(NamedTuple):
 
 
 class JournalCorrectionRow(NamedTuple):
-    """Une `source_publication` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
+    """Une `source_record` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `journal_id` courant et `raw_metadata` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
 
     id: int
     source: str
@@ -109,7 +109,7 @@ class JournalCorrectionUpdate(NamedTuple):
 
 
 class DoiClusterRow(NamedTuple):
-    """Une `source_publication` candidate à la correction de DOI par cluster.
+    """Une `source_record` candidate à la correction de DOI par cluster.
 
     `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre de référence quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` donne alors le cas correspondant."""
 
@@ -173,9 +173,9 @@ _SELECT = f"""
            COALESCE(m.proceedings, false) AS in_proceedings_volume,
            sp.meta->>'group_title' AS group_title,
            COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond,
-           (SELECT count(*) FROM source_authorships sa
-            WHERE sa.source_publication_id = sp.id) AS author_count
-    FROM source_publications sp
+           (SELECT count(*) FROM source_contributions sa
+            WHERE sa.source_record_id = sp.id) AS author_count
+    FROM source_records sp
     LEFT JOIN journals j ON j.id = sp.journal_id
     LEFT JOIN monographs m ON m.id = sp.monograph_id
     LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sp.doi, '/', 1)
@@ -192,8 +192,8 @@ _CORRECTABLE_COLUMNS: frozenset[str] = frozenset(
 
 # Garde-fou de dérive : une colonne renommée dans le schéma fait échouer l'import, plutôt que
 # de laisser la liste désigner un nom qui n'existe plus.
-assert _CORRECTABLE_COLUMNS <= {c.name for c in source_publications.c}, (
-    "liste des colonnes corrigibles désynchronisée de la table source_publications"
+assert _CORRECTABLE_COLUMNS <= {c.name for c in source_records.c}, (
+    "liste des colonnes corrigibles désynchronisée de la table source_records"
 )
 
 
@@ -204,7 +204,7 @@ def _persist_updates(
     set_columns: tuple[str, ...],
     jsonb_params: tuple[str, ...] = (),
 ) -> int:
-    """UPDATE en lot sur `source_publications` : pose les `set_columns` de chaque row (avec sa clé `id`), marque `keys_dirty`, bump `updated_at`. Retourne le nombre de lignes.
+    """UPDATE en lot sur `source_records` : pose les `set_columns` de chaque row (avec sa clé `id`), marque `keys_dirty`, bump `updated_at`. Retourne le nombre de lignes.
 
     `set_columns` est confronté à `_CORRECTABLE_COLUMNS` avant toute composition : le nom d'une colonne s'écrit dans le texte de la requête, et cette liste est la seule origine qu'il puisse avoir.
     """
@@ -216,7 +216,7 @@ def _persist_updates(
     assignments = [f"{c} = :{c}" for c in set_columns]
     assignments += ["keys_dirty = true", "updated_at = clock_timestamp()"]
     # noqa S608 : requête composée, dont les seuls identifiants viennent de la liste blanche.
-    sql = f"UPDATE source_publications SET {', '.join(assignments)} WHERE id = :id"  # noqa: S608
+    sql = f"UPDATE source_records SET {', '.join(assignments)} WHERE id = :id"  # noqa: S608
     stmt = text(sql)
     if jsonb_params:
         stmt = stmt.bindparams(*(bindparam(p, type_=Jsonb) for p in jsonb_params))
@@ -226,8 +226,8 @@ def _persist_updates(
 
 # La notice `{sp}` a au moins une signature individuelle.
 _HAS_INDIVIDUAL_SIGNATURE = (
-    "EXISTS (SELECT 1 FROM source_authorships s"
-    " WHERE s.source_publication_id = {sp} AND NOT s.collective)"
+    "EXISTS (SELECT 1 FROM source_contributions s"
+    " WHERE s.source_record_id = {sp} AND NOT s.collective)"
 )
 
 
@@ -240,9 +240,9 @@ class PgMetadataCorrectionQueries:
     """Requêtes de la phase `metadata_correction`."""
 
     def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
-        """Toutes les `source_publications`, avec join `journals` et `raw_metadata`.
+        """Toutes les `source_records`, avec join `journals` et `raw_metadata`.
 
-        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_publication` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
+        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_record` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
         """
         rows = conn.execute(text(_SELECT))
         return rows_as(UnaryCorrectionRow, rows)
@@ -250,16 +250,16 @@ class PgMetadataCorrectionQueries:
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
     ) -> list[UnaryCorrectionRow]:
-        """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
+        """Les `source_records` rattachées à un journal (`journal_id = :jid`).
 
-        Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_publications` voient leur correction journal-dépendante bouger."""
+        Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
         rows = conn.execute(text(_SELECT + " WHERE sp.journal_id = :jid"), {"jid": journal_id})
         return rows_as(UnaryCorrectionRow, rows)
 
     def fetch_for_unary_correction_by_hal_ids(
         self, conn: Connection, hal_ids: list[str]
     ) -> list[UnaryCorrectionRow]:
-        """Les `source_publications` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des notices ScanR d'une correction ciblée."""
+        """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des notices ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         rows = conn.execute(
@@ -290,15 +290,15 @@ class PgMetadataCorrectionQueries:
         return rows_as(DoiNamespace, rows)
 
     def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
-        """`source_publications` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
+        """`source_records` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         rows = conn.execute(
             text(f"""
                 SELECT id, source::text AS source,
-                       {raw_column("doc_type", "source_publications")} AS raw_doc_type,
+                       {raw_column("doc_type", "source_records")} AS raw_doc_type,
                        doi, journal_id, raw_metadata
-                FROM source_publications
+                FROM source_records
                 WHERE (journal_id IS NULL AND doi IS NOT NULL)
-                   OR {corrected("journal_id", "source_publications")}
+                   OR {corrected("journal_id", "source_records")}
             """)
         )
         return rows_as(JournalCorrectionRow, rows)
@@ -315,14 +315,14 @@ class PgMetadataCorrectionQueries:
         )
 
     def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref, et `source_publications` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
+        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec la notice Crossref, et `source_records` déjà corrigées (`raw_metadata.doi` ou `raw_metadata.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
         rows = conn.execute(
             text(f"""
                 WITH sp_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, raw_metadata,
                            meta, external_ids,
-                           lower({raw_column("doi", "source_publications")}) AS eff_doi
-                    FROM source_publications
+                           lower({raw_column("doi", "source_records")}) AS eff_doi
+                    FROM source_records
                 ),
                 dataset_dois AS (
                     SELECT DISTINCT eff_doi AS d
@@ -390,13 +390,13 @@ class PgMetadataCorrectionQueries:
                       AND {_HAS_INDIVIDUAL_SIGNATURE.format(sp="hc.crossref_id")}
                       AND NOT EXISTS (
                           SELECT 1
-                          FROM source_authorships a
-                          JOIN author_identifying_keys ka ON ka.id = a.identity_id
-                          JOIN author_identifying_keys kb
+                          FROM source_contributions a
+                          JOIN contributor_information ka ON ka.id = a.contributor_information_id
+                          JOIN contributor_information kb
                             ON kb.last_name_normalized = ka.last_name_normalized
-                          JOIN source_authorships b
-                            ON b.identity_id = kb.id AND b.source_publication_id = hc.crossref_id
-                          WHERE a.source_publication_id = hc.hal_id
+                          JOIN source_contributions b
+                            ON b.contributor_information_id = kb.id AND b.source_record_id = hc.crossref_id
+                          WHERE a.source_record_id = hc.hal_id
                             AND NOT a.collective AND NOT b.collective
                       )
                 ),
@@ -422,9 +422,9 @@ class PgMetadataCorrectionQueries:
                        sp.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
                        CASE WHEN sp.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
                            SELECT DISTINCT aik.last_name_normalized
-                           FROM source_authorships sa
-                           JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-                           WHERE sa.source_publication_id = sp.id AND NOT sa.collective
+                           FROM source_contributions sa
+                           JOIN contributor_information aik ON aik.id = sa.contributor_information_id
+                           WHERE sa.source_record_id = sp.id AND NOT sa.collective
                              AND aik.last_name_normalized <> ''
                        ) ELSE ARRAY[]::text[] END AS author_names
                 FROM sp_eff sp
@@ -454,13 +454,13 @@ class PgMetadataCorrectionQueries:
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes `doi`, `external_ids` et `raw_metadata`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
 
-        La publication de chaque notice reçoit `authorships_dirty` : le groupement des signatures écarte une notice dont le DOI converge sur celui d'une autre œuvre.
+        La publication de chaque notice reçoit `contributions_dirty` : le groupement des signatures écarte une notice dont le DOI converge sur celui d'une autre œuvre.
         """
         conn.execute(
             text("""
-                UPDATE publications p SET authorships_dirty = true
-                FROM source_publications sp
-                WHERE sp.id = ANY(:ids) AND p.id = sp.publication_id AND NOT p.authorships_dirty
+                UPDATE publications p SET contributions_dirty = true
+                FROM source_records sp
+                WHERE sp.id = ANY(:ids) AND p.id = sp.publication_id AND NOT p.contributions_dirty
             """),
             {"ids": [u.id for u in updates]},
         )

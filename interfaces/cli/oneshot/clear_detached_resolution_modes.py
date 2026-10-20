@@ -25,7 +25,7 @@ _WHERE = "person_id IS NULL AND resolution_mode IS NOT NULL"
 def clear(conn: Connection) -> int:
     """Retire le mode de résolution des signatures sans personne. Rend le nombre de signatures modifiées."""
     return conn.execute(
-        text(f"UPDATE source_authorships SET resolution_mode = NULL WHERE {_WHERE}")
+        text(f"UPDATE source_contributions SET resolution_mode = NULL WHERE {_WHERE}")
     ).rowcount
 
 
@@ -36,7 +36,7 @@ def main() -> int:
 
     with get_sync_engine().connect() as conn:
         count = conn.execute(
-            text(f"SELECT count(*) FROM source_authorships WHERE {_WHERE}")
+            text(f"SELECT count(*) FROM source_contributions WHERE {_WHERE}")
         ).scalar_one()
         log.info("signatures sans personne avec un mode de résolution : %d", count)
         if args.dry_run or not count:

@@ -1,4 +1,4 @@
-"""Tests des règles métier sur `structure_tutelles`."""
+"""Tests des règles métier sur `structure_parents`."""
 
 import pytest
 

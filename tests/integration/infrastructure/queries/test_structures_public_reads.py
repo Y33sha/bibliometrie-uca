@@ -9,19 +9,19 @@ from tests.integration.helpers.addresses import (
     insert_address,
     insert_address_structure,
 )
-from tests.integration.helpers.authorships import insert_authorship
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.structures import (
-    add_authorship_structure,
+    add_contribution_structure,
     insert_persons_perimeter,
     insert_structure,
     insert_tutelle,
 )
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
-# Authorship du périmètre, de rôle auteur.
-_lab_author = partial(insert_authorship, in_perimeter=True, roles=["author"])
+# Contribution du périmètre, de rôle auteur.
+_lab_author = partial(insert_contribution, in_perimeter=True, roles=["author"])
 
 
 def _setup_perimeter(conn, lab_ids, code="uca"):
@@ -147,7 +147,7 @@ class TestGetLaboratoryDashboard:
         pid = insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"])
         aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
-        add_authorship_structure(sa_sync_conn, aid, lab)
+        add_contribution_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.oa.open_access == 1
@@ -161,7 +161,7 @@ class TestGetLaboratoryDashboard:
         pid = insert_person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn, "Y", oa_status="closed", countries=["fr", "xx"])
         aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
-        add_authorship_structure(sa_sync_conn, aid, lab)
+        add_contribution_structure(sa_sync_conn, aid, lab)
 
         res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.collab.total_articles == 1
@@ -180,7 +180,7 @@ class TestGetLaboratorySubjects:
         # 3 publications du labo avec sujets variables.
         def _attach(pub_id):
             aid = _lab_author(sa_sync_conn, pub_id, person_id=pid)
-            add_authorship_structure(sa_sync_conn, aid, lab)
+            add_contribution_structure(sa_sync_conn, aid, lab)
 
         p1 = insert_publication(sa_sync_conn, "p1")
         p2 = insert_publication(sa_sync_conn, "p2")

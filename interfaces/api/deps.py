@@ -16,13 +16,13 @@ from application.ports.pipeline.journal_recompute import JournalRecompute as Jou
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
 )
-from application.ports.pipeline.pub_count import PubCountRecompute as PubCountRecomputePort
+from application.ports.pipeline.publication_count import PubCountRecompute as PubCountRecomputePort
 from application.ports.pipeline.publication_perimeter import (
     PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
 )
 from application.ports.read_models.addresses_queries import AddressesQueries
-from application.ports.read_models.authorships_queries import AuthorshipsQueries
 from application.ports.read_models.config_queries import ConfigQueries
+from application.ports.read_models.contributions_queries import ContributionsQueries
 from application.ports.read_models.countries_queries import CountriesQueries
 from application.ports.read_models.entity_labels_queries import EntityLabelQueries
 from application.ports.read_models.feedback_queries import FeedbackQueries
@@ -39,21 +39,21 @@ from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.config_repository import ConfigRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import countries as countries_service
-from application.services.authorships.core import propagate_in_perimeter_for_addresses
+from application.services.contributions.core import propagate_in_perimeter_for_addresses
 from domain.merge import MergedEntity
 from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
-from infrastructure.read_models.authorships import PgAuthorshipsQueries
 from infrastructure.read_models.config import PgConfigQueries
+from infrastructure.read_models.contributions import PgContributionsQueries
 from infrastructure.read_models.countries import PgCountriesQueries
 from infrastructure.read_models.entity_labels import PgEntityLabelQueries
 from infrastructure.read_models.feedback import PgFeedbackQueries
@@ -72,7 +72,7 @@ from infrastructure.read_models.subjects import PgSubjectsQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,
-    authorship_repository,
+    contribution_repository,
     journal_repository,
     perimeter_repository,
     person_repository,
@@ -182,8 +182,8 @@ def subjects_queries(
     return PgSubjectsQueries(conn)
 
 
-def authorships_queries(conn: Connection = Depends(db_conn)) -> AuthorshipsQueries:
-    return PgAuthorshipsQueries(conn)
+def contributions_queries(conn: Connection = Depends(db_conn)) -> ContributionsQueries:
+    return PgContributionsQueries(conn)
 
 
 def countries_queries(conn: Connection = Depends(db_conn)) -> CountriesQueries:
@@ -278,8 +278,8 @@ def publications_queries(
     return PgPublicationsQueries(conn, open_connection=open_connection)
 
 
-def authorship_repo(conn: Connection = Depends(db_conn)) -> AuthorshipRepository:
-    return authorship_repository(conn)
+def contribution_repo(conn: Connection = Depends(db_conn)) -> ContributionRepository:
+    return contribution_repository(conn)
 
 
 def address_repo(conn: Connection = Depends(db_conn)) -> AddressRepository:
@@ -321,7 +321,7 @@ def journal_recompute() -> JournalRecomputePort:
 _publication_perimeter_recompute_singleton: PublicationPerimeterRecomputePort = (
     PublicationPerimeterRecompute()
 )
-_pub_count_recompute_singleton: PubCountRecomputePort = PubCountRecompute()
+_publication_count_recompute_singleton: PubCountRecomputePort = PubCountRecompute()
 
 
 def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
@@ -329,9 +329,9 @@ def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
     return _publication_perimeter_recompute_singleton
 
 
-def pub_count_recompute() -> PubCountRecomputePort:
-    """`pub_count` d'un éditeur, après une fusion d'éditeurs."""
-    return _pub_count_recompute_singleton
+def publication_count_recompute() -> PubCountRecomputePort:
+    """`publication_count` d'un éditeur, après une fusion d'éditeurs."""
+    return _publication_count_recompute_singleton
 
 
 # Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
@@ -373,14 +373,14 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
 def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     """Tâche de fond : propage `in_perimeter` après une review d'affiliation.
 
-    Le recalcul peut toucher des dizaines de milliers de `source_authorships`, d'où son décorrélage de la réponse admin.
+    Le recalcul peut toucher des dizaines de milliers de `source_contributions`, d'où son décorrélage de la réponse admin.
     """
     _run_detached(
         "propagation d'in_perimeter",
         lambda conn: propagate_in_perimeter_for_addresses(
             conn,
             address_ids,
-            repo=authorship_repository(conn),
+            repo=contribution_repository(conn),
             perimeter_structures=get_perimeter_structures(),
             perimeter_recompute=SourceContributionPerimeterRecompute(),
         ),

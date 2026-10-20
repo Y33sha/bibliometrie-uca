@@ -73,7 +73,7 @@
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-pubs">{ha.pub_count} publi{ha.pub_count > 1 ? "s" : ""}</span>
+                <span class="hal-pubs">{ha.publication_count} publi{ha.publication_count > 1 ? "s" : ""}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}

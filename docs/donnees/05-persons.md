@@ -8,22 +8,22 @@ Référentiel des individus.
 
 ```mermaid
 flowchart LR
-    structures --- authorships
-    authorships --- publications
-    authorships ---- persons
-    source_authorships-->|match_or_create|persons
-    persons---persons_rh
+    structures --- contributions
+    contributions --- publications
+    contributions ---- persons
+    source_contributions-->|match_or_create|persons
+    persons---hr_records
     persons---person_identifiers
     persons---person_name_forms
 
     classDef manuel  fill:#8e5,stroke:#5a3
     class structures manuel;
     classDef csv fill:#fa5
-    class persons_rh csv
+    class hr_records csv
     classDef auto fill:#adf,stroke:#58c
-    class source_authorships,publications,person_identifiers,person_name_forms,authorships,persons auto
+    class source_contributions,publications,person_identifiers,person_name_forms,contributions,persons auto
     classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,authorships main
+    class structures,publications,persons,contributions main
 ```
 
 Légende :
@@ -33,17 +33,17 @@ Légende :
 
 ## Tables associées
 
-- **`persons_rh`** : table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/10-imports-manuels.md#extraction-rh).
+- **`hr_records`** : table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/10-imports-manuels.md#extraction-rh).
 - **`person_identifiers`** : identifiants persistants — [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` dit d'où vient l'attribution — `manual` pour une décision humaine, `auto` pour une résolution du pipeline — et `status` où elle en est : `pending`, `confirmed`, `rejected` ou `authenticated`. La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
 - **`person_name_forms`** : formes de noms normalisées, servant à reconnaître une personne existante lors de la création.
 - **`distinct_persons`** : paires de personnes déclarées **distinctes malgré une forme de nom commune** ; les files de triage par nom et par identifiant du référentiel `admin/persons` écartent la paire.
 
 ## Décisions humaines
 
-Deux tables contiennent les arbitrages saisis à la main sur les signatures, et survivent aux reconstructions de la table `authorships` :
+Deux tables contiennent les arbitrages saisis à la main sur les signatures, et survivent aux reconstructions de la table `contributions` :
 
-- **`rejected_authorships`** — paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`.
-- **`confirmed_authorships`** — signatures épinglées sur une personne. Clé primaire `source_authorship_id`.
+- **`rejected_contributions`** — paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`.
+- **`confirmed_source_contributions`** — signatures épinglées sur une personne. Clé primaire `source_contribution_id`.
 
 ## Propriété des tables
 
@@ -53,6 +53,6 @@ Deux tables contiennent les arbitrages saisis à la main sur les signatures, et 
 | `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |
-| `persons_rh` | import CSV | `interfaces/cli/imports/import_persons.py` |
-| `rejected_authorships` | admin | `application/services/authorships/core.py` |
-| `confirmed_authorships` | admin | `application/services/authorships/assign_orphans.py` |
+| `hr_records` | import CSV | `interfaces/cli/imports/import_persons.py` |
+| `rejected_contributions` | admin | `application/services/contributions/core.py` |
+| `confirmed_source_contributions` | admin | `application/services/contributions/assign_orphans.py` |

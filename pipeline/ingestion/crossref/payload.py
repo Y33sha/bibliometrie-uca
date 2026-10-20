@@ -2,7 +2,7 @@
 
 Interprétation des champs propres au schéma CrossRef Works API — extracteurs et nettoyeurs qui encapsulent les conventions CrossRef.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_publications.meta` (JSONB).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_records.meta` (JSONB).
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def strip_jats_tags(s: str) -> str:
     return _JATS_TAG_RE.sub("", s)
 
 
-def extract_crossref_pub_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
+def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
     """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print > approved`.
 
     Sémantique CrossRef : `published` = min(published-online, published-print) ; `issued` = date déclarée par l'éditeur (peut être prospective sur des « futur numéro » 2030+ déposés avant publication réelle) ; `approved` = date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
@@ -112,7 +112,7 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
 def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
-    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_publications.meta`.
+    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_records.meta`.
 
     Le sous-objet `meta->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
     """

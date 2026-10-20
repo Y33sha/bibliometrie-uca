@@ -98,22 +98,22 @@ Le même endpoint renvoie les deux. La présence de `dateSoutenance` est le seul
 
 Les thèses en cours n'ont ni NNT ni DOI ; leur identifiant theses.fr (`sXXXXXX`) sert seul de clé. L'année est dérivée par cascade `dateSoutenance > datePremiereInscriptionDoctorat`.
 
-### 5 rôles dans une thèse, tous matérialisés comme authorships
+### 5 rôles dans une thèse, tous matérialisés comme contributions
 
-`auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` sont tous transformés en `source_authorships`, chacun avec ses `roles` (`author`, `supervisor`, `reviewer`, `committee_member`, `committee_president`). Seuls les auteurs portent un `author_position` ; les autres rôles ont `author_position = NULL`.
+`auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `supervisor`, `reviewer`, `committee_member`, `committee_president`). Seuls les auteurs portent un `author_position` ; les autres rôles ont `author_position = NULL`.
 
 Une personne qui apparaît dans plusieurs champs est dédupliquée et porte plusieurs rôles. Clé de déduplication : PPN si présent, sinon `(nom, prenom)`.
 
 ### Identifiants : PPN IdRef pour les personnes, NNT pour les thèses
 
-Le PPN [IdRef](../glossaire.md#idref), lorsque présent, est porté par l'identité d'auteur de la signature (`author_identifying_keys.person_identifiers->>'idref'`, reliée par `source_authorships.identity_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/08-persons.md) du pipeline.
+Le PPN [IdRef](../glossaire.md#idref), lorsque présent, est porté par l'identité d'auteur de la signature (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/08-persons.md) du pipeline.
 
-Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_publications`, il permet le rattachement à des `source_publications` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
+Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_records`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
 
 ### Affiliations partagées au document
 
-L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `meta` avec leur PPN IdRef, et les signatures de la thèse sont sans adresse. La vue `source_authorship_structures` rattache toutes les signatures à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la signature du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
+L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `meta` avec leur PPN IdRef, et les signatures de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les signatures à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la signature du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
 
 ### OA = `closed` par défaut côté source
 
-Le payload *theses.fr* n'expose aucun signal sur le statut OA, donc `source_publications.oa_status` est posé à `closed` par défaut en l'absence d'autres sources ([HAL](../glossaire.md#hal) principalement).
+Le payload *theses.fr* n'expose aucun signal sur le statut OA, donc `source_records.oa_status` est posé à `closed` par défaut en l'absence d'autres sources ([HAL](../glossaire.md#hal) principalement).

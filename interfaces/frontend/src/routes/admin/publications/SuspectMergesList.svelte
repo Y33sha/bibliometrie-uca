@@ -53,7 +53,7 @@
             {item.title}
           </button>
           <span class="meta">
-            {item.doc_type}{#if item.pub_year} · {item.pub_year}{/if} ·
+            {item.doc_type}{#if item.publication_year} · {item.publication_year}{/if} ·
             <a href="{base}/publications/{item.publication_id}" target="_blank" rel="noopener"
               >listes d'auteurs</a
             >
@@ -61,15 +61,15 @@
         </div>
         <div class="stats">
           <span class="share">
-            {percent(item.matched_signatures, item.signatures)}&nbsp;% d'auteurs retrouvés
+            {percent(item.matched_source_contributions, item.signatures)}&nbsp;% d'auteurs retrouvés
           </span>
-          <span>{item.matched_signatures} / {item.signatures} signatures</span>
+          <span>{item.matched_source_contributions} / {item.signatures} signatures</span>
         </div>
         <div class="notices">
           {#each item.notices as n (n.source + n.source_id)}
             <span class="notice">
               <SourceTag source={n.source} id={n.source_id} href={sourceExternalUrl(n.source, n.source_id) ?? undefined} />
-              {n.matched_signatures} / {n.signatures}
+              {n.matched_source_contributions} / {n.signatures}
             </span>
           {/each}
         </div>

@@ -3,13 +3,13 @@
 Incrémental et publication-centré :
   1. Sélectionne les publications à ingérer : `publications.subjects_ingested_at` vide. L'enregistrement d'une publication recalculée depuis ses sources vide cette date ; les autres écritures sur la publication (statut OA…) la laissent en place.
   2. Dégage leurs liens `publication_subjects` (non rejetés).
-  3. Ré-ingère, par `source_publication`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
+  3. Ré-ingère, par `source_record`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
   4. Date l'ingestion de chaque publication traitée, qu'elle ait des sujets ou non.
   5. Purge les `subjects` devenus orphelins (plus aucun lien).
 
-Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_publications` et affichés via `publications_detail.keywords`, hors de `subjects`.
+Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_records` et affichés via `publications_detail.keywords`, hors de `subjects`.
 
-On lit les `source_publications` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
+On lit les `source_records` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
 """
 
 import logging
@@ -66,7 +66,7 @@ def run(
         return metrics
 
     queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
-    rows = queries.select_source_publications_for_pubs(conn, publication_ids=pub_ids)
+    rows = queries.select_source_records_for_pubs(conn, publication_ids=pub_ids)
     logger.info(
         "%s%s à traiter (%s), soit %s",
         BRANCHE,

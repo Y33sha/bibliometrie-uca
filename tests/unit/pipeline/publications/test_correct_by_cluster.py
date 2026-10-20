@@ -1,13 +1,13 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre, volume d'actes/communication) + `compute_updates`."""
 
-from domain.source_publications.metadata_correction.shared_doi import (
+from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
     DoiClusterMember,
     resolve_cluster_doi_corrections,
 )
-from domain.source_publications.raw_metadata import stash_entry
+from domain.source_records.raw_metadata import stash_entry
 from pipeline.transformation.publications.correction.correct_by_cluster import (
     compute_updates,
     tally_doi_corrections,

@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les structures : frontière transactionnelle de l'agrégat.
 
-Couvre `structures`, `structure_tutelles`, `structure_name_forms`. `delete_structure`, `create_tutelle` et `delete_tutelle` rafraîchissent en plus la clôture matérialisée des périmètres, qu'une tutelle modifiée fait bouger.
+Couvre `structures`, `structure_parents`, `structure_name_forms`. `delete_structure`, `create_tutelle` et `delete_tutelle` rafraîchissent en plus la clôture matérialisée des périmètres, qu'une tutelle modifiée fait bouger.
 """
 
 from sqlalchemy import Connection
@@ -85,7 +85,7 @@ def delete_structure(
     conn.commit()
 
 
-# ── structure_tutelles ────────────────────────────────────────────
+# ── structure_parents ────────────────────────────────────────────
 
 
 def create_tutelle(

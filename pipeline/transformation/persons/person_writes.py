@@ -14,9 +14,9 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 logger = logging.getLogger(__name__)
 
 
-def add_identifiers_from_authorships(
+def add_identifiers_from_contributions(
     person_id: int,
-    authorships: Sequence[Mapping[str, JsonValue]],
+    contributions: Sequence[Mapping[str, JsonValue]],
     *,
     repo: PgPersonRepository,
 ) -> None:
@@ -25,7 +25,7 @@ def add_identifiers_from_authorships(
     Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` est laissée : l'arbitrage par consensus du run suivant la tranche.
     """
     seen: set[tuple[str, str]] = set()
-    for a in authorships:
+    for a in contributions:
         for id_type in PERSON_IDENTIFIER_TYPES:
             raw = a.get(id_type)
             if not raw:

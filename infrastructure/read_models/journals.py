@@ -54,7 +54,7 @@ from infrastructure.sql_fragments import active_issns, corrected, has_active_iss
 _JOURNAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS pub_name,
-    j.is_in_doaj, j.journal_type, j.pub_count,
+    j.is_in_doaj, j.journal_type, j.publication_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
 """
@@ -77,7 +77,7 @@ def _journal_list_item(row: Row[tuple[object, ...]]) -> JournalListItem:
         pub_name=row.pub_name,
         is_in_doaj=row.is_in_doaj,
         journal_type=row.journal_type,
-        pub_count=row.pub_count,
+        publication_count=row.publication_count,
         doaj_url=resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
     )
 
@@ -132,7 +132,7 @@ def _build_journal_where(
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = filters.oa_models
     if filters.with_pubs:
-        parts.append("j.pub_count > 0")
+        parts.append("j.publication_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -141,8 +141,8 @@ _SORT_MAP = {
     "title_desc": "j.title DESC",
     "publisher_asc": "pub_name ASC NULLS LAST, j.title ASC",
     "publisher_desc": "pub_name DESC NULLS LAST, j.title ASC",
-    "pubs_asc": "pub_count ASC, j.title ASC",
-    "pubs_desc": "pub_count DESC, j.title ASC",
+    "pubs_asc": "publication_count ASC, j.title ASC",
+    "pubs_desc": "publication_count DESC, j.title ASC",
 }
 
 
@@ -163,7 +163,7 @@ _JOURNAL_RECORD_TYPES = f"""
            array_agg(s.source::text ORDER BY s.id) AS sources,
            array_agg({raw_column("doc_type", "s")} ORDER BY s.id) AS raw_types
     FROM journals j
-    JOIN source_publications s ON s.journal_id = j.id
+    JOIN source_records s ON s.journal_id = j.id
     WHERE j.journal_type = 'journal'
     GROUP BY j.id
 """
@@ -171,9 +171,9 @@ _JOURNAL_RECORD_TYPES = f"""
 # Enregistrements à DOI et à revue. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
 _RECORDS_WITH_DOI_AND_JOURNAL = f"""
     SELECT doi, journal_id, source::text AS source
-    FROM source_publications
+    FROM source_records
     WHERE doi IS NOT NULL AND journal_id IS NOT NULL
-      AND NOT {corrected("journal_id", "source_publications")}
+      AND NOT {corrected("journal_id", "source_records")}
 """
 
 # Revues où le même ISSN est actif.
@@ -293,12 +293,13 @@ class PgJournalQueries(JournalQueries):
             JournalDuplicateGroup(
                 value=g.value,
                 journals=sorted(
-                    (items[i] for i in g.ids if i in items), key=lambda j: (-j.pub_count, j.id)
+                    (items[i] for i in g.ids if i in items),
+                    key=lambda j: (-j.publication_count, j.id),
                 ),
             )
             for g in groups
         ]
-        duplicates.sort(key=lambda g: (-g.journals[0].pub_count, g.value))
+        duplicates.sort(key=lambda g: (-g.journals[0].publication_count, g.value))
         return JournalDuplicatesResponse(groups=duplicates)
 
     def list_journals(

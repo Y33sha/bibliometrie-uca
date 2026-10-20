@@ -1,6 +1,6 @@
-"""Règles métier sur les tutelles entre structures (`structure_tutelles`).
+"""Règles métier sur les tutelles entre structures (`structure_parents`).
 
-Fonctions libres (domain services) validant le graphe `structure_tutelles` : la règle cycle / auto-référence porte sur l'arête `parent → child`, hors de l'agrégat `Structure`.
+Fonctions libres (domain services) validant le graphe `structure_parents` : la règle cycle / auto-référence porte sur l'arête `parent → child`, hors de l'agrégat `Structure`.
 
 Pattern caller : le service applicatif prefetche les ancêtres du `parent_id` candidat via le repo (`WITH RECURSIVE`) et passe le set ici. Le domaine reste pur (zéro I/O).
 """
@@ -25,8 +25,7 @@ def check_can_create_tutelle(
     """
     if parent_id == child_id:
         raise ValidationError(
-            f"Auto-référence interdite dans structure_tutelles : "
-            f"parent_id == child_id ({parent_id})"
+            f"Auto-référence interdite dans structure_parents : parent_id == child_id ({parent_id})"
         )
     if child_id in ancestors_of_parent:
         raise ValidationError(

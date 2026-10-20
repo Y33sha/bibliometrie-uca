@@ -3,7 +3,7 @@
 import logging
 
 from domain.journals.doi_namespaces import DoiNamespace
-from domain.source_publications.raw_metadata import stash_entry
+from domain.source_records.raw_metadata import stash_entry
 from pipeline.transformation.publications.correction.journal_by_doi import compute_updates, run
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     JournalCorrectionRow,

@@ -34,7 +34,7 @@ class StructureRow(TypedDict):
 
 
 class StructureTutelleRow(TypedDict):
-    """Ligne `structure_tutelles` renvoyée par create."""
+    """Ligne `structure_parents` renvoyée par create."""
 
     id: int
     parent_id: int
@@ -68,12 +68,12 @@ class StructureNameFormDeletedRow(TypedDict):
 
 
 class StructureRepository(Protocol):
-    """Contrat d'accès aux 3 tables du concept Structure (structures, structure_tutelles, structure_name_forms)."""
+    """Contrat d'accès aux 3 tables du concept Structure (structures, structure_parents, structure_name_forms)."""
 
     # ── structures : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_tutelles` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
+        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_parents` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
         ...
 
     def add(self, structure: Structure) -> int:
@@ -88,10 +88,10 @@ class StructureRepository(Protocol):
         """Supprime la structure et retourne son instantané, pris avant la suppression : la ligne `structures`, ses formes de nom, ses tutelles (`parent_ids`, `child_ids`), ses liens adresse-structure confirmés, rejetés ou manuels (listes d'`address_id`) et les périmètres dont elle est une racine. `None` si elle n'existe pas."""
         ...
 
-    # ── structure_tutelles ─────────────────────────────────────────
+    # ── structure_parents ─────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        """Ancêtres stricts de `structure_id` dans le graphe `structure_tutelles`. Exclut `structure_id` lui-même. Sert au service pour valider l'absence de cycle avant insertion d'une tutelle."""
+        """Ancêtres stricts de `structure_id` dans le graphe `structure_parents`. Exclut `structure_id` lui-même. Sert au service pour valider l'absence de cycle avant insertion d'une tutelle."""
         ...
 
     def create_tutelle(

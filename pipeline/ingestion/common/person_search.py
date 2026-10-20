@@ -43,7 +43,7 @@ def searched_persons(
             FROM person_identifiers pi
             WHERE pi.id_type::text = ANY(:id_types)
               AND pi.status::text = ANY(:statuses)
-              AND EXISTS (SELECT 1 FROM persons_rh r WHERE r.person_id = pi.person_id)
+              AND EXISTS (SELECT 1 FROM hr_records r WHERE r.person_id = pi.person_id)
             ORDER BY pi.person_id, pi.id_type, pi.id_value
         """),
         {"id_types": sorted(id_types), "statuses": sorted(SEARCHED_IDENTIFIER_STATUSES)},

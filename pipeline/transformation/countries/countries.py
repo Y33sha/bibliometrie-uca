@@ -5,7 +5,7 @@ Quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
 1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
 2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
 3. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
-4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (contributions sources, source_publications, publications).
+4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (contributions sources, source_records, publications).
 
 L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
 """
@@ -31,21 +31,21 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
 class AddressCountryStatus(NamedTuple):
-    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
+    """Bilan de l'état pays des adresses (restreint à `publication_count > 0`)."""
 
     total: int
     with_country: int
 
 
 def count_address_country_status(conn: Connection) -> AddressCountryStatus:
-    """Bilan de la résolution des pays sur les adresses utiles (`pub_count > 0`)."""
+    """Bilan de la résolution des pays sur les adresses utiles (`publication_count > 0`)."""
     row = conn.execute(
         text("""
             SELECT
                 count(*) AS total,
                 count(*) FILTER (WHERE countries IS NOT NULL) AS with_country
             FROM addresses
-            WHERE pub_count > 0
+            WHERE publication_count > 0
         """)
     ).one()
     return AddressCountryStatus(row.total, row.with_country)

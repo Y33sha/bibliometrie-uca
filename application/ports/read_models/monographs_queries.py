@@ -36,7 +36,7 @@ class MonographFilters:
 
 
 class MonographListItem(BaseModel):
-    """Ligne de la liste des monographies. `pub_count` compte les publications qu'elle contient."""
+    """Ligne de la liste des monographies. `publication_count` compte les publications qu'elle contient."""
 
     id: int
     title: str
@@ -48,7 +48,7 @@ class MonographListItem(BaseModel):
     pub_name: str | None
     journal_id: int | None
     journal_title: str | None
-    pub_count: int
+    publication_count: int
 
 
 class MonographListResponse(PaginatedResponse):

@@ -131,7 +131,7 @@ def ror_candidates(conn: Connection) -> Iterator[Candidate]:
     rows = conn.execute(
         text("""
             SELECT DISTINCT sar.address_id, ro.country_code
-            FROM source_authorship_rors sar
+            FROM source_contribution_rors sar
             JOIN ror_organizations ro USING (ror_id)
             WHERE sar.address_id IS NOT NULL
         """)

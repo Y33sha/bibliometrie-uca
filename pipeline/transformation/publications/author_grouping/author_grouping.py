@@ -1,6 +1,6 @@
-"""Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_authorship_groups`, `grouped_source_authorships`).
+"""Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_contribution_groups`, `source_contribution_group_members`).
 
-Les publications marquées `authorships_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres signatures, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `contributions_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres signatures, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
 
 Tâche `author_grouping.build`.
 """

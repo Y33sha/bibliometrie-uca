@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-    A[source_authorships]-->B[addresses]
+    A[source_contributions]-->B[addresses]
     D[structures]-->E[structure_name_forms]
     E-->|resolve_addresses|F[address_structures]
     B-->|resolve_addresses|F
@@ -30,4 +30,4 @@ La phase `affiliations` rattache les signatures aux structures du périmètre, e
 
 4. **`resolve_thesis_partners`** — rattache le PPN IdRef de chaque laboratoire partenaire de thèse à une structure, par les formes de noms (`idref_structures`).
 
-5. **`populate`** — rafraîchit la vue matérialisée `source_authorship_structures`, qui rattache chaque signature aux structures du périmètre qu'elle atteint, avec l'indice : adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse. Une signature entre aussi dans le périmètre quand elle contient un identifiant fort (ORCID, IdRef, `hal_person_id`) d'une personne RH, et que le document paraît entre l'année qui suit son arrivée et la fin de son contrat. Ces indices sont écrits dans `source_authorships.perimeter_evidence` ; `in_perimeter` est vrai quand la signature en a au moins un. Un document sans publication dont une signature entre dans le périmètre est signalé à la phase [`publications`](07-publications.md), qui le met en publication. Code : `pipeline/transformation/structures/affiliations.py`.
+5. **`populate`** — rafraîchit la vue matérialisée `source_contribution_structures`, qui rattache chaque signature aux structures du périmètre qu'elle atteint, avec l'indice : adresse, ROR, structure HAL, établissement de soutenance ou laboratoire partenaire d'une thèse. Une signature entre aussi dans le périmètre quand elle contient un identifiant fort (ORCID, IdRef, `hal_person_id`) d'une personne RH, et que le document paraît entre l'année qui suit son arrivée et la fin de son contrat. Ces indices sont écrits dans `source_contributions.perimeter_evidence` ; `in_perimeter` est vrai quand la signature en a au moins un. Un document sans publication dont une signature entre dans le périmètre est signalé à la phase [`publications`](07-publications.md), qui le met en publication. Code : `pipeline/transformation/structures/affiliations.py`.

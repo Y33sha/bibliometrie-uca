@@ -168,15 +168,17 @@ def test_succeeding_title_absorbs_the_preceding_one():
     assert metrics.extras["journals_merged"] == 1
 
 
-def _journal(journal_id: int, title: str, *issns: str, pub_count: int = 1) -> JournalMergeCandidate:
-    return JournalMergeCandidate(journal_id, title, frozenset(issns), pub_count)
+def _journal(
+    journal_id: int, title: str, *issns: str, publication_count: int = 1
+) -> JournalMergeCandidate:
+    return JournalMergeCandidate(journal_id, title, frozenset(issns), publication_count)
 
 
 def test_abbreviated_title_is_absorbed_by_the_journal_with_an_issn():
     """Cas réel : HAL rattache à « JINST », sans ISSN, les articles du Journal of Instrumentation."""
     pair = JournalPublicationPair(
-        _journal(1631, "Journal of Instrumentation", "1748-0221", pub_count=40),
-        _journal(21071, "JINST", pub_count=47),
+        _journal(1631, "Journal of Instrumentation", "1748-0221", publication_count=40),
+        _journal(21071, "JINST", publication_count=47),
         publications=47,
     )
     metrics, merges = _run(_Repo(publication_pairs=[pair]))

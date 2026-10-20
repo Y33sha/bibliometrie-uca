@@ -2,7 +2,7 @@ import type { components } from './api/schema';
 
 type PersonExclusion = components['schemas']['PersonExclusion'];
 
-/** Libellés FR (singulier) des types de documents, codés en dur. Source de vérité de la liste canonique : l'enum PG `doc_type` / `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée par un test pytest (tests/unit/domain/source_publications/test_doc_types.py) qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
+/** Libellés FR (singulier) des types de documents, codés en dur. Source de vérité de la liste canonique : l'enum PG `doc_type` / `DOC_TYPES` du domain backend. La cohérence des clés est vérifiée par un test pytest (tests/unit/domain/source_records/test_doc_types.py) qui lit ce fichier et casse si une valeur de l'enum n'a pas son libellé. */
 export const docTypeSingular: Record<string, string> = {
 	article: 'Article',
 	conference_paper: 'Conference paper',
@@ -280,8 +280,8 @@ export function issnLabel(issn: { support: string | null; linking: boolean }): s
 	return support ?? 'ISSN';
 }
 
-/** Rôles d'une signature dans leur ordre d'affichage. Valeurs de `AuthorshipRole` côté backend. */
-export const AUTHORSHIP_ROLE_ORDER = [
+/** Rôles d'une signature dans leur ordre d'affichage. Valeurs de `ContributionRole` côté backend. */
+export const CONTRIBUTION_ROLE_ORDER = [
 	'author',
 	'speaker',
 	'editor',
@@ -296,7 +296,7 @@ export const AUTHORSHIP_ROLE_ORDER = [
 ];
 
 /** Libellés FR des rôles d'une signature. */
-export const authorshipRoleLabels: Record<string, string> = {
+export const contributionRoleLabels: Record<string, string> = {
 	author: 'Auteur',
 	speaker: 'Orateur',
 	editor: 'Éditeur',

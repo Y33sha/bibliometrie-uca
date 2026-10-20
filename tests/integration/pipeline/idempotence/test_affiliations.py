@@ -6,18 +6,18 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
-    insert_source_publication,
+    insert_source_record,
 )
 from tests.integration.helpers.structures import insert_perimeter, insert_structure, insert_tutelle
 
 
 def _setup_affiliations_test_data(conn):
     """Crée des données pour tester populate_affiliations :
-    structures + périmètres + adresses + source_authorships liées.
+    structures + périmètres + adresses + source_contributions liées.
 
     Scénario : une structure UCA (labo, id=80001) sous la tutelle
-    d'UCA (id=80000). Un authorship OpenAlex est rattaché
-    au labo via une adresse résolue. Un authorship HAL coexiste sans
+    d'UCA (id=80000). Une contribution OpenAlex est rattachée
+    au labo via une adresse résolue. Une contribution HAL coexiste sans
     résolution d'adresse (sert pour l'idempotence des comptages).
     """
 
@@ -44,14 +44,14 @@ def _setup_affiliations_test_data(conn):
         (80001, "hal", "hal-80000001", "ART"),
         (80002, "openalex", "W80000001", "article"),
     ):
-        insert_source_publication(
+        insert_source_record(
             conn,
             80001,
             source=source,
             source_id=source_id,
             title="Pub Affiliation Test",
             row_id=row_id,
-            pub_year=2024,
+            publication_year=2024,
             doc_type=doc_type,
         )
         insert_signature(
@@ -73,7 +73,7 @@ def _setup_affiliations_test_data(conn):
     insert_address_structure(conn, 80001, structure_id=80001, is_confirmed=True)
     insert_signature_address(conn, 80002, address_id=80001)
 
-    # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
+    # `source_contribution_structures` (matview) filtre par `perimeter_structures` :
     # peupler la clôture du périmètre depuis les perimeters/relations semés.
     from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
@@ -101,15 +101,15 @@ def _count_affiliations(conn) -> dict:
     for src in ["hal", "openalex"]:
         counts[f"{src}_in_perimeter"] = conn.execute(
             text(
-                "SELECT COUNT(*) AS cnt FROM source_authorships "
+                "SELECT COUNT(*) AS cnt FROM source_contributions "
                 "WHERE source = :src AND in_perimeter = TRUE"
             ),
             {"src": src},
         ).scalar_one()
         counts[f"{src}_with_structs"] = conn.execute(
             text(
-                "SELECT COUNT(DISTINCT sa.id) AS cnt FROM source_authorships sa "
-                "JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id "
+                "SELECT COUNT(DISTINCT sa.id) AS cnt FROM source_contributions sa "
+                "JOIN source_contribution_structures sas ON sas.source_contribution_id = sa.id "
                 "WHERE sa.source = :src"
             ),
             {"src": src},
@@ -129,9 +129,9 @@ class TestPopulateAffiliationsIdempotence:
         # HAL utilise maintenant le circuit adresses (comme les autres sources).
         # Sans populate_addresses + resolve_addresses dans ce test, HAL n'est pas in_perimeter.
         # L'idempotence est vérifiée par la comparaison counts_1 == counts_2 ci-dessous.
-        assert counts_1["openalex_in_perimeter"] == 1, "L'authorship OA doit être in_perimeter"
+        assert counts_1["openalex_in_perimeter"] == 1, "La contribution OA doit être in_perimeter"
         assert counts_1["openalex_with_structs"] == 1, (
-            "L'authorship OA doit avoir des structure_ids"
+            "La contribution OA doit avoir des structure_ids"
         )
 
         _run_populate_affiliations(sa_sync_conn)
@@ -169,9 +169,9 @@ class TestPopulateAffiliationsIdempotence:
             text(
                 "SELECT sa.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
-                "        FROM source_authorship_structures "
-                "        WHERE source_authorship_id = sa.id) AS structure_ids "
-                "FROM source_authorships sa WHERE sa.id = 80002"
+                "        FROM source_contribution_structures "
+                "        WHERE source_contribution_id = sa.id) AS structure_ids "
+                "FROM source_contributions sa WHERE sa.id = 80002"
             )
         ).one()
         assert row.in_perimeter is True
@@ -179,28 +179,28 @@ class TestPopulateAffiliationsIdempotence:
 
 
 class TestPopulateAffiliationsTheses:
-    """Régression : les authorships theses doivent obtenir `in_perimeter` comme
+    """Régression : les contributions theses doivent obtenir `in_perimeter` comme
     les autres sources (le sync est source-agnostique, dérivé de la matview).
     Avant fix, `BIBLIO_SOURCES` excluait theses → `in_perimeter` restait FALSE et
-    la cascade personnes ne voyait jamais ces authorships (jury, directeurs,
+    la cascade personnes ne voyait jamais ces contributions (jury, directeurs,
     rapporteurs, voire auteurs)."""
 
-    def test_theses_authorship_in_perimeter_via_address(self, sa_sync_conn):
+    def test_theses_contribution_in_perimeter_via_address(self, sa_sync_conn):
         from sqlalchemy import text
 
         _setup_affiliations_test_data(sa_sync_conn)
 
-        # Ajoute une source_publication + source_authorship theses,
+        # Ajoute une source_record + source_contribution theses,
         # liées à l'adresse 80001 (déjà résolue vers structure 80001
         # via address_structures par _setup_affiliations_test_data).
-        insert_source_publication(
+        insert_source_record(
             sa_sync_conn,
             80001,
             source="theses",
             source_id="2024UCFA0001",
             title="Thèse Test",
             row_id=80003,
-            pub_year=2024,
+            publication_year=2024,
             doc_type="thesis",
         )
         insert_signature(
@@ -221,21 +221,21 @@ class TestPopulateAffiliationsTheses:
             text(
                 "SELECT sa.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
-                "        FROM source_authorship_structures "
-                "        WHERE source_authorship_id = sa.id) AS structure_ids "
-                "FROM source_authorships sa WHERE sa.id = 80003"
+                "        FROM source_contribution_structures "
+                "        WHERE source_contribution_id = sa.id) AS structure_ids "
+                "FROM source_contributions sa WHERE sa.id = 80003"
             )
         ).one()
         assert row.in_perimeter is True
         assert row.structure_ids == [80001]
 
 
-def _keys_dirty(conn, source_publication_id: int) -> bool:
+def _keys_dirty(conn, source_record_id: int) -> bool:
     from sqlalchemy import text
 
     return conn.execute(
-        text("SELECT keys_dirty FROM source_publications WHERE id = :id"),
-        {"id": source_publication_id},
+        text("SELECT keys_dirty FROM source_records WHERE id = :id"),
+        {"id": source_record_id},
     ).scalar_one()
 
 
@@ -247,7 +247,7 @@ class TestEntreeDansLePerimetre:
 
         conn.execute(
             text(
-                "UPDATE source_publications SET publication_id = NULL, keys_dirty = FALSE"
+                "UPDATE source_records SET publication_id = NULL, keys_dirty = FALSE"
                 " WHERE id = 80002"
             )
         )
@@ -264,7 +264,7 @@ class TestEntreeDansLePerimetre:
         from sqlalchemy import text
 
         _setup_affiliations_test_data(sa_sync_conn)
-        sa_sync_conn.execute(text("UPDATE source_publications SET keys_dirty = FALSE"))
+        sa_sync_conn.execute(text("UPDATE source_records SET keys_dirty = FALSE"))
 
         _run_populate_affiliations(sa_sync_conn)
 

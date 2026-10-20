@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Rapport de cohérence entre `structure_tutelles` et les relations parent/enfant du référentiel ROR.
+"""Rapport de cohérence entre `structure_parents` et les relations parent/enfant du référentiel ROR.
 
 Liste les tutelles absentes du ROR, les parents ROR absents des tutelles, les parents et enfants ROR des structures du périmètre absents de `structures`, et les ROR attribués à plusieurs structures. Chaque écart se corrige dans l'interface d'administration ou se signale au ROR.
 
@@ -43,12 +43,12 @@ def ror_names(conn: Connection, ror_ids: Iterable[RorId]) -> dict[RorId, str]:
 
 
 def ror_coherence_report(conn: Connection) -> RorCoherenceReport:
-    """Compare `structure_tutelles` aux relations du ROR, pour toutes les structures qui ont un ROR."""
+    """Compare `structure_parents` aux relations du ROR, pour toutes les structures qui ont un ROR."""
     structures = conn.execute(text("SELECT id, code, ror_id FROM structures ORDER BY code")).all()
     structure_rors = {
         s.id: ror_id for s in structures if (ror_id := RorId.try_parse(s.ror_id)) is not None
     }
-    tutelles = conn.execute(text("SELECT parent_id, child_id FROM structure_tutelles"))
+    tutelles = conn.execute(text("SELECT parent_id, child_id FROM structure_parents"))
     perimeter = conn.execute(text("SELECT DISTINCT structure_id FROM perimeter_structures"))
     coherence = tutelle_coherence(
         structure_rors=structure_rors,

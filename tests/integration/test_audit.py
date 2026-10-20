@@ -249,7 +249,7 @@ class TestEndToEndServiceIntegration:
 
     def test_name_form_confirm_emits_event(self, sa_sync_conn):
         from application.services.persons.core import update_name_form_status
-        from infrastructure.repositories import authorship_repository, person_repository
+        from infrastructure.repositories import contribution_repository, person_repository
 
         person_id = _person(sa_sync_conn)
         insert_person_name_form(
@@ -262,7 +262,7 @@ class TestEndToEndServiceIntegration:
                 "x x",
                 "confirmed",
                 repo=person_repository(sa_sync_conn),
-                authorship_repo=authorship_repository(sa_sync_conn),
+                contribution_repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
@@ -276,7 +276,7 @@ class TestEndToEndServiceIntegration:
     def test_name_form_reject_emits_event(self, sa_sync_conn):
         """Le rejet d'une forme (action « détacher l'intrus ») émet l'événement."""
         from application.services.persons.core import update_name_form_status
-        from infrastructure.repositories import authorship_repository, person_repository
+        from infrastructure.repositories import contribution_repository, person_repository
 
         person_id = _person(sa_sync_conn)
         insert_person_name_form(
@@ -289,7 +289,7 @@ class TestEndToEndServiceIntegration:
                 "x x",
                 "rejected",
                 repo=person_repository(sa_sync_conn),
-                authorship_repo=authorship_repository(sa_sync_conn),
+                contribution_repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
@@ -301,8 +301,8 @@ class TestEndToEndServiceIntegration:
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
         """Le détachement d'une paire (publication, personne) émet l'événement."""
-        from application.services.authorships.core import reject_pair
-        from infrastructure.repositories import authorship_repository
+        from application.services.contributions.core import reject_pair
+        from infrastructure.repositories import contribution_repository
 
         person_id = _person(sa_sync_conn)
         pub_id = insert_publication(sa_sync_conn)
@@ -311,14 +311,14 @@ class TestEndToEndServiceIntegration:
             reject_pair(
                 pub_id,
                 person_id,
-                repo=authorship_repository(sa_sync_conn),
+                repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
             reset_current_user(token)
 
         row = self._last_event(sa_sync_conn)
-        assert row.event_type == "authorship.rejected"
+        assert row.event_type == "contribution.rejected"
         assert row.aggregate_type == "publication"
         assert row.aggregate_id == pub_id
         assert row.payload == {"person_id": person_id}

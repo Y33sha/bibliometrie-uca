@@ -1,6 +1,6 @@
-"""Recalcul de `publications.perimeter_evidence`, par la phase `authorships`, après l'exclusion d'une personne et après une correction d'adresse.
+"""Recalcul de `publications.perimeter_evidence`, par la phase `contributions`, après l'exclusion d'une personne et après une correction d'adresse.
 
-Une publication réunit les indices de ses authorships d'auteurs, de personnes non exclues : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
+Une publication réunit les indices de ses contributions d'auteurs, de personnes non exclues : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
 """
 
 from sqlalchemy import Connection, text
@@ -17,13 +17,13 @@ def _refresh_sql(scope: str) -> str:
             SELECT id, array_agg(DISTINCT e ORDER BY e) AS evidence
             FROM (
                 SELECT a.publication_id AS id, e
-                FROM authorships a
+                FROM contributions a
                 JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
                 CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
                 WHERE a.publication_id {scope} AND {has_author_role("a")}
                 UNION
                 SELECT sp.publication_id, '{PerimeterEvidence.THESIS_INSTITUTION}'::perimeter_evidence
-                FROM source_publications sp
+                FROM source_records sp
                 WHERE sp.publication_id {scope}
                   AND sp.source = 'theses'
                   AND sp.meta ->> 'etablissement_ppn' = ANY(:thesis_ppns)
@@ -44,7 +44,7 @@ def _refresh_sql(scope: str) -> str:
 
 _ALL = text(_refresh_sql("IS NOT NULL"))
 _OF_PERSON = text(
-    _refresh_sql("IN (SELECT publication_id FROM authorships WHERE person_id = :pid)")
+    _refresh_sql("IN (SELECT publication_id FROM contributions WHERE person_id = :pid)")
 )
 _OF_PUBLICATIONS = text(_refresh_sql("= ANY(:publication_ids)"))
 

@@ -12,7 +12,7 @@ def insert_address(
     row_id: int | None = None,
     normalized_text: str | None = None,
     countries: list[str] | None = None,
-    pub_count: int | None = None,
+    publication_count: int | None = None,
     reuse: bool = False,
 ) -> int:
     """Insère une adresse et renvoie son `id`. `row_id` fixe l'`id`. Le texte normalisé vaut par défaut le texte brut en minuscules. `reuse` renvoie l'adresse de même texte brut si elle existe."""
@@ -30,7 +30,7 @@ def insert_address(
             "raw_text": raw_text,
             "normalized_text": normalized_text if normalized_text is not None else raw_text.lower(),
             "countries": countries,
-            "pub_count": pub_count,
+            "publication_count": publication_count,
         },
     )
 

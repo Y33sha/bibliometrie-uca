@@ -71,7 +71,7 @@ class JournalTitleTypeRow(NamedTuple):
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
 _DOCUMENT_ISSNS = text("""
     SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
-    FROM source_publications s
+    FROM source_records s
     CROSS JOIN LATERAL (
         VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
     ) AS v(issn)

@@ -124,7 +124,7 @@ def test_seed_links_children_to_root_and_skips_untyped():
         (2, "loria", "labo"),
     ]
     assert structures[0][-1] == {"openalex": ["I90183372"]}
-    assert _section(seed, "structure_tutelles").rows == [(1, 1, 2)]
+    assert _section(seed, "structure_parents").rows == [(1, 1, 2)]
     assert _section(seed, "perimeters").rows == [(1, "lorraine", "UL", [1])]
     assert [row[:2] for row in _section(seed, "config").rows] == [
         ("perimeter_extraction", "lorraine"),

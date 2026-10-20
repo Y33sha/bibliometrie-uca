@@ -72,7 +72,7 @@
           {#each state.publications as p, i}
             <div class="detach-item">
               <input type="checkbox" bind:checked={state.publications[i].checked} />
-              <span class="detach-year">{p.pub_year ?? "?"}</span>
+              <span class="detach-year">{p.publication_year ?? "?"}</span>
               <a
                 class="detach-title"
                 href="{base}/publications/{p.pub_id}"

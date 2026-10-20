@@ -361,7 +361,7 @@
         {#each addresses as a (a.id)}
           <tr>
             <td class="addr-text">{a.raw_text}</td>
-            <td class="num">{a.pub_count}</td>
+            <td class="num">{a.publication_count}</td>
             <td>
               {#if a.structures && a.structures.length > 0}
                 {#each a.structures as l}

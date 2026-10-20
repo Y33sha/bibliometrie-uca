@@ -33,7 +33,7 @@ def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
 
 # Liaison SQL par clé de dimension : expression de groupement et jointure éventuelle.
 _DIM_EXPR: dict[str, str] = {
-    "year": "p.pub_year",
+    "year": "p.publication_year",
     "oa_access": (
         f"CASE WHEN p.oa_status::text IN {OA_OPEN_SQL} THEN 'ouvert' "
         f"WHEN p.oa_status = '{OaStatus.EMBARGOED.value}' THEN 'embargo' "
@@ -59,7 +59,7 @@ _DIM_JOIN: dict[str, str] = {
 }
 # Agrégat de chaque mesure sur les publications distinctes `g`, et jointure éventuelle.
 _MEASURE_AGG: dict[str, str] = {
-    "pub_count": "COUNT(*)",
+    "publication_count": "COUNT(*)",
     "apc_amount": "COALESCE(SUM(apc.amount), 0)::float8",
 }
 _MEASURE_JOIN: dict[str, str] = {

@@ -2,14 +2,14 @@
 
 Interprétation des champs propres au schéma theses.fr — prédicats et extracteurs qui encapsulent la connaissance de la sémantique theses.fr.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisAuthorship` transmet tel quel le sous-objet personne au caller.
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisContribution` transmet tel quel le sous-objet personne au caller.
 """
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 from domain.persons.signature_name import SignatureName
-from domain.publications.authorship_roles import THESES_FIELD_ROLES, AuthorshipRole, merge_roles
+from domain.publications.contribution_roles import THESES_FIELD_ROLES, ContributionRole, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -24,32 +24,32 @@ def derive_theses_doc_type(date_soutenance: str | None) -> str:
 
 
 @dataclass(frozen=True)
-class ThesisAuthorship:
+class ThesisContribution:
     """Une personne d'une thèse, avec ses rôles fusionnés.
 
-    Produite par `aggregate_thesis_persons` à partir du dict `these` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_authorships`).
+    Produite par `aggregate_thesis_persons` à partir du dict `these` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
     """
 
     person: Mapping[str, JsonValue]
-    roles: list[AuthorshipRole]
+    roles: list[ContributionRole]
     name: SignatureName
     author_position: int | None
-    person_identifiers: dict[str, str] | None
+    identifiers: dict[str, str] | None
     is_author: bool
 
 
-def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAuthorship]:
+def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContribution]:
     """Agrège les personnes d'une thèse depuis `these` (API theses.fr).
 
     Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` (cf. `THESES_FIELD_ROLES`). Une personne qui apparaît dans plusieurs champs est dédupliquée (clé : PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés via `merge_roles`.
 
-    En pratique, le cas multi-rôles concerne presque exclusivement le président du jury qui est aussi rapporteur (~1 % des authorships theses au 2026-05-08).
+    En pratique, le cas multi-rôles concerne presque exclusivement le président du jury qui est aussi rapporteur (~1 % des contributions theses au 2026-05-08).
 
     `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `these["auteurs"]`.
     """
     # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
     personnes: dict[str, Mapping[str, JsonValue]] = {}
-    roles_par_personne: dict[str, list[AuthorshipRole]] = {}
+    roles_par_personne: dict[str, list[ContributionRole]] = {}
 
     for field, roles in THESES_FIELD_ROLES.items():
         if field == "president":
@@ -67,24 +67,24 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisAutho
             personnes.setdefault(key, person)
             roles_par_personne.setdefault(key, []).extend(roles)
 
-    out: list[ThesisAuthorship] = []
+    out: list[ThesisContribution] = []
     position = 0
     for key, person in personnes.items():
         name = SignatureName.from_parts(as_str(person.get("nom")), as_str(person.get("prenom")))
         if name is None:
             continue
         merged = merge_roles([roles_par_personne[key]])
-        is_author = AuthorshipRole.AUTHOR in merged
+        is_author = ContributionRole.AUTHOR in merged
         ppn = as_str(person.get("ppn"))
-        person_identifiers = {"idref": ppn} if ppn else None
+        identifiers = {"idref": ppn} if ppn else None
 
         out.append(
-            ThesisAuthorship(
+            ThesisContribution(
                 person=person,
                 roles=merged,
                 name=name,
                 author_position=position if is_author else None,
-                person_identifiers=person_identifiers,
+                identifiers=identifiers,
                 is_author=is_author,
             )
         )

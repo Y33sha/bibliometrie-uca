@@ -1,8 +1,8 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { AUTHORSHIP_ROLE_ORDER, authorshipRoleLabels } from "$lib/labels";
+  import { CONTRIBUTION_ROLE_ORDER, contributionRoleLabels } from "$lib/labels";
   import StructureTag from "./StructureTag.svelte";
-  import { type StructInfo, type ThesisAuthorship, type ThesisMeta } from "./types";
+  import { type StructInfo, type ThesisContribution, type ThesisMeta } from "./types";
 
   const {
     thesesAuth,
@@ -10,7 +10,7 @@
     thesisAuthorStructures,
     structures,
   }: {
-    thesesAuth: ThesisAuthorship[];
+    thesesAuth: ThesisContribution[];
     thesisMeta: ThesisMeta | null | undefined;
     thesisAuthorStructures: number[];
     structures: Record<string, StructInfo>;
@@ -21,10 +21,10 @@
 <div class="section thesis-section">
   <h2 class="section-title">Thèse</h2>
   <dl class="thesis-dl">
-    {#each AUTHORSHIP_ROLE_ORDER as role}
+    {#each CONTRIBUTION_ROLE_ORDER as role}
       {@const people = thesesAuth.filter((a) => a.roles?.includes(role))}
       {#if people.length}
-        <dt>{authorshipRoleLabels[role] || role}</dt>
+        <dt>{contributionRoleLabels[role] || role}</dt>
         <dd>
           {#each people as p, i}
             {#if p.person_id}

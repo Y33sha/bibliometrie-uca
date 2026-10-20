@@ -24,20 +24,20 @@ def _m(
     doc_type=None,
 ):
     return ReconcileMember(
-        source_publication_id=sp_id,
+        source_record_id=sp_id,
         publication_id=pub_id,
         publication_doi=pub_doi,
         effective_doi=doi,
         tokens=frozenset(tokens),
         in_perimeter=in_perimeter,
         title_normalized=tn,
-        pub_year=year,
+        publication_year=year,
         doc_type=doc_type,
     )
 
 
 def _groups(plan):
-    return {g.target_publication_id: g.source_publication_ids for g in plan.groups}
+    return {g.target_publication_id: g.source_record_ids for g in plan.groups}
 
 
 class TestMerge:
@@ -253,7 +253,7 @@ class TestAssignmentOfOrphans:
 
     def test_create_gated_by_missing_metadata(self):
         """Orphelin in-périmètre mais sans titre/année → pas de create (skip), comme le gate
-        `has_minimal_publication_metadata` (sinon `pub_year NOT NULL` ferait échouer la création)."""
+        `has_minimal_publication_metadata` (sinon `publication_year NOT NULL` ferait échouer la création)."""
         plan = plan_reconciliation(
             [
                 _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True, year=None),

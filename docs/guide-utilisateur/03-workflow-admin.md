@@ -119,13 +119,13 @@ Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[ex
 
 La fusion s'opère depuis `admin/persons`: la file des doublons par nom (doublons probables en tête, homonymes en fin) présente les paires candidates; pour chacune, on fusionne vers la personne à conserver, ou on la marque comme distincte — elle sort alors de la file.
 
-#### Détachement des authorships attribuées à tort
+#### Détachement des contributions attribuées à tort
 
 Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis `admin/persons`. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* publications".
 
 ![Détacher publications](../img/screenshots/admin_persons_detacher.png)
 
-Pour réattribuer les publications en question: cf [Authorships orphelines](#authorships-orphelines)
+Pour réattribuer les publications en question: cf [Contributions orphelines](#contributions-orphelines)
 
 #### Vérification des identifiants de personne
 
@@ -153,19 +153,19 @@ TODO: expliquer *authenticated*
 
 La page `admin/persons` permet de corriger le nom et prénom si ceux issus des sources sont incorrects. C'est souvent le cas des patronymes composés: le parsing des sources a tendance à mettre la première partie du patronyme dans le prénom. Ex. : Alain Le Grand => prénom: "Alain Le", nom: "Grand". On constate aussi parfois des inversions nom-prénom.
 
-#### Authorships orphelines
+#### Contributions orphelines
 
-La page `admin/orphan-authorships` donne accès aux [authorships](../glossaire.md#authorship) orphelines, c'est-à-dire:
+La page `admin/orphan-contributions` donne accès aux [contributions](../glossaire.md#contribution) orphelines, c'est-à-dire:
 - relevant du périmètre (signature UCA en l'occurrence)
 - mais non rattachées à une personne.
 
 Il y a deux raisons possibles à cela:
-- Soit ces authorships ont été détachées manuellement d'un auteur;
+- Soit ces contributions ont été détachées manuellement d'un auteur;
 - Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucune résolution par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est fréquent pour les publications où le prénom est réduit à l'initiale).
 
-La page `admin/orphan-authorships` permet de rattacher les authorships en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
+La page `admin/orphan-contributions` permet de rattacher les contributions en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
 
-![Authorships orphelines](../img/screenshots/admin_orphan_authorships.png)
+![Contributions orphelines](../img/screenshots/admin_orphan_contributions.png)
 
 ### Gestion des référentiels d'éditeurs et de revues
 

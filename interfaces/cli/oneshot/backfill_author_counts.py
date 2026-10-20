@@ -14,30 +14,30 @@ import os
 
 from sqlalchemy import Connection, text
 
-from domain.publications.authorship_roles import AuthorshipRole
+from domain.publications.contribution_roles import ContributionRole
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("backfill_author_counts", os.path.dirname(__file__))
 
 # Signature d'auteur individuelle, comme `is_individual_author`.
-_AUTHOR = f"NOT sa.collective AND '{AuthorshipRole.AUTHOR.value}' = ANY(sa.roles)"
+_AUTHOR = f"NOT sa.collective AND '{ContributionRole.AUTHOR.value}' = ANY(sa.roles)"
 
 
 def _update_counts(conn: Connection, notices: str, params: dict[str, object]) -> int:
     """Écrit les décomptes des notices filtrées par la condition SQL `notices` (sur `sp`) qui changent. Rend le nombre de notices modifiées."""
     return conn.execute(
         text(f"""
-            UPDATE source_publications sp
+            UPDATE source_records sp
             SET author_count = c.n, distinct_author_count = c.d
             FROM (
                 SELECT sp.id,
                        count(sa.id) FILTER (WHERE {_AUTHOR}) AS n,
                        count(DISTINCT (k.last_name_normalized, coalesce(k.first_name_normalized, '')))
                            FILTER (WHERE {_AUTHOR}) AS d
-                FROM source_publications sp
-                LEFT JOIN source_authorships sa ON sa.source_publication_id = sp.id
-                LEFT JOIN author_identifying_keys k ON k.id = sa.identity_id
+                FROM source_records sp
+                LEFT JOIN source_contributions sa ON sa.source_record_id = sp.id
+                LEFT JOIN contributor_information k ON k.id = sa.contributor_information_id
                 WHERE {notices}
                 GROUP BY sp.id
             ) c
@@ -66,9 +66,7 @@ def main() -> int:
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
-        min_id, max_id = conn.execute(
-            text("SELECT min(id), max(id) FROM source_publications")
-        ).one()
+        min_id, max_id = conn.execute(text("SELECT min(id), max(id) FROM source_records")).one()
         conn.commit()
         if min_id is None:
             log.info("aucune notice")

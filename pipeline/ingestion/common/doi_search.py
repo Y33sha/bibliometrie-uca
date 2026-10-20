@@ -15,7 +15,7 @@ import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
 from domain.publications.identifiers import clean_doi
-from domain.source_publications.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType
 from domain.sources.registry import (
     ALL_SOURCES_SET as VALID_SOURCES,
     DOI_ORG,
@@ -79,9 +79,9 @@ _TARGET_RA: dict[str, str] = {
 def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) -> list[str]:
     """DOI présents dans les autres sources et absents de la cible.
 
-    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_publications.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne chercher que les DOI de publications in-périmètre évite de rapatrier des documents hors périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
+    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_records.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne chercher que les DOI de publications in-périmètre évite de rapatrier des documents hors périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
 
-    Exclut les DOI que la cible porte déjà, en `source_publications.doi` comme en `external_ids.related_dois` : une source rend un même document pour l'un ou l'autre de ses identifiants, si bien qu'un DOI secondaire ramènerait un document déjà présent.
+    Exclut les DOI que la cible porte déjà, en `source_records.doi` comme en `external_ids.related_dois` : une source rend un même document pour l'un ou l'autre de ses identifiants, si bien qu'un DOI secondaire ramènerait un document déjà présent.
 
     Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
@@ -105,11 +105,11 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
     query = f"""
         WITH deja_connus AS (
             SELECT sp.doi
-            FROM source_publications sp
+            FROM source_records sp
             WHERE sp.source = CAST(:target AS source_type) AND sp.doi IS NOT NULL
             UNION
             SELECT d.value
-            FROM source_publications sp
+            FROM source_records sp
             CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') d(value)
             WHERE sp.source = CAST(:target AS source_type)
               AND jsonb_typeof(sp.external_ids -> '{ExternalIdType.RELATED_DOIS}') = 'array'

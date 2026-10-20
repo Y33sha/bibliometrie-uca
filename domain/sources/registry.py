@@ -107,7 +107,7 @@ AUTHOR_SOURCES = ALL_SOURCES
 # - l'agrégation multi-sources des métadonnées publication
 #   (`refresh_from_sources` dans `pipeline/transformation/publications/consolidation.py`)
 # - la résolution de `author_position` quand plusieurs sources
-#   attestent une même authorship
+#   attestent une même contribution
 # - l'ordre d'exécution des normaliseurs dans le pipeline
 #
 # theses.fr fait autorité sur les métadonnées de thèse ; CrossRef et DataCite

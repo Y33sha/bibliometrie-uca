@@ -17,7 +17,7 @@ class PublicationMetadata:
     """
 
     title: str | None
-    pub_year: int | None
+    publication_year: int | None
     doc_type: str | None
     doi: str | None
     nnt: str | None

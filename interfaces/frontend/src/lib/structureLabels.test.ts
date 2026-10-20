@@ -4,7 +4,7 @@ import { structsTooltip, type Affiliation, type StructInfo } from "./structureLa
 const struct = (over: Partial<StructInfo>): StructInfo =>
   ({ id: 1, name: "Laboratoire", acronym: "LAB", type: "labo", ...over }) as StructInfo;
 
-const authorship = (over: Partial<Affiliation>): Affiliation => ({
+const contribution = (over: Partial<Affiliation>): Affiliation => ({
   raw_affiliation: null,
   structure_ids: [],
   ...over,
@@ -13,7 +13,7 @@ const authorship = (over: Partial<Affiliation>): Affiliation => ({
 describe("structsTooltip", () => {
   it("assemble l'affiliation brute et les structures identifiées", () => {
     const out = structsTooltip(
-      authorship({ raw_affiliation: "Université Clermont Auvergne", structure_ids: [1] }),
+      contribution({ raw_affiliation: "Université Clermont Auvergne", structure_ids: [1] }),
       { "1": struct({ acronym: "LMBP" }) },
     );
     expect(out).toBe("Université Clermont Auvergne\nStructures identifiées\u00a0: LMBP");
@@ -23,7 +23,7 @@ describe("structsTooltip", () => {
     // L'affiliation brute vient des sources externes : le tooltip la rend en texte,
     // la fonction ne doit introduire aucune balise autour d'elle.
     const payload = '<img src=x onerror="alert(1)">';
-    const out = structsTooltip(authorship({ raw_affiliation: payload }), {});
+    const out = structsTooltip(contribution({ raw_affiliation: payload }), {});
     // La charge utile ressort telle quelle (elle sera affichée comme texte par Tooltip),
     // sans balise ajoutée par la fonction (pas de <em>, pas de <br>).
     expect(out).toBe(payload);

@@ -5,7 +5,7 @@ from pipeline.ingestion.crossref.payload import (
     crossref_raw_doc_type,
     extract_crossref_conference,
     extract_crossref_meta,
-    extract_crossref_pub_year,
+    extract_crossref_publication_year,
     parse_crossref_issns,
     strip_jats_tags,
 )
@@ -24,17 +24,17 @@ class TestExtractCrossrefPubYearOrder:
             "published": _date_field(2024),
             "issued": _date_field(2025),
         }
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2024
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2024
 
     def test_falls_back_to_issued_when_published_missing(self):
         msg = {"issued": _date_field(2024)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2024
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2024
 
     def test_falls_back_through_online_then_print(self):
         msg = {"published-online": _date_field(2023)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2023
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2023
         msg = {"published-print": _date_field(2022)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2022
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2022
 
     def test_thesis_falls_back_to_approved(self):
         """Cas réel : thèse ABES (10.70675) dont `issued` est vide et seule la soutenance est datée."""
@@ -43,7 +43,7 @@ class TestExtractCrossrefPubYearOrder:
             "issued": {"date-parts": [[None]]},
             "approved": {"date-parts": [[2023, 12, 11]]},
         }
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2023
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2023
 
 
 class TestExtractCrossrefPubYearFutureBound:
@@ -54,16 +54,16 @@ class TestExtractCrossrefPubYearFutureBound:
 
     def test_skips_far_future(self):
         msg = {"published": _date_field(2030), "issued": _date_field(2030)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) is None
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) is None
 
     def test_accepts_max_year(self):
         """Un preprint légitimement daté de l'année suivante reste accepté."""
         msg = {"published": _date_field(_NEXT_YEAR)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == _NEXT_YEAR
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == _NEXT_YEAR
 
     def test_rejects_year_above_max(self):
         msg = {"published": _date_field(_NEXT_YEAR + 1)}
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) is None
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) is None
 
     def test_falls_back_when_first_field_in_future(self):
         """Hypothèse rare mais correcte : si published est en futur mais
@@ -74,34 +74,40 @@ class TestExtractCrossrefPubYearFutureBound:
             "issued": _date_field(future),
             "published-online": _date_field(2024),
         }
-        assert extract_crossref_pub_year(msg, max_year=_NEXT_YEAR) == 2024
+        assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) == 2024
 
 
 class TestExtractCrossrefPubYearMalformed:
     def test_missing_all_fields(self):
-        assert extract_crossref_pub_year({}, max_year=_NEXT_YEAR) is None
+        assert extract_crossref_publication_year({}, max_year=_NEXT_YEAR) is None
 
     def test_empty_date_parts(self):
         assert (
-            extract_crossref_pub_year({"published": {"date-parts": []}}, max_year=_NEXT_YEAR)
+            extract_crossref_publication_year(
+                {"published": {"date-parts": []}}, max_year=_NEXT_YEAR
+            )
             is None
         )
 
     def test_invalid_year_string(self):
         assert (
-            extract_crossref_pub_year({"published": {"date-parts": [["abc"]]}}, max_year=_NEXT_YEAR)
+            extract_crossref_publication_year(
+                {"published": {"date-parts": [["abc"]]}}, max_year=_NEXT_YEAR
+            )
             is None
         )
 
     def test_pre_1500_rejected(self):
         """Bornage bas : un DOI antérieur à 1500 est manifestement aberrant."""
         assert (
-            extract_crossref_pub_year({"published": _date_field(1200)}, max_year=_NEXT_YEAR) is None
+            extract_crossref_publication_year({"published": _date_field(1200)}, max_year=_NEXT_YEAR)
+            is None
         )
 
     def test_1500_accepted(self):
         assert (
-            extract_crossref_pub_year({"published": _date_field(1500)}, max_year=_NEXT_YEAR) == 1500
+            extract_crossref_publication_year({"published": _date_field(1500)}, max_year=_NEXT_YEAR)
+            == 1500
         )
 
 

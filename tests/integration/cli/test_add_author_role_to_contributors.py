@@ -3,9 +3,9 @@
 from sqlalchemy import text
 
 from interfaces.cli.oneshot.add_author_role_to_contributors import complete_notices
-from tests.integration.helpers.authorships import upsert_split_identity
+from tests.integration.helpers.contributions import upsert_split_identity
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_signature, insert_source_publication
+from tests.integration.helpers.sources import insert_signature, insert_source_record
 
 _PAYLOAD = {
     "authQuality_s": ["aut", "ctb", "sad"],
@@ -21,14 +21,15 @@ def test_un_contributeur_ctb_devient_auteur(sa_sync_conn):
     conn = sa_sync_conn
     publication = insert_publication(conn)
     conn.execute(
-        text("UPDATE publications SET authorships_dirty = false WHERE id = :p"), {"p": publication}
+        text("UPDATE publications SET contributions_dirty = false WHERE id = :p"),
+        {"p": publication},
     )
-    notice = insert_source_publication(conn, publication, source="hal", source_id="hal-1")
+    notice = insert_source_record(conn, publication, source="hal", source_id="hal-1")
     signatures = [
         insert_signature(
             conn,
             notice,
-            identity_id=upsert_split_identity(conn, last, first),
+            contributor_information_id=upsert_split_identity(conn, last, first),
             author_position=position,
             roles=roles,
         )
@@ -51,7 +52,7 @@ def test_un_contributeur_ctb_devient_auteur(sa_sync_conn):
     roles = (
         conn.execute(
             text(
-                "SELECT roles FROM source_authorships WHERE id = ANY(:ids) ORDER BY author_position"
+                "SELECT roles FROM source_contributions WHERE id = ANY(:ids) ORDER BY author_position"
             ),
             {"ids": signatures},
         )
@@ -60,12 +61,12 @@ def test_un_contributeur_ctb_devient_auteur(sa_sync_conn):
     )
     assert roles == [["author"], ["author", "contributor"], ["contributor"]]
     counts = conn.execute(
-        text("SELECT author_count, distinct_author_count FROM source_publications WHERE id = :n"),
+        text("SELECT author_count, distinct_author_count FROM source_records WHERE id = :n"),
         {"n": notice},
     ).one()
     assert tuple(counts) == (2, 2)
     assert conn.execute(
-        text("SELECT authorships_dirty FROM publications WHERE id = :p"), {"p": publication}
+        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
     ).scalar_one()
 
 

@@ -8,7 +8,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_signature,
     insert_signature_address,
-    insert_source_publication,
+    insert_source_record,
 )
 from tests.integration.helpers.structures import insert_structure
 
@@ -19,7 +19,7 @@ def _address_ids(conn) -> set[int]:
 
 def test_seules_les_adresses_sans_signature_sont_supprimees(sa_sync_conn):
     pub_id = insert_publication(sa_sync_conn, "P")
-    sa_id = insert_signature(sa_sync_conn, insert_source_publication(sa_sync_conn, pub_id))
+    sa_id = insert_signature(sa_sync_conn, insert_source_record(sa_sync_conn, pub_id))
     liee = insert_address(sa_sync_conn, "Adresse liée")
     insert_signature_address(sa_sync_conn, sa_id, address_id=liee)
     insert_address(sa_sync_conn, "Adresse orpheline")

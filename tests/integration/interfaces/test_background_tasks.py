@@ -10,7 +10,7 @@ task n'escalade pas l'erreur **et** rend sa connexion au pool (aucune fuite).
 """
 
 import application.services.addresses.countries as countries_service
-import application.services.authorships.core as authorships_core
+import application.services.contributions.core as contributions_core
 from infrastructure.db.engine import get_sync_engine
 from interfaces.api.deps import bg_propagate_countries, bg_propagate_in_perimeter
 
@@ -20,7 +20,7 @@ def _boom(*args, **kwargs):
 
 
 def test_bg_propagate_in_perimeter_swallows_errors_and_releases_connection(monkeypatch):
-    monkeypatch.setattr(authorships_core, "propagate_in_perimeter_for_addresses", _boom)
+    monkeypatch.setattr(contributions_core, "propagate_in_perimeter_for_addresses", _boom)
     pool = get_sync_engine().pool
     before = pool.checkedout()
     bg_propagate_in_perimeter([1])  # ne doit pas lever (erreur loggée)

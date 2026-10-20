@@ -303,7 +303,7 @@ class TestProcessWorkMinimalMetadata:
         row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
         assert norm.process_work(MagicMock(), row) is None
         staging.mark_done.assert_called_once()
-        staging.discard_source_publication.assert_not_called()
+        staging.discard_source_record.assert_not_called()
 
     def test_notice_sans_annee_ecartee_et_son_enregistrement_supprime(self):
         """Régression : une notice qu'OpenAlex renvoie sans année ne fonde aucune publication, et l'enregistrement qu'elle avait produit disparaît."""
@@ -311,7 +311,7 @@ class TestProcessWorkMinimalMetadata:
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
         assert norm.process_work(MagicMock(), row) is False
-        staging.discard_source_publication.assert_called_once_with(ANY, 7)
+        staging.discard_source_record.assert_called_once_with(ANY, 7)
         staging.mark_done.assert_called_once_with(ANY, 7)
         assert norm.normalized == []
 
@@ -322,7 +322,7 @@ class TestProcessWorkMinimalMetadata:
         norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
         assert norm.process_work(MagicMock(), row) is False
-        staging.discard_source_publication.assert_called_once_with(ANY, 3)
+        staging.discard_source_record.assert_called_once_with(ANY, 3)
         staging.mark_done.assert_called_once_with(ANY, 3)
 
     def test_notice_complete_normalisee(self):
@@ -331,4 +331,4 @@ class TestProcessWorkMinimalMetadata:
         row = StagingRow(id=2, source_id="b", doi=None, raw_data={"title": "T", "year": 2020})
         assert norm.process_work(MagicMock(), row) is True
         assert norm.normalized == [row]
-        staging.discard_source_publication.assert_not_called()
+        staging.discard_source_record.assert_not_called()

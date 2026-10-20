@@ -76,12 +76,12 @@ APRÈS :
     | Phase | Ce qu'elle écrit |
 
 AVANT :
-    Deux chaînes propagent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_authorships.perimeter_evidence`, et `addresses.countries` → `source_publications.countries` → `publications.countries`.
+    Deux chaînes propagent une écriture de ces tables jusqu'aux colonnes que consultent les pages : `address_structures` → vue matérialisée → `source_contributions.perimeter_evidence`, et `addresses.countries` → `source_records.countries` → `publications.countries`.
 
     **Appartenance au périmètre.** Dernière étape d'`affiliations` […]
 
 APRÈS :
-    **Appartenance au périmètre** : `address_structures` → vue matérialisée → `source_authorships.perimeter_evidence`. Dernière étape d'`affiliations` […]
+    **Appartenance au périmètre** : `address_structures` → vue matérialisée → `source_contributions.perimeter_evidence`. Dernière étape d'`affiliations` […]
 
 ## Pronoms « y » et « en » à antécédent lointain
 
@@ -94,10 +94,10 @@ APRÈS :
     La règle générale est que les use-cases commitent (cf. discipline transactionnelle). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent par batch.
 
 AVANT :
-    Une `SourcePublication` est ce qu'une source dit d'un document. Une `Publication` est la référence unifiée que le pipeline en dérive.
+    Un `SourceRecord` est ce qu'une source dit d'un document. Une `Publication` est la référence unifiée que le pipeline en dérive.
 
 APRÈS :
-    Une `Publication` est l'entité unifiée que le pipeline dérive de plusieurs `SourcePublication` désignant le même document.
+    Une `Publication` est l'entité unifiée que le pipeline dérive de plusieurs `SourceRecord` désignant le même document.
 
 ## Périphrases obscures
 
@@ -172,16 +172,16 @@ APRÈS :
 Une table dont le rôle tient en une phrase n'a pas besoin d'un paragraphe. Garder ce qu'elle contient et la conséquence qui compte ; couper le chemin d'écriture, les cas de conflit, les comparaisons avec l'alternative écartée.
 
 AVANT :
-    Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`. Écrit par l'exclusion canonique (croix de la page personne → `PATCH /api/authorships/{id}/exclude`), qui y insère la paire et supprime la row `authorships`. Tous les sites de création d'`authorships` (build + assignation d'orphelins) anti-joignent ce store, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
+    Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`. Écrit par l'exclusion canonique (croix de la page personne → `PATCH /api/contributions/{id}/exclude`), qui y insère la paire et supprime la row `contributions`. Tous les sites de création d'`contributions` (build + assignation d'orphelins) anti-joignent ce store, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
 
 APRÈS :
-    Paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`. Les sites de création d'`authorships` les anti-joignent, si bien que le rejet ne se défait pas au rebuild.
+    Paires (publication, personne) écartées. Clé primaire `(publication_id, person_id)`. Les sites de création d'`contributions` les anti-joignent, si bien que le rejet ne se défait pas au rebuild.
 
 AVANT :
-    Pendant du rejet : store `(source_authorship_id, person_id)` des attributions épinglées à la main. `enforce_confirmed_authorships` (phase `persons`) réapplique l'épingle à chaque run — `source_authorships.person_id` est recalé sur la personne épinglée — et le matching la respecte : une signature épinglée n'est ni re-orphelinée ni réattribuée. Durable aux reconstructions, comme `rejected_authorships`.
+    Pendant du rejet : store `(source_contribution_id, person_id)` des attributions épinglées à la main. `enforce_confirmed_source_contributions` (phase `persons`) réapplique l'épingle à chaque run — `source_contributions.person_id` est recalé sur la personne épinglée — et le matching la respecte : une signature épinglée n'est ni re-orphelinée ni réattribuée. Durable aux reconstructions, comme `rejected_contributions`.
 
 APRÈS :
-    Signatures épinglées sur une personne. Clé primaire `source_authorship_id` seul : une signature ne s'épingle qu'à une personne. La phase `persons` réapplique l'épingle à chaque exécution, et une signature épinglée n'est ni ré-orphelinée ni réattribuée.
+    Signatures épinglées sur une personne. Clé primaire `source_contribution_id` seul : une signature ne s'épingle qu'à une personne. La phase `persons` réapplique l'épingle à chaque exécution, et une signature épinglée n'est ni ré-orphelinée ni réattribuée.
 
 Dans une doc de haut niveau, une règle d'implémentation glissée en incise rend la phrase inintelligible sans le contexte du code. La règle va dans la docstring ; la doc nomme seulement la donnée.
 

@@ -16,7 +16,7 @@ Les destinataires des rapports demandent les indicateurs d'un tableau InCites. S
 
 Mesures sur les publications du périmètre parues de 2022 à 2025, des types retenus par le rapport : 17 862 publications.
 
-- **Citations.** `source_publications.impact->'cited_by_count'`, fourni par OpenAlex, Crossref, WoS, DataCite et une partie des notices ScanR. 17 471 publications ont au moins un compte. Somme des maxima par publication : 148 825. Somme des comptes OpenAlex : 141 068. Somme des comptes WoS : 101 756, sur 9 188 publications.
+- **Citations.** `source_records.impact->'cited_by_count'`, fourni par OpenAlex, Crossref, WoS, DataCite et une partie des notices ScanR. 17 471 publications ont au moins un compte. Somme des maxima par publication : 148 825. Somme des comptes OpenAlex : 141 068. Somme des comptes WoS : 101 756, sur 9 188 publications.
 - **Indice normalisé.** Le FWCI d'OpenAlex (`impact->'fwci'`), présent pour 16 936 publications. 394 publications ont plusieurs notices OpenAlex aux FWCI différents.
 - **Top 10 % et rôles clés.** Calculés par le rapport.
 - **Langue.** `publications.language` : 11 845 publications en anglais, 5 689 en français, 46 sans langue.

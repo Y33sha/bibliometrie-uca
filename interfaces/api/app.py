@@ -52,8 +52,8 @@ configure_root_logging()
 from interfaces.api.routers import (  # noqa: E402
     addresses,
     auth,
-    authorships,
     config,
+    contributions,
     countries,
     entity_labels,
     feedback,
@@ -447,7 +447,7 @@ app.include_router(countries.router)
 app.include_router(feedback.router)
 app.include_router(structures.router)
 app.include_router(persons.router)
-app.include_router(authorships.router)
+app.include_router(contributions.router)
 app.include_router(hal_problems.router)
 app.include_router(config.router)
 app.include_router(perimeters.router)

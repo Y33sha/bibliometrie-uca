@@ -1,4 +1,4 @@
-"""Query services admin pour les personnes : authorships par forme de nom, files de triage des formes et des identifiants."""
+"""Query services admin pour les personnes : contributions par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
 
@@ -14,8 +14,8 @@ from application.ports.read_models.persons_queries import (
     IdentifierRef,
     NameDuplicatePairOut,
     NameDuplicatesResponse,
-    NameFormAuthorshipRef,
-    NameFormAuthorshipsResponse,
+    NameFormContributionRef,
+    NameFormContributionsResponse,
     OtherPersonOut,
     OverlapCountsOut,
     SharingPersonOut,
@@ -28,23 +28,23 @@ from domain.structures.structure import StructureType
 from infrastructure.read_models.sql_fragments import name_form_holder, other_name_form_holders
 from infrastructure.sql_fragments import has_author_role, identifier_neutralized, in_clause
 
-# ── Name-form authorships ────────────────────────────────────────
+# ── Name-form contributions ────────────────────────────────────────
 
 
-def name_form_authorships(
+def name_form_contributions(
     conn: Connection, person_id: int, name_form: str
-) -> NameFormAuthorshipsResponse:
-    """Authorships sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
+) -> NameFormContributionsResponse:
+    """Contributions sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
         text(f"""
-            SELECT sa.source, sa.id AS source_authorship_id,
-                   sd.publication_id, sd.title, sd.pub_year, sd.doi
-            FROM source_authorships sa
-            JOIN author_identifying_keys aik ON aik.id = sa.identity_id
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
+            SELECT sa.source, sa.id AS source_contribution_id,
+                   sd.publication_id, sd.title, sd.publication_year, sd.doi
+            FROM source_contributions sa
+            JOIN contributor_information aik ON aik.id = sa.contributor_information_id
+            JOIN source_records sd ON sd.id = sa.source_record_id
             WHERE sa.person_id = :pid AND aik.author_name_normalized = :nf
               AND sa.source IN {in_clause(AUTHOR_SOURCES)}
-            ORDER BY sd.pub_year DESC, sd.title
+            ORDER BY sd.publication_year DESC, sd.title
         """),
         {"pid": person_id, "nf": name_form},
     ).all()
@@ -53,22 +53,22 @@ def name_form_authorships(
         text(f"""
             SELECT p.id AS person_id, p.first_name, p.last_name,
                    pr.department_name,
-                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
+                   EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
             FROM persons p
-            LEFT JOIN persons_rh pr ON pr.person_id = p.id
+            LEFT JOIN hr_records pr ON pr.person_id = p.id
             WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
             ORDER BY p.last_name, p.first_name
         """),
         {"nf": name_form, "pid": person_id},
     ).all()
-    return NameFormAuthorshipsResponse(
-        authorships=[
-            NameFormAuthorshipRef(
+    return NameFormContributionsResponse(
+        contributions=[
+            NameFormContributionRef(
                 source=r.source,
-                source_authorship_id=r.source_authorship_id,
+                source_contribution_id=r.source_contribution_id,
                 publication_id=r.publication_id,
                 title=r.title,
-                pub_year=r.pub_year,
+                publication_year=r.publication_year,
                 doi=r.doi,
             )
             for r in auth_rows
@@ -130,7 +130,7 @@ def ambiguous_name_forms(
                        ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)) AS canonical,
                        p.first_name, p.last_name,
                        p.last_name_normalized AS ln, p.first_name_normalized AS fn,
-                       EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
+                       EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
                 FROM person_name_forms pnf
                 JOIN persons p ON p.id = pnf.person_id
                 WHERE pnf.name_form = ANY(:forms) AND {name_form_holder("pnf", "p")}
@@ -173,25 +173,25 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
     ),
     pending_identities AS MATERIALIZED (
         SELECT aik.id, k.k, p.id_type, p.id_value
-        FROM author_identifying_keys aik
+        FROM contributor_information aik
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
-        JOIN pending p ON p.id_type = k.k AND p.id_value = aik.person_identifiers ->> k.k
+        JOIN pending p ON p.id_type = k.k AND p.id_value = aik.identifiers ->> k.k
     ),
-    -- Couples (personne, identité) lus sur l'index `idx_sa_person`, sans accès à la table.
+    -- Couples (personne, identité) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
     person_identities AS MATERIALIZED (
-        SELECT DISTINCT sa.person_id, sa.identity_id
-        FROM source_authorships sa
+        SELECT DISTINCT sa.person_id, sa.contributor_information_id
+        FROM source_contributions sa
         WHERE sa.person_id IS NOT NULL
-          AND sa.identity_id IN (SELECT id FROM pending_identities)
+          AND sa.contributor_information_id IN (SELECT id FROM pending_identities)
     ),
     bearers AS (
         SELECT DISTINCT pi.person_id, p.id_type, p.id_value
         FROM person_identities pi
-        JOIN pending_identities p ON p.id = pi.identity_id
+        JOIN pending_identities p ON p.id = pi.contributor_information_id
         -- Une signature du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
         CROSS JOIN LATERAL (
-            SELECT 1 FROM source_authorships sa
-            WHERE sa.person_id = pi.person_id AND sa.identity_id = pi.identity_id
+            SELECT 1 FROM source_contributions sa
+            WHERE sa.person_id = pi.person_id AND sa.contributor_information_id = pi.contributor_information_id
               AND NOT {identifier_neutralized("p.k")}
             LIMIT 1
         ) kept
@@ -232,16 +232,16 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
     rows = conn.execute(
         text(f"""
             SELECT p.id, p.first_name, p.last_name,
-                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh,
-                   (SELECT count(*) FROM authorships a
+                   EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh,
+                   (SELECT count(*) FROM contributions a
                     WHERE a.person_id = p.id AND {has_author_role("a")}) AS signature_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
                        WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
-                           SELECT sas.structure_id FROM source_authorship_structures sas
-                           JOIN source_authorships sa ON sa.id = sas.source_authorship_id
+                           SELECT sas.structure_id FROM source_contribution_structures sas
+                           JOIN source_contributions sa ON sa.id = sas.source_contribution_id
                            WHERE sa.person_id = p.id
                        )
                    ), ARRAY[]::text[]) AS labs
@@ -298,8 +298,8 @@ _DUP_WHERE = """
         WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
     )
     AND NOT (
-        EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
-        AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
+        EXISTS (SELECT 1 FROM hr_records WHERE person_id = p1.id)
+        AND EXISTS (SELECT 1 FROM hr_records WHERE person_id = p2.id)
     )
 """
 
@@ -376,28 +376,28 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain `authorships`. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain `contributions`. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
-        FROM authorships a1
-        JOIN authorships a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
+        FROM contributions a1
+        JOIN contributions a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
         WHERE a1.person_id = ANY(:ids) AND a2.person_id IS NOT NULL
     """,
     "shared_pubs": """
         SELECT a.person_id AS person, a.publication_id AS val
-        FROM authorships a WHERE a.person_id = ANY(:ids)
+        FROM contributions a WHERE a.person_id = ANY(:ids)
     """,
     "labs": f"""
         SELECT a.person_id AS person, aus.structure_id AS val
-        FROM authorships a
-        JOIN authorship_structures aus ON aus.authorship_id = a.id
+        FROM contributions a
+        JOIN contribution_structures aus ON aus.contribution_id = a.id
         JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
     "journals": """
         SELECT a.person_id AS person, p.journal_id AS val
-        FROM authorships a
+        FROM contributions a
         JOIN publications p ON p.id = a.publication_id
         WHERE a.person_id = ANY(:ids) AND p.journal_id IS NOT NULL
     """,
@@ -489,7 +489,7 @@ def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingP
     rows = conn.execute(
         text(f"""
             SELECT p2.id AS person_id, p2.first_name, p2.last_name,
-                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p2.id) AS has_rh,
+                   EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p2.id) AS has_rh,
                    array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
             FROM person_name_forms pnf1
             JOIN LATERAL ({other_name_form_holders("pnf1.name_form", "pnf1.person_id")}) holders ON TRUE

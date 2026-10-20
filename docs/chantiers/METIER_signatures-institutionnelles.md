@@ -13,7 +13,7 @@ Deux critères font la justesse d'une signature.
 1. **Présence de l'université** là où elle est attendue.
 2. **Conformité de forme** à la convention : les bons éléments, sous la bonne forme, dans le bon ordre.
 
-`persons_rh` fonde l'attente : une personne dont la fiche RH couvre l'année de publication relève de l'établissement, donc sa signature doit mentionner l'université. La fiche donne un département (`department_name`), pas un laboratoire. Le texte de l'adresse fournit d'autres signaux : un laboratoire du périmètre mentionné sans l'université, un partenaire associé mentionné seul.
+`hr_records` fonde l'attente : une personne dont la fiche RH couvre l'année de publication relève de l'établissement, donc sa signature doit mentionner l'université. La fiche donne un département (`department_name`), pas un laboratoire. Le texte de l'adresse fournit d'autres signaux : un laboratoire du périmètre mentionné sans l'université, un partenaire associé mentionné seul.
 
 La base porte le reste du matériau : `addresses` stocke le texte des signatures, `address_structures` les structures reconnues dans chacune, `structures.structure_type` leur type (`universite`, `labo`, `onr`, `chu`, `ecole`), `perimeters.root_structure_ids` les racines de l'établissement.
 
@@ -71,6 +71,6 @@ Orientations à confirmer ou amender.
 ## Liens
 
 - Convention de signature : <https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications>
-- Tables : `addresses`, `source_authorship_addresses`, `address_structures`, `structures`, `structure_name_forms`, `perimeters`, `persons_rh`.
+- Tables : `addresses`, `source_contribution_addresses`, `address_structures`, `structures`, `structure_name_forms`, `perimeters`, `hr_records`.
 - Phase `affiliations` : `pipeline/transformation/structures/`.
 - Administration : `interfaces/frontend/src/routes/admin/addresses/`, `interfaces/frontend/src/routes/admin/structures/`.

@@ -18,17 +18,17 @@ def test_parametre_lie_none_donne_null_sql(sa_sync_conn):
 
 
 def test_colonne_de_table_none_donne_null_sql(sa_sync_conn):
-    """Une identité d'auteur sans identifiant s'écrit avec un `person_identifiers` NULL."""
+    """Une identité d'auteur sans identifiant s'écrit avec un `identifiers` NULL."""
     sa_sync_conn.execute(
         text(
-            "INSERT INTO author_identifying_keys (last_name_normalized, person_identifiers) "
+            "INSERT INTO contributor_information (last_name_normalized, identifiers) "
             "VALUES ('sans identifiant', :p)"
         ).bindparams(bindparam("p", type_=Jsonb)),
         {"p": None},
     )
     forme = sa_sync_conn.execute(
         text(
-            "SELECT jsonb_typeof(person_identifiers) FROM author_identifying_keys "
+            "SELECT jsonb_typeof(identifiers) FROM contributor_information "
             "WHERE last_name_normalized = 'sans identifiant'"
         )
     ).scalar_one()
@@ -44,29 +44,29 @@ def test_identite_sans_identifiant_ne_se_dedouble_pas(sa_sync_conn):
     """
     sa_sync_conn.execute(
         text(
-            "INSERT INTO author_identifying_keys"
-            " (last_name_normalized, first_name_normalized, person_identifiers)"
+            "INSERT INTO contributor_information"
+            " (last_name_normalized, first_name_normalized, identifiers)"
             " VALUES ('durand', 'j', NULL)"
         )
     )
     sa_sync_conn.execute(
         text("""
-            INSERT INTO author_identifying_keys
-                (last_name_normalized, first_name_normalized, person_identifiers)
+            INSERT INTO contributor_information
+                (last_name_normalized, first_name_normalized, identifiers)
             VALUES (:nom, :prenom, :p)
-            ON CONFLICT (last_name_normalized, first_name_normalized, person_identifiers)
+            ON CONFLICT (last_name_normalized, first_name_normalized, identifiers)
             DO NOTHING
         """).bindparams(bindparam("p", type_=Jsonb)),
         {"nom": "durand", "prenom": "j", "p": None},
     )
 
     lignes = sa_sync_conn.execute(
-        text("SELECT count(*) FROM author_identifying_keys WHERE last_name_normalized = 'durand'")
+        text("SELECT count(*) FROM contributor_information WHERE last_name_normalized = 'durand'")
     ).scalar_one()
     assert lignes == 1
 
     lookup = text(
-        "SELECT count(*) FROM author_identifying_keys WHERE key_hash = "
+        "SELECT count(*) FROM contributor_information WHERE key_hash = "
         + key_hash_sql([":nom", ":prenom", ":p"])
     ).bindparams(bindparam("p", type_=Jsonb))
     assert (

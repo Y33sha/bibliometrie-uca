@@ -29,9 +29,9 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/addresses/batch-review"): "address.batch_link_reviewed",
     ("POST", "/api/addresses/{addr_id}/country"): "address.country_set",
     ("POST", "/api/addresses/{addr_id}/review"): "address.link_reviewed",
-    ("POST", "/api/authorships/orphans/assign"): "authorship.assigned",
-    ("POST", "/api/authorships/orphans/batch-assign"): "authorship.batch_assigned",
-    ("PATCH", "/api/authorships/{authorship_id}/exclude"): "authorship.rejected",
+    ("POST", "/api/contributions/orphans/assign"): "contribution.assigned",
+    ("POST", "/api/contributions/orphans/batch-assign"): "contribution.batch_assigned",
+    ("PATCH", "/api/contributions/{contribution_id}/exclude"): "contribution.rejected",
     ("PUT", "/api/config/{key}"): "config.updated",
     ("PUT", "/api/journals/{journal_id}"): "journal.updated",
     ("POST", "/api/journals/{journal_id}/merge"): "journal.merged",
@@ -41,7 +41,7 @@ AUDITE: dict[tuple[str, str], str] = {
     ("PATCH", "/api/persons/identifiers/{ident_id}/reassign"): "person_identifier.reassigned",
     ("PATCH", "/api/persons/identifiers/{ident_id}/status"): "person_identifier.status_changed",
     ("POST", "/api/persons/mark-distinct"): "person.marked_distinct",
-    ("POST", "/api/persons/{person_id}/detach-authorships"): "authorship.rejected",
+    ("POST", "/api/persons/{person_id}/detach-contributions"): "contribution.rejected",
     ("POST", "/api/persons/{person_id}/identifiers"): "person_identifier.added",
     ("POST", "/api/persons/{person_id}/merge"): "person.merged",
     ("PATCH", "/api/persons/{person_id}/name"): "person.name_updated",
@@ -128,7 +128,7 @@ CONSEQUENCES: dict[str, str] = {
         "Ampleur de la requalification des publications, entraînée par un changement de type "
         "de revue : elle suit l'édition, personne ne la décide pour elle-même."
     ),
-    "authorship.unrejected": (
+    "contribution.unrejected": (
         "Rejets levés par une attribution confirmée : ils tombent parce qu'on a attribué, "
         "et l'attribution porte déjà sa propre trace."
     ),

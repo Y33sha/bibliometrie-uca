@@ -2,15 +2,15 @@
 
 *Obsolète, à réécrire*
 
-Procédure d'écriture, validation et déploiement d'une règle de résolution de `source_publications`.
+Procédure d'écriture, validation et déploiement d'une règle de résolution de `source_records`.
 
 Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/archived/2026-06-26_DATA_dedup-pairwise-gated.md).
 
 ## Modèle : clustering par tokens de confirmation
 
-La résolution d'entités est un record-linkage par graphe. Chaque `source_publication` est un nœud ; deux SP sont reliées si elles partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
+La résolution d'entités est un record-linkage par graphe. Chaque `source_record` est un nœud ; deux SP sont reliées si elles partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
 
-- **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_publications/keys.py) lit une SP (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<pub_year>`, gardé par une longueur minimale de titre).
+- **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_records/keys.py) lit une SP (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<publication_year>`, gardé par une longueur minimale de titre).
 - **Clustering** : [`connected_components`](../../domain/entity_resolution.py) regroupe les SP reliées par token partagé (fermeture transitive).
 - **Assignation** : [`plan_reconciliation`](../../domain/publications/reconciliation.py) assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. La passe applicative est [`reconcile_components`](../../pipeline/publications/reconcile_components.py) (phase `publications`).
 - **Univers SQL** : [`reconciliation.py`](../../pipeline/publications/reconciliation.py) construit le voisinage 1-hop des SP `keys_dirty` — une branche `UNION` par type de token, qui ramène les SP partageant ce token avec une SP dirty.
@@ -39,10 +39,10 @@ Un vrai doublon que le clustering ne rattrape pas : deux publications manifestem
 
 - `doc_type` identique (les types se mélangent rarement sans erreur de typage — cf. fiche).
 - Champs textuels normalisés (`title_normalized`, éventuellement `container_title`).
-- `pub_year` identique.
+- `publication_year` identique.
 - Garde de sélectivité : longueur minimale de titre (écarte les titres génériques), présence d'un champ discriminant.
 
-Le token est cette valeur sérialisée en chaîne (ex. `"<doc_type>|<title_normalized>|<pub_year>"`). Penser garde **par classe** : un token restreint à un `doc_type` est plus défensif qu'un token universel.
+Le token est cette valeur sérialisée en chaîne (ex. `"<doc_type>|<title_normalized>|<publication_year>"`). Penser garde **par classe** : un token restreint à un `doc_type` est plus défensif qu'un token universel.
 
 ### 3. Inventorier et mesurer
 
@@ -60,7 +60,7 @@ Revue du résidu suspect (couples sans recouvrement d'auteurs). Trois sorties :
 
 #### 5.1 Projection
 
-Dans [`domain/source_publications/keys.py`](../../domain/source_publications/keys.py) :
+Dans [`domain/source_records/keys.py`](../../domain/source_records/keys.py) :
 
 - ajouter le champ à `ConfirmationKeys` et son émission dans `tokens()` (`("<nom>", "<valeur>")`) ;
 - le calculer dans `project_confirmation_keys`, avec sa garde de sélectivité.
@@ -75,7 +75,7 @@ Dans [`reconciliation.py`](../../pipeline/publications/reconciliation.py), ajout
 UNION
 SELECT {_COLS.format(a="o")}
 FROM dirty d
-JOIN source_publications o ON <égalité du token entre o et d>
+JOIN source_records o ON <égalité du token entre o et d>
 LEFT JOIN publications p ON p.id = o.publication_id
 WHERE <garde sur d, identique à celle de la projection>
 ```
@@ -84,7 +84,7 @@ La branche doit ramener exactement les voisins que la projection relie : même c
 
 ### 6. Tests
 
-- **Projection** ([`test_keys.py`](../../tests/unit/domain/source_publications/test_keys.py)) : une SP émet le token quand la garde passe, ne l'émet pas sinon ; cas-limites de la garde (longueur juste sous/au-dessus du seuil).
+- **Projection** ([`test_keys.py`](../../tests/unit/domain/source_records/test_keys.py)) : une SP émet le token quand la garde passe, ne l'émet pas sinon ; cas-limites de la garde (longueur juste sous/au-dessus du seuil).
 - **Univers + bout-en-bout** ([`test_reconcile_components.py`](../../tests/integration/pipeline/test_reconcile_components.py)) : deux SP au même token entrent dans le même univers et fusionnent ; deux DOI distincts co-bloqués ne fusionnent pas (cannot-link).
 - **Différentiel anti-divergence** (`test_reconcile_components.py`) : étendre `TestUniverseMatchesPythonTokens` au token ajouté — semer des SP qui le portent (et les bords de garde : longueur juste sous/au-dessus du seuil) et vérifier que le voisinage SQL relie exactement les SP que les tokens Python relient. C'est ce qui garde la synchronisation `keys.py` ↔ SQL.
 

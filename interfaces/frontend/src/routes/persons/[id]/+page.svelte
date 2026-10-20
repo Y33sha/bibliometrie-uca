@@ -3,7 +3,7 @@
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api, apiDetail, auth, authorships } from '$lib/api';
+	import { api, apiDetail, auth, contributions } from '$lib/api';
 	import { titleCase, formatDate } from '$lib/utils';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
@@ -106,11 +106,11 @@
 		dashboardLoaded = true;
 	}
 
-	async function excludeAuthorship(authorshipId: number) {
+	async function excludeContribution(contributionId: number) {
 		if (!(await confirmDialog({ message: 'Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.', danger: true }))) {
 			return false;
 		}
-		await authorships.exclude(authorshipId);
+		await contributions.exclude(contributionId);
 		return true;
 	}
 
@@ -245,7 +245,7 @@
 				showCorrespondingColumn
 				showPerimeterFacet
 				showAdminExclude={isAdmin}
-				onExcludeAuthorship={excludeAuthorship}
+				onExcludeContribution={excludeContribution}
 				apcMode="person"
 				perPage={50}
 			/>
@@ -277,7 +277,7 @@
 									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
 									<td><a href="{base}/publications/{t.id}">{t.title}</a></td>
 									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
-									<td>{t.pub_year ?? ''}</td>
+									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}
 						</tbody>

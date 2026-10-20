@@ -15,7 +15,7 @@ def _install(monkeypatch, queries: MagicMock) -> None:
     """Branche les accès SQL de `identifier_arbitration` sur les attributs de `queries`."""
     for name in (
         "fetch_identifier_votes",
-        "fetch_identity_identifiers",
+        "fetch_contributor_information_identifiers",
         "write_misplaced_neutralizations",
         "PersonsStore",
     ):
@@ -36,8 +36,8 @@ def test_identite_contredisant_le_consensus_neutralisee_et_detachee(monkeypatch)
     }
     queries = MagicMock()
     _install(monkeypatch, queries)
-    queries.fetch_identity_identifiers.side_effect = lambda conn, id_type: identities.get(
-        id_type, []
+    queries.fetch_contributor_information_identifiers.side_effect = lambda conn, id_type: (
+        identities.get(id_type, [])
     )
     queries.write_misplaced_neutralizations.return_value = MisplacedNeutralizations(
         neutralized=3, to_detach=[10]

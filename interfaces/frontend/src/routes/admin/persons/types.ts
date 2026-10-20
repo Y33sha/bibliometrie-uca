@@ -16,7 +16,7 @@ export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 export type PersonExclusion = components["schemas"]["PersonExclusion"];
 
 // ── Extensions UI (champs ajoutés côté front) ──
-type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
+type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];
 
 /**
  * Publication regroupant toutes ses sources observées sous une même forme de nom. Le rejet porte sur la publication entière (toutes ses sources) : la modale affiche une ligne par publication, pas par source.
@@ -24,8 +24,8 @@ type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
 export interface DetachPublication {
   pub_id: number;
   title: string;
-  pub_year: number | null;
-  sources: Pick<NameFormAuthorshipRef, "source" | "source_authorship_id">[];
+  publication_year: number | null;
+  sources: Pick<NameFormContributionRef, "source" | "source_contribution_id">[];
   checked: boolean;
 }
 

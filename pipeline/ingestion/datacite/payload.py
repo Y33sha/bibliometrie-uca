@@ -36,7 +36,9 @@ def get_title(attributes: Mapping[str, JsonValue]) -> str | None:
     return fallback
 
 
-def extract_datacite_pub_year(attributes: Mapping[str, JsonValue], *, max_year: int) -> int | None:
+def extract_datacite_publication_year(
+    attributes: Mapping[str, JsonValue], *, max_year: int
+) -> int | None:
     """Année de publication (`publicationYear`).
 
     Borne supérieure `max_year` (typiquement `current_year + 1`) : au-dessus, donnée polluée → None (le caller skippera, `refresh_from_sources` arbitrera). Borne inférieure 1500. `max_year` injecté pour la testabilité.
@@ -173,9 +175,9 @@ def get_cited_by_count(attributes: Mapping[str, JsonValue]) -> int | None:
 
 
 def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Token brut de doc_type à stocker sur `source_publications.doc_type`.
+    """Token brut de doc_type à stocker sur `source_records.doc_type`.
 
-    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, mappé ensuite par `domain.source_publications.doc_types._SOURCE_MAPS["datacite"]` :
+    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, mappé ensuite par `domain.source_records.doc_types._SOURCE_MAPS["datacite"]` :
 
     - `resourceTypeGeneral` spécifique (≠ Text / Other) → ce token ;
     - sinon `resourceType` libre s'il est renseigné ;
@@ -297,7 +299,7 @@ def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> 
 
 
 def extract_datacite_meta(attributes: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Champs DataCite-spécifiques conservés en JSONB sur `source_publications.meta`.
+    """Champs DataCite-spécifiques conservés en JSONB sur `source_records.meta`.
 
     Whitelist : `related_identifiers` (DOI typés avec leur `relationType`, pour les relations et la résolution concept/version), `rights` (licences) et `funding` (financeurs).
     """

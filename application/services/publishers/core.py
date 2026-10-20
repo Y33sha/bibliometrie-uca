@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.journal_recompute import JournalRecompute
-from application.ports.pipeline.pub_count import PubCountRecompute
+from application.ports.pipeline.publication_count import PubCountRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
@@ -67,10 +67,10 @@ def merge_publishers(
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
     recompute: JournalRecompute,
-    pub_count_recompute: PubCountRecompute,
+    publication_count_recompute: PubCountRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `pub_count` de la cible.
+    """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
 
     Deux invariants métier refusent la fusion (`ConflictError`), chacun sur une identité déclarée : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
 
@@ -135,6 +135,6 @@ def merge_publishers(
 
     # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
     publisher_repo.merge_publisher_into(target_id, source_id)
-    pub_count_recompute.refresh_publisher_pub_count(conn, target_id)
+    publication_count_recompute.refresh_publisher_publication_count(conn, target_id)
 
     emit_event(audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id})

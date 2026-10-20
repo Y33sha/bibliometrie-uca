@@ -25,10 +25,14 @@ class TestPivotEngine:
         )
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"])
         insert_publication(
-            sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["openalex"], pub_year=2023
+            sa_sync_conn,
+            in_perimeter=True,
+            oa_status="gold",
+            sources=["openalex"],
+            publication_year=2023,
         )
 
-        res = _piv(sa_sync_conn, "pub_count", ["oa_access"])
+        res = _piv(sa_sync_conn, "publication_count", ["oa_access"])
         by_access = {r["oa_access"]: r["value"] for r in res.rows}
         assert by_access == {"ouvert": 2, "ferme": 1}
 
@@ -45,7 +49,7 @@ class TestPivotEngine:
             sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"], doc_type="thesis"
         )  # → theses
 
-        res = _piv(sa_sync_conn, "pub_count", ["doc_type_grouped"], doc_types=())
+        res = _piv(sa_sync_conn, "publication_count", ["doc_type_grouped"], doc_types=())
         by_type = {r["doc_type_grouped"]: r["value"] for r in res.rows}
         assert by_type == {"article": 1, "book": 1, "theses": 1}
 
@@ -54,7 +58,7 @@ class TestPivotEngine:
         # Smoke test : on vérifie que la requête s'exécute et renvoie la forme attendue, sans
         # dépendre des matviews de rattachement peuplées.
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
-        res = _piv(sa_sync_conn, "pub_count", ["lab"])
+        res = _piv(sa_sync_conn, "publication_count", ["lab"])
         assert isinstance(res.rows, list)
         assert res.groups == ["lab"]
 
@@ -63,14 +67,14 @@ class TestPivotEngine:
         # requête s'exécute et renvoie la forme attendue, sans dépendre de données peuplées.
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         for dim in ("publisher", "journal"):
-            res = _piv(sa_sync_conn, "pub_count", [dim])
+            res = _piv(sa_sync_conn, "publication_count", [dim])
             assert res.groups == [dim]
 
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="closed", sources=["hal"])
 
-        res = _piv(sa_sync_conn, "pub_count", [])
+        res = _piv(sa_sync_conn, "publication_count", [])
         assert res.rows == [{"value": 2}]
 
     def test_doc_type_is_a_filter_not_hardcoded(self, sa_sync_conn):
@@ -82,9 +86,9 @@ class TestPivotEngine:
             sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="book"
         )
 
-        restricted = _piv(sa_sync_conn, "pub_count", [], doc_types=("article", "review"))
+        restricted = _piv(sa_sync_conn, "publication_count", [], doc_types=("article", "review"))
         assert restricted.rows == [{"value": 1}]
-        unrestricted = _piv(sa_sync_conn, "pub_count", [], doc_types=())
+        unrestricted = _piv(sa_sync_conn, "publication_count", [], doc_types=())
         assert unrestricted.rows == [{"value": 2}]
 
 
@@ -96,12 +100,12 @@ class TestLicense:
             text("UPDATE publications SET license = 'cc-by' WHERE id = :id"), {"id": licensed}
         )
 
-        res = _piv(sa_sync_conn, "pub_count", ["license"], doc_types=())
+        res = _piv(sa_sync_conn, "publication_count", ["license"], doc_types=())
         assert {r["license"]: r["value"] for r in res.rows} == {"cc-by": 1, "none": 1}
 
         filtered = run_pivot(
             sa_sync_conn,
-            measure="pub_count",
+            measure="publication_count",
             groups=[],
             perimeter_structure_ids=[],
             filters=StatsFilters(license=["none"]),
@@ -115,7 +119,7 @@ class TestApcAmount:
     def _seed(self, conn):
         inside = insert_structure(conn, "pivot_apc_inside", structure_type="universite")
         outside = insert_structure(conn, "pivot_apc_outside", structure_type="universite")
-        paid = insert_publication(conn, in_perimeter=True, oa_status="gold", pub_year=2024)
+        paid = insert_publication(conn, in_perimeter=True, oa_status="gold", publication_year=2024)
         for amount, budget, oa_fee in (
             (100, inside, True),
             (50, inside, False),
@@ -129,7 +133,7 @@ class TestApcAmount:
                 open_access_fee=oa_fee,
             )
         paid_elsewhere = insert_publication(
-            conn, in_perimeter=True, oa_status="gold", pub_year=2024
+            conn, in_perimeter=True, oa_status="gold", publication_year=2024
         )
         insert_apc_payment(
             conn,
@@ -138,7 +142,7 @@ class TestApcAmount:
             budget_structure_id=outside,
             open_access_fee=True,
         )
-        insert_publication(conn, in_perimeter=True, oa_status="gold", pub_year=2023)
+        insert_publication(conn, in_perimeter=True, oa_status="gold", publication_year=2023)
         return inside
 
     def _pivot(self, conn, inside, groups):
@@ -166,7 +170,7 @@ class TestApcAmount:
 
         res = run_pivot(
             sa_sync_conn,
-            measure="pub_count",
+            measure="publication_count",
             groups=[],
             perimeter_structure_ids=[inside],
             filters=StatsFilters(has_apc=["yes"]),

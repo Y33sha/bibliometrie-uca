@@ -6,7 +6,7 @@
   import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import SourceTag from "$lib/components/SourceTag.svelte";
   import Tooltip from "$lib/components/Tooltip.svelte";
-  import { authorshipRoleLabels } from "$lib/labels";
+  import { contributionRoleLabels } from "$lib/labels";
   import { sourceExternalUrl } from "$lib/sources";
   import { structsTooltip } from "$lib/structureLabels";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
@@ -36,7 +36,7 @@
   });
 
   // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de signatures d'un même auteur.
-  const records = $derived(data ? orderRecords(data.source_publications) : []);
+  const records = $derived(data ? orderRecords(data.source_records) : []);
   const rows = $derived(comparisonRows(records));
   const authors = $derived(data ? authorRows(records, data.signatures) : []);
 </script>
@@ -150,7 +150,7 @@
                         {#if otherRoles(s).length}
                           <span class="roles"
                             >{otherRoles(s)
-                              .map((r) => (authorshipRoleLabels[r] ?? r).toLowerCase())
+                              .map((r) => (contributionRoleLabels[r] ?? r).toLowerCase())
                               .join(", ")}</span
                           >
                         {/if}

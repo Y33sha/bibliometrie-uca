@@ -1,8 +1,8 @@
 """Phase `metadata_correction` — sous-étape unaire (corrections per-record).
 
-Pour chaque `source_publication` : reconstruit le brut normalisé (via `raw_metadata`), **mappe** le `doc_type` source vers le canonique (`map_doc_type`) et la langue vers le code du référentiel `languages`, puis applique les règles de correction `effective_metadata` (per-record + journal-dépendantes — les journaux sont typés à ce stade, la phase tourne après `publishers_journals`) sur les valeurs canoniques. Écrit les métadonnées corrigées dans les colonnes typées et stashe le brut source dans `raw_metadata`.
+Pour chaque `source_record` : reconstruit le brut normalisé (via `raw_metadata`), **mappe** le `doc_type` source vers le canonique (`map_doc_type`) et la langue vers le code du référentiel `languages`, puis applique les règles de correction `effective_metadata` (per-record + journal-dépendantes — les journaux sont typés à ce stade, la phase tourne après `publishers_journals`) sur les valeurs canoniques. Écrit les métadonnées corrigées dans les colonnes typées et stashe le brut source dans `raw_metadata`.
 
-Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type` opérantes pour toutes les sources : sans lui, une `source_publication` HAL porte `ART` (≠ `article`), et aucune règle canonique ne matche.
+Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type` opérantes pour toutes les sources : sans lui, une `source_record` HAL porte `ART` (≠ `article`), et aucune règle canonique ne matche.
 
 Idempotent et auto-cicatrisant : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 
@@ -16,9 +16,9 @@ from dataclasses import dataclass, replace
 
 from sqlalchemy import Connection
 
-from domain.source_publications.doc_types import map_doc_type
-from domain.source_publications.languages import language_code
-from domain.source_publications.metadata_correction.rules import (
+from domain.source_records.doc_types import map_doc_type
+from domain.source_records.languages import language_code
+from domain.source_records.metadata_correction.rules import (
     CorrectedFields,
     MetadataCorrectionRule,
     MetadataForCorrection,
@@ -26,8 +26,8 @@ from domain.source_publications.metadata_correction.rules import (
     origin_doc_type_correction,
     strip_dissertation_keys,
 )
-from domain.source_publications.metadata_correction.shared_doi import REMOVED_EXTERNAL_IDS
-from domain.source_publications.raw_metadata import (
+from domain.source_records.metadata_correction.shared_doi import REMOVED_EXTERNAL_IDS
+from domain.source_records.raw_metadata import (
     CORRECTED_BY,
     hydrate_raw_view,
     raw_value,
@@ -88,7 +88,7 @@ def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
 
 
 def corrected_doc_type(row: UnaryCorrectionRow) -> str | None:
-    """Type corrigé d'une `source_publication` : correspondance du vocabulaire de la source, puis règles de correction."""
+    """Type corrigé d'une `source_record` : correspondance du vocabulaire de la source, puis règles de correction."""
     raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)
     mapped, corrected = _map_and_correct_doc_type(raw, row.source)
     return corrected.doc_type.value if corrected.doc_type is not None else mapped
@@ -106,7 +106,7 @@ def compute_update(
     language_forms: Mapping[str, str],
     origin_doc_type: str | None = None,
 ) -> CorrectionUpdate | None:
-    """Recalcule les métadonnées corrigées d'une `source_publication` depuis son brut reconstruit. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
+    """Recalcule les métadonnées corrigées d'une `source_record` depuis son brut reconstruit. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
 
     `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). `language` n'a que le mapping : `language_forms` associe chaque forme connue au code de sa langue, et une valeur inconnue donne `None`. Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` / `LANGUAGE_MAP` quand seul le mapping a changé la valeur.
 
@@ -178,7 +178,7 @@ def compute_update(
 
 @dataclass
 class UnaryCorrectionStats:
-    """Bilan de la passe unaire : `source_publications` examinées, `source_publications` réellement corrigées (au moins une règle de correction, hors traduction de vocabulaire `DOC_TYPE_MAP` ou `LANGUAGE_MAP`), et nombre de déclenchements par règle."""
+    """Bilan de la passe unaire : `source_records` examinées, `source_records` réellement corrigées (au moins une règle de correction, hors traduction de vocabulaire `DOC_TYPE_MAP` ou `LANGUAGE_MAP`), et nombre de déclenchements par règle."""
 
     examined: int
     corrected: int
@@ -186,7 +186,7 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(source_publications réellement corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Les traductions de vocabulaire (`DOC_TYPE_MAP`, `LANGUAGE_MAP`) ne sont pas des corrections : elles ne comptent ni dans les `source_publications` corrigées ni dans la ventilation."""
+    """`(source_records réellement corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Les traductions de vocabulaire (`DOC_TYPE_MAP`, `LANGUAGE_MAP`) ne sont pas des corrections : elles ne comptent ni dans les `source_records` corrigées ni dans la ventilation."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
@@ -207,7 +207,7 @@ def run(
     queries: PgMetadataCorrectionQueries,
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
-    """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_publications`."""
+    """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_records`."""
     etape(logger, "Corrections de métadonnées par document")
     t0 = time.perf_counter()
     rows = queries.fetch_for_unary_correction(conn)
