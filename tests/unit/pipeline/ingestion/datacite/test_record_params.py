@@ -3,9 +3,7 @@
 import asyncio
 
 import httpx2
-import pytest
 
-from pipeline.http import polite_pool
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
 from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
@@ -13,11 +11,6 @@ from pipeline.ingestion.datacite.harvest import DataciteClient
 
 _DOIS = "https://api.datacite.org/dois"
 _EMPTY = {"data": [], "links": {}, "meta": {"total": 0}}
-
-
-@pytest.fixture(autouse=True)
-def _polite_pool(monkeypatch):
-    monkeypatch.setattr(polite_pool, "get_polite_pool_email", lambda: "test@example.org")
 
 
 def _affiliation_param(route):

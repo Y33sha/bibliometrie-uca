@@ -23,7 +23,7 @@ def _message(http_mock, path: str, payload) -> None:
 
 async def _fetch(prefix: str, sample_doi: str | None = None):
     async with httpx2.AsyncClient() as client:
-        return await fetch_crossref_prefix(client, prefix, sample_doi, user_agent="ua")
+        return await fetch_crossref_prefix(client, prefix, sample_doi)
 
 
 # ── parse_member_id ─────────────────────────────────────────────────

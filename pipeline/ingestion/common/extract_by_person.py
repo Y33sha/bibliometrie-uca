@@ -122,10 +122,8 @@ def _extractors() -> dict[str, ExtractorFactory]:
         return DatacitePersonExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
 
     def crossref(conn: Connection, source_log: logging.Logger) -> Extractor:
-        from pipeline.ingestion.crossref.person_search import (
-            CrossrefClient,
-            CrossrefPersonExtractor,
-        )
+        from pipeline.ingestion.crossref.api import CrossrefClient
+        from pipeline.ingestion.crossref.person_search import CrossrefPersonExtractor
 
         return CrossrefPersonExtractor(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
 

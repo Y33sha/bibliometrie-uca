@@ -3,24 +3,17 @@
 from __future__ import annotations
 
 import httpx2
-import pytest
 
 from domain.sources.staging import StagingEntryMode
-from pipeline.http import polite_pool
 from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.crossref.api import CrossrefClient
 from pipeline.ingestion.crossref.person_search import (
-    CrossrefClient,
     CrossrefPersonExtractor,
     build_orcid_filter,
 )
 from tests.helpers.extractors import arguments_du_run, extracteur
 
 _WORKS = "https://api.crossref.org/works"
-
-
-@pytest.fixture(autouse=True)
-def _polite_pool(monkeypatch):
-    monkeypatch.setattr(polite_pool, "get_polite_pool_email", lambda: "test@example.org")
 
 
 def _page(dois: list[str], cursor: str) -> httpx2.Response:
