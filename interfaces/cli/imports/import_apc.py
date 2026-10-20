@@ -37,10 +37,10 @@ from domain.structures.structure import StructureType
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.transformation.structures.address_resolution import (
-    AddressMatcher,
-    AddressResolutionQueries,
-    StructureNameForm,
+from pipeline.transformation.structures.name_recognition import (
+    MatchableNameForm,
+    StructureNameMatcher,
+    load_name_forms,
 )
 
 log = setup_logger("import_apc", os.path.dirname(__file__))
@@ -275,10 +275,10 @@ PAYER_TYPES = frozenset(
 
 
 class StructureResolver:
-    """Structure désignée par un libellé, reconnue par le matcher des adresses d'affiliation."""
+    """Structure désignée par un libellé, reconnue par ses formes de nom."""
 
-    def __init__(self, forms: list[StructureNameForm]) -> None:
-        self._matcher = AddressMatcher(forms)
+    def __init__(self, forms: list[MatchableNameForm]) -> None:
+        self._matcher = StructureNameMatcher(forms)
         self._types = {f.structure_id: f.structure_type for f in forms}
 
     def resolve(
@@ -402,7 +402,7 @@ def import_payments(
     map_publications(conn)
     map_journals(conn)
     map_publishers(conn)
-    resolver = StructureResolver(AddressResolutionQueries().load_name_forms(conn))
+    resolver = StructureResolver(load_name_forms(conn))
     unresolved = map_structures(conn, resolver)
     superseded = drop_open_apc_superseded_by_institution(conn)
     return ImportStats(
