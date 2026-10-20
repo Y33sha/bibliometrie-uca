@@ -106,13 +106,13 @@ Une personne qui apparaît dans plusieurs champs est dédupliquée et porte plus
 
 ### Identifiants : PPN IdRef pour les personnes, NNT pour les thèses
 
-Le PPN [IdRef](../glossaire.md#idref), lorsque présent, est porté par l'identité d'auteur de la signature (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/08-persons.md) du pipeline.
+Le PPN [IdRef](../glossaire.md#idref), lorsque présent, figure dans les informations du contributeur (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/08-persons.md) du pipeline.
 
 Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_records`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
 
 ### Affiliations partagées au document
 
-L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `meta` avec leur PPN IdRef, et les signatures de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les signatures à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la signature du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
+L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `meta` avec leur PPN IdRef, et les contributions sources de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les contributions sources à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la contribution source du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
 
 ### OA = `closed` par défaut côté source
 

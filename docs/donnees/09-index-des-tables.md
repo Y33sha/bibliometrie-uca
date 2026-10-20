@@ -63,16 +63,16 @@ Les vues et vues matérialisées sont signalées comme telles.
 |---|---|---|
 | `address_country_candidates` | pays proposés pour une adresse par chaque moyen de détection | [structures](06-structures.md) |
 | `address_structures` | liaison adresse ↔ structure (avec confirmation) | [structures](06-structures.md) |
-| `addresses` | adresses normalisées issues des signatures | [structures](06-structures.md) |
+| `addresses` | adresses normalisées issues des contributions sources | [structures](06-structures.md) |
 | `alembic_version` | révision de schéma appliquée — technique | `public` |
 | `apc_payments` | frais de publication (import CSV) | [publishing](04-publishing.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](07-ref-et-ops.md) |
-| `contributor_information` | attributs d'identité d'une signature source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
+| `contributor_information` | informations du contributeur d'une contribution source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
 | `contribution_structures` | *vue matérialisée* : structures liées à une contribution | [publications](03-publications.md) |
 | `contributions` | table consolidée personne × publication | [publications](03-publications.md) |
 | `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](07-ref-et-ops.md) |
-| `confirmed_source_contributions` | épinglages admin (must-link) signature source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
+| `confirmed_source_contributions` | épinglages admin (must-link) contribution source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
 | `countries` | référentiel des pays | [ref](07-ref-et-ops.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](04-publishing.md) |
@@ -104,7 +104,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `ror_organizations` | organisations du Research Organization Registry | [ref](07-ref-et-ops.md) |
 | `ror_relations` | relations parent/enfant entre organisations ROR | [ref](07-ref-et-ops.md) |
 | `source_contribution_addresses` | liaison contribution source ↔ adresse | [sources](02-sources.md) |
-| `source_contribution_rors` | ROR attribués par la source à une signature, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
+| `source_contribution_rors` | ROR attribués par la source à une contribution source, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
 | `source_contribution_structures` | *vue matérialisée* : affiliations résolues d'une contribution source | [sources](02-sources.md) |
 | `source_contributions` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
 | `source_records` | un enregistrement par document par source | [sources](02-sources.md) |

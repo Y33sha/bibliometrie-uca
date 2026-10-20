@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-12.*
 
-Une personne est un chercheur unifié à travers les sources : plusieurs signatures, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque signature à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
+Une personne est un chercheur unifié à travers les sources : plusieurs contributions sources, venues de HAL, d'OpenAlex ou du Web of Science sous des graphies différentes, désignent la même personne. Contrairement aux [structures](structures.md), qui sont un référentiel saisi à la main, les personnes sont **construites par le pipeline** — la phase `persons` rattache chaque contribution source à une personne et en crée au besoin — **puis corrigées à la main** : fusion, réattribution d'identifiant, rejet, détachement. Le pipeline et l'interface d'administration écrivent donc tous deux.
 
 `domain/persons/` contient les règles pures : la décision de résolution (`decide_person_match`), la comparaison des noms (`names_compatible`), et des types dédiés qui valident et normalisent chaque identifiant avant écriture.
 
@@ -17,36 +17,36 @@ Une personne est un chercheur unifié à travers les sources : plusieurs signatu
 | `distinct_persons` | Paires déclarées comme deux personnes différentes | `(person_id_a, person_id_b)`, avec `a < b` |
 | `rejected_contributions` | Paires publication–personne écartées durablement | `(publication_id, person_id)` |
 
-`source_contributions.person_id` rattache une signature à une personne. `resolution_mode` retient par quel moyen la résolution a été faite : identifiant, nom, ou report d'une autre source.
+`source_contributions.person_id` rattache une contribution source à une personne. `resolution_mode` retient par quel moyen la résolution a été faite : identifiant, nom, ou report d'une autre source.
 
 ## Écriture par le pipeline
 
-`pipeline/transformation/persons/persons.py` exécute six étapes. Les quatre premières partagent une transaction. La régénération des formes de nom et la purge ont chacune la leur. La phase lit les signatures du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des signatures, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
+`pipeline/transformation/persons/persons.py` exécute six étapes. Les quatre premières partagent une transaction. La régénération des formes de nom et la purge ont chacune la leur. La phase lit les contributions sources du périmètre non encore rattachées, avec leurs identifiants, leur nom normalisé, leurs rôles et leur position dans la publication, ainsi que des index chargés en mémoire au début du traitement. Elle écrit le rattachement des contributions sources, crée des personnes, inscrit les identifiants rencontrés et régénère les formes de nom.
 
 1. **Appliquer les décisions humaines.** Les rattachements épinglés à la main sont reposés en premier ; les étapes suivantes ne les défont pas.
-2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des signatures où il figure sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les signatures où figure cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les signatures qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
+2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des contributions sources où il figure sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les contributions sources où figure cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les contributions sources qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
 3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Les rôles non-auteurs des thèses — jury, rapporteurs — n'autorisent aucune création.
 4. **Détacher ce qui a perdu son appui.** Un rattachement obtenu par report depuis une autre source, dont l'attache d'origine a disparu, repasse à nul.
-5. **Régénérer les formes de nom.** Les formes calculées depuis l'état civil de la personne rejoignent celles observées dans ses signatures ; seules les différences sont écrites. Une forme calculée naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
+5. **Régénérer les formes de nom.** Les formes calculées depuis l'état civil de la personne rejoignent celles observées dans ses contributions sources ; seules les différences sont écrites. Une forme calculée naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
 6. **Purger.** Les rattachements par nom dont la forme désigne maintenant deux personnes ou plus sont détachés, puis les personnes devenues vides sont supprimées — sauf celles qui ont une fiche annuaire.
 
 Les identifiants rencontrés sont inscrits par un point unique, toujours en attente de confirmation et marqués comme automatiques. Un conflit y est consigné sans bloquer, et laissé à l'arbitrage de l'exécution suivante.
 
-Ce qu'une exécution inscrit devient ce que la suivante lit, si bien que la convergence demande plusieurs exécutions. Trois remises à nul se décident d'après l'état lu au début de la phase : la signature dont l'identifiant a été transféré, le rattachement par nom devenu ambigu, et le report entre sources recalculé. Un homonyme apparu à une exécution se résout donc à la suivante ; deux passages suffisent en pratique.
+Ce qu'une exécution inscrit devient ce que la suivante lit, si bien que la convergence demande plusieurs exécutions. Trois remises à nul se décident d'après l'état lu au début de la phase : la contribution source dont l'identifiant a été transféré, le rattachement par nom devenu ambigu, et le report entre sources recalculé. Un homonyme apparu à une exécution se résout donc à la suivante ; deux passages suffisent en pratique.
 
 ## Écriture par l'API — édition manuelle
 
 Routeur `interfaces/api/routers/persons.py`, commandes dans `application/services/persons/commands.py`, adaptateur `PgPersonRepository`. Une commande vaut une transaction.
 
-**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — signatures, contributions, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses signatures y sont détachées et la contribution supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
+**Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — contributions sources, contributions, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses contributions sources y sont détachées et la contribution supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
 
 **Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
 
 **Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes calculées.
 
-**Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les signatures de cette forme et supprime les contributions devenues orphelines.
+**Trancher une forme de nom.** La confirmer ou la rejeter ; un rejet détache aussi les contributions sources de cette forme et supprime les contributions devenues orphelines.
 
-**Détacher des contributions** (`POST /api/persons/{id}/detach-contributions`). Inscrit le rejet durable, détache les signatures, supprime la ligne consolidée et nettoie les formes restées sans emploi.
+**Détacher des contributions** (`POST /api/persons/{id}/detach-contributions`). Inscrit le rejet durable, détache les contributions sources, supprime la ligne consolidée et nettoie les formes restées sans emploi.
 
 **Déclarer deux personnes distinctes** inscrit la paire dans `distinct_persons`, ce qui l'écarte des files de doublons.
 
@@ -69,8 +69,8 @@ Port `PersonsQueries`, adaptateurs dans `infrastructure/read_models/persons/`.
 
 | Usage | Ce qui est servi |
 |---|---|
-| Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les signatures, les contributions et les publications |
+| Fiche personne | Profil, thèses, adresses, tableau de bord et sujets, en croisant les personnes, la fiche annuaire, les identifiants, les contributions sources, les contributions et les publications |
 | Annuaire, listes, recherche, facettes, statistiques | Listes publiques et d'administration, filtrables par laboratoire |
-| Files de doublons | Doublons par nom, conflits d'identifiant, signatures détachables, formes de nom ambiguës, candidates au partage d'une forme |
+| Files de doublons | Doublons par nom, conflits d'identifiant, contributions sources détachables, formes de nom ambiguës, candidates au partage d'une forme |
 
 Toutes les files de doublons écartent les paires déclarées distinctes ; celle des doublons par nom écarte en outre les paires dont les deux personnes ont une fiche annuaire.

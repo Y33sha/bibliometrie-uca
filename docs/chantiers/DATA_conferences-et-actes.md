@@ -56,7 +56,7 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 - **Résumés de congrès publiés en revue.** Environ 175 sont repérables : 104 dans 14 revues de résumés (Goldschmidt Abstracts, Abstracts with programs de la GSA…), 82 en numéro de supplément. 392 `article` paraissent aussi en numéro de supplément.
 - **Crossref.** 2 509 des 2 697 communications à DOI ont un enregistrement Crossref. IEEE et ACM donnent `proceedings-article`, le titre des actes et l'événement, sans ISBN. Le volume IEEE a son propre enregistrement (type `proceedings`) avec ISBN ; son DOI est celui de la communication privé de son dernier segment. Springer donne `book-chapter` avec l'ISBN du volume et la collection. Elsevier donne `journal-article`. `source_records.meta` garde le nom et l'acronyme du congrès.
 - **Résumés.** `meeting abstract` (WoS) et `conference-abstract` (Crossref) donnent `conference_paper`, comme les textes d'actes.
-- **HAL**, deux échantillons de 200. Sur 350 communications, `isbn_s` est rempli 8 fois, `bookTitle_s` jamais, `serie_s` parfois, `conferenceTitle_s` toujours. Les ISBN sont lus dans la notice TEI. L'indicateur « avec actes » (`proceedings_s`, non extrait) est rempli presque partout et contredit la revue dans des cas nets (volumes LNCS déclarés sans actes). Il est saisi à la main ; sa fiabilité reste à établir.
+- **HAL**, deux échantillons de 200. Sur 350 communications, `isbn_s` est rempli 8 fois, `bookTitle_s` jamais, `serie_s` parfois, `conferenceTitle_s` toujours. Les ISBN sont lus dans le TEI. L'indicateur « avec actes » (`proceedings_s`, non extrait) est rempli presque partout et contredit la revue dans des cas nets (volumes LNCS déclarés sans actes). Il est saisi à la main ; sa fiabilité reste à établir.
 - **Recherche externe**, 30 communications d'informatique et de sciences de l'ingénieur sans DOI ni revue. Crossref retrouve la communication par son titre 2 fois (similarité 0,99), le volume par le nom du colloque 1 fois. Les échecs : rencontres françaises sans actes à DOI (la moitié de l'échantillon), congrès internationaux à résumés seuls, actes sans DOI Crossref, éditions pas encore parues. IEEE Xplore et DBLP refusent les requêtes automatiques ; l'API IEEE demande une clé.
 
 ### `container_title` sans `journal_id`
@@ -92,8 +92,8 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
     | DOI seul | 41 | 39 | 8 |
     | Aucune | 1 465 | 8 499 | 225 |
 
-    La valeur 0 est fausse pour 44 % des communications à volume d'actes : actes IEEE, ACM, Winter Simulation Conference déclarés sans actes. Sans trace en base, les deux valeurs se distinguent. Sur 30 notices à 1, 22 portent des pages, un éditeur, un ISBN, une série ou un titre de source ; plusieurs sont des recueils de résumés (« Book of abstracts », « Recueil des résumés »). Sur 30 notices à 0, une seule porte l'un de ces champs.
-- [x] Lire les ISBN de HAL, dans la notice TEI (chantier Monographies)
+    La valeur 0 est fausse pour 44 % des communications à volume d'actes : actes IEEE, ACM, Winter Simulation Conference déclarés sans actes. Sans trace en base, les deux valeurs se distinguent. Sur 30 enregistrements sources à 1, 22 portent des pages, un éditeur, un ISBN, une série ou un titre de source ; plusieurs sont des recueils de résumés (« Book of abstracts », « Recueil des résumés »). Sur 30 enregistrements sources à 0, un seul a l'un de ces champs.
+- [x] Lire les ISBN de HAL, dans le TEI (chantier Monographies)
 - [x] Importer l'enregistrement Crossref des communications à DOI (type, ISBN, congrès)
 - [ ] Reconnaître les résumés publiés en numéro de supplément
 - [ ] Reconnaître un résumé à son nombre de pages : un article d'actes d'une seule page est un résumé (AAAI, `10.1609/aaai.v40i47.41377`, page 39862). Les pages sont dans `biblio` : `page` chez Crossref, `pages` chez HAL, `first_page` et `last_page` chez OpenAlex, WoS et DataCite. À vérifier sur trois volumes SPIE qu'OpenAlex désigne comme résumés.
@@ -124,5 +124,5 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 ## Questions ouvertes
 
 - Le colloque, en tant qu'événement, mérite-t-il une entité distincte des actes ? Le rapprochement des noms doit alors distinguer les éditions (année, numéro).
-- Retrouver le DOI manquant d'une notice HAL par son titre vaut pour tous les types de documents : chantier à part ?
+- Retrouver le DOI manquant d'un enregistrement source HAL par son titre vaut pour tous les types de documents : chantier à part ?
 - Points laissés en attente par le chantier [Types de documents](archived/2026-06-19_METIER_doc-types.md) : WoS `Article; Proceedings Paper`, posters et communications partageant un DOI.

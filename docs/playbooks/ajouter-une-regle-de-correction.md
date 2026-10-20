@@ -13,7 +13,7 @@ Une correction est une règle déterministe « si tel signal, alors le champ can
 - **Réversibilité** : la sous-étape unaire ([`correct_unary.py`](../../pipeline/publications/correct_unary.py)) reconstruit le brut depuis `raw_metadata`, **mappe** le `doc_type` source vers le canonique (`map_doc_type`), applique `effective_metadata`, écrit l'effective dans les colonnes et stashe le brut écrasé sous `raw_metadata.<champ>` avec sa provenance `corrected_by` (le membre `MetadataCorrectionRule`, ou le marqueur `DOC_TYPE_MAP` quand seul le mapping a changé la valeur).
 - **Idempotence** : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 - **Cascade par champ** (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. `_correct_field(sp, "<field>")` parcourt `_RULES` dans l'ordre d'insertion et retourne la première règle qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent. L'ordre intra-cascade traduit la spécificité du signal (signaux forts d'abord : URL > `journal_type` > titre).
-- **Mutation de clé ⇒ résolution** : persister une correction qui change `doc_type`, `external_ids` ou `doi` pose `keys_dirty` sur la SP — `doc_type` entre dans le token `metadata_block`, le `doi` est un token. La phase `publications` résout à nouveau ces SP au run suivant.
+- **Mutation de clé ⇒ résolution** : persister une correction qui change `doc_type`, `external_ids` ou `doi` pose `keys_dirty` sur l'enregistrement source — `doc_type` entre dans le token `metadata_block`, le `doi` est un token. La phase `publications` résout à nouveau ces enregistrements sources au run suivant.
 
 ## Quand utiliser ce playbook
 
@@ -36,7 +36,7 @@ Avant d'ouvrir un fichier, expliciter :
   - hors du contrat → l'étendre (cf. § 4).
 - **Rejouable sur la publication canonique ?** Rien à câbler : `effective_doc_type_for_publication` écarte d'elle-même toute règle dont un prédicat figure dans `_SOURCE_ONLY_PREDICATES` (`url_contains`, `embargo_expired`, `self_declared_preprint` — des faits d'un enregistrement source, sans contrepartie canonique). Une règle qui n'en lit aucun se rejoue sur le canonique, ce qui répare les combinaisons nées de l'arbitrage (`doc_type` d'une source, `journal_id` d'une autre).
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
-- **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de la SP : tester que la résolution utilise la valeur corrigée (la persistance pose `keys_dirty`, le regroupement suit).
+- **Output qui change le clustering ?** Une correction de `doc_type` change le token `metadata_block` de l'enregistrement source : tester que la résolution utilise la valeur corrigée (la persistance pose `keys_dirty`, le regroupement suit).
 
 ### 2. Audit avant de coder
 
@@ -111,7 +111,7 @@ Si l'input est absent de `MetadataForCorrection` :
 3. colonne ajoutée au `_SELECT` de l'adaptateur ([`metadata_correction_queries.py`](../../pipeline/publications/metadata_correction_queries.py)), **sous le nom du champ** : les lignes sont construites par appariement de noms ;
 4. si le champ est un fait propre à un enregistrement source, sans contrepartie sur la publication, inscrire son prédicat dans `_SOURCE_ONLY_PREDICATES` : les règles qui le lisent sont écartées du rejeu sur la publication. Sinon, le renseigner dans `_apply_canonical_doc_type_correction` ([`refresh.py`](../../pipeline/publications/refresh.py)) depuis la valeur arbitrée.
 
-Alternative écartée : threader un repo dans toutes les signatures. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
+Alternative écartée : threader un repo dans toutes les signatures de fonctions. Beaucoup plus invasif sans bénéfice métier — le contrat (champs joints à la lecture) garde `effective_metadata` pure.
 
 ### 5. Tests
 
@@ -136,9 +136,9 @@ Si la règle consomme un champ que l'admin modifie en base via l'UI (`journal.jo
 
 ### 7. Rattrapage du stock
 
-Une règle ajoutée à `_RULES` ne s'applique qu'aux SP retraitées. Pour l'appliquer au stock :
+Une règle ajoutée à `_RULES` ne s'applique qu'aux enregistrements sources retraités. Pour l'appliquer au stock :
 
-- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque SP depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline --only publications` pour résoudre à nouveau les SP re-dirtiées et rafraîchir leurs publications.
+- **Règle intrinsèque ou journal-jointe** : rejouer la phase `metadata_correction` (`run_pipeline --only metadata_correction`) — la sous-étape unaire recalcule l'effective de chaque enregistrement source depuis le brut, pose la correction, et marque `keys_dirty` si elle change `doc_type`/`doi`/`external_ids`. Enchaîner `run_pipeline --only publications` pour résoudre à nouveau les enregistrements sources re-dirtiés et rafraîchir leurs publications.
 
 ### 8. Documentation
 
@@ -146,7 +146,7 @@ Le catalogue des règles actives est le dict `_RULES` lui-même (entrées + comm
 
 ## Corrections par grappe de DOI (cluster)
 
-Les règles `_RULES` décident d'une SP **seule**. D'autres corrections demandent de regarder le **groupe de SP partageant un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon la résolution les fusionnerait à tort).
+Les règles `_RULES` décident d'un enregistrement source **seul**. D'autres corrections demandent de regarder le **groupe d'enregistrements sources qui partagent un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon la résolution les fusionnerait à tort).
 
 La décision est dans `resolve_cluster_doi_corrections` (`correction.py`) — pure, agnostique de la source. La sous-étape [`correct_by_cluster.py`](../../pipeline/publications/correct_by_cluster.py) regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, substitue ou nulle le DOI et stashe le brut sous la provenance `DoiClusterCase`. Cas couverts : versions DataCite → DOI concept ; ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (tous le perdent) ; volume d'actes et communications au même DOI (les communications le perdent).
 
@@ -154,15 +154,15 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 
 ## Exemples concrets
 
-### Règle SP-intrinsèque mono-critère
+### Règle intrinsèque à l'enregistrement source, mono-critère
 
 **`THESES_FR_URL_TO_THESIS`** — URL theses.fr (sans `journal_id`) ⇒ `doc_type = thesis`.
 
-- Input : `sp.urls` + `journal_id_present: False` (une SP theses.fr *avec* journal est un article publié, traité par `THESIS_WITH_JOURNAL_TO_ARTICLE`).
+- Input : `sp.urls` + `journal_id_present: False` (un enregistrement source theses.fr *avec* journal est un article publié, traité par `THESIS_WITH_JOURNAL_TO_ARTICLE`).
 - Hook admin : non (URL non éditable).
 - Référence : [`metadata_correction/rules.py` — entrée `THESES_FR_URL_TO_THESIS`](../../domain/source_records/metadata_correction/rules.py)
 
-### Règle SP-intrinsèque multi-critères avec whitelist + set de signaux
+### Règle intrinsèque à l'enregistrement source, multi-critères avec whitelist + set de signaux
 
 **`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`** — titre dans `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` + `doc_type ∈ {article, other}` ⇒ `dataset`.
 
@@ -182,7 +182,7 @@ Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dan
 - **Muter `source_records` à l'ingestion** (dans le normalizer) : casse l'auditabilité et la réversibilité. La correction est une dérivation dans `correction.py`, persistée par la phase `metadata_correction` qui conserve le brut dans `raw_metadata`.
 - **Encoder la règle en SQL pur** (vue, trigger, UPDATE non audité) : perd la trace `raw_metadata.<champ>.corrected_by` et le brut réversible.
 - **Cascade implicite** : deux règles touchant le même champ sans ordre explicite → non-déterministe. L'ordre des entrées dans `_RULES` est la convention.
-- **Hook admin sans service** : déclencher `refresh_from_sources` depuis le router. Le service propriétaire (`application/services/<table>/`) reste l'unique point d'écriture côté pubs.
+- **Hook admin sans service** : déclencher `refresh_from_sources` depuis le router. Le service propriétaire (`application/services/<table>/`) reste l'unique point d'écriture côté publications.
 
 ## Limites du périmètre
 

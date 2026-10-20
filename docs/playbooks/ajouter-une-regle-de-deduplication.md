@@ -8,22 +8,22 @@ Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions
 
 ## Modèle : clustering par tokens de confirmation
 
-La résolution d'entités est un record-linkage par graphe. Chaque `source_record` est un nœud ; deux SP sont reliées si elles partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
+La résolution d'entités est un record-linkage par graphe. Chaque `source_record` est un nœud ; deux enregistrements sources sont reliés s'ils partagent une **clé de confirmation** (un *token*). Une publication canonique est une **composante connexe** de ce graphe, partitionnée par DOI.
 
-- **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_records/keys.py) lit une SP (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<publication_year>`, gardé par une longueur minimale de titre).
-- **Clustering** : [`connected_components`](../../domain/entity_resolution.py) regroupe les SP reliées par token partagé (fermeture transitive).
-- **Assignation** : [`plan_reconciliation`](../../domain/publications/reconciliation.py) assigne chaque SP au pub-ancre de sa partition `(composante ∩ DOI)`. La passe applicative est [`reconcile_components`](../../pipeline/publications/reconcile_components.py) (phase `publications`).
-- **Univers SQL** : [`reconciliation.py`](../../pipeline/publications/reconciliation.py) construit le voisinage 1-hop des SP `keys_dirty` — une branche `UNION` par type de token, qui ramène les SP partageant ce token avec une SP dirty.
+- **Projection des tokens** : [`project_confirmation_keys`](../../domain/source_records/keys.py) lit un enregistrement source (colonnes corrigées + `external_ids`) et renvoie son jeu de tokens. Tokens en place : `doi`, `nnt`, `hal_id` (multivalué), `pmid`, et `metadata_block` (`<doc_type>|<title_normalized>|<publication_year>`, gardé par une longueur minimale de titre).
+- **Clustering** : [`connected_components`](../../domain/entity_resolution.py) regroupe les enregistrements sources reliés par token partagé (fermeture transitive).
+- **Assignation** : [`plan_reconciliation`](../../domain/publications/reconciliation.py) assigne chaque enregistrement source à la publication-ancre de sa partition `(composante ∩ DOI)`. La passe applicative est [`reconcile_components`](../../pipeline/publications/reconcile_components.py) (phase `publications`).
+- **Univers SQL** : [`reconciliation.py`](../../pipeline/publications/reconciliation.py) construit le voisinage 1-hop des enregistrements sources `keys_dirty` — une branche `UNION` par type de token, qui ramène les enregistrements sources partageant ce token avec un enregistrement source dirty.
 
-Un token est une **égalité** : deux SP au même token sont la même œuvre, sans comparaison. C'est ce qui le rend `GROUP BY`-able et le fait entrer nativement dans le clustering.
+Un token est une **égalité** : deux enregistrements sources au même token sont la même œuvre, sans comparaison. C'est ce qui le rend `GROUP BY`-able et le fait entrer nativement dans le clustering.
 
 **Cannot-link DOI** : deux DOI non-nuls distincts ne fusionnent jamais, à aucun palier. La partition `∩ DOI` les sépare même s'ils sont co-bloqués par un autre token.
 
 ## Quand un signal est-il un token ?
 
-Un signal devient un token quand l'**égalité** d'une valeur dérivable de la SP vaut identité d'œuvre — assez sélective pour ne pas regrouper des œuvres distinctes. Les identifiants (DOI, NNT, hal_id, pmid) le sont par nature. Une clé composite de métadonnées (`metadata_block`) l'est pour les classes où l'audit le démontre.
+Un signal devient un token quand l'**égalité** d'une valeur dérivable de l'enregistrement source vaut identité d'œuvre — assez sélective pour ne pas regrouper des œuvres distinctes. Les identifiants (DOI, NNT, hal_id, pmid) le sont par nature. Une clé composite de métadonnées (`metadata_block`) l'est pour les classes où l'audit le démontre.
 
-Un token est une **valeur unique** que la SP porte : on range les SP par elle (`GROUP BY`), sans comparaison. Un signal qui n'est pas une telle valeur — l'accord d'auteurs est un *recouvrement* entre deux listes, pas une valeur à ranger — ne peut pas être un token ; la résolution par auteurs relève d'un autre mécanisme (cf. fiche chantier). Ce playbook couvre les tokens.
+Un token est une **valeur unique** que l'enregistrement source porte : on range les enregistrements sources par elle (`GROUP BY`), sans comparaison. Un signal qui n'est pas une telle valeur — l'accord d'auteurs est un *recouvrement* entre deux listes, pas une valeur à ranger — ne peut pas être un token ; la résolution par auteurs relève d'un autre mécanisme (cf. fiche chantier). Ce playbook couvre les tokens.
 
 ## Procédure pas-à-pas
 
@@ -65,11 +65,11 @@ Dans [`domain/source_records/keys.py`](../../domain/source_records/keys.py) :
 - ajouter le champ à `ConfirmationKeys` et son émission dans `tokens()` (`("<nom>", "<valeur>")`) ;
 - le calculer dans `project_confirmation_keys`, avec sa garde de sélectivité.
 
-La projection est l'**unique définition** de « quelles clés porte cette SP ». Un seuil de garde déclaré ici (ex. `_METADATA_BLOCK_MIN_TITLE_LENGTH`) est dupliqué côté SQL : le commenter des deux côtés (« garder synchrone »).
+La projection est l'**unique définition** de « quelles clés a cet enregistrement source ». Un seuil de garde déclaré ici (ex. `_METADATA_BLOCK_MIN_TITLE_LENGTH`) est dupliqué côté SQL : le commenter des deux côtés (« garder synchrone »).
 
 #### 5.2 Branche d'univers
 
-Dans [`reconciliation.py`](../../pipeline/publications/reconciliation.py), ajouter une branche `UNION` à `_UNIVERSE_SQL` qui joint les SP partageant le token avec une SP dirty :
+Dans [`reconciliation.py`](../../pipeline/publications/reconciliation.py), ajouter une branche `UNION` à `_UNIVERSE_SQL` qui joint les enregistrements sources partageant le token avec un enregistrement source dirty :
 
 ```sql
 UNION
@@ -84,13 +84,13 @@ La branche doit ramener exactement les voisins que la projection relie : même c
 
 ### 6. Tests
 
-- **Projection** ([`test_keys.py`](../../tests/unit/domain/source_records/test_keys.py)) : une SP émet le token quand la garde passe, ne l'émet pas sinon ; cas-limites de la garde (longueur juste sous/au-dessus du seuil).
-- **Univers + bout-en-bout** ([`test_reconcile_components.py`](../../tests/integration/pipeline/test_reconcile_components.py)) : deux SP au même token entrent dans le même univers et fusionnent ; deux DOI distincts co-bloqués ne fusionnent pas (cannot-link).
-- **Différentiel anti-divergence** (`test_reconcile_components.py`) : étendre `TestUniverseMatchesPythonTokens` au token ajouté — semer des SP qui le portent (et les bords de garde : longueur juste sous/au-dessus du seuil) et vérifier que le voisinage SQL relie exactement les SP que les tokens Python relient. C'est ce qui garde la synchronisation `keys.py` ↔ SQL.
+- **Projection** ([`test_keys.py`](../../tests/unit/domain/source_records/test_keys.py)) : un enregistrement source émet le token quand la garde passe, ne l'émet pas sinon ; cas-limites de la garde (longueur juste sous/au-dessus du seuil).
+- **Univers + bout-en-bout** ([`test_reconcile_components.py`](../../tests/integration/pipeline/test_reconcile_components.py)) : deux enregistrements sources au même token entrent dans le même univers et fusionnent ; deux DOI distincts co-bloqués ne fusionnent pas (cannot-link).
+- **Différentiel anti-divergence** (`test_reconcile_components.py`) : étendre `TestUniverseMatchesPythonTokens` au token ajouté — semer des enregistrements sources qui le portent (et les bords de garde : longueur juste sous/au-dessus du seuil) et vérifier que le voisinage SQL relie exactement les enregistrements sources que les tokens Python relient. C'est ce qui garde la synchronisation `keys.py` ↔ SQL.
 
 ### 7. Rollout sur le stock
 
-Un token neuf ne s'applique qu'aux SP `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline --only publications --rebuild-publications` (re-dirty complet : le regroupement porte alors sur tout le corpus, et non sur le seul voisinage des lignes marquées).
+Un token neuf ne s'applique qu'aux enregistrements sources `keys_dirty`. Pour matérialiser les fusions sur le stock existant, re-dirtier tout le stock : `run_pipeline --only publications --rebuild-publications` (re-dirty complet : le regroupement porte alors sur tout le corpus, et non sur le seul voisinage des lignes marquées).
 
 Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés doivent être consolidés (une publication par bloc, hors séparations légitimes par DOI).
 
@@ -98,7 +98,7 @@ Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés
 
 - **Token laxiste sans garde de sélectivité** : un titre générique (« Foreword », « Introduction ») partagé par des œuvres distinctes fusionne à tort. La garde de longueur / la restriction de `doc_type` est la défense.
 - **Critère d'égalité divergent entre `keys.py` et le SQL** : la branche d'univers ne ramène pas les voisins que le clustering relie (ou l'inverse) → fusions partielles ou manquées. Garder les deux strictement synchrones, et étendre le test différentiel (§ 6) au token ajouté pour verrouiller cette synchronisation.
-- **Oublier le rollout** : sans re-dirty, le token ne s'applique qu'aux SP touchées par une (re-)normalisation ultérieure ; le stock existant reste non consolidé.
+- **Oublier le rollout** : sans re-dirty, le token ne s'applique qu'aux enregistrements sources touchés par une (re-)normalisation ultérieure ; le stock existant reste non consolidé.
 
 ## Limites du périmètre
 

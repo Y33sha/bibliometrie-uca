@@ -19,9 +19,9 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 ## Données récupérées
 
-- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` de la notice TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
+- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` du TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
 - **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
-- **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les signatures HAL sont sans adresse.
+- **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources HAL sont sans adresse.
 
 ## Exemple de payload
 
@@ -89,7 +89,7 @@ Extrait du `label_xml` (TEI, ~22k chars), 1er `<author>` :
 
 ### Champs auteurs alignés vs compactés
 
-Les seuls champs auteurs Solr requêtés (`authQuality_s` et le composite `authFullNameFormIDPersonIDIDHal_fs`) sont alignés par position : longueur = nombre d'auteurs, l'index correspond à la position dans la signature.
+Les seuls champs auteurs Solr requêtés (`authQuality_s` et le composite `authFullNameFormIDPersonIDIDHal_fs`) sont alignés par position : longueur = nombre d'auteurs, l'index correspond à la position d'auteur.
 
 HAL expose aussi des listes d'identifiants Solr par auteur (`authIdHal_s`, `authIdHal_i`, `authORCIDIdExt_s`, `authIdRefIdExt_s`) mais elles sont **compactées** (valeurs non-null seulement) : l'index ne correspond plus à la position d'auteur, donc elles sont inutilisables pour reconstituer l'alignement. Ces champs ne sont pas requêtés. Les ORCID et IdRef sont récupérés via le TEI `label_xml` (cf. infra) — seul endroit qui les attache à chaque auteur par position.
 

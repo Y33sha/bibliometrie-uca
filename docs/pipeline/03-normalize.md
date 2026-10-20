@@ -15,27 +15,27 @@ flowchart LR
     class C,D,F,journals,publishers new;
 ```
 
-Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `journals`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une signature d'auteur à ses adresses.
+Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `journals`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
 
 Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. Les plateformes d'ebooks d'OpenAlex ne créent pas de revue.
 
-Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque signature : identifiants de l'auteur (ORCID, IdRef…) et affiliations.
+Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations.
 
-Une signature collective (collaboration, consortium, groupe d'étude…) reste à sa position, marquée `collective`. La marque vient de la source quand elle distingue les collectifs : entrée Crossref à `name` seul, créateur DataCite `Organizational`. Sinon, une règle sur le nom décide (`domain/persons/collective_names.py`).
+Une contribution source collective (collaboration, consortium, groupe d'étude…) reste à sa position, marquée `collective`. La marque vient de la source quand elle distingue les collectifs : entrée Crossref à `name` seul, créateur DataCite `Organizational`. Sinon, une règle sur le nom décide (`domain/persons/collective_names.py`).
 
-Chaque normaliseur pose aussi la licence de la notice (`source_records.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `meta`.
+Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_records.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `meta`.
 
 En fin de phase, les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-extract.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
 Conservés en base, les payloads bruts la font grossir hors de proportion avec les données normalisées qu'on en tire. En fin de phase, le `raw_data` du staging est donc vidé, puis un `VACUUM` récupère l'espace.
 
-## Synchronisation des signatures
+## Synchronisation des contributions sources
 
-Chaque signature entrante est rapprochée d'une signature en base de même identité (nom, prénom et identifiants normalisés, marque collective), puis de même position si l'identité est répétée. Une signature rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
+Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
 
-Une notice dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses signatures en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour toutes les notices des sources normalisées : leurs signatures se resynchronisent à leur prochaine normalisation.
+Un enregistrement source dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses contributions sources en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
 
-Les signatures des thèses sont supprimées puis recréées à chaque normalisation.
+Les contributions sources des thèses sont supprimées puis recréées à chaque normalisation.
 
 ## Archivage du payload brut
 

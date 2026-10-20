@@ -16,8 +16,8 @@ Les destinataires des rapports demandent les indicateurs d'un tableau InCites. S
 
 Mesures sur les publications du périmètre parues de 2022 à 2025, des types retenus par le rapport : 17 862 publications.
 
-- **Citations.** `source_records.impact->'cited_by_count'`, fourni par OpenAlex, Crossref, WoS, DataCite et une partie des notices ScanR. 17 471 publications ont au moins un compte. Somme des maxima par publication : 148 825. Somme des comptes OpenAlex : 141 068. Somme des comptes WoS : 101 756, sur 9 188 publications.
-- **Indice normalisé.** Le FWCI d'OpenAlex (`impact->'fwci'`), présent pour 16 936 publications. 394 publications ont plusieurs notices OpenAlex aux FWCI différents.
+- **Citations.** `source_records.impact->'cited_by_count'`, fourni par OpenAlex, Crossref, WoS, DataCite et une partie des enregistrements sources ScanR. 17 471 publications ont au moins un compte. Somme des maxima par publication : 148 825. Somme des comptes OpenAlex : 141 068. Somme des comptes WoS : 101 756, sur 9 188 publications.
+- **Indice normalisé.** Le FWCI d'OpenAlex (`impact->'fwci'`), présent pour 16 936 publications. 394 publications ont plusieurs enregistrements sources OpenAlex aux FWCI différents.
 - **Top 10 % et rôles clés.** Calculés par le rapport.
 - **Langue.** `publications.language` : 11 845 publications en anglais, 5 689 en français, 46 sans langue.
 
@@ -27,7 +27,7 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 ## Décisions
 
-- **Citations d'une publication.** Le maximum des `cited_by_count` de ses notices. Un écart suspect entre sources donne lieu à une vérification ciblée sur d'autres sources en ligne. 40 publications ont au moins 10 citations et un maximum supérieur au double du compte OpenAlex.
+- **Citations d'une publication.** Le maximum des `cited_by_count` de ses enregistrements sources. Un écart suspect entre sources donne lieu à une vérification ciblée sur d'autres sources en ligne. 40 publications ont au moins 10 citations et un maximum supérieur au double du compte OpenAlex.
 - **Calcul à la requête**, dans le script de rapport. La consolidation des indicateurs dans `publications.publications`, nécessaire aux filtres de l'interface, relève d'un chantier ultérieur.
 - **FWCI et top 10 % d'OpenAlex conservés quand le compte OpenAlex est aberrant.** OpenAlex sous-compte les citations de certaines publications : 0 citation pour un article de la collaboration ATLAS cité 59 fois dans le WoS, avec la même valeur dans l'API. 68 publications ont un compte OpenAlex inférieur à la moitié du maximum des autres sources, ce maximum étant d'au moins 5 (0,38 %). Les écarter fait passer le FWCI moyen de 1,652 à 1,656 et la part dans le top 10 % de 16,48 % à 16,51 %. Le laboratoire le plus touché, de physique des particules, en compte 45 : son FWCI moyen passe de 2,16 à 2,21.
 - **Groupes de publications.** Articles originaux : type `article`, qui comprend les short communications dans toutes les sources. Autres publications : articles de synthèse et conference papers. Publications non anglophones : publications des deux premiers groupes dont la langue est connue et autre que l'anglais.
@@ -55,5 +55,5 @@ InCites compte les publications indexées dans le WoS et les citations du WoS. S
 
 ## Questions ouvertes
 
-- **FWCI d'une publication à plusieurs notices OpenAlex.** Maximum, moyenne ou notice unique. Le prototype retient le maximum, comme pour les citations et le top 10 %.
+- **FWCI d'une publication à plusieurs enregistrements sources OpenAlex.** Maximum, moyenne ou enregistrement source unique. Le prototype retient le maximum, comme pour les citations et le top 10 %.
 - **Publications sans FWCI** (926). Le prototype les exclut de la moyenne.

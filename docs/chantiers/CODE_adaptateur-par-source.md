@@ -18,9 +18,9 @@ Les politiques de source sont des littéraux dans les orchestrateurs :
 - mode `daily` réduit à HAL : `modes.py` et `extract.py` ;
 - agence d'enregistrement de Crossref et de DataCite : `fetch_missing.py` et `graph.py`.
 
-`SourceNormalizer` fait la boucle de la normalisation. Chaque source réécrit la séquence d'écriture : conteneurs, métadonnées, notice, signatures, `mark_done`.
+`SourceNormalizer` fait la boucle de la normalisation. Chaque source réécrit la séquence d'écriture : conteneurs, métadonnées, enregistrement source, contributions sources, `mark_done`.
 
-L'identité d'une notice (identifiant, DOI, troncature des auteurs OpenAlex) se recalcule à chaque point d'entrée : moissonnage, recherche par DOI, recherche par personne, relecture. Les méthodes `insert` des six `DoiSearch` sont presque identiques.
+Les identifiants d'un enregistrement source (identifiant, DOI, troncature des auteurs OpenAlex) se recalcule à chaque point d'entrée : moissonnage, recherche par DOI, recherche par personne, relecture. Les méthodes `insert` des six `DoiSearch` sont presque identiques.
 
 `extract` et `extract_by_person` dupliquent le câblage des nœuds, la construction du client ScanR et la capture d'`ExtractionConfigError`.
 
@@ -29,7 +29,7 @@ L'identité d'une notice (identifiant, DOI, troncature des auteurs OpenAlex) se 
 - Chaque source expose un adaptateur dans `<source>/__init__.py` : client, extracteurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, politiques.
 - Les tables des phases et les nœuds du graphe se construisent depuis la liste des adaptateurs.
 - La classe de base de la normalisation fait la séquence d'écriture. Une source fournit l'analyse d'une ligne de `staging`.
-- La phase 3 se coordonne avec le chantier [Normalisation par lots](CODE_batch-normalize.md), qui réécrit le writer des signatures.
+- La phase 3 se coordonne avec le chantier [Normalisation par lots](CODE_batch-normalize.md), qui réécrit le writer des contributions sources.
 
 ## Phasage
 
@@ -51,7 +51,7 @@ L'identité d'une notice (identifiant, DOI, troncature des auteurs OpenAlex) se 
 
 ### Phase 4 — Identité et écriture dans `staging`
 
-- [ ] Identité d'une notice fournie par l'adaptateur à tous les points d'entrée.
+- [ ] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée.
 - [ ] Écriture commune dans `staging`, effacement des échecs compris.
 - [ ] `upsert_staging` et `StagingQueries` en store : la connexion reçue à la construction.
 
