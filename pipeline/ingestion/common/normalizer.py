@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
@@ -202,28 +202,12 @@ class BibliographicNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourcePublicationQueries,
-        container_repo_factory: Callable[[Connection], ContainerGatewayQueries],
-        publisher_repo_factory: Callable[[Connection], PublisherGatewayQueries],
+        container_repo: ContainerGatewayQueries,
+        publisher_repo: PublisherGatewayQueries,
         authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
-        self._container_repo_factory = container_repo_factory
-        self._container_repo: ContainerGatewayQueries | None = None
-        self._publisher_repo_factory = publisher_repo_factory
-        self._publisher_repo: PublisherGatewayQueries | None = None
+        self._container_repo = container_repo
+        self._publisher_repo = publisher_repo
         self._authorship_queries = authorship_queries
-
-    def preload_caches(self, conn: Connection) -> None:
-        """Instancie les repositories sur la connexion prête, une fois avant la boucle de traitement."""
-        self._container_repo = self._container_repo_factory(conn)
-        self._publisher_repo = self._publisher_repo_factory(conn)
-
-    def _require_repos(
-        self,
-    ) -> tuple[ContainerGatewayQueries, PublisherGatewayQueries]:
-        """Les deux repositories, garantis chargés par `preload_caches`."""
-        assert self._container_repo is not None and self._publisher_repo is not None, (
-            "preload_caches doit être appelé avant process_work"
-        )
-        return self._container_repo, self._publisher_repo

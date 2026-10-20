@@ -11,7 +11,7 @@ import argparse
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import ClassVar
+from typing import ClassVar, Protocol
 
 from sqlalchemy import Connection
 
@@ -26,15 +26,16 @@ from pipeline.runtime.observability.libelles import (
     branche_de_source,
     forme,
 )
-from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression, progression
 
 __all__ = [
     "ExtractLogger",
     "ExtractionConfigError",
+    "Extractor",
+    "ExtractorFactory",
     "SourceExtractor",
-    "scoped_logger",
     "stage_document",
 ]
 
@@ -270,3 +271,21 @@ class SourceExtractor[ConfigT, ClientT](ABC):
         config = self.load_config(self.conn)
         self.setup_logging(args, config)
         return self.extract_all(args, config)
+
+
+class Extractor(Protocol):
+    """Point d'entrée d'un `SourceExtractor`, seul que les orchestrateurs appellent.
+
+    Le protocole efface les paramètres de type de `SourceExtractor`, la configuration et le client propres à chaque source.
+    """
+
+    def run(
+        self,
+        args: argparse.Namespace,
+        *,
+        breaker: SourceCircuitBreaker | None = None,
+    ) -> PhaseMetrics: ...
+
+
+type ExtractorFactory = Callable[[Connection, logging.Logger], Extractor]
+"""Construit l'extracteur d'une source sur la connexion de sa phase et le journal scopé à la source."""

@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.openalex.normalize`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `get_container_facts` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `get_container_facts` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (process_work wrapper / summary_stats).
 
 Pattern : `FakeSourcePublicationQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
 """
@@ -716,8 +716,8 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourcePublicationQueries(),
-        container_repo_factory=lambda c: MagicMock(),
-        publisher_repo_factory=lambda c: MagicMock(),
+        container_repo=MagicMock(),
+        publisher_repo=MagicMock(),
         authorship_queries=MagicMock(),
     )
 
@@ -728,15 +728,8 @@ class TestOpenalexNormalizerClass:
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
         assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
 
-    def test_preload_caches_sets_repos(self):
-        norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
-        assert norm._container_repo is not None
-        assert norm._publisher_repo is not None
-
     def test_process_work_delegates_to_module_function(self, monkeypatch):
         norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
         captured = {}
 
         def fake_process(*args, **kwargs):

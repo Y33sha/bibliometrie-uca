@@ -20,10 +20,10 @@ from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.common.harvest import (
     ExtractionConfigError,
     SourceExtractor,
-    scoped_logger,
     stage_document,
 )
 from pipeline.ingestion.datacite.fields import RECORD_PARAMS, api_headers, record_doi
+from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progression import Progression
 

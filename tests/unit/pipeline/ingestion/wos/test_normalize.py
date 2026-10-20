@@ -6,7 +6,7 @@ Couvre :
 - `extract_pub_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
 - `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
-- `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
+- `WosNormalizer.process_work` : wiring de la classe.
 
 Mocks : `WosNormalizeQueries`, `StagingQueries`, `JournalRepository`, `PublisherRepository`. `find_or_create_journal` / `find_or_create_publisher` monkeypatchés pour isoler la logique de wiring.
 """
@@ -1161,38 +1161,16 @@ class TestProcessRecord:
 
 
 class TestWosNormalizer:
-    def test_preload_caches_instantiates_repos(self, logger):
-        journal_factory = MagicMock(return_value="j-repo")
-        publisher_factory = MagicMock(return_value="p-repo")
-        norm = WosNormalizer(
-            MagicMock(),
-            logger,
-            staging_queries=MagicMock(),
-            queries=MagicMock(),
-            container_repo_factory=journal_factory,
-            publisher_repo_factory=publisher_factory,
-            authorship_queries=MagicMock(),
-        )
-
-        conn2 = MagicMock()
-        norm.preload_caches(conn2)
-
-        journal_factory.assert_called_once_with(conn2)
-        publisher_factory.assert_called_once_with(conn2)
-        assert norm._container_repo == "j-repo"
-        assert norm._publisher_repo == "p-repo"
-
     def test_process_work_delegates_to_process_record(self, logger, monkeypatch):
         norm = WosNormalizer(
             MagicMock(),
             logger,
             staging_queries=MagicMock(),
             queries=MagicMock(),
-            container_repo_factory=lambda c: MagicMock(),
-            publisher_repo_factory=lambda c: MagicMock(),
+            container_repo=MagicMock(),
+            publisher_repo=MagicMock(),
             authorship_queries=MagicMock(),
         )
-        norm.preload_caches(MagicMock())
 
         captured: dict[str, Any] = {}
 

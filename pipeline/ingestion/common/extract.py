@@ -23,14 +23,18 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.common.harvest import ExtractionConfigError
+from pipeline.ingestion.common.harvest import (
+    ExtractionConfigError,
+    Extractor,
+    ExtractorFactory,
+)
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -162,24 +166,6 @@ class ExtractPhase:
 # ── Câblage ───────────────────────────────────────────────────
 
 
-class Extracteur(Protocol):
-    """Point d'entrée commun des extracteurs, seul que l'orchestrateur appelle.
-
-    Chaque source a son type de configuration et son client ; ce protocole les laisse aux extracteurs.
-    """
-
-    def run(
-        self,
-        args: argparse.Namespace,
-        *,
-        breaker: SourceCircuitBreaker | None = None,
-    ) -> PhaseMetrics: ...
-
-
-# Un extracteur se construit sur la connexion de sa phase et le journal scopé à sa source.
-type ConstructeurExtracteur = Callable[[Connection, logging.Logger], Extracteur]
-
-
 def build() -> Phase:
     from infrastructure.observability.phase_executions import get_last_daily_extract_date
     from pipeline.runtime.parallel import run_parallel
@@ -210,7 +196,7 @@ def _extraction_structure_count(ctx: PhaseContext) -> int:
         return PerimeterQueries().count_extraction_structures(conn)
 
 
-def _extractors() -> dict[str, ConstructeurExtracteur]:
+def _extractors() -> dict[str, ExtractorFactory]:
     """Constructeur de l'extracteur de chaque source : `(conn, source_log)` → extracteur câblé.
 
     `wos` et `scanr` lisent leurs identifiants d'API en configuration.
@@ -218,36 +204,36 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
     Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
     from pipeline.ingestion.api_params import API_BASE_URLS
 
-    def hal(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def hal(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.hal.harvest import HalClient, HalExtractor
 
         return HalExtractor(conn, source_log, HalClient(API_BASE_URLS["hal"]))
 
-    def openalex(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def openalex(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.openalex.harvest import OpenalexClient, OpenalexExtractor
 
         return OpenalexExtractor(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
 
-    def wos(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def wos(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.credentials import get_wos_api_key
         from pipeline.ingestion.wos.harvest import WosClient, WosExtractor
 
         client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
         return WosExtractor(conn, source_log, client)
 
-    def scanr(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def scanr(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.credentials import get_scanr_credentials
         from pipeline.ingestion.scanr.harvest import ScanrClient, ScanrExtractor
 
         client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
         return ScanrExtractor(conn, source_log, client)
 
-    def theses(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def theses(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.theses.harvest import ThesesClient, ThesesExtractor
 
         return ThesesExtractor(conn, source_log, ThesesClient(API_BASE_URLS["theses"]))
 
-    def datacite(conn: Connection, source_log: logging.Logger) -> Extracteur:
+    def datacite(conn: Connection, source_log: logging.Logger) -> Extractor:
         from pipeline.ingestion.datacite.harvest import DataciteClient, DataciteExtractor
 
         return DataciteExtractor(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
@@ -265,7 +251,7 @@ def _extractors() -> dict[str, ConstructeurExtracteur]:
 def _run_extract(
     ctx: PhaseContext,
     source: str,
-    make_extractor: ConstructeurExtracteur,
+    make_extractor: ExtractorFactory,
     args: argparse.Namespace,
     breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:

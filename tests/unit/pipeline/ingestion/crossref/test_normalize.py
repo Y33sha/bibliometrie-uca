@@ -673,11 +673,10 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         logger=MagicMock(),
         staging_queries=MagicMock(),
         queries=MagicMock(),
-        container_repo_factory=lambda c: MagicMock(),
-        publisher_repo_factory=lambda c: MagicMock(),
+        container_repo=MagicMock(),
+        publisher_repo=MagicMock(),
         authorship_queries=MagicMock(),
     )
-    normalizer.preload_caches(MagicMock())
     row = staging_row()
 
     assert normalizer.normalize_record(MagicMock(), row) is True
