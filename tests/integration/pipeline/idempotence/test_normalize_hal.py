@@ -61,7 +61,6 @@ def insert_hal_staging(conn, docs):
 
 def run_normalize_hal(conn):
     """Exécute la normalisation HAL sur la Connection SA de test."""
-    import logging
 
     from sqlalchemy import text
 
@@ -77,7 +76,6 @@ def run_normalize_hal(conn):
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()
     authorship_queries = AuthorshipsBatchQueries()
-    logger = logging.getLogger("test")
     container_repo = ContainerGatewayQueries(conn)
     publisher_repo = PublisherGatewayQueries(conn)
 
@@ -98,7 +96,6 @@ def run_normalize_hal(conn):
         if process_work(
             conn,
             queries,
-            logger,
             staging_row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,

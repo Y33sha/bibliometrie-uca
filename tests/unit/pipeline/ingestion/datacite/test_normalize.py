@@ -422,7 +422,7 @@ class TestProcessWork:
 
     def _run(self, raw, queries, staging, logger, doi=None):
         row = staging_row(staging_id=42, raw=raw, doi=doi)
-        return process_work(MagicMock(), queries, logger, row, **self._kwargs(queries, staging))
+        return process_work(MagicMock(), queries, row, **self._kwargs(queries, staging))
 
     def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
         rendu = self._run({"attributes": _attributs()}, queries, staging, logger)
@@ -484,7 +484,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_datacite,
         "process_work",
-        lambda conn, queries, logger, row, **kw: vus.update(row=row, **kw) or True,
+        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = DataciteNormalizer(
         conn=MagicMock(),

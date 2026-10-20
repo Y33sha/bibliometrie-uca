@@ -216,7 +216,6 @@ def process_authorships(
 def process_work(
     conn: Connection,
     queries: SourcePublicationQueries,
-    logger: logging.Logger,
     staging_row: StagingRow,
     *,
     staging_queries: StagingQueries,
@@ -262,7 +261,6 @@ class ThesesNormalizer(SourceNormalizer):
         return process_work(
             conn,
             self._queries,
-            self.logger,
             row,
             staging_queries=self._staging,
             batch_queries=self._batch_queries,

@@ -7,7 +7,6 @@ Particularités CrossRef :
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Mapping
 
 from sqlalchemy import Connection
@@ -362,7 +361,6 @@ def process_authorships(
 def process_work(
     conn: Connection,
     queries: SourcePublicationQueries,
-    logger: logging.Logger,
     staging_row: StagingRow,
     *,
     container_repo: ContainerGatewayQueries,
@@ -430,7 +428,6 @@ class CrossrefNormalizer(BibliographicNormalizer):
         return process_work(
             conn,
             self._queries,
-            self.logger,
             row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,

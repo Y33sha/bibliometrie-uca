@@ -604,7 +604,6 @@ class TestProcessWork:
     def _kwargs(self, queries=None, staging_queries=None):
         return {
             "queries": queries or FakeSourcePublicationQueries(),
-            "logger": logging.getLogger("test"),
             "container_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),

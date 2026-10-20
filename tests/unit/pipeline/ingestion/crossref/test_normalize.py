@@ -625,7 +625,6 @@ class TestProcessWork:
         return process_work(
             MagicMock(),
             queries,
-            logger,
             staging_row(staging_id=42, raw=raw),
             container_repo=MagicMock(),
             publisher_repo=MagicMock(),
@@ -666,7 +665,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_crossref,
         "process_work",
-        lambda conn, queries, logger, row, **kw: vus.update(row=row, **kw) or True,
+        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = CrossrefNormalizer(
         conn=MagicMock(),

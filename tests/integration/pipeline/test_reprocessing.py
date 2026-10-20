@@ -45,7 +45,6 @@ def _insert_hal_staging(conn, doc):
 
 def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
-    import logging
 
     from pipeline.ingestion.common.signature_queries import AuthorshipsBatchQueries
     from pipeline.ingestion.common.source_publications import (
@@ -59,7 +58,6 @@ def _run_normalize_hal(conn):
     queries = SourcePublicationQueries()
     staging_queries = StagingQueries()
     authorship_queries = AuthorshipsBatchQueries()
-    logger = logging.getLogger("test")
     container_repo = ContainerGatewayQueries(conn)
     publisher_repo = PublisherGatewayQueries(conn)
 
@@ -82,7 +80,6 @@ def _run_normalize_hal(conn):
         if process_work(
             conn,
             queries,
-            logger,
             staging_row,
             container_repo=container_repo,
             publisher_repo=publisher_repo,
