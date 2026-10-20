@@ -26,13 +26,13 @@ def conn(sa_sync_conn, monkeypatch):
     return sa_sync_conn
 
 
-def _notice(conn, publication_id, source, source_id, names, roles=None, positions=True):
-    """Notice et ses signatures, à partir de couples (patronyme, prénom). Rend les identifiants des signatures."""
-    notice = insert_source_record(conn, publication_id, source=source, source_id=source_id)
+def _source_record(conn, publication_id, source, source_id, names, roles=None, positions=True):
+    """Enregistrement source et ses contributions sources, à partir de couples (patronyme, prénom). Rend les identifiants des contributions sources."""
+    source_record = insert_source_record(conn, publication_id, source=source, source_id=source_id)
     return [
         insert_signature(
             conn,
-            notice,
+            source_record,
             source=source,
             author_position=pos if positions else None,
             contributor_information_id=upsert_split_identity(conn, last, first),
@@ -43,7 +43,7 @@ def _notice(conn, publication_id, source, source_id, names, roles=None, position
 
 
 def _groups(conn, publication_id):
-    """Signatures de chaque groupe de la publication : identifiant de groupe → ensemble de signatures."""
+    """Contributions sources de chaque groupe de la publication : identifiant de groupe → ensemble de contributions sources."""
     rows = conn.execute(
         text("""
             SELECT g.id, gs.source_contribution_id FROM source_contribution_groups g
@@ -53,8 +53,8 @@ def _groups(conn, publication_id):
         {"p": publication_id},
     ).all()
     out: dict[int, set[int]] = {}
-    for gid, sig in rows:
-        out.setdefault(gid, set()).add(sig)
+    for gid, contribution in rows:
+        out.setdefault(gid, set()).add(contribution)
     return out
 
 
@@ -63,57 +63,61 @@ def _run(conn):
 
 
 def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
-    pub = insert_publication(conn)
-    notice = insert_source_record(conn, pub, source="crossref", source_id="c-neutre")
-    signature = insert_signature(
+    publication = insert_publication(conn)
+    source_record = insert_source_record(conn, publication, source="crossref", source_id="c-neutre")
+    source_contribution = insert_signature(
         conn,
-        notice,
+        source_record,
         source="crossref",
         author_name_normalized="jean dupont",
         identifiers={"orcid": "0000-0001-2345-6789", "idref": "123456789"},
         neutralized_identifiers={"orcid": "shared", "idref": "misplaced"},
     )
 
-    [row] = AuthorGroupingQueries().fetch_signatures(conn, [pub])
+    [row] = AuthorGroupingQueries().fetch_source_contributions(conn, [publication])
 
-    assert (row.id, row.orcid, row.idref) == (signature, "", "")
+    assert (row.id, row.orcid, row.idref) == (source_contribution, "", "")
 
 
-def test_les_signatures_d_un_meme_auteur_sont_groupees(conn):
-    pub = insert_publication(conn)
-    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")])
-    oa = _notice(conn, pub, "openalex", "W1", [("martin", "a"), ("durand", "c")])
+def test_les_contributions_sources_d_un_meme_auteur_sont_groupees(conn):
+    publication = insert_publication(conn)
+    hal = _source_record(
+        conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")]
+    )
+    oa = _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("durand", "c")])
 
     metrics = _run(conn)
 
-    groups = sorted(_groups(conn, pub).values(), key=min)
+    groups = sorted(_groups(conn, publication).values(), key=min)
     assert groups == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
     assert metrics.details["summary"] == {"publications": 1, "groups": 3, "reference": 3, "name": 2}
     dirty = conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": pub}
+        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
     )
     assert dirty.scalar_one() is False
 
 
 def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
-    pub = insert_publication(conn)
-    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
-    _notice(conn, pub, "openalex", "W1", [("martin", "a")])
+    publication = insert_publication(conn)
+    hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    martin = next(gid for gid, sigs in _groups(conn, pub).items() if hal[0] in sigs)
+    martin = next(
+        gid for gid, contributions in _groups(conn, publication).items() if hal[0] in contributions
+    )
     person = insert_person(conn, "Martin", first_name="Anne")
     conn.execute(
         text("UPDATE source_contribution_groups SET person_id = :person WHERE id = :g"),
         {"person": person, "g": martin},
     )
-    _notice(conn, pub, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
+    _source_record(conn, publication, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
     conn.execute(
-        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": pub}
+        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
     )
 
     _run(conn)
 
-    groups = _groups(conn, pub)
+    groups = _groups(conn, publication)
     assert hal[0] in groups[martin] and len(groups[martin]) == 3
     kept = conn.execute(
         text("SELECT person_id FROM source_contribution_groups WHERE id = :g"), {"g": martin}
@@ -122,14 +126,14 @@ def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
 
 
 def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
-    pub = insert_publication(conn)
-    _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
-    _notice(conn, pub, "openalex", "W1", [("martin", "a"), ("petit", "b")])
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
     _run(conn)
     tuples = "SELECT source_contribution_id, ctid::text FROM source_contribution_group_members"
     before = dict(conn.execute(text(tuples)).all())
     conn.execute(
-        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": pub}
+        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
     )
 
     _run(conn)
@@ -137,14 +141,14 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     assert dict(conn.execute(text(tuples)).all()) == before
 
 
-def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
-    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la signature."""
+def test_un_enregistrement_source_deplace_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
+    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la contribution source."""
     monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)
     arrival = insert_publication(conn)
     departure = insert_publication(conn)
-    _notice(conn, arrival, "hal", "hal-1", [("martin", "anne")])
-    moved = _notice(conn, departure, "openalex", "W1", [("martin", "a")])
-    _notice(conn, departure, "crossref", "10.1/x", [("martin", "a")])
+    _source_record(conn, arrival, "hal", "hal-1", [("martin", "anne")])
+    moved = _source_record(conn, departure, "openalex", "W1", [("martin", "a")])
+    _source_record(conn, departure, "crossref", "10.1/x", [("martin", "a")])
     _run(conn)
     conn.execute(
         text("UPDATE source_records SET publication_id = :p WHERE source_id = 'W1'"),
@@ -154,21 +158,21 @@ def test_une_notice_deplacee_quitte_les_groupes_de_sa_publication(conn, monkeypa
 
     _run(conn)
 
-    assert any(moved[0] in sigs for sigs in _groups(conn, arrival).values())
-    assert all(moved[0] not in sigs for sigs in _groups(conn, departure).values())
+    assert any(moved[0] in contributions for contributions in _groups(conn, arrival).values())
+    assert all(moved[0] not in contributions for contributions in _groups(conn, departure).values())
 
 
 def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
-    pub = insert_publication(conn)
-    _notice(conn, pub, "hal", "hal-1", [("martin", "anne")])
-    _notice(conn, pub, "openalex", "W1", [("martin", "a")])
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    conn.execute(text("DELETE FROM source_records WHERE publication_id = :p"), {"p": pub})
-    conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": pub})
+    conn.execute(text("DELETE FROM source_records WHERE publication_id = :p"), {"p": publication})
+    conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": publication})
 
     _run(conn)
 
-    assert _groups(conn, pub) == {}
+    assert _groups(conn, publication) == {}
     orphans = conn.execute(
         text("""
             SELECT count(*) FROM source_contribution_group_members gs
@@ -179,12 +183,16 @@ def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
 
 
 def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
-    pub = insert_publication(conn)
-    scanr = _notice(
-        conn, pub, "scanr", "doi10.1/x", [("hollandts", "xavier"), ("hollandts", "xavier")]
+    publication = insert_publication(conn)
+    scanr = _source_record(
+        conn, publication, "scanr", "doi10.1/x", [("hollandts", "xavier"), ("hollandts", "xavier")]
     )
-    crossref = _notice(
-        conn, pub, "crossref", "10.1/x", [("valiorgue", "bertrand"), ("hollandts", "xavier")]
+    crossref = _source_record(
+        conn,
+        publication,
+        "crossref",
+        "10.1/x",
+        [("valiorgue", "bertrand"), ("hollandts", "xavier")],
     )
     assert scanr[0] < crossref[0]
 
@@ -196,25 +204,29 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
             JOIN source_contribution_groups g ON g.id = gs.group_id
             WHERE g.publication_id = :p AND gs.method = 'reference'
         """),
-        {"p": pub},
+        {"p": publication},
     ).scalars()
     assert set(crossref) <= set(references)
 
 
 def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
-    """Deux œuvres réunies à tort : aucune signature d'auteur n'a de correspondant dans l'autre notice. La publication bien alignée reste hors de la file."""
+    """Deux œuvres réunies à tort : aucune contribution source d'auteur n'a de correspondant dans l'autre enregistrement source. La publication bien alignée reste hors de la file."""
     merged = insert_publication(conn)
-    _notice(conn, merged, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
-    _notice(conn, merged, "openalex", "W1", [("durand", "claire"), ("leroy", "denis")])
+    _source_record(conn, merged, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+    _source_record(conn, merged, "openalex", "W1", [("durand", "claire"), ("leroy", "denis")])
     aligned = insert_publication(conn)
-    _notice(conn, aligned, "hal", "hal-2", [("martin", "anne"), ("petit", "bruno")])
-    _notice(conn, aligned, "openalex", "W2", [("martin", "a"), ("petit", "b")])
+    _source_record(conn, aligned, "hal", "hal-2", [("martin", "anne"), ("petit", "bruno")])
+    _source_record(conn, aligned, "openalex", "W2", [("martin", "a"), ("petit", "b")])
 
     _run(conn)
 
     assert suspect_merges_count(conn) == 1
     [suspect] = suspect_merges(conn, page=1, per_page=10).publications
-    assert (suspect.publication_id, suspect.signatures, suspect.matched_source_contributions) == (
+    assert (
+        suspect.publication_id,
+        suspect.signatures,
+        suspect.matched_source_contributions,
+    ) == (
         merged,
         4,
         0,
@@ -225,31 +237,35 @@ def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
     ]
 
 
-def _duplicate_of(conn, signatures):
+def _duplicate_of(conn, source_contributions):
     rows = conn.execute(
         text("SELECT id, duplicate_of FROM source_contributions WHERE id = ANY(:ids)"),
-        {"ids": signatures},
+        {"ids": source_contributions},
     )
     return dict(rows.all())
 
 
 def test_les_copies_d_une_liste_restent_hors_des_groupes(conn):
-    pub = insert_publication(conn)
+    publication = insert_publication(conn)
     names = [("martin", "anne"), ("petit", "bruno"), ("durand", "claire")]
-    hal = _notice(conn, pub, "hal", "hal-1", names + names)
-    oa = _notice(conn, pub, "openalex", "W1", names)
+    hal = _source_record(conn, publication, "hal", "hal-1", names + names)
+    oa = _source_record(conn, publication, "openalex", "W1", names)
 
     _run(conn)
 
     originals = dict.fromkeys(hal[:3])
     copies = dict(zip(hal[3:], hal[:3], strict=True))
     assert _duplicate_of(conn, hal) == originals | copies
-    assert sorted(_groups(conn, pub).values(), key=min) == [{hal[i], oa[i]} for i in range(3)]
+    assert sorted(_groups(conn, publication).values(), key=min) == [
+        {hal[i], oa[i]} for i in range(3)
+    ]
 
 
-def test_une_signature_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
-    pub = insert_publication(conn)
-    hal = _notice(conn, pub, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
+def test_une_contribution_source_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
+    publication = insert_publication(conn)
+    hal = _source_record(
+        conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")]
+    )
     conn.execute(
         text("UPDATE source_contributions SET duplicate_of = :a WHERE id = :b"),
         {"a": hal[0], "b": hal[1]},
@@ -262,64 +278,68 @@ def test_une_signature_qui_n_est_plus_copiee_perd_son_duplicate_of(conn):
 
 def test_les_roles_s_alignent_ensemble(conn):
     """Régression : un conseiller scientifique HAL (`sad`) reste à part de la même personne, auteur chez OpenAlex."""
-    pub = insert_publication(conn)
+    publication = insert_publication(conn)
     names = [("bahier porte", "christelle"), ("schweitzer", "zoe")]
-    hal = _notice(conn, pub, "hal", "ujm-1", names, roles=["contributor"])
-    oa = _notice(conn, pub, "openalex", "W1", [("ferrier", "beatrice"), *names])
+    hal = _source_record(conn, publication, "hal", "ujm-1", names, roles=["contributor"])
+    oa = _source_record(conn, publication, "openalex", "W1", [("ferrier", "beatrice"), *names])
 
     _run(conn)
 
-    groups = _groups(conn, pub).values()
+    groups = _groups(conn, publication).values()
     assert {hal[0], oa[1]} in groups and {hal[1], oa[2]} in groups
 
 
 def test_le_jury_sans_position_s_aligne_par_le_nom(conn):
-    pub = insert_publication(conn)
-    theses = _notice(
+    publication = insert_publication(conn)
+    theses = _source_record(
         conn,
-        pub,
+        publication,
         "theses",
         "2020UCFA0001",
         [("durand", "paul"), ("dupont", "jean")],
         roles=["thesis_director"],
         positions=False,
     )
-    hal = _notice(conn, pub, "hal", "tel-1", [("dupont", "j")], roles=["thesis_director"])
+    hal = _source_record(
+        conn, publication, "hal", "tel-1", [("dupont", "j")], roles=["thesis_director"]
+    )
 
     _run(conn)
 
-    assert {theses[1], hal[0]} in _groups(conn, pub).values()
+    assert {theses[1], hal[0]} in _groups(conn, publication).values()
 
 
 _ORCID = "0000-0002-1825-0097"
 
 
 def _homonyms_with_orcid(conn, status):
-    """Deux homonymes de même initiale dans la notice HAL. La notice OpenAlex a une signature réduite à l'initiale, dont l'ORCID est rattaché avec `status` à une personne du prénom du second."""
-    pub = insert_publication(conn)
-    hal = _notice(conn, pub, "hal", "hal-1", [("xu", "zhihao"), ("xu", "zehua")])
-    notice = insert_source_record(conn, pub, source="openalex", source_id="W1")
+    """Deux homonymes de même initiale dans l'enregistrement source HAL. L'enregistrement source OpenAlex a une contribution source réduite à l'initiale, dont l'ORCID est rattaché avec `status` à une personne du prénom du second."""
+    publication = insert_publication(conn)
+    hal = _source_record(conn, publication, "hal", "hal-1", [("xu", "zhihao"), ("xu", "zehua")])
+    source_record = insert_source_record(conn, publication, source="openalex", source_id="W1")
     identity = upsert_split_identity(conn, "xu", "z", {"orcid": _ORCID})
-    oa = insert_signature(conn, notice, source="openalex", contributor_information_id=identity)
+    oa = insert_signature(
+        conn, source_record, source="openalex", contributor_information_id=identity
+    )
     person = insert_person(conn, "Xu", first_name="Zehua")
     insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status=status)
-    return pub, hal, oa
+    return publication, hal, oa
 
 
 def test_le_prenom_d_un_identifiant_confirme_aligne_les_initiales(conn):
-    pub, hal, oa = _homonyms_with_orcid(conn, "confirmed")
+    publication, hal, oa = _homonyms_with_orcid(conn, "confirmed")
 
     _run(conn)
 
-    assert {hal[1], oa} in _groups(conn, pub).values()
+    assert {hal[1], oa} in _groups(conn, publication).values()
 
 
 def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
-    pub, hal, oa = _homonyms_with_orcid(conn, "pending")
+    publication, hal, oa = _homonyms_with_orcid(conn, "pending")
 
     _run(conn)
 
-    assert {hal[0], oa} in _groups(conn, pub).values()
+    assert {hal[0], oa} in _groups(conn, publication).values()
 
 
 def _dirty(conn, publication_id):
@@ -329,7 +349,7 @@ def _dirty(conn, publication_id):
 
 
 def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):
-    pub, _, _ = _homonyms_with_orcid(conn, "pending")
+    publication, _, _ = _homonyms_with_orcid(conn, "pending")
     _run(conn)
 
     conn.execute(
@@ -337,11 +357,11 @@ def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):
         {"v": _ORCID},
     )
 
-    assert _dirty(conn, pub) is True
+    assert _dirty(conn, publication) is True
 
 
 def test_un_changement_de_prenom_marque_la_publication_a_regrouper(conn):
-    pub, _, _ = _homonyms_with_orcid(conn, "confirmed")
+    publication, _, _ = _homonyms_with_orcid(conn, "confirmed")
     _run(conn)
 
     conn.execute(
@@ -352,4 +372,4 @@ def test_un_changement_de_prenom_marque_la_publication_a_regrouper(conn):
         {"v": _ORCID},
     )
 
-    assert _dirty(conn, pub) is True
+    assert _dirty(conn, publication) is True

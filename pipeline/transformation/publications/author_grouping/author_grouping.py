@@ -1,6 +1,6 @@
-"""Phase `author_grouping` : groupes des signatures d'un même auteur dans chaque publication (`source_contribution_groups`, `source_contribution_group_members`).
+"""Phase `author_grouping` : groupes des contributions sources d'un même auteur dans chaque publication (`source_contribution_groups`, `source_contribution_group_members`).
 
-Les publications marquées `contributions_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'une notice (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres signatures, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de signatures.
+Les publications marquées `contributions_dirty` se recalculent entièrement, par lots ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de contributions sources.
 
 Tâche `author_grouping.build`.
 """
@@ -21,12 +21,12 @@ from sqlalchemy import Connection
 from domain.publications.author_grouping import (
     Group,
     ResidualModel,
-    Signature,
+    SourceContribution,
     align_publication,
     plan_group_ids,
     with_known_first_name,
 )
-from domain.publications.list_copies import copied_signatures
+from domain.publications.list_copies import copied_source_contributions
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
@@ -38,31 +38,31 @@ from pipeline.transformation.publications.author_grouping.queries import (
     BatchPlan,
     GroupRow,
     MembershipRow,
-    SignatureRow,
+    SourceContributionRow,
 )
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
 
-# Plafonds d'un lot de publications : nombre de publications, nombre de signatures d'auteur chargées en mémoire.
+# Plafonds d'un lot de publications : nombre de publications, nombre de contributions sources d'auteur chargées en mémoire.
 BATCH_SIZE = 1000
-BATCH_SIGNATURES = 200_000
+BATCH_SOURCE_CONTRIBUTIONS = 200_000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
-# Source dont la notice passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
+# Source dont l'enregistrement source passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
 DEFERRED_SOURCE = "scanr"
 
 
 def publication_batches(publications: Sequence[tuple[int, int]]) -> list[list[int]]:
-    """Lots de publications, dans l'ordre : un lot se ferme à `BATCH_SIZE` publications ou dès qu'il atteint `BATCH_SIGNATURES` signatures. `publications` : (publication, nombre de signatures)."""
+    """Lots de publications, dans l'ordre : un lot se ferme à `BATCH_SIZE` publications ou dès qu'il atteint `BATCH_SOURCE_CONTRIBUTIONS` contributions sources. `publications` : (publication, nombre de contributions sources)."""
     batches: list[list[int]] = []
     batch: list[int] = []
-    signatures = 0
+    source_contributions = 0
     for publication_id, count in publications:
         batch.append(publication_id)
-        signatures += count
-        if len(batch) >= BATCH_SIZE or signatures >= BATCH_SIGNATURES:
+        source_contributions += count
+        if len(batch) >= BATCH_SIZE or source_contributions >= BATCH_SOURCE_CONTRIBUTIONS:
             batches.append(batch)
-            batch, signatures = [], 0
+            batch, source_contributions = [], 0
     if batch:
         batches.append(batch)
     return batches
@@ -74,32 +74,45 @@ def assign(matrix: Sequence[Sequence[float]]) -> Iterable[tuple[int, int]]:
     return zip(rows.tolist(), cols.tolist(), strict=True)
 
 
-def notices_of(rows: Sequence[SignatureRow]) -> dict[int, list[Signature]]:
-    """Signatures d'une publication par notice, tous rôles réunis. Une signature réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`)."""
-    notices: dict[int, list[Signature]] = {}
+def contributions_by_source_record(
+    rows: Sequence[SourceContributionRow],
+) -> dict[int, list[SourceContribution]]:
+    """Contributions sources d'une publication par enregistrement source, tous rôles réunis. Une contribution source réduite à des initiales prend le prénom de la personne à laquelle un humain a rattaché son identifiant (`with_known_first_name`)."""
+    source_records: dict[int, list[SourceContribution]] = {}
     for row in rows:
         first_name = with_known_first_name(row.first_name, row.known_first_name)
-        notices.setdefault(row.notice, []).append(
-            Signature(
-                row.id, row.notice, row.position, row.last_name, first_name, row.orcid, row.idref
+        source_records.setdefault(row.source_record, []).append(
+            SourceContribution(
+                row.id,
+                row.source_record,
+                row.position,
+                row.last_name,
+                first_name,
+                row.orcid,
+                row.idref,
             )
         )
-    return notices
+    return source_records
 
 
-def deferred_notices(rows: Sequence[SignatureRow]) -> set[int]:
-    """Notices de `DEFERRED_SOURCE` parmi les signatures d'une publication."""
-    return {row.notice for row in rows if row.source == DEFERRED_SOURCE}
+def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
+    """Enregistrements sources de `DEFERRED_SOURCE` parmi les contributions sources d'une publication."""
+    return {row.source_record for row in rows if row.source == DEFERRED_SOURCE}
 
 
-def group_publication(rows: Sequence[SignatureRow]) -> tuple[list[Group], dict[int, int]]:
-    """Groupes des signatures d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les signatures qui ont une position. Les doublons restent hors des groupes."""
-    notices = notices_of(rows)
+def group_publication(rows: Sequence[SourceContributionRow]) -> tuple[list[Group], dict[int, int]]:
+    """Groupes des contributions sources d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources qui ont une position. Les doublons restent hors des groupes."""
+    source_records = contributions_by_source_record(rows)
     copies: dict[int, int] = {}
-    for signatures in notices.values():
-        copies |= copied_signatures(signatures)
-    kept = {n: [s for s in sigs if s.id not in copies] for n, sigs in notices.items()}
-    groups = align_publication(kept, model=_MODEL, assign=assign, deferred=deferred_notices(rows))
+    for source_contributions in source_records.values():
+        copies |= copied_source_contributions(source_contributions)
+    kept = {
+        n: [s for s in contributions if s.id not in copies]
+        for n, contributions in source_records.items()
+    }
+    groups = align_publication(
+        kept, model=_MODEL, assign=assign, deferred=deferred_source_records(rows)
+    )
     return groups, copies
 
 
@@ -112,8 +125,8 @@ def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bo
         return a is None if b is None else a is not None and math.isclose(a, b, rel_tol=1e-6)
 
     return (
-        (stored.group, stored.notice, stored.method)
-        == (planned.group, planned.notice, planned.method)
+        (stored.group, stored.source_record, stored.method)
+        == (planned.group, planned.source_record, planned.method)
         and close(stored.score, planned.score)
         and close(stored.margin, planned.margin)
     )
@@ -122,47 +135,53 @@ def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bo
 def membership_changes(
     stored: Mapping[int, MembershipRow], planned: Sequence[MembershipRow]
 ) -> tuple[list[int], list[MembershipRow]]:
-    """Signatures dont l'appartenance en base disparaît ou change, et appartenances à insérer. Une appartenance inchangée reste en place."""
-    inserted = [m for m in planned if not _same_membership(stored.get(m.signature), m)]
-    kept = {m.signature for m in planned}
-    removed = [s for s in stored if s not in kept] + [m.signature for m in inserted]
+    """Contributions sources dont l'appartenance en base disparaît ou change, et appartenances à insérer. Une appartenance inchangée reste en place."""
+    inserted = [m for m in planned if not _same_membership(stored.get(m.source_contribution), m)]
+    kept = {m.source_contribution for m in planned}
+    removed = [s for s in stored if s not in kept] + [m.source_contribution for m in inserted]
     return removed, inserted
 
 
-# Signature (champs de `SignatureRow` dans l'ordre), appartenance (signature, notice, méthode, score, marge) et groupe (signature de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
-type SignatureTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
+# Contribution source (champs de `SourceContributionRow` dans l'ordre), appartenance (contribution source, enregistrement source, méthode, score, marge) et groupe (contribution source de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
+type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
 type MemberTuple = tuple[int, int, str, float | None, float | None]
 type GroupTuple = tuple[int, list[MemberTuple]]
 type Aligned = tuple[list[GroupTuple], dict[int, int]]
 
-_SIGNATURE_FIELDS = attrgetter(*(f.name for f in fields(SignatureRow)))
+_SOURCE_CONTRIBUTION_FIELDS = attrgetter(*(f.name for f in fields(SourceContributionRow)))
 
 
-def align_rows(rows: Sequence[SignatureTuple]) -> Aligned:
-    """`group_publication` sur les signatures d'une publication en tuples, résultat en tuples."""
-    groups, copies = group_publication([SignatureRow(*row) for row in rows])
+def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
+    """`group_publication` sur les contributions sources d'une publication en tuples, résultat en tuples."""
+    groups, copies = group_publication([SourceContributionRow(*row) for row in rows])
     return [
         (
             g.reference.id,
-            [(m.signature, m.notice, str(m.method), m.score, m.margin) for m in g.members],
+            [
+                (m.source_contribution, m.source_record, str(m.method), m.score, m.margin)
+                for m in g.members
+            ],
         )
         for g in groups
     ], copies
 
 
 type Mapper = Callable[
-    [Callable[[Sequence[SignatureTuple]], Aligned], Sequence[Sequence[SignatureTuple]]],
+    [
+        Callable[[Sequence[SourceContributionTuple]], Aligned],
+        Sequence[Sequence[SourceContributionTuple]],
+    ],
     Iterator[Aligned],
 ]
-"""Applique `align_rows` aux signatures de chaque publication et rend les résultats dans l'ordre : `map`, ou un pool de processus."""
+"""Applique `align_rows` aux contributions sources de chaque publication et rend les résultats dans l'ordre : `map`, ou un pool de processus."""
 
 
 def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
     """`Mapper` qui répartit les publications d'un lot entre les `workers` processus de `pool`, par paquets de taille adaptée au lot."""
 
     def mapper(
-        fn: Callable[[Sequence[SignatureTuple]], Aligned],
-        items: Sequence[Sequence[SignatureTuple]],
+        fn: Callable[[Sequence[SourceContributionTuple]], Aligned],
+        items: Sequence[Sequence[SourceContributionTuple]],
     ) -> Iterator[Aligned]:
         return pool.map(fn, items, chunksize=max(1, len(items) // (4 * workers)))
 
@@ -178,10 +197,12 @@ def _plan_batch(
     mapper: Mapper,
 ) -> BatchPlan:
     """Plan d'écriture d'un lot de publications. `on_publication` est appelé après chaque publication calculée."""
-    rows_by_publication: dict[int, list[SignatureTuple]] = {}
+    rows_by_publication: dict[int, list[SourceContributionTuple]] = {}
     positions: dict[int, int | None] = {}
-    for row in queries.fetch_signatures(conn, publication_ids):
-        rows_by_publication.setdefault(row.publication_id, []).append(_SIGNATURE_FIELDS(row))
+    for row in queries.fetch_source_contributions(conn, publication_ids):
+        rows_by_publication.setdefault(row.publication_id, []).append(
+            _SOURCE_CONTRIBUTION_FIELDS(row)
+        )
         positions[row.id] = row.position
     existing, stored = queries.fetch_groups(conn, publication_ids)
     planned: list[tuple[int, GroupTuple, int | None]] = []
@@ -190,7 +211,10 @@ def _plan_batch(
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
     for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
         copies |= publication_copies
-        old = {gid: frozenset(sigs) for gid, sigs in existing.get(publication_id, {}).items()}
+        old = {
+            gid: frozenset(contributions)
+            for gid, contributions in existing.get(publication_id, {}).items()
+        }
         ids = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
         planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
@@ -202,9 +226,11 @@ def _plan_batch(
         existing_id = gid is not None
         group_id = gid if gid is not None else next(fresh)
         group_rows.append(GroupRow(group_id, publication_id, positions[reference], existing_id))
-        for signature, notice, method, score, margin in members:
+        for source_contribution, source_record, method, score, margin in members:
             methods[method] += 1
-            memberships.append(MembershipRow(signature, group_id, notice, method, score, margin))
+            memberships.append(
+                MembershipRow(source_contribution, group_id, source_record, method, score, margin)
+            )
     removed, inserted = membership_changes(stored, memberships)
     return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, copies)
 
