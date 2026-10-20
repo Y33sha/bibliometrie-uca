@@ -1,6 +1,6 @@
-"""Groupes de signatures : les signatures d'un même auteur dans une publication, avec au maximum une signature par notice.
+"""Groupes de contributions sources : les contributions sources d'un même auteur dans une publication, avec au maximum une contribution source par enregistrement source.
 
-Les notices d'une publication se traitent de la plus longue liste d'auteurs à la plus courte, chacune face aux groupes déjà formés. Ce module réunit les décisions pures : ordre des liens, trous, poids du modèle du résidu, réconciliation des identifiants de groupes.
+Les enregistrements sources d'une publication se traitent de la plus longue liste d'auteurs à la plus courte, chacune face aux groupes déjà formés. Ce module réunit les décisions pures : ordre des liens, trous, poids du modèle du résidu, réconciliation des identifiants de groupes.
 """
 
 import math
@@ -13,16 +13,16 @@ from functools import lru_cache
 
 
 class GroupingMethod(StrEnum):
-    """Origine de l'appartenance d'une signature à son groupe. Mappe l'enum PostgreSQL `grouping_method`."""
+    """Origine de l'appartenance d'une contribution source à son groupe. Mappe l'enum PostgreSQL `grouping_method`."""
 
     REFERENCE = "reference"
-    """La signature fonde le groupe."""
+    """La contribution source fonde le groupe."""
     NAME = "name"
     """Patronyme, prénom ou initiale, uniques de part et d'autre."""
     IDENTIFIER = "identifier"
     """ORCID ou IdRef partagé, à patronyme égal."""
     ORDER = "order"
-    """Rang parmi les signatures de même patronyme et de même initiale."""
+    """Rang parmi les contributions sources de même patronyme et de même initiale."""
     MODEL = "model"
     """Modèle probabiliste, avec un score et une marge."""
 
@@ -33,9 +33,9 @@ def full_first_name(first_name: str) -> str:
 
 
 def with_known_first_name(first_name: str, known: str) -> str:
-    """Prénom d'une signature pour l'alignement : `known` quand le prénom de la signature est absent ou fait d'initiales que `known` prolonge (« z » et « zhihao »), sinon le prénom de la signature.
+    """Prénom d'une contribution source pour l'alignement : `known` quand son prénom est absent ou fait d'initiales que `known` prolonge (« z » et « zhihao »), sinon son prénom.
 
-    `known` : prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la signature.
+    `known` : prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la contribution source.
     """
     if (
         full_first_name(known)
@@ -47,7 +47,7 @@ def with_known_first_name(first_name: str, known: str) -> str:
 
 
 def longest_ordered(links: Iterable[tuple[int, int, int]]) -> set[int]:
-    """Identifiants de la plus longue suite de liens (position dans la notice, rang du groupe, identifiant) dont les rangs croissent avec les positions."""
+    """Identifiants de la plus longue suite de liens (position dans l'enregistrement source, rang du groupe, identifiant) dont les rangs croissent avec les positions."""
     items = sorted(links)
     tails: list[int] = []
     tail_index: list[int] = []
@@ -113,7 +113,7 @@ def jaro_winkler(a: str, b: str) -> float:
 
 @dataclass(frozen=True)
 class Author:
-    """Ce qu'une signature ou un membre de groupe expose au modèle du résidu : noms normalisés, identifiants, trou."""
+    """Ce qu'une contribution source ou un membre de groupe expose au modèle du résidu : noms normalisés, identifiants, trou."""
 
     last_name: str
     first_name: str
@@ -253,14 +253,18 @@ def plan_group_ids(
 ) -> list[int | None]:
     """Identifiant repris par chaque nouveau groupe, ou `None`.
 
-    Chaque nouveau groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de signatures, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `old` : signatures de chaque ancien groupe ; `new` : signatures de chaque nouveau groupe.
+    Chaque nouveau groupe reprend l'identifiant de l'ancien groupe avec lequel il partage le plus de contributions sources, chaque ancien identifiant une seule fois, le plus petit en cas d'égalité. `old` : contributions sources de chaque ancien groupe ; `new` : contributions sources de chaque nouveau groupe.
     """
-    owner = {sig: old_id for old_id, sigs in old.items() for sig in sigs}
+    owner = {
+        contribution: old_id
+        for old_id, contributions in old.items()
+        for contribution in contributions
+    }
     overlaps: list[tuple[int, int, int]] = []
-    for index, sigs in enumerate(new):
+    for index, contributions in enumerate(new):
         counts: dict[int, int] = {}
-        for sig in sigs:
-            if (old_id := owner.get(sig)) is not None:
+        for contribution in contributions:
+            if (old_id := owner.get(contribution)) is not None:
                 counts[old_id] = counts.get(old_id, 0) + 1
         overlaps.extend((-count, old_id, index) for old_id, count in counts.items())
     plan: list[int | None] = [None] * len(new)
@@ -273,11 +277,11 @@ def plan_group_ids(
 
 
 @dataclass(frozen=True)
-class Signature:
-    """Signature à grouper : notice, position dans la liste, noms normalisés, identifiants. Une signature hors de la liste ordonnée (jury de thèse chez theses.fr) n'a pas de position."""
+class SourceContribution:
+    """Contribution source à grouper : enregistrement source, position dans la liste, noms normalisés, identifiants. Une contribution source hors de la liste ordonnée (jury de thèse chez theses.fr) est sans position."""
 
     id: int
-    notice: int
+    source_record: int
     position: int | None
     last_name: str
     first_name: str
@@ -287,10 +291,10 @@ class Signature:
 
 @dataclass(frozen=True)
 class Member:
-    """Appartenance d'une signature à un groupe ; `score` et `margin` en bits pour `GroupingMethod.MODEL`."""
+    """Appartenance d'une contribution source à un groupe ; `score` et `margin` en bits pour `GroupingMethod.MODEL`."""
 
-    signature: int
-    notice: int
+    source_contribution: int
+    source_record: int
     method: GroupingMethod
     score: float | None = None
     margin: float | None = None
@@ -298,10 +302,10 @@ class Member:
 
 @dataclass
 class Group:
-    """Groupe formé : sa signature de référence et ses membres."""
+    """Groupe formé : sa contribution source de référence et ses membres."""
 
     index: int
-    reference: Signature
+    reference: SourceContribution
     members: list[Member]
 
 
@@ -309,50 +313,50 @@ type Assign = Callable[[Sequence[Sequence[float]]], Iterable[tuple[int, int]]]
 """Affectation de gain maximal sur une matrice de gains : paires (ligne, colonne)."""
 
 type ResidualSink = Callable[[int, Sequence[Author], Sequence[Author]], None]
-"""Reçoit le résidu de la règle pour une notice : son identifiant, ses signatures sans lien, puis les signatures de référence des groupes sans lien, chacune avec son trou."""
+"""Reçoit le résidu de la règle pour un enregistrement source : son identifiant, ses contributions sources sans lien, puis les contributions sources de référence des groupes sans lien, chacune avec son trou."""
 
 
-def _list_order(s: Signature) -> tuple[bool, int, int]:
-    """Clé de tri dans la liste : les signatures sans position à la fin."""
+def _list_order(s: SourceContribution) -> tuple[bool, int, int]:
+    """Clé de tri dans la liste : les contributions sources sans position à la fin."""
     return (s.position is None, s.position or 0, s.id)
 
 
-def _name_key(s: Signature) -> str:
+def _name_key(s: SourceContribution) -> str:
     return s.last_name
 
 
-def _full_name_key(s: Signature) -> tuple[str, str] | None:
+def _full_name_key(s: SourceContribution) -> tuple[str, str] | None:
     full = full_first_name(s.first_name)
     return (s.last_name, full) if s.last_name and full else None
 
 
-def _initial_key(s: Signature) -> tuple[str, str] | None:
+def _initial_key(s: SourceContribution) -> tuple[str, str] | None:
     return (s.last_name, s.first_name[:1]) if s.last_name and s.first_name else None
 
 
-class _NoticeLinks:
-    """Liens de la règle entre une notice et les groupes déjà formés.
+class _SourceRecordLinks:
+    """Liens de la règle entre un enregistrement source et les groupes déjà formés.
 
-    Seules les signatures et les groupes qui ont une position entrent dans le filtre d'ordre, les trous et le résidu. Les autres se lient par le nom et l'identifiant.
+    Seuls les contributions sources et les groupes qui ont une position entrent dans le filtre d'ordre, les trous et le résidu. Les autres se lient par le nom et l'identifiant.
     """
 
     def __init__(
         self,
-        sigs: Sequence[Signature],
+        contributions: Sequence[SourceContribution],
         groups: Sequence[Group],
-        signatures: Mapping[int, Signature] | None = None,
+        source_contributions: Mapping[int, SourceContribution] | None = None,
     ) -> None:
-        self.sigs = sigs
+        self.contributions = contributions
         self.groups = groups
-        # Signatures des membres des groupes, pour comparer les identifiants à tout le groupe.
-        self.signatures = signatures or {}
+        # Contributions sources des membres des groupes, pour comparer les identifiants à tout le groupe.
+        self.source_contributions = source_contributions or {}
         self.rank = {g.index: r for r, g in enumerate(groups)}
         self.ranked = {g.index for g in groups if g.reference.position is not None}
         self.links: dict[int, int] = {}
         self.methods: dict[int, GroupingMethod] = {}
         self.forbidden: set[tuple[int, int]] = set()
 
-    def link(self, s: Signature, g: Group, method: GroupingMethod) -> None:
+    def link(self, s: SourceContribution, g: Group, method: GroupingMethod) -> None:
         if (s.id, g.index) not in self.forbidden:
             self.links[s.id] = g.index
             self.methods[s.id] = method
@@ -360,27 +364,31 @@ class _NoticeLinks:
     def linked_groups(self) -> set[int]:
         return set(self.links.values())
 
-    def unique_pairs(self, key: Callable[[Signature], object], method: GroupingMethod) -> None:
-        """Lie une signature et un groupe quand leur clé est unique des deux côtés, parmi les signatures et groupes sans lien."""
+    def unique_pairs(
+        self, key: Callable[[SourceContribution], object], method: GroupingMethod
+    ) -> None:
+        """Lie une contribution source et un groupe quand leur clé est unique des deux côtés, parmi les contributions sources et groupes sans lien."""
         taken = self.linked_groups()
-        by_sig: dict[object, list[Signature]] = {}
+        by_contribution: dict[object, list[SourceContribution]] = {}
         by_group: dict[object, list[Group]] = {}
-        for s in self.sigs:
+        for s in self.contributions:
             if s.id not in self.links and (k := key(s)):
-                by_sig.setdefault(k, []).append(s)
+                by_contribution.setdefault(k, []).append(s)
         for g in self.groups:
             if g.index not in taken and (k := key(g.reference)):
                 by_group.setdefault(k, []).append(g)
-        for k, ss in by_sig.items():
+        for k, ss in by_contribution.items():
             gs = by_group.get(k, [])
             if len(ss) == 1 and len(gs) == 1:
                 self.link(ss[0], gs[0], method)
 
-    def _members(self, g: Group) -> list[Signature]:
-        return [self.signatures.get(m.signature, g.reference) for m in g.members]
+    def _members(self, g: Group) -> list[SourceContribution]:
+        return [
+            self.source_contributions.get(m.source_contribution, g.reference) for m in g.members
+        ]
 
     def shared_identifier(self) -> None:
-        """Lie une signature au groupe dont un membre partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs groupes ne lie rien."""
+        """Lie une contribution source au groupe dont un membre partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs groupes ne lie rien."""
         by_identifier: dict[tuple[str, str, str], set[int]] = defaultdict(set)
         for g in self.groups:
             for m in self._members(g):
@@ -389,7 +397,7 @@ class _NoticeLinks:
                 if m.last_name and m.idref:
                     by_identifier[("idref", m.last_name, m.idref)].add(g.index)
         by_index = {g.index: g for g in self.groups}
-        for s in self.sigs:
+        for s in self.contributions:
             if s.id in self.links or not s.last_name:
                 continue
             candidates = (
@@ -409,33 +417,33 @@ class _NoticeLinks:
         self.unique_pairs(_initial_key, GroupingMethod.NAME)
         self.shared_identifier()
 
-    def _in_order(self, s: Signature) -> bool:
+    def _in_order(self, s: SourceContribution) -> bool:
         """Le lien de `s` entre dans le filtre d'ordre : le groupe a une position, et le lien ne vient pas d'un identifiant."""
         return self.links[s.id] in self.ranked and self.methods[s.id] != GroupingMethod.IDENTIFIER
 
     def order_filter(self) -> None:
-        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant, ou d'une signature ou d'un groupe sans position, reste."""
+        """Garde la plus longue suite de liens rangés dans le même ordre des deux côtés ; écarte et interdit les autres. Un lien par identifiant, ou d'une contribution source ou d'un groupe sans position, reste."""
         ordered = [
             (s.position, self.rank[self.links[s.id]], s.id)
-            for s in self.sigs
+            for s in self.contributions
             if s.id in self.links and s.position is not None and self._in_order(s)
         ]
         kept = longest_ordered(ordered)
-        for _, _, signature_id in ordered:
-            if signature_id not in kept:
-                self.forbidden.add((signature_id, self.links.pop(signature_id)))
-                del self.methods[signature_id]
+        for _, _, source_contribution_id in ordered:
+            if source_contribution_id not in kept:
+                self.forbidden.add((source_contribution_id, self.links.pop(source_contribution_id)))
+                del self.methods[source_contribution_id]
 
     def gaps(self) -> tuple[dict[int, int], dict[int, int]]:
-        """Trou de chaque signature et de chaque groupe restés sans lien, parmi ceux qui ont une position."""
+        """Trou de chaque contribution source et de chaque groupe restés sans lien, parmi ceux qui ont une position."""
         taken = self.linked_groups()
         anchor_positions = sorted(
-            s.position for s in self.sigs if s.id in self.links and s.position is not None
+            s.position for s in self.contributions if s.id in self.links and s.position is not None
         )
         anchor_ranks = sorted(self.rank[g] for g in taken if g in self.ranked)
-        sig_gaps = {
+        contribution_gaps = {
             s.id: gap(anchor_positions, s.position)
-            for s in self.sigs
+            for s in self.contributions
             if s.id not in self.links and s.position is not None
         }
         group_gaps = {
@@ -443,59 +451,67 @@ class _NoticeLinks:
             for g in self.groups
             if g.index not in taken and g.index in self.ranked
         }
-        return sig_gaps, group_gaps
+        return contribution_gaps, group_gaps
 
     def order_in_gaps(self) -> None:
         """Dans chaque trou, patronyme et initiale en nombre égal des deux côtés : lien dans l'ordre des positions."""
-        sig_gaps, group_gaps = self.gaps()
-        by_sig: dict[tuple[str, str, int], list[Signature]] = {}
+        contribution_gaps, group_gaps = self.gaps()
+        by_contribution: dict[tuple[str, str, int], list[SourceContribution]] = {}
         by_group: dict[tuple[str, str, int], list[Group]] = {}
-        for s in self.sigs:
-            if s.id in sig_gaps and s.last_name:
-                by_sig.setdefault((s.last_name, s.first_name[:1], sig_gaps[s.id]), []).append(s)
+        for s in self.contributions:
+            if s.id in contribution_gaps and s.last_name:
+                by_contribution.setdefault(
+                    (s.last_name, s.first_name[:1], contribution_gaps[s.id]), []
+                ).append(s)
         for g in self.groups:
             if g.index in group_gaps and g.reference.last_name:
                 ref = g.reference
                 key = (ref.last_name, ref.first_name[:1], group_gaps[g.index])
                 by_group.setdefault(key, []).append(g)
-        for k, ss in by_sig.items():
+        for k, ss in by_contribution.items():
             gs = by_group.get(k, [])
             if len(ss) > 1 and len(ss) == len(gs):
                 for s, g in zip(ss, gs, strict=True):
                     self.link(s, g, GroupingMethod.ORDER)
 
 
-def _author(s: Signature, gap_index: int) -> Author:
+def _author(s: SourceContribution, gap_index: int) -> Author:
     return Author(s.last_name, s.first_name, s.orcid, s.idref, gap_index)
 
 
-def _swapped(s: Signature) -> Signature:
+def _swapped(s: SourceContribution) -> SourceContribution:
     return replace(s, last_name=s.first_name, first_name=s.last_name)
 
 
-def _inverted(sigs: Sequence[Signature], groups: Sequence[Group]) -> bool:
-    """La notice donne le prénom à la place du patronyme : plus de ses prénoms que de ses patronymes sont des patronymes de groupes."""
+def _inverted(contributions: Sequence[SourceContribution], groups: Sequence[Group]) -> bool:
+    """L'enregistrement source donne le prénom à la place du patronyme : plus de ses prénoms que de ses patronymes sont des patronymes de groupes."""
     last_names = {g.reference.last_name for g in groups if g.reference.last_name}
-    direct = sum(s.last_name in last_names for s in sigs)
-    swapped = sum(bool(s.first_name) and s.first_name in last_names for s in sigs)
+    direct = sum(s.last_name in last_names for s in contributions)
+    swapped = sum(bool(s.first_name) and s.first_name in last_names for s in contributions)
     return swapped > direct
 
 
 def _residual_links(
-    notice: _NoticeLinks, signatures: Mapping[int, Signature], model: ResidualModel, assign: Assign
+    record_links: _SourceRecordLinks,
+    source_contributions: Mapping[int, SourceContribution],
+    model: ResidualModel,
+    assign: Assign,
 ) -> dict[int, tuple[int, float, float]]:
-    """Liens du résidu : signature → (indice de groupe, score, marge).
+    """Liens du résidu : contribution source → (indice de groupe, score, marge).
 
     Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe que la position seule ne rapproche pas (`position_only`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
     """
-    sig_gaps, group_gaps = notice.gaps()
-    rest_sigs = [s for s in notice.sigs if s.id in sig_gaps]
-    rest_groups = [g for g in notice.groups if g.index in group_gaps]
-    if not rest_sigs or not rest_groups:
+    contribution_gaps, group_gaps = record_links.gaps()
+    rest_contributions = [s for s in record_links.contributions if s.id in contribution_gaps]
+    rest_groups = [g for g in record_links.groups if g.index in group_gaps]
+    if not rest_contributions or not rest_groups:
         return {}
     threshold = link_threshold(len(rest_groups))
     members = {
-        g.index: [_author(signatures[m.signature], group_gaps[g.index]) for m in g.members]
+        g.index: [
+            _author(source_contributions[m.source_contribution], group_gaps[g.index])
+            for m in g.members
+        ]
         for g in rest_groups
     }
     # Index de blocage : groupes par trou, par deux premières lettres d'un patronyme de membre, par identifiant de membre.
@@ -512,8 +528,8 @@ def _residual_links(
             if y.idref:
                 by_idref[y.idref].add(index)
     gains: dict[tuple[int, int], float] = {}
-    for s in rest_sigs:
-        x = _author(s, sig_gaps[s.id])
+    for s in rest_contributions:
+        x = _author(s, contribution_gaps[s.id])
         candidates = (
             by_gap.get(x.gap - 1, set())
             | by_gap.get(x.gap, set())
@@ -559,40 +575,46 @@ def _residual_links(
 
 
 def align_publication(
-    notices: Mapping[int, Sequence[Signature]],
+    source_records: Mapping[int, Sequence[SourceContribution]],
     *,
     model: ResidualModel | None = None,
     assign: Assign | None = None,
     on_residual: ResidualSink | None = None,
     deferred: Collection[int] = (),
 ) -> list[Group]:
-    """Groupes de signatures d'une publication.
+    """Groupes de contributions sources d'une publication.
 
-    Les notices se traitent de la plus longue à la plus courte, chacune face aux groupes déjà formés. À longueur égale, les notices `deferred` passent après les autres, puis l'ordre suit l'identifiant de notice. Une notice qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
+    Les enregistrements sources se traitent du plus long au plus court, chacun face aux groupes déjà formés. À longueur égale, les enregistrements sources `deferred` passent après les autres, puis l'ordre suit leur identifiant. Un enregistrement source qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
-    signatures = {s.id: s for sigs in notices.values() for s in sigs}
+    source_contributions = {
+        s.id: s for contributions in source_records.values() for s in contributions
+    }
     groups: list[Group] = []
-    order = sorted(notices, key=lambda n: (-len(notices[n]), n in deferred, n))
-    for i, notice_id in enumerate(order):
-        sigs = sorted(notices[notice_id], key=_list_order)
-        if i and _inverted(sigs, groups):
-            sigs = [_swapped(s) for s in sigs]
-            signatures.update((s.id, s) for s in sigs)
+    order = sorted(source_records, key=lambda n: (-len(source_records[n]), n in deferred, n))
+    for i, source_record_id in enumerate(order):
+        contributions = sorted(source_records[source_record_id], key=_list_order)
+        if i and _inverted(contributions, groups):
+            contributions = [_swapped(s) for s in contributions]
+            source_contributions.update((s.id, s) for s in contributions)
         links: dict[int, int] = {}
         methods: dict[int, GroupingMethod] = {}
         scores: dict[int, tuple[float, float]] = {}
         if i:
-            notice = _NoticeLinks(sigs, groups, signatures)
-            notice.name_steps()
-            notice.order_filter()
-            notice.name_steps()
-            notice.order_filter()
-            notice.order_in_gaps()
+            record_links = _SourceRecordLinks(contributions, groups, source_contributions)
+            record_links.name_steps()
+            record_links.order_filter()
+            record_links.name_steps()
+            record_links.order_filter()
+            record_links.order_in_gaps()
             if on_residual is not None:
-                sig_gaps, group_gaps = notice.gaps()
+                contribution_gaps, group_gaps = record_links.gaps()
                 on_residual(
-                    notice_id,
-                    [_author(s, sig_gaps[s.id]) for s in sigs if s.id in sig_gaps],
+                    source_record_id,
+                    [
+                        _author(s, contribution_gaps[s.id])
+                        for s in contributions
+                        if s.id in contribution_gaps
+                    ],
                     [
                         _author(g.reference, group_gaps[g.index])
                         for g in groups
@@ -600,20 +622,20 @@ def align_publication(
                     ],
                 )
             if model is not None and assign is not None:
-                residual = _residual_links(notice, signatures, model, assign)
-                for sig, (g, link_score, link_margin) in residual.items():
-                    notice.links[sig] = g
-                    notice.methods[sig] = GroupingMethod.MODEL
-                    scores[sig] = (link_score, link_margin)
-            links, methods = notice.links, notice.methods
+                residual = _residual_links(record_links, source_contributions, model, assign)
+                for contribution, (g, link_score, link_margin) in residual.items():
+                    record_links.links[contribution] = g
+                    record_links.methods[contribution] = GroupingMethod.MODEL
+                    scores[contribution] = (link_score, link_margin)
+            links, methods = record_links.links, record_links.methods
         by_index = {g.index: g for g in groups}
-        for s in sigs:
+        for s in contributions:
             if s.id in links:
                 score, margin = scores.get(s.id, (None, None))
-                member = Member(s.id, notice_id, methods[s.id], score, margin)
+                member = Member(s.id, source_record_id, methods[s.id], score, margin)
                 by_index[links[s.id]].members.append(member)
             else:
-                member = Member(s.id, notice_id, GroupingMethod.REFERENCE)
+                member = Member(s.id, source_record_id, GroupingMethod.REFERENCE)
                 groups.append(Group(len(groups), s, [member]))
         groups.sort(key=lambda g: (*_list_order(g.reference)[:2], g.index))
     return groups

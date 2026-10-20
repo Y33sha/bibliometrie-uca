@@ -9,7 +9,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
 from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
 
-# Notice dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
+# Enregistrement source dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
 _CONVERGED = [
     DoiClusterCase.DATACITE_PACKAGE_PIECE,
     DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
@@ -21,7 +21,7 @@ _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTI
 
 
 def _known_first_name(id_type: str) -> str:
-    """Prénom normalisé de la personne à laquelle un humain a rattaché l'identifiant `id_type` de la signature `sa`, s'il n'est pas neutralisé."""
+    """Prénom normalisé de la personne à laquelle un humain a rattaché l'identifiant `id_type` de la contribution source `sa`, s'il n'est pas neutralisé."""
     return f"""(
         SELECT p.first_name_normalized FROM person_identifiers pi JOIN persons p ON p.id = pi.person_id
         WHERE pi.id_type = '{id_type}' AND pi.id_value = {usable_identifier(f"'{id_type}'")}
@@ -29,21 +29,21 @@ def _known_first_name(id_type: str) -> str:
     )"""
 
 
-# Signatures à grouper, hors collectifs, hors notices convergées ou recopiées d'un dépôt HAL présent.
-_SIGNATURES_SQL = text(f"""
-    WITH notices AS (
+# Contributions sources à grouper, hors collectifs, hors enregistrements sources convergés ou recopiés d'un dépôt HAL présent.
+_SOURCE_CONTRIBUTIONS_SQL = text(f"""
+    WITH records AS (
         SELECT sp.id, sp.publication_id, sp.source::text AS source, sp.source_id,
                ({corrected_by("doi")}) = ANY(:converged) IS TRUE AS converged
         FROM source_records sp
         WHERE sp.publication_id = ANY(:publications)
     ), kept AS (
-        SELECT n.* FROM notices n
+        SELECT n.* FROM records n
         WHERE NOT (n.converged AND EXISTS (
-                SELECT 1 FROM notices o WHERE o.publication_id = n.publication_id AND NOT o.converged))
+                SELECT 1 FROM records o WHERE o.publication_id = n.publication_id AND NOT o.converged))
           AND NOT (n.source = 'scanr' AND n.source_id LIKE 'hal%' AND EXISTS (
-                SELECT 1 FROM notices h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
+                SELECT 1 FROM records h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
     )
-    SELECT k.publication_id, k.id AS notice, k.source, sa.id, sa.author_position AS position,
+    SELECT k.publication_id, k.id AS source_record, k.source, sa.id, sa.author_position AS position,
            aik.last_name_normalized AS last_name,
            coalesce(aik.first_name_normalized, '') AS first_name,
            coalesce({usable_identifier("'orcid'")}, '') AS orcid,
@@ -64,7 +64,7 @@ _GROUPS_SQL = text("""
 """)
 
 _DELETE_MEMBERSHIPS_SQL = text(
-    "DELETE FROM source_contribution_group_members WHERE source_contribution_id = ANY(:signatures)"
+    "DELETE FROM source_contribution_group_members WHERE source_contribution_id = ANY(:source_contributions)"
 )
 
 _DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
@@ -103,17 +103,17 @@ _INSERT_MEMBERSHIPS_SQL = text("""
     INSERT INTO source_contribution_group_members
         (source_contribution_id, group_id, source_record_id, method, score, margin)
     SELECT * FROM unnest(
-        CAST(:signatures AS integer[]), CAST(:groups AS integer[]), CAST(:notices AS integer[]),
+        CAST(:source_contributions AS integer[]), CAST(:groups AS integer[]), CAST(:source_records AS integer[]),
         CAST(:methods AS grouping_method[]), CAST(:scores AS real[]), CAST(:margins AS real[]))
 """)
 
 
 @dataclass(frozen=True, slots=True)
-class SignatureRow:
-    """Signature à grouper, telle que la base la rend."""
+class SourceContributionRow:
+    """Contribution source à grouper, telle que la base la rend."""
 
     publication_id: int
-    notice: int
+    source_record: int
     source: str
     id: int
     position: int | None
@@ -136,11 +136,11 @@ class GroupRow:
 
 @dataclass(frozen=True, slots=True)
 class MembershipRow:
-    """Appartenance d'une signature à un groupe."""
+    """Appartenance d'une contribution source à un groupe."""
 
-    signature: int
+    source_contribution: int
     group: int
-    notice: int
+    source_record: int
     method: str
     score: float | None
     margin: float | None
@@ -153,7 +153,7 @@ class BatchPlan:
     publication_ids: Sequence[int]
     groups: list[GroupRow]
     removed: list[int]
-    """Signatures dont l'appartenance en base est supprimée."""
+    """Contributions sources dont l'appartenance en base est supprimée."""
     memberships: list[MembershipRow]
     """Appartenances à insérer."""
     unmatched: list[int]
@@ -163,17 +163,17 @@ class BatchPlan:
 
 
 class AuthorGroupingQueries:
-    """Lectures et écritures des groupes de signatures."""
+    """Lectures et écritures des groupes de contributions sources."""
 
     def refresh_alignment(self, conn: Connection) -> None:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment"))
 
     def fetch_dirty_publications(self, conn: Connection) -> list[tuple[int, int]]:
-        """Publications marquées `contributions_dirty`, avec le nombre de signatures d'auteur de leurs notices (`author_count`)."""
+        """Publications marquées `contributions_dirty`, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         rows = conn.execute(
             text("""
-                SELECT p.id, coalesce(sum(sp.author_count), 0)::integer AS signatures
+                SELECT p.id, coalesce(sum(sp.author_count), 0)::integer AS source_contributions
                 FROM publications p
                 LEFT JOIN source_records sp ON sp.publication_id = p.id
                 WHERE p.contributions_dirty
@@ -181,22 +181,22 @@ class AuthorGroupingQueries:
                 ORDER BY p.id
             """)
         ).all()
-        return [(r.id, r.signatures) for r in rows]
+        return [(r.id, r.source_contributions) for r in rows]
 
-    def fetch_signatures(
+    def fetch_source_contributions(
         self, conn: Connection, publication_ids: Sequence[int]
-    ) -> list[SignatureRow]:
-        """Signatures à grouper de ces publications."""
+    ) -> list[SourceContributionRow]:
+        """Contributions sources à grouper de ces publications."""
         rows = conn.execute(
-            _SIGNATURES_SQL,
+            _SOURCE_CONTRIBUTIONS_SQL,
             {"publications": list(publication_ids), "converged": [str(c) for c in _CONVERGED]},
         ).mappings()
-        return [SignatureRow(**row) for row in rows]
+        return [SourceContributionRow(**row) for row in rows]
 
     def fetch_groups(
         self, conn: Connection, publication_ids: Sequence[int]
     ) -> tuple[dict[int, dict[int, set[int]]], dict[int, MembershipRow]]:
-        """Groupes en base de ces publications : publication → groupe → signatures, et appartenance de chaque signature groupée."""
+        """Groupes en base de ces publications : publication → groupe → contributions sources, et appartenance de chaque contribution source groupée."""
         groups: dict[int, dict[int, set[int]]] = {}
         memberships: dict[int, MembershipRow] = {}
         for row in conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
@@ -222,7 +222,7 @@ class AuthorGroupingQueries:
     def write(self, conn: Connection, plan: BatchPlan) -> None:
         """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `contributions_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres signatures des publications du lot perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
@@ -234,7 +234,7 @@ class AuthorGroupingQueries:
                 _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
             )
         if removed:
-            conn.execute(_DELETE_MEMBERSHIPS_SQL, {"signatures": list(removed)})
+            conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
         if unmatched_ids:
             conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
         kept = [g for g in groups if g.existing]
@@ -257,9 +257,9 @@ class AuthorGroupingQueries:
             conn.execute(
                 _INSERT_MEMBERSHIPS_SQL,
                 {
-                    "signatures": [m.signature for m in memberships],
+                    "source_contributions": [m.source_contribution for m in memberships],
                     "groups": [m.group for m in memberships],
-                    "notices": [m.notice for m in memberships],
+                    "source_records": [m.source_record for m in memberships],
                     "methods": [m.method for m in memberships],
                     "scores": [m.score for m in memberships],
                     "margins": [m.margin for m in memberships],

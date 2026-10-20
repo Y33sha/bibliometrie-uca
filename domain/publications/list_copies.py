@@ -1,10 +1,10 @@
-"""Doublons d'auteur dans la liste d'une notice : la source répète tout ou partie de la liste à sa suite (A B C A B C), ou chaque nom à sa place (A A B B…)."""
+"""Doublons d'auteur dans la liste d'un enregistrement source : la source répète tout ou partie de la liste à sa suite (A B C A B C), ou chaque nom à sa place (A A B B…)."""
 
 from collections import defaultdict
 from collections.abc import Sequence
 from itertools import pairwise
 
-from domain.publications.author_grouping import Signature
+from domain.publications.author_grouping import SourceContribution
 
 # Nombre de noms complets répétés au même décalage qui signale la répétition d'un bloc de la liste.
 MIN_COPIED_NAMES = 2
@@ -12,14 +12,16 @@ MIN_COPIED_NAMES = 2
 MIN_DOUBLED_PAIRS = 4
 
 type Name = tuple[str, str]
-# Rang d'une signature dans la liste des auteurs, et la signature.
-type Placed = tuple[int, Signature]
+# Rang d'une contribution source dans la liste des auteurs, et la contribution source.
+type Placed = tuple[int, SourceContribution]
 
 
-def copied_signatures(signatures: Sequence[Signature]) -> dict[int, int]:
-    """Doublons d'auteur d'une notice, chacun vers la première occurrence de son nom complet. Seules les signatures qui ont une position et un nom de famille comptent."""
+def copied_source_contributions(
+    source_contributions: Sequence[SourceContribution],
+) -> dict[int, int]:
+    """Doublons d'auteur d'un enregistrement source, chacun vers la première occurrence de son nom complet. Seules les contributions sources qui ont une position et un nom de famille comptent."""
     ordered = sorted(
-        ((s.position, s) for s in signatures if s.last_name and s.position is not None),
+        ((s.position, s) for s in source_contributions if s.last_name and s.position is not None),
         key=lambda p: (p[0], p[1].id),
     )
     by_name: dict[Name, list[Placed]] = defaultdict(list)
