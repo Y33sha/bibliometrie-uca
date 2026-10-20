@@ -154,27 +154,6 @@ class PublicationStore:
             },
         )
 
-    # ── Écritures simples ──────────────────────────────────────────
-
-    def update_sources(self, pub_id: int) -> None:
-        """Recalcule `publications.sources` par agrégation des `source_publications` rattachées."""
-        self._conn.execute(
-            text("""
-                UPDATE publications SET sources = COALESCE(sub.srcs, '{}'),
-                                        updated_at = now()
-                FROM (
-                    SELECT array_agg(
-                        DISTINCT CAST(source AS source_type)
-                        ORDER BY CAST(source AS source_type)
-                    ) AS srcs
-                    FROM source_publications
-                    WHERE publication_id = :id
-                ) sub
-                WHERE id = :id
-            """),
-            {"id": pub_id},
-        )
-
     # ── Création ───────────────────────────────────────────────────
 
     def create(
