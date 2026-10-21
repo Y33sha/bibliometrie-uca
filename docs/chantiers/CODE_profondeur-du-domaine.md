@@ -61,8 +61,9 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] Colonne `raw_metadata` renommée `corrections`. e102ffc2f
 - [x] Colonnes `meta` de `source_records` et `publications` renommées `source_extras` ; trace des corrections d'une publication dans `publications.corrections`. 3b584b73c
 - [x] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ. d882da50e
-- [ ] Module propriétaire du format des JSON `source_extras` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `source_extras` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
-- [ ] Projection SQL des faits des règles à côté des règles.
+- [x] Module propriétaire des clés de `source_extras` (`domain/source_records/source_extras.py`), fragments SQL dérivés ; les faits des règles lus dans `source_extras` en viennent. fddfe65f6
+- [ ] Clés et accesseurs de `biblio`.
+- [x] Projection SQL des faits des règles construite depuis les champs de `MetadataForCorrection`. fddfe65f6
 - [ ] Registre des clés de `corrections` et de leur sous-étape ; `effective_external_ids`.
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
 - [ ] Revue par espace de noms DOI en fonction de domaine.
