@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.source_contribution_queries import delete_orphan_addresses
+from pipeline.ingestion.common.source_contribution_store import delete_orphan_addresses
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (

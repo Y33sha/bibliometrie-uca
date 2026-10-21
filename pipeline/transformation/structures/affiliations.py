@@ -25,16 +25,16 @@ from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import ZenodoRorDumpSource
 from pipeline.ingestion.hal.api import HalStructuresClient
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.structures.address_resolution import (
     AddressResolutionQueries,
     run_resolution,
 )
 from pipeline.transformation.structures.hal_structures import (
-    HalStructuresQueries,
+    HalStructureStore,
     run_refresh_hal_structures,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
@@ -43,7 +43,7 @@ from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
-from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
+from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 
 
 @dataclass(frozen=True)
@@ -115,10 +115,10 @@ class AffiliationsPhase:
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
     """Pose les indices de l'entrée dans le périmètre sur les `source_contributions` : rafraîchit la matview `source_contribution_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
     t0 = time.perf_counter()
-    with attente(f"{DERNIERE_BRANCHE}rattachement en cours", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as line:
         refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -140,7 +140,7 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
         return run_refresh_hal_structures(
             conn,
             source=HalStructuresClient(),
-            queries=HalStructuresQueries(conn),
+            store=HalStructureStore(conn),
             logger=ctx.logger,
             refresh_stale=refresh_stale,
         )
@@ -152,4 +152,4 @@ def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     # Le dump est public : l'adresse du polite pool y est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
-        return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=ctx.logger)
+        return run_refresh_ror(conn, source=source, store=RorStore(conn), logger=ctx.logger)

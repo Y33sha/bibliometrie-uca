@@ -3,22 +3,18 @@
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from sqlalchemy import Connection
-
 from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
+from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import (
     JsonValue,
@@ -32,18 +28,19 @@ from domain.types import (
 )
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
     extract_external_ids_from_urls,
@@ -81,8 +78,8 @@ def extract_locations_data(
     urls: list[str] = []
     seen: set[str] = set()
     location_ids: list[str] = []
-    for entree in as_sequence(work.get("locations")):
-        loc = as_mapping(entree)
+    for entry in as_sequence(work.get("locations")):
+        loc = as_mapping(entry)
         for key in ("landing_page_url", "pdf_url"):
             url = as_str(loc.get(key))
             if url and url not in seen:
@@ -118,9 +115,9 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
     if not inverted_index:
         return None
     positions: dict[int, str] = {}
-    for word, indices in inverted_index.items():
-        for brut in as_sequence(indices):
-            if (idx := as_int(brut)) is not None:
+    for word, word_positions in inverted_index.items():
+        for raw in as_sequence(word_positions):
+            if (idx := as_int(raw)) is not None:
                 positions[idx] = word
     if not positions:
         return None
@@ -130,13 +127,13 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
 def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
     """Extrait les topics OpenAlex sous forme de liste simplifiée."""
     topics: list[dict[str, JsonValue]] = []
-    for entree in as_sequence(work.get("topics")):
-        t = as_mapping(entree)
+    for entry in as_sequence(work.get("topics")):
+        t = as_mapping(entry)
         topic: dict[str, JsonValue] = {}
         for level in ("domain", "field", "subfield", "topic"):
             obj = as_mapping(t.get(level)) or (t if level == "topic" else {})
-            if nom := as_str(obj.get("display_name")):
-                topic[level] = nom
+            if name := as_str(obj.get("display_name")):
+                topic[level] = name
         if (score := t.get("score")) is not None:
             topic["score"] = score
         if topic:
@@ -233,7 +230,7 @@ def extract_publication_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un work OpenAlex.
 
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans `map_doc_type(source="openalex")`).
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex.
     """
     title = as_str(work.get("title")) or as_str(work.get("display_name")) or ""
     if primary is None:
@@ -263,8 +260,7 @@ def extract_publication_metadata(
 
 
 def insert_openalex_document(  # noqa: C901
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     work: Mapping[str, JsonValue],
     staging_id: int,
     publication_meta: PublicationMetadata,
@@ -293,62 +289,43 @@ def insert_openalex_document(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Biblio (volume, issue, pages)
+    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # L'éditeur et la revue sont ignorés pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.), même critère que la création.
     raw_biblio = as_mapping(work.get("biblio"))
-    biblio: dict[str, JsonValue] = {
-        k: raw_biblio[k]
-        for k in ("volume", "issue", "first_page", "last_page")
-        if raw_biblio.get(k)
-    }
-
-    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex, en parallèle des publishers/journals créés via find_or_create_*).
-    # Ignoré pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
-    if not should_skip_publisher_journal(primary):
-        source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
-        if publisher_raw := as_str(source.get("host_organization_name")):
-            biblio["publisher"] = publisher_raw
-        journal_obj: dict[str, str] = {}
-        if jt := as_str(source.get("display_name")):
-            journal_obj["title"] = jt
-        issn_l = as_str(source.get("issn_l"))
-        journal_issn = None
-        journal_eissn = None
-        for entree in as_sequence(source.get("issn")):
-            i = as_str(entree)
-            if not i or i == issn_l:
-                continue
-            if not journal_issn:
-                journal_issn = i
-            elif not journal_eissn:
-                journal_eissn = i
-        if journal_issn:
-            journal_obj["issn"] = journal_issn
-        if journal_eissn:
-            journal_obj["eissn"] = journal_eissn
-        if issn_l:
-            journal_obj["issnl"] = issn_l
-        if journal_oa_id := short_openalex_id(as_str(source.get("id")) or ""):
-            journal_obj["openalex_id"] = journal_oa_id
-        if journal_obj:
-            biblio["journal"] = journal_obj
-
-    biblio_json = biblio if biblio else None
+    source = (
+        {}
+        if should_skip_publisher_journal(primary)
+        else as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    )
+    issn_l = as_str(source.get("issn_l"))
+    issns = [i for e in as_sequence(source.get("issn")) if (i := as_str(e)) and i != issn_l]
+    biblio_json = compact_biblio(
+        volume=as_str(raw_biblio.get("volume")),
+        issue=as_str(raw_biblio.get("issue")),
+        first_page=as_str(raw_biblio.get("first_page")),
+        last_page=as_str(raw_biblio.get("last_page")),
+        publisher=as_str(source.get("host_organization_name")),
+        journal_title=as_str(source.get("display_name")),
+        journal_issn=issns[0] if issns else None,
+        journal_eissn=issns[1] if len(issns) > 1 else None,
+        journal_issnl=issn_l,
+        journal_openalex_id=short_openalex_id(as_str(source.get("id")) or ""),
+    )
 
     # Abstract, keywords, topics
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))
-    mots = [
+    words = [
         as_str(as_mapping(k).get("keyword")) or as_str(k) for k in as_sequence(work.get("keywords"))
     ]
-    keywords = [m for m in mots if m] or None
+    keywords = [m for m in words if m] or None
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `meta`, sans licence normalisée.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `source_extras`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
     publisher_license = None if should_skip_publisher_journal(primary) else raw_license
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="openalex",
             source_id=openalex_id,
@@ -357,11 +334,11 @@ def insert_openalex_document(  # noqa: C901
             external_ids=external_ids or None,
             title=publication_meta.title or "",
             publication_year=publication_meta.publication_year,
-            doc_type=publication_meta.doc_type,
+            raw_doc_type=publication_meta.doc_type,
             journal_id=publication_meta.journal_id,
             monograph_id=publication_meta.monograph_id,
             container_title=publication_meta.container_title,
-            language=publication_meta.language,
+            raw_language=publication_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
@@ -371,7 +348,7 @@ def insert_openalex_document(  # noqa: C901
             urls=urls or None,
             impact=extract_impact(work).to_json(),
             is_retracted=is_retracted,
-            meta={"license": raw_license} if raw_license else None,
+            source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
         ),
     )
 
@@ -392,7 +369,7 @@ def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
 
     On retient `raw_orcid` et on ignore `author.orcid`.
     """
-    return normalize_orcid(as_str(authorship.get("raw_orcid")))
+    return as_str(authorship.get("raw_orcid"))
 
 
 # =============================================================
@@ -405,9 +382,9 @@ def _countries(institutions: Iterable[Mapping[str, JsonValue]]) -> list[str] | N
     return (
         sorted(
             {
-                pays
+                country
                 for i in institutions
-                if (pays := normalize_country_code(as_str(i.get("country_code"))))
+                if (country := normalize_country_code(as_str(i.get("country_code"))))
             }
         )
         or None
@@ -429,7 +406,9 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
-    ids_by_position = [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
+    ids_by_position = [
+        contributor_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships
+    ]
 
     records: list[AuthorRecord] = []
     for position, authorship in enumerate(authorships):
@@ -446,18 +425,18 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
         institutions_by_text: dict[str, set[str]] = defaultdict(set)
         for affiliation in as_sequence(authorship.get("affiliations")):
             affiliation = as_mapping(affiliation)
-            if texte := as_str(affiliation.get("raw_affiliation_string")):
-                institutions_by_text[texte].update(
+            if text := as_str(affiliation.get("raw_affiliation_string")):
+                institutions_by_text[text].update(
                     institution_id
                     for e in as_sequence(affiliation.get("institution_ids"))
                     if (institution_id := as_str(e)) in institutions
                 )
         raw_strings = [
-            texte
+            text
             for e in as_sequence(authorship.get("raw_affiliation_strings"))
-            if (texte := as_str(e))
+            if (text := as_str(e))
         ]
-        with_text = {i for texte in raw_strings for i in institutions_by_text.get(texte, ())}
+        with_text = {i for text in raw_strings for i in institutions_by_text.get(text, ())}
 
         ids = ids_by_position[position]
         records.append(
@@ -469,13 +448,13 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(
-                        text=texte,
+                        text=text,
                         countries=_countries(
-                            institutions[i] for i in institutions_by_text.get(texte, ())
+                            institutions[i] for i in institutions_by_text.get(text, ())
                         ),
-                        ror_ids=_rors(institutions[i] for i in institutions_by_text.get(texte, ())),
+                        ror_ids=_rors(institutions[i] for i in institutions_by_text.get(text, ())),
                     )
-                    for texte in raw_strings
+                    for text in raw_strings
                 ],
                 ror_ids=_rors(institutions[i] for i in institutions.keys() - with_text),
             )
@@ -489,15 +468,13 @@ def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     work: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources OpenAlex de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "openalex",
         source_record_id,
         extract_openalex_author_block(work),
@@ -511,14 +488,13 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    staging_store: StagingStore,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
@@ -536,10 +512,10 @@ def process_work(
     )
 
     source_record_id = insert_openalex_document(
-        conn, queries, work, staging_id, publication_meta, primary
+        record_store, work, staging_id, publication_meta, primary
     )
-    process_contributions(conn, contribution_queries, work, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    process_contributions(contribution_store, work, source_record_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -552,14 +528,13 @@ class OpenalexNormalizer(BibliographicNormalizer):
         title = as_str(work.get("title")) or as_str(work.get("display_name"))
         return title, as_int(work.get("publication_year"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            staging_store=self._staging,
+            contribution_store=self._contribution_store,
         )

@@ -14,7 +14,9 @@ from sqlalchemy import Connection, bindparam, text
 
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
+from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import normalize_external_ids
+from domain.source_records.languages import language_code
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
@@ -28,7 +30,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas d'indicateur de citation, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
-    Deux colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture. `publication_id` est le rattachement à la publication canonique, que la phase `publications` pose et que l'import ne connaît pas.
+    Quatre colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
     """
 
     # Clé de l'enregistrement source
@@ -44,11 +46,13 @@ class SourceRecordUpsert:
     # Métadonnées bibliographiques
     title: str
     publication_year: int | None = None
-    doc_type: str | None = None
+    raw_doc_type: str | None = None
+    """Type de document dans le vocabulaire de la source."""
     journal_id: int | None = None
     monograph_id: int | None = None
     container_title: str | None = None
-    language: str | None = None
+    raw_language: str | None = None
+    """Langue dans le vocabulaire de la source."""
     biblio: JsonValue = None
 
     # Contenu
@@ -71,18 +75,18 @@ class SourceRecordUpsert:
     hal_collections: list[str] | None = None
 
     # Charge utile propre à la source
-    meta: JsonValue = None
+    source_extras: JsonValue = None
 
 
 _FIELDS = fields(SourceRecordUpsert)
 
-# Les colonnes écrites se dérivent des champs de la ligne, plus `title_normalized`
-# calculé à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
+# Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes
+# calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
 # réécrit sans autre geste, en phase avec le contrat.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
-_COLUMNS = (*_ROW_FIELDS, "title_normalized")
+_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
 
-# Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `raw_metadata` se vide : les
+# Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `corrections` se vide : les
 # valeurs d'origine qu'il garde viennent de l'import précédent, et la phase `metadata_correction` refait ses
 # corrections sur les valeurs fraîches.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
@@ -106,7 +110,7 @@ _UPSERT_SQL = text(
     VALUES ({", ".join(_value(c) for c in _COLUMNS)})
     ON CONFLICT (source, source_id) DO UPDATE SET
         {", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATED_COLUMNS)},
-        raw_metadata = '{{}}'::jsonb,
+        corrections = '{{}}'::jsonb,
         keys_dirty = true,
         updated_at = clock_timestamp()
     RETURNING id
@@ -114,14 +118,48 @@ _UPSERT_SQL = text(
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
 
-class SourceRecordQueries:
-    """Écriture des `source_records`."""
+class SourceRecordStore:
+    """Écriture des `source_records`. Les formes de `language_forms` se chargent à la première écriture."""
 
-    def upsert_source_record(self, conn: Connection, row: SourceRecordUpsert) -> int:
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+        self._language_forms: dict[str, str] | None = None
+
+    def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
+        params["doc_type"] = _doc_type(row)
+        params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
-        return scalar_int(conn.execute(_UPSERT_SQL, params))
+        return scalar_int(self._conn.execute(_UPSERT_SQL, params))
+
+    def _forms(self) -> dict[str, str]:
+        if self._language_forms is None:
+            self._language_forms = fetch_language_forms(self._conn)
+        return self._language_forms
+
+
+def _doc_type(row: SourceRecordUpsert) -> str | None:
+    """Type du référentiel de `row.raw_doc_type` (`map_doc_type`). Un type inconnu de la table de sa source donne `other` et est journalisé."""
+    if row.raw_doc_type is None:
+        return None
+    doc_type = map_doc_type(row.raw_doc_type, row.source)
+    if doc_type is None:
+        logger.warning(
+            "Type de document inconnu (%s %s) : %r",
+            row.source,
+            row.source_id,
+            row.raw_doc_type,
+            extra={"detail": True},
+        )
+        return "other"
+    return doc_type
+
+
+def fetch_language_forms(conn: Connection) -> dict[str, str]:
+    """Formes de `language_forms`, chacune associée au code de sa langue."""
+    rows = conn.execute(text("SELECT form_normalized, language_code FROM language_forms"))
+    return {r.form_normalized: r.language_code for r in rows}
 
 
 def _external_ids(row: SourceRecordUpsert) -> dict[str, JsonValue]:

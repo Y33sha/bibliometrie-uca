@@ -4,7 +4,7 @@ Tourne après `publications` : les `source_records` sont rattachées à leur pub
 
 Trois signaux peuplent la table :
 
-- **Signal #1 — relations déclarées par les sources** : DataCite `meta.related_identifiers` et Crossref `meta.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
+- **Signal #1 — relations déclarées par les sources** : DataCite `source_extras.related_identifiers` et Crossref `source_extras.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes qui partagent une clé (hal_id, arXiv, PMID, NNT) sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
@@ -29,7 +29,7 @@ from domain.publications.relations import (
     infer_shared_key_relation,
 )
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.relations_queries import (
@@ -47,9 +47,9 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
     edges: list[RelationEdge] = []
     for source_record in sources:
         if source_record.source == "datacite":
-            relations = extract_datacite_relations(source_record.meta)
+            relations = extract_datacite_relations(source_record.source_extras)
         elif source_record.source == "crossref":
-            relations = extract_crossref_relations(source_record.meta)
+            relations = extract_crossref_relations(source_record.source_extras)
         else:
             continue
         edges.extend(
@@ -69,7 +69,7 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
             for source_record in sources
             if source_record.source == "datacite"
             for doi in extract_datacite_distinct_works(
-                source_record.meta, source_record.doi, source_record.source_record_doc_type
+                source_record.source_extras, source_record.doi, source_record.source_record_doc_type
             )
         }
     )
@@ -87,7 +87,7 @@ def _build_distinct_work_edges(
         if source_record.source != "datacite":
             continue
         for target_doi in extract_datacite_distinct_works(
-            source_record.meta, source_record.doi, source_record.source_record_doc_type
+            source_record.source_extras, source_record.doi, source_record.source_record_doc_type
         ):
             target = publications_by_doi.get(target_doi)
             inferred = infer_shared_key_relation(
@@ -236,41 +236,41 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
 
     La table étant reconstruite entière à chaque run, le nombre d'arêtes écrites ne dit rien : presque toutes s'y trouvaient déjà. Seul l'écart avec l'état précédent porte une information.
     """
-    ajoutees = _count_by_pair_label(rebuild.added_by_type)
-    total = sum(ajoutees.values())
+    added = _count_by_pair_label(rebuild.added_by_type)
+    total = sum(added.values())
     if total:
-        etape(
+        step(
             logger,
             "%s entre publications",
-            accord(total, "nouvelle relation", "nouvelles relations"),
+            quantity(total, "nouvelle relation", "nouvelles relations"),
         )
         logger.info("")
-        largeur = max(len(str(count)) for count in ajoutees.values())
-        for libelle, count in ajoutees.items():
-            logger.info("     %s %s", str(count).rjust(largeur), libelle)
+        width = max(len(str(count)) for count in added.values())
+        for label, count in added.items():
+            logger.info("     %s %s", str(count).rjust(width), label)
     else:
-        etape(logger, "Relations entre publications")
+        step(logger, "Relations entre publications")
 
     if rebuild.removed:
         if total:
             logger.info("")
         logger.info(
             "%s%s %s",
-            DERNIERE_BRANCHE,
-            accord(rebuild.removed, "relation"),
-            forme(rebuild.removed, "retirée"),
+            LAST_BRANCH,
+            quantity(rebuild.removed, "relation"),
+            inflect(rebuild.removed, "retirée"),
         )
     elif not total:
-        logger.info("%saucun changement", DERNIERE_BRANCHE)
+        logger.info("%saucun changement", LAST_BRANCH)
 
 
 def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]:
     """Regroupe les compteurs par nature du lien : un type et son inverse désignent le même."""
-    par_libelle: dict[str, int] = {}
+    by_label: dict[str, int] = {}
     for relation_type, count in added_by_type:
-        libelle = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
-        par_libelle[libelle] = par_libelle.get(libelle, 0) + count
-    return dict(sorted(par_libelle.items(), key=lambda item: item[1], reverse=True))
+        label = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
+        by_label[label] = by_label.get(label, 0) + count
+    return dict(sorted(by_label.items(), key=lambda item: item[1], reverse=True))
 
 
 # ── Câblage ───────────────────────────────────────────────────

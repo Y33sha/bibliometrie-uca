@@ -28,8 +28,8 @@ class ContainerRole(StrEnum):
 
 
 def _doc_types(raw_doc_type: str | None, source: str) -> set[str]:
-    """Valeurs `doc_type` d'un type brut, composite ou non (WoS « Book Chapter; Proceedings Paper »)."""
-    return {map_doc_type(part, source) for part in (raw_doc_type or "").split(";")}
+    """Valeurs `doc_type` d'un type brut, composite ou non (WoS « Book Chapter; Proceedings Paper »). Une partie inconnue donne `other`."""
+    return {map_doc_type(part, source) or "other" for part in (raw_doc_type or "").split(";")}
 
 
 def container_role(

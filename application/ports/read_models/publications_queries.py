@@ -263,7 +263,7 @@ class ThesesContributionOut(BaseModel):
 class EcoleDoctorale(BaseModel):
     """École doctorale d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
 
-    Lu depuis la colonne JSONB `meta.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
+    Lu depuis la colonne JSONB `source_extras.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -274,7 +274,7 @@ class EcoleDoctorale(BaseModel):
 class PartenaireThese(BaseModel):
     """Partenaire de recherche d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
 
-    Lu depuis la colonne JSONB `meta.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
+    Lu depuis la colonne JSONB `source_extras.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
     """
 
     model_config = ConfigDict(extra="allow")

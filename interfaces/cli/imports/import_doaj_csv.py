@@ -16,7 +16,7 @@ import os
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.complements.doaj import read_doaj_dump_rows
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
     run_import_doaj_dump,
 )
@@ -40,7 +40,9 @@ def main() -> None:
             rows=read_doaj_dump_rows(args.csv_file),
             dry_run=args.dry_run,
         )
-        log.info("Terminé : %s", accord(stats.matched, "revue mise à jour", "revues mises à jour"))
+        log.info(
+            "Terminé : %s", quantity(stats.matched, "revue mise à jour", "revues mises à jour")
+        )
     finally:
         conn.close()
 

@@ -22,7 +22,7 @@ from pipeline.ingestion.common.harvester import (
 from pipeline.ingestion.scanr.api import ScanrClient
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 # Nombre de documents écrits entre deux commits.
 _COMMIT_EVERY = 500
@@ -72,7 +72,7 @@ def harvest_year(
     conn: Connection,
     year: int,
     affiliation_ids: list[str],
-    avancement: Progression,
+    progress: Progress,
 ) -> PhaseMetrics:
     """Moissonne les documents d'une année, page après page."""
     metrics = PhaseMetrics()
@@ -86,7 +86,7 @@ def harvest_year(
             break
 
         for hit in hits:
-            avancement.avance()
+            progress.advance()
             doc = as_mapping(hit.get("_source"))
             scanr_id = extract_id(doc)
             if not scanr_id:
@@ -126,8 +126,8 @@ class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
         ids = config.affiliation_ids
         client = self._client
         years = self._years(window)
-        return self._extrait_par_annee(
+        return self._harvest_by_year(
             years,
-            lambda annee: client.count(build_query(annee, ids)),
-            lambda annee, avancement: harvest_year(client, self.conn, annee, ids, avancement),
+            lambda year: client.count(build_query(year, ids)),
+            lambda year, progress: harvest_year(client, self.conn, year, ids, progress),
         )

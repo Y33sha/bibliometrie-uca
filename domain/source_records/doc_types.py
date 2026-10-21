@@ -1,12 +1,6 @@
-"""Mapping unifié des doc_types sources → enum canonique doc_type.
+"""Traduction du type de document de chaque source dans le vocabulaire du référentiel, l'enum PostgreSQL `doc_type`.
 
-Chaque source (HAL, OpenAlex, WoS, ScanR, theses.fr) utilise sa propre nomenclature. Ce module fournit un point unique de conversion vers l'enum PostgreSQL `doc_type` de la table `publications`.
-
-Usage :
-    from domain.source_records.doc_types import map_doc_type
-    canonical = map_doc_type("THESE", source="hal")       # → "thesis"
-    canonical = map_doc_type("dissertation", source="openalex")  # → "thesis"
-    canonical = map_doc_type("article")                    # → "article" (lookup global)
+Chaque source (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Crossref) a sa propre nomenclature, et sa propre table.
 """
 
 from domain.publications.doc_types import DOC_TYPES_SET
@@ -98,6 +92,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "book chapter": "book_chapter",
         "proceedings paper": "conference_paper",
         "editorial material": "editorial",
+        "editorial": "editorial",
         "letter": "letter",
         "meeting abstract": "conference",
         "book review": "book_review",
@@ -183,6 +178,8 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "conference proceeding": "proceedings",
         "thesis": "thesis",
         "project deliverable": "report",
+        "data paper": "data_paper",
+        "book review": "book_review",
         "figure": "other",
         "taxonomic treatment": "other",
         "post": "other",
@@ -216,49 +213,20 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 }
 
 
-def map_doc_type(raw: str | None, source: str | None = None) -> str:
-    """Convertit un doc_type source en valeur canonique de l'enum doc_type.
+def map_doc_type(raw: str, source: str) -> str | None:
+    """Type du référentiel pour le type `raw` donné par `source` : sa valeur dans la table de la source, sinon `raw` lui-même s'il est un type du référentiel. `None` pour une valeur absente des deux ; `other` pour une valeur vide.
 
-    Gère les types composites séparés par ";" (ex: WoS "Article; Proceedings Paper") en prenant le premier type significatif (non "other").
-
-    Lookup :
-    1. Si source est fourni, cherche dans le mapping de cette source.
-    2. Sinon (ou si non trouvé), cherche dans tous les mappings.
-    3. Si la valeur est déjà un doc_type valide, la retourne telle quelle.
-    4. Sinon retourne "other".
+    Un type composite (WoS « Article; Proceedings Paper ») prend la traduction de sa première partie traduite autrement qu'en `other`.
     """
-    if not raw:
+    parts = [p.strip().lower() for p in raw.split(";") if p.strip()]
+    if not parts:
         return "other"
-
-    # Types composites (WoS) : "Article; Proceedings Paper"
-    if ";" in raw:
-        parts = [p.strip() for p in raw.split(";") if p.strip()]
-        best = "other"
-        for part in parts:
-            mapped = map_doc_type(part, source)
-            if mapped != "other":
-                return mapped
-            best = mapped
-        return best
-
-    key = raw.strip().lower()
-
-    # 1. Lookup dans la source spécifique
-    if source:
-        source_map = _SOURCE_MAPS.get(source)
-        if source_map:
-            result = source_map.get(key)
-            if result:
-                return result
-
-    # 2. Lookup global (toutes les sources)
-    for smap in _SOURCE_MAPS.values():
-        result = smap.get(key)
-        if result:
-            return result
-
-    # 3. Identity si déjà valide
-    if key in DOC_TYPES_SET:
-        return key
-
-    return "other"
+    source_map = _SOURCE_MAPS.get(source, {})
+    known = [
+        translated
+        for part in parts
+        if (translated := source_map.get(part) or (part if part in DOC_TYPES_SET else None))
+    ]
+    if not known:
+        return None
+    return next((t for t in known if t != "other"), "other")

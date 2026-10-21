@@ -21,24 +21,23 @@ from pipeline.transformation.publications.subjects.subject_cooccurrences import 
     run as run_cooccurrences,
 )
 from pipeline.transformation.publications.subjects.subject_ingestion import run as run_ingest
-from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
 
 @dataclass(frozen=True)
 class SubjectsPhase:
-    queries: SubjectsIngestionQueries
-
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
-        queries = self.queries
 
         def ingest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                return run_ingest(conn, queries, ctx.logger, rebuild=ctx.options.rebuild_subjects)
+                return run_ingest(
+                    SubjectStore(conn), ctx.logger, rebuild=ctx.options.rebuild_subjects
+                )
 
         def usage(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                run_cooccurrences(conn, queries, ctx.logger)
+                run_cooccurrences(SubjectStore(conn), ctx.logger)
             return PhaseMetrics()
 
         by_task = run_tasks(
@@ -53,4 +52,4 @@ class SubjectsPhase:
 
 
 def build() -> Phase:
-    return SubjectsPhase(SubjectsIngestionQueries())
+    return SubjectsPhase()

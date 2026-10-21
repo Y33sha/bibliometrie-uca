@@ -13,7 +13,7 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from domain.pipeline_runs import (
+from application.ports.pipeline.phase_executions import (
     PhaseExecution,
     PhaseMetricsPayload,
     PhaseStatus,

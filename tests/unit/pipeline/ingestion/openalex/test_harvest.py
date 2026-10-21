@@ -15,7 +15,7 @@ from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.openalex import api, harvest
 from pipeline.ingestion.openalex.api import build_params
 from pipeline.ingestion.openalex.harvest import OpenalexHarvester, harvest_period
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
@@ -73,8 +73,8 @@ class TestBuildParams:
         assert "api_key" not in params
 
 
-def _avancement() -> Progression:
-    return Progression(None, "OpenAlex", None)
+def _avancement() -> Progress:
+    return Progress(None, "OpenAlex", None)
 
 
 def _work(identifiant: str, *, route: UpsertOutcome = UpsertOutcome.NEW, auteurs: int = 1) -> dict:

@@ -15,8 +15,8 @@ from pipeline.transformation.publications.correction.correct_by_cluster import (
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_update as compute_unary_update,
 )
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
-    PgMetadataCorrectionQueries,
+from pipeline.transformation.publications.correction.correction_store import (
+    SourceRecordCorrectionStore,
 )
 from pipeline.transformation.publications.reconciliation import reconcile
 
@@ -32,17 +32,14 @@ def apply_metadata_corrections(conn: Connection) -> None:
     source, avant tout `refresh_from_sources` / matching : c'est l'ordre du pipeline
     (phase `metadata_correction` avant phase `publications`).
     """
-    queries = PgMetadataCorrectionQueries()
+    queries = SourceRecordCorrectionStore(conn)
 
-    unary_rows = queries.fetch_for_unary_correction(conn)
-    language_forms = queries.fetch_language_forms(conn)
-    unary_updates = [
-        u for row in unary_rows if (u := compute_unary_update(row, language_forms)) is not None
-    ]
-    queries.persist_corrections(conn, unary_updates)
+    unary_rows = queries.fetch_for_unary_correction()
+    unary_updates = [u for row in unary_rows if (u := compute_unary_update(row)) is not None]
+    queries.persist_corrections(unary_updates)
 
-    cluster_updates = compute_cluster_updates(queries.fetch_doi_cluster_candidates(conn))
-    queries.persist_doi_corrections(conn, cluster_updates)
+    cluster_updates = compute_cluster_updates(queries.fetch_doi_cluster_candidates())
+    queries.persist_doi_corrections(cluster_updates)
 
 
 def create_all_publications(conn: Connection) -> None:

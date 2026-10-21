@@ -383,7 +383,7 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "structure_name_forms",
             "structures",
-            "source_records.meta",
+            "source_records.source_extras",
             "idref_structures",
         ),
         writes=("idref_structures",),
@@ -405,7 +405,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structure_aliases",
             "structures.ror_id",
             "structures.api_ids",
-            "source_records.meta",
+            "source_records.source_extras",
             "source_contributions.roles",
             "idref_structures",
             "source_contributions.source_record_id",
@@ -571,7 +571,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.oa_status",
             "source_records.language",
             "source_records.external_ids",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "publications",
             "publications_detail",
             "publishers.publication_count",
@@ -594,7 +594,7 @@ TASKS: tuple[Task, ...] = (
             "journals.journal_type",
             "journals.manual_fields",
             "journal_issns",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.doc_type",
             "source_records.journal_id",
         ),
@@ -603,7 +603,7 @@ TASKS: tuple[Task, ...] = (
             "journals",
             "journal_issns",
             # Type brut de la source (`raw_column`) : la correction ne le change pas.
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.doc_type",
             "source_records.journal_id",
         ),
@@ -614,7 +614,7 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "source_records.doi",
             "source_records.journal_id",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "journals.journal_type",
         ),
         writes=("journal_doi_namespaces",),
@@ -659,7 +659,7 @@ TASKS: tuple[Task, ...] = (
             "monographs.id",
             "monographs.journal_id",
             "journals.journal_type",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.doc_type",
         ),
         writes=("monographs.proceedings",),
@@ -667,7 +667,7 @@ TASKS: tuple[Task, ...] = (
             "monographs",
             "journals",
             # Type brut de la source (`raw_column`) : la correction ne le change pas.
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.doc_type",
         ),
     ),
@@ -678,12 +678,12 @@ TASKS: tuple[Task, ...] = (
             "journal_doi_namespaces",
             "source_records.doi",
             "source_records.journal_id",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.doc_type",
         ),
         writes=(
             "source_records.journal_id",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.keys_dirty",
         ),
         previous_run=("source_records",),
@@ -707,9 +707,9 @@ TASKS: tuple[Task, ...] = (
                     "language",
                     "urls",
                     "external_ids",
-                    "raw_metadata",
+                    "corrections",
                     "embargo_until",
-                    "meta",
+                    "source_extras",
                 )
             ),
             "journals.journal_type",
@@ -727,7 +727,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.oa_status",
             "source_records.language",
             "source_records.external_ids",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.keys_dirty",
         ),
         # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
@@ -752,8 +752,8 @@ TASKS: tuple[Task, ...] = (
                 "doc_type",
                 "doi",
                 "title_normalized",
-                "raw_metadata",
-                "meta",
+                "corrections",
+                "source_extras",
                 "external_ids",
                 "source_id",
                 "publication_id",
@@ -771,7 +771,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_records.doi",
             "source_records.external_ids",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_records.keys_dirty",
             "publications.contributions_dirty",
         ),
@@ -822,7 +822,7 @@ TASKS: tuple[Task, ...] = (
             "publications.contributions_dirty",
             "source_records.publication_id",
             "source_records.source_id",
-            "source_records.raw_metadata",
+            "source_records.corrections",
             "source_contributions.id",
             "source_contributions.source_record_id",
             "source_contributions.author_position",
@@ -1049,8 +1049,8 @@ TASKS: tuple[Task, ...] = (
             *(
                 f"source_records.{column}"
                 for column in (
-                    "meta",
-                    "raw_metadata",
+                    "source_extras",
+                    "corrections",
                     "doi",
                     "external_ids",
                     "doc_type",
@@ -1182,7 +1182,7 @@ PHASE_ORDER: tuple[str, ...] = tuple(
 )
 """Ordre d'exécution des phases : celui de leurs tâches dans `TASKS`."""
 
-PHASE_LIBELLES: dict[str, str] = {
+PHASE_LABELS: dict[str, str] = {
     "harvest": "Moissonnage par affiliation",
     "harvest_by_person": "Moissonnage par personne",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
@@ -1216,5 +1216,5 @@ Aucune ne dépend d'une autre. Des phases placées avant elles lisent leurs sort
 if not EXTRA_PHASES <= set(PHASE_ORDER):
     raise ValueError("EXTRA_PHASES nomme une phase absente du graphe")
 
-if set(PHASE_LIBELLES) != set(PHASE_ORDER):
+if set(PHASE_LABELS) != set(PHASE_ORDER):
     raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")

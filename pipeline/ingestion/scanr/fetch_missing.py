@@ -42,10 +42,10 @@ class ScanrDoiSearch:
             return DoiBatchResult()
         # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé, cohérente avec les DOI lowercase de `get_missing_dois`.
         found = {
-            clean_doi(as_str(champs.get("id")))
+            clean_doi(as_str(fields.get("id")))
             for rec in records
             for ext in as_sequence(rec.get("externalIds"))
-            if as_str((champs := as_mapping(ext)).get("type")) == "doi"
+            if as_str((fields := as_mapping(ext)).get("type")) == "doi"
         }
         return DoiBatchResult(records=records, not_found=[d for d in dois if d not in found])
 
@@ -55,10 +55,10 @@ class ScanrDoiSearch:
             return False
 
         dois = [
-            propre
-            for entree in as_sequence(record.get("externalIds"))
-            if as_str((ext := as_mapping(entree)).get("type")) == "doi"
-            and (propre := clean_doi(as_str(ext.get("id"))))
+            clean
+            for entry in as_sequence(record.get("externalIds"))
+            if as_str((ext := as_mapping(entry)).get("type")) == "doi"
+            and (clean := clean_doi(as_str(ext.get("id"))))
         ]
 
         inserted, _ = upsert_staging(

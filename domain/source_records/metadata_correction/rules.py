@@ -1,18 +1,16 @@
-"""Correction unaire des métadonnées d'un enregistrement, par table de règles.
+"""Correction des métadonnées par table de règles, pour un enregistrement source comme pour une publication.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction à partir de `MetadataForCorrection` — son contrat d'entrée, qui porte les champs lus par les prédicats des règles, dont `journal_type` et `oa_model` joints depuis `journals`. Couvre les règles intrinsèques à un enregistrement (URL, titre) comme les règles journal-dépendantes, sans threader de repo. Sert les deux niveaux : la `source_record` comme la publication canonique (refresh, via `effective_doc_type_for_publication`).
+`effective_metadata` applique les règles aux faits de `MetadataForCorrection`. Elle corrige `doc_type` et `oa_status`.
 
-Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
-- `applies_to` est un dict de prédicats AND-és sur la `source_record` (clés typées par `_AppliesTo`).
-- `applies_correction` est un dict champ → valeur cible.
+Une règle est un membre de `MetadataCorrectionRule` et son entrée dans `_RULES`. `applies_to` liste ses prédicats, tous requis. `applies_correction` donne la valeur cible de chaque champ corrigé. Pour un champ, la première règle de `_RULES` qui s'applique l'emporte.
 
-Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(source_record, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
+Les prédicats sont les clés de `_AppliesTo`. Une clé qui nomme un champ de `MetadataForCorrection` teste l'égalité. Les autres clés ont leur branche dans `_check_predicate`.
 
-Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant et la correction du DOI de groupe vivent dans les modules frères `journal_by_doi` et `shared_doi`).
+Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une publication connaît seulement les faits de `MetadataForCorrection.for_publication`.
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
@@ -26,51 +24,63 @@ from domain.types import JsonValue
 
 @dataclass(frozen=True, slots=True)
 class MetadataForCorrection:
-    """Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs que lisent les prédicats des règles, et eux seuls.
+    """Faits que lisent les règles de correction, pour un enregistrement source ou une publication.
 
-    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
+    Un fait à `None` est inconnu, et un prédicat sur un fait inconnu est faux. Une publication renseigne seulement les champs que l'agrégation arbitre (`for_publication`) : les règles qui lisent un fait propre aux enregistrements sources ne s'appliquent pas à elle.
 
-    Deux niveaux alimentent ce contrat. Une `source_record` renseigne tous les champs. Une publication renseigne ceux que l'agrégation arbitre. `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume`, `group_title`, `source` et `author_count` sont des faits d'un enregistrement source, absents de la publication : les règles qui les lisent restent muettes à ce niveau.
-
-    Frozen : `hydrate_raw_view` et la cascade produisent une vue par `dataclasses.replace`, jamais une mutation en place.
+    Frozen : `hydrate_raw_view` produit une vue par `dataclasses.replace`.
     """
 
     title: str
     doc_type: str | None
     doi: str | None
     journal_id: int | None
-    oa_status: str | None
-    urls: list[str] | None
-    journal_type: str | None
-    oa_model: str | None
-    # Calculé à la lecture (`embargo_until <= current_date`), pas une colonne : seule donnée
-    # date-dépendante du contrat, pour garder `effective_metadata` pure (elle lit un booléen).
-    embargo_expired: bool
-    # Calculé à la lecture : l'enregistrement déclare la relation Crossref `is-preprint-of`, soit
-    # « je suis le preprint d'une autre œuvre ». Le sens inverse porte la clé `has-preprint`.
-    # Booléen pour garder `effective_metadata` pure (pas de lecture de `meta` dans le domaine).
-    self_declared_preprint: bool
-    # Calculé à la lecture : l'enregistrement nomme le congrès dont il est issu (Crossref `event`,
-    # ou `assertion` Springer).
-    declares_conference: bool
-    # Joint à la lecture : type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
-    registrant_publisher_type: str | None
-    # Joint à la lecture : la monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
-    in_proceedings_volume: bool = False
-    # Lu dans `meta` : forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
+    journal_type: str | None = None
+    oa_status: str | None = None
+    oa_model: str | None = None
+    urls: list[str] | None = None
+    # `embargo_until <= current_date`.
+    embargo_expired: bool | None = None
+    # L'enregistrement déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre.
+    self_declared_preprint: bool | None = None
+    # L'enregistrement nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer).
+    declares_conference: bool | None = None
+    # Type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
+    registrant_publisher_type: str | None = None
+    # La monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
+    in_proceedings_volume: bool | None = None
+    # Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
     group_title: str | None = None
-    # Joint à la lecture : la revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
-    journal_diamond: bool = False
-    # Source de l'enregistrement.
+    # La revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
+    journal_diamond: bool | None = None
     source: str | None = None
-    # Calculé à la lecture : nombre de contributions sources de l'enregistrement source.
+    # `source_records.author_count` : contributions sources d'auteur non collectives.
     author_count: int | None = None
+
+    @classmethod
+    def for_publication(
+        cls,
+        *,
+        title: str,
+        doc_type: str | None,
+        doi: str | None,
+        journal_id: int | None,
+        journal_type: str | None,
+    ) -> "MetadataForCorrection":
+        """Faits d'une publication : les champs que l'agrégation arbitre, et le type de sa revue."""
+        return cls(
+            title=title,
+            doc_type=doc_type,
+            doi=doi,
+            journal_id=journal_id,
+            journal_type=journal_type,
+        )
 
 
 class MetadataCorrectionRule(StrEnum):
     """Identifiants des règles de correction figées. Une règle = un membre.
 
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_records.raw_metadata.<champ>.corrected_by` côté source_record, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
+    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`corrections.<champ>.corrected_by` de `source_records` comme de `publications`) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
     """
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
@@ -198,31 +208,19 @@ _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 
 
 class _AppliesTo(TypedDict, total=False):
-    """Prédicats supportés dans la clause `applies_to` d'une règle.
+    """Prédicats d'une règle, tous AND-és.
 
-    Toutes les clés présentes sont AND-ées. Les clés absentes sont ignorées (pas de prédicat sur ce champ).
+    Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ. Les autres :
 
-    - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
-    - `journal_type` : `str` — équivalence sur `source_record.journal_type` (champ joint depuis `journals`).
-    - `oa_model` : `str` — équivalence sur `source_record.oa_model` (champ joint depuis `journals`).
-    - `url_contains` : `str` — substring présente dans au moins une des `source_record.urls`.
-    - `doi_contains` : `str` — substring présente dans `source_record.doi` (DOIs stockés en minuscules).
-    - `title_prefix_normalized` : `tuple[str, ...]` — `normalize_text(source_record.title)` commence par au moins un préfixe du tuple.
-    - `title_regex` : `re.Pattern[str]` — `pattern.search(source_record.title)` matche.
-    - `journal_id_present` : `bool` — `(source_record.journal_id is not None)` vaut la valeur attendue. Signal « la `source_record` est rattachée à un journal », marqueur d'article.
-    - `doi_prefix_not_in` : `tuple[str, ...]` — la `source_record` porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
-    - `oa_status` : `str` — équivalence sur `source_record.oa_status` (le statut d'entrée, ex. `embargoed`).
-    - `embargo_expired` : `bool` — `source_record.embargo_expired` (calculé à la lecture : `embargo_until <= current_date`) vaut la valeur attendue.
-    - `self_declared_preprint` : `bool` — `source_record.self_declared_preprint` (calculé à la lecture : l'enregistrement déclare la relation `is-preprint-of`) vaut la valeur attendue.
-    - `declares_conference` : `bool` — `source_record.declares_conference` (calculé à la lecture : l'enregistrement nomme son congrès) vaut la valeur attendue.
-    - `registrant_publisher_type` : `str` — équivalence sur `source_record.registrant_publisher_type` (type de l'éditeur qui a déposé le préfixe du DOI).
-    - `in_proceedings_volume` : `bool` — `source_record.in_proceedings_volume` (joint à la lecture : la monographie de l'enregistrement est un volume d'actes) vaut la valeur attendue.
-    - `group_title` : `frozenset[str]` — `source_record.group_title` (forme de présentation d'un `posted-content` Crossref) appartient à l'ensemble, après lowercase.
-    - `journal_diamond` : `bool` — `source_record.journal_diamond` (joint à la lecture : la revue rattachée est diamant) vaut la valeur attendue.
-    - `source` : `str` — équivalence sur `source_record.source`.
-    - `author_count_max` : `int` — `source_record.author_count` est connu et au plus égal à la valeur.
-
-    Étendre les prédicats = ajouter une clé ici + une branche dans `_check_predicate`.
+    - `doc_type` : `str` ou `frozenset[str]`, comparé en minuscules. Limite la règle aux types plausibles.
+    - `group_title` : `frozenset[str]`, comparé en minuscules.
+    - `url_contains` : sous-chaîne d'au moins une des `urls`.
+    - `doi_contains` : sous-chaîne du DOI.
+    - `title_prefix_normalized` : préfixes de `normalize_text(title)`.
+    - `title_regex` : motif cherché dans le titre.
+    - `journal_id_present` : présence d'un `journal_id`.
+    - `doi_prefix_not_in` : le DOI existe et son préfixe est hors du tuple.
+    - `author_count_max` : `author_count` connu et au plus égal à la valeur.
     """
 
     doc_type: str | frozenset[str]
@@ -258,7 +256,7 @@ class _RuleDefinition(TypedDict):
     applies_correction: _AppliesCorrection
 
 
-# Whitelist récurrente : sources brutes plausibles pour une reclassification par titre.
+# Whitelist récurrente : types plausibles pour une reclassification par titre.
 _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 
 
@@ -293,17 +291,17 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.ARTICLE},
     },
-    # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
+    # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type`.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
         "applies_to": {"journal_type": JournalType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type` brut. The Conversation dépose ses articles sans titre de revue.
+    # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type`. The Conversation dépose ses articles sans titre de revue.
     MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: {
         "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # Enregistrement source Crossref d'un volume d'actes ou d'un recueil de résumés, sans auteur ou avec son seul éditeur pour contributeur ⇒ `proceedings`.
+    # Enregistrement source Crossref sans auteur dont le titre nomme un volume d'actes ou un recueil de résumés ⇒ `proceedings`.
     MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: {
         "applies_to": {
             "source": "crossref",
@@ -313,10 +311,10 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PROCEEDINGS},
     },
+    # Enregistrement source Crossref dont le titre commence par un mot de volume ⇒ `proceedings`, quel que soit son nombre d'auteurs.
     MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS: {
         "applies_to": {
             "source": "crossref",
-            "author_count_max": 1,
             "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
             "title_regex": _VOLUME_TITLE_PREFIX_PATTERN,
         },
@@ -356,7 +354,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les enregistrements sources Crossref ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
+    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`.
     MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
             "journal_type": JournalType.PREPRINT_SERVER,
@@ -364,7 +362,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `meta.relation`) : il EST
+    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `source_extras.relation`) : il EST
     # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
     # des relations dérivées du type). Sans whitelist `doc_type` : la déclaration prime, y compris
     # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`
@@ -482,7 +480,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
     # (`embargo_expired`, calculé à la lecture) devient `green`. Promotion à l'échéance sans
     # ré-import HAL — seule règle date-dépendante (la date est lue en SQL, hors de la
-    # fonction pure). Trace dans `raw_metadata.oa_status` ; corrige un champ orthogonal au
+    # fonction pure). Trace dans `corrections.oa_status` ; corrige un champ orthogonal au
     # `doc_type`, donc aucun chaînage avec les règles ci-dessus.
     MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
@@ -512,27 +510,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     },
 }
 
-# Prédicats portant sur un fait propre à un enregistrement source. L'agrégation n'arbitre pas ces
-# champs : une publication canonique n'en a aucune contrepartie, et toute règle qui en lit un est
-# écartée du rejeu canonique (`effective_doc_type_for_publication`). Décrit la forme du contrat,
-# pas la table des règles : un champ propre aux sources ajouté à `MetadataForCorrection` s'inscrit
-# ici, et les règles qui le liront seront écartées d'elles-mêmes.
-_SOURCE_ONLY_PREDICATES = frozenset(
-    {
-        "url_contains",
-        "embargo_expired",
-        "self_declared_preprint",
-        "declares_conference",
-        "registrant_publisher_type",
-        "in_proceedings_volume",
-        "group_title",
-        "source",
-        "author_count_max",
-    }
-)
-
-
 # ── Moteur ──────────────────────────────────────────────────────────────
+
+_FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
 
 
 def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
@@ -542,20 +522,6 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         if isinstance(value, frozenset):
             return doc_type in value
         return doc_type == value
-    # Égalité simple sur l'attribut de même nom.
-    if key in (
-        "journal_type",
-        "oa_model",
-        "oa_status",
-        "registrant_publisher_type",
-        "embargo_expired",
-        "self_declared_preprint",
-        "declares_conference",
-        "in_proceedings_volume",
-        "journal_diamond",
-        "source",
-    ):
-        return bool(getattr(source_record, key) == value)
     if key == "author_count_max":
         assert isinstance(value, int)
         return source_record.author_count is not None and source_record.author_count <= value
@@ -585,6 +551,8 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         if not source_record.doi:
             return False
         return source_record.doi.split("/", 1)[0] not in value
+    if key in _FIELDS:
+        return bool(getattr(source_record, key) == value)
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
@@ -593,20 +561,10 @@ def _rule_applies(source_record: MetadataForCorrection, rule_def: _RuleDefinitio
     return all(_check_predicate(source_record, k, v) for k, v in rule_def["applies_to"].items())
 
 
-def _correct_field(
-    source_record: MetadataForCorrection,
-    field: str,
-    *,
-    skip_predicates: frozenset[str] = frozenset(),
-) -> Correction[str] | None:
-    """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne.
-
-    Une règle dont `applies_to` porte l'une des clés de `skip_predicates` est écartée sans être évaluée : le niveau appelant ne renseigne pas les champs correspondants.
-    """
+def _correct_field(source_record: MetadataForCorrection, field: str) -> Correction[str] | None:
+    """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne."""
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
-            continue
-        if rule_def["applies_to"].keys() & skip_predicates:
             continue
         if _rule_applies(source_record, rule_def):
             return Correction(rule_def["applies_correction"][field], rule_id)  # type: ignore[literal-required]
@@ -624,16 +582,6 @@ def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
         doc_type=_correct_field(source_record, "doc_type"),
         oa_status=_correct_field(source_record, "oa_status"),
     )
-
-
-def effective_doc_type_for_publication(view: MetadataForCorrection) -> Correction[str] | None:
-    """Correction de `doc_type` applicable à une publication canonique, ou `None`.
-
-    Retient les règles dont tous les prédicats portent sur des champs que l'agrégation arbitre. Celles qui lisent un fait propre à un enregistrement source (`_SOURCE_ONLY_PREDICATES`) sont écartées : la publication n'en a aucune contrepartie.
-
-    L'`oa_status` relève de l'agrégation du statut le plus ouvert et d'Unpaywall, hors de ce rejeu.
-    """
-    return _correct_field(view, "doc_type", skip_predicates=_SOURCE_ONLY_PREDICATES)
 
 
 # Préfixes d'identifiants HAL propres aux dissertations : TEL (thèses en ligne) et DUMAS

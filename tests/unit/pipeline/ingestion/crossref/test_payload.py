@@ -4,8 +4,8 @@ from domain.dates import today
 from pipeline.ingestion.crossref.payload import (
     crossref_raw_doc_type,
     extract_crossref_conference,
-    extract_crossref_meta,
     extract_crossref_publication_year,
+    extract_crossref_source_extras,
     parse_crossref_issns,
     strip_jats_tags,
 )
@@ -198,7 +198,7 @@ class TestExtractCrossrefMeta:
             "indexed": {"timestamp": 1234567890},
             "title": ["ignored"],  # hors whitelist
         }
-        meta = extract_crossref_meta(msg)
+        meta = extract_crossref_source_extras(msg)
         assert meta is not None
         assert meta == {
             "license": [{"URL": "https://x"}],
@@ -209,28 +209,30 @@ class TestExtractCrossrefMeta:
         }
 
     def test_drops_zero_references_count(self):
-        meta = extract_crossref_meta({"references-count": 0})
+        meta = extract_crossref_source_extras({"references-count": 0})
         assert meta is None
 
     def test_keeps_a_single_reference(self):
-        assert extract_crossref_meta({"references-count": 1}) == {"references_count": 1}
+        assert extract_crossref_source_extras({"references-count": 1}) == {"references_count": 1}
 
     def test_falls_back_to_indexed_date_time(self):
-        meta = extract_crossref_meta({"indexed": {"date-time": "2024-01-01T00:00:00Z"}})
+        meta = extract_crossref_source_extras({"indexed": {"date-time": "2024-01-01T00:00:00Z"}})
         assert meta == {"indexed": "2024-01-01T00:00:00Z"}
 
     def test_returns_none_when_empty(self):
-        assert extract_crossref_meta({}) is None
+        assert extract_crossref_source_extras({}) is None
 
     def test_keeps_group_title_of_posted_content(self):
-        meta = extract_crossref_meta({"type": "posted-content", "group-title": "oral"})
+        meta = extract_crossref_source_extras({"type": "posted-content", "group-title": "oral"})
         assert meta == {"group_title": "oral"}
 
     def test_ignores_group_title_of_other_types(self):
-        assert extract_crossref_meta({"type": "journal-article", "group-title": "x"}) is None
+        assert (
+            extract_crossref_source_extras({"type": "journal-article", "group-title": "x"}) is None
+        )
 
     def test_keeps_conference(self):
-        meta = extract_crossref_meta({"event": {"name": "EUROCALL 2022"}})
+        meta = extract_crossref_source_extras({"event": {"name": "EUROCALL 2022"}})
         assert meta == {"conference": {"name": "EUROCALL 2022"}}
 
 

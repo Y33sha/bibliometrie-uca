@@ -1,7 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 Particularités CrossRef :
-- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; la phase `metadata_correction` le traduit par `domain.source_records.doc_types._SOURCE_MAPS["crossref"]`. `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
+- `raw_doc_type` : `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 
@@ -9,42 +9,38 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sqlalchemy import Connection
-
 from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.journals.series import split_collection_and_volume
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
+from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
-from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.crossref.payload import (
     crossref_issns,
     crossref_raw_doc_type,
     extract_crossref_conference,
-    extract_crossref_meta,
     extract_crossref_publication_year,
+    extract_crossref_source_extras,
     parse_crossref_issns,
     strip_jats_tags,
 )
@@ -137,52 +133,45 @@ def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | Non
     `isbn-type` donne le support de chaque ISBN : celui de l'édition électronique va sous `eisbn`. Un ISBN sans support déclaré reste sous `isbn`.
     """
     ext: dict[str, JsonValue] = {}
-    electroniques = {
+    electronic = {
         value
         for entry in as_sequence(msg.get("isbn-type"))
         if (value := as_str(as_mapping(entry).get("value")))
         and as_str(as_mapping(entry).get("type")) == "electronic"
     }
     isbns = [s for s in as_sequence(msg.get("ISBN")) if isinstance(s, str)]
-    if papier := [s for s in isbns if s not in electroniques]:
-        ext[ExternalIdType.ISBN] = papier
-    if en_ligne := [s for s in isbns if s in electroniques]:
-        ext[ExternalIdType.EISBN] = en_ligne
+    if print_isbns := [s for s in isbns if s not in electronic]:
+        ext[ExternalIdType.ISBN] = print_isbns
+    if online := [s for s in isbns if s in electronic]:
+        ext[ExternalIdType.EISBN] = online
     return ext or None
 
 
+def page_range(page: str | None, article_number: str | None) -> PageRange:
+    """Pagination Crossref (`page`). Une page seule égale au numéro d'article est écartée."""
+    pages = parse_pages(page)
+    if pages.last_page is None and pages.first_page == article_number:
+        return PageRange()
+    return pages
+
+
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume, issue, page, article-number + publisher/journal bruts.
+    """Volume, issue, pages, article-number + publisher/journal bruts.
 
     `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
     """
-    biblio: dict[str, JsonValue] = {}
-    for src_key, dest_key in (
-        ("volume", "volume"),
-        ("issue", "issue"),
-        ("page", "page"),
-        ("article-number", "article_number"),
-    ):
-        val = msg.get(src_key)
-        if isinstance(val, str) and val.strip():
-            biblio[dest_key] = val.strip()
-    if publisher_raw := get_publisher_name(msg):
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := get_container_title(msg):
-        journal_obj["title"] = jt
     issn_val, eissn_val = get_issns(msg)
-    if issn_val:
-        journal_obj["issn"] = issn_val
-    if eissn_val:
-        journal_obj["eissn"] = eissn_val
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    return biblio or None
-
-
-def get_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    return extract_crossref_meta(msg)
+    article_number = as_text(msg.get("article-number"))
+    return compact_biblio(
+        volume=as_text(msg.get("volume")),
+        issue=as_text(msg.get("issue")),
+        **page_range(as_text(msg.get("page")), article_number)._asdict(),
+        article_number=article_number,
+        publisher=get_publisher_name(msg),
+        journal_title=get_container_title(msg),
+        journal_issn=issn_val,
+        journal_eissn=eissn_val,
+    )
 
 
 # =============================================================
@@ -297,9 +286,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
         return []
 
     ids_by_position = [
-        compact_identifiers(orcid=normalize_orcid(as_str(a.get("ORCID"))))
-        if isinstance(a, dict)
-        else None
+        contributor_identifiers(orcid=as_str(a.get("ORCID"))) if isinstance(a, dict) else None
         for a in authors
     ]
 
@@ -337,15 +324,13 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     msg: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources Crossref de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "crossref",
         source_record_id,
         extract_crossref_author_block(msg),
@@ -359,14 +344,13 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    staging_store: StagingStore,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -385,10 +369,9 @@ def process_work(
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
-    meta = get_meta(msg)
+    source_extras = extract_crossref_source_extras(msg)
 
-    source_record_id = queries.upsert_source_record(
-        conn,
+    source_record_id = record_store.upsert_source_record(
         SourceRecordUpsert(
             source="crossref",
             source_id=doi,
@@ -397,22 +380,22 @@ def process_work(
             external_ids=external_ids,
             title=title,
             publication_year=publication_year,
-            doc_type=crossref_raw_doc_type(msg),
+            raw_doc_type=crossref_raw_doc_type(msg),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
             container_title=get_container_title(msg) if not containers.journal_id else None,
-            language=get_language(msg),
+            raw_language=get_language(msg),
             biblio=biblio,
             abstract=get_abstract(msg),
             keywords=get_keywords(msg),
             oa_status=None,
             license=crossref_license(msg.get("license")),
             impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
-            meta=meta,
+            source_extras=source_extras,
         ),
     )
-    process_contributions(conn, contribution_queries, msg, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    process_contributions(contribution_store, msg, source_record_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -423,14 +406,13 @@ class CrossrefNormalizer(BibliographicNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            staging_store=self._staging,
+            contribution_store=self._contribution_store,
         )

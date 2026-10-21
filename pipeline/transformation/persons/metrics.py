@@ -4,7 +4,7 @@ import logging
 from typing import NamedTuple
 
 from domain.persons.matching import MatchReason
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord
+from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Méthodes de rattachement, par fiabilité décroissante de la cascade, et ce qu'elles disent.
@@ -39,13 +39,13 @@ class CascadeResult(NamedTuple):
 def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
     """Écrit ce qui a identifié les personnes, méthode par méthode, nombres alignés à droite."""
     matched = result.matched_counts
-    total = sum(matched.get(methode, 0) for methode in _MATCHING_METHODS)
-    logger.info("%s%s, dont", DERNIERE_BRANCHE, accord(total, "identification"))
+    total = sum(matched.get(method, 0) for method in _MATCHING_METHODS)
+    logger.info("%s%s, dont", LAST_BRANCH, quantity(total, "identification"))
 
-    largeur = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
+    width = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
     logger.info("")
-    for methode, libelle in _MATCHING_METHODS.items():
-        logger.info("     %s %s", f"{matched.get(methode, 0)}".rjust(largeur), libelle)
+    for method, label in _MATCHING_METHODS.items():
+        logger.info("     %s %s", f"{matched.get(method, 0)}".rjust(width), label)
 
 
 def build_metrics(

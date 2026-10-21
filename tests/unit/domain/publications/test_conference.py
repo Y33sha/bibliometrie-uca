@@ -25,7 +25,7 @@ def _source_record(**overrides) -> SourceRecord:
         "urls": (),
         "topics": None,
         "biblio": None,
-        "meta": None,
+        "source_extras": None,
     }
     defaults.update(overrides)
     return SourceRecord(**defaults)  # type: ignore[arg-type]
@@ -39,23 +39,25 @@ class TestAttestsPublication:
 
     def test_congres_declare_par_crossref(self):
         assert attests_publication(
-            _source_record(source="crossref", meta={"conference": {"name": "ICRA"}})
+            _source_record(source="crossref", source_extras={"conference": {"name": "ICRA"}})
         )
 
     def test_champs_editoriaux_hal(self):
-        assert attests_publication(_source_record(meta={"proceedings": True}))
-        assert attests_publication(_source_record(biblio={"pages": "pp. 465-470"}))
+        assert attests_publication(_source_record(source_extras={"proceedings": True}))
+        assert attests_publication(_source_record(biblio={"first_page": "465", "last_page": "470"}))
         assert attests_publication(_source_record(biblio={"publisher": "Dykinson S. L."}))
         assert attests_publication(
-            _source_record(meta={"source_title": "Actes des 8èmes journées"})
+            _source_record(source_extras={"source_title": "Actes des 8èmes journées"})
         )
 
     def test_bruit_hal_sans_valeur(self):
-        assert not attests_publication(_source_record(meta={"proceedings": False}))
+        assert not attests_publication(_source_record(source_extras={"proceedings": False}))
         assert not attests_publication(
-            _source_record(biblio={"pages": "21 p.", "publisher": "s.n."})
+            _source_record(biblio={"first_page": "21", "publisher": "s.n."})
         )
-        assert not attests_publication(_source_record(meta={"source_title": "Colloque de 2020"}))
+        assert not attests_publication(
+            _source_record(source_extras={"source_title": "Colloque de 2020"})
+        )
 
     def test_champs_editoriaux_ignores_hors_hal(self):
         assert not attests_publication(
@@ -98,7 +100,9 @@ class TestArbitrateConference:
         assert arbitrate_conference("article", sources) == "conference"
 
     def test_recueil_de_resumes_hal(self):
-        sources = [_source_record(meta={"source_title": "Book of abstracts", "proceedings": True})]
+        sources = [
+            _source_record(source_extras={"source_title": "Book of abstracts", "proceedings": True})
+        ]
         assert arbitrate_conference("conference_paper", sources) == "conference"
 
     def test_autres_types_inchanges(self):

@@ -91,7 +91,7 @@ class TestOADocTypeMap:
             "preprint",
             "dissertation",
         ]:
-            assert map_doc_type(t, "openalex") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "openalex") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["openalex"].values():
@@ -169,7 +169,7 @@ class TestHALGetTitle:
 class TestHALDocTypeMap:
     def test_covers_common_types(self):
         for t in ["ART", "COMM", "OUV", "COUV", "THESE", "HDR"]:
-            assert map_doc_type(t, "hal") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "hal") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["hal"].values():
@@ -229,7 +229,7 @@ class TestWoSDocTypeMap:
             "proceedings paper",
             "editorial material",
         ]:
-            assert map_doc_type(t, "wos") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "wos") not in (None, "other"), f"{t} non mappé"
 
 
 # ── CrossRef ────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ class TestCrossRefDocTypeMap:
             "peer-review",
             "report",
         ]:
-            assert map_doc_type(t, "crossref") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "crossref") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["crossref"].values():
@@ -290,7 +290,7 @@ class TestFirstDocTypeArbitration:
             urls=(),
             topics=None,
             biblio=None,
-            meta=None,
+            source_extras=None,
         )
 
     def _arbitrate(self):
@@ -410,20 +410,20 @@ class TestNormalizeNnt:
 # ── theses.fr ────────────────────────────────────────────────────
 
 from pipeline.ingestion.theses.normalize import (
-    _build_source_meta,
+    _build_source_extras,
     extract_publication_metadata,
 )
 
 
 class TestThesesExtractPublicationMetadata:
     def test_soutenue(self):
-        these = {
+        thesis = {
             "titrePrincipal": "Titre de la thèse",
             "dateSoutenance": "15/03/2023",
             "doi": "10.1234/test",
             "nnt": "2023ucfa0069",
         }
-        meta = extract_publication_metadata(these)
+        meta = extract_publication_metadata(thesis)
         assert meta.title == "Titre de la thèse"
         assert meta.doc_type == "thesis"
         assert meta.publication_year == 2023
@@ -433,11 +433,11 @@ class TestThesesExtractPublicationMetadata:
         assert meta.journal_id is None
 
     def test_en_cours_falls_back_to_inscription(self):
-        these = {
+        thesis = {
             "titrePrincipal": "Thèse en cours",
             "datePremiereInscriptionDoctorat": "01/09/2022",
         }
-        meta = extract_publication_metadata(these)
+        meta = extract_publication_metadata(thesis)
         assert meta.doc_type == "ongoing_thesis"
         assert meta.publication_year == 2022
         assert meta.doi is None
@@ -462,7 +462,7 @@ class TestThesesExtractPublicationMetadata:
 
 class TestThesesBuildSourceMeta:
     def test_full(self):
-        these = {
+        thesis = {
             "dateSoutenance": "15/03/2023",
             "datePremiereInscriptionDoctorat": "01/09/2020",
             "discipline": "Informatique",
@@ -472,7 +472,7 @@ class TestThesesBuildSourceMeta:
                 {"nom": "CNRS", "type": "org"},
             ],
         }
-        meta = _build_source_meta(these)
+        meta = _build_source_extras(thesis)
         assert meta == {
             "date_soutenance": "2023-03-15",
             "date_inscription": "2020-09-01",
@@ -486,18 +486,18 @@ class TestThesesBuildSourceMeta:
 
     def test_empty(self):
         """Sans aucun champ exploitable → None."""
-        assert _build_source_meta({}) is None
+        assert _build_source_extras({}) is None
 
     def test_partial(self):
-        meta = _build_source_meta({"discipline": "Physique"})
+        meta = _build_source_extras({"discipline": "Physique"})
         assert meta == {"discipline": "Physique"}
 
     def test_filters_entries_without_nom(self):
-        these = {
+        thesis = {
             "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
             "partenairesDeRecherche": [{"type": "lab"}],
         }
-        assert _build_source_meta(these) is None
+        assert _build_source_extras(thesis) is None
 
 
 # ── contribution_roles ─────────────────────────────────────────────

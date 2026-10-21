@@ -19,7 +19,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from interfaces.cli.oneshot.backfill_author_counts import backfill_source_records
 from interfaces.cli.oneshot.decode_latex_author_names import candidates_sql
-from pipeline.ingestion.common.source_contribution_queries import (
+from pipeline.ingestion.common.source_contribution_store import (
     delete_orphan_contributor_information,
 )
 

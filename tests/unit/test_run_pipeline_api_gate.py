@@ -13,7 +13,7 @@ from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications import oa_status
 
-_RUN_ENRICH = "pipeline.transformation.publications.oa_status._verifier"
+_RUN_ENRICH = "pipeline.transformation.publications.oa_status._check"
 _LOG = logging.getLogger("test")
 
 

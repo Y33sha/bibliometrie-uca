@@ -70,7 +70,7 @@ class TestGetPublicationDetail:
                 publication,
                 source="openalex",
                 source_id=source_id,
-                raw_metadata={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
+                corrections={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
             )
         detail = get_publication_detail(sa_sync_conn, publication)
         assert detail is not None
@@ -84,17 +84,17 @@ class TestGetPublicationDetail:
     def test_thesis_meta_populated_for_thesis(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, title="Thèse", doc_type="thesis")
         sa_sync_conn.execute(
-            text("UPDATE publications SET meta = CAST(:m AS jsonb) WHERE id = :id"),
+            text("UPDATE publications SET source_extras = CAST(:m AS jsonb) WHERE id = :id"),
             {"m": json.dumps({"date_soutenance": "2023-05-10"}), "id": publication},
         )
-        # source_records theses avec meta
+        # source_records theses avec source_extras
         insert_source_record(
             sa_sync_conn,
             publication,
             source="theses",
             source_id="t-1",
             title="Thèse",
-            meta={"discipline": "Informatique"},
+            source_extras={"discipline": "Informatique"},
         )
 
         detail = get_publication_detail(sa_sync_conn, publication)

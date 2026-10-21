@@ -1,20 +1,16 @@
-"""Value objects et helpers de normalisation des identifiants personne.
+"""Identifiants de personne, au contrat de `domain.identifiers.NormalizedIdentifier` : ORCID, IdHAL, IdRef (PPN SUDOC), compte HAL (`HalPersonId`).
 
-ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs immuables et auto-validés au même contrat que `domain/publications/identifiers.py` :
-
-- `X("...")` strict : lève `ValidationError` si malformé
-- `X.try_parse(...)` tolérant : renvoie None si malformé
-
-`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de VO.
+`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de value object.
 """
 
 import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 from domain.errors import ValidationError
+from domain.identifiers import NormalizedIdentifier
 from domain.types import JsonValue
 
 
@@ -111,44 +107,24 @@ def orcid_uri(orcid: str) -> str:
     return f"{_ORCID_URL_PREFIXES[0]}{orcid}"
 
 
-@dataclass(frozen=True)
-class ORCID:
+class ORCID(NormalizedIdentifier):
     """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
 
     Lève `ValidationError` si la valeur ne respecte pas le format. Contrôle le format, sans vérifier la checksum MOD 11-2.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = normalize_orcid(self.value)
-        if not cleaned:
-            raise ValidationError(f"ORCID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "ORCID | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "ORCID"
+    normalize = staticmethod(normalize_orcid)
 
 
 # ── IdHAL (personne) ───────────────────────────────────────────────
 
-# Slug HAL : minuscules, chiffres, tirets. Certains comptes sont numériques
-# (l'API HAL distingue idHal_s et idHal_i). On accepte les deux formes,
-# stockées en base comme texte.
-_IDHAL_CANONICAL = re.compile(r"^[a-z0-9][a-z0-9-]{1,59}$")
+# Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`.
+_IDHAL_CANONICAL = re.compile(r"^\S+$")
 
 
 def _normalize_idhal(raw: str | None) -> str | None:
-    """Normalise un IdHAL personne : trim, lowercase, vérifie la forme slug."""
+    """Normalise un IdHAL personne : trim, lowercase, refuse une valeur vide ou qui contient un espace. HAL ne distingue pas la casse."""
     if not raw:
         return None
     s = raw.strip().lower()
@@ -157,32 +133,14 @@ def _normalize_idhal(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class IdHAL:
-    """Identifiant IdHAL d'une personne (login HAL, forme slug).
+class IdHAL(NormalizedIdentifier):
+    """Identifiant IdHAL d'une personne, choisi par la personne à sa création.
 
-    Ex. `jean-dupont`, `jdupont`, ou une forme numérique.
+    Ex. `jean-dupont`, `jdupont`, `jean.dupont`.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_idhal(self.value)
-        if not cleaned:
-            raise ValidationError(f"IdHAL invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "IdHAL | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "IdHAL"
+    normalize = staticmethod(_normalize_idhal)
 
 
 # ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
@@ -195,11 +153,11 @@ _IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
 def _normalize_idref(raw: str | None) -> str | None:
     """Normalise un IdRef (PPN) : 9 caractères, dernier peut être X.
 
-    Accepte une URL idref.fr en entrée.
+    Accepte une URL idref.fr en entrée. Les blancs sont retirés.
     """
     if not raw:
         return None
-    s = raw.strip()
+    s = "".join(raw.split())
     # URL éventuelle
     m = _IDREF_URL_RE.search(s)
     if m:
@@ -210,29 +168,11 @@ def _normalize_idref(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class IdRef:
+class IdRef(NormalizedIdentifier):
     """Identifiant IdRef (PPN SUDOC), format 8 chiffres + clé de contrôle."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_idref(self.value)
-        if not cleaned:
-            raise ValidationError(f"IdRef invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "IdRef | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "IdRef"
+    normalize = staticmethod(_normalize_idref)
 
 
 # ── hal_person_id (compte HAL) ────────────────────────────────────
@@ -251,29 +191,11 @@ def _normalize_hal_person_id(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class HalPersonId:
+class HalPersonId(NormalizedIdentifier):
     """Identifiant d'un compte HAL (`personId`), entier positif."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_hal_person_id(self.value)
-        if not cleaned:
-            raise ValidationError(f"hal_person_id invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "HalPersonId | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "hal_person_id"
+    normalize = staticmethod(_normalize_hal_person_id)
 
 
 # ── Validation d'un identifiant par type ──────────────────────────
@@ -297,16 +219,34 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
     return value_object(raw).value
 
 
-# ── Construction du dict JSONB `source_contributions.identifiers` ────
+# ── Identifiants d'une contribution source (`contributor_information.identifiers`) ──
 
 
-def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
-    """Construit le dict d'identifiants pour `source_contributions.identifiers`.
+class ContributorIdentifiers(NamedTuple):
+    """Identifiants d'une contribution source : `values` pour `contributor_information.identifiers`, `malformed` pour les couples `(type, valeur brute)` écartés."""
 
-    Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict vide → None.
+    values: dict[str, JsonValue] | None
+    malformed: tuple[tuple[str, str], ...]
+
+
+def compact_identifiers(**ids: str | int | None) -> ContributorIdentifiers:
+    """Construit les identifiants d'une contribution source depuis les valeurs brutes de la source.
+
+    Une valeur falsy (None, 0, "") est absente. Un identifiant de `PersonIdentifierType` prend la forme normalisée par le value object de son type ; une valeur mal formée va dans `malformed`. Les autres clés gardent leur valeur. Sans identifiant, `values` vaut None.
     """
-    out: dict[str, JsonValue] = {k: v for k, v in ids.items() if v}
-    return out or None
+    values: dict[str, JsonValue] = {}
+    malformed: list[tuple[str, str]] = []
+    for id_type, raw in ids.items():
+        if not raw:
+            continue
+        value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
+        if value_object is None:
+            values[id_type] = raw
+        elif parsed := value_object.try_parse(str(raw)):
+            values[id_type] = parsed.value
+        else:
+            malformed.append((id_type, str(raw)))
+    return ContributorIdentifiers(values or None, tuple(malformed))
 
 
 class IdentifierNeutralization(StrEnum):

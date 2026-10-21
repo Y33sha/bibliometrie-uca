@@ -17,7 +17,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import fetch_ror_dump, read_ror_dump
-from pipeline.transformation.structures.ror import RorDumpQueries, import_ror_dump
+from pipeline.transformation.structures.ror import RorStore, import_ror_dump
 
 log = setup_logger("import_ror_dump", os.path.dirname(__file__))
 
@@ -26,7 +26,7 @@ def _load(archive_path: str, version: str) -> None:
     conn = get_sync_engine().connect()
     try:
         stats = import_ror_dump(
-            conn, read_ror_dump(archive_path), version=version, repo=RorDumpQueries(conn)
+            conn, read_ror_dump(archive_path), version=version, store=RorStore(conn)
         )
     finally:
         conn.close()

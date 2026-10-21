@@ -7,10 +7,10 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-LIBELLE = "Monographies vides"
+LABEL = "Monographies vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _DELETE_EMPTY = text("""
@@ -38,5 +38,5 @@ def run_delete_empty_monographs(conn: Connection, logger: logging.Logger) -> Pha
             "Monographie vide supprimée : %d « %s »", monograph_id, title, extra={"detail": True}
         )
     metrics.add(seen=len(deleted), monographs_deleted=len(deleted))
-    metrics.report = accord(len(deleted), "monographie supprimée", "monographies supprimées")
+    metrics.report = quantity(len(deleted), "monographie supprimée", "monographies supprimées")
     return metrics

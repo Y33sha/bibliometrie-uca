@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.read_models.publications.source_records`."""
 
-import json
 from functools import partial
 
 from sqlalchemy import text
@@ -95,30 +94,27 @@ class TestGetPublicationSources:
             "100-120",
         )
 
-    def test_pages_as_given_by_source(self, sa_sync_conn):
+    def test_single_page(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         _source_record(
             sa_sync_conn,
             publication,
             source="crossref",
             source_id="10.1/y",
-            biblio={"page": "e1234", "article_number": "e1234"},
+            biblio={"first_page": "e1234", "article_number": "e1235"},
         )
         [record] = _records(sa_sync_conn, publication)
-        assert (record.pages, record.article_number) == ("e1234", "e1234")
+        assert (record.pages, record.article_number) == ("e1234", "e1235")
 
     def test_language_name_and_source_value(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication, source="wos", source_id="WOS:1")
         sa_sync_conn.execute(
             text(
-                "UPDATE source_records SET language = 'en', "
-                "raw_metadata = CAST(:rm AS jsonb) WHERE publication_id = :pid"
+                "UPDATE source_records SET language = 'en', raw_language = 'English' "
+                "WHERE publication_id = :pid"
             ),
-            {
-                "rm": json.dumps({"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}),
-                "pid": publication,
-            },
+            {"pid": publication},
         )
         [record] = _records(sa_sync_conn, publication)
         assert (record.language, record.language_name, record.language_raw) == (
@@ -126,6 +122,19 @@ class TestGetPublicationSources:
             "Anglais",
             "English",
         )
+
+    def test_source_value_absent_when_equal_to_the_code(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        _source_record(sa_sync_conn, publication, source="openalex", source_id="W2")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_records SET language = 'en', raw_language = 'en' "
+                "WHERE publication_id = :pid"
+            ),
+            {"pid": publication},
+        )
+        [record] = _records(sa_sync_conn, publication)
+        assert record.language_raw is None
 
 
 class TestSourceContributions:

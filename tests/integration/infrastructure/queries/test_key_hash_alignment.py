@@ -5,7 +5,7 @@ Un désalignement ferait échouer silencieusement la résolution des information
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.source_contribution_queries import (
+from pipeline.ingestion.common.source_contribution_store import (
     CONTRIBUTOR_INFORMATION_KEY_COLUMNS,
     key_hash_sql,
 )

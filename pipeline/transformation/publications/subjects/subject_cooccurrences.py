@@ -8,30 +8,27 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 import logging
 
-from sqlalchemy import Connection
-
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
-from pipeline.runtime.observability.progression import attente
-from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.progress import waiting
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
 
 def run(
-    conn: Connection,
-    queries: SubjectsIngestionQueries,
+    store: SubjectStore,
     logger: logging.Logger,
 ) -> dict[str, int]:
     """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats.
 
     Les deux recalculs balaient tous les liens publication-sujet : chaque ligne dit le travail en cours, puis cède la place à son résultat.
     """
-    etape(logger, "Rafraîchissement des décomptes")
-    with attente(f"{BRANCHE}publications par sujet", logger) as ligne:
-        n_updated = queries.recompute_usage_counts(conn)
+    step(logger, "Rafraîchissement des décomptes")
+    with waiting(f"{BRANCH}publications par sujet", logger) as line:
+        n_updated = store.recompute_usage_counts()
         # « mis à jour » ne varie pas au pluriel.
-        ligne.conclut(f"{BRANCHE}publications par sujet : {accord(n_updated, 'sujet')} mis à jour")
+        line.conclude(f"{BRANCH}publications par sujet : {quantity(n_updated, 'sujet')} mis à jour")
 
-    with attente(f"{DERNIERE_BRANCHE}co-occurrences entre sujets", logger) as ligne:
-        n_pairs = queries.refresh_cooccurrences(conn)
-        ligne.conclut(f"{DERNIERE_BRANCHE}co-occurrences entre sujets : décomptes rafraîchis")
+    with waiting(f"{LAST_BRANCH}co-occurrences entre sujets", logger) as line:
+        n_pairs = store.refresh_cooccurrences()
+        line.conclude(f"{LAST_BRANCH}co-occurrences entre sujets : décomptes rafraîchis")
 
     return {"usage_counts_updated": n_updated, "cooccurrence_pairs": n_pairs}

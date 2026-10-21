@@ -18,8 +18,8 @@ from infrastructure.repositories.perimeter_repository import PgPerimeterReposito
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from pipeline.transformation.publications.consolidation import source_records_of
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
-    PgMetadataCorrectionQueries,
+from pipeline.transformation.publications.correction.correction_store import (
+    SourceRecordCorrectionStore,
 )
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.structures import (
@@ -33,25 +33,22 @@ class TestRelevesRendantUneListe:
     """Relevés dont l'accord se vérifie sans qu'aucune ligne existe."""
 
     def test_les_candidates_a_la_correction_unaire_s_accordent(self, sa_sync_conn_owner):
-        assert PgMetadataCorrectionQueries().fetch_for_unary_correction(sa_sync_conn_owner) == []
+        assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_for_unary_correction() == []
 
     def test_les_candidates_d_une_revue_s_accordent(self, sa_sync_conn_owner):
-        queries = PgMetadataCorrectionQueries()
-        assert queries.fetch_for_unary_correction_by_journal(sa_sync_conn_owner, 1) == []
+        queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
+        assert queries.fetch_for_unary_correction_by_journal(1) == []
 
     def test_les_depots_hal_d_origine_s_accordent(self, sa_sync_conn_owner):
-        queries = PgMetadataCorrectionQueries()
-        assert (
-            queries.fetch_for_unary_correction_by_hal_ids(sa_sync_conn_owner, ["hal-01234567"])
-            == []
-        )
+        queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
+        assert queries.fetch_for_unary_correction_by_hal_ids(["hal-01234567"]) == []
 
     def test_les_espaces_de_noms_doi_des_revues_s_accordent(self, sa_sync_conn_owner):
-        assert PgMetadataCorrectionQueries().fetch_journal_doi_namespaces(sa_sync_conn_owner) == []
+        assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_journal_doi_namespaces() == []
 
     def test_les_candidates_au_rattachement_par_doi_s_accordent(self, sa_sync_conn_owner):
-        queries = PgMetadataCorrectionQueries()
-        assert queries.fetch_journal_by_doi_candidates(sa_sync_conn_owner) == []
+        queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
+        assert queries.fetch_journal_by_doi_candidates() == []
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
         assert source_records_of(sa_sync_conn_owner, 1) == []
@@ -94,7 +91,6 @@ TYPES_EXERCES = {
     "FacetOption",
     "DoiNamespace",
     "JournalCorrectionRow",
-    "UnaryCorrectionRow",
     "_JournalRow",
     "_PerimeterRow",
     "_PublisherRow",
@@ -135,7 +131,7 @@ def _types_apparies() -> set[str]:
 
 def test_le_parcours_trouve_les_appariements():
     """Filet du filet : un parcours qui n'en trouverait aucun rendrait l'assertion vide, donc verte."""
-    assert len(_types_apparies()) >= 10
+    assert len(_types_apparies()) >= 9
 
 
 def test_chaque_type_apparie_est_exerce_par_un_test():

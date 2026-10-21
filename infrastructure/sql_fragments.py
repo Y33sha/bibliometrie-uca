@@ -9,9 +9,12 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
-from domain.source_records.raw_metadata import CORRECTED_BY, RAW
+from domain.publications.identifiers import HAL_DOC_PATTERN
+from domain.source_records.corrections import CORRECTED_BY, RAW
+from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY, Source
+from domain.sources.scanr import SCANR_HAL_PREFIX
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -202,26 +205,59 @@ def source_contribution_perimeter_evidence(source_contribution_ids: str | None =
 
 
 def corrected(field: str, source_record: str = "sr") -> str:
-    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.raw_metadata`)."""
-    return f"{source_record}.raw_metadata ? '{field}'"
+    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.corrections`)."""
+    return f"{source_record}.corrections ? '{field}'"
 
 
 def corrected_by(field: str, source_record: str = "sr") -> str:
     """Règle qui a corrigé le champ `field` de l'enregistrement source aliasé `source_record`. NULL quand le champ est intact."""
-    return f"{source_record}.raw_metadata -> '{field}' ->> '{CORRECTED_BY}'"
+    return f"{source_record}.corrections -> '{field}' ->> '{CORRECTED_BY}'"
 
 
 def stashed_raw(field: str, source_record: str = "sr") -> str:
     """Valeur que la source donne pour le champ `field` de l'enregistrement source aliasé `source_record`, quand une correction l'a changée. NULL quand le champ est intact."""
-    return f"{source_record}.raw_metadata -> '{field}' ->> '{RAW}'"
+    return f"{source_record}.corrections -> '{field}' ->> '{RAW}'"
 
 
 def raw_column(field: str, source_record: str = "sr") -> str:
     """Valeur que la source donne pour la colonne texte `field` de l'enregistrement source aliasé `source_record` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
     return (
-        f"CASE WHEN {source_record}.raw_metadata -> '{field}' ? '{RAW}'"
+        f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
         f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
     )
+
+
+def scanr_from_hal_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` est un enregistrement ScanR issu d'un dépôt HAL (`extract_hal_id_from_scanr_id`)."""
+    return (
+        f"({alias}.source = '{Source.SCANR.value}'"
+        f" AND {alias}.source_id ~* '^{SCANR_HAL_PREFIX}.*{HAL_DOC_PATTERN}')"
+    )
+
+
+def source_extra(key: SourceExtra, alias: str = "sr") -> str:
+    """Valeur texte de la clé `key` des champs propres à la source de la ligne aliasée `alias`, enregistrement source ou publication."""
+    return f"{alias}.source_extras ->> '{key}'"
+
+
+def source_extra_json(key: SourceExtra, alias: str = "sr") -> str:
+    """Valeur JSON de la clé `key` des champs propres à la source de la ligne aliasée `alias`."""
+    return f"{alias}.source_extras -> '{key}'"
+
+
+def has_source_extra(key: SourceExtra, alias: str = "sr") -> str:
+    """Condition vraie quand les champs propres à la source de la ligne aliasée `alias` contiennent la clé `key`."""
+    return f"{alias}.source_extras ? '{key}'"
+
+
+def declares_conference_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` nomme son congrès (`declares_conference`)."""
+    return f"COALESCE({has_source_extra(SourceExtra.CONFERENCE, alias)}, false)"
+
+
+def self_declared_preprint_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` déclare être le preprint d'une autre œuvre."""
+    return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
 # Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la contribution source `sc` et son enregistrement source `sr`.

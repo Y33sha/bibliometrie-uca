@@ -11,6 +11,7 @@ import re
 from collections.abc import Iterable, Mapping
 
 from domain.publications.identifiers import clean_doi, find_isbns
+from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -175,9 +176,9 @@ def get_cited_by_count(attributes: Mapping[str, JsonValue]) -> int | None:
 
 
 def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Token brut de doc_type à stocker sur `source_records.doc_type`.
+    """Token brut de doc_type à stocker sur `source_records.raw_doc_type`.
 
-    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, mappé ensuite par `domain.source_records.doc_types._SOURCE_MAPS["datacite"]` :
+    DataCite donne deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, traduit par `domain.source_records.doc_types._SOURCE_MAPS["datacite"]` :
 
     - `resourceTypeGeneral` spécifique (≠ Text / Other) → ce token ;
     - sinon `resourceType` libre s'il est renseigné ;
@@ -261,7 +262,7 @@ def _doi_related_identifiers(attributes: Mapping[str, JsonValue]) -> list[dict[s
 # IsReferencedBy) en sont EXCLUES : elles désignent un lien bibliographique,
 # pas une œuvre du périmètre — les ajouter aux DOI cherchés par fetch_missing ferait
 # ingérer toute la bibliographie citée. La nature complète des relations
-# (citations comprises) reste tracée dans `meta.related_identifiers`.
+# (citations comprises) reste tracée dans `source_extras.related_identifiers`.
 _CORPUS_RELATION_TYPES = frozenset(
     {
         "IsVersionOf",
@@ -282,7 +283,7 @@ _CORPUS_RELATION_TYPES = frozenset(
 def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> list[str]:
     """DOI secondaires à rapatrier dans le corpus, hors DOI primaire, dédupliqués.
 
-    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois`, que la phase `fetch_missing` cherche dans chaque source. La liste typée complète vit dans `meta.related_identifiers`.
+    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois`, que la phase `fetch_missing` cherche dans chaque source. La liste typée complète vit dans `source_extras.related_identifiers`.
     """
     self_doi_clean = clean_doi(self_doi)
     out: list[str] = []
@@ -298,19 +299,21 @@ def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> 
     return out
 
 
-def extract_datacite_meta(attributes: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Champs DataCite-spécifiques conservés en JSONB sur `source_records.meta`.
+def extract_datacite_source_extras(
+    attributes: Mapping[str, JsonValue],
+) -> Mapping[str, JsonValue] | None:
+    """Champs DataCite-spécifiques conservés en JSONB sur `source_records.source_extras`.
 
     Whitelist : `related_identifiers` (DOI typés avec leur `relationType`, pour les relations et la résolution concept/version), `rights` (licences) et `funding` (financeurs).
     """
-    meta: dict[str, JsonValue] = {}
+    source_extras: dict[str, JsonValue] = {}
     related = _doi_related_identifiers(attributes)
     if related:
-        meta["related_identifiers"] = related
+        source_extras[SourceExtra.RELATED_IDENTIFIERS] = related
     rights = attributes.get("rightsList")
     if isinstance(rights, list) and rights:
-        meta["rights"] = rights
+        source_extras[SourceExtra.RIGHTS] = rights
     funding = attributes.get("fundingReferences")
     if isinstance(funding, list) and funding:
-        meta["funding"] = funding
-    return meta or None
+        source_extras[SourceExtra.FUNDING] = funding
+    return source_extras or None

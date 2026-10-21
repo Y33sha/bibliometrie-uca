@@ -274,7 +274,7 @@ class TestDoiNamespaceConflicts:
         _seed_record(
             journal_id=parasite,
             doi=f"{namespace}4",
-            raw_metadata={"journal_id": {"raw": None, "corrected_by": "X"}},
+            corrections={"journal_id": {"raw": None, "corrected_by": "X"}},
         )
 
         conflicts = client.get("/api/journals/doi-namespace-conflicts").json()["conflicts"]

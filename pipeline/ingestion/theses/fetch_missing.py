@@ -22,9 +22,9 @@ from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, 
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.theses.api import fetch_thesis
 from pipeline.ingestion.theses.fields import extract_doi
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
+from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 
 _COMMIT_EVERY = 50
 
@@ -64,7 +64,7 @@ async def fetch_missing_theses_by_nnt(
     nnts = get_missing_nnts(conn, retry_after_days=retry_after_days)
     metrics = PhaseMetrics(seen=len(nnts))
     if not nnts:
-        rien_a_faire(log)
+        nothing_to_do(log)
         return metrics
 
     async def _fetch(
@@ -74,9 +74,7 @@ async def fetch_missing_theses_by_nnt(
         await asyncio.sleep(THESES_DELAY)
         return fetched
 
-    with progression(
-        len(nnts), f"{DERNIERE_BRANCHE}theses.fr", log, compte_retenus=True
-    ) as avancement:
+    with track_progress(len(nnts), f"{LAST_BRANCH}theses.fr", log, count_kept=True) as progress:
 
         def _write(
             conn: Connection, nnt: str, result: LookupOutcome[Mapping[str, JsonValue]]
@@ -95,8 +93,8 @@ async def fetch_missing_theses_by_nnt(
                 )
                 if inserted:
                     metrics.add(new=1)
-                    avancement.retient()
-            avancement.avance()
+                    progress.keep()
+            progress.advance()
 
         await run_fetch_pool(
             nnts,

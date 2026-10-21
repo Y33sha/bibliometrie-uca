@@ -160,12 +160,13 @@ def delete_orphan_addresses(conn: Connection) -> int:
     ).rowcount
 
 
-class ContributionsBatchQueries:
+class SourceContributionStore:
     """Opérations SQL par lot pour l'écriture des contributions sources."""
 
-    def upsert_source_contributions_batch(
-        self, conn: Connection, values: list[SourceContributionItem]
-    ) -> None:
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def upsert_source_contributions_batch(self, values: list[SourceContributionItem]) -> None:
         """Les informations du contributeur (`CONTRIBUTOR_INFORMATION_KEY_COLUMNS`) sont dans la table dédupliquée `contributor_information` ; la contribution source a seulement une FK `contributor_information_id`. Deux requêtes dans la transaction du writer :
 
         1. **Upsert des informations du contributeur du lot** — `INSERT … SELECT DISTINCT … ON CONFLICT DO NOTHING` : les lignes de l'enregistrement source, dédupliquées, sans churn (un `DO UPDATE` récrirait chaque ligne récurrente à chaque enregistrement source).
@@ -193,7 +194,7 @@ class ContributionsBatchQueries:
             for v in values
         ]
         # 1. Upsert des informations du contributeur du lot (dédup par clé, sans churn).
-        conn.execute(
+        self._conn.execute(
             text(f"""
                 INSERT INTO contributor_information ({_KEY_COLUMNS_SQL})
                 SELECT DISTINCT t.last_name_normalized, t.first_name_normalized,
@@ -226,7 +227,7 @@ class ContributionsBatchQueries:
               ON ci.key_hash = """
             + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
         ).bindparams(bindparam("payload", type_=Jsonb))
-        conn.execute(
+        self._conn.execute(
             stmt,
             {
                 "source": values[0]["source"],
@@ -236,9 +237,9 @@ class ContributionsBatchQueries:
         )
 
     def fetch_stored_source_contributions(
-        self, conn: Connection, source_record_id: int
+        self, source_record_id: int
     ) -> list[StoredSourceContributionRow]:
-        rows = conn.execute(
+        rows = self._conn.execute(
             text("""
                 SELECT sc.id, sc.author_position, ci.last_name_normalized,
                        ci.first_name_normalized, ci.identifiers, sc.content_hash,
@@ -251,9 +252,9 @@ class ContributionsBatchQueries:
         ).all()
         return [StoredSourceContributionRow(*r) for r in rows]
 
-    def mark_contributions_dirty(self, conn: Connection, source_record_id: int) -> None:
+    def mark_contributions_dirty(self, source_record_id: int) -> None:
         """Pose `contributions_dirty` sur la publication de l'enregistrement source."""
-        conn.execute(
+        self._conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
                 FROM source_records sr
@@ -262,15 +263,13 @@ class ContributionsBatchQueries:
             {"spid": source_record_id},
         )
 
-    def delete_source_contributions(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contributions(self, ids: list[int]) -> None:
         if ids:
-            conn.execute(
+            self._conn.execute(
                 text("DELETE FROM source_contributions WHERE id = ANY(:ids)"), {"ids": ids}
             )
 
-    def update_source_contributions_batch(
-        self, conn: Connection, values: list[SourceContributionUpdate]
-    ) -> None:
+    def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
         # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
         if not values:
             return
@@ -289,7 +288,7 @@ class ContributionsBatchQueries:
             }
             for v in values
         ]
-        conn.execute(
+        self._conn.execute(
             text("""
                 UPDATE source_contributions sc
                 SET author_position = t.author_position,
@@ -311,11 +310,9 @@ class ContributionsBatchQueries:
             {"payload": payload},
         )
 
-    def set_author_counts(
-        self, conn: Connection, source_record_id: int, author_count: int, distinct: int
-    ) -> None:
+    def set_author_counts(self, source_record_id: int, author_count: int, distinct: int) -> None:
         """Écrit `author_count` et `distinct_author_count` de l'enregistrement source."""
-        conn.execute(
+        self._conn.execute(
             text("""
                 UPDATE source_records
                 SET author_count = :n, distinct_author_count = :d
@@ -324,39 +321,39 @@ class ContributionsBatchQueries:
             {"n": author_count, "d": distinct, "id": source_record_id},
         )
 
-    def fetch_authors_hash(self, conn: Connection, source_record_id: int) -> str | None:
-        return conn.execute(
+    def fetch_authors_hash(self, source_record_id: int) -> str | None:
+        return self._conn.execute(
             text("SELECT authors_hash FROM source_records WHERE id = :id"),
             {"id": source_record_id},
         ).scalar_one_or_none()
 
-    def set_authors_hash(self, conn: Connection, source_record_id: int, authors_hash: str) -> None:
-        conn.execute(
+    def set_authors_hash(self, source_record_id: int, authors_hash: str) -> None:
+        self._conn.execute(
             text("UPDATE source_records SET authors_hash = :h WHERE id = :id"),
             {"h": authors_hash, "id": source_record_id},
         )
 
-    def delete_source_contribution_addresses(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contribution_addresses(self, ids: list[int]) -> None:
         if ids:
-            conn.execute(
+            self._conn.execute(
                 text(
                     "DELETE FROM source_contribution_addresses WHERE source_contribution_id = ANY(:ids)"
                 ),
                 {"ids": ids},
             )
 
-    def delete_source_contribution_rors(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contribution_rors(self, ids: list[int]) -> None:
         if ids:
-            conn.execute(
+            self._conn.execute(
                 text(
                     "DELETE FROM source_contribution_rors WHERE source_contribution_id = ANY(:ids)"
                 ),
                 {"ids": ids},
             )
 
-    def delete_source_contribution_hal_structures(self, conn: Connection, ids: list[int]) -> None:
+    def delete_source_contribution_hal_structures(self, ids: list[int]) -> None:
         if ids:
-            conn.execute(
+            self._conn.execute(
                 text(
                     "DELETE FROM source_contribution_hal_structures"
                     " WHERE source_contribution_id = ANY(:ids)"
@@ -364,7 +361,7 @@ class ContributionsBatchQueries:
                 {"ids": ids},
             )
 
-    def upsert_addresses_batch(self, conn: Connection, values: list[AddressBatchItem]) -> None:
+    def upsert_addresses_batch(self, values: list[AddressBatchItem]) -> None:
         if not values:
             return
         stmt = text("""
@@ -373,18 +370,16 @@ class ContributionsBatchQueries:
             FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
             ON CONFLICT (md5(normalized_text)) DO NOTHING
         """).bindparams(bindparam("payload", type_=Jsonb))
-        conn.execute(stmt, {"payload": list(values)})
+        self._conn.execute(stmt, {"payload": list(values)})
 
-    def fetch_address_ids_by_normalized_text(
-        self, conn: Connection, normalized_texts: list[str]
-    ) -> dict[str, int]:
+    def fetch_address_ids_by_normalized_text(self, normalized_texts: list[str]) -> dict[str, int]:
         """Identifiant de l'adresse de chaque forme normalisée. Le filtre sur `md5(normalized_text)` passe par l'index unique `addresses_normalized_text_key`, qui sert aussi le `ON CONFLICT` de `upsert_addresses_batch`. `md5()` PostgreSQL et `hashlib.md5` sur l'UTF-8 coïncident."""
         if not normalized_texts:
             return {}
         md5s = [
             hashlib.md5(t.encode(), usedforsecurity=False).hexdigest() for t in normalized_texts
         ]
-        rows = conn.execute(
+        rows = self._conn.execute(
             text(
                 "SELECT normalized_text, id FROM addresses WHERE md5(normalized_text) = ANY(:md5s)"
             ),
@@ -394,15 +389,14 @@ class ContributionsBatchQueries:
 
     def insert_address_country_candidates(
         self,
-        conn: Connection,
         method: CountryDetectionMethod,
         rows: list[tuple[int, list[str]]],
     ) -> None:
         """Ajoute les pays candidats `(adresse, pays)` du moyen `method` (`CountryCandidatesStore.add`)."""
-        CountryCandidatesStore(conn).add(method, rows)
+        CountryCandidatesStore(self._conn).add(method, rows)
 
     def insert_source_contribution_addresses_batch(
-        self, conn: Connection, values: list[ContributionAddressItem]
+        self, values: list[ContributionAddressItem]
     ) -> None:
         # Pas d'ON CONFLICT : le writer supprime les liens d'une contribution source réécrite avant de les réinsérer, et déduplique les couples (source_contribution_id, addr_id).
         if not values:
@@ -412,7 +406,7 @@ class ContributionsBatchQueries:
             SELECT source_contribution_id, addr_id
             FROM unnest(:source_contribution_ids ::integer[], :addr_ids ::integer[]) AS t(source_contribution_id, addr_id)
         """)
-        conn.execute(
+        self._conn.execute(
             stmt,
             {
                 "source_contribution_ids": [v["source_contribution_id"] for v in values],
@@ -421,12 +415,12 @@ class ContributionsBatchQueries:
         )
 
     def insert_source_contribution_hal_structures_batch(
-        self, conn: Connection, values: list[tuple[int, int]]
+        self, values: list[tuple[int, int]]
     ) -> None:
         """Écrit les couples (contribution source, structure HAL). Le writer supprime d'abord ceux d'une contribution source réécrite."""
         if not values:
             return
-        conn.execute(
+        self._conn.execute(
             text("""
                 INSERT INTO source_contribution_hal_structures (source_contribution_id, hal_structure_id)
                 SELECT source_contribution_id, hal_structure_id
@@ -440,13 +434,11 @@ class ContributionsBatchQueries:
             },
         )
 
-    def insert_source_contribution_rors_batch(
-        self, conn: Connection, values: list[ContributionRorItem]
-    ) -> None:
+    def insert_source_contribution_rors_batch(self, values: list[ContributionRorItem]) -> None:
         # Pas d'ON CONFLICT : le writer supprime les ROR d'une contribution source réécrite avant de les réinsérer, et les ROR d'une contribution source forment un ensemble.
         if not values:
             return
-        conn.execute(
+        self._conn.execute(
             text("""
                 INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id)
                 SELECT source_contribution_id, ror_id, addr_id

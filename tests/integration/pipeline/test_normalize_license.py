@@ -4,20 +4,17 @@ from sqlalchemy import text
 
 from domain.publications.licenses import License
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
 from tests.integration.helpers.staging import insert_staging
-
-_Q = SourceRecordQueries()
 
 
 def test_licence_ecrite_puis_reecrite(sa_sync_conn):
     staging_id = insert_staging(sa_sync_conn, "openalex", source_id="W_license")
 
     def upsert(found: License | None) -> str | None:
-        source_record_id = _Q.upsert_source_record(
-            sa_sync_conn,
+        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
             SourceRecordUpsert(
                 source="openalex",
                 source_id="W_license",

@@ -19,13 +19,13 @@ from sqlalchemy import Connection, text
 
 from domain.journals.titles import compatible_titles, nested_titles
 from infrastructure.sql_fragments import active_issns, has_active_issn
-from pipeline.runtime.observability.libelles import BRANCHE, accord
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import JournalStore
 
-LIBELLE = "Fusion des revues en double"
+LABEL = "Fusion des revues en double"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 MergeJournals = Callable[[int, int], None]
@@ -35,7 +35,7 @@ MergeGroup = tuple[str, tuple[int, ...]]
 """`(libellé, revues)` : ce que les revues partagent, puis les revues, la cible en tête."""
 
 # Ce que les revues d'un groupe partagent : la ligne qui annonce chaque règle, au-dessus de sa barre d'avancement.
-_REGLES = (
+_RULES = (
     "même ISSN-L",
     "même ISSN et titre emboîté",
     "titre successif ou supplément",
@@ -265,12 +265,12 @@ def run_merge_duplicate_journals(
     metrics = PhaseMetrics()
     # Revue absorbée → revue qui l'a absorbée. Une revue qui partage ses deux ISSN avec son double figure dans deux groupes.
     absorbed: dict[int, int] = {}
-    issnl, issn_et_titre, titre_successif, titre_et_prefixe, publication_et_titre = _REGLES
+    issnl, issn_and_title, successive_title, title_and_prefix, publication_and_title = _RULES
 
-    def merge_groups(groups: Sequence[MergeGroup], regle: str) -> None:
+    def merge_groups(groups: Sequence[MergeGroup], rule: str) -> None:
         if not groups:
             return
-        _merge_groups(logger, metrics, JournalStore(conn), merge, absorbed, groups, regle)
+        _merge_groups(logger, metrics, JournalStore(conn), merge, absorbed, groups, rule)
 
     merge_groups(
         [(f"ISSN-L {g.key}", g.journal_ids) for g in find_journals_sharing_issnl(conn)],
@@ -280,24 +280,24 @@ def run_merge_duplicate_journals(
         (f"ISSN {g.issn}", tuple(j.id for j in g.journals if _nested(g.journals[0], j)))
         for g in find_journals_sharing_active_issn(conn)
     ]
-    merge_groups([(label, ids) for label, ids in shared if len(ids) > 1], issn_et_titre)
+    merge_groups([(label, ids) for label, ids in shared if len(ids) > 1], issn_and_title)
     merge_groups(
         [
             (f"ISSN rejeté {g.key}", g.journal_ids)
             for g in find_journals_sharing_an_inactive_issn(conn)
         ],
-        titre_successif,
+        successive_title,
     )
     merge_groups(
         [(f"titre {g.key!r}", g.journal_ids) for g in find_same_title_duplicates(conn)],
-        titre_et_prefixe,
+        title_and_prefix,
     )
     merge_groups(
         _compatible_pairs(find_journals_sharing_a_publication(conn)),
-        publication_et_titre,
+        publication_and_title,
     )
     if metrics.total:
-        metrics.report = accord(
+        metrics.report = quantity(
             metrics.extras.get("journals_merged", 0), "revue fusionnée", "revues fusionnées"
         )
     return metrics
@@ -321,7 +321,7 @@ def _compatible_pairs(pairs: Sequence[JournalPublicationPair]) -> list[MergeGrou
         if not compatible_titles(a.title, b.title):
             continue
         target, source = sorted((a, b), key=_merge_priority, reverse=True)
-        label = accord(pair.publications, "publication commune", "publications communes")
+        label = quantity(pair.publications, "publication commune", "publications communes")
         groups.append((label, (target.id, source.id)))
     return groups
 
@@ -338,13 +338,11 @@ def _merge_groups(
     merge: MergeJournals,
     absorbed: dict[int, int],
     groups: Sequence[MergeGroup],
-    regle: str,
+    rule: str,
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
     metrics.add(seen=len(groups))
-    with progression(
-        len(groups), f"{BRANCHE}{LIBELLE} ({regle})", logger, efface=True
-    ) as avancement:
+    with track_progress(len(groups), f"{BRANCH}{LABEL} ({rule})", logger, erase=True) as progress:
         for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             sources = [s for s in journal_ids[1:] if s not in absorbed and s != target]
@@ -357,12 +355,12 @@ def _merge_groups(
                 logger.info(
                     "%s (%s) : la revue %s absorbe la revue %s",
                     label,
-                    regle,
+                    rule,
                     journal_label(summaries[target]),
                     journal_label(summaries[source]),
                     extra={"detail": True},
                 )
-            avancement.avance()
+            progress.advance()
 
 
 def _survivor(journal_id: int, absorbed: dict[int, int]) -> int:

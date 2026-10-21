@@ -11,6 +11,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import PersonIdentifierType
 from domain.persons.name_matching import (
     first_name_initials,
+    full_first_name_extends,
     initials_extend,
     names_compatible,
 )
@@ -109,11 +110,7 @@ class Namesake(NamedTuple):
 
 def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
     """Personnes au prénom plein dont les initiales commencent par `initials`."""
-    return [
-        n.person_id
-        for n in namesakes
-        if first_name_initials(n.first_name) is None and initials_extend(initials, n.first_name)
-    ]
+    return [n.person_id for n in namesakes if full_first_name_extends(initials, n.first_name)]
 
 
 def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
@@ -170,12 +167,9 @@ def attested_full_first_names(
     spellings: dict[str, Counter[str]] = {}
     for name in contributor_names:
         contributor_first_name = name.first_name_for(last_name)
-        if (
-            contributor_first_name is None
-            or first_name_initials(contributor_first_name) is not None
+        if contributor_first_name is None or not full_first_name_extends(
+            initials, contributor_first_name
         ):
-            continue
-        if not initials_extend(initials, contributor_first_name):
             continue
         spellings.setdefault(normalize_text(contributor_first_name), Counter())[
             contributor_first_name

@@ -76,7 +76,7 @@ class TestCrossrefMapping:
 
 class TestExtractDatacite:
     def test_keeps_in_scope_drops_rest(self):
-        meta = {
+        source_extras = {
             "related_identifiers": [
                 {"doi": "10.1/sup", "relation_type": "IsSupplementTo"},
                 {"doi": "10.1/concept", "relation_type": "IsVersionOf"},  # même-œuvre → exclu
@@ -84,20 +84,24 @@ class TestExtractDatacite:
                 {"relation_type": "IsSupplementTo"},  # sans DOI → ignoré
             ]
         }
-        assert extract_datacite_relations(meta) == [(RelationType.IS_SUPPLEMENT_TO, "10.1/sup")]
+        assert extract_datacite_relations(source_extras) == [
+            (RelationType.IS_SUPPLEMENT_TO, "10.1/sup")
+        ]
 
     def test_empty(self):
         assert extract_datacite_relations({}) == []
         assert extract_datacite_relations(None) == []
 
     def test_an_entry_that_is_not_an_object_leaves_the_next_one(self):
-        meta = {
+        source_extras = {
             "related_identifiers": [
                 "pas un objet",
                 {"doi": "10.1/sup", "relation_type": "IsSupplementTo"},
             ]
         }
-        assert extract_datacite_relations(meta) == [(RelationType.IS_SUPPLEMENT_TO, "10.1/sup")]
+        assert extract_datacite_relations(source_extras) == [
+            (RelationType.IS_SUPPLEMENT_TO, "10.1/sup")
+        ]
 
 
 class TestExtractDataciteDistinctWorks:
@@ -108,46 +112,49 @@ class TestExtractDataciteDistinctWorks:
         return {"related_identifiers": [{"relation_type": relation_type, "doi": doi}]}
 
     def test_preprint_arxiv_vers_l_article_publie(self):
-        meta = self._meta("IsVersionOf", "10.1007/jhep07(2023)066")
-        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000", "preprint") == [
-            "10.1007/jhep07(2023)066"
-        ]
+        source_extras = self._meta("IsVersionOf", "10.1007/jhep07(2023)066")
+        assert extract_datacite_distinct_works(
+            source_extras, "10.48550/arxiv.2210.12000", "preprint"
+        ) == ["10.1007/jhep07(2023)066"]
 
     def test_copie_de_preprint_vers_l_article_publie(self):
-        meta = self._meta("IsVariantFormOf", "10.1140/epjc/s10052-017-5315-6")
-        assert extract_datacite_distinct_works(meta, "10.3204/pubdb-2017-13318", "preprint") == [
-            "10.1140/epjc/s10052-017-5315-6"
-        ]
+        source_extras = self._meta("IsVariantFormOf", "10.1140/epjc/s10052-017-5315-6")
+        assert extract_datacite_distinct_works(
+            source_extras, "10.3204/pubdb-2017-13318", "preprint"
+        ) == ["10.1140/epjc/s10052-017-5315-6"]
 
     def test_copie_de_l_article_ecartee(self):
         """La copie de repository de l'article publié rejoint l'article : aucune relation."""
-        meta = self._meta("IsVariantFormOf", "10.1103/physrevd.105.012010")
-        assert extract_datacite_distinct_works(meta, "10.18154/rwth-2022-02923", "article") == []
+        source_extras = self._meta("IsVariantFormOf", "10.1103/physrevd.105.012010")
+        assert (
+            extract_datacite_distinct_works(source_extras, "10.18154/rwth-2022-02923", "article")
+            == []
+        )
 
     def test_version_du_meme_registrant_ecartee(self):
-        meta = self._meta("IsVersionOf", "10.5281/zenodo.1")
-        assert extract_datacite_distinct_works(meta, "10.5281/zenodo.10", "dataset") == []
+        source_extras = self._meta("IsVersionOf", "10.5281/zenodo.1")
+        assert extract_datacite_distinct_works(source_extras, "10.5281/zenodo.10", "dataset") == []
 
     def test_autres_relations_ignorees(self):
-        meta = self._meta("IsSupplementTo", "10.1103/x")
-        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.1", "preprint") == []
+        source_extras = self._meta("IsSupplementTo", "10.1103/x")
+        assert extract_datacite_distinct_works(source_extras, "10.48550/arxiv.1", "preprint") == []
 
     def test_les_entrees_ecartees_laissent_passer_la_suivante(self):
-        meta = {
+        source_extras = {
             "related_identifiers": [
                 "pas un objet",
                 {"relation_type": "IsSupplementTo", "doi": "10.1103/x"},
                 {"relation_type": "IsVersionOf", "doi": "10.1007/jhep07(2023)066"},
             ]
         }
-        assert extract_datacite_distinct_works(meta, "10.48550/arxiv.2210.12000", "preprint") == [
-            "10.1007/jhep07(2023)066"
-        ]
+        assert extract_datacite_distinct_works(
+            source_extras, "10.48550/arxiv.2210.12000", "preprint"
+        ) == ["10.1007/jhep07(2023)066"]
 
 
 class TestExtractCrossref:
     def test_keeps_doi_targets_in_scope(self):
-        meta = {
+        source_extras = {
             "relation": {
                 "is-preprint-of": [{"id": "10.1/pub", "id-type": "doi", "asserted-by": "subject"}],
                 "has-review": [{"id": "10.1/rev", "id-type": "doi"}],  # peer-review → exclu
@@ -157,7 +164,7 @@ class TestExtractCrossref:
                 ],
             }
         }
-        assert sorted(extract_crossref_relations(meta)) == sorted(
+        assert sorted(extract_crossref_relations(source_extras)) == sorted(
             [
                 (RelationType.IS_PREPRINT_OF, "10.1/pub"),
                 (RelationType.DESCRIBES, "10.1/ds"),
@@ -169,7 +176,7 @@ class TestExtractCrossref:
         assert extract_crossref_relations({"relation": None}) == []
 
     def test_an_ignored_target_leaves_the_next_one(self):
-        meta = {
+        source_extras = {
             "relation": {
                 "is-part-of": [
                     "pas un objet",
@@ -178,7 +185,7 @@ class TestExtractCrossref:
                 ]
             }
         }
-        assert extract_crossref_relations(meta) == [(RelationType.DESCRIBES, "10.1/ds")]
+        assert extract_crossref_relations(source_extras) == [(RelationType.DESCRIBES, "10.1/ds")]
 
 
 class TestInferSharedKeyRelation:

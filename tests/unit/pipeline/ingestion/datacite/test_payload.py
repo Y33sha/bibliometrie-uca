@@ -5,8 +5,8 @@ from domain.source_records.doc_types import map_doc_type
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
-    extract_datacite_meta,
     extract_datacite_publication_year,
+    extract_datacite_source_extras,
     extract_related_dois,
     get_abstract,
     get_cited_by_count,
@@ -281,7 +281,7 @@ class TestRelatedDois:
         assert dois == ["10.5281/zenodo.999", "10.1234/suppl"]
 
     def test_meta_keeps_all_doi_relations_with_type(self):
-        meta = extract_datacite_meta(self._attrs())
+        meta = extract_datacite_source_extras(self._attrs())
         related = meta["related_identifiers"]
         # Toutes les relations DOI (citations comprises), avec leur type ; pas les URL.
         types = {r["relation_type"] for r in related}
@@ -304,7 +304,7 @@ class TestRelatedDois:
                 },
             ]
         }
-        assert extract_datacite_meta(attrs) == {
+        assert extract_datacite_source_extras(attrs) == {
             "related_identifiers": [{"doi": "10.1234/partie", "relation_type": "IsPartOf"}]
         }
 
@@ -363,11 +363,11 @@ class TestMeta:
 
     def test_les_licences_sont_conservees(self):
         attrs = {"rightsList": [{"rights": "CC-BY-4.0"}]}
-        assert extract_datacite_meta(attrs) == {"rights": [{"rights": "CC-BY-4.0"}]}
+        assert extract_datacite_source_extras(attrs) == {"rights": [{"rights": "CC-BY-4.0"}]}
 
     def test_les_financeurs_sont_conserves(self):
         attrs = {"fundingReferences": [{"funderName": "ANR"}]}
-        assert extract_datacite_meta(attrs) == {"funding": [{"funderName": "ANR"}]}
+        assert extract_datacite_source_extras(attrs) == {"funding": [{"funderName": "ANR"}]}
 
     def test_les_identifiants_lies_portent_leur_type_de_relation(self):
         attrs = {
@@ -379,7 +379,7 @@ class TestMeta:
                 }
             ]
         }
-        meta = extract_datacite_meta(attrs)
+        meta = extract_datacite_source_extras(attrs)
         assert meta is not None
         assert meta["related_identifiers"] == [
             {"doi": "10.5281/zenodo.1", "relation_type": "IsVersionOf"}
@@ -390,18 +390,20 @@ class TestMeta:
             "rightsList": [{"rights": "CC0"}],
             "fundingReferences": [{"funderName": "ERC"}],
         }
-        meta = extract_datacite_meta(attrs)
+        meta = extract_datacite_source_extras(attrs)
         assert meta is not None
         assert set(meta) == {"rights", "funding"}
 
     def test_une_liste_vide_n_est_pas_conservee(self):
-        assert extract_datacite_meta({"rightsList": [], "fundingReferences": []}) is None
+        assert extract_datacite_source_extras({"rightsList": [], "fundingReferences": []}) is None
 
     def test_une_valeur_qui_n_est_pas_une_liste_est_ecartee(self):
-        assert extract_datacite_meta({"rightsList": "CC-BY", "fundingReferences": {}}) is None
+        assert (
+            extract_datacite_source_extras({"rightsList": "CC-BY", "fundingReferences": {}}) is None
+        )
 
     def test_sans_aucun_champ_il_n_y_a_pas_de_meta(self):
-        assert extract_datacite_meta({}) is None
+        assert extract_datacite_source_extras({}) is None
 
 
 class TestEntreesAEcarterAvantLaBonne:
@@ -443,7 +445,7 @@ class TestEntreesAEcarterAvantLaBonne:
                 },
             ]
         }
-        meta = extract_datacite_meta(attrs)
+        meta = extract_datacite_source_extras(attrs)
         assert meta is not None
         assert meta["related_identifiers"] == [
             {"doi": "10.5281/zenodo.2", "relation_type": "IsPartOf"}

@@ -1,6 +1,6 @@
 # CrossRef
 
-*À jour le 2026-10-13.*
+*À jour le 2026-10-21.*
 
 https://www.crossref.org/
 
@@ -76,7 +76,7 @@ Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés re
 
 ### Relations entre publications
 
-Crossref déclare ses relations dans `meta.relation`, sous des clés comme `is-preprint-of` ou `erratum`. La phase [relations](../pipeline/10-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
+Crossref déclare ses relations dans `source_extras.relation`, sous des clés comme `is-preprint-of` ou `erratum`. La phase [relations](../pipeline/10-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
 
 ### Affiliations mal renseignées
 

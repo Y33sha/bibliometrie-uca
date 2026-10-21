@@ -1,7 +1,5 @@
 """Tests du writer partagé des contributions sources : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
 
-from unittest.mock import MagicMock
-
 from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
@@ -9,12 +7,12 @@ from pipeline.ingestion.common.source_contributions import (
     contributor_name_fields,
     write_source_contributions,
 )
-from tests.helpers.normalize_doubles import FakeContributionsBatchQueries
+from tests.helpers.normalize_doubles import FakeSourceContributionStore
 
 
 def _items_written(records: list[AuthorRecord]) -> list[dict]:
-    queries = FakeContributionsBatchQueries()
-    write_source_contributions(MagicMock(), queries, "crossref", 1, records)
+    queries = FakeSourceContributionStore()
+    write_source_contributions(queries, "crossref", 1, records)
     return queries.upserted_batches[0]
 
 

@@ -24,6 +24,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
@@ -37,11 +38,11 @@ from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
 from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
-from pipeline.runtime.config import get_doaj_refresh_after_days
+from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
+from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
     enrich_journals_from_doaj,
@@ -168,11 +169,11 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
         "rows": [
             {
                 "key": key,
-                "traités": by_step[champ].total,
-                "identifiés": identifies(by_step[champ]),
-                "créés": by_step[champ].extras.get("publisher_created", 0),
+                "traités": by_step[field].total,
+                "identifiés": identifies(by_step[field]),
+                "créés": by_step[field].extras.get("publisher_created", 0),
             }
-            for champ, key, identifies in _TABLE
+            for field, key, identifies in _TABLE
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
@@ -192,56 +193,56 @@ def build() -> Phase:
                 "resolve_crossref_publishers": TaskStep(
                     _run_resolve_crossref_publishers,
                     "Éditeurs",
-                    resolve_publishers.LIBELLES["Crossref"],
+                    resolve_publishers.LABELS["Crossref"],
                 ),
                 "resolve_datacite_publishers": TaskStep(
                     _run_resolve_datacite_publishers,
                     "Éditeurs",
-                    resolve_publishers.LIBELLES["DataCite"],
+                    resolve_publishers.LABELS["DataCite"],
                 ),
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
                 "enrich_journals_from_openalex": TaskStep(
                     _run_enrich_journals_from_openalex,
                     "Revues",
-                    enrich_journals_from_openalex.LIBELLE,
+                    enrich_journals_from_openalex.LABEL,
                     threshold=3,
                 ),
                 "check_journals_in_sudoc": TaskStep(
                     _run_check_journals_in_sudoc,
                     "Revues",
-                    check_journals_in_sudoc.LIBELLE,
+                    check_journals_in_sudoc.LABEL,
                     threshold=3,
                 ),
                 "merge_duplicate_journals": TaskStep(
-                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LIBELLE
+                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LABEL
                 ),
                 "type_proceedings_journals": TaskStep(
-                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LIBELLE
+                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LABEL
                 ),
                 "learn_journal_doi_namespaces": TaskStep(
                     _run_learn_journal_doi_namespaces,
                     "Revues",
-                    learn_journal_doi_namespaces.LIBELLE,
+                    learn_journal_doi_namespaces.LABEL,
                 ),
                 "enrich_journals_from_doaj": TaskStep(
                     _run_enrich_journals_from_doaj,
                     "Revues",
-                    enrich_journals_from_doaj.LIBELLE,
+                    enrich_journals_from_doaj.LABEL,
                 ),
                 "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,
                     "Monographies",
-                    merge_duplicate_monographs.LIBELLE,
+                    merge_duplicate_monographs.LABEL,
                 ),
                 "link_monographs_to_collections": TaskStep(
                     _run_link_monographs_to_collections,
                     "Monographies",
-                    link_monographs_to_collections.LIBELLE,
+                    link_monographs_to_collections.LABEL,
                 ),
                 "type_proceedings_volumes": TaskStep(
                     _run_type_proceedings_volumes,
                     "Monographies",
-                    type_proceedings_volumes.LIBELLE,
+                    type_proceedings_volumes.LABEL,
                 ),
             }.items()
         }
@@ -255,7 +256,7 @@ def _run_resolve_crossref_publishers(
         return run_resolve_crossref_publishers(
             conn,
             ctx.logger,
-            repo=DoiPrefixesQueries(conn),
+            prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_crossref_prefix,
             breaker=breaker,
@@ -269,7 +270,7 @@ def _run_resolve_datacite_publishers(
         return run_resolve_datacite_publishers(
             conn,
             ctx.logger,
-            repo=DoiPrefixesQueries(conn),
+            prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
             breaker=breaker,
@@ -372,6 +373,6 @@ def _run_enrich_journals_from_doaj(
         return run_enrich_journals_from_doaj(
             conn,
             ctx.logger,
-            refresh_after_days=get_doaj_refresh_after_days(conn),
+            refresh_after_days=delay(conn, ConfigKey.DOAJ_REFRESH_AFTER_DAYS),
             download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=ctx.logger),
         )

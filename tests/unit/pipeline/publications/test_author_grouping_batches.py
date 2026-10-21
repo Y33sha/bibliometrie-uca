@@ -5,7 +5,7 @@ from pipeline.transformation.publications.author_grouping.author_grouping import
     membership_changes,
     publication_batches,
 )
-from pipeline.transformation.publications.author_grouping.queries import MembershipRow
+from pipeline.transformation.publications.author_grouping.store import MembershipRow
 
 
 def test_un_lot_se_ferme_au_plafond_de_contributions_sources(monkeypatch):

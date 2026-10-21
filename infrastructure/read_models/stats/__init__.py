@@ -26,13 +26,12 @@ from application.ports.read_models.stats_queries import (
     StatsFilters,
     StatsQueries,
 )
-from domain.stats import DIMENSIONS, MEASURES
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.read_models.stats.collaborations import (
     run_collaborations as _run_collaborations,
 )
 from infrastructure.read_models.stats.entity_facets import stats_entity_facet as _stats_entity_facet
-from infrastructure.read_models.stats.pivot import run_pivot as _run_pivot
+from infrastructure.read_models.stats.pivot import DIMENSIONS, MEASURES, run_pivot as _run_pivot
 from infrastructure.read_models.stats.summary import (
     stats_facets as _stats_facets,
 )

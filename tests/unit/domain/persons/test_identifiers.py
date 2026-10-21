@@ -65,7 +65,9 @@ class TestIdHAL:
         [
             ("jean-dupont", "jean-dupont"),  # slug
             ("jdupont", "jdupont"),  # slug court
-            ("123456", "123456"),  # legacy numérique (idHal_i)
+            ("123456", "123456"),  # numérique
+            ("a", "a"),  # un caractère, présent dans HAL
+            ("fabrice.rojat", "fabrice.rojat"),  # point, présent dans HAL
             ("Jean-Dupont", "jean-dupont"),  # minuscules
             ("  jean-dupont  ", "jean-dupont"),  # strip whitespace
         ],
@@ -77,10 +79,8 @@ class TestIdHAL:
         "raw",
         [
             "",  # vide
-            "j",  # trop court
-            "-jean-dupont",  # tiret en tête
-            "jean_dupont",  # underscore
-            "jean.dupont",  # caractère spécial
+            "   ",  # blanc
+            "jean dupont",  # espace
         ],
     )
     def test_raises_on_invalid(self, raw):
@@ -91,7 +91,7 @@ class TestIdHAL:
         assert IdHAL.try_parse(None) is None
 
     def test_try_parse_invalid(self):
-        assert IdHAL.try_parse("j") is None
+        assert IdHAL.try_parse("jean dupont") is None
 
     def test_try_parse_valid(self):
         assert IdHAL.try_parse("jean-dupont") is not None
@@ -109,6 +109,8 @@ class TestIdRef:
             ("05547854x", "05547854X"),  # x minuscule → X
             ("https://www.idref.fr/252404955/id", "252404955"),  # strip URL
             ("idref.fr/252404955", "252404955"),  # strip préfixe nu
+            # URL répétée, blanc avant le PPN
+            ("https://www.idref.fr/https://www.idref.fr/ 089437810", "089437810"),
         ],
     )
     def test_normalizes(self, raw, expected):
@@ -187,10 +189,10 @@ class TestNormalizedIdentifierValue:
 
 class TestCompactIdentifiers:
     def test_empty_returns_none(self):
-        assert compact_identifiers() is None
+        assert compact_identifiers().values is None
 
     def test_all_none_returns_none(self):
-        assert compact_identifiers(orcid=None, idref=None) is None
+        assert compact_identifiers(orcid=None, idref=None).values is None
 
     def test_keeps_truthy_strips_falsy(self):
         result = compact_identifiers(
@@ -199,16 +201,33 @@ class TestCompactIdentifiers:
             idhal="",
             researcher_id="ABC-1234",
         )
-        assert result == {"orcid": "0000-0001-2345-6789", "researcher_id": "ABC-1234"}
+        assert result.values == {"orcid": "0000-0001-2345-6789", "researcher_id": "ABC-1234"}
 
     def test_strips_zero_int(self):
         """hal_person_id=0 (sentinelle HAL) doit être filtré comme falsy."""
-        assert compact_identifiers(orcid="0000-0001-2345-6789", hal_person_id=0) == {
+        assert compact_identifiers(orcid="0000-0001-2345-6789", hal_person_id=0).values == {
             "orcid": "0000-0001-2345-6789"
         }
 
-    def test_keeps_int(self):
-        assert compact_identifiers(hal_person_id=42) == {"hal_person_id": 42}
+    def test_hal_person_id_as_string(self):
+        assert compact_identifiers(hal_person_id=42).values == {"hal_person_id": "42"}
+
+    @pytest.mark.parametrize(
+        ("id_type", "raw", "expected"),
+        [
+            ("orcid", "https://orcid.org/0000-0001-2345-678x", "0000-0001-2345-678X"),
+            ("idref", "https://www.idref.fr/099757427", "099757427"),
+            ("idref", "https://www.idref.fr/099757427/id", "099757427"),
+            ("idhal", "Jean-Dupont", "jean-dupont"),
+        ],
+    )
+    def test_normalizes_person_identifiers(self, id_type, raw, expected):
+        assert compact_identifiers(**{id_type: raw}).values == {id_type: expected}
+
+    def test_sets_aside_malformed(self):
+        result = compact_identifiers(orcid="0000-0001-2345-6789", idref="16239546500")
+        assert result.values == {"orcid": "0000-0001-2345-6789"}
+        assert result.malformed == (("idref", "16239546500"),)
 
 
 # ── shared_identifier_neutralizations ───────────────────────────────

@@ -8,12 +8,12 @@ import logging
 from sqlalchemy import Connection, text
 
 from infrastructure.sql_fragments import active_issns
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import JournalSummary
 
-LIBELLE = "Revues vides"
+LABEL = "Revues vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _EMPTY_JOURNALS = text(f"""
@@ -58,5 +58,5 @@ def run_delete_empty_journals(conn: Connection, logger: logging.Logger) -> Phase
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Revue vide supprimée : %s", journal_label(journal), extra={"detail": True})
     metrics.add(seen=len(deleted), journals_deleted=len(deleted))
-    metrics.report = accord(len(deleted), "revue supprimée", "revues supprimées")
+    metrics.report = quantity(len(deleted), "revue supprimée", "revues supprimées")
     return metrics

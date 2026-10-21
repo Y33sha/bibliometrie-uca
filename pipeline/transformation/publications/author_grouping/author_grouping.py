@@ -29,19 +29,19 @@ from domain.publications.author_grouping import (
 from domain.publications.list_copies import copied_source_contributions
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.cpu import available_cpus
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
+from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente, progression
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.task_runner import SingleTaskPhase
-from pipeline.transformation.publications.author_grouping.queries import (
-    AuthorGroupingQueries,
+from pipeline.transformation.publications.author_grouping.residual_weights import (
+    RESIDUAL_WEIGHTS,
+)
+from pipeline.transformation.publications.author_grouping.store import (
     BatchPlan,
     GroupRow,
     MembershipRow,
+    SourceContributionGroupStore,
     SourceContributionRow,
-)
-from pipeline.transformation.publications.author_grouping.residual_weights import (
-    RESIDUAL_WEIGHTS,
 )
 
 # Plafonds d'un lot de publications : nombre de publications, nombre de contributions sources d'auteur chargées en mémoire.
@@ -189,8 +189,7 @@ def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
 
 
 def _plan_batch(
-    queries: AuthorGroupingQueries,
-    conn: Connection,
+    store: SourceContributionGroupStore,
     publication_ids: Sequence[int],
     methods: Counter[str],
     on_publication: Callable[[], None],
@@ -199,12 +198,12 @@ def _plan_batch(
     """Plan d'écriture d'un lot de publications. `on_publication` est appelé après chaque publication calculée."""
     rows_by_publication: dict[int, list[SourceContributionTuple]] = {}
     positions: dict[int, int | None] = {}
-    for row in queries.fetch_source_contributions(conn, publication_ids):
+    for row in store.fetch_source_contributions(publication_ids):
         rows_by_publication.setdefault(row.publication_id, []).append(
             _SOURCE_CONTRIBUTION_FIELDS(row)
         )
         positions[row.id] = row.position
-    existing, stored = queries.fetch_groups(conn, publication_ids)
+    existing, stored = store.fetch_groups(publication_ids)
     planned: list[tuple[int, GroupTuple, int | None]] = []
     unmatched: list[int] = []
     copies: dict[int, int] = {}
@@ -219,7 +218,7 @@ def _plan_batch(
         planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
-    fresh = iter(queries.group_ids(conn, sum(1 for *_, gid in planned if gid is None)))
+    fresh = iter(store.group_ids(sum(1 for *_, gid in planned if gid is None)))
     group_rows: list[GroupRow] = []
     memberships: list[MembershipRow] = []
     for publication_id, (reference, members), gid in planned:
@@ -236,8 +235,7 @@ def _plan_batch(
 
 
 def regroup(
-    conn: Connection,
-    queries: AuthorGroupingQueries,
+    store: SourceContributionGroupStore,
     publication_ids: Sequence[int],
     methods: Counter[str] | None = None,
     on_publication: Callable[[], None] = lambda: None,
@@ -245,26 +243,25 @@ def regroup(
 ) -> int:
     """Recalcule et écrit les groupes et les doublons d'auteur de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
     plan = _plan_batch(
-        queries,
-        conn,
+        store,
         publication_ids,
         methods if methods is not None else Counter(),
         on_publication,
         mapper,
     )
-    queries.write(conn, plan)
+    store.write(plan)
     return len(plan.groups)
 
 
 def build_groups(
-    conn: Connection, queries: AuthorGroupingQueries, logger: logging.Logger
+    conn: Connection, store: SourceContributionGroupStore, logger: logging.Logger
 ) -> PhaseMetrics:
     """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`)."""
-    dirty = queries.fetch_dirty_publications(conn)
+    dirty = store.fetch_dirty_publications()
     publication_ids = [publication_id for publication_id, _ in dirty]
-    etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
+    step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
-        rien_a_faire(logger)
+        nothing_to_do(logger)
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
     methods: Counter[str] = Counter()
@@ -272,18 +269,18 @@ def build_groups(
     workers = min(available_cpus(), len(publication_ids))
     with (
         ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
-        progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement,
+        track_progress(len(publication_ids), LAST_BRANCH.rstrip(), logger) as progress,
     ):
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
-            group_count += regroup(conn, queries, batch, methods, avancement.avance, mapper)
+            group_count += regroup(store, batch, methods, progress.advance, mapper)
             conn.commit()
-    etape(logger, "Recouvrement des listes d'auteurs")
+    step(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
-    with attente(DERNIERE_BRANCHE, logger) as ligne:
-        queries.refresh_alignment(conn)
+    with waiting(LAST_BRANCH, logger) as line:
+        store.refresh_alignment()
         conn.commit()
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),
@@ -291,21 +288,17 @@ def build_groups(
         **{str(method): count for method, count in methods.items()},
     }
     metrics.report = (
-        f"{accord(len(publication_ids), 'publication')}, {accord(group_count, 'groupe')}"
+        f"{quantity(len(publication_ids), 'publication')}, {quantity(group_count, 'groupe')}"
     )
     return metrics
 
 
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
-    queries: AuthorGroupingQueries
-
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
-            return build_groups(conn, self.queries, ctx.logger)
+            return build_groups(conn, SourceContributionGroupStore(conn), ctx.logger)
 
 
 def build() -> Phase:
-    return SingleTaskPhase(
-        "author_grouping.build", AuthorGroupingPhase(AuthorGroupingQueries()), label="Bilan"
-    )
+    return SingleTaskPhase("author_grouping.build", AuthorGroupingPhase(), label="Bilan")

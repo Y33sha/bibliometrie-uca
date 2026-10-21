@@ -190,14 +190,14 @@ def _run_publication(repo, pubrepo, cr=None, dc=None):
     crossref = run_resolve_crossref_publishers(
         MagicMock(),
         _LOG,
-        repo=repo,
+        prefix_store=repo,
         publisher_store=pubrepo,
         fetch_prefix_fn=cr if cr is not None else StubCrossref(),
     )
     datacite = run_resolve_datacite_publishers(
         MagicMock(),
         _LOG,
-        repo=repo,
+        prefix_store=repo,
         publisher_store=pubrepo,
         fetch_prefix_fn=dc if dc is not None else StubDataCite(),
     )

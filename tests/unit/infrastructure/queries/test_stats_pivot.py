@@ -3,7 +3,7 @@
 import pytest
 
 from domain.errors import ValidationError
-from domain.stats import DIMENSIONS, MEASURES, validate_pivot
+from infrastructure.read_models.stats.pivot import DIMENSIONS, MEASURES, validate_pivot
 
 
 def test_validate_returns_measure_and_dimensions():

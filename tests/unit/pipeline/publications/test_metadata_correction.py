@@ -35,7 +35,7 @@ def _run(contexte, *, journal=None, unary=None, cluster=None):
             side_effect=lambda conn, q, log: ordre.append("cluster") or cluster,
         ),
     ):
-        metrics = phase.MetadataCorrectionPhase(object()).run(contexte())
+        metrics = phase.MetadataCorrectionPhase().run(contexte())
     return metrics, ordre
 
 

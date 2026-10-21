@@ -1,18 +1,12 @@
-"""Value objects et helpers de normalisation des identifiants structure.
+"""Identifiants de structure, au contrat de `domain.identifiers.NormalizedIdentifier` : `RorId` (Research Organization Registry), `HalCollection` (code collection HAL).
 
-`RorId` (Research Organization Registry), `HalCollection` (code collection HAL) : deux VOs immuables et auto-validés, au même contrat que `domain/persons/identifiers.py` et `domain/publications/identifiers.py` :
-
-- `X("...")` strict : lève `ValidationError` si malformé
-- `X.try_parse(...)` tolérant : renvoie None si malformé
-
-Les helpers `normalize_*` sont exposés indépendamment pour les call sites qui veulent juste normaliser sans construire un VO.
+`normalize_ror_id` et `normalize_hal_collection` rendent la forme canonique d'une valeur brute, sans construire de value object.
 """
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
 
-from domain.errors import ValidationError
+from domain.identifiers import NormalizedIdentifier
 
 # ── RorId (Research Organization Registry) ─────────────────────────
 #
@@ -47,32 +41,14 @@ def normalize_ror_id(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class RorId:
+class RorId(NormalizedIdentifier):
     """Identifiant Research Organization Registry, forme canonique 9-char.
 
     Format ROR : `0` + 8 caractères de l'alphabet ROR (chiffres + lettres sans i/l/o/u). Stocké et comparé en forme courte ; l'URL complète `https://ror.org/<id>` est une décoration d'affichage uniquement.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = normalize_ror_id(self.value)
-        if not cleaned:
-            raise ValidationError(f"RorId invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "RorId | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "RorId"
+    normalize = staticmethod(normalize_ror_id)
 
 
 def parse_ror_ids(raws: Iterable[str | None]) -> frozenset[RorId]:
@@ -102,29 +78,11 @@ def normalize_hal_collection(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class HalCollection:
+class HalCollection(NormalizedIdentifier):
     """Code de collection HAL (ex. `LIMOS`, `INSTITUT_PASCAL`).
 
     Normalisé en majuscules. Le format admis est `[A-Z0-9][A-Z0-9_-]*` — observation empirique sur le corpus, pas de spec HAL formelle.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = normalize_hal_collection(self.value)
-        if not cleaned:
-            raise ValidationError(f"HalCollection invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "HalCollection | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "HalCollection"
+    normalize = staticmethod(normalize_hal_collection)

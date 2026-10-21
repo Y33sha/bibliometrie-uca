@@ -9,11 +9,11 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.monographs.matching import MonographCandidate, duplicate_monographs
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 
-LIBELLE = "Fusion des monographies en double"
+LABEL = "Fusion des monographies en double"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 
@@ -72,5 +72,5 @@ def run_merge_duplicate_monographs(conn: Connection, logger: logging.Logger) -> 
             extra={"detail": True},
         )
     metrics.add(seen=len(merges), monographs_merged=len(merges))
-    metrics.report = accord(len(merges), "monographie fusionnée", "monographies fusionnées")
+    metrics.report = quantity(len(merges), "monographie fusionnée", "monographies fusionnées")
     return metrics

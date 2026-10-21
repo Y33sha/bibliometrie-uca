@@ -93,8 +93,8 @@ def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
     config = yaml.safe_load(_CI.read_text(encoding="utf-8"))
     litterales: dict[str, list[str]] = {langage: [] for langage in _LANGAGES}
     for job in config["jobs"].values():
-        for etape in job.get("steps", []):
-            parametres = etape.get("with") or {}
+        for step in job.get("steps", []):
+            parametres = step.get("with") or {}
             for langage, cle in _LANGAGES.items():
                 valeur = str(parametres.get(cle, ""))
                 if valeur and not _EXPRESSION.match(valeur):

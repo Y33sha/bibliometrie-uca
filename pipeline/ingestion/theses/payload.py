@@ -11,72 +11,73 @@ from dataclasses import dataclass
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import THESES_FIELD_ROLES, ContributionRole, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from pipeline.ingestion.common.source_contributions import contributor_identifiers
 
 
-def derive_theses_doc_type(date_soutenance: str | None) -> str:
+def derive_theses_doc_type(defense_date: str | None) -> str:
     """Mapping date_soutenance → doc_type canonique pour theses.fr.
 
     theses.fr distribue à la fois les thèses soutenues et les thèses en préparation. La date de soutenance est le seul signal fiable pour distinguer les deux états :
       - dateSoutenance présent → 'thesis' (soutenue)
       - dateSoutenance absent → 'ongoing_thesis' (en cours)
     """
-    return "thesis" if date_soutenance else "ongoing_thesis"
+    return "thesis" if defense_date else "ongoing_thesis"
 
 
 @dataclass(frozen=True)
 class ThesisContribution:
     """Une personne d'une thèse, avec ses rôles fusionnés.
 
-    Produite par `aggregate_thesis_persons` à partir du dict `these` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
+    Produite par `aggregate_thesis_persons` à partir du dict `thesis` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
     """
 
     person: Mapping[str, JsonValue]
     roles: list[ContributionRole]
     name: ContributorName
     author_position: int | None
-    identifiers: dict[str, str] | None
+    identifiers: dict[str, JsonValue] | None
     is_author: bool
 
 
-def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContribution]:
-    """Agrège les personnes d'une thèse depuis `these` (API theses.fr).
+def aggregate_thesis_persons(thesis: Mapping[str, JsonValue]) -> list[ThesisContribution]:
+    """Agrège les personnes d'une thèse depuis `thesis` (API theses.fr).
 
     Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` (cf. `THESES_FIELD_ROLES`). Une personne qui apparaît dans plusieurs champs est dédupliquée (clé : PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés via `merge_roles`.
 
     En pratique, le cas multi-rôles concerne presque exclusivement le président du jury qui est aussi rapporteur (~1 % des contributions theses au 2026-05-08).
 
-    `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `these["auteurs"]`.
+    `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `thesis["auteurs"]`.
     """
     # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
-    personnes: dict[str, Mapping[str, JsonValue]] = {}
-    roles_par_personne: dict[str, list[ContributionRole]] = {}
+    persons_by_key: dict[str, Mapping[str, JsonValue]] = {}
+    roles_by_key: dict[str, list[ContributionRole]] = {}
 
     for field, roles in THESES_FIELD_ROLES.items():
         if field == "president":
-            president = as_mapping(these.get("president"))
+            president = as_mapping(thesis.get("president"))
             persons = [president] if as_str(president.get("nom")) else []
         else:
-            persons = [as_mapping(p) for p in as_sequence(these.get(field))]
+            persons = [as_mapping(p) for p in as_sequence(thesis.get(field))]
 
         for person in persons:
-            nom = as_str(person.get("nom"))
-            if not nom:
+            last_name = as_str(person.get("nom"))
+            if not last_name:
                 continue
             ppn = as_str(person.get("ppn"))
-            key = ppn if ppn else f"name:{nom}:{as_str(person.get('prenom')) or ''}"
-            personnes.setdefault(key, person)
-            roles_par_personne.setdefault(key, []).extend(roles)
+            key = ppn if ppn else f"name:{last_name}:{as_str(person.get('prenom')) or ''}"
+            persons_by_key.setdefault(key, person)
+            roles_by_key.setdefault(key, []).extend(roles)
 
     out: list[ThesisContribution] = []
     position = 0
-    for key, person in personnes.items():
+    for key, person in persons_by_key.items():
         name = ContributorName.from_parts(as_str(person.get("nom")), as_str(person.get("prenom")))
         if name is None:
             continue
-        merged = merge_roles([roles_par_personne[key]])
+        merged = merge_roles([roles_by_key[key]])
         is_author = ContributionRole.AUTHOR in merged
         ppn = as_str(person.get("ppn"))
-        identifiers = {"idref": ppn} if ppn else None
+        identifiers = contributor_identifiers(idref=ppn)
 
         out.append(
             ThesisContribution(

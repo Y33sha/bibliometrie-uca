@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from domain.source_records.raw_metadata import hydrate_raw_view, stash_entry
+from domain.source_records.corrections import hydrate_raw_view, stash_entry
 
 
 @dataclass(frozen=True)
@@ -15,11 +15,11 @@ _VUE = _Vue(doc_type="article", doi="10.1/x")
 
 
 def test_un_champ_corrige_reprend_sa_valeur_source():
-    raw_metadata = {"doc_type": stash_entry("thesis", "THESIS_WITH_JOURNAL_TO_ARTICLE")}
-    assert hydrate_raw_view(_VUE, raw_metadata) == _Vue(doc_type="thesis", doi="10.1/x")
+    corrections = {"doc_type": stash_entry("thesis", "THESIS_WITH_JOURNAL_TO_ARTICLE")}
+    assert hydrate_raw_view(_VUE, corrections) == _Vue(doc_type="thesis", doi="10.1/x")
 
 
-def test_sans_raw_metadata_la_vue_est_rendue_telle_quelle():
+def test_sans_corrections_la_vue_est_rendue_telle_quelle():
     assert hydrate_raw_view(_VUE, None) is _VUE
 
 

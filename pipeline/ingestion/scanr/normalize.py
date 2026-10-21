@@ -2,37 +2,34 @@
 
 from collections.abc import Mapping
 
-from sqlalchemy import Connection
-
 from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
+from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.scanr.payload import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
@@ -53,8 +50,8 @@ from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
-    for entree in as_sequence(doc.get("externalIds")):
-        ext = as_mapping(entree)
+    for entry in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entry)
         if as_str(ext.get("type")) == "doi":
             return clean_doi(as_str(ext.get("id")))
     return None
@@ -131,7 +128,7 @@ def extract_publication_metadata(
     container_title = None
     if not journal_id:
         container_title = as_str(as_mapping(doc.get("source")).get("title"))
-    ouvert = doc.get("isOa")
+    is_open = doc.get("isOa")
     return PublicationMetadata(
         title=title,
         publication_year=as_int(doc.get("year")),
@@ -139,7 +136,7 @@ def extract_publication_metadata(
         doi=extract_doi(doc),
         nnt=extract_nnt_from_scanr_id(scanr_id),
         oa_status=derive_scanr_oa_status(
-            ouvert if isinstance(ouvert, bool) else None, as_mapping(doc.get("oaEvidence"))
+            is_open if isinstance(is_open, bool) else None, as_mapping(doc.get("oaEvidence"))
         ),
         journal_id=journal_id,
         monograph_id=monograph_id,
@@ -154,8 +151,7 @@ def extract_publication_metadata(
 
 
 def insert_scanr_document(  # noqa: C901
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
@@ -171,18 +167,18 @@ def insert_scanr_document(  # noqa: C901
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
     dois: list[str] = []
-    for entree in as_sequence(doc.get("externalIds")):
-        eid = as_mapping(entree)
+    for entry in as_sequence(doc.get("externalIds")):
+        eid = as_mapping(entry)
         etype = as_str(eid.get("type"))
-        valeur = as_str(eid.get("id"))
-        if not etype or not valeur:
+        value = as_str(eid.get("id"))
+        if not etype or not value:
             continue
         etype = etype.lower()
-        if etype == "hal" and valeur not in hal_ids:
-            hal_ids.append(valeur)
+        if etype == "hal" and value not in hal_ids:
+            hal_ids.append(value)
         elif etype == "pmid":
-            ext[ExternalIdType.PMID] = valeur
-        elif etype == "doi" and (doi := clean_doi(valeur)) and doi not in dois:
+            ext[ExternalIdType.PMID] = value
+        elif etype == "doi" and (doi := clean_doi(value)) and doi not in dois:
             dois.append(doi)
     if hal_ids:
         ext[ExternalIdType.HAL_ID] = hal_ids
@@ -197,8 +193,8 @@ def insert_scanr_document(  # noqa: C901
     kw_val = as_mapping(doc.get("keywords")).get("default")
     if isinstance(kw_val, str) and kw_val:
         keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
-    elif liste := as_sequence(kw_val):
-        keywords = [str(k).strip() for k in liste if k] or None
+    elif items := as_sequence(kw_val):
+        keywords = [str(k).strip() for k in items if k] or None
     else:
         keywords = None
 
@@ -209,42 +205,34 @@ def insert_scanr_document(  # noqa: C901
     topics = subjects or None
 
     cbc = as_mapping(doc.get("cited_by_counts_by_year"))
-    annees = [n for v in cbc.values() if (n := as_int(v)) is not None]
-    cited_by_count = sum(annees) if annees else None
+    years = [n for v in cbc.values() if (n := as_int(v)) is not None]
+    cited_by_count = sum(years) if years else None
 
     urls: list[str] = []
     seen: set[str] = set()
     oa_ev = as_mapping(doc.get("oaEvidence"))
     raw_license = as_str(oa_ev.get("license"))
-    # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `meta`, sans licence normalisée : HAL donne la licence de ses dépôts.
+    # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `source_extras`, sans licence normalisée : HAL donne la licence de ses dépôts.
     publisher_license = raw_license if oa_ev.get("hostType") == "publisher" else None
-    adresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
-    adresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
-    for brut in adresses:
-        u = as_str(brut)
+    addresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
+    addresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
+    for raw in addresses:
+        u = as_str(raw)
         if u and u not in seen:
             seen.add(u)
             urls.append(u)
 
     # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/journals créés via find_or_create_*).
     source = as_mapping(doc.get("source"))
-    biblio: dict[str, JsonValue] = {}
-    if publisher_raw := as_str(source.get("publisher")):
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := as_str(source.get("title")):
-        journal_obj["title"] = jt
     jissn, jeissn = _extract_journal_issns(source)
-    if jissn:
-        journal_obj["issn"] = jissn
-    if jeissn:
-        journal_obj["eissn"] = jeissn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    biblio_json = biblio if biblio else None
+    biblio_json = compact_biblio(
+        publisher=as_str(source.get("publisher")),
+        journal_title=as_str(source.get("title")),
+        journal_issn=jissn,
+        journal_eissn=jeissn,
+    )
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="scanr",
             source_id=scanr_id,
@@ -253,11 +241,11 @@ def insert_scanr_document(  # noqa: C901
             external_ids=external_ids,
             title=publication_meta.title or "",
             publication_year=publication_meta.publication_year,
-            doc_type=publication_meta.doc_type,
+            raw_doc_type=publication_meta.doc_type,
             journal_id=publication_meta.journal_id,
             monograph_id=publication_meta.monograph_id,
             container_title=publication_meta.container_title,
-            language=publication_meta.language,
+            raw_language=publication_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,
@@ -266,7 +254,7 @@ def insert_scanr_document(  # noqa: C901
             license=normalize_license(publisher_license),
             urls=urls or None,
             impact=Impact(cited_by_count=cited_by_count).to_json(),
-            meta={"license": raw_license} if raw_license else None,
+            source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
         ),
     )
 
@@ -287,8 +275,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
-        compact_identifiers(
-            orcid=normalize_orcid(as_str(as_mapping(a.get("denormalized")).get("orcid"))),
+        contributor_identifiers(
+            orcid=as_str(as_mapping(a.get("denormalized")).get("orcid")),
             idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
         )
         for a in authors
@@ -320,9 +308,9 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 source_contribution_rors |= rors
                 continue
             countries = {
-                pays
+                country
                 for p in as_sequence(aff.get("detected_countries"))
-                if (pays := normalize_country_code(as_str(p)))
+                if (country := normalize_country_code(as_str(p)))
             }
             addresses.append(
                 AddressRecord(text=name, countries=sorted(countries) or None, ror_ids=rors)
@@ -372,15 +360,13 @@ def extract_scanr_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     doc: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources ScanR de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "scanr",
         source_record_id,
         extract_scanr_author_block(doc),
@@ -394,14 +380,13 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    staging_store: StagingStore,
+    contribution_store: SourceContributionStore,
 ) -> bool:
     staging_id = staging_row.id
     scanr_id = staging_row.source_id
@@ -415,10 +400,10 @@ def process_work(
     )
 
     source_record_id = insert_scanr_document(
-        conn, queries, doc, staging_id, scanr_id, publication_meta
+        record_store, doc, staging_id, scanr_id, publication_meta
     )
-    process_contributions(conn, contribution_queries, doc, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    process_contributions(contribution_store, doc, source_record_id)
+    staging_store.mark_done(staging_id)
 
     return True
 
@@ -430,14 +415,13 @@ class ScanrNormalizer(BibliographicNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), as_int(row.raw_data.get("year"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            staging_store=self._staging,
+            contribution_store=self._contribution_store,
         )

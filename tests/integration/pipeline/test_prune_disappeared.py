@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 from sqlalchemy import text
 
 from pipeline.ingestion.common.source_records import delete_disappeared_source_records
-from pipeline.ingestion.common.staging import StagingQueries
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.staging import insert_staging
@@ -184,7 +184,7 @@ def test_un_enregistrement_source_sans_metadonnees_minimales_est_supprime(sa_syn
         sa_sync_conn_owner, publication, source_id="hal-soeur", staging_id=autre_staging
     )
 
-    StagingQueries(raw_store=MagicMock()).discard_source_record(sa_sync_conn_owner, staging_id)
+    StagingStore(sa_sync_conn_owner, raw_store=MagicMock()).discard_source_record(staging_id)
 
     restants = (
         sa_sync_conn_owner.execute(

@@ -837,7 +837,7 @@ contributor_information = Table(
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
-    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_queries.py).
+    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_store.py).
     Column(
         "key_hash",
         Text,
@@ -1130,7 +1130,13 @@ publications = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("countries", ARRAY(Text)),
     Column("sources", ARRAY(source_type_enum), nullable=False, server_default="{}"),
-    Column("meta", Jsonb),
+    Column("source_extras", Jsonb),
+    Column(
+        "corrections",
+        Jsonb,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
@@ -1170,6 +1176,10 @@ publications = Table(
     # l'unique publication ancre de la partition `(composante ∩ DOI)`). Partiel : les
     # publications sans DOI (NULL) ne sont pas contraintes.
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
+    CheckConstraint(
+        "jsonb_typeof(corrections) = 'object'",
+        name="publications_corrections_is_object",
+    ),
     schema="publications",
 )
 
@@ -1200,6 +1210,11 @@ source_records = Table(
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),
     Column("doc_type", Text),
+    Column(
+        "raw_doc_type",
+        Text,
+        comment="Type de document donné par la source, dans son vocabulaire.",
+    ),
     Column("publication_id", Integer),
     Column("staging_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -1222,19 +1237,24 @@ source_records = Table(
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("oa_status", Text),
-    # Licence normalisée de l'enregistrement source ; la forme brute reste dans `meta`.
+    # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
     Column("embargo_until", Date),
     Column("language", Text),
+    Column(
+        "raw_language",
+        Text,
+        comment="Langue donnée par la source, dans son vocabulaire.",
+    ),
     Column("container_title", Text),
     Column("is_retracted", Boolean),
     Column("abstract", Text),
     Column("keywords", ARRAY(Text)),
     Column("topics", Jsonb),
     Column("biblio", Jsonb),
-    Column("meta", Jsonb),
+    Column("source_extras", Jsonb),
     Column(
-        "raw_metadata",
+        "corrections",
         Jsonb,
         nullable=False,
         server_default=text("'{}'::jsonb"),
@@ -1278,8 +1298,8 @@ source_records = Table(
         name="source_records_impact_is_object",
     ),
     CheckConstraint(
-        "jsonb_typeof(raw_metadata) = 'object'",
-        name="source_records_raw_metadata_is_object",
+        "jsonb_typeof(corrections) = 'object'",
+        name="source_records_corrections_is_object",
     ),
     schema="sources",
 )

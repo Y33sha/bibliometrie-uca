@@ -25,17 +25,18 @@ from domain.journals.journal import JournalType, ManualField
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
+from domain.source_records.biblio import BiblioKey, JournalKey
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import journal_issns, journals
 from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
 from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.http.fetch_pool import RequestPace, run_fetch_pool
-from pipeline.runtime.observability.libelles import BRANCHE, accord, forme
+from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.journals.store import JournalStore
 
-LIBELLE = "Vérification des ISSN dans le Sudoc"
+LABEL = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 COMMIT_EVERY = 50  # revues par commit
@@ -69,11 +70,12 @@ class JournalTitleTypeRow(NamedTuple):
 
 
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
-_DOCUMENT_ISSNS = text("""
+_DOCUMENT_ISSNS = text(f"""
     SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
     FROM source_records s
     CROSS JOIN LATERAL (
-        VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
+        VALUES (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.ISSN}'),
+               (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.EISSN}')
     ) AS v(issn)
     WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
 """)
@@ -289,14 +291,12 @@ async def run_check_journals_in_sudoc(
         return records
 
     # Le compteur de la barre compte les revues présentes dans le Sudoc.
-    with progression(
-        total, f"{BRANCHE}{LIBELLE}", logger, compte_retenus=True, efface=True
-    ) as avancement:
+    with track_progress(total, f"{BRANCH}{LABEL}", logger, count_kept=True, erase=True) as progress:
 
         def _write(
             conn: Connection, row: JournalSudocRow, records: dict[str, SudocSerialRecord] | None
         ) -> None:
-            avancement.avance()
+            progress.advance()
             if records is None:
                 metrics.add(errors=1)
                 return
@@ -322,7 +322,7 @@ async def run_check_journals_in_sudoc(
                 issn_from_documents=len(_adopted(row, check)),
                 series_titled=int(check.title is not None),
             )
-            avancement.retient(int(check.found))
+            progress.keep(int(check.found))
 
         await run_fetch_pool(
             rows,
@@ -342,8 +342,8 @@ async def run_check_journals_in_sudoc(
         )
     found = metrics.extras.get("sudoc_found", 0)
     metrics.report = (
-        f"{accord(total, 'revue vérifiée', 'revues vérifiées')}, "
-        f"{accord(found, 'présente', 'présentes')} dans le Sudoc, "
-        f"{metrics.updated} {forme(metrics.updated, 'modifiée')}"
+        f"{quantity(total, 'revue vérifiée', 'revues vérifiées')}, "
+        f"{quantity(found, 'présente', 'présentes')} dans le Sudoc, "
+        f"{metrics.updated} {inflect(metrics.updated, 'modifiée')}"
     )
     return metrics

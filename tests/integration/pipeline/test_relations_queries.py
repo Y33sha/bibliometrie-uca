@@ -237,8 +237,8 @@ def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, 
         title="T",
         doi=doi,
         doc_type=doc_type,
-        meta={"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]},
-        raw_metadata={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
+        source_extras={"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]},
+        corrections={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
     )
 
 
@@ -439,7 +439,9 @@ class TestPhaseRelations:
             source_id="10.1/pr-a",
             title="t",
             doi="10.1/pr-a",
-            meta={"related_identifiers": [{"relation_type": "IsSupplementTo", "doi": "10.1/pr-b"}]},
+            source_extras={
+                "related_identifiers": [{"relation_type": "IsSupplementTo", "doi": "10.1/pr-b"}]
+            },
         )
 
         @contextmanager

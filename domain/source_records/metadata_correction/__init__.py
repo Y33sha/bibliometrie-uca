@@ -8,5 +8,5 @@ Trois sous-étapes, un module chacune :
 - `shared_doi` — correction du DOI d'un groupe d'enregistrements portant un même DOI (convergence vers l'œuvre canonique, ou nullage d'un DOI recopié à tort).
 - `journal_by_doi` — rattachement d'une revue à un enregistrement via l'espace de noms de son DOI.
 
-La provenance de chaque correction est tracée par le caller : une `source_record` la stashe dans `raw_metadata.<champ>.corrected_by` avec la valeur brute écrasée (réversibilité) ; une publication canonique l'inscrit dans `meta.corrections.<champ>` (provenance seule, recalculée à chaque refresh).
+La provenance de chaque correction est tracée par le caller dans la colonne `corrections` de `source_records` ou de `publications`, avec la valeur d'avant correction. Celle d'une publication est recalculée à chaque refresh.
 """

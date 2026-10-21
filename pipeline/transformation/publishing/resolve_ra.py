@@ -20,17 +20,17 @@ from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import (
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
 from pipeline.task_runner import SingleTaskPhase
-from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
+from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
 ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 """Signature : `(préfixes) -> (préfixe, agence)` pour chaque préfixe auquel doi.org a répondu. Agence `None` : doi.org ne connaît pas le préfixe."""
@@ -38,9 +38,9 @@ ResolveRasFn = Callable[[Sequence[str]], Iterable[tuple[str, str | None]]]
 
 @dataclass(frozen=True)
 class ResolveRaPhase:
-    """`repo_factory` construit les requêtes sur les préfixes sur la connexion de la phase."""
+    """`prefix_store_factory` construit les requêtes sur les préfixes sur la connexion de la phase."""
 
-    repo_factory: Callable[[Connection], DoiPrefixesQueries]
+    prefix_store_factory: Callable[[Connection], DoiPrefixStore]
     resolve_ras_fn: ResolveRasFn
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
@@ -50,7 +50,7 @@ class ResolveRaPhase:
         """
         with ctx.open_tx() as conn:
             try:
-                return _resolve(ctx.logger, self.repo_factory(conn), self.resolve_ras_fn)
+                return _resolve(ctx.logger, self.prefix_store_factory(conn), self.resolve_ras_fn)
             except SourceUnavailableError:
                 metrics = PhaseMetrics()
                 signal_source_unavailable(
@@ -60,7 +60,7 @@ class ResolveRaPhase:
 
 
 def _resolve(
-    log: logging.Logger, repo: DoiPrefixesQueries, resolve_ras_fn: ResolveRasFn
+    log: logging.Logger, prefix_store: DoiPrefixStore, resolve_ras_fn: ResolveRasFn
 ) -> PhaseMetrics:
     """Résout l'agence des préfixes absents de `doi_prefixes` (`doi.org/ra`) et l'insère.
 
@@ -70,17 +70,17 @@ def _resolve(
     # Un préfixe hors de la forme `10.<chiffres>` vient d'une valeur qui n'est pas un DOI : il n'est pas enregistré.
     prefixes = [
         prefix
-        for prefix in repo.get_prefixes_to_resolve()
+        for prefix in prefix_store.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
-    etape(log, "Agences d'enregistrement des préfixes DOI")
+    step(log, "Agences d'enregistrement des préfixes DOI")
     if not prefixes:
-        rien_a_faire(log)
+        nothing_to_do(log)
     else:
         log.info(
             "%s%s à résoudre",
-            DERNIERE_BRANCHE,
-            accord(len(prefixes), "préfixe DOI", "préfixes DOI"),
+            LAST_BRANCH,
+            quantity(len(prefixes), "préfixe DOI", "préfixes DOI"),
         )
 
     new_by_ra: dict[str, int] = {}
@@ -90,7 +90,7 @@ def _resolve(
             metrics.add(seen=1, resolved=1)
         else:
             metrics.add(seen=1, unresolved=1)
-        if repo.insert_ra(prefix=prefix, ra=ra):
+        if prefix_store.insert_ra(prefix=prefix, ra=ra):
             metrics.add(new=1)
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("     %s → %s", prefix, ra)
@@ -103,12 +103,12 @@ def _resolve(
     metrics.details["table"] = {
         "rows": [
             {"key": ra, "dois": dois, "prefixes": n_prefixes, "new": new_by_ra.get(ra, 0)}
-            for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
+            for ra, dois, n_prefixes in prefix_store.breakdown_by_registration_agency()
         ]
     }
-    resolus = metrics.extras.get("resolved", 0)
+    resolved = metrics.extras.get("resolved", 0)
     total = metrics.total
-    metrics.report = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
+    metrics.report = f"{resolved}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
     return metrics
 
 
@@ -122,7 +122,7 @@ def build() -> Phase:
     return SingleTaskPhase(
         "resolve_ra.resolve_prefixes",
         ResolveRaPhase(
-            DoiPrefixesQueries,
+            DoiPrefixStore,
             lambda prefixes: fetch_registration_agencies(prefixes, user_agent=user_agent),
         ),
         label="Bilan",

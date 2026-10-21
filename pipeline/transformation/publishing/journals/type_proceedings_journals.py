@@ -20,13 +20,12 @@ from domain.journals.containers import (
 from domain.journals.issns import IssnStatus
 from domain.journals.journal import JournalType
 from infrastructure.db.tables import journal_issns, journals
-from infrastructure.sql_fragments import raw_column
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import TYPE_NOT_MANUAL, JournalStore
 
-LIBELLE = "Typage des recueils d'actes"
+LABEL = "Typage des recueils d'actes"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _BY_RECORDS = "articles de congrès"
@@ -50,10 +49,10 @@ class JournalTitleIssnRow(NamedTuple):
 
 
 # Type brut de chaque document des revues de type inconnu : celui de la source, avant correction.
-_RECORD_TYPES_OF_UNKNOWN_JOURNALS = text(f"""
+_RECORD_TYPES_OF_UNKNOWN_JOURNALS = text("""
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
-           array_agg({raw_column("doc_type", "s")} ORDER BY s.id) AS raw_types
+           array_agg(s.raw_doc_type ORDER BY s.id) AS raw_types
     FROM journals j
     JOIN source_records s ON s.journal_id = j.id
     WHERE j.journal_type = 'unknown' AND NOT 'journal_type' = ANY(j.manual_fields)
@@ -118,7 +117,7 @@ def run_type_proceedings_journals(conn: Connection, logger: logging.Logger) -> P
             extra={"detail": True},
         )
     metrics.add(seen=len(reasons), journals_typed_proceedings=len(reasons))
-    metrics.report = accord(
+    metrics.report = quantity(
         len(reasons), "revue typée recueil d'actes", "revues typées recueils d'actes"
     )
     return metrics

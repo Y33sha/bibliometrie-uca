@@ -23,7 +23,7 @@ from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
 from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ def harvest_period(
     conn: Connection,
     institution_ids: list[str],
     logger: ScopedOrPlainLogger,
-    avancement: Progression,
+    progress: Progress,
     *,
     years: list[int],
     since: str | None = None,
@@ -79,7 +79,7 @@ def harvest_period(
             stage_work(conn, metrics, work)
         conn.commit()
         fetched += len(works)
-        avancement.avance(len(works))
+        progress.advance(len(works))
 
         next_cursor = as_str(at_path(data, "meta").get("next_cursor"))
         if not next_cursor:
@@ -114,28 +114,28 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
         client = self._client
         years = self._years(window)
 
-        def extrait(
-            avancement: Progression, *, years: list[int], since: str | None = None
+        def harvest_step(
+            progress: Progress, *, years: list[int], since: str | None = None
         ) -> PhaseMetrics:
-            portee = f"depuis {since}" if since else str(years[0])
+            scope = f"depuis {since}" if since else str(years[0])
             return harvest_period(
                 client,
                 self.conn,
                 ids,
-                scoped_logger(self.logger, self.SOURCE, portee),
-                avancement,
+                scoped_logger(self.logger, self.SOURCE, scope),
+                progress,
                 years=years,
                 since=since,
             )
 
         if window.since:
-            return self._extrait_d_un_tenant(
+            return self._harvest_at_once(
                 client.count(ids, years=years, since=window.since),
-                lambda avancement: extrait(avancement, years=years, since=window.since),
+                lambda progress: harvest_step(progress, years=years, since=window.since),
             )
 
-        return self._extrait_par_annee(
+        return self._harvest_by_year(
             years,
-            lambda annee: client.count(ids, years=[annee]),
-            lambda annee, avancement: extrait(avancement, years=[annee]),
+            lambda year: client.count(ids, years=[year]),
+            lambda year, progress: harvest_step(progress, years=[year]),
         )

@@ -3,8 +3,8 @@
 Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
-- `doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
-- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
+- `raw_doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`).
+- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `source_extras.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
 
@@ -12,42 +12,39 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sqlalchemy import Connection
-
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
+from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_text
 from domain.urls import is_host
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
-    extract_datacite_meta,
     extract_datacite_publication_year,
+    extract_datacite_source_extras,
     extract_related_dois,
     get_abstract,
     get_cited_by_count,
@@ -120,29 +117,17 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
 
     Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
     """
-    biblio: dict[str, JsonValue] = {}
-    container = attributes.get("container")
-    if isinstance(container, dict):
-        for src_key, dest_key in (
-            ("volume", "volume"),
-            ("issue", "issue"),
-            ("firstPage", "first_page"),
-            ("lastPage", "last_page"),
-        ):
-            val = container.get(src_key)
-            if isinstance(val, str) and val.strip():
-                biblio[dest_key] = val.strip()
-    if publisher_raw := get_publisher_name(attributes):
-        biblio["publisher"] = publisher_raw
+    container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
-    journal_obj: dict[str, str] = {}
-    if title:
-        journal_obj["title"] = title
-    if issn:
-        journal_obj["issn"] = issn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    return biblio or None
+    return compact_biblio(
+        volume=as_text(container.get("volume")),
+        issue=as_text(container.get("issue")),
+        first_page=as_text(container.get("firstPage")),
+        last_page=as_text(container.get("lastPage")),
+        publisher=get_publisher_name(attributes),
+        journal_title=title,
+        journal_issn=issn,
+    )
 
 
 # =============================================================
@@ -162,12 +147,12 @@ def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
 def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
     """ORCID depuis `nameIdentifiers` (scheme ORCID ou schemeUri orcid.org)."""
     for identifier in as_sequence(creator.get("nameIdentifiers")):
-        champs = as_mapping(identifier)
-        if not champs:
+        fields = as_mapping(identifier)
+        if not fields:
             continue
-        scheme = (as_str(champs.get("nameIdentifierScheme")) or "").strip().lower()
-        if scheme == "orcid" or is_host(as_str(champs.get("schemeUri")), "orcid.org"):
-            orcid = normalize_orcid(as_str(champs.get("nameIdentifier")))
+        scheme = (as_str(fields.get("nameIdentifierScheme")) or "").strip().lower()
+        if scheme == "orcid" or is_host(as_str(fields.get("schemeUri")), "orcid.org"):
+            orcid = normalize_orcid(as_str(fields.get("nameIdentifier")))
             if orcid:
                 return orcid
     return None
@@ -180,8 +165,8 @@ def _creator_affiliations(
     addresses: list[AddressRecord] = []
     without_text: set[RorId] = set()
     for aff in as_sequence(creator.get("affiliation")):
-        if (texte := as_str(aff)) and texte.strip():
-            addresses.append(AddressRecord(text=texte.strip()))
+        if (text := as_str(aff)) and text.strip():
+            addresses.append(AddressRecord(text=text.strip()))
             continue
         obj = as_mapping(aff)
         rors = parse_ror_ids(
@@ -206,7 +191,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
         return []
 
     ids_by_position = [
-        compact_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
+        contributor_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
         for c in creators
     ]
 
@@ -239,15 +224,13 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
 
 
 def process_contributions(
-    conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     attributes: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources DataCite de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "datacite",
         source_record_id,
         extract_datacite_author_block(attributes),
@@ -261,14 +244,13 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    staging_store: StagingStore,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -297,8 +279,7 @@ def process_work(
     if isbns := get_isbns(attributes):
         external_ids[ExternalIdType.ISBN] = isbns
 
-    source_record_id = queries.upsert_source_record(
-        conn,
+    source_record_id = record_store.upsert_source_record(
         SourceRecordUpsert(
             source="datacite",
             source_id=doi,
@@ -307,22 +288,22 @@ def process_work(
             external_ids=external_ids or None,
             title=title,
             publication_year=publication_year,
-            doc_type=extract_datacite_doc_type_token(attributes),
+            raw_doc_type=extract_datacite_doc_type_token(attributes),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
             container_title=container_title if not containers.journal_id else None,
-            language=get_language(attributes),
+            raw_language=get_language(attributes),
             biblio=get_biblio(attributes),
             abstract=get_abstract(attributes),
             keywords=get_keywords(attributes),
             oa_status=None,
             license=datacite_license(attributes.get("rightsList")),
             impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
-            meta=extract_datacite_meta(attributes),
+            source_extras=extract_datacite_source_extras(attributes),
         ),
     )
-    process_contributions(conn, contribution_queries, attributes, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    process_contributions(contribution_store, attributes, source_record_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -338,14 +319,13 @@ class DataciteNormalizer(BibliographicNormalizer):
             attributes, max_year=today().year + 1
         )
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            staging_store=self._staging,
+            contribution_store=self._contribution_store,
         )

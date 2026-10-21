@@ -18,6 +18,7 @@ from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
+from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from infrastructure.read_models.sql_fragments import (
     contribution_has_source,
@@ -217,9 +218,9 @@ def get_publication_detail(
 
     thesis_meta: ThesisMeta | None = None
     if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
-        meta_row = conn.execute(
+        extras_row = conn.execute(
             text(f"""
-                SELECT sr.meta AS source_record_meta, p.meta AS publication_meta
+                SELECT sr.source_extras AS source_record_extras, p.source_extras AS publication_extras
                 FROM publications p
                 LEFT JOIN source_records sr
                        ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
@@ -228,17 +229,17 @@ def get_publication_detail(
             """),
             {"pid": publication_id},
         ).one_or_none()
-        if meta_row:
-            source_record_meta = meta_row.source_record_meta or {}
-            publication_meta = meta_row.publication_meta or {}
+        if extras_row:
+            source_record_extras = extras_row.source_record_extras or {}
+            publication_extras = extras_row.publication_extras or {}
             thesis_meta = ThesisMeta(
-                discipline=source_record_meta.get("discipline"),
-                ecoles_doctorales=source_record_meta.get("ecoles_doctorales"),
-                partenaires=source_record_meta.get("partenaires"),
-                date_soutenance=source_record_meta.get("date_soutenance")
-                or publication_meta.get("date_soutenance"),
-                date_inscription=source_record_meta.get("date_inscription")
-                or publication_meta.get("date_inscription"),
+                discipline=source_record_extras.get(SourceExtra.DISCIPLINE),
+                ecoles_doctorales=source_record_extras.get(SourceExtra.ECOLES_DOCTORALES),
+                partenaires=source_record_extras.get(SourceExtra.PARTENAIRES),
+                date_soutenance=source_record_extras.get(SourceExtra.DATE_SOUTENANCE)
+                or publication_extras.get(SourceExtra.DATE_SOUTENANCE),
+                date_inscription=source_record_extras.get(SourceExtra.DATE_INSCRIPTION)
+                or publication_extras.get(SourceExtra.DATE_INSCRIPTION),
             )
 
     subjects = get_publication_subjects(conn, publication_id)

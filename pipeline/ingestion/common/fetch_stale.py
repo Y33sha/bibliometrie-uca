@@ -17,6 +17,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES, source_label
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.stale_refetch import (
@@ -30,9 +31,9 @@ from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
 from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
 from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
 from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
-from pipeline.runtime.config import get_fetch_stale_after_days, get_years
+from pipeline.runtime.config import delay, get_years
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
@@ -57,7 +58,7 @@ class FetchStalePhase:
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
         if not options.policy.fetch_stale:
-            logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
+            logger.info("%sSautée en mode %s", LAST_BRANCH, options.mode)
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
 
@@ -73,7 +74,7 @@ class FetchStalePhase:
 
             return run
 
-        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+        def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets
 
         by_task = run_tasks(
@@ -83,7 +84,7 @@ class FetchStalePhase:
                     task(source),
                     label=source_label(source),
                     progress_bar=True,
-                    when=retenue(source),
+                    when=selected(source),
                 )
                 for source in ALL_SOURCES
             },
@@ -151,7 +152,7 @@ def _run_fetch_stale(
     """
     refetch = _make_refetch(target)
     with ctx.open_tx() as conn:
-        after_days = get_fetch_stale_after_days(conn)
+        after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
         return asyncio.run(
             refresh(conn, refetch, ctx.logger, after_days=after_days, years=years, breaker=breaker)
         )

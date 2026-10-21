@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
+from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -35,7 +36,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import EXTRA_PHASES, PHASE_LIBELLES, PHASE_ORDER
+from pipeline.graph import EXTRA_PHASES, PHASE_LABELS, PHASE_ORDER
 from pipeline.ingestion.common import (
     fetch_missing,
     fetch_stale,
@@ -45,15 +46,15 @@ from pipeline.ingestion.common import (
 )
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.runtime.config import get_fetch_stale_after_days
+from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
@@ -66,8 +67,8 @@ from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
-set_console_writer(ecrire_hors_barre)
-set_flux_barres(console_stream())
+set_console_writer(write_above_bars)
+set_bar_stream(console_stream())
 
 # Seuil du root logger, où émettent les modules qui appellent `logging.getLogger(__name__)` :
 # les bibliothèques tierces y écrivent trop d'information pour la laisser passer.
@@ -125,12 +126,12 @@ def _install_sigterm_handler() -> None:
 
 def _catalogue_des_phases() -> str:
     """Phases dans l'ordre d'exécution, chacune résumée par la première ligne de la docstring de sa fonction `build`."""
-    largeur = max(len(name) for name, _ in PHASES)
-    lignes = ["Phases, dans l'ordre :"]
+    width = max(len(name) for name, _ in PHASES)
+    lines = ["Phases, dans l'ordre :"]
     for i, (name, build) in enumerate(PHASES, 1):
         doc = build.__doc__.strip().split("\n")[0] if build.__doc__ else ""
-        lignes.append(f"  {i:2d}. {name:{largeur}s}  {doc}")
-    return "\n".join(lignes)
+        lines.append(f"  {i:2d}. {name:{width}s}  {doc}")
+    return "\n".join(lines)
 
 
 def _source_list(value: str) -> str:
@@ -234,132 +235,134 @@ def _select_phases_to_run(
     if args.only:
         return [(n, build) for n, build in PHASES if n == args.only]
     if args.from_phase:
-        retenues = PHASES[PHASE_NAMES.index(args.from_phase) :]
+        selected = PHASES[PHASE_NAMES.index(args.from_phase) :]
     else:
-        retenues = list(PHASES)
+        selected = list(PHASES)
     if args.no_extras:
-        retenues = [(n, build) for n, build in retenues if n not in EXTRA_PHASES]
-    return retenues
+        selected = [(n, build) for n, build in selected if n not in EXTRA_PHASES]
+    return selected
 
 
-LARGEUR_TITRE_PHASE = 48
+PHASE_TITLE_WIDTH = 48
 """Largeur du texte dans le cadre d'un titre, la même pour tous."""
 
 
-def _encadre(lignes: list[str]) -> list[str]:
-    """Encadre `lignes`, chacune repliée à la largeur du cadre.
+def _framed(lines: list[str]) -> list[str]:
+    """Encadre `lines`, chacune repliée à la largeur du cadre.
 
     Un terminal reçoit un cadre de largeur constante, une sortie capturée deux filets horizontaux.
     """
     if not sys.stdout.isatty():
-        return ["─" * 40, *lignes, "─" * 40]
+        return ["─" * 40, *lines, "─" * 40]
 
-    repliees = [repli for ligne in lignes for repli in textwrap.wrap(ligne, LARGEUR_TITRE_PHASE)]
-    largeur = LARGEUR_TITRE_PHASE + 4
+    wrapped_lines = [
+        wrapped for line in lines for wrapped in textwrap.wrap(line, PHASE_TITLE_WIDTH)
+    ]
+    width = PHASE_TITLE_WIDTH + 4
     return [
-        f"╔{'═' * largeur}╗",
-        *[f"║  {ligne.ljust(largeur - 2)}║" for ligne in repliees],
-        f"╚{'═' * largeur}╝",
+        f"╔{'═' * width}╗",
+        *[f"║  {line.ljust(width - 2)}║" for line in wrapped_lines],
+        f"╚{'═' * width}╝",
     ]
 
 
-def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
+def _fetch_stale_fields(conn: "Connection") -> dict[str, str]:
+    return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
 
 
-_CHAMPS_DE_LIBELLE: dict[str, Callable[["Connection"], dict[str, str]]] = {
-    "fetch_stale": _champs_fetch_stale,
+_LABEL_FIELDS: dict[str, Callable[["Connection"], dict[str, str]]] = {
+    "fetch_stale": _fetch_stale_fields,
 }
 """Valeurs des champs de chaque libellé de phase qui en porte, lues en configuration."""
 
 
-def _libelle_de_phase(name: str) -> str | None:
+def _phase_label(name: str) -> str | None:
     """Ce que la phase produit, ses champs remplis par la configuration."""
-    # `PHASE_LIBELLES` couvre les phases du pipeline ; les tests en nomment d'autres.
-    libelle = PHASE_LIBELLES.get(name)
-    champs = _CHAMPS_DE_LIBELLE.get(name)
-    if libelle is None or champs is None:
-        return libelle
+    # `PHASE_LABELS` couvre les phases du pipeline ; les tests en nomment d'autres.
+    label = PHASE_LABELS.get(name)
+    fields = _LABEL_FIELDS.get(name)
+    if label is None or fields is None:
+        return label
     with open_tx() as conn:
-        return libelle.format(**champs(conn))
+        return label.format(**fields(conn))
 
 
-def _titre_de_phase(name: str, libelle: str | None) -> list[str]:
+def _phase_title(name: str, label: str | None) -> list[str]:
     """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
-    return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
+    return _framed([f"{PHASE_MARKER}{name}", *([label] if label else [])])
 
 
-TITRE_PIPELINE = (
+PIPELINE_TITLE = (
     "┏┓ ╻┏┓ ╻  ╻┏━┓┏┳┓┏━╸╺┳╸┏━┓╻┏━╸",
     "┣┻┓┃┣┻┓┃  ┃┃ ┃┃┃┃┣╸  ┃ ┣┳┛┃┣╸",
     "┗━┛╹┗━┛┗━╸╹┗━┛╹ ╹┗━╸ ╹ ╹┗╸╹┗━╸",
 )
 """« BIBLIOMETRIE » en caractères de filets, en tête de la bannière d'une exécution."""
 
-_LARGEUR_CLE_REGLAGE = 9
+_SETTING_KEY_WIDTH = 9
 """Largeur d'une clé de réglage et de ses points de conduite, dans la bannière."""
 
 
-def _reglage(cle: str, valeur: str) -> list[str]:
+def _setting(key: str, value: str) -> list[str]:
     """Lignes « clé ···· valeur » de la bannière, la valeur repliée sous elle-même."""
-    tete = f"{cle} {'·' * (_LARGEUR_CLE_REGLAGE - len(cle))} "
-    repliee = textwrap.wrap(valeur, LARGEUR_TITRE_PHASE - len(tete)) or [""]
-    return [tete + repliee[0], *(" " * len(tete) + suite for suite in repliee[1:])]
+    head = f"{key} {'·' * (_SETTING_KEY_WIDTH - len(key))} "
+    wrapped = textwrap.wrap(value, PHASE_TITLE_WIDTH - len(head)) or [""]
+    return [head + wrapped[0], *(" " * len(head) + continuation for continuation in wrapped[1:])]
 
 
-def _banniere(reglages: list[str]) -> list[str]:
+def _banner(settings: list[str]) -> list[str]:
     """Encadre le titre et les réglages d'une exécution, avec une ombre.
 
     Un terminal reçoit le cadre, au moins aussi large que celui d'une phase ; une sortie capturée reçoit deux filets et le titre en texte.
     """
     if not sys.stdout.isatty():
-        return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *reglages, "─" * 40]
+        return ["─" * 40, "PIPELINE BIBLIOMÉTRIQUE", *settings, "─" * 40]
 
-    reglages = [f"  {reglage}" for reglage in reglages]
-    largeur_dessin = max(map(len, TITRE_PIPELINE))
-    largeur = max(
-        LARGEUR_TITRE_PHASE + 4, largeur_dessin + 4, *(len(reglage) + 2 for reglage in reglages)
+    settings = [f"  {setting}" for setting in settings]
+    drawing_width = max(map(len, PIPELINE_TITLE))
+    width = max(
+        PHASE_TITLE_WIDTH + 4, drawing_width + 4, *(len(setting) + 2 for setting in settings)
     )
     # Un même retrait pour toutes les lignes du dessin : centrées une à une, elles se décaleraient.
-    retrait = " " * ((largeur - largeur_dessin) // 2)
-    corps = ["", *(retrait + ligne for ligne in TITRE_PIPELINE), "", *reglages, ""]
-    onglet = "┤ PIPELINE ├"
+    indent = " " * ((width - drawing_width) // 2)
+    body = ["", *(indent + line for line in PIPELINE_TITLE), "", *settings, ""]
+    tab = "┤ PIPELINE ├"
     return [
-        f"┌───{onglet}{'─' * (largeur - 3 - len(onglet))}┐",
-        *(f"│{ligne.ljust(largeur)}│▒" for ligne in corps),
-        f"└{'─' * largeur}┘▒",
-        f" {'▒' * (largeur + 2)}",
+        f"┌───{tab}{'─' * (width - 3 - len(tab))}┐",
+        *(f"│{line.ljust(width)}│▒" for line in body),
+        f"└{'─' * width}┘▒",
+        f" {'▒' * (width + 2)}",
     ]
 
 
-def _titre_du_run(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]]) -> list[str]:
+def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]]) -> list[str]:
     """Lignes ouvrant une exécution : son mode, puis ce qui écarte le lancement du courant."""
-    reglages = _reglage("mode", args.mode)
+    settings = _setting("mode", args.mode)
 
     if args.year:
-        reglages += _reglage("année", str(args.year))
+        settings += _setting("année", str(args.year))
     elif args.start_year:
-        reglages += _reglage("depuis", str(args.start_year))
+        settings += _setting("depuis", str(args.start_year))
 
     if args.only or args.from_phase:
-        reglages += _reglage("phases", ", ".join(n for n, _ in phases))
+        settings += _setting("phases", ", ".join(n for n, _ in phases))
     elif args.no_extras:
-        reglages += _reglage("phases", "sans les enrichissements terminaux")
+        settings += _setting("phases", "sans les enrichissements terminaux")
 
     options = [
-        texte
-        for drapeau, texte in (
+        text
+        for flag, text in (
             (args.rebuild_publications, "publications reconstruites"),
             (args.rebuild_subjects, "sujets reconstruits"),
             (args.raw_store, "archivage des données brutes"),
             (args.normalize_full, "contributions sources resynchronisées"),
         )
-        if drapeau
+        if flag
     ]
     if options:
-        reglages += _reglage("options", ", ".join(options))
+        settings += _setting("options", ", ".join(options))
 
-    return _banniere(reglages)
+    return _banner(settings)
 
 
 def _run_one_phase(
@@ -379,8 +382,8 @@ def _run_one_phase(
     try:
         # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.
         log.info("")
-        for ligne in _titre_de_phase(name, _libelle_de_phase(name)):
-            log.info("%s", ligne)
+        for line in _phase_title(name, _phase_label(name)):
+            log.info("%s", line)
         phase_started_at = datetime.datetime.now(datetime.UTC)
         t0_phase = time.time()
         try:
@@ -495,8 +498,8 @@ def main() -> None:
 
     phases_to_run = _select_phases_to_run(args)
     log.info("")
-    for ligne in _titre_du_run(args, phases_to_run):
-        log.info("%s", ligne)
+    for line in _run_title(args, phases_to_run):
+        log.info("%s", line)
     log.info("")
 
     # Une seule exécution à la fois sur la base : deux en parallèle s'interbloquent.

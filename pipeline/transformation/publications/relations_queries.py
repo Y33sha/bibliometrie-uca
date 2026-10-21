@@ -10,22 +10,23 @@ from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     SCALAR_CONFIRMATION_ID_TYPES,
 )
+from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import raw_column
+from infrastructure.sql_fragments import has_source_extra, raw_column
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Une `source_record` rattachée qui déclare des relations dans son `meta` (DataCite `related_identifiers` ou Crossref `relation`).
+    """Une `source_record` rattachée qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`).
 
     Son DOI d'origine et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
 
     publication_id: int
     source: str
-    meta: dict[str, JsonValue]
+    source_extras: dict[str, JsonValue]
     doi: str | None = None
     doc_type: str | None = None
     source_record_doc_type: str | None = None
@@ -174,23 +175,28 @@ class PublicationRelationsQueries:
     """Requêtes de la phase `relations`."""
 
     def fetch_declared_relation_sources(self, conn: Connection) -> list[DeclaredRelationSource]:
-        """Les `source_records` rattachées dont le `meta` déclare des relations."""
+        """Les `source_records` rattachées dont le `source_extras` déclare des relations."""
         # Le DOI d'origine, et non le DOI corrigé : c'est lui que l'enregistrement source déclare, et c'est son
         # préfixe qui dit si une relation de même œuvre franchit un registrant.
         rows = conn.execute(
             text(f"""
-                SELECT sr.publication_id, sr.source::text AS source, sr.meta,
+                SELECT sr.publication_id, sr.source::text AS source, sr.source_extras,
                        lower({raw_column("doi")}) AS doi,
                        p.doc_type::text AS doc_type, sr.doc_type AS source_record_doc_type
                 FROM source_records sr
                 JOIN publications p ON p.id = sr.publication_id
-                WHERE (sr.source = '{Source.DATACITE.value}' AND sr.meta ? 'related_identifiers')
-                   OR (sr.source = '{Source.CROSSREF.value}' AND sr.meta ? 'relation')
+                WHERE (sr.source = '{Source.DATACITE.value}' AND {has_source_extra(SourceExtra.RELATED_IDENTIFIERS)})
+                   OR (sr.source = '{Source.CROSSREF.value}' AND {has_source_extra(SourceExtra.RELATION)})
             """)
         ).all()
         return [
             DeclaredRelationSource(
-                r.publication_id, r.source, r.meta, r.doi, r.doc_type, r.source_record_doc_type
+                r.publication_id,
+                r.source,
+                r.source_extras,
+                r.doi,
+                r.doc_type,
+                r.source_record_doc_type,
             )
             for r in rows
         ]
@@ -234,7 +240,7 @@ class PublicationRelationsQueries:
 
     # Colonnes qui identifient une arête, celles de la contrainte d'unicité : deux arêtes qui s'y
     # accordent sont le même lien. Le diff avant/après les compare.
-    _IDENTITE = "from_publication_id, relation_type, target_publication_id, target_doi"
+    _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, target_doi"
 
     def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
         """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
@@ -242,14 +248,14 @@ class PublicationRelationsQueries:
         # disparaît. Un échec en cours de route annule sa création avec le reste de la transaction.
         conn.execute(
             text(
-                f"CREATE TEMP TABLE relations_avant AS "
-                f"SELECT {self._IDENTITE} FROM publication_relations"
+                f"CREATE TEMP TABLE relations_before AS "
+                f"SELECT {self._IDENTITY_COLUMNS} FROM publication_relations"
             )
         )
         conn.execute(text("DELETE FROM publication_relations"))
         written = 0 if not edges else self._insert_edges(conn, edges)
         rebuild = RelationsRebuild(written, self._count_added(conn), self._count_removed(conn))
-        conn.execute(text("DROP TABLE relations_avant"))
+        conn.execute(text("DROP TABLE relations_before"))
         return rebuild
 
     def _count_added(self, conn: Connection) -> list[tuple[str, int]]:
@@ -258,9 +264,9 @@ class PublicationRelationsQueries:
             text(f"""
                 SELECT relation_type::text AS rel_type, count(*) AS cnt
                 FROM (
-                    SELECT {self._IDENTITE} FROM publication_relations
+                    SELECT {self._IDENTITY_COLUMNS} FROM publication_relations
                     EXCEPT
-                    SELECT {self._IDENTITE} FROM relations_avant
+                    SELECT {self._IDENTITY_COLUMNS} FROM relations_before
                 ) ajoutees
                 GROUP BY relation_type
                 ORDER BY cnt DESC
@@ -274,9 +280,9 @@ class PublicationRelationsQueries:
             conn.execute(
                 text(f"""
                     SELECT count(*) FROM (
-                        SELECT {self._IDENTITE} FROM relations_avant
+                        SELECT {self._IDENTITY_COLUMNS} FROM relations_before
                         EXCEPT
-                        SELECT {self._IDENTITE} FROM publication_relations
+                        SELECT {self._IDENTITY_COLUMNS} FROM publication_relations
                     ) disparues
                 """)
             )

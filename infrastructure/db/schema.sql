@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict hIh4syP4Bk9m1aKIGibBkP58ttNKuas5ypYfhKSA8mxbOolRnMls795zNzWsaSk
+\restrict 1zUsi9891gy282C0xQJyWcV2F8sUuWM36a1PrYKsTIpskA7GslVYON1qd9WZZ5Y
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1089,9 +1089,9 @@ CREATE TABLE sources.source_records (
     keywords text[],
     topics jsonb,
     biblio jsonb,
-    meta jsonb,
+    source_extras jsonb,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    corrections jsonb DEFAULT '{}'::jsonb CONSTRAINT source_records_raw_metadata_not_null NOT NULL,
     title_normalized text,
     keys_dirty boolean DEFAULT true NOT NULL,
     embargo_until date,
@@ -1101,9 +1101,11 @@ CREATE TABLE sources.source_records (
     license public.license_type,
     author_count integer DEFAULT 0 NOT NULL,
     distinct_author_count integer DEFAULT 0 NOT NULL,
+    raw_doc_type text,
+    raw_language text,
+    CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
     CONSTRAINT source_records_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
-    CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
-    CONSTRAINT source_records_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+    CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
 
 
@@ -1126,6 +1128,20 @@ COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources 
 --
 
 COMMENT ON COLUMN sources.source_records.distinct_author_count IS 'Noms complets normalisés distincts parmi les contributions sources comptées par author_count.';
+
+
+--
+-- Name: COLUMN source_records.raw_doc_type; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.raw_doc_type IS 'Type de document donné par la source, dans son vocabulaire.';
+
+
+--
+-- Name: COLUMN source_records.raw_language; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.raw_language IS 'Langue donnée par la source, dans son vocabulaire.';
 
 
 --
@@ -1302,7 +1318,7 @@ UNION
     'thesis_institution'::public.perimeter_evidence AS evidence
    FROM ((sources.source_records sp
      JOIN sources.source_contributions sa ON ((sa.source_record_id = sp.id)))
-     JOIN structures.structures s ON (((s.api_ids -> 'theses'::text) ? (sp.meta ->> 'etablissement_ppn'::text))))
+     JOIN structures.structures s ON (((s.api_ids -> 'theses'::text) ? (sp.source_extras ->> 'etablissement_ppn'::text))))
   WHERE ((sp.source = 'theses'::public.source_type) AND (s.id IN ( SELECT perimeter.structure_id
            FROM perimeter)))
 UNION
@@ -1310,7 +1326,7 @@ UNION
     ist.structure_id,
     'thesis_partner'::public.perimeter_evidence AS evidence
    FROM (((sources.source_records sp
-     CROSS JOIN LATERAL jsonb_array_elements((sp.meta -> 'partenaires'::text)) partner(value))
+     CROSS JOIN LATERAL jsonb_array_elements((sp.source_extras -> 'partenaires'::text)) partner(value))
      JOIN structures.idref_structures ist ON ((ist.idref_ppn = (partner.value ->> 'ppn'::text))))
      JOIN sources.source_contributions sa ON (((sa.source_record_id = sp.id) AND (sa.roles && ARRAY['author'::text]))))
   WHERE ((sp.source = 'theses'::public.source_type) AND (ist.is_confirmed IS DISTINCT FROM false) AND ((ist.matched_form_id IS NOT NULL) OR ist.is_confirmed) AND (ist.structure_id IN ( SELECT perimeter.structure_id
@@ -1503,7 +1519,7 @@ CREATE TABLE publications.publications (
     updated_at timestamp with time zone DEFAULT now(),
     countries text[],
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
-    meta jsonb,
+    source_extras jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
     subjects_ingested_at timestamp with time zone,
     monograph_id integer,
@@ -1511,7 +1527,9 @@ CREATE TABLE publications.publications (
     deposit_license public.license_type,
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
-    contributions_dirty boolean DEFAULT true NOT NULL
+    contributions_dirty boolean DEFAULT true NOT NULL,
+    corrections jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
 
 
@@ -3655,17 +3673,17 @@ CREATE INDEX idx_publications_journal ON publications.publications USING btree (
 
 
 --
--- Name: idx_publications_meta; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_publications_meta ON publications.publications USING gin (meta) WHERE (meta IS NOT NULL);
-
-
---
 -- Name: idx_publications_monograph; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX idx_publications_monograph ON publications.publications USING btree (monograph_id) WHERE (monograph_id IS NOT NULL);
+
+
+--
+-- Name: idx_publications_source_extras; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_source_extras ON publications.publications USING gin (source_extras) WHERE (source_extras IS NOT NULL);
 
 
 --
@@ -4925,5 +4943,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hIh4syP4Bk9m1aKIGibBkP58ttNKuas5ypYfhKSA8mxbOolRnMls795zNzWsaSk
+\unrestrict 1zUsi9891gy282C0xQJyWcV2F8sUuWM36a1PrYKsTIpskA7GslVYON1qd9WZZ5Y
 

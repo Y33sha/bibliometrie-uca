@@ -32,9 +32,9 @@ from pipeline.ingestion.common.failed_lookups import (
 from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.hal.api import search_one
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, rien_a_faire
+from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 
 # HAL ne publie pas de seuil officiel : 5 workers et une pause de HAL_DELAY par worker donnent ~6-7 req/s, sans rafale.
 HAL_MAX_CONCURRENT = 5
@@ -138,7 +138,7 @@ async def _fetch_ids(
     """
     metrics = PhaseMetrics(seen=len(ids))
     if not ids:
-        rien_a_faire(log)
+        nothing_to_do(log)
         return metrics
 
     async def _fetch(
@@ -148,7 +148,7 @@ async def _fetch_ids(
         await asyncio.sleep(HAL_DELAY)
         return fetched
 
-    with progression(len(ids), f"{DERNIERE_BRANCHE}HAL", log, compte_retenus=True) as avancement:
+    with track_progress(len(ids), f"{LAST_BRANCH}HAL", log, count_kept=True) as progress:
 
         def _write(
             conn: Connection, identifier: str, result: LookupOutcome[Mapping[str, JsonValue]]
@@ -159,8 +159,8 @@ async def _fetch_ids(
             elif not isinstance(result, Unavailable) and extract_id(result):
                 if _stage(conn, result):
                     metrics.add(new=1)
-                    avancement.retient()
-            avancement.avance()
+                    progress.keep()
+            progress.advance()
 
         await run_fetch_pool(
             ids,

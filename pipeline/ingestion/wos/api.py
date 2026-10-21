@@ -137,8 +137,8 @@ class WosClient:
             )
         if resp.status_code != 200:
             return None
-        restant: str | None = resp.headers.get("X-REC-AmtPerYear-Remaining")
-        return restant
+        remaining: str | None = resp.headers.get("X-REC-AmtPerYear-Remaining")
+        return remaining
 
 
 async def search(

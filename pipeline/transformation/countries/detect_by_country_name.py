@@ -11,7 +11,7 @@ from sqlalchemy import Connection, text
 
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
@@ -46,13 +46,13 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
 
     `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat, `extras["unmatched"]` = adresses sans nom de pays final.
     """
-    etape(logger, "Pays des adresses d'après le nom de pays qui les termine")
+    step(logger, "Pays des adresses d'après le nom de pays qui les termine")
     store = CountryCandidatesStore(conn)
     country_forms = load_country_forms(conn)
     max_tokens = max((form.count(" ") + 1 for form in country_forms), default=1)
 
     rows = store.dirty_addresses()
-    logger.info("%s%s à traiter", BRANCHE, accord(len(rows), "adresse"))
+    logger.info("%s%s à traiter", BRANCH, quantity(len(rows), "adresse"))
 
     matched: list[tuple[int, list[str]]] = []
     for addr_id, normalized_text in rows:
@@ -60,5 +60,5 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
             matched.append((addr_id, [iso]))
 
     added = store.replace_for_dirty_addresses(CountryDetectionMethod.COUNTRY_NAME, matched)
-    logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
+    logger.info("%spays trouvé pour %s", LAST_BRANCH, quantity(added, "adresse"))
     return PhaseMetrics(seen=len(rows), new=added, extras={"unmatched": len(rows) - len(matched)})

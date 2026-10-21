@@ -3,15 +3,24 @@
 import pytest
 
 from domain.source_records.metadata_correction.rules import (
-    _SOURCE_ONLY_PREDICATES,
     MetadataCorrectionRule,
     MetadataForCorrection,
-    _AppliesTo,
     _check_predicate,
-    effective_doc_type_for_publication,
     effective_metadata,
     strip_dissertation_keys,
 )
+
+
+def _publication(**overrides: object) -> MetadataForCorrection:
+    defaults: dict[str, object] = {
+        "title": "Some title",
+        "doc_type": None,
+        "doi": None,
+        "journal_id": None,
+        "journal_type": None,
+    }
+    defaults.update(overrides)
+    return MetadataForCorrection.for_publication(**defaults)  # type: ignore[arg-type]
 
 
 def _view(**overrides: object) -> MetadataForCorrection:
@@ -357,9 +366,8 @@ class TestConferenceDeclaredRule:
     def test_chapitre_sans_congres_reste_chapitre(self):
         assert effective_metadata(_view(doc_type="book_chapter")).doc_type is None
 
-    def test_regle_ecartee_du_rejeu_canonique(self):
-        view = _view(doc_type="book_chapter", declares_conference=True)
-        assert effective_doc_type_for_publication(view) is None
+    def test_publication_sans_ce_fait_non_corrigee(self):
+        assert effective_metadata(_publication(doc_type="book_chapter")).doc_type is None
 
 
 class TestProceedingsVolumeRule:
@@ -380,9 +388,8 @@ class TestProceedingsVolumeRule:
         view = _view(doc_type="book", in_proceedings_volume=True)
         assert effective_metadata(view).doc_type is None
 
-    def test_regle_ecartee_du_rejeu_canonique(self):
-        view = _view(doc_type="article", in_proceedings_volume=True)
-        assert effective_doc_type_for_publication(view) is None
+    def test_publication_sans_ce_fait_non_corrigee(self):
+        assert effective_metadata(_publication(doc_type="article")).doc_type is None
 
 
 class TestCrossrefVolumeRules:
@@ -400,12 +407,24 @@ class TestCrossrefVolumeRules:
             corrected.rule == MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS
         )
 
-    def test_volume_signe_par_son_editeur_devient_volume(self):
+    def test_volume_a_un_auteur_declare_devient_volume(self):
         view = _view(
             source="crossref",
             author_count=1,
             doc_type="conference_paper",
             title="Proceedings of the 23rd International Conference of IFORS",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS
+
+    def test_recueil_de_resumes_listant_leurs_auteurs_devient_volume(self):
+        """Cas réel : le recueil liste les 934 auteurs de ses résumés."""
+        view = _view(
+            source="crossref",
+            author_count=934,
+            doc_type="article",
+            title="Abstracts from the Food Allergy and Anaphylaxis Meeting 2016",
         )
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
@@ -442,11 +461,9 @@ class TestCrossrefVolumeRules:
         view = _view(source="crossref", doc_type="article", title="Poster Abstracts")
         assert effective_metadata(view).doc_type is None
 
-    def test_regles_ecartees_du_rejeu_canonique(self):
-        view = _view(
-            source="crossref", author_count=0, doc_type="article", title="Poster Abstracts"
-        )
-        assert effective_doc_type_for_publication(view) is None
+    def test_publication_sans_source_ni_auteurs_non_corrigee(self):
+        view = _publication(doc_type="article", title="Poster Abstracts")
+        assert effective_metadata(view).doc_type is None
 
 
 class TestJournalTypeProceedingsRule:
@@ -1052,31 +1069,28 @@ class TestEffectiveMetadataScope:
         assert fields.oa_status is None
 
 
-class TestEffectiveDocTypeForPublication:
-    def test_arbitrated_predicates_still_apply(self):
-        # journal_type est arbitré (il suit le journal_id canonique) : la règle se rejoue.
-        corrected = effective_doc_type_for_publication(
-            _view(doc_type="preprint", journal_type="media")
-        )
+class TestPublication:
+    def test_regle_sur_la_revue_rejouee(self):
+        corrected = effective_metadata(
+            _publication(doc_type="preprint", journal_id=7, journal_type="media")
+        ).doc_type
         assert corrected is not None
         assert corrected.rule == MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA
 
-    def test_source_only_rule_is_skipped_even_when_its_signal_is_present(self):
-        # Une vue canonique ne porte pas d'urls ; si un appelant en fournissait quand même,
-        # la règle resterait écartée — l'exclusion tient au prédicat, pas à la valeur.
-        view = _view(doc_type="article", urls=("https://theses.fr/s1",))
-        assert effective_metadata(view).doc_type is not None
-        assert effective_doc_type_for_publication(view) is None
+    def test_faits_propres_aux_enregistrements_sources_inconnus(self):
+        view = _publication(doc_type="article")
+        assert (view.urls, view.self_declared_preprint, view.source, view.author_count) == (
+            None,
+            None,
+            None,
+            None,
+        )
 
-    def test_declared_preprint_rule_is_skipped(self):
-        view = _view(doc_type="article", self_declared_preprint=True)
-        assert effective_metadata(view).doc_type is not None
-        assert effective_doc_type_for_publication(view) is None
 
-    def test_source_only_predicates_are_real_predicate_names(self):
-        # Un nom absent d'`_AppliesTo` n'écarterait aucune règle : le filtre deviendrait muet
-        # sans rien signaler, et les règles source-only se rejoueraient sur le canonique.
-        assert _SOURCE_ONLY_PREDICATES <= set(_AppliesTo.__annotations__)
+class TestFaitInconnu:
+    @pytest.mark.parametrize("expected", [True, False])
+    def test_predicat_sur_un_fait_inconnu_faux(self, expected):
+        assert not _check_predicate(_view(journal_diamond=None), "journal_diamond", expected)
 
 
 class TestPresentationRules:

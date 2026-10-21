@@ -8,17 +8,17 @@ from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue, as_str
 
 
-def extract_id(these: Mapping[str, JsonValue]) -> str:
+def extract_id(thesis: Mapping[str, JsonValue]) -> str:
     """Identifiant d'une thèse (champ `id`) : le NNT d'une thèse soutenue (`2021UCFAC022`), l'identifiant theses.fr d'une thèse en cours (`s367812`)."""
-    return as_str(these.get("id")) or ""
+    return as_str(thesis.get("id")) or ""
 
 
-def extract_doi(these: Mapping[str, JsonValue]) -> str | None:
+def extract_doi(thesis: Mapping[str, JsonValue]) -> str | None:
     """DOI nettoyé d'une thèse (champ `doi`), ou `None`."""
-    doi = these.get("doi")
+    doi = thesis.get("doi")
     return clean_doi(doi) if isinstance(doi, str) else None
 
 
-def is_ongoing(these: Mapping[str, JsonValue]) -> bool:
+def is_ongoing(thesis: Mapping[str, JsonValue]) -> bool:
     """Vrai pour une thèse en cours, qui n'a ni soutenance ni NNT."""
-    return as_str(these.get("status")) == "enCours"
+    return as_str(thesis.get("status")) == "enCours"

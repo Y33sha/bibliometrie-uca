@@ -6,15 +6,13 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
-from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
-
-# Enregistrement source dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
-_CONVERGED = [
-    DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-    DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-]
+from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
+from infrastructure.sql_fragments import (
+    corrected_by,
+    in_clause,
+    scanr_from_hal_sql,
+    usable_identifier,
+)
 
 # Statuts d'un rattachement d'identifiant posé par un humain.
 _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
@@ -40,7 +38,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
         SELECT n.* FROM records n
         WHERE NOT (n.converged AND EXISTS (
                 SELECT 1 FROM records o WHERE o.publication_id = n.publication_id AND NOT o.converged))
-          AND NOT (n.source = 'scanr' AND n.source_id LIKE 'hal%' AND EXISTS (
+          AND NOT ({scanr_from_hal_sql("n")} AND EXISTS (
                 SELECT 1 FROM records h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
     )
     SELECT k.publication_id, k.id AS source_record, k.source, sc.id, sc.author_position AS position,
@@ -162,16 +160,21 @@ class BatchPlan:
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
 
-class AuthorGroupingQueries:
+class SourceContributionGroupStore:
     """Lectures et écritures des groupes de contributions sources."""
 
-    def refresh_alignment(self, conn: Connection) -> None:
-        """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
-        conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment"))
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
-    def fetch_dirty_publications(self, conn: Connection) -> list[tuple[int, int]]:
+    def refresh_alignment(self) -> None:
+        """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
+        self._conn.execute(
+            text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment")
+        )
+
+    def fetch_dirty_publications(self) -> list[tuple[int, int]]:
         """Publications marquées `contributions_dirty`, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
-        rows = conn.execute(
+        rows = self._conn.execute(
             text("""
                 SELECT p.id, coalesce(sum(sr.author_count), 0)::integer AS source_contributions
                 FROM publications p
@@ -184,22 +187,22 @@ class AuthorGroupingQueries:
         return [(r.id, r.source_contributions) for r in rows]
 
     def fetch_source_contributions(
-        self, conn: Connection, publication_ids: Sequence[int]
+        self, publication_ids: Sequence[int]
     ) -> list[SourceContributionRow]:
         """Contributions sources à grouper de ces publications."""
-        rows = conn.execute(
+        rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
-            {"publications": list(publication_ids), "converged": [str(c) for c in _CONVERGED]},
+            {"publications": list(publication_ids), "converged": list(CONVERGENCE_CASES)},
         ).mappings()
         return [SourceContributionRow(**row) for row in rows]
 
     def fetch_groups(
-        self, conn: Connection, publication_ids: Sequence[int]
+        self, publication_ids: Sequence[int]
     ) -> tuple[dict[int, dict[int, set[int]]], dict[int, MembershipRow]]:
         """Groupes en base de ces publications : publication → groupe → contributions sources, et appartenance de chaque contribution source groupée."""
         groups: dict[int, dict[int, set[int]]] = {}
         memberships: dict[int, MembershipRow] = {}
-        for row in conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
+        for row in self._conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
             members = groups.setdefault(row.publication_id, {}).setdefault(row.id, set())
             if row.source_contribution_id is not None:
                 members.add(row.source_contribution_id)
@@ -213,39 +216,39 @@ class AuthorGroupingQueries:
                 )
         return groups, memberships
 
-    def group_ids(self, conn: Connection, n: int) -> list[int]:
+    def group_ids(self, n: int) -> list[int]:
         """`n` identifiants tirés de la séquence des groupes."""
         if not n:
             return []
-        return list(conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
+        return list(self._conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
 
-    def write(self, conn: Connection, plan: BatchPlan) -> None:
+    def write(self, plan: BatchPlan) -> None:
         """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `contributions_dirty`.
 
         Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
-        conn.execute(
+        self._conn.execute(
             _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
         )
         if copies:
-            conn.execute(
+            self._conn.execute(
                 _SET_COPIES_SQL, {"copies": list(copies), "originals": list(copies.values())}
             )
         if removed:
-            conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
+            self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
         if unmatched_ids:
-            conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
+            self._conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
         kept = [g for g in groups if g.existing]
         if kept:
-            conn.execute(
+            self._conn.execute(
                 _UPDATE_POSITIONS_SQL,
                 {"ids": [g.id for g in kept], "positions": [g.reference_position for g in kept]},
             )
         created = [g for g in groups if not g.existing]
         if created:
-            conn.execute(
+            self._conn.execute(
                 _INSERT_GROUPS_SQL,
                 {
                     "ids": [g.id for g in created],
@@ -254,7 +257,7 @@ class AuthorGroupingQueries:
                 },
             )
         if memberships:
-            conn.execute(
+            self._conn.execute(
                 _INSERT_MEMBERSHIPS_SQL,
                 {
                     "source_contributions": [m.source_contribution for m in memberships],
@@ -265,7 +268,7 @@ class AuthorGroupingQueries:
                     "margins": [m.margin for m in memberships],
                 },
             )
-        conn.execute(
+        self._conn.execute(
             text("UPDATE publications SET contributions_dirty = false WHERE id = ANY(:ids)"),
             {"ids": list(publication_ids)},
         )

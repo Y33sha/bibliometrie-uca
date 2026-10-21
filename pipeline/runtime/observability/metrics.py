@@ -7,10 +7,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from domain.pipeline_runs import PhaseMetricsPayload, Signal
-from pipeline.runtime.observability.libelles import forme
+from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
+from pipeline.runtime.observability.log_format import inflect
 
-LIBELLES_EXTRAS: dict[str, str | tuple[str, str]] = {
+EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "already_complete": "déjà complet",
     "conflicts": "conflit",
     "disappeared": "disparu",
@@ -165,18 +165,18 @@ class PhaseMetrics:
         # d'administration et les runs déjà enregistrés lisent : la traduction reste à l'affichage.
         parts: list[str] = []
         if self.new:
-            parts.append(f"{self.new} {forme(self.new, 'nouveau', 'nouveaux')}")
+            parts.append(f"{self.new} {inflect(self.new, 'nouveau', 'nouveaux')}")
         if self.updated:
             parts.append(f"{self.updated} mis à jour")
         if self.unchanged:
-            parts.append(f"{self.unchanged} {forme(self.unchanged, 'inchangé')}")
+            parts.append(f"{self.unchanged} {inflect(self.unchanged, 'inchangé')}")
         if self.errors:
-            parts.append(f"{self.errors} {forme(self.errors, 'erreur')}")
+            parts.append(f"{self.errors} {inflect(self.errors, 'erreur')}")
         for k, v in self.extras.items():
             if v:
-                libelle = LIBELLES_EXTRAS.get(k, (k, k))
-                singulier, pluriel = libelle if isinstance(libelle, tuple) else (libelle, None)
-                parts.append(f"{v} {forme(v, singulier, pluriel)}")
+                label = EXTRA_LABELS.get(k, (k, k))
+                singular, plural = label if isinstance(label, tuple) else (label, None)
+                parts.append(f"{v} {inflect(v, singular, plural)}")
         if self.total and not parts:
             parts.append(f"{self.total} au total")
         return ", ".join(parts) if parts else "rien à faire"

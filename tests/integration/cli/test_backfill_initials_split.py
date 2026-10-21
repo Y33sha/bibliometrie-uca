@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from domain.persons.contributor_name import ContributorName
 from interfaces.cli.oneshot.backfill_initials_split import backfill
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import AuthorRecord, write_source_contributions
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -49,8 +49,7 @@ def test_synchronisation_apres_backfill_garde_la_contribution_source(sa_sync_con
     backfill(sa_sync_conn, apply=True)
 
     write_source_contributions(
-        sa_sync_conn,
-        ContributionsBatchQueries(),
+        SourceContributionStore(sa_sync_conn),
         "openalex",
         source_record,
         [AuthorRecord(0, ContributorName(raw="Del Buono L."))],

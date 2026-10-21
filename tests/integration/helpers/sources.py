@@ -25,11 +25,13 @@ def insert_source_record(
     doi: str | None = None,
     publication_year: int | None = None,
     doc_type: str | None = None,
+    raw_doc_type: str | None = None,
     journal_id: int | None = None,
     monograph_id: int | None = None,
     staging_id: int | None = None,
     container_title: str | None = None,
     language: str | None = None,
+    raw_language: str | None = None,
     keywords: list[str] | None = None,
     countries: list[str] | None = None,
     hal_collections: list[str] | None = None,
@@ -40,11 +42,11 @@ def insert_source_record(
     keys_dirty: bool | None = None,
     external_ids: dict[str, object] | None = None,
     biblio: dict[str, object] | None = None,
-    meta: dict[str, object] | None = None,
+    source_extras: dict[str, object] | None = None,
     topics: object = None,
-    raw_metadata: dict[str, object] | None = None,
+    corrections: dict[str, object] | None = None,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`."""
     return insert_row(
         conn,
         "source_records",
@@ -58,11 +60,13 @@ def insert_source_record(
             "doi": doi,
             "publication_year": publication_year,
             "doc_type": doc_type,
+            "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
             "journal_id": journal_id,
             "monograph_id": monograph_id,
             "staging_id": staging_id,
             "container_title": container_title,
             "language": language,
+            "raw_language": language if raw_language is None else raw_language,
             "keywords": keywords,
             "countries": countries,
             "hal_collections": hal_collections,
@@ -73,11 +77,13 @@ def insert_source_record(
             "keys_dirty": keys_dirty,
             "external_ids": _jsonb(external_ids),
             "biblio": _jsonb(biblio),
-            "meta": _jsonb(meta),
+            "source_extras": _jsonb(source_extras),
             "topics": _jsonb(topics),
-            "raw_metadata": _jsonb(raw_metadata),
+            "corrections": _jsonb(corrections),
         },
-        dict.fromkeys(("external_ids", "biblio", "meta", "topics", "raw_metadata"), "jsonb"),
+        dict.fromkeys(
+            ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
+        ),
     )
 
 

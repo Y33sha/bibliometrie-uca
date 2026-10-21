@@ -50,7 +50,7 @@ from domain.persons.matching import (
     trusted_identifier,
 )
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
-from domain.persons.name_matching import first_name_initials, initials_extend
+from domain.persons.name_matching import first_name_initials, full_first_name_extends
 from domain.persons.person import validated_name
 from domain.sources.registry import require_known_source
 from infrastructure.repositories.person_repository import PgPersonRepository
@@ -58,8 +58,8 @@ from infrastructure.sql_fragments import (
     REJECTED_PAIRS,
     active_name_form,
 )
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
-from pipeline.runtime.observability.progression import attente, progression
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.loading import (
     EnrichedContribution,
@@ -422,8 +422,7 @@ class _Cascade:
         if (
             initials is None
             or first_name is None
-            or first_name_initials(first_name) is not None
-            or not initials_extend(initials, first_name)
+            or not full_first_name_extends(initials, first_name)
         ):
             return
         self._repo.update_name(pid, *validated_name(namesake.last_name, first_name))
@@ -461,16 +460,16 @@ def run_cascade(
 
     Passe `create` (`decide_cross_and_name`) sur les seules contributions sources du périmètre restées sans personne : cross-source et nom contre l'état ferme complet, puis création des inconnues. Une création ancre le cross-source d'une autre contribution source du groupe traitée juste après, dans la même passe — sans quoi deux graphies du même auteur inconnu produiraient deux personnes.
     """
-    etape(logger, "Identification des personnes")
+    step(logger, "Identification des personnes")
     completion = complete_reduced_first_names(conn, repo=repo)
     logger.info(
         "%s%s d'après les contributions sources",
-        BRANCHE,
-        accord(completion.completed, "prénom complété", "prénoms complétés"),
+        BRANCH,
+        quantity(completion.completed, "prénom complété", "prénoms complétés"),
     )
     # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
     # muette jusqu'à ce qu'il rende la main.
-    with attente(f"{BRANCHE}chargement des contributions sources", logger) as ligne:
+    with waiting(f"{BRANCH}chargement des contributions sources", logger) as line:
         c = _Cascade(
             conn,
             repo=repo,
@@ -478,19 +477,19 @@ def run_cascade(
         )
         c.first_names_completed = completion.completed
         total = len(c.contributions)
-        ligne.conclut(
-            f"{BRANCHE}{accord(total, 'contribution source', 'contributions sources')} à examiner"
+        line.conclude(
+            f"{BRANCH}{quantity(total, 'contribution source', 'contributions sources')} à examiner"
         )
 
     unresolved: list[EnrichedContribution] = []
-    with progression(total, BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
+    with track_progress(total, BRANCH.rstrip(), logger, count_kept=True) as progress:
         for a in c.contributions:
-            avancement.avance()
+            progress.advance()
             decision = c.decide_full(a)
             if decision.action == "match":
                 # La barre compte les rattachements réels, pas les confirmations à l'identique.
                 if c.apply_match(a, decision.person_id, decision.reason):
-                    avancement.retient()
+                    progress.keep()
             else:
                 # Création différée ou aucun signal : reprise en passe create.
                 unresolved.append(a)
@@ -501,45 +500,45 @@ def run_cascade(
     # hors périmètre, ou déjà liées en cross-source — n'attendent de cette passe qu'un
     # rattachement à une personne qu'elle vient de créer ; la passe suivante du run d'après les
     # rejuge contre l'état ferme complet.
-    sans_personne = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
-    non_identifiees = [a for a in sans_personne if a.allow_create]
+    without_person = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
+    unidentified = [a for a in without_person if a.allow_create]
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme indécidable le reste.
-    indecidables = [a for a in non_identifiees if c.name_form_undecidable(a)]
-    indecidables_ids = {a.source_contribution_id for a in indecidables}
+    undecidable = [a for a in unidentified if c.name_form_undecidable(a)]
+    undecidable_ids = {a.source_contribution_id for a in undecidable}
     # Les contributions sources au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
-    a_creer = sorted(
-        (a for a in non_identifiees if a.source_contribution_id not in indecidables_ids),
+    to_create = sorted(
+        (a for a in unidentified if a.source_contribution_id not in undecidable_ids),
         key=lambda a: not a.name.split_by_source,
     )
 
-    etape(logger, "Création de nouvelles personnes")
+    step(logger, "Création de nouvelles personnes")
     logger.info(
         "%s%s %s",
-        BRANCHE,
-        accord(len(non_identifiees), "contribution source", "contributions sources"),
-        forme(len(non_identifiees), "non identifiée"),
+        BRANCH,
+        quantity(len(unidentified), "contribution source", "contributions sources"),
+        inflect(len(unidentified), "non identifiée"),
     )
     logger.info(
         "%s%s (forme de nom ambiguë, ou candidats tous rejetés)",
-        BRANCHE,
-        accord(len(indecidables), "indécidable"),
+        BRANCH,
+        quantity(len(undecidable), "indécidable"),
     )
-    creees_avant = c.created
-    with progression(len(a_creer), BRANCHE.rstrip(), logger, compte_retenus=True) as avancement:
-        for a in a_creer:
-            avancement.avance()
+    created_before = c.created
+    with track_progress(len(to_create), BRANCH.rstrip(), logger, count_kept=True) as progress:
+        for a in to_create:
+            progress.advance()
             if c.resolve_or_create(a):
-                avancement.retient()
+                progress.keep()
     # Les contributions sources qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë —
     # peuvent encore rejoindre en cross-source une personne créée pour une autre contribution source du groupe. Traitées
     # après toutes les créations, elles en reçoivent tous les ancrages.
-    for a in [*(a for a in sans_personne if not a.allow_create), *indecidables]:
+    for a in [*(a for a in without_person if not a.allow_create), *undecidable]:
         c.resolve_or_create(a)
     logger.info(
         "%s%s %s",
-        DERNIERE_BRANCHE,
-        accord(c.created - creees_avant, "personne"),
-        forme(c.created - creees_avant, "créée"),
+        LAST_BRANCH,
+        quantity(c.created - created_before, "personne"),
+        inflect(c.created - created_before, "créée"),
     )
     if orphans_log is not None:
         c.log_orphans(orphans_log)

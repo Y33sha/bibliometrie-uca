@@ -28,14 +28,14 @@ PIPELINE_LOCK_KEY = 8_014_552_301_774_233_001
 # `pg_locks` couvre tout le cluster, alors qu'un verrou consultatif vaut pour une seule base : le
 # filtre sur `database` écarte les sessions d'une autre base qui détiennent la même clé.
 _HOLDER_SQL = text("""
-    SELECT activite.application_name AS identite,
-           to_char(activite.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS depuis
-    FROM pg_locks AS verrou
-    JOIN pg_stat_activity AS activite USING (pid)
-    WHERE verrou.locktype = 'advisory'
-      AND verrou.granted
-      AND verrou.database = (SELECT oid FROM pg_database WHERE datname = current_database())
-      AND (verrou.classid::bigint << 32) | (verrou.objid::bigint & 4294967295) = :cle
+    SELECT a.application_name AS holder,
+           to_char(a.backend_start, 'DD/MM/YYYY HH24:MI:SS') AS started_at
+    FROM pg_locks AS l
+    JOIN pg_stat_activity AS a USING (pid)
+    WHERE l.locktype = 'advisory'
+      AND l.granted
+      AND l.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+      AND (l.classid::bigint << 32) | (l.objid::bigint & 4294967295) = :key
     LIMIT 1
 """)
 
@@ -44,17 +44,17 @@ class PipelineAlreadyRunningError(RuntimeError):
     """Levée quand une autre exécution du pipeline détient le verrou."""
 
 
-def _identite() -> str:
+def _identity() -> str:
     """Nom de machine et identifiant de processus, portés par `application_name`."""
     return f"run_pipeline@{socket.gethostname()} (processus {os.getpid()})"
 
 
-def _detenteur(conn: Connection) -> str:
+def _holder(conn: Connection) -> str:
     """Décrit l'exécution qui détient le verrou, pour le message de refus."""
-    ligne = conn.execute(_HOLDER_SQL, {"cle": PIPELINE_LOCK_KEY}).one_or_none()
-    if ligne is None or not ligne.identite:
+    row = conn.execute(_HOLDER_SQL, {"key": PIPELINE_LOCK_KEY}).one_or_none()
+    if row is None or not row.holder:
         return "une autre exécution"
-    return f"{ligne.identite}, démarrée le {ligne.depuis}"
+    return f"{row.holder}, démarrée le {row.started_at}"
 
 
 @contextmanager
@@ -65,15 +65,15 @@ def pipeline_lock() -> Iterator[None]:
     """
     with get_sync_engine().connect() as conn:
         conn.execute(
-            text("SELECT set_config('application_name', :nom, false)"), {"nom": _identite()}
+            text("SELECT set_config('application_name', :name, false)"), {"name": _identity()}
         )
-        pris: bool = conn.execute(
-            text("SELECT pg_try_advisory_lock(:cle)"), {"cle": PIPELINE_LOCK_KEY}
+        acquired: bool = conn.execute(
+            text("SELECT pg_try_advisory_lock(:key)"), {"key": PIPELINE_LOCK_KEY}
         ).scalar_one()
-        if not pris:
-            raise PipelineAlreadyRunningError(f"Pipeline déjà en cours : {_detenteur(conn)}.")
-        log.debug("Verrou pipeline acquis (%s)", _identite())
+        if not acquired:
+            raise PipelineAlreadyRunningError(f"Pipeline déjà en cours : {_holder(conn)}.")
+        log.debug("Verrou pipeline acquis (%s)", _identity())
         try:
             yield
         finally:
-            conn.execute(text("SELECT pg_advisory_unlock(:cle)"), {"cle": PIPELINE_LOCK_KEY})
+            conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": PIPELINE_LOCK_KEY})

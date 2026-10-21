@@ -22,9 +22,9 @@ from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.openalex.api import fetch_work
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.task_runner import SingleTaskPhase
 
 COMMIT_EVERY = 50
@@ -86,12 +86,12 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     if not truncated:
         return metrics
 
-    etape(
+    step(
         log,
         "%s de %d auteurs, potentiellement %s",
-        accord(total, "document"),
+        quantity(total, "document"),
         BULK_AUTHORSHIPS_CAP,
-        forme(total, "tronqué"),
+        inflect(total, "tronqué"),
     )
 
     async def _fetch(
@@ -99,7 +99,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
     ) -> LookupOutcome[Mapping[str, JsonValue]]:
         return await fetch_work(client, ref.openalex_id)
 
-    with progression(total, DERNIERE_BRANCHE.rstrip(), log) as avancement:
+    with track_progress(total, LAST_BRANCH.rstrip(), log) as progress:
 
         def _write(
             conn: Connection, ref: TruncatedWork, work: LookupOutcome[Mapping[str, JsonValue]]
@@ -116,7 +116,7 @@ async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetric
             else:
                 conn.execute(_UPDATE_SQL, {"raw_data": work, "id": ref.staging_id})
                 metrics.add(updated=1)
-            avancement.avance()
+            progress.advance()
 
         await run_fetch_pool(
             truncated,

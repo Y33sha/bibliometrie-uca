@@ -109,9 +109,11 @@ source_modules = ["pipeline"]
 forbidden_modules = ["application", "interfaces"]
 # Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
 # réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
-# Exception : `infrastructure/` importe `application.ports` (voir le contrat des couches).
+# Exception : `application.ports` est zone neutre, pour le pipeline comme pour `infrastructure/`
+# (voir le contrat des couches) : le pipeline en importe les structures de transport.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
+    "pipeline.** -> application.ports.**",
 ]
 
 [[tool.importlinter.contracts]]

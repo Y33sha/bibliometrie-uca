@@ -13,11 +13,11 @@ PERSIST_BATCH = 5000
 def persist_in_batches[U](
     conn: Connection,
     updates: list[U],
-    persist: Callable[[Connection, list[U]], int | None],
+    persist: Callable[[list[U]], int | None],
 ) -> int:
     """Persiste `updates` par lots de `PERSIST_BATCH`, un commit par lot. Retourne le total remonté par `persist` (0 si `persist` ne compte pas)."""
     total = 0
     for start in range(0, len(updates), PERSIST_BATCH):
-        total += persist(conn, updates[start : start + PERSIST_BATCH]) or 0
+        total += persist(updates[start : start + PERSIST_BATCH]) or 0
         conn.commit()
     return total

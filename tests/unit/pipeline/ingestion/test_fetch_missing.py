@@ -6,7 +6,7 @@ Les dépendances techniques sont injectées (runners par canal et par source, pa
 import logging
 
 from pipeline.ingestion.common.fetch_missing import FetchMissingPhase
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 
@@ -72,7 +72,7 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
 
 def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(contexte, caplog):
     journal = _run_doi_only(contexte, lambda _ctx, source, _breaker: PhaseMetrics(), caplog)
-    assert f"{DERNIERE_BRANCHE}Rien à faire" in journal
+    assert f"{LAST_BRANCH}Rien à faire" in journal
 
 
 def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(contexte, caplog):

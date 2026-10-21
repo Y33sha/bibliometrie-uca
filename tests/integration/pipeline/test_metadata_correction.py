@@ -10,8 +10,8 @@ from domain.dates import today
 from pipeline.transformation.publications.correction import journal_by_doi
 from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
 from pipeline.transformation.publications.correction.correct_unary import compute_update
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
-    PgMetadataCorrectionQueries,
+from pipeline.transformation.publications.correction.correction_store import (
+    SourceRecordCorrectionStore,
 )
 from tests.integration.helpers.journals import (
     insert_doi_prefix,
@@ -30,8 +30,6 @@ _typed_source_record = partial(
 # Enregistrement source de titre « Un titre », OpenAlex par défaut.
 _source_record = partial(insert_source_record, source="openalex", title="Un titre")
 
-_Q = PgMetadataCorrectionQueries()
-
 
 def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
     journal_id = insert_journal(conn, "J", journal_type=journal_type)
@@ -42,17 +40,18 @@ def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
 
 def _apply(conn) -> int:
     """Joue la passe unaire sans committer (transaction de test rollbackée)."""
-    rows = _Q.fetch_for_unary_correction(conn)
-    language_forms = _Q.fetch_language_forms(conn)
-    updates = [u for r in rows if (u := compute_update(r, language_forms)) is not None]
-    return _Q.persist_corrections(conn, updates)
+    rows = SourceRecordCorrectionStore(conn).fetch_for_unary_correction()
+    updates = [u for r in rows if (u := compute_update(r)) is not None]
+    return SourceRecordCorrectionStore(conn).persist_corrections(updates)
 
 
 def _apply_journal_by_doi(conn) -> int:
     """Joue le sous-step journal_by_doi sans committer."""
-    namespaces = _Q.fetch_journal_doi_namespaces(conn)
-    rows = _Q.fetch_journal_by_doi_candidates(conn)
-    return _Q.persist_journal_corrections(conn, journal_by_doi.compute_updates(rows, namespaces))
+    namespaces = SourceRecordCorrectionStore(conn).fetch_journal_doi_namespaces()
+    rows = SourceRecordCorrectionStore(conn).fetch_journal_by_doi_candidates()
+    return SourceRecordCorrectionStore(conn).persist_journal_corrections(
+        journal_by_doi.compute_updates(rows, namespaces)
+    )
 
 
 def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
@@ -66,7 +65,7 @@ def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
 
     assert _apply_journal_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert jid == media_journal
@@ -94,7 +93,7 @@ def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
     conn.execute(text("DELETE FROM journal_doi_namespaces WHERE journal_id = :id"), {"id": journal})
     assert _apply_journal_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert jid is None
@@ -103,7 +102,7 @@ def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
 
 def _state(conn, source_record_id: int) -> tuple:
     return conn.execute(
-        text("SELECT doc_type, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT doc_type, corrections FROM source_records WHERE id = :id"),
         {"id": source_record_id},
     ).one()
 
@@ -163,25 +162,16 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
     assert raw["doc_type"]["corrected_by"] == "DOI_REGISTRANT_MEDIA_TO_MEDIA"
 
 
-def test_hal_code_mapped_to_canonical(sa_sync_conn):
-    conn = sa_sync_conn
-    source_record = _source_record(conn, source_id="hal-1", doc_type="ART", source="hal")
-    assert _apply(conn) == 1
-    doc_type, raw = _state(conn, source_record)
-    assert doc_type == "article"  # ART → article par mapping
-    assert raw == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
-
-
 def test_reversibility_invariant(sa_sync_conn):
     conn = sa_sync_conn
     media_journal = _seed_journal(conn, "media")
     _source_record(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
     _apply(conn)
 
-    # COALESCE(raw_metadata->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
+    # COALESCE(corrections->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
     reconstructed = conn.execute(
         text(
-            "SELECT COALESCE(raw_metadata->'doc_type'->>'raw', doc_type) "
+            "SELECT COALESCE(corrections->'doc_type'->>'raw', doc_type) "
             "FROM source_records WHERE source_id = 'W_media'"
         )
     ).scalar_one()
@@ -238,17 +228,17 @@ def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
 
     assert _apply(conn) == 1
     row = conn.execute(
-        text("SELECT doc_type, external_ids, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT doc_type, external_ids, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert row.doc_type == "article"  # mistype corrigé
     assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
-    assert row.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
-    assert row.raw_metadata["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.corrections["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
     # Réversibilité : le brut external_ids est reconstructible.
     raw_nnt = conn.execute(
         text(
-            "SELECT raw_metadata->'external_ids'->'raw'->>'nnt' FROM source_records WHERE id = :id"
+            "SELECT corrections->'external_ids'->'raw'->>'nnt' FROM source_records WHERE id = :id"
         ),
         {"id": source_record},
     ).scalar_one()
@@ -270,11 +260,11 @@ def test_expired_embargo_promoted_to_green(sa_sync_conn):
     )
     assert _apply(conn) == 1
     row = conn.execute(
-        text("SELECT oa_status::text AS oa, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT oa_status::text AS oa, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert row.oa == "green"
-    assert row.raw_metadata["oa_status"] == {
+    assert row.corrections["oa_status"] == {
         "raw": "embargoed",
         "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
     }
@@ -333,8 +323,8 @@ def test_active_embargo_not_promoted(sa_sync_conn):
 
 
 def _apply_cluster(conn) -> int:
-    rows = _Q.fetch_doi_cluster_candidates(conn)
-    return _Q.persist_doi_corrections(conn, compute_updates(rows))
+    rows = SourceRecordCorrectionStore(conn).fetch_doi_cluster_candidates()
+    return SourceRecordCorrectionStore(conn).persist_doi_corrections(compute_updates(rows))
 
 
 def test_chapter_loses_doi_of_its_book(sa_sync_conn):
@@ -357,15 +347,13 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     ).scalar_one()
     assert chap_doi is None
     chap_raw = conn.execute(
-        text("SELECT raw_metadata FROM source_records WHERE id = :id"), {"id": chapter}
+        text("SELECT corrections FROM source_records WHERE id = :id"), {"id": chapter}
     ).scalar_one()
     assert chap_raw == {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
 
     # Réversibilité : le DOI brut du chapitre reste reconstructible.
     reconstructed = conn.execute(
-        text(
-            "SELECT COALESCE(raw_metadata->'doi'->>'raw', doi) FROM source_records WHERE id = :id"
-        ),
+        text("SELECT COALESCE(corrections->'doi'->>'raw', doi) FROM source_records WHERE id = :id"),
         {"id": chapter},
     ).scalar_one()
     assert reconstructed == "10.1/x"
@@ -384,10 +372,10 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     )
     assert _apply_cluster(conn) == 1
     chap_doi = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": chapter}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": chapter}
     ).one()
     assert chap_doi.doi == "10.1/x"
-    assert chap_doi.raw_metadata == {}
+    assert chap_doi.corrections == {}
 
 
 def test_chapters_same_title_untouched(sa_sync_conn):
@@ -438,11 +426,11 @@ def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
     assert _apply_cluster(conn) == 2
     for source_record in (c1, c2):
         row = conn.execute(
-            text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"),
+            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
             {"id": source_record},
         ).one()
         assert row.doi is None
-        assert row.raw_metadata["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
+        assert row.corrections["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
 
 
 def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
@@ -490,10 +478,10 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 
     assert _apply_cluster(conn) == 2
     raw = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": first}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": first}
     ).one()
     assert raw.doi is None
-    assert raw.raw_metadata == {
+    assert raw.corrections == {
         "doi": {"raw": "10.1364/ao.xx.xxxxxx", "corrected_by": "UNRESOLVED_DOI_TO_NULL"}
     }
 
@@ -510,17 +498,17 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 # ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
 
 
-def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=None):
+def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=None):
     """Enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
-    meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
+    source_extras = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
     return _typed_source_record(
         conn,
         source="datacite",
         source_id=source_id,
         doi=doi,
         doc_type=doc_type,
-        meta=meta,
-        raw_metadata=raw_metadata,
+        source_extras=source_extras,
+        corrections=corrections,
     )
 
 
@@ -551,11 +539,11 @@ def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
         doi="10.48550/arxiv.1",
         doc_type="preprint",
         relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
-        raw_metadata=stash,
+        corrections=stash,
     )
     oa = _typed_source_record(conn, source_id="oa", doi="10.48550/arxiv.1", doc_type="article")
     conn.execute(
-        text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
+        text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE id = :id"),
         {"raw": json.dumps(stash), "id": oa},
     )
     assert _apply_cluster(conn) == 2
@@ -595,7 +583,7 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
-    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `meta`."""
+    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
     return insert_source_record(
         conn,
         source="datacite",
@@ -604,7 +592,7 @@ def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset"
         title_normalized="piece",
         doi=doi,
         doc_type=doc_type,
-        meta={"related_identifiers": [{"relation_type": "IsPartOf", "doi": parent_doi}]},
+        source_extras={"related_identifiers": [{"relation_type": "IsPartOf", "doi": parent_doi}]},
     )
 
 
@@ -626,11 +614,11 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
     assert _doi(conn, parent) == "10.9001/set"  # le parent garde son DOI
     for source_record in (piece, sibling):
         row = conn.execute(
-            text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"),
+            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
             {"id": source_record},
         ).one()
         assert row.doi == "10.9001/set"
-        assert row.raw_metadata["doi"] == {
+        assert row.corrections["doi"] == {
             "raw": "10.9002/file1",
             "corrected_by": "DATACITE_PACKAGE_PIECE",
         }
@@ -659,7 +647,9 @@ def test_une_correction_de_doi_regroupe_les_contributions_sources_de_la_publicat
         title_normalized="piece",
         doi="10.9002/file1",
         doc_type="dataset",
-        meta={"related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]},
+        source_extras={
+            "related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]
+        },
     )
     insert_source_record(conn, other, source="openalex", source_id="W-other", title="Other")
     conn.execute(text("UPDATE publications SET contributions_dirty = false"))
@@ -707,26 +697,7 @@ def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_con
     )
     assert _apply_cluster(conn) == 1
     row = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": piece}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": piece}
     ).one()
     assert row.doi == "10.9002/file1"
-    assert row.raw_metadata == {}
-
-
-def test_language_mapped_to_referential_code_with_source_value_kept(sa_sync_conn):
-    # WoS donne le nom anglais de la langue ; la forme `english` du référentiel le ramène à `en`.
-    conn = sa_sync_conn
-    source_record = _source_record(conn, source="wos", source_id="wos-1", doc_type="article")
-    conn.execute(
-        text("UPDATE source_records SET language = 'English' WHERE id = :id"), {"id": source_record}
-    )
-    _apply(conn)
-    row = conn.execute(
-        text(
-            "SELECT language, raw_metadata->'language' AS source_value "
-            "FROM source_records WHERE id = :id"
-        ),
-        {"id": source_record},
-    ).one()
-    assert row.language == "en"
-    assert row.source_value == {"raw": "English", "corrected_by": "LANGUAGE_MAP"}
+    assert row.corrections == {}

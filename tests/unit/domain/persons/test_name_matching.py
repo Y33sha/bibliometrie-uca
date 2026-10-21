@@ -9,6 +9,7 @@ from domain.persons.name_matching import (
     _edit_distance,
     family_name_splits,
     first_name_initials,
+    full_first_name_extends,
     initials_extend,
     names_compatible,
 )
@@ -150,6 +151,21 @@ def test_initiales_d_un_prenom(first_name, initials):
 )
 def test_initiales_qui_commencent_un_prenom(initials, first_name, extend):
     assert initials_extend(initials, first_name) is extend
+
+
+@pytest.mark.parametrize(
+    ("initials", "first_name", "extends"),
+    [
+        (("a",), "Abdellah", True),
+        (("a", "m"), "Abdul-Majeed", True),
+        (("j",), "J.-P.", False),
+        (("a",), "A. B.", False),
+        (("h",), "Bo-Hyung", False),
+        (("a",), "", False),
+    ],
+)
+def test_prenom_plein_qui_prolonge_des_initiales(initials, first_name, extends):
+    assert full_first_name_extends(initials, first_name) is extends
 
 
 @pytest.mark.parametrize(

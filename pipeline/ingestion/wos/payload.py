@@ -53,7 +53,7 @@ def parse_export_researcher_ids(ri: str | None) -> dict[str, str]:
     return ids
 
 
-def is_wos_author_exploitable(author: Mapping[str, JsonValue]) -> bool:
+def is_wos_author_usable(author: Mapping[str, JsonValue]) -> bool:
     """Indique si une entrée auteur WoS est utilisable côté pipeline.
 
     `daisng_id` (Distinct Author Identification System) est l'identifiant interne WoS de l'auteur. Pas utilisé côté DB (entité algorithmique WoS, non fiable) mais c'est un signal de **qualité** : son absence indique un parsing API WoS douteux (typiquement les enregistrements mal indexés ou incomplets). Combiné à l'exigence d'un `full_name`, le filtre garde une bonne approximation « auteur réel exploitable » et écarte les fragments d'erreur.

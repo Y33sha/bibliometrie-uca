@@ -17,24 +17,25 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
+from domain.config import ConfigKey
 from domain.publications.metadata import publication_oa_status
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-from pipeline.runtime.config import get_unpaywall_max_per_run, get_unpaywall_recheck_after_days
+from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import (
-    BRANCHE,
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 
@@ -65,7 +66,7 @@ class OaStatusPhase:
         with ctx.open_tx() as conn:
             metrics.merge(
                 asyncio.run(
-                    _verifier(
+                    _check(
                         conn,
                         self.queries,
                         ctx.logger,
@@ -79,7 +80,7 @@ class OaStatusPhase:
         return metrics
 
 
-async def _verifier(
+async def _check(
     conn: Connection,
     queries: OaStatusQueries,
     logger: logging.Logger,
@@ -135,27 +136,27 @@ async def _verifier(
         }
         return metrics
 
-    etape(logger, "Vérification du statut open access sur Unpaywall")
+    step(logger, "Vérification du statut open access sur Unpaywall")
     if not total:
-        rien_a_faire(logger)
+        nothing_to_do(logger)
         return _result()
 
     logger.info(
         "%s%s %s ou %s depuis plus de %s",
-        BRANCHE,
-        accord(stale_total, "DOI", "DOI"),
-        forme(stale_total, "jamais vérifié"),
-        forme(stale_total, "vérifié"),
-        accord(staleness_days, "jour"),
+        BRANCH,
+        quantity(stale_total, "DOI", "DOI"),
+        inflect(stale_total, "jamais vérifié"),
+        inflect(stale_total, "vérifié"),
+        quantity(staleness_days, "jour"),
     )
     if max_per_run and max_per_run < stale_total:
-        reportes = stale_total - total
+        deferred = stale_total - total
         logger.info(
             "%splafond de %s par run ⇒ %s %s au prochain",
-            BRANCHE,
+            BRANCH,
             max_per_run,
-            reportes,
-            forme(reportes, "reporté"),
+            deferred,
+            inflect(deferred, "reporté"),
         )
 
     sem = asyncio.Semaphore(max_concurrent)
@@ -167,7 +168,7 @@ async def _verifier(
                 return doi, await fetcher(client, doi)
 
         # Par paquets : les requêtes d'un paquet partent en concurrence (débit borné par `sem`), puis ses écritures sont committées.
-        with progression(total, BRANCHE.rstrip(), logger) as avancement:
+        with track_progress(total, BRANCH.rstrip(), logger) as bar:
             for start in range(0, total, BATCH_SIZE):
                 chunk = dois[start : start + BATCH_SIZE]
                 verdicts: list[tuple[str, str | None]] = []
@@ -181,17 +182,17 @@ async def _verifier(
                         verdicts.append((doi, outcome))
                 await asyncio.to_thread(_apply_verdicts, conn, queries, verdicts, progress)
                 await asyncio.to_thread(conn.commit)
-                avancement.avance(len(chunk))
+                bar.advance(len(chunk))
 
-    bilan = [
-        accord(progress["new"], "nouveau", "nouveaux"),
-        accord(progress["updated"], "modifié"),
-        accord(progress["unchanged"], "inchangé"),
-        accord(progress["not_found"], "non trouvé", "non trouvés"),
+    summary = [
+        quantity(progress["new"], "nouveau", "nouveaux"),
+        quantity(progress["updated"], "modifié"),
+        quantity(progress["unchanged"], "inchangé"),
+        quantity(progress["not_found"], "non trouvé", "non trouvés"),
     ]
     if progress["unavailable"]:
-        bilan.append(accord(progress["unavailable"], "reporté"))
-    logger.info("%s%s", DERNIERE_BRANCHE, ", ".join(bilan))
+        summary.append(quantity(progress["unavailable"], "reporté"))
+    logger.info("%s%s", LAST_BRANCH, ", ".join(summary))
 
     return _result()
 
@@ -236,7 +237,7 @@ def build() -> Phase:
         OaStatusPhase(
             OaStatusQueries(),
             fetcher,
-            staleness_days=get_unpaywall_recheck_after_days,
-            max_per_run=get_unpaywall_max_per_run,
+            staleness_days=lambda conn: delay(conn, ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS),
+            max_per_run=lambda conn: cap(conn, ConfigKey.UNPAYWALL_MAX_PER_RUN),
         ),
     )

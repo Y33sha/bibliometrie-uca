@@ -15,8 +15,8 @@ def extract_id(doc: Mapping[str, JsonValue]) -> str:
 
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """Premier DOI nettoyé des `externalIds` d'un document ScanR."""
-    for entree in as_sequence(doc.get("externalIds")):
-        ext = as_mapping(entree)
+    for entry in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entry)
         if as_str(ext.get("type")) == "doi":
             return clean_doi(as_str(ext.get("id")))
     return None

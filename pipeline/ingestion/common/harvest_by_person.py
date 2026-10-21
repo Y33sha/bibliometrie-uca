@@ -26,7 +26,7 @@ from pipeline.ingestion.common.harvester import (
 )
 from pipeline.ingestion.credentials import get_scanr_credentials
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -48,7 +48,7 @@ class HarvestByPersonPhase:
         """Exécute en parallèle la tâche de chaque source retenue et assemble les métriques."""
         options = ctx.options
         if not options.policy.harvest_by_person:
-            ctx.logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
+            ctx.logger.info("%sSautée en mode %s", LAST_BRANCH, options.mode)
             return PhaseMetrics()
         effective = set(PERSON_SEARCHED_SOURCES) & options.sources
 
@@ -66,7 +66,7 @@ class HarvestByPersonPhase:
 
             return run
 
-        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+        def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in effective
 
         by_task = run_tasks(
@@ -77,7 +77,7 @@ class HarvestByPersonPhase:
                     label=source_label(source),
                     progress_bar=True,
                     threshold=5,
-                    when=retenue(source),
+                    when=selected(source),
                 )
                 for source in PERSON_SEARCHED_SOURCES
             },

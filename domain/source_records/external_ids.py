@@ -55,6 +55,11 @@ _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
 }
 
 
+def external_id_normalizer(id_type: ExternalIdType) -> Callable[[str], str | None]:
+    """Fonction qui rend la forme normalisée d'une valeur de type `id_type`, ou `None` si elle est invalide."""
+    return _NORMALIZERS[id_type]
+
+
 @dataclass(frozen=True, slots=True)
 class RejectedExternalId:
     """Entrée écartée d'un `external_ids` : clé hors de `ExternalIdType`, ou valeur invalide pour son type."""

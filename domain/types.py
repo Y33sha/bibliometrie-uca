@@ -22,6 +22,11 @@ def as_str(value: JsonValue) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def as_text(value: JsonValue) -> str | None:
+    """Chaîne de `value` sans les espaces qui l'entourent, ou `None` si `value` n'est pas une chaîne ou se réduit à des espaces."""
+    return (as_str(value) or "").strip() or None
+
+
 def as_int(value: JsonValue) -> int | None:
     """Entier porté par `value`, ou `None` si elle n'en porte pas.
 

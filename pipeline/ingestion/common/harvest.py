@@ -40,7 +40,7 @@ from pipeline.ingestion.common.harvester import (
 )
 from pipeline.ingestion.credentials import get_scanr_credentials, get_wos_api_key
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import BRANCHE
+from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -85,20 +85,20 @@ class HarvestPhase:
         policy = options.policy
         effective = set(policy.harvest_sources) | ({"wos"} if options.include_wos else set())
         effective &= options.sources
-        depuis = self._since_last_daily() if policy.year_selection == "since_last" else None
-        since = depuis[0].isoformat() if depuis else None
-        if depuis is not None:
+        last_daily = self._since_last_daily() if policy.year_selection == "since_last" else None
+        since = last_daily[0].isoformat() if last_daily else None
+        if last_daily is not None:
             # Le mode quotidien moissonne HAL seul.
             effective &= {"hal"}
 
         def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                if depuis is not None and source == "hal":
+                if last_daily is not None and source == "hal":
                     ctx.logger.info(
                         "%sMode incrémental : enregistrements HAL modifiés depuis le %s (%s)",
-                        BRANCHE,
-                        date_to_french(depuis[0]),
-                        depuis[1],
+                        BRANCH,
+                        date_to_french(last_daily[0]),
+                        last_daily[1],
                     )
                 window = HarvestWindow(
                     start_year=options.start_year if source in _YEAR_BOUNDED_SOURCES else None,
@@ -116,7 +116,7 @@ class HarvestPhase:
 
             return run
 
-        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+        def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in effective
 
         by_task = run_tasks(
@@ -127,7 +127,7 @@ class HarvestPhase:
                     label=source_label(source),
                     progress_bar=True,
                     threshold=5,
-                    when=retenue(source),
+                    when=selected(source),
                 )
                 for source in HARVESTED_SOURCES
             },

@@ -122,7 +122,7 @@ class TestRefreshFromSources:
             doi="10.9001/set",
             publication_year=2024,
             doc_type="dataset",
-            raw_metadata={"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
+            corrections={"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
         )
         # Parent dataset, DOI non corrigé.
         insert_source_record(

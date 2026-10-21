@@ -33,7 +33,7 @@ Une publication appartient au laboratoire si une adresse d'auteur est rattachée
 - **Serveurs de preprints.** `journals.journal_type = preprint_server` et `publication_relations` (`is_preprint_of`) donnent une partie de l'information.
 - **Entrepôts de jeux de données.** Chantier [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md). Le moissonnage de DataCite par ORCID ajoute 49 jeux de données au périmètre, dont ceux de quatre entrepôts absents jusque-là : EarthChem Library, ICOS Carbon Portal, Build Environment Data_Experiments, DANDI Archive.
 - **Affiliations des coauteurs.** Seul le pays est résolu pour les adresses hors périmètre. Les institutions partenaires demandent une résolution des adresses vers un référentiel (ROR).
-- **Financements ANR et européens.** Crossref fournit les financeurs (`meta->'funder'`, avec numéro de projet) : 4 938 des 18 360 articles du périmètre parus de 2021 à 2025. Il déclare les financeurs de tous les coauteurs. HAL expose `anrProjectReference_s` et `europeanProjectReference_s`, saisis par les déposants, non extraits. OpenAlex expose `grants`, non extrait.
+- **Financements ANR et européens.** Crossref fournit les financeurs (`source_extras->'funder'`, avec numéro de projet) : 4 938 des 18 360 articles du périmètre parus de 2021 à 2025. Il déclare les financeurs de tous les coauteurs. HAL expose `anrProjectReference_s` et `europeanProjectReference_s`, saisis par les déposants, non extraits. OpenAlex expose `grants`, non extrait.
 
 ## Décisions
 

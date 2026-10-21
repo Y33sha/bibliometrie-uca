@@ -31,8 +31,8 @@ def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None)
 
     La source paraît sous le nom qu'on lui connaît — `theses.fr` plutôt que `theses`.
     """
-    nom = source_label(source)
-    prefix = f"[{nom} · {scope}]" if scope else f"[{nom}]"
+    name = source_label(source)
+    prefix = f"[{name} · {scope}]" if scope else f"[{name}]"
     return _ScopedLogger(logger, prefix)
 
 

@@ -9,11 +9,11 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.monographs.proceedings import MonographRecord, is_proceedings_volume
-from infrastructure.sql_fragments import raw_column
-from pipeline.runtime.observability.libelles import accord
+from infrastructure.sql_fragments import declares_conference_sql
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-LIBELLE = "Nature des monographies"
+LABEL = "Nature des monographies"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 
@@ -33,12 +33,12 @@ _PROCEEDINGS_FACTS = text(f"""
                array_agg(sr.source::text ORDER BY sr.id) FILTER (WHERE sr.id IS NOT NULL), '{{}}'
            ) AS sources,
            coalesce(
-               array_agg({raw_column("doc_type")} ORDER BY sr.id)
+               array_agg(sr.raw_doc_type ORDER BY sr.id)
                    FILTER (WHERE sr.id IS NOT NULL),
                '{{}}'
            ) AS raw_doc_types,
            coalesce(
-               array_agg(coalesce(sr.meta ? 'conference', false) ORDER BY sr.id)
+               array_agg({declares_conference_sql()} ORDER BY sr.id)
                    FILTER (WHERE sr.id IS NOT NULL),
                '{{}}'
            ) AS declares
@@ -112,6 +112,6 @@ def run_type_proceedings_volumes(conn: Connection, logger: logging.Logger) -> Ph
         monographs_to_proceedings=len(to_proceedings),
         monographs_to_books=len(to_books),
     )
-    volumes = accord(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
-    metrics.report = f"{volumes}, {accord(len(to_books), 'livre reconnu', 'livres reconnus')}"
+    volumes = quantity(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
+    metrics.report = f"{volumes}, {quantity(len(to_books), 'livre reconnu', 'livres reconnus')}"
     return metrics

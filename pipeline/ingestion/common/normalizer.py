@@ -14,16 +14,16 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
-from pipeline.ingestion.common.source_records import SourceRecordQueries
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.runtime.observability.libelles import (
-    SUITE_DE_BRANCHE,
-    accord,
-    branche_de_source,
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
+from pipeline.ingestion.common.source_records import SourceRecordStore
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.runtime.observability.log_format import (
+    BRANCH_CONTINUATION,
+    quantity,
+    source_branch,
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
@@ -44,8 +44,8 @@ class SourceNormalizer(ABC):
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
     - `minimal_metadata(row)` : abstrait, titre et année de l'enregistrement source
-    - `normalize_record(conn, row) -> bool | None` : abstrait, logique métier d'un enregistrement source complet
-    - `preload_caches(conn)` : pré-chargement optionnel
+    - `normalize_record(row) -> bool | None` : abstrait, logique métier d'un enregistrement source complet
+    - `preload_caches()` : pré-chargement optionnel
     - `cleanup()` : libération des caches après commit final
     """
 
@@ -55,11 +55,11 @@ class SourceNormalizer(ABC):
     FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
-        self, conn: Connection, logger: logging.Logger, staging_queries: StagingQueries
+        self, conn: Connection, logger: logging.Logger, staging_store: StagingStore
     ) -> None:
         self.conn = conn
         self.logger = logger
-        self._staging = staging_queries
+        self._staging = staging_store
 
     # ── Hooks métier ────────────────────────────────────────────
 
@@ -68,32 +68,32 @@ class SourceNormalizer(ABC):
         """Titre et année de l'enregistrement source, lus dans son payload."""
 
     @abstractmethod
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (enregistrement refusé, sans rien écrire)."""
 
-    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+    def process_work(self, row: StagingRow) -> bool | None:
         """Traite une ligne staging. Retourne True (ok), None (skip), False (enregistrement refusé).
 
         Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
-            self._staging.mark_done(conn, row.id)
+            self._staging.mark_done(row.id)
             return None
         title, publication_year = self.minimal_metadata(row)
         if not has_minimal_publication_metadata(title, publication_year):
-            return self._reject(conn, row)
-        result = self.normalize_record(conn, row)
+            return self._reject(row)
+        result = self.normalize_record(row)
         if result is False:
-            return self._reject(conn, row)
+            return self._reject(row)
         return result
 
-    def _reject(self, conn: Connection, row: StagingRow) -> bool:
+    def _reject(self, row: StagingRow) -> bool:
         """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme enregistrement incomplet."""
-        self._staging.discard_source_record(conn, row.id)
-        self._staging.mark_done(conn, row.id)
+        self._staging.discard_source_record(row.id)
+        self._staging.mark_done(row.id)
         return False
 
-    def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
+    def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel, avant la boucle sur les enregistrements sources."""
 
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
@@ -101,35 +101,35 @@ class SourceNormalizer(ABC):
 
     # ── Template method ────────────────────────────────────────
 
-    def _count_pending(self, conn: Connection) -> int:
-        return self._staging.count_pending_staging(conn, self.SOURCE)
+    def _count_pending(self) -> int:
+        return self._staging.count_pending_staging(self.SOURCE)
 
-    def _iter_rows(self, conn: Connection) -> Iterator[StagingRow]:
+    def _iter_rows(self) -> Iterator[StagingRow]:
         """Itère toutes les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
-        work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE)
+        work_ids = self._staging.fetch_pending_staging_ids(self.SOURCE)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            yield from self._staging.fetch_staging_by_ids(conn, batch_ids)
+            yield from self._staging.fetch_staging_by_ids(batch_ids)
 
-    def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
+    def _process_one(self, row: StagingRow) -> bool | None:
         """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
-        with savepoint(conn, on_rollback_failure=self.conn.rollback):
-            return self.process_work(conn, row)
+        with savepoint(self.conn, on_rollback_failure=self.conn.rollback):
+            return self.process_work(row)
 
-    def _recapitule_incomplets(self, identifiants: list[str]) -> None:
+    def _summarize_incomplete(self, identifiers: list[str]) -> None:
         """Récapitule sous la barre de la source les documents qu'elle a laissés de côté.
 
         Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source, et la liste des sources reste d'un seul tenant. Le logger nu porte ces lignes, celui de la source les préfixerait de son nom et romprait l'alignement.
         """
-        if not identifiants:
+        if not identifiers:
             return
         self.logger.info(
             "%s%s aux métadonnées incomplètes",
-            SUITE_DE_BRANCHE,
-            accord(len(identifiants), "document"),
+            BRANCH_CONTINUATION,
+            quantity(len(identifiers), "document"),
         )
-        for identifiant in identifiants:
-            self.logger.info("%s%s", SUITE_DE_BRANCHE, identifiant)
+        for identifier in identifiers:
+            self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
         """Entry point : pilote la boucle de normalisation."""
@@ -139,24 +139,24 @@ class SourceNormalizer(ABC):
         slog = scoped_logger(self.logger, self.SOURCE)
 
         try:
-            total = self._count_pending(self.conn)
+            total = self._count_pending()
             if total == 0:
                 return NormalizeStats(0, 0, 0)
 
-            self.preload_caches(self.conn)
+            self.preload_caches()
 
             processed = 0
             skipped = 0
             errors = 0
             # Documents que `process_work` laisse de côté faute de métadonnées exploitables :
             # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
-            incomplets: list[str] = []
+            incomplete: list[str] = []
 
-            with progression(total, branche_de_source(self.SOURCE), slog) as avancement:
-                for row in self._iter_rows(self.conn):
-                    avancement.avance()
+            with track_progress(total, source_branch(self.SOURCE), slog) as progress:
+                for row in self._iter_rows():
+                    progress.advance()
                     try:
-                        result = self._process_one(self.conn, row)
+                        result = self._process_one(row)
                     except Exception as e:
                         slog.error(f"Erreur sur {row.source_id}: {e}")
                         errors += 1
@@ -168,7 +168,7 @@ class SourceNormalizer(ABC):
                         skipped += 1
                     else:
                         errors += 1
-                        incomplets.append(row.source_id)
+                        incomplete.append(row.source_id)
 
                     done = processed + skipped
                     if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
@@ -177,7 +177,7 @@ class SourceNormalizer(ABC):
             self.conn.commit()
             self.cleanup()
 
-            self._recapitule_incomplets(incomplets)
+            self._summarize_incomplete(incomplete)
             return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:
@@ -200,14 +200,14 @@ class BibliographicNormalizer(SourceNormalizer):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging_queries: StagingQueries,
-        queries: SourceRecordQueries,
+        staging_store: StagingStore,
+        record_store: SourceRecordStore,
         container_stores: ContainerStores,
         publisher_store: PublisherStore,
-        contribution_queries: ContributionsBatchQueries,
+        contribution_store: SourceContributionStore,
     ) -> None:
-        super().__init__(conn, logger, staging_queries)
-        self._queries = queries
+        super().__init__(conn, logger, staging_store)
+        self._record_store = record_store
         self._container_stores = container_stores
         self._publisher_store = publisher_store
-        self._contribution_queries = contribution_queries
+        self._contribution_store = contribution_store

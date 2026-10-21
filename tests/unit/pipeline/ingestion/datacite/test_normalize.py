@@ -24,8 +24,8 @@ from pipeline.ingestion.datacite.normalize import (
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourceRecordQueries,
-    FakeStagingQueries,
+    FakeSourceRecordStore,
+    FakeStagingStore,
     staging_row,
 )
 
@@ -284,7 +284,7 @@ class TestProcessContributions:
         monkeypatch.setattr(
             normalize_datacite,
             "sync_source_contributions",
-            lambda conn, queries, source, spid, block, build: vus.update(
+            lambda store, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -295,7 +295,7 @@ class TestProcessContributions:
             ]
         }
 
-        process_contributions(MagicMock(), MagicMock(), attrs, 555)
+        process_contributions(MagicMock(), attrs, 555)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
         assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
@@ -395,12 +395,12 @@ def _attributs(**surcharges) -> dict:
 
 
 class TestProcessWork:
-    def _kwargs(self, queries, staging_queries):
+    def _kwargs(self, record_store, staging_store):
         return {
             "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
-            "staging_queries": staging_queries,
-            "contribution_queries": MagicMock(),
+            "staging_store": staging_store,
+            "contribution_store": MagicMock(),
         }
 
     @pytest.fixture(autouse=True)
@@ -413,30 +413,30 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_datacite, "process_contributions", lambda *a, **kw: None)
 
     @pytest.fixture
-    def queries(self) -> FakeSourceRecordQueries:
-        return FakeSourceRecordQueries()
+    def record_store(self) -> FakeSourceRecordStore:
+        return FakeSourceRecordStore()
 
     @pytest.fixture
-    def staging(self) -> FakeStagingQueries:
-        return FakeStagingQueries()
+    def staging(self) -> FakeStagingStore:
+        return FakeStagingStore()
 
-    def _run(self, raw, queries, staging, logger, doi=None):
+    def _run(self, raw, record_store, staging, logger, doi=None):
         row = staging_row(staging_id=42, raw=raw, doi=doi)
-        return process_work(MagicMock(), queries, row, **self._kwargs(queries, staging))
+        return process_work(record_store, row, **self._kwargs(record_store, staging))
 
-    def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
-        rendu = self._run({"attributes": _attributs()}, queries, staging, logger)
+    def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
+        rendu = self._run({"attributes": _attributs()}, record_store, staging, logger)
 
         assert rendu is True
         assert staging.marked_done == [42]
-        (document,) = queries.upserted_documents
+        (document,) = record_store.upserted_documents
         assert document.source == "datacite"
         assert document.doi == "10.5281/zenodo.1"
         assert document.title == "Un jeu de données"
         assert document.publication_year == 2024
         assert document.oa_status is None  # DataCite ne renseigne pas l'accès ouvert
 
-    def test_dois_apparentes_rassembles(self, queries, staging, logger):
+    def test_dois_apparentes_rassembles(self, record_store, staging, logger):
         attributs = _attributs(
             relatedIdentifiers=[
                 {
@@ -447,9 +447,9 @@ class TestProcessWork:
             ]
         )
 
-        self._run({"attributes": attributs}, queries, staging, logger)
+        self._run({"attributes": attributs}, record_store, staging, logger)
 
-        (document,) = queries.upserted_documents
+        (document,) = record_store.upserted_documents
         assert document.external_ids == {"related_dois": ["10.5281/zenodo.0"]}
 
     @pytest.mark.parametrize(
@@ -458,24 +458,24 @@ class TestProcessWork:
             ({"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}, "sans DOI"),
         ],
     )
-    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, record_store, staging, logger):
         """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
-        rendu = self._run(raw, queries, staging, logger)
+        rendu = self._run(raw, record_store, staging, logger)
 
         assert rendu is False, motif
         assert staging.marked_done == []
-        assert queries.upserted_documents == []
+        assert record_store.upserted_documents == []
 
-    def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, queries, staging, logger):
+    def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, record_store, staging, logger):
         attributs = _attributs()
         del attributs["doi"]
 
         rendu = self._run(
-            {"attributes": attributs}, queries, staging, logger, doi="10.5281/zenodo.9"
+            {"attributes": attributs}, record_store, staging, logger, doi="10.5281/zenodo.9"
         )
 
         assert rendu is True
-        assert queries.upserted_documents[0].doi == "10.5281/zenodo.9"
+        assert record_store.upserted_documents[0].doi == "10.5281/zenodo.9"
 
 
 def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
@@ -484,20 +484,20 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_datacite,
         "process_work",
-        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
+        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = DataciteNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
-        staging_queries=MagicMock(),
-        queries=MagicMock(),
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     row = staging_row()
 
-    assert normalizer.normalize_record(MagicMock(), row) is True
+    assert normalizer.normalize_record(row) is True
     assert vus["row"] is row
 
 
@@ -505,11 +505,11 @@ def test_metadonnees_minimales_d_attributs_illisibles():
     normalizer = DataciteNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
-        staging_queries=MagicMock(),
-        queries=MagicMock(),
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,

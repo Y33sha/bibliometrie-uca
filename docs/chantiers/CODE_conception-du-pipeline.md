@@ -74,6 +74,7 @@ D'autres modules réunissent des connaissances sans rapport :
 
   Les noms et textes ajoutés avant la phase 8 emploient déjà ces termes. La collecte des sources s'appelle *harvest* partout, phases comprises, et « moissonnage » dans les textes affichés.
 - Les alias de table du SQL restent courts : leur portée est la requête qui les déclare.
+- Le module d'une phase a le nom de la phase et expose `build()`.
 - L'outillage HTTP quitte `ingestion/` pour un paquet neutre `pipeline/http/`. `parallel.py` et `access_source.py` rejoignent `runtime/`. Des contrats import-linter fixent le sens des dépendances : le noyau (`runtime`, `graph`, `node_runner`) n'importe ni `ingestion` ni `transformation`.
 - Le contexte de phase est le seul canal des transactions et du journal.
 - Chaque phase par paquet applique les conventions SQL, de nommage et de langue aux modules qu'elle touche. Un module se modifie une seule fois.
@@ -151,8 +152,14 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Alias de table du SQL aux initiales des noms cibles (`sr`, `sc`, `ci`), fragments de `sql_fragments.py` compris. 7bf39771a
 - [x] Textes alignés : « signature », « notice », « identité » et « authorship » remplacés. a92d7ada1, e2006712a, 9c6bf8287, fc6b3bb5f, 5ce09278d, 6f8a4051b, 0a1c8f1ee
 
+### Phase 9 — Conventions restantes
+
+- [x] Identifiants en anglais : `runtime/observability/` (`log_format.py`, `progress.py`) et ses appelants. 4851f94a8
+- [x] Identifiants en anglais : `run.py`, `graph.py`, constantes `LABEL` de `publishing/`. f74620b25
+- [x] Identifiants en anglais : `ingestion/`. 2094f2732
+- [x] Identifiants en anglais : `transformation/`. 528b8fbf3
+- [ ] Classes à suffixe `Queries` ou préfixe `Pg` : store d'entité ou SQL du module qui l'utilise.
+
 ## Questions ouvertes
 
-- Nom du module qui expose `build()`, puisque la phase regroupe des tâches pour l'affichage.
-- `source_contribution_group_members`, table à côté de `source_contributions`, au même grain : nom d'attente, et raison de la table distincte. `source_contribution_groups` prendra le nom `contributions` quand il remplacera la table consolidée.
 - Vérification des lectures et écritures que `graph.py` déclare pour chaque tâche. Les tests en tirent l'ordre des phases, mais rien ne les confronte au SQL. Piste : sur un run audité, capturer les requêtes du pipeline par les événements de SQLAlchemy, les attribuer à la tâche en cours et les analyser par `sqlglot`, au niveau de la colonne. `sqlglot` se limite aux dépendances de développement.

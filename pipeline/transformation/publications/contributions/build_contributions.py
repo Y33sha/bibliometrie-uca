@@ -7,9 +7,9 @@ import logging
 
 from sqlalchemy import Connection
 
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.publications.contributions.contributions_queries import (
     ContributionsBuild,
 )
@@ -21,18 +21,18 @@ def build(
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Ajoute les liens attestés et retire ceux que plus aucune source n'atteste. Idempotent."""
-    etape(logger, "Liens publication-personne")
+    step(logger, "Liens publication-personne")
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.
-    with attente(f"{BRANCHE}création des liens en cours", logger) as ligne:
+    with waiting(f"{BRANCH}création des liens en cours", logger) as line:
         inserted = queries.insert_missing_contributions(conn)
-        ligne.conclut(
-            f"{BRANCHE}{accord(inserted, 'nouveau lien', 'nouveaux liens')} {forme(inserted, 'créé')}"
+        line.conclude(
+            f"{BRANCH}{quantity(inserted, 'nouveau lien', 'nouveaux liens')} {inflect(inserted, 'créé')}"
         )
-    with attente(f"{DERNIERE_BRANCHE}suppression des liens obsolètes en cours", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}suppression des liens obsolètes en cours", logger) as line:
         pruned = queries.prune_orphan_contributions(conn)
-        ligne.conclut(
-            f"{DERNIERE_BRANCHE}{accord(pruned, 'lien')} {forme(pruned, 'obsolète')} {forme(pruned, 'supprimé')}"
+        line.conclude(
+            f"{LAST_BRANCH}{quantity(pruned, 'lien')} {inflect(pruned, 'obsolète')} {inflect(pruned, 'supprimé')}"
         )
 
     metrics = PhaseMetrics()

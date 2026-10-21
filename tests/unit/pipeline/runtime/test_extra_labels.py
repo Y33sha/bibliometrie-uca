@@ -9,7 +9,7 @@ import ast
 from pathlib import Path
 
 from infrastructure import PROJECT_ROOT
-from pipeline.runtime.observability.metrics import LIBELLES_EXTRAS
+from pipeline.runtime.observability.metrics import EXTRA_LABELS
 
 COUCHES = ("application", "domain", "infrastructure", "interfaces", "pipeline")
 
@@ -49,7 +49,7 @@ def test_chaque_compteur_sur_mesure_a_son_libelle() -> None:
     cles = _cles_extras()
     assert cles, "aucune clé relevée : le relevé ne trouve plus les appels aux compteurs"
 
-    sans_libelle = {c: sorted(f) for c, f in cles.items() if c not in LIBELLES_EXTRAS}
+    sans_libelle = {c: sorted(f) for c, f in cles.items() if c not in EXTRA_LABELS}
     assert not sans_libelle, (
         "compteurs affichés sous leur clé technique dans le bilan de phase — "
         f"à ajouter à LIBELLES_EXTRAS : {sans_libelle}"

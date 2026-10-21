@@ -22,12 +22,12 @@ from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
 from infrastructure.db.tables import journal_issns, journals
 from pipeline.http.dump_download import DumpUnavailableError
-from pipeline.runtime.observability.libelles import BRANCHE, accord
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
-LIBELLE = "Import du DOAJ"
+LABEL = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 # Colonnes ISSN du dump CSV DOAJ.
@@ -189,18 +189,18 @@ def run_enrich_journals_from_doaj(
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
     last = doaj_last_import_at(conn)
-    delai = timedelta(days=refresh_after_days)
-    if last is not None and last > datetime.now(UTC) - delai:
+    refresh_delay = timedelta(days=refresh_after_days)
+    if last is not None and last > datetime.now(UTC) - refresh_delay:
         metrics = PhaseMetrics(extras={"skipped": 1})
         metrics.report = (
             f"importé le {date_to_french(last.date())}, "
-            f"prochain import le {date_to_french((last + delai).date())}"
+            f"prochain import le {date_to_french((last + refresh_delay).date())}"
         )
         return metrics
 
     try:
-        with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
-            ligne.efface()
+        with waiting(f"{BRANCH}{LABEL}", logger) as line:
+            line.erase()
             with download_dump() as rows:
                 stats = run_import_doaj_dump(conn, logger, rows=rows)
     except DumpUnavailableError as e:
@@ -219,5 +219,5 @@ def run_enrich_journals_from_doaj(
         )
         metrics.report = "aucune revue reconnue, revues inchangées"
         return metrics
-    metrics.report = accord(stats.matched, "revue mise à jour", "revues mises à jour")
+    metrics.report = quantity(stats.matched, "revue mise à jour", "revues mises à jour")
     return metrics

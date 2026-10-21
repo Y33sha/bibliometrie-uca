@@ -8,17 +8,13 @@ from xml.etree.ElementTree import Element, ParseError
 
 import defusedxml.ElementTree as ET
 from defusedxml.common import DefusedXmlException
-from sqlalchemy import Connection
 
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import map_role
+from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
     clean_doi,
     find_isbns,
@@ -28,23 +24,30 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
+from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.hal.payload import (
+    derive_hal_oa_status,
+    extract_hal_source_extras,
+    hal_text_field,
+)
 from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -123,7 +126,7 @@ def extract_publication_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un document HAL.
 
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_records`.
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`).
     """
     title = get_title(doc)
     raw_type = hal_text_field(doc.get("docType_s")) or ""
@@ -142,7 +145,7 @@ def extract_publication_metadata(
 
     embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
-    ouvert = doc.get("openAccess_bool")
+    is_open = doc.get("openAccess_bool")
     return PublicationMetadata(
         title=title,
         publication_year=as_int(doc.get("producedDateY_i")),
@@ -150,7 +153,7 @@ def extract_publication_metadata(
         doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
         nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
         oa_status=derive_hal_oa_status(
-            ouvert if isinstance(ouvert, bool) else None,
+            is_open if isinstance(is_open, bool) else None,
             hal_text_field(doc.get("fileMain_s")),
             hal_text_field(doc.get("linkExtId_s")),
             embargo_until,
@@ -167,6 +170,15 @@ def extract_publication_metadata(
 # SOURCE DOCUMENTS (HAL)
 # =============================================================
 
+_BOOK_TYPES = frozenset({DocType.BOOK, DocType.BOOK_CHAPTER})
+
+
+def page_range(page_s: str | None, raw_doc_type: str | None) -> PageRange:
+    """Pagination HAL (`page_s`). Sur un livre ou un chapitre, un nombre seul est le nombre de pages de l'ouvrage : il est écarté."""
+    if (page_s or "").strip().isdigit() and map_doc_type(raw_doc_type or "", "hal") in _BOOK_TYPES:
+        return PageRange()
+    return parse_pages(page_s)
+
 
 def build_hal_external_ids(
     doc: Mapping[str, JsonValue], hal_id: str, nnt: str | None
@@ -182,10 +194,10 @@ def build_hal_external_ids(
         external_ids[ExternalIdType.ISBN] = isbns
     if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
         external_ids[ExternalIdType.PMID] = pmid
-    brut = doc.get("linkExtUrl_s")
-    link_urls = [brut] if isinstance(brut, str) else as_sequence(brut)
-    for entree in link_urls:
-        url = hal_text_field(entree)
+    raw = doc.get("linkExtUrl_s")
+    link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
+    for entry in link_urls:
+        url = hal_text_field(entry)
         if ExternalIdType.PMCID not in external_ids and (pmcid := normalize_pmcid(url)):
             external_ids[ExternalIdType.PMCID] = pmcid
         if ExternalIdType.ARXIV_ID not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
@@ -194,8 +206,7 @@ def build_hal_external_ids(
 
 
 def insert_hal_document(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
@@ -207,7 +218,7 @@ def insert_hal_document(
     journal_id, oa_status, language, container_title) viennent toutes de
     `publication_meta`, construit en amont par `extract_publication_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
-    keywords, domaines, biblio, meta, urls).
+    keywords, domaines, biblio, source_extras, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -224,42 +235,23 @@ def insert_hal_document(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Biblio
-    biblio: dict[str, JsonValue] = {}
-    vol = hal_text_field(doc.get("volume_s"))
-    if vol:
-        biblio["volume"] = vol
-    issue = hal_text_field(doc.get("issue_s"))
-    if issue:
-        biblio["issue"] = issue
-    page = hal_text_field(doc.get("page_s"))
-    if page:
-        biblio["pages"] = page
-
-    # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en parallèle de publishers/journals créés via find_or_create_*).
-    publisher_raw = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
-        doc.get("publisher_s")
+    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    biblio_json = compact_biblio(
+        volume=hal_text_field(doc.get("volume_s")),
+        issue=hal_text_field(doc.get("issue_s")),
+        **page_range(hal_text_field(doc.get("page_s")), publication_meta.doc_type)._asdict(),
+        publisher=hal_text_field(doc.get("journalPublisher_s"))
+        or hal_text_field(doc.get("publisher_s")),
+        journal_title=hal_text_field(doc.get("journalTitle_s")),
+        journal_issn=hal_text_field(doc.get("journalIssn_s")),
+        journal_eissn=hal_text_field(doc.get("journalEissn_s")),
     )
-    if publisher_raw:
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := hal_text_field(doc.get("journalTitle_s")):
-        journal_obj["title"] = jt
-    if jissn := hal_text_field(doc.get("journalIssn_s")):
-        journal_obj["issn"] = jissn
-    if jeissn := hal_text_field(doc.get("journalEissn_s")):
-        journal_obj["eissn"] = jeissn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-
-    biblio_json = biblio if biblio else None
 
     # URLs
     uri = hal_text_field(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="hal",
             source_id=hal_id,
@@ -268,13 +260,13 @@ def insert_hal_document(
             external_ids=external_ids,
             title=publication_meta.title or "",
             publication_year=publication_meta.publication_year,
-            doc_type=publication_meta.doc_type,
+            raw_doc_type=publication_meta.doc_type,
             journal_id=publication_meta.journal_id,
             monograph_id=publication_meta.monograph_id,
             container_title=publication_meta.container_title,
-            language=publication_meta.language,
+            raw_language=publication_meta.language,
             biblio=biblio_json,
-            meta=extract_hal_meta(doc),
+            source_extras=extract_hal_source_extras(doc),
             abstract=abstract,
             keywords=keywords,
             topics=topics,
@@ -397,7 +389,7 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
 
     L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
 
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal` (formes normalisées : préfixes d'URL strippés). Renvoie `[]` si `label_xml` est absent ou mal formé.
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal`, avec les valeurs du TEI. Renvoie `[]` si `label_xml` est absent ou mal formé.
     """
     out: list[dict[str, str]] = []
     for author in _tei_title_authors(label_xml):
@@ -409,11 +401,9 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
             if not val:
                 continue
             if typ == "ORCID":
-                orcid = normalize_orcid(val)
-                if orcid:
-                    ids["orcid"] = orcid
+                ids["orcid"] = val
             elif typ == "IDREF":
-                ids["idref"] = val.rsplit("/", 1)[-1].strip()
+                ids["idref"] = val
             elif typ == "IDHAL":
                 # HAL émet souvent deux <idno type="idhal"> par auteur, distingués par notation="string" (slug `prenom-nom`, le vrai idhal) et notation="numeric" (le hal_person_id ré-étiqueté idhal).
                 # Seul le slug nous intéresse ici — le hal_person_id est capturé via le composite Solr.
@@ -540,7 +530,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                     pass
 
     ids_by_position = [
-        compact_identifiers(
+        contributor_identifiers(
             orcid=(as_str(tei_ids[pos].get("orcid")) if pos < len(tei_ids) else None),
             idref=(as_str(tei_ids[pos].get("idref")) if pos < len(tei_ids) else None),
             idhal=(as_str(tei_ids[pos].get("idhal")) if pos < len(tei_ids) else None),
@@ -588,15 +578,13 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
 
 def process_contributions(
-    conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     doc: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources HAL de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "hal",
         source_record_id,
         extract_hal_author_block(doc),
@@ -610,14 +598,13 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    staging_store: StagingStore,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     staging_id = staging_row.id
@@ -641,15 +628,14 @@ def process_work(
     )
 
     source_record_id = insert_hal_document(
-        conn,
-        queries,
+        record_store,
         doc,
         staging_id,
         hal_id,
         publication_meta,
     )
-    process_contributions(conn, contribution_queries, doc, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    process_contributions(contribution_store, doc, source_record_id)
+    staging_store.mark_done(staging_id)
 
     return True
 
@@ -661,14 +647,13 @@ class HalNormalizer(BibliographicNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            staging_store=self._staging,
+            contribution_store=self._contribution_store,
         )

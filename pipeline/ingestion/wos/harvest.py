@@ -22,7 +22,7 @@ from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
 from pipeline.ingestion.wos.fields import extract_doi, extract_ut
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 # Pause longue toutes les `_BREATHER_EVERY` pages.
 _BREATHER_EVERY = 10
@@ -47,7 +47,7 @@ def harvest_year(
     year: int,
     affiliations: list[str],
     logger: ScopedOrPlainLogger,
-    avancement: Progression,
+    progress: Progress,
 ) -> PhaseMetrics:
     """Moissonne les records d'une année, page après page.
 
@@ -91,7 +91,7 @@ def harvest_year(
                 raw_data=record,
             )
         conn.commit()
-        avancement.avance(len(records))
+        progress.advance(len(records))
         first_record += len(records)
 
         if first_record > _WOS_FIRST_RECORD_LIMIT:
@@ -138,27 +138,27 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
         client = self._client
         years = self._years(window)
 
-        def compte(annee: int) -> int:
+        def count_year(year: int) -> int:
             try:
-                return client.count(annee, affiliations)
+                return client.count(year, affiliations)
             except SourceUnavailableError:
                 raise
             except Exception:
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
 
-        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
-            slog = scoped_logger(self.logger, self.SOURCE, str(annee))
+        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
+            slog = scoped_logger(self.logger, self.SOURCE, str(year))
             try:
-                metrics = harvest_year(client, self.conn, annee, affiliations, slog, avancement)
+                metrics = harvest_year(client, self.conn, year, affiliations, slog, progress)
             except SourceUnavailableError:
                 raise
             except Exception as e:
                 slog.error("erreur : %s — passage à la suivante", e)
                 metrics = PhaseMetrics()
             # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
-            if annee != years[-1] and not self._breaker_tripped():
+            if year != years[-1] and not self._breaker_tripped():
                 time.sleep(_BETWEEN_YEARS_SECS)
             return metrics
 
-        return self._extrait_par_annee(years, compte, extrait)
+        return self._harvest_by_year(years, count_year, harvest_step)

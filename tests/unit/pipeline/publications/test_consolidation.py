@@ -28,14 +28,16 @@ def test_journal_type_media_decoupling_is_repaired():
     publication = _publication(doc_type="preprint", journal_id=7)
     _apply_canonical_doc_type_correction(publication, journal_type="media")
     assert publication.doc_type == "media"
-    assert publication.meta == {"corrections": {"doc_type": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}}
+    assert publication.corrections == {
+        "doc_type": {"raw": "preprint", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+    }
 
 
 def test_no_journal_type_no_change():
     publication = _publication(doc_type="preprint", journal_id=None)
     _apply_canonical_doc_type_correction(publication, journal_type=None)
     assert publication.doc_type == "preprint"
-    assert publication.meta is None
+    assert publication.corrections == {}
 
 
 def test_journal_type_without_rule_leaves_doc_type():
@@ -43,7 +45,7 @@ def test_journal_type_without_rule_leaves_doc_type():
     publication = _publication(doc_type="preprint", journal_id=7)
     _apply_canonical_doc_type_correction(publication, journal_type="journal")
     assert publication.doc_type == "preprint"
-    assert publication.meta is None
+    assert publication.corrections == {}
 
 
 def test_full_cascade_replayed_thesis_with_publisher_doi():
@@ -51,20 +53,31 @@ def test_full_cascade_replayed_thesis_with_publisher_doi():
     publication = _publication(doc_type="thesis", journal_id=7, doi=DOI("10.1016/j.ex.2020.01.001"))
     _apply_canonical_doc_type_correction(publication, journal_type="journal")
     assert publication.doc_type == "article"
-    assert publication.meta == {"corrections": {"doc_type": "THESIS_WITH_JOURNAL_TO_ARTICLE"}}
+    assert publication.corrections == {
+        "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
+    }
 
 
 def test_thesis_with_abes_doi_stays_thesis():
     publication = _publication(doc_type="thesis", journal_id=7, doi=DOI("10.70675/abc"))
     _apply_canonical_doc_type_correction(publication, journal_type="journal")
     assert publication.doc_type == "thesis"
-    assert publication.meta is None
+    assert publication.corrections == {}
 
 
-def test_meta_preserved_when_correction_added():
-    publication = _publication(doc_type="preprint", journal_id=7, meta={"k": "v"})
+def test_source_extras_untouched_by_the_correction():
+    publication = _publication(doc_type="preprint", journal_id=7, source_extras={"k": "v"})
     _apply_canonical_doc_type_correction(publication, journal_type="media")
-    assert publication.meta == {
-        "k": "v",
-        "corrections": {"doc_type": "JOURNAL_TYPE_MEDIA_TO_MEDIA"},
-    }
+    assert publication.source_extras == {"k": "v"}
+
+
+def test_correction_that_no_longer_applies_is_cleared():
+    publication = _publication(
+        doc_type="preprint",
+        journal_id=7,
+        corrections={
+            "doc_type": {"raw": "preprint", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+        },
+    )
+    _apply_canonical_doc_type_correction(publication, journal_type="journal")
+    assert publication.corrections == {}

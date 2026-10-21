@@ -15,9 +15,9 @@ from domain.structures.hal_structures import HalStructure, parse_hal_structure
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.log_format import LAST_BRANCH, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression, progression
+from pipeline.runtime.observability.progress import Progress, track_progress
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
 STALE_AFTER_DAYS = 30
@@ -29,7 +29,7 @@ class HalStructuresSource(Protocol):
     def by_aliases(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]: ...
 
 
-class HalStructuresQueries:
+class HalStructureStore:
     """Accès PostgreSQL du pipeline au référentiel des structures HAL."""
 
     def __init__(self, conn: Connection) -> None:
@@ -203,18 +203,18 @@ def fetch_hal_structures(
     ids: Collection[int],
     *,
     source: HalStructuresSource,
-    queries: HalStructuresQueries,
+    store: HalStructureStore,
     save_batch: SaveBatch,
-    avancement: Progression | None = None,
+    progress: Progress | None = None,
 ) -> HalStructuresLoad:
-    """Lit `ids` dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `avancement` compte les identifiants lus ; son total croît avec les parents à lire."""
+    """Lit `ids` dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `progress` compte les identifiants lus ; son total croît avec les parents à lire."""
     load = HalStructuresLoad()
     pending = set(ids)
     requested: set[int] = set()
     while pending:
         requested |= pending
-        if avancement is not None:
-            avancement.fixer_total(len(requested))
+        if progress is not None:
+            progress.set_total(len(requested))
         parents: set[int] = set()
         for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH):
             structures = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
@@ -232,10 +232,10 @@ def fetch_hal_structures(
                 parents |= set(s.parent_ids)
             save_batch(list(structures.values()), aliases)
             load.structures += len(structures)
-            if avancement is not None:
-                avancement.avance(len(chunk))
+            if progress is not None:
+                progress.advance(len(chunk))
         pending = parents - requested
-        pending -= queries.known_ids(pending)
+        pending -= store.known_ids(pending)
     load.requested = len(requested)
     return load
 
@@ -244,35 +244,35 @@ def run_refresh_hal_structures(
     conn: Connection,
     *,
     source: HalStructuresSource,
-    queries: HalStructuresQueries,
+    store: HalStructureStore,
     logger: logging.Logger,
     refresh_stale: bool,
 ) -> PhaseMetrics:
     """Charge les structures HAL citées et absentes du référentiel, relit les anciennes quand `refresh_stale` est vrai, puis reconstruit les relations. Chaque lot est validé dès son écriture."""
     metrics = PhaseMetrics()
-    etape(logger, "Référentiel des structures HAL")
-    ids = queries.ids_to_fetch(refresh_stale=refresh_stale)
+    step(logger, "Référentiel des structures HAL")
+    ids = store.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
-        logger.info("%sAucune structure à charger", DERNIERE_BRANCHE)
+        logger.info("%sAucune structure à charger", LAST_BRANCH)
         return metrics
 
     def save_batch(structures: list[HalStructure], aliases: dict[int, int]) -> None:
-        queries.save(structures, aliases)
+        store.save(structures, aliases)
         conn.commit()
 
     try:
-        with progression(len(ids), f"{DERNIERE_BRANCHE}HAL", logger) as avancement:
+        with track_progress(len(ids), f"{LAST_BRANCH}HAL", logger) as progress:
             load = fetch_hal_structures(
-                ids, source=source, queries=queries, save_batch=save_batch, avancement=avancement
+                ids, source=source, store=store, save_batch=save_batch, progress=progress
             )
     except SourceUnavailableError:
         conn.rollback()
-        queries.rebuild_relations()
+        store.rebuild_relations()
         conn.commit()
         signal_source_unavailable(metrics, "hal", logger=logger, phase="affiliations")
         metrics.report = "référentiel HAL inaccessible, chargement repris au prochain run"
         return metrics
-    queries.rebuild_relations()
+    store.rebuild_relations()
     conn.commit()
     metrics.add(seen=len(ids), updated=load.structures)
     metrics.details["hal_structures"] = {
@@ -282,7 +282,7 @@ def run_refresh_hal_structures(
     }
     logger.info(
         "%s%d structures cherchées : %d trouvées, %d introuvables",
-        DERNIERE_BRANCHE,
+        LAST_BRANCH,
         load.requested,
         load.requested - len(load.not_found),
         len(load.not_found),

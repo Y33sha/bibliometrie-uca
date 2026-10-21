@@ -17,7 +17,7 @@ from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.wos import harvest
 from pipeline.ingestion.wos.harvest import WosHarvester, harvest_year
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
@@ -52,7 +52,7 @@ def _client(reponses: list, *, total: int | None = None) -> MagicMock:
 
 
 def _extraire(client: MagicMock):
-    return harvest_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progression(None, "WoS", None))
+    return harvest_year(client, MagicMock(), 2024, ["UCA"], _LOGGER, Progress(None, "WoS", None))
 
 
 def test_pagination_sur_le_premier_record(ecritures):

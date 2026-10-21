@@ -1,8 +1,8 @@
-"""Fragments SQL de lecture de `raw_metadata`, confrontés à `raw_value` sur vraie base."""
+"""Fragments SQL de lecture de `corrections`, confrontés à `raw_value` sur vraie base."""
 
 from sqlalchemy import text
 
-from domain.source_records.raw_metadata import raw_value, stash_entry
+from domain.source_records.corrections import raw_value, stash_entry
 from infrastructure.sql_fragments import corrected, corrected_by, raw_column, stashed_raw
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record
@@ -19,7 +19,7 @@ def _read(conn, expression, source_record):
     ).scalar_one()
 
 
-def test_les_fragments_lisent_raw_metadata_comme_raw_value(sa_sync_conn):
+def test_les_fragments_lisent_corrections_comme_raw_value(sa_sync_conn):
     source_record = insert_source_record(
         sa_sync_conn,
         insert_publication(sa_sync_conn),
@@ -28,7 +28,7 @@ def test_les_fragments_lisent_raw_metadata_comme_raw_value(sa_sync_conn):
         doc_type="article",
         doi="10.1/raw",
         language="fr",
-        raw_metadata=_RAW_METADATA,
+        corrections=_RAW_METADATA,
     )
 
     for field, column in (("doc_type", "article"), ("doi", "10.1/raw"), ("language", "fr")):

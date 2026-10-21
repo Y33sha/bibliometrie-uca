@@ -92,28 +92,28 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
-        SourceRecordQueries,
+        SourceRecordStore,
     )
-    from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.common.staging import StagingRow, StagingStore
     from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourceRecordQueries()
-    staging_queries = StagingQueries()
-    contribution_queries = ContributionsBatchQueries()
+    record_store = SourceRecordStore(conn)
+    staging_store = StagingStore(conn)
+    contribution_store = SourceContributionStore(conn)
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = CrossrefNormalizer(
         conn,
         logger,
-        staging_queries,
-        queries,
+        staging_store,
+        record_store,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
-        contribution_queries=contribution_queries,
+        contribution_store=contribution_store,
     )
 
     rows = conn.execute(
@@ -127,7 +127,7 @@ def _run_normalize_crossref(conn):
         staging_row = StagingRow(
             id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
         )
-        if normalizer.process_work(conn, staging_row):
+        if normalizer.process_work(staging_row):
             processed += 1
     return processed
 

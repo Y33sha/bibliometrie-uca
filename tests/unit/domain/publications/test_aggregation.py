@@ -35,7 +35,7 @@ def _source_record(**overrides) -> SourceRecord:
         "urls": (),
         "topics": None,
         "biblio": None,
-        "meta": None,
+        "source_extras": None,
     }
     defaults.update(overrides)
     return SourceRecord(**defaults)  # type: ignore[arg-type]
@@ -154,7 +154,7 @@ class TestChampsAgreges:
             countries=("FR",),
             topics={"domaine": "agronomie"},
             biblio={"volume": "3"},
-            meta={"licence": "cc-by"},
+            source_extras={"licence": "cc-by"},
             is_retracted=True,
         )
 
@@ -170,7 +170,7 @@ class TestChampsAgreges:
         assert publication.countries == ("FR",)
         assert publication.topics == {"datacite": {"domaine": "agronomie"}}
         assert publication.biblio == {"volume": "3"}
-        assert publication.meta == {"licence": "cc-by"}
+        assert publication.source_extras == {"licence": "cc-by"}
         assert publication.is_retracted is True
 
     def test_les_mots_cles_sont_dedoublonnes_sans_egard_a_la_casse(self):

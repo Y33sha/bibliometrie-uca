@@ -13,6 +13,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
 )
@@ -27,12 +28,9 @@ from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
-from pipeline.runtime.config import (
-    get_fetch_missing_max_per_source,
-    get_fetch_missing_retry_after_days,
-)
+from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import rien_a_faire
+from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -79,15 +77,15 @@ class FetchMissingPhase:
         doi_targets = set(
             select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
         )
-        retenus = {
+        selected_tasks = {
             _HAL_BY_ID: hal,
             _HAL_BY_NNT: hal and options.mode == "full",
             _THESES_BY_NNT: theses,
             **{_doi_task(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
         }
 
-        def quand(task: str) -> Callable[[PhaseContext], bool]:
-            return lambda _ctx: retenus[task]
+        def when_selected(task: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: selected_tasks[task]
 
         def channel(fetch: FetchChannel) -> TaskRun:
             return lambda ctx, _breaker: fetch(ctx)
@@ -105,23 +103,23 @@ class FetchMissingPhase:
                 _HAL_BY_ID: TaskStep(
                     channel(self.fetch_hal_by_id),
                     section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
-                    when=quand(_HAL_BY_ID),
+                    when=when_selected(_HAL_BY_ID),
                 ),
                 _HAL_BY_NNT: TaskStep(
                     channel(self.fetch_hal_by_nnt),
                     section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
-                    when=quand(_HAL_BY_NNT),
+                    when=when_selected(_HAL_BY_NNT),
                 ),
                 _THESES_BY_NNT: TaskStep(
                     channel(self.fetch_theses_by_nnt),
                     section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
-                    when=quand(_THESES_BY_NNT),
+                    when=when_selected(_THESES_BY_NNT),
                 ),
                 **{
                     _doi_task(target): TaskStep(
                         doi(target),
                         section="Recherche par DOI des documents manquants dans chaque source",
-                        when=quand(_doi_task(target)),
+                        when=when_selected(_doi_task(target)),
                     )
                     for target in DOI_SEARCHABLE_SOURCES
                 },
@@ -133,7 +131,7 @@ class FetchMissingPhase:
         doi_metrics = [by_task[_doi_task(target)] for target in doi_targets]
         # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
         if doi_metrics and all(m.total == 0 and not m.signals for m in doi_metrics):
-            rien_a_faire(ctx.logger)
+            nothing_to_do(ctx.logger)
 
         metrics = PhaseMetrics()
         by_channel: dict[str, dict[str, float | None]] = {}
@@ -145,7 +143,7 @@ class FetchMissingPhase:
         }
         for task, key in channels.items():
             metrics.merge(by_task[task])
-            if retenus[task] and not skipped(by_task[task]):
+            if selected_tasks[task] and not skipped(by_task[task]):
                 by_channel[key] = _summary(by_task[task])
         if by_channel:
             metrics.details["table"] = {
@@ -172,7 +170,7 @@ def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_hal_by_id(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -183,7 +181,7 @@ def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_hal_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -194,7 +192,7 @@ def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_theses_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -219,8 +217,8 @@ def _run_fetch_missing_doi(
 ) -> PhaseMetrics:
     search = _make_doi_search(target)
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
-        limit = get_fetch_missing_max_per_source(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
+        limit = cap(conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE)
         return asyncio.run(
             fetch_missing_doi(
                 conn,

@@ -16,6 +16,7 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.licenses import license_label
+from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
@@ -48,7 +49,7 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role, source_extra
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
@@ -160,10 +161,10 @@ _ORDER_MAP = {
     "title_desc": "p.title DESC",
     "apc_desc": f"{_APC_SORT} DESC, p.title",
     "apc_asc": f"{_APC_SORT} ASC, p.title",
-    "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
-    "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
-    "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
-    "inscription_asc": "p.meta->>'date_inscription' ASC NULLS LAST, p.title",
+    "soutenance_desc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title",
+    "soutenance_asc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} ASC NULLS LAST, p.title",
+    "inscription_desc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} DESC NULLS LAST, p.title",
+    "inscription_asc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} ASC NULLS LAST, p.title",
 }
 
 
@@ -213,8 +214,8 @@ def list_publications(
                 pub.name AS publisher_name,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
                 src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
-                p.meta->>'date_soutenance' AS date_soutenance,
-                p.meta->>'date_inscription' AS date_inscription,
+                {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
+                {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT pe.first_name || ' ' || pe.last_name
                      FROM contributions ath
@@ -600,15 +601,17 @@ def export_theses_csv(
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)
-    order = _ORDER_MAP.get(sort, "p.meta->>'date_soutenance' DESC NULLS LAST, p.title")
+    order = _ORDER_MAP.get(
+        sort, f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title"
+    )
 
     rows = conn.execute(
         text(f"""
             SELECT
                 p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
-                p.meta->>'date_soutenance' AS date_soutenance,
-                p.meta->>'date_inscription' AS date_inscription,
+                {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
+                {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))

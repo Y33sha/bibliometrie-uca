@@ -36,12 +36,14 @@ _UPSERT_SUBJECT_SQL = text(
 )
 
 
-class SubjectsIngestionQueries:
+class SubjectStore:
     """Requêtes de la phase `subjects`."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
     def upsert_subject(
         self,
-        conn: Connection,
         *,
         label: str,
         language: str | None = None,
@@ -51,7 +53,7 @@ class SubjectsIngestionQueries:
         Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
         label = to_plain_text(label)
         return scalar_int(
-            conn.execute(
+            self._conn.execute(
                 _UPSERT_SUBJECT_SQL,
                 {
                     "label": label,
@@ -63,7 +65,6 @@ class SubjectsIngestionQueries:
 
     def link_publication_subjects_bulk(
         self,
-        conn: Connection,
         *,
         source: str,
         rows: list[PublicationSubjectLink],
@@ -72,7 +73,7 @@ class SubjectsIngestionQueries:
         if not rows:
             return 0
         payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
-        return conn.execute(
+        return self._conn.execute(
             text(
                 """
                 INSERT INTO publication_subjects (publication_id, subject_id, source)
@@ -84,40 +85,38 @@ class SubjectsIngestionQueries:
             {"payload": payload, "source": source},
         ).rowcount
 
-    def clear_publication_subjects_for_publications(
-        self, conn: Connection, *, publication_ids: list[int]
-    ) -> int:
+    def clear_publication_subjects_for_publications(self, *, publication_ids: list[int]) -> int:
         """`DELETE` des liens (non rejetés) des publications données, toutes sources. Préserve les liens rejetés. Retourne le rowcount."""
         if not publication_ids:
             return 0
-        return conn.execute(
+        return self._conn.execute(
             text(
                 "DELETE FROM publication_subjects WHERE publication_id = ANY(:ids) AND NOT rejected"
             ),
             {"ids": publication_ids},
         ).rowcount
 
-    def select_publications_to_reingest(self, conn: Connection) -> list[int]:
+    def select_publications_to_reingest(self) -> list[int]:
         """Ids des publications dont les sujets sont à (ré)ingérer : `publications.subjects_ingested_at` vide, soit jamais ingérées, soit recalculées depuis leurs sources après leur dernière ingestion."""
         return [
             r.id
-            for r in conn.execute(
+            for r in self._conn.execute(
                 text("SELECT id FROM publications WHERE subjects_ingested_at IS NULL")
             ).all()
         ]
 
-    def mark_subjects_ingested(self, conn: Connection, *, publication_ids: list[int]) -> None:
+    def mark_subjects_ingested(self, *, publication_ids: list[int]) -> None:
         """Pose `subjects_ingested_at = now()` sur les publications données : elles sortent de la sélection jusqu'à leur prochain recalcul depuis leurs sources."""
         if not publication_ids:
             return
-        conn.execute(
+        self._conn.execute(
             text("UPDATE publications SET subjects_ingested_at = now() WHERE id = ANY(:ids)"),
             {"ids": publication_ids},
         )
 
-    def mark_all_publications_to_reingest(self, conn: Connection) -> int:
+    def mark_all_publications_to_reingest(self) -> int:
         """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Rend le nombre de publications marquées."""
-        return conn.execute(
+        return self._conn.execute(
             text(
                 "UPDATE publications SET subjects_ingested_at = NULL "
                 "WHERE subjects_ingested_at IS NOT NULL"
@@ -125,12 +124,12 @@ class SubjectsIngestionQueries:
         ).rowcount
 
     def select_source_records_for_publications(
-        self, conn: Connection, *, publication_ids: list[int]
+        self, *, publication_ids: list[int]
     ) -> list[SourceRecordTopics]:
         """Le `topics` de chaque `source_record` des publications données, avec sa source."""
         if not publication_ids:
             return []
-        rows = conn.execute(
+        rows = self._conn.execute(
             text(
                 """
                 SELECT publication_id, source::text AS source, topics
@@ -146,25 +145,25 @@ class SubjectsIngestionQueries:
             for r in rows
         ]
 
-    def purge_orphan_subjects(self, conn: Connection) -> int:
+    def purge_orphan_subjects(self) -> int:
         """`DELETE` des sujets sans aucun lien `publication_subjects` (tous statuts). Retourne le nombre supprimé."""
-        return conn.execute(
+        return self._conn.execute(
             text(
                 "DELETE FROM subjects s WHERE NOT EXISTS "
                 "(SELECT 1 FROM publication_subjects ps WHERE ps.subject_id = s.id)"
             )
         ).rowcount
 
-    def count_all_subjects(self, conn: Connection) -> int:
+    def count_all_subjects(self) -> int:
         """Nombre total de sujets du référentiel (`COUNT(*)` sur `subjects`)."""
-        return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subjects")))
+        return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subjects")))
 
-    def recompute_usage_counts(self, conn: Connection) -> int:
+    def recompute_usage_counts(self) -> int:
         """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
-        n_reset = conn.execute(
+        n_reset = self._conn.execute(
             text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
         ).rowcount
-        n_updated = conn.execute(
+        n_updated = self._conn.execute(
             text(
                 """
                 UPDATE subjects s
@@ -181,7 +180,7 @@ class SubjectsIngestionQueries:
         ).rowcount
         return n_reset + n_updated
 
-    def refresh_cooccurrences(self, conn: Connection) -> int:
+    def refresh_cooccurrences(self) -> int:
         """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre de paires après refresh (seuil `count >= 2` figé dans la matview)."""
-        conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
-        return scalar_int(conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))
+        self._conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
+        return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")))

@@ -53,7 +53,7 @@ def pytest_configure(config):
 def _isolate_raw_store(tmp_path_factory):
     """Pointe le raw store vers un tmp de session.
 
-    `StagingQueries()` (donc la normalisation) écrit chaque payload au raw
+    `StagingStore()` (donc la normalisation) écrit chaque payload au raw
     store par défaut (`data/raw_store`) via `mark_done` ; sans isolation, les
     tests pollueraient ce répertoire de travail.
     """

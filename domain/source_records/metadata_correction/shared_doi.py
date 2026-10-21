@@ -28,7 +28,7 @@ from domain.types import JsonValue
 
 
 class DoiClusterCase(StrEnum):
-    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `raw_metadata.doi.corrected_by`."""
+    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `corrections.doi.corrected_by`."""
 
     # Formes secondaires DataCite → convergence sur l'œuvre canonique.
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
@@ -131,9 +131,6 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
         DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE,
     }
 )
-
-# Clé de `raw_metadata` où la correction par cluster note les identifiants externes qu'elle retire.
-REMOVED_EXTERNAL_IDS = "removed_external_ids"
 
 
 def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[str, ...]]:

@@ -6,7 +6,7 @@ Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `get_external_ids`, `get_biblio`, `_author_name`,
 `_author_affiliations`.
 
-Les délégations vers `domain.sources.crossref` (`extract_crossref_meta`,
+Les délégations vers `domain.sources.crossref` (`extract_crossref_source_extras`,
 `extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`)
 sont testées directement dans `tests/unit/domain/sources/test_crossref.py` ;
 ici on ne fait que vérifier le wiring (1-2 cas par délégation).
@@ -36,7 +36,6 @@ from pipeline.ingestion.crossref.normalize import (
     get_issns,
     get_keywords,
     get_language,
-    get_meta,
     get_publication_year,
     get_publisher_name,
     get_title,
@@ -47,8 +46,8 @@ from pipeline.ingestion.crossref.normalize import (
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourceRecordQueries,
-    FakeStagingQueries,
+    FakeSourceRecordStore,
+    FakeStagingStore,
     staging_row,
 )
 
@@ -266,9 +265,18 @@ class TestGetBiblio:
         ) == {
             "volume": "12",
             "issue": "3",
-            "page": "45-67",
+            "first_page": "45",
+            "last_page": "67",
             "article_number": "e12345",
         }
+
+    def test_page_seule_egale_au_numero_d_article_ecartee(self):
+        assert get_biblio({"page": "e12345", "article-number": "e12345"}) == {
+            "article_number": "e12345"
+        }
+
+    def test_page_seule_gardee(self):
+        assert get_biblio({"page": "1191"}) == {"first_page": "1191"}
 
     def test_partial_fields(self):
         # Seuls les champs présents et non-vides sont inclus.
@@ -312,15 +320,6 @@ class TestGetBiblio:
         assert get_biblio({"container-title": ["J. Phys."]}) == {
             "journal": {"title": "J. Phys."},
         }
-
-
-class TestGetMeta:
-    def test_delegates_to_domain(self):
-        # Délégation à `extract_crossref_meta` ; on vérifie juste le wiring.
-        result = get_meta({"DOI": "10.1000/abc"})
-        # Le résultat exact dépend de la fonction domain ; ici on s'assure
-        # juste qu'on retourne quelque chose (dict ou None), sans crasher.
-        assert result is None or isinstance(result, dict)
 
 
 class TestAuthorName:
@@ -575,13 +574,12 @@ class TestProcessContributions:
         monkeypatch.setattr(
             normalize_crossref,
             "sync_source_contributions",
-            lambda conn, queries, source, spid, block, build: vus.update(
+            lambda store, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
 
         process_contributions(
-            MagicMock(),
             MagicMock(),
             {"author": [{"family": "Dupont"}]},
             555,
@@ -614,34 +612,33 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_crossref, "process_contributions", lambda *a, **kw: None)
 
     @pytest.fixture
-    def queries(self) -> FakeSourceRecordQueries:
-        return FakeSourceRecordQueries()
+    def record_store(self) -> FakeSourceRecordStore:
+        return FakeSourceRecordStore()
 
     @pytest.fixture
-    def staging(self) -> FakeStagingQueries:
-        return FakeStagingQueries()
+    def staging(self) -> FakeStagingStore:
+        return FakeStagingStore()
 
-    def _run(self, raw, queries, staging, logger):
+    def _run(self, raw, record_store, staging, logger):
         return process_work(
-            MagicMock(),
-            queries,
+            record_store,
             staging_row(staging_id=42, raw=raw),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            staging_queries=staging,
-            contribution_queries=MagicMock(),
+            staging_store=staging,
+            contribution_store=MagicMock(),
         )
 
-    def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
-        rendu = self._run(_message(), queries, staging, logger)
+    def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
+        rendu = self._run(_message(), record_store, staging, logger)
 
         assert rendu is True
         assert staging.marked_done == [42]
-        (document,) = queries.upserted_documents
+        (document,) = record_store.upserted_documents
         assert document.source == "crossref"
         assert document.doi == "10.1000/abc"
         assert document.publication_year == 2024
-        assert document.doc_type == "journal-article"
+        assert document.raw_doc_type == "journal-article"
         assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
 
     @pytest.mark.parametrize(
@@ -650,13 +647,13 @@ class TestProcessWork:
             ({"title": ["T"], "issued": {"date-parts": [[2024]]}}, "sans DOI"),
         ],
     )
-    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, record_store, staging, logger):
         """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
-        rendu = self._run(raw, queries, staging, logger)
+        rendu = self._run(raw, record_store, staging, logger)
 
         assert rendu is False, motif
         assert staging.marked_done == []
-        assert queries.upserted_documents == []
+        assert record_store.upserted_documents == []
 
 
 def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
@@ -665,18 +662,18 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_crossref,
         "process_work",
-        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
+        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = CrossrefNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
-        staging_queries=MagicMock(),
-        queries=MagicMock(),
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     row = staging_row()
 
-    assert normalizer.normalize_record(MagicMock(), row) is True
+    assert normalizer.normalize_record(row) is True
     assert vus["row"] is row

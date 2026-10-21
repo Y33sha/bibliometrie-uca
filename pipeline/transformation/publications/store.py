@@ -55,7 +55,7 @@ class PublicationStore:
                        CAST(p.deposit_license AS text) AS deposit_license,
                        p.journal_id, p.monograph_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
-                       d.topics, d.biblio, p.meta
+                       d.topics, d.biblio, p.source_extras, p.corrections
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = :id
@@ -85,7 +85,8 @@ class PublicationStore:
             keywords=tuple(m["keywords"]) if m["keywords"] else (),
             topics=m["topics"],
             biblio=m["biblio"],
-            meta=m["meta"],
+            source_extras=m["source_extras"],
+            corrections=m["corrections"],
         )
 
     def save(self, publication: Publication) -> None:
@@ -110,7 +111,8 @@ class PublicationStore:
                     language = :lang,
                     is_retracted = :is_retracted,
                     countries = CAST(:countries AS text[]),
-                    meta = CAST(:meta AS jsonb),
+                    source_extras = CAST(:source_extras AS jsonb),
+                    corrections = CAST(:corrections AS jsonb),
                     -- Sources recalculées : la phase subjects ingère de nouveau la publication.
                     subjects_ingested_at = NULL,
                     updated_at = now()
@@ -131,7 +133,8 @@ class PublicationStore:
                 "lang": publication.language,
                 "is_retracted": publication.is_retracted,
                 "countries": list(publication.countries) if publication.countries else None,
-                "meta": _json_dumps_or_none(publication.meta),
+                "source_extras": _json_dumps_or_none(publication.source_extras),
+                "corrections": json.dumps(publication.corrections),
             },
         )
         # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1 publications_detail (upsert).

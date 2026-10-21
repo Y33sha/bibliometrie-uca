@@ -1,72 +1,57 @@
-"""Tests purs de `compute_update` : mapping source→canonique puis correction unaire idempotente."""
+"""Tests purs de `compute_update` : correction unaire idempotente."""
 
 import logging
 from unittest.mock import MagicMock
 
-from domain.source_records.raw_metadata import stash_entry
+from domain.source_records.corrections import stash_entry
+from domain.source_records.metadata_correction.rules import MetadataForCorrection
+from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
 from pipeline.transformation.publications.correction.correct_unary import (
-    DOC_TYPE_MAP_MARKER,
-    LANGUAGE_MAP_MARKER,
     compute_update,
     compute_updates,
     hal_origin_ids,
     run,
     tally_corrections,
 )
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     CorrectionUpdate,
     UnaryCorrectionRow,
 )
 
-# Formes du référentiel des langues, chacune associée au code de sa langue.
-_FORMS = {"en": "en", "eng": "en", "english": "en", "fr": "fr", "fra": "fr"}
-
 
 def _update(source_record: UnaryCorrectionRow) -> CorrectionUpdate | None:
-    return compute_update(source_record, _FORMS)
+    return compute_update(source_record)
 
 
-def test_tally_corrections_exclut_les_traductions_de_vocabulaire():
+def test_tally_corrections_compte_les_regles():
     updates = [
-        # mapping de vocabulaire seul → pas une correction
-        CorrectionUpdate(
-            1, "article", None, None, {}, {"doc_type": stash_entry("ART", DOC_TYPE_MAP_MARKER)}
-        ),
-        # langue ramenée au référentiel → pas une correction
-        CorrectionUpdate(
-            4,
-            "article",
-            None,
-            "en",
-            {},
-            {"language": stash_entry("English", LANGUAGE_MAP_MARKER)},
-        ),
-        # règle réelle sur doc_type
         CorrectionUpdate(
             2,
-            "thesis",
-            None,
-            None,
-            {},
-            {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+            CorrectedSourceRecord(
+                "thesis",
+                None,
+                {},
+                {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+            ),
         ),
-        # deux champs corrigés sur une même enregistrement source → 1 enregistrement source, 2 déclenchements
+        # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
         CorrectionUpdate(
             3,
-            "media",
-            "green",
-            None,
-            {},
-            {
-                "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
-                "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
-            },
+            CorrectedSourceRecord(
+                "media",
+                "green",
+                {},
+                {
+                    "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+                    "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
+                },
+            ),
         ),
+        # correction défaite : mise à jour sans règle
+        CorrectionUpdate(4, CorrectedSourceRecord("article", None, {}, {})),
     ]
     corrected, rule_counts = tally_corrections(updates)
-    assert (
-        corrected == 2
-    )  # enregistrement source 1 et 4 = traductions seules (exclues) ; enregistrement source 2 et 3 corrigées
+    assert corrected == 2
     assert rule_counts == {
         "THESIS_WITH_JOURNAL_TO_ARTICLE": 1,
         "JOURNAL_TYPE_MEDIA_TO_MEDIA": 1,
@@ -74,46 +59,32 @@ def test_tally_corrections_exclut_les_traductions_de_vocabulaire():
     }
 
 
+_ROW_FIELDS = ("id", "source_id", "external_ids", "corrections")
+
+
 def _source_record(**overrides: object) -> UnaryCorrectionRow:
-    base: dict[str, object] = {
-        "id": 1,
+    """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles."""
+    row: dict[str, object] = {"id": 1, "source_id": "W1", "external_ids": {}, "corrections": {}}
+    facts: dict[str, object] = {
         "source": "openalex",
-        "source_id": "W1",
         "title": "Un titre quelconque",
         "doc_type": "article",
         "doi": None,
         "journal_id": None,
-        "oa_status": None,
-        "language": None,
-        "urls": None,
-        "external_ids": {},
-        "journal_type": None,
-        "oa_model": None,
-        "raw_metadata": {},
         "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
-        "registrant_publisher_type": None,
         "in_proceedings_volume": False,
-        "group_title": None,
         "journal_diamond": False,
         "author_count": 1,
     }
-    base.update(overrides)
-    return UnaryCorrectionRow(**base)  # type: ignore[arg-type]
+    for key, value in overrides.items():
+        (row if key in _ROW_FIELDS else facts)[key] = value
+    return UnaryCorrectionRow(**row, facts=MetadataForCorrection(**facts))  # type: ignore[arg-type]
 
 
-def test_no_rule_no_mapping_change_returns_none():
-    # OpenAlex 'article' → map = 'article' (inchangé), aucune règle → no-op.
+def test_no_rule_returns_none():
     assert _update(_source_record(doc_type="article")) is None
-
-
-def test_hal_code_mapped_to_canonical_with_marker():
-    # ART (HAL) → 'article' par mapping seul, sans règle : marqueur DOC_TYPE_MAP.
-    upd = _update(_source_record(source="hal", doc_type="ART"))
-    assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.raw_metadata == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
 
 
 def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
@@ -121,8 +92,8 @@ def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
     # (préfixe ≠ registre de thèses) → article.
     upd = _update(_source_record(doc_type="thesis", journal_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.raw_metadata == {
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections == {
         "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
     }
 
@@ -151,7 +122,7 @@ def test_retrait_par_cluster_reapplique():
             "corrected_by": "ACTES_VS_COMMUNICATION",
         }
     }
-    assert _update(_source_record(external_ids={"hal_id": ["hal-2"]}, raw_metadata=removal)) is None
+    assert _update(_source_record(external_ids={"hal_id": ["hal-2"]}, corrections=removal)) is None
 
 
 def test_retrait_par_cluster_compose_avec_la_conflation_these():
@@ -168,12 +139,12 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
             journal_id=42,
             doi="10.1016/j.ex.2020.01.001",
             external_ids={"hal_id": ["tel-01", "hal-99", "hal-5"]},
-            raw_metadata=removal,
+            corrections=removal,
         )
     )
     assert upd is not None
-    assert upd.external_ids == {"hal_id": ["hal-99"]}
-    assert upd.raw_metadata["removed_external_ids"] == removal["removed_external_ids"]
+    assert upd.corrected.external_ids == {"hal_id": ["hal-99"]}
+    assert upd.corrected.corrections["removed_external_ids"] == removal["removed_external_ids"]
 
 
 def test_thesis_to_article_strips_dissertation_keys():
@@ -188,9 +159,9 @@ def test_thesis_to_article_strips_dissertation_keys():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
-    assert upd.raw_metadata["external_ids"] == {
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
+    assert upd.corrected.corrections["external_ids"] == {
         "raw": {"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
         "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE",
     }
@@ -207,9 +178,9 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.external_ids == {"pmid": "123"}
-    assert "external_ids" not in upd.raw_metadata
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.external_ids == {"pmid": "123"}
+    assert "external_ids" not in upd.corrected.corrections
 
 
 def test_journal_id_wins_over_theses_fr_url_conflation():
@@ -225,26 +196,24 @@ def test_journal_id_wins_over_theses_fr_url_conflation():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
 
 
-def test_hal_code_mapped_then_rule_corrects():
-    # ART → 'article' (map) → journal media → 'media' (règle). map-then-correct chaîné ;
-    # corrected_by = la règle (pas le marqueur), raw = la valeur source ART.
-    upd = _update(_source_record(source="hal", doc_type="ART", journal_type="media"))
+def test_journal_media_corrects_and_stashes_the_value_before_correction():
+    upd = _update(_source_record(source="hal", doc_type="article", journal_type="media"))
     assert upd is not None
-    assert upd.doc_type == "media"
-    assert upd.raw_metadata == {
-        "doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+    assert upd.corrected.doc_type == "media"
+    assert upd.corrected.corrections == {
+        "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
 
 def test_theses_fr_url_corrects_doc_type_and_stashes_raw():
     upd = _update(_source_record(doc_type="article", urls=["https://theses.fr/2020ABCD"]))
     assert upd is not None
-    assert upd.doc_type == "thesis"
-    assert upd.raw_metadata == {
+    assert upd.corrected.doc_type == "thesis"
+    assert upd.corrected.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}
     }
 
@@ -253,7 +222,7 @@ def test_already_corrected_is_idempotent_noop():
     source_record = _source_record(
         doc_type="thesis",
         urls=["https://theses.fr/2020ABCD"],
-        raw_metadata={"doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}},
+        corrections={"doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}},
     )
     assert _update(source_record) is None
 
@@ -264,22 +233,20 @@ def test_self_heals_when_rule_no_longer_applies():
     source_record = _source_record(
         doc_type="media",
         journal_type=None,
-        raw_metadata={
-            "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
-        },
+        corrections={"doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.raw_metadata == {}
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections == {}
 
 
 def test_expired_embargo_promotes_oa_status_to_green():
     # oa_status `embargoed` + embargo expiré (calculé au fetch) → `green`, brut stashé.
     upd = _update(_source_record(oa_status="embargoed", embargo_expired=True))
     assert upd is not None
-    assert upd.oa_status == "green"
-    assert upd.raw_metadata["oa_status"] == {
+    assert upd.corrected.oa_status == "green"
+    assert upd.corrected.corrections["oa_status"] == {
         "raw": "embargoed",
         "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
     }
@@ -291,64 +258,40 @@ def test_active_embargo_oa_status_untouched():
 
 
 def test_null_doc_type_left_null_when_no_rule():
-    # Pas de mapping forcé pour None (pas de représentation à traduire) ; aucune règle → no-op.
     assert _update(_source_record(doc_type=None)) is None
 
 
-def test_preserves_unmanaged_raw_metadata_keys():
+def test_preserves_unmanaged_corrections_keys():
     # La clé `doi` (gérée par la sous-étape relationnelle) doit survivre à la passe unaire.
     source_record = _source_record(
         doc_type="article",
         urls=["https://theses.fr/2020ABCD"],
-        raw_metadata={"doi": {"raw": "10.1/book", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
+        corrections={"doi": {"raw": "10.1/book", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.raw_metadata == {
+    assert upd.corrected.corrections == {
         "doi": {"raw": "10.1/book", "corrected_by": "OUVRAGE_VS_CHAPITRE"},
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"},
     }
 
 
-def test_language_code_of_referential_untouched():
-    assert _update(_source_record(language="en")) is None
-
-
-def test_language_name_mapped_to_code_with_marker():
-    # WoS donne le nom anglais : la forme `english` le ramène à `en`, valeur source stashée.
-    upd = _update(_source_record(source="wos", language="English"))
-    assert upd is not None
-    assert upd.language == "en"
-    assert upd.raw_metadata == {"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}
-
-
-def test_unknown_language_gives_none_with_source_value_kept():
-    upd = _update(_source_record(source="hal", language="und"))
-    assert upd is not None
-    assert upd.language is None
-    assert upd.raw_metadata == {"language": {"raw": "und", "corrected_by": "LANGUAGE_MAP"}}
-
-
 def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
-    """Un type de document seulement traduit (`ART` → `article`) est mis à jour sans être corrigé."""
+    """Une correction défaite donne une mise à jour, sans compter comme une correction."""
     queries = MagicMock()
     queries.fetch_for_unary_correction.return_value = [
-        _source_record(id=1, source="hal", doc_type="ART"),
+        _source_record(
+            id=1,
+            doc_type="media",
+            corrections={
+                "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+            },
+        ),
         _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
     ]
-    queries.fetch_language_forms.return_value = _FORMS
     with caplog.at_level(logging.INFO, logger="test"):
         run(MagicMock(), queries, logging.getLogger("test"))
     assert "  ├─ 1 document à corriger" in caplog.messages
-
-
-def test_language_already_mapped_is_idempotent_noop():
-    source_record = _source_record(
-        source="wos",
-        language="en",
-        raw_metadata={"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}},
-    )
-    assert _update(source_record) is None
 
 
 # ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
@@ -356,25 +299,28 @@ def test_language_already_mapped_is_idempotent_noop():
 
 def test_scanr_from_hal_takes_corrected_hal_type():
     """Un enregistrement source ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis l'enregistrement source HAL."""
-    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
+    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 
-    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, {})
+    updates = compute_updates([hal, scanr], {"hal-04565713": hal})
 
     (scanr_update,) = [u for u in updates if u.id == 2]
-    assert scanr_update.doc_type == "poster"
-    assert scanr_update.raw_metadata["doc_type"]["corrected_by"] == "SCANR_FROM_HAL_TO_HAL_TYPE"
+    assert scanr_update.corrected.doc_type == "poster"
+    assert (
+        scanr_update.corrected.corrections["doc_type"]["corrected_by"]
+        == "SCANR_FROM_HAL_TO_HAL_TYPE"
+    )
 
 
 def test_scanr_without_hal_deposit_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
-    assert compute_updates([scanr], {}, {}) == []
+    assert compute_updates([scanr], {}) == []
 
 
 def test_scanr_from_another_origin_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="doi10.1/x", doc_type="other")
-    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
-    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, {})] == []
+    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
+    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal})] == []
 
 
 def test_hal_origin_ids():

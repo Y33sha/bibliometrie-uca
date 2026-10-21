@@ -37,6 +37,7 @@ from sqlalchemy import Connection, text
 
 from domain.dates import today
 from domain.publications.author_grouping import (
+    JARO_WINKLER_THRESHOLDS,
     Author,
     Comparison,
     ComparisonLevel,
@@ -51,8 +52,8 @@ from pipeline.transformation.publications.author_grouping.author_grouping import
     deferred_source_records,
     publication_batches,
 )
-from pipeline.transformation.publications.author_grouping.queries import (
-    AuthorGroupingQueries,
+from pipeline.transformation.publications.author_grouping.store import (
+    SourceContributionGroupStore,
     SourceContributionRow,
 )
 
@@ -146,7 +147,7 @@ def _collector(records: list[dict[str, object]], publication_id: int) -> Residua
 
 def export(conn: Connection, residual_path: Path, source_contributions_path: Path) -> None:
     """Écrit le résidu de la règle et les contributions sources du modèle complet à partir des contributions sources en base."""
-    queries = AuthorGroupingQueries()
+    store = SourceContributionGroupStore(conn)
     t0 = time.perf_counter()
     publications = [(r[0], r[1]) for r in conn.execute(_PUBLICATIONS_SQL)]
     log.info("%d publications à plusieurs enregistrements sources", len(publications))
@@ -159,7 +160,7 @@ def export(conn: Connection, residual_path: Path, source_contributions_path: Pat
         done = 0
         for batch in publication_batches(publications):
             rows_by_publication: dict[int, list[SourceContributionRow]] = {}
-            for row in queries.fetch_source_contributions(conn, batch):
+            for row in store.fetch_source_contributions(batch):
                 rows_by_publication.setdefault(row.publication_id, []).append(row)
             residual: list[dict[str, object]] = []
             source_contributions: list[dict[str, object]] = []
@@ -228,11 +229,12 @@ def _name_comparisons() -> list[cl.CustomComparison]:
                 label_for_charts=ComparisonLevel.WORDS_INCLUDED,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.92",
+                f"jaro_winkler_similarity(ln_l, ln_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_092]}",
                 label_for_charts=ComparisonLevel.JW_092,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.8", label_for_charts=ComparisonLevel.JW_08
+                f"jaro_winkler_similarity(ln_l, ln_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_08]}",
+                label_for_charts=ComparisonLevel.JW_08,
             ),
             cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
@@ -251,7 +253,8 @@ def _name_comparisons() -> list[cl.CustomComparison]:
                 label_for_charts=ComparisonLevel.INITIALS_MATCH,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(fn_l, fn_r) >= 0.9", label_for_charts=ComparisonLevel.JW_09
+                f"jaro_winkler_similarity(fn_l, fn_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_09]}",
+                label_for_charts=ComparisonLevel.JW_09,
             ),
             cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],

@@ -29,54 +29,54 @@ class _FakeSource:
 
 
 def _repo(last):
-    repo = MagicMock()
-    repo.last_imported_version.return_value = last
-    return repo
+    store = MagicMock()
+    store.last_imported_version.return_value = last
+    return store
 
 
 def test_version_deja_importee_laissee_en_l_etat():
-    source, repo = _FakeSource(), _repo("v2.14-2026-10-06-ror-data.zip")
-    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    source, store = _FakeSource(), _repo("v2.14-2026-10-06-ror-data.zip")
+    metrics = run_refresh_ror(MagicMock(), source=source, store=store, logger=_LOG)
     assert source.read == []
-    repo.replace_all.assert_not_called()
+    store.replace_all.assert_not_called()
     assert metrics.details["ror"]["imported"] is False
 
 
 def test_version_publiee_deja_importee_sans_interroger_zenodo():
     source = _FakeSource(published="v2.14")
-    repo = _repo("v2.14-2026-10-06-ror-data.zip")
-    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    store = _repo("v2.14-2026-10-06-ror-data.zip")
+    metrics = run_refresh_ror(MagicMock(), source=source, store=store, logger=_LOG)
     assert source.zenodo_calls == 0
     assert metrics.details["ror"] == {"version": "v2.14-2026-10-06-ror-data.zip", "imported": False}
 
 
 def test_version_publiee_differente_interroge_zenodo():
     source = _FakeSource(published="v2.15", latest="v2.15-2026-11-03-ror-data.zip")
-    repo = _repo("v2.14-2026-10-06-ror-data.zip")
-    run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    store = _repo("v2.14-2026-10-06-ror-data.zip")
+    run_refresh_ror(MagicMock(), source=source, store=store, logger=_LOG)
     assert source.zenodo_calls == 1
     assert source.read == ["v2.15-2026-11-03-ror-data.zip"]
 
 
 def test_version_plus_recente_importee():
-    source, repo = _FakeSource(), _repo("v2.13-2026-09-01-ror-data.zip")
-    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    source, store = _FakeSource(), _repo("v2.13-2026-09-01-ror-data.zip")
+    metrics = run_refresh_ror(MagicMock(), source=source, store=store, logger=_LOG)
     assert source.read == ["v2.14-2026-10-06-ror-data.zip"]
-    repo.replace_all.assert_called_once()
-    assert repo.replace_all.call_args.kwargs["version"] == "v2.14-2026-10-06-ror-data.zip"
+    store.replace_all.assert_called_once()
+    assert store.replace_all.call_args.kwargs["version"] == "v2.14-2026-10-06-ror-data.zip"
     assert metrics.details["ror"] == {"version": "v2.14-2026-10-06-ror-data.zip", "imported": True}
 
 
 def test_dump_inaccessible_laisse_le_referentiel_inchange():
     conn = MagicMock()
-    source, repo = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
-    metrics = run_refresh_ror(conn, source=source, repo=repo, logger=_LOG)
-    repo.replace_all.assert_not_called()
+    source, store = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
+    metrics = run_refresh_ror(conn, source=source, store=store, logger=_LOG)
+    store.replace_all.assert_not_called()
     conn.rollback.assert_called_once()
     assert metrics.details["ror"] == {"imported": False, "error": "HTTP 502"}
 
 
 def test_dump_inaccessible_degrade_le_statut_de_la_phase():
-    source, repo = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
-    metrics = run_refresh_ror(MagicMock(), source=source, repo=repo, logger=_LOG)
+    source, store = _FakeSource(error=DumpUnavailableError("HTTP 502")), _repo(None)
+    metrics = run_refresh_ror(MagicMock(), source=source, store=store, logger=_LOG)
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

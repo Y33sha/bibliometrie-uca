@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.lifecycle import delete_publications_without_sources
@@ -65,8 +65,8 @@ def _delete_publications_without_sources(open_tx: OpenTransaction, logger: loggi
     with open_tx() as conn:
         n = delete_publications_without_sources(conn)
     if n:
-        etape(logger, "Publications sans source")
-        logger.info("%s%s %s", DERNIERE_BRANCHE, accord(n, "publication"), forme(n, "supprimée"))
+        step(logger, "Publications sans source")
+        logger.info("%s%s %s", LAST_BRANCH, quantity(n, "publication"), inflect(n, "supprimée"))
     return n
 
 
