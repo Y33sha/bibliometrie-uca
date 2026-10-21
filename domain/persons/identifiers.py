@@ -1,21 +1,16 @@
-"""Value objects et helpers de normalisation des identifiants personne.
+"""Identifiants de personne, au contrat de `domain.identifiers.NormalizedIdentifier` : ORCID, IdHAL, IdRef (PPN SUDOC), compte HAL (`HalPersonId`).
 
-ORCID, IdHAL (login HAL en forme slug), IdRef (PPN SUDOC). Trois VOs immuables et auto-validés au même contrat que `domain/publications/identifiers.py` :
-
-- `X("...")` strict : lève `ValidationError` si malformé
-- `X.try_parse(...)` tolérant : renvoie None si malformé
-
-`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de VO.
+`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de value object.
 """
 
 import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from enum import StrEnum
 from typing import NamedTuple
 
 from domain.errors import ValidationError
+from domain.identifiers import NormalizedIdentifier
 from domain.types import JsonValue
 
 
@@ -112,32 +107,14 @@ def orcid_uri(orcid: str) -> str:
     return f"{_ORCID_URL_PREFIXES[0]}{orcid}"
 
 
-@dataclass(frozen=True)
-class ORCID:
+class ORCID(NormalizedIdentifier):
     """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
 
     Lève `ValidationError` si la valeur ne respecte pas le format. Contrôle le format, sans vérifier la checksum MOD 11-2.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = normalize_orcid(self.value)
-        if not cleaned:
-            raise ValidationError(f"ORCID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "ORCID | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "ORCID"
+    normalize = staticmethod(normalize_orcid)
 
 
 # ── IdHAL (personne) ───────────────────────────────────────────────
@@ -156,32 +133,14 @@ def _normalize_idhal(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class IdHAL:
+class IdHAL(NormalizedIdentifier):
     """Identifiant IdHAL d'une personne, choisi par la personne à sa création.
 
     Ex. `jean-dupont`, `jdupont`, `jean.dupont`.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_idhal(self.value)
-        if not cleaned:
-            raise ValidationError(f"IdHAL invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "IdHAL | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "IdHAL"
+    normalize = staticmethod(_normalize_idhal)
 
 
 # ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
@@ -209,29 +168,11 @@ def _normalize_idref(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class IdRef:
+class IdRef(NormalizedIdentifier):
     """Identifiant IdRef (PPN SUDOC), format 8 chiffres + clé de contrôle."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_idref(self.value)
-        if not cleaned:
-            raise ValidationError(f"IdRef invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "IdRef | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "IdRef"
+    normalize = staticmethod(_normalize_idref)
 
 
 # ── hal_person_id (compte HAL) ────────────────────────────────────
@@ -250,29 +191,11 @@ def _normalize_hal_person_id(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class HalPersonId:
+class HalPersonId(NormalizedIdentifier):
     """Identifiant d'un compte HAL (`personId`), entier positif."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_hal_person_id(self.value)
-        if not cleaned:
-            raise ValidationError(f"hal_person_id invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "HalPersonId | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "hal_person_id"
+    normalize = staticmethod(_normalize_hal_person_id)
 
 
 # ── Validation d'un identifiant par type ──────────────────────────

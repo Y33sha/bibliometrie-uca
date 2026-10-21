@@ -1,23 +1,12 @@
-"""Value objects et helpers de normalisation des identifiants publication.
+"""Identifiants de publication, au contrat de `domain.identifiers.NormalizedIdentifier` : DOI et son préfixe (DoiPrefix), HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre).
 
-DOI et son préfixe (DoiPrefix), HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre). VOs immuables et auto-validés au même contrat que `domain/persons/identifiers.py` :
-
-- `X("...")` strict : lève `ValidationError` si malformé
-- `X.try_parse(...)` tolérant : renvoie None si malformé
-
-Les helpers `clean_doi`, `normalize_nnt`, `extract_hal_id_from_url`,
-`normalize_pmid`, `normalize_pmcid`, `normalize_arxiv_id` sont exposés
-indépendamment pour les call sites qui veulent juste normaliser sans
-construire un VO (typiquement les normalizers de pipeline qui stockent la
-forme texte en base). Ils acceptent une URL (location OpenAlex, lien externe
-HAL) ou un identifiant brut.
+`clean_doi`, `normalize_nnt`, `extract_hal_id_from_url`, `normalize_pmid`, `normalize_pmcid` et `normalize_arxiv_id` rendent la forme canonique d'une URL ou d'un identifiant brut, sans construire de value object.
 """
 
 import re
-from dataclasses import dataclass
 from urllib.parse import unquote, urlparse
 
-from domain.errors import ValidationError
+from domain.identifiers import NormalizedIdentifier
 from domain.urls import is_host
 
 # ── DOI ────────────────────────────────────────────────────────────
@@ -50,7 +39,7 @@ _DOI_PREFIX_RE = re.compile(r"(10\.\d+)(?![\w.])")
 _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
-def _normalize_doi(raw: str | None) -> str | None:
+def clean_doi(raw: str | None) -> str | None:
     """Normalise un DOI brut vers sa forme canonique : minuscule, sans préfixe URL ni schéma, sans artefact de copier-coller, ramené sur son concept (suffixe de version retiré).
 
     Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
@@ -72,7 +61,7 @@ def _normalize_doi(raw: str | None) -> str | None:
 def _normalize_doi_step(s: str) -> str:
     """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes `/pdf` et `.vN`.
 
-    Ne converge pas seule : c'est `_normalize_doi` qui la réitère jusqu'au point fixe."""
+    Ne converge pas seule : c'est `clean_doi` qui la réitère jusqu'au point fixe."""
     if s.startswith("doi:"):
         # Préfixe de schéma (relatedIdentifier DataCite, location.id OAI-PMH côté OpenAlex) :
         # sinon `doi:10.x` ≠ `10.x` (faux doublon, cible de correction irrésoluble en base).
@@ -107,35 +96,15 @@ def _normalize_doi_step(s: str) -> str:
     return _DOI_VERSION_SUFFIX.sub("", s)
 
 
-@dataclass(frozen=True)
-class DOI:
+class DOI(NormalizedIdentifier):
     """Digital Object Identifier, normalisé et validé.
 
     Lève ValidationError à la construction si la valeur est invalide ou vide : après nettoyage, un DOI a la forme `10.<chiffres>/<suffixe>`.
     Utiliser `DOI.try_parse()` quand l'absence est un cas normal.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_doi(self.value)
-        if not cleaned:
-            raise ValidationError(f"DOI invalide : {self.value!r}")
-        # frozen=True interdit l'assignation directe — détour par object.__setattr__
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "DOI | None":
-        """Tente de parser ; renvoie None si l'entrée est vide ou invalide."""
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "DOI"
+    normalize = staticmethod(clean_doi)
 
     @property
     def prefix(self) -> "DoiPrefix":
@@ -143,33 +112,20 @@ class DOI:
         return DoiPrefix(self.value.split("/", 1)[0])
 
 
-@dataclass(frozen=True)
-class DoiPrefix:
+def _doi_prefix(raw: str | None) -> str | None:
+    """Préfixe en tête de `raw`, ou `None`."""
+    match = _DOI_PREFIX_RE.match((raw or "").strip())
+    return match.group(1) if match else None
+
+
+class DoiPrefix(NormalizedIdentifier):
     """Préfixe DOI (`10.<chiffres>`), partie registrant d'un DOI, avant la première barre oblique.
 
     À la construction, tolère une entrée bruitée : espaces, DOI complet, ponctuation finale. Lève ValidationError si aucun préfixe n'est en tête de la valeur (« doi:10.5194 », « https: », « 10.101621gloenvcha.2020.102168 »).
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        match = _DOI_PREFIX_RE.match(self.value.strip())
-        if not match:
-            raise ValidationError(f"Préfixe DOI invalide : {self.value!r}")
-        object.__setattr__(self, "value", match.group(1))
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "DoiPrefix | None":
-        """Tente de parser ; renvoie None si l'entrée est vide ou invalide."""
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "Préfixe DOI"
+    normalize = staticmethod(_doi_prefix)
 
 
 # ── HAL ID (document) ──────────────────────────────────────────────
@@ -204,7 +160,7 @@ def is_hal_host(host: str) -> bool:
     return any(label == "hal" or label.startswith("hal-") for label in host.split("."))
 
 
-def _normalize_hal_id(raw: str | None) -> str | None:
+def extract_hal_id_from_url(raw: str | None) -> str | None:
     """Extrait le HAL ID canonique d'une chaîne ou URL.
 
     Accepte une URL (hal.science, tel.archives-ouvertes.fr, …), un identifiant OAI-PMH HAL
@@ -234,33 +190,15 @@ def _normalize_hal_id(raw: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-@dataclass(frozen=True)
-class HALId:
+class HALId(NormalizedIdentifier):
     """Identifiant HAL d'un document (hal-XXXXX, tel-XXXXX, halshs-XXXXX, …).
 
     Normalisé en minuscules sans suffixe de version (`hal-04123456v2` →
     `hal-04123456`). Accepte une URL en entrée.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_hal_id(self.value)
-        if not cleaned:
-            raise ValidationError(f"HAL ID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "HALId | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "HAL ID"
+    normalize = staticmethod(extract_hal_id_from_url)
 
 
 # ── NNT (Numéro National de Thèse) ─────────────────────────────────
@@ -269,7 +207,7 @@ class HALId:
 _NNT_RE = re.compile(r"[0-9A-Z]+")
 
 
-def _normalize_nnt(raw: str | None) -> str | None:
+def normalize_nnt(raw: str | None) -> str | None:
     """Normalise un NNT : uppercase + strip. Format variable, on exige une valeur strictement alphanumérique ASCII (chiffres et lettres non accentuées). Ce garde rejette les identifiants OAI-PMH (`oai:HAL:…`, `doi:…`, `ark:/…`) qu'OpenAlex expose dans `primary_location.id` et qui ne sont pas des NNT — sans lui, ces valeurs alimenteraient un lien theses.fr mort."""
     if not raw:
         return None
@@ -279,32 +217,14 @@ def _normalize_nnt(raw: str | None) -> str | None:
     return s
 
 
-@dataclass(frozen=True)
-class NNT:
+class NNT(NormalizedIdentifier):
     """Numéro National de Thèse. Format typique : YYYY + code établissement + séquence (ex. 2021CLFAC030), sans être garanti.
 
     On normalise en majuscules, trim, et on exige une valeur alphanumérique.
     """
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_nnt(self.value)
-        if not cleaned:
-            raise ValidationError(f"NNT invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "NNT | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "NNT"
+    normalize = staticmethod(normalize_nnt)
 
 
 # ── PMID / PMCID (PubMed) ──────────────────────────────────────────
@@ -314,7 +234,7 @@ _PMC_URL_RE = re.compile(r"ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)")
 _PMCID_BARE_RE = re.compile(r"^(?:PMC)?(\d+)$", re.IGNORECASE)
 
 
-def _normalize_pmid(raw: str | None) -> str | None:
+def normalize_pmid(raw: str | None) -> str | None:
     """PMID depuis une URL PubMed ou un identifiant brut (suite de chiffres)."""
     if not raw:
         return None
@@ -325,7 +245,7 @@ def _normalize_pmid(raw: str | None) -> str | None:
     return s if s.isdigit() else None
 
 
-def _normalize_pmcid(raw: str | None) -> str | None:
+def normalize_pmcid(raw: str | None) -> str | None:
     """PMCID (`PMC<digits>`) depuis une URL PubMed Central ou un id brut."""
     if not raw:
         return None
@@ -337,54 +257,18 @@ def _normalize_pmcid(raw: str | None) -> str | None:
     return f"PMC{m.group(1)}" if m else None
 
 
-@dataclass(frozen=True)
-class PMID:
+class PMID(NormalizedIdentifier):
     """PubMed ID (suite de chiffres). Accepte une URL PubMed en entrée."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_pmid(self.value)
-        if not cleaned:
-            raise ValidationError(f"PMID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "PMID | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "PMID"
+    normalize = staticmethod(normalize_pmid)
 
 
-@dataclass(frozen=True)
-class PMCID:
+class PMCID(NormalizedIdentifier):
     """PubMed Central ID (`PMC<digits>`). Accepte une URL PMC en entrée."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_pmcid(self.value)
-        if not cleaned:
-            raise ValidationError(f"PMCID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "PMCID | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "PMCID"
+    normalize = staticmethod(normalize_pmcid)
 
 
 # ── arXiv ──────────────────────────────────────────────────────────
@@ -396,7 +280,7 @@ _ARXIV_URL_RE = re.compile(
 _ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.IGNORECASE)
 
 
-def _normalize_arxiv_id(raw: str | None) -> str | None:
+def normalize_arxiv_id(raw: str | None) -> str | None:
     """Identifiant arXiv depuis une URL `arxiv.org/abs|pdf/<id>` ou un id brut.
 
     Gère les deux schémas d'identifiant : `AAAA.NNNNN` (`2103.00001`) et `catégorie/NNNNNNN` (`math/0211159`), en ignorant le suffixe de version (`v2`) et l'extension `.pdf`.
@@ -411,29 +295,11 @@ def _normalize_arxiv_id(raw: str | None) -> str | None:
     return m.group(1) if m else None
 
 
-@dataclass(frozen=True)
-class ArxivId:
+class ArxivId(NormalizedIdentifier):
     """Identifiant arXiv. Accepte une URL arXiv ou un id brut en entrée."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_arxiv_id(self.value)
-        if not cleaned:
-            raise ValidationError(f"arXiv ID invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "ArxivId | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "arXiv ID"
+    normalize = staticmethod(normalize_arxiv_id)
 
 
 # ── ISSN ───────────────────────────────────────────────────────────
@@ -468,29 +334,11 @@ def issn_rejection_reason(raw: str) -> str:
     return "forme invalide"
 
 
-@dataclass(frozen=True)
-class ISSN:
+class ISSN(NormalizedIdentifier):
     """International Standard Serial Number (`NNNN-NNNC`), clé de contrôle vérifiée."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_issn(self.value)
-        if not cleaned:
-            raise ValidationError(f"ISSN invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "ISSN | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "ISSN"
+    normalize = staticmethod(_normalize_issn)
 
 
 _ISSN_SEARCH_RE = re.compile(r"\d{1,8}|\d{7}X", re.ASCII)
@@ -551,29 +399,11 @@ def _normalize_isbn(raw: str | None) -> str | None:
     return None
 
 
-@dataclass(frozen=True)
-class ISBN:
+class ISBN(NormalizedIdentifier):
     """International Standard Book Number, sous sa forme ISBN-13 sans séparateur, clé de contrôle vérifiée. Accepte un ISBN-10."""
 
-    value: str
-
-    def __post_init__(self) -> None:
-        cleaned = _normalize_isbn(self.value)
-        if not cleaned:
-            raise ValidationError(f"ISBN invalide : {self.value!r}")
-        object.__setattr__(self, "value", cleaned)
-
-    @classmethod
-    def try_parse(cls, raw: str | None) -> "ISBN | None":
-        if not raw:
-            return None
-        try:
-            return cls(raw)
-        except ValidationError:
-            return None
-
-    def __str__(self) -> str:
-        return self.value
+    label = "ISBN"
+    normalize = staticmethod(_normalize_isbn)
 
 
 # Suite de chiffres, tirets et espaces de la longueur d'un ISBN, isolée de ce qui l'entoure. La
@@ -594,40 +424,10 @@ def find_isbns(text: str | None) -> list[str]:
     return found
 
 
-# ── Helpers publics (API string-in/string-out) ─────────────────────
-#
-# Ces fonctions couvrent le besoin du code existant qui travaille sur
-# des chaînes brutes (pipelines d'extraction, normalisation). Elles
-# sont l'équivalent fonctionnel des VO mais en retour string|None.
-# Pour un accès structuré et typé, préférer DOI/NNT/HALId directement.
-
-
-def clean_doi(doi: str | None) -> str | None:
-    """Nettoie un DOI brut : préfixe URL, espaces, suffixe de version. Retourne le DOI canonique, ou None si l'entrée est vide/inutilisable."""
-    return _normalize_doi(doi)
-
-
 def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
     """Vrai si deux DOI portent le même préfixe, c'est-à-dire relèvent du même registrant."""
     prefixe = DoiPrefix.try_parse(doi_a)
     return prefixe is not None and prefixe == DoiPrefix.try_parse(doi_b)
-
-
-def normalize_nnt(nnt: str | None) -> str | None:
-    """Normalise un NNT : uppercase, strip whitespace. Retourne None si l'entrée est vide ou ne contient pas de caractères alphanumériques."""
-    return _normalize_nnt(nnt)
-
-
-def extract_hal_id_from_url(url: str | None) -> str | None:
-    """Extrait le HAL ID canonique d'une URL HAL ou d'un ID brut.
-
-    Accepte tout préfixe de collection (`hal-`, `tel-`, `halshs-`, `dumas-`, `emse-`, `in2p3-`…).
-    Ignore le suffixe de version (v1, v2, etc.).
-
-    >>> extract_hal_id_from_url("https://hal.science/hal-04123456v2")
-    'hal-04123456'
-    """
-    return _normalize_hal_id(url)
 
 
 def extract_doi_from_url(url: str | None) -> str | None:
@@ -646,18 +446,3 @@ def extract_doi_from_url(url: str | None) -> str | None:
     if is_host(url, "doi.org"):
         return clean_doi(url)
     return None
-
-
-def normalize_pmid(raw: str | None) -> str | None:
-    """PMID canonique depuis une URL PubMed ou un id brut ; None sinon."""
-    return _normalize_pmid(raw)
-
-
-def normalize_pmcid(raw: str | None) -> str | None:
-    """PMCID canonique (`PMC<digits>`) depuis une URL PMC ou un id brut ; None sinon."""
-    return _normalize_pmcid(raw)
-
-
-def normalize_arxiv_id(raw: str | None) -> str | None:
-    """Identifiant arXiv canonique depuis une URL arXiv ou un id brut ; None sinon."""
-    return _normalize_arxiv_id(raw)
