@@ -4,11 +4,11 @@ import logging
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import stash_entry
-from pipeline.transformation.publications.correction.journal_by_doi import compute_updates, run
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
 )
+from pipeline.transformation.publications.correction.journal_by_doi import compute_updates, run
 
 _NAMESPACES = [
     DoiNamespace("10.64628/aak.", 7, 300, 1.0),
@@ -101,13 +101,13 @@ class _Queries:
     def __init__(self, rows: list[JournalCorrectionRow]) -> None:
         self._rows = rows
 
-    def fetch_journal_doi_namespaces(self, conn):
+    def fetch_journal_doi_namespaces(self):
         return _NAMESPACES
 
-    def fetch_journal_by_doi_candidates(self, conn):
+    def fetch_journal_by_doi_candidates(self):
         return self._rows
 
-    def persist_journal_corrections(self, conn, updates):
+    def persist_journal_corrections(self, updates):
         return len(updates)
 
 

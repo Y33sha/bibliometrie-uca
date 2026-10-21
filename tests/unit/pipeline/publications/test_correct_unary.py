@@ -13,7 +13,7 @@ from pipeline.transformation.publications.correction.correct_unary import (
     run,
     tally_corrections,
 )
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     CorrectionUpdate,
     UnaryCorrectionRow,
 )

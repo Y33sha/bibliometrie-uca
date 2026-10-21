@@ -18,9 +18,9 @@ from domain.source_records.metadata_correction.source_record import (
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     CorrectionUpdate,
-    PgMetadataCorrectionQueries,
+    SourceRecordCorrectionStore,
     UnaryCorrectionRow,
 )
 
@@ -95,13 +95,13 @@ def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, i
 
 def run(
     conn: Connection,
-    queries: PgMetadataCorrectionQueries,
+    store: SourceRecordCorrectionStore,
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
     """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_records`."""
     step(logger, "Corrections de métadonnées par document")
     t0 = time.perf_counter()
-    rows = queries.fetch_for_unary_correction(conn)
+    rows = store.fetch_for_unary_correction()
     logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
 
     hal_rows = {row.source_id: row for row in rows if row.facts.source == "hal"}
@@ -109,6 +109,6 @@ def run(
     corrected, rule_counts = tally_corrections(updates)
     logger.info("%s%s à corriger", BRANCH, quantity(corrected, "document"))
 
-    persist_in_batches(conn, updates, queries.persist_corrections)
+    persist_in_batches(conn, updates, store.persist_corrections)
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
     return UnaryCorrectionStats(len(rows), corrected, rule_counts)

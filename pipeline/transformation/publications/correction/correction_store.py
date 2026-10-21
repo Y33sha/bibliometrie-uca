@@ -202,53 +202,54 @@ def _cluster_case(value: str | None) -> DoiClusterCase | None:
     return DoiClusterCase(value) if value is not None else None
 
 
-class PgMetadataCorrectionQueries:
+class SourceRecordCorrectionStore:
     """Requêtes de la phase `metadata_correction`."""
 
-    def fetch_for_unary_correction(self, conn: Connection) -> list[UnaryCorrectionRow]:
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def fetch_for_unary_correction(self) -> list[UnaryCorrectionRow]:
         """Toutes les `source_records`, avec join `journals` et `corrections`.
 
         Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_record` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
         """
-        return _unary_rows(conn.execute(text(_SELECT)))
+        return _unary_rows(self._conn.execute(text(_SELECT)))
 
-    def fetch_for_unary_correction_by_journal(
-        self, conn: Connection, journal_id: int
-    ) -> list[UnaryCorrectionRow]:
+    def fetch_for_unary_correction_by_journal(self, journal_id: int) -> list[UnaryCorrectionRow]:
         """Les `source_records` rattachées à un journal (`journal_id = :jid`).
 
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
         return _unary_rows(
-            conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
+            self._conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
         )
 
-    def fetch_for_unary_correction_by_hal_ids(
-        self, conn: Connection, hal_ids: list[str]
-    ) -> list[UnaryCorrectionRow]:
+    def fetch_for_unary_correction_by_hal_ids(self, hal_ids: list[str]) -> list[UnaryCorrectionRow]:
         """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         return _unary_rows(
-            conn.execute(
+            self._conn.execute(
                 text(_SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)"),
                 {"ids": hal_ids},
             )
         )
 
-    def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
+    def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes effectives + `corrections`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
-        return _persist_updates(conn, [{"id": u.id, **u.corrected._asdict()} for u in updates])
+        return _persist_updates(
+            self._conn, [{"id": u.id, **u.corrected._asdict()} for u in updates]
+        )
 
-    def fetch_journal_doi_namespaces(self, conn: Connection) -> list[DoiNamespace]:
+    def fetch_journal_doi_namespaces(self) -> list[DoiNamespace]:
         """Le contenu de `journal_doi_namespaces`."""
-        rows = conn.execute(
+        rows = self._conn.execute(
             text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
         )
         return rows_as(DoiNamespace, rows)
 
-    def fetch_journal_by_doi_candidates(self, conn: Connection) -> list[JournalCorrectionRow]:
+    def fetch_journal_by_doi_candidates(self) -> list[JournalCorrectionRow]:
         """`source_records` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`corrections ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
-        rows = conn.execute(
+        rows = self._conn.execute(
             text(f"""
                 SELECT id, source::text AS source, raw_doc_type,
                        doi, journal_id, corrections
@@ -259,15 +260,13 @@ class PgMetadataCorrectionQueries:
         )
         return rows_as(JournalCorrectionRow, rows)
 
-    def persist_journal_corrections(
-        self, conn: Connection, updates: list[JournalCorrectionUpdate]
-    ) -> int:
+    def persist_journal_corrections(self, updates: list[JournalCorrectionUpdate]) -> int:
         """UPDATE en lot de la colonne `journal_id` + `corrections`, bump `updated_at`, marque `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` de la publication — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
-        return _persist_updates(conn, [u._asdict() for u in updates])
+        return _persist_updates(self._conn, [u._asdict() for u in updates])
 
-    def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
+    def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
         """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref, et `source_records` déjà corrigées (`corrections.doi` ou `corrections.removed_external_ids`) pour la ré-évaluation auto-cicatrisante."""
-        rows = conn.execute(
+        rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
@@ -402,12 +401,12 @@ class PgMetadataCorrectionQueries:
             for row in rows
         ]
 
-    def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
+    def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes `doi`, `external_ids` et `corrections`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
 
         La publication de chaque enregistrement source reçoit `contributions_dirty` : le groupement des contributions sources écarte un enregistrement source dont le DOI converge sur celui d'une autre œuvre.
         """
-        conn.execute(
+        self._conn.execute(
             text("""
                 UPDATE publications p SET contributions_dirty = true
                 FROM source_records sr
@@ -415,4 +414,4 @@ class PgMetadataCorrectionQueries:
             """),
             {"ids": [u.id for u in updates]},
         )
-        return _persist_updates(conn, [u._asdict() for u in updates])
+        return _persist_updates(self._conn, [u._asdict() for u in updates])

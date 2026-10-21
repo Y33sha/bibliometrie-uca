@@ -5,7 +5,7 @@ from sqlalchemy.dialects import postgresql
 
 from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
 from infrastructure.db.tables import source_records
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     _UPDATE,
     DoiCorrectionUpdate,
     JournalCorrectionUpdate,

@@ -10,10 +10,10 @@ from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_records.metadata_correction.journal_by_doi import attach_journal_by_doi
 from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     JournalCorrectionRow,
     JournalCorrectionUpdate,
-    PgMetadataCorrectionQueries,
+    SourceRecordCorrectionStore,
 )
 
 
@@ -46,18 +46,18 @@ class JournalByDoiStats:
 
 
 def run(
-    conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
+    conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> JournalByDoiStats:
     """Rattache leur revue aux `source_records` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
     step(logger, "Revues non renseignées, identifiables par le DOI du document")
-    namespaces = queries.fetch_journal_doi_namespaces(conn)
-    rows = queries.fetch_journal_by_doi_candidates(conn)
+    namespaces = store.fetch_journal_doi_namespaces()
+    rows = store.fetch_journal_by_doi_candidates()
 
     updates = compute_updates(rows, namespaces)
     journals = [u.journal_id for u in updates if u.journal_id is not None]
     detached = len(updates) - len(journals)
 
-    persist_in_batches(conn, updates, queries.persist_journal_corrections)
+    persist_in_batches(conn, updates, store.persist_journal_corrections)
     logger.info(
         "%s%s %s à %s%s",
         LAST_BRANCH,

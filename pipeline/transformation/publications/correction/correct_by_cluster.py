@@ -42,10 +42,10 @@ from domain.source_records.metadata_correction.shared_doi import (
 from domain.types import JsonValue
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     DoiClusterRow,
     DoiCorrectionUpdate,
-    PgMetadataCorrectionQueries,
+    SourceRecordCorrectionStore,
 )
 
 
@@ -146,12 +146,12 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 
 
 def run(
-    conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
+    conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, et le DOI inconnu de doi.org."""
     step(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
-    rows = queries.fetch_doi_cluster_candidates(conn)
+    rows = store.fetch_doi_cluster_candidates()
     logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
 
     updates = compute_updates(rows)
@@ -164,6 +164,6 @@ def run(
     )
     case_counts = tally_doi_corrections(updates)
 
-    persist_in_batches(conn, updates, queries.persist_doi_corrections)
+    persist_in_batches(conn, updates, store.persist_doi_corrections)
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
     return ClusterCorrectionStats(len(rows), len(updates), case_counts)

@@ -12,7 +12,7 @@ from pipeline.transformation.publications.correction.correct_by_cluster import (
     compute_updates,
     tally_doi_corrections,
 )
-from pipeline.transformation.publications.correction.metadata_correction_queries import (
+from pipeline.transformation.publications.correction.correction_store import (
     DoiClusterRow,
     DoiCorrectionUpdate,
 )
