@@ -13,11 +13,11 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 ## Décisions
 
 - `source_contribution_groups` remplace `contributions`. Une contribution est un groupe dont `person_id` est renseigné. `person_id` et `resolution_mode` quittent `source_contributions`.
-- Une contribution source sans jumelle forme un groupe à elle seule. Les contributions sources collectives et celles des enregistrements sources écartés de l'alignement (enregistrement source scanR issu d'un dépôt HAL présent, enregistrement source DataCite au DOI convergé) restent hors groupe, donc sans personne.
+- Une contribution source sans jumelle forme un groupe à elle seule. Les contributions sources collectives et celles des enregistrements sources écartés de l'alignement (enregistrement source scanR issu d'un dépôt HAL présent, enregistrement source au DOI convergé) restent hors groupe, donc sans personne.
 - Les changements irréversibles du schéma passent en dernier, après l'étude de leurs conséquences.
 - La cascade décide par groupe. Elle cherche les indices de périmètre du groupe, puis rattache le groupe à une personne existante.
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
-- Le rattachement d'un groupe à une personne est figé d'un run à l'autre.
+- Le rattachement d'un groupe à une personne est figé tant que ses membres restent les mêmes. Un groupe dont les membres changent est réévalué.
 - Les décisions humaines visent des entités stables et se propagent au groupe :
   - l'épinglage d'une contribution source rattache son groupe ;
   - le rejet d'un couple (enregistrement source, personne) interdit de lier la personne à la publication de l'enregistrement source, donc à tout groupe de cette publication.
@@ -69,7 +69,17 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
 ### Phase 3 — Enregistrements sources écartés de l'alignement
 
-- [ ] Mesure de ce que leurs contributions sources apportent seules : contributions (publication, personne) absentes des groupes, indices de périmètre absents des groupes de la publication. 358 enregistrements sources au 2026-10-18.
+- [x] Mesure de ce que leurs contributions sources apportent seules, le 2026-10-21. Hors collectifs, 3 134 000 contributions sources de 36 100 enregistrements sources sont hors groupe. Ce sont les doublons d'auteur (`duplicate_of`, sans personne) et les contributions sources des enregistrements sources écartés : DOI convergé, toutes sources (8 700 enregistrements sources, dont 4 900 DataCite et 3 500 OpenAlex), ou scanR issu d'un dépôt HAL présent (26 500).
+
+  | Enregistrements sources écartés | Contributions sources | Avec personne | Couples (publication, personne) absents des groupes | Publications du périmètre par eux seuls |
+  |---|---|---|---|---|
+  | DataCite, DOI convergé | 2 732 000 | 81 700 | 17 474 | 5 |
+  | OpenAlex, DOI convergé | 274 000 | 22 800 | 2 601 | 21 |
+  | HAL, DOI convergé | 1 197 | 664 | 92 | 76 |
+  | scanR issu d'un dépôt HAL | 104 800 | 51 400 | 2 104 | 148 |
+  | WoS, DOI convergé | 1 | 1 | 0 | 1 |
+
+  - 1 400 de ces enregistrements sources sont dans des publications marquées `contributions_dirty`.
 
 ### Phase 4 — Essais d'une cascade par groupe
 
@@ -86,13 +96,9 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 #### Étape A — Personne sur le groupe, en double écriture
 
 - [ ] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`. `reference_position` tient lieu d'`author_position`.
-- [ ] Contrainte : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La suppression d'une personne vide `person_id` par la clé étrangère (`ON DELETE SET NULL`) sans vider `resolution_mode` : elle détache donc d'abord ses groupes.
+- [ ] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La clé étrangère `ON DELETE SET NULL` vide seulement `person_id`, donc la suppression d'une personne viole la contrainte si ses groupes ne sont pas détachés avant.
 - [ ] La phase `persons` écrit la personne du groupe en plus de celle des contributions sources. Tant que la cascade décide par contribution source, la personne du groupe est celle de ses membres. Des membres rattachés à deux personnes laissent le groupe sans personne, et le conflit est compté.
-- [ ] Report de la personne quand `author_grouping` recalcule les groupes. Un groupe reprend l'identifiant de l'ancien groupe dont il partage le plus de membres (`plan_group_ids`). Cas où la personne se perd sans report :
-  - scission d'un groupe : le groupe sans l'identifiant repart sans personne ;
-  - réunion de deux groupes : l'identifiant abandonné emporte sa personne ;
-  - fusion de publications : les groupes de la publication absorbée sont supprimés en cascade ;
-  - enregistrement source déplacé vers une autre publication.
+- [ ] Réévaluation des groupes recomposés par `author_grouping`. Un groupe recomposé reprend l'identifiant de l'ancien groupe dont il partage le plus de membres (`plan_group_ids`) : `author_grouping` vide sa personne quand ses membres changent.
 - [ ] Écart entre les groupes et `contributions` : couples (publication, personne) présents d'un seul côté.
 
 #### Étape B — Bascule des lecteurs
