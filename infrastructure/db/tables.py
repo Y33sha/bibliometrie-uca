@@ -1200,6 +1200,11 @@ source_records = Table(
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),
     Column("doc_type", Text),
+    Column(
+        "raw_doc_type",
+        Text,
+        comment="Type de document donné par la source, dans son vocabulaire.",
+    ),
     Column("publication_id", Integer),
     Column("staging_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -1226,6 +1231,11 @@ source_records = Table(
     Column("license", license_type_enum),
     Column("embargo_until", Date),
     Column("language", Text),
+    Column(
+        "raw_language",
+        Text,
+        comment="Langue donnée par la source, dans son vocabulaire.",
+    ),
     Column("container_title", Text),
     Column("is_retracted", Boolean),
     Column("abstract", Text),
