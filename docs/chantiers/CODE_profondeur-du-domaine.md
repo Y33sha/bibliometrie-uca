@@ -54,7 +54,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 ### Phase 2 — Correction des métadonnées
 
 - [x] Colonnes `raw_doc_type` et `raw_language` ; type et langue traduits par `normalize` ; lecteurs de la valeur de la source branchés sur ces colonnes ; marqueurs `DOC_TYPE_MAP` et `LANGUAGE_MAP` retirés ; oneshot `split_raw_doc_type_language`. a543d6495
-- [ ] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées.
+- [x] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées. d473dd1b8
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
 - [ ] Revue par espace de noms DOI en fonction de domaine.
 - [ ] Registre des clés de `raw_metadata` et de leur sous-étape ; `effective_external_ids`.
