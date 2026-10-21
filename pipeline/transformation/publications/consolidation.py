@@ -13,7 +13,7 @@ from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
 from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
-    effective_doc_type_for_publication,
+    effective_metadata,
 )
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_record import SourceRecord
@@ -221,28 +221,19 @@ def _apply_canonical_doc_type_correction(
 ) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication porte alors une combinaison — `doc_type` de l'une, `journal_id` de l'autre — qu'aucune `source_record` ne portait, et qu'aucune correction par source n'a pu voir. Le contrat reçoit les champs que l'agrégation arbitre, dont le `journal_type` du `journal_id` canonique.
-
-    `effective_doc_type_for_publication` écarte les règles lisant un fait propre à un enregistrement source ; les champs correspondants restent nuls ici. L'`oa_status` est hors du rejeu, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
+    L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication réunit alors un `doc_type` d'une source et un `journal_id` d'une autre, combinaison qu'aucune correction par source n'a vue.
 
     `journal_type` est le type de la revue `publication.journal_id`. Mute `publication.doc_type` et réécrit `publication.corrections` : le type arbitré et la règle, ou rien sans correction. Idempotent.
     """
-    corrected = effective_doc_type_for_publication(
-        MetadataForCorrection(
+    corrected = effective_metadata(
+        MetadataForCorrection.for_publication(
             title=publication.title,
             doc_type=publication.doc_type,
             doi=str(publication.doi) if publication.doi else None,
             journal_id=publication.journal_id,
-            oa_status=None,
-            urls=None,
             journal_type=journal_type,
-            oa_model=None,
-            embargo_expired=False,
-            self_declared_preprint=False,
-            declares_conference=False,
-            registrant_publisher_type=None,
         )
-    )
+    ).doc_type
     publication.corrections = {}
     if corrected is not None and corrected.value != publication.doc_type:
         publication.corrections = {
