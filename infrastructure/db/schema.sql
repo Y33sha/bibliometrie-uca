@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3b4QLNCX1bgMcxfdnoMNCfF9RFhTwxO5FuAG2OfI1MqoBuPaUmXqq1aaerKUWdP
+\restrict NdhLqmRzGYscMwBo7EYELhEVcL8d27dUZuOif3I2S6zTNNG57efSeQcqWSlkQxD
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1091,7 +1091,7 @@ CREATE TABLE sources.source_records (
     biblio jsonb,
     meta jsonb,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    corrections jsonb DEFAULT '{}'::jsonb CONSTRAINT source_records_raw_metadata_not_null NOT NULL,
     title_normalized text,
     keys_dirty boolean DEFAULT true NOT NULL,
     embargo_until date,
@@ -1103,9 +1103,9 @@ CREATE TABLE sources.source_records (
     distinct_author_count integer DEFAULT 0 NOT NULL,
     raw_doc_type text,
     raw_language text,
+    CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
     CONSTRAINT source_records_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
-    CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
-    CONSTRAINT source_records_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+    CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
 
 
@@ -4941,5 +4941,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3b4QLNCX1bgMcxfdnoMNCfF9RFhTwxO5FuAG2OfI1MqoBuPaUmXqq1aaerKUWdP
+\unrestrict NdhLqmRzGYscMwBo7EYELhEVcL8d27dUZuOif3I2S6zTNNG57efSeQcqWSlkQxD
 
