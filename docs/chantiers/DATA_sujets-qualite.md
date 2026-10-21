@@ -82,7 +82,7 @@ Conséquence : **le score OpenAlex n'est pas un proxy linéaire de pertinence**.
 - [ ] **Phase 4 — Prototype Specter2**, si la phase 3 conclut que les classifieurs ISTEX ne suffisent pas : extraction embeddings (Specter2 base via HuggingFace, batch sur titres + abstracts existants). Persistance vecteurs (pgvector ou fichier numpy + lookup).
 - [ ] **Phase 5 — Centroïdes par topic + score similarité** : calcul des centroïdes sur publis nettoyées par le bootstrap, score cosine pour chaque lien `publication_subjects`. Vue admin temporaire pour calibration manuelle du seuil.
 - [ ] **Phase 6 — Rejet Specter2 autonome** : application du seuil calibré, en remplacement du bootstrap.
-- [ ] **Redondance `topics.theses.discipline`** (connexe, hors flux OA/Specter2) : `meta.discipline` fait foi pour la discipline d'une thèse ; `topics.theses.discipline` en garde une copie. Décider d'arrêter d'écrire la copie (normalizer theses) et de purger l'existant.
+- [ ] **Redondance `topics.theses.discipline`** (connexe, hors flux OA/Specter2) : `source_extras.discipline` fait foi pour la discipline d'une thèse ; `topics.theses.discipline` en garde une copie. Décider d'arrêter d'écrire la copie (normalizer theses) et de purger l'existant.
 
 ## Questions ouvertes
 

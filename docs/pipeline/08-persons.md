@@ -1,6 +1,6 @@
 #  Résolution et création des personnes
 
-*À jour le 2026-10-09.*
+*À jour le 2026-10-21.*
 
 ```mermaid
 flowchart LR
@@ -21,7 +21,7 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 3. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-4. **Forme de nom** : le nom normalisé de la contribution source désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — « prénom nom » et « initiales nom » — et du nom porté par ses contributions sources. Une contribution source est cherchée sous la forme « prénom nom », puis « nom prénom », ce qui rattrape un nom et un prénom inversés par la source. Un nom qui désigne plusieurs personnes laisse la contribution source orpheline, pour traitement manuel via `admin/orphan-contributions`.
+4. **Forme de nom** : le nom normalisé de la contribution source désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — « prénom nom » et « initiales nom » — et du nom de ses contributions sources. Une contribution source est cherchée sous la forme « prénom nom », puis « nom prénom », ce qui rattrape un nom et un prénom inversés par la source. Un nom qui désigne plusieurs personnes laisse la contribution source orpheline, pour traitement manuel via `admin/orphan-contributions`.
 
 5. **Même publication, même position, dans une autre source** : une autre source donne la même publication, avec à la même position d'auteur une contribution source déjà rattachée à une personne, dont le nom est compatible. Interrogé en dernier : il s'appuie sur les rattachements que les critères précédents viennent de poser.
 
@@ -35,6 +35,8 @@ La phase fait deux passes sur ces critères.
 
 - La première rattache seulement, sans jamais créer de personne.
 - La seconde reprend les contributions sources restées orphelines : aucun identifiant ne les a prises. Elle les rejuge sur la forme de nom et sur la position dans une autre source. Un nom inconnu donne alors une personne neuve. Cette seconde passe voit les rattachements posés par la première.
+
+Une contribution source dont tous les rôles sont des rôles de jury de thèse (direction, rapport, jury, présidence) ne crée pas de personne.
 
 ### Contributions sources hors périmètre
 

@@ -81,7 +81,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 5 — Documentation
 
-- [ ] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) et `docs/playbooks/ajouter-une-regle-de-correction.md` ; noms `corrections` et `source_extras` dans les fiches des autres chantiers.
+- [x] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) et `docs/playbooks/ajouter-une-regle-de-correction.md` ; noms `corrections` et `source_extras` dans les fiches des autres chantiers.
 
 ## Questions ouvertes
 

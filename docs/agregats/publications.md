@@ -1,16 +1,16 @@
 # Publications — cycle de vie
 
-*À jour le 2026-09-06.*
+*À jour le 2026-10-21.*
 
 Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état consolidé depuis leur union.
 
-`domain/publications/` porte les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut *open access*.
+`domain/publications/` contient les règles pures : les types d'identifiants qui valident et normalisent DOI, identifiant HAL, numéro national de thèse, PMID, PMCID et identifiant arXiv ; la nomenclature des types de document ; l'agrégation des métadonnées entre sources ; les règles de regroupement ; et le choix du statut *open access*.
 
 ## Tables
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `publication_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `subjects_ingested_at`, `meta` |
+| `publications` | La référence unifiée | `doi` (unique sur sa forme minuscule), `doc_type`, `oa_status`, `publication_year`, `journal_id`, `sources` (sources contributrices), `in_perimeter`, `subjects_ingested_at`, `source_extras`, `corrections` |
 | `contributions` | Lien personne ↔ publication | `publication_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
 | `publication_relations` | Lien orienté entre deux publications | `from_publication_id`, `relation_type`, `target_publication_id` **ou** `target_doi`, `source` |
 | `apc_payments` | Frais de publication, importés puis corrigés à la main | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
@@ -22,7 +22,7 @@ En amont se trouvent les [enregistrements sources](source_records.md). La constr
 
 La phase `publications` constitue les publications ; les phases `relations`, `oa_status`, `countries` et `contributions` enrichissent ensuite certaines colonnes.
 
-**Regroupement (`pipeline/transformation/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en porte un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
+**Regroupement (`pipeline/transformation/publications/`).** `reconcile_components` charge les enregistrements sources marqués à reprendre et leurs voisins immédiats, puis calcule un plan avant d'écrire quoi que ce soit. Le plan regroupe par composante et par DOI, sous une règle absolue : deux DOI distincts ne se rejoignent jamais. Un enregistrement sans DOI peut en revanche rejoindre un groupe qui en a un. L'application du plan repointe les enregistrements, crée les publications manquantes, réunit celles qui doivent l'être — les dépendants sont repointés vers la publication conservée, puis la publication vidée est supprimée — et sépare celles qui ont été rapprochées à tort. Chaque publication conservée est ensuite rafraîchie.
 
 **Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail.
 
