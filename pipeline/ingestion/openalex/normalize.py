@@ -13,6 +13,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
@@ -291,46 +292,28 @@ def insert_openalex_document(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Biblio (volume, issue, pages)
+    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # L'éditeur et la revue sont ignorés pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.), même critère que la création.
     raw_biblio = as_mapping(work.get("biblio"))
-    biblio: dict[str, JsonValue] = {
-        k: raw_biblio[k]
-        for k in ("volume", "issue", "first_page", "last_page")
-        if raw_biblio.get(k)
-    }
-
-    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex, en parallèle des publishers/journals créés via find_or_create_*).
-    # Ignoré pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
-    if not should_skip_publisher_journal(primary):
-        source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
-        if publisher_raw := as_str(source.get("host_organization_name")):
-            biblio["publisher"] = publisher_raw
-        journal_obj: dict[str, str] = {}
-        if jt := as_str(source.get("display_name")):
-            journal_obj["title"] = jt
-        issn_l = as_str(source.get("issn_l"))
-        journal_issn = None
-        journal_eissn = None
-        for entree in as_sequence(source.get("issn")):
-            i = as_str(entree)
-            if not i or i == issn_l:
-                continue
-            if not journal_issn:
-                journal_issn = i
-            elif not journal_eissn:
-                journal_eissn = i
-        if journal_issn:
-            journal_obj["issn"] = journal_issn
-        if journal_eissn:
-            journal_obj["eissn"] = journal_eissn
-        if issn_l:
-            journal_obj["issnl"] = issn_l
-        if journal_oa_id := short_openalex_id(as_str(source.get("id")) or ""):
-            journal_obj["openalex_id"] = journal_oa_id
-        if journal_obj:
-            biblio["journal"] = journal_obj
-
-    biblio_json = biblio if biblio else None
+    source = (
+        {}
+        if should_skip_publisher_journal(primary)
+        else as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    )
+    issn_l = as_str(source.get("issn_l"))
+    issns = [i for e in as_sequence(source.get("issn")) if (i := as_str(e)) and i != issn_l]
+    biblio_json = compact_biblio(
+        volume=as_str(raw_biblio.get("volume")),
+        issue=as_str(raw_biblio.get("issue")),
+        first_page=as_str(raw_biblio.get("first_page")),
+        last_page=as_str(raw_biblio.get("last_page")),
+        publisher=as_str(source.get("host_organization_name")),
+        journal_title=as_str(source.get("display_name")),
+        journal_issn=issns[0] if issns else None,
+        journal_eissn=issns[1] if len(issns) > 1 else None,
+        journal_issnl=issn_l,
+        journal_openalex_id=short_openalex_id(as_str(source.get("id")) or ""),
+    )
 
     # Abstract, keywords, topics
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))

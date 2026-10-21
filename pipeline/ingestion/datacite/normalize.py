@@ -22,10 +22,11 @@ from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_text
 from domain.urls import is_host
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
@@ -118,29 +119,17 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
 
     Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
     """
-    biblio: dict[str, JsonValue] = {}
-    container = attributes.get("container")
-    if isinstance(container, dict):
-        for src_key, dest_key in (
-            ("volume", "volume"),
-            ("issue", "issue"),
-            ("firstPage", "first_page"),
-            ("lastPage", "last_page"),
-        ):
-            val = container.get(src_key)
-            if isinstance(val, str) and val.strip():
-                biblio[dest_key] = val.strip()
-    if publisher_raw := get_publisher_name(attributes):
-        biblio["publisher"] = publisher_raw
+    container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
-    journal_obj: dict[str, str] = {}
-    if title:
-        journal_obj["title"] = title
-    if issn:
-        journal_obj["issn"] = issn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    return biblio or None
+    return compact_biblio(
+        volume=as_text(container.get("volume")),
+        issue=as_text(container.get("issue")),
+        first_page=as_text(container.get("firstPage")),
+        last_page=as_text(container.get("lastPage")),
+        publisher=get_publisher_name(attributes),
+        journal_title=title,
+        journal_issn=issn,
+    )
 
 
 # =============================================================

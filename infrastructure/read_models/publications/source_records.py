@@ -9,6 +9,7 @@ from application.ports.read_models.publications_queries import (
     SourceContributionOut,
     SourceRecordMetadataOut,
 )
+from domain.source_records.biblio import BiblioKey, JournalKey
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.sql_fragments import contributor_display_name
 
@@ -31,9 +32,9 @@ def _text(mapping: Mapping[str, object], key: str) -> str | None:
 
 def _pages(biblio: Mapping[str, object]) -> str | None:
     """Plage de pages telle que la source la donne (`pages` pour HAL, `page` pour Crossref), sinon composée de `first_page` et `last_page`."""
-    if given := _text(biblio, "pages") or _text(biblio, "page"):
+    if given := _text(biblio, BiblioKey.PAGES) or _text(biblio, BiblioKey.PAGE):
         return given
-    first, last = _text(biblio, "first_page"), _text(biblio, "last_page")
+    first, last = _text(biblio, BiblioKey.FIRST_PAGE), _text(biblio, BiblioKey.LAST_PAGE)
     if first and last and first != last:
         return f"{first}-{last}"
     return first or last
@@ -41,7 +42,7 @@ def _pages(biblio: Mapping[str, object]) -> str | None:
 
 def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
     biblio: Mapping[str, object] = r.biblio or {}
-    journal = biblio.get("journal")
+    journal = biblio.get(BiblioKey.JOURNAL)
     raw_journal: Mapping[str, object] = journal if isinstance(journal, Mapping) else {}
     return SourceRecordMetadataOut(
         id=r.id,
@@ -59,17 +60,17 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         oa_status=r.oa_status,
         journal_id=r.journal_id,
         journal_title=r.journal_title,
-        journal_raw_title=_text(raw_journal, "title"),
-        journal_raw_issn=_text(raw_journal, "issn"),
-        journal_raw_eissn=_text(raw_journal, "eissn"),
+        journal_raw_title=_text(raw_journal, JournalKey.TITLE),
+        journal_raw_issn=_text(raw_journal, JournalKey.ISSN),
+        journal_raw_eissn=_text(raw_journal, JournalKey.EISSN),
         publisher_id=r.publisher_id,
         publisher_name=r.publisher_name,
-        publisher_raw_name=_text(biblio, "publisher"),
+        publisher_raw_name=_text(biblio, BiblioKey.PUBLISHER),
         container_title=r.container_title,
-        volume=_text(biblio, "volume"),
-        issue=_text(biblio, "issue"),
+        volume=_text(biblio, BiblioKey.VOLUME),
+        issue=_text(biblio, BiblioKey.ISSUE),
         pages=_pages(biblio),
-        article_number=_text(biblio, "article_number"),
+        article_number=_text(biblio, BiblioKey.ARTICLE_NUMBER),
     )
 
 

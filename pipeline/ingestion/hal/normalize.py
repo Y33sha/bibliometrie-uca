@@ -24,6 +24,7 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
@@ -225,35 +226,17 @@ def insert_hal_document(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Biblio
-    biblio: dict[str, JsonValue] = {}
-    vol = hal_text_field(doc.get("volume_s"))
-    if vol:
-        biblio["volume"] = vol
-    issue = hal_text_field(doc.get("issue_s"))
-    if issue:
-        biblio["issue"] = issue
-    page = hal_text_field(doc.get("page_s"))
-    if page:
-        biblio["pages"] = page
-
-    # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en parallèle de publishers/journals créés via find_or_create_*).
-    publisher_raw = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
-        doc.get("publisher_s")
+    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    biblio_json = compact_biblio(
+        volume=hal_text_field(doc.get("volume_s")),
+        issue=hal_text_field(doc.get("issue_s")),
+        pages=hal_text_field(doc.get("page_s")),
+        publisher=hal_text_field(doc.get("journalPublisher_s"))
+        or hal_text_field(doc.get("publisher_s")),
+        journal_title=hal_text_field(doc.get("journalTitle_s")),
+        journal_issn=hal_text_field(doc.get("journalIssn_s")),
+        journal_eissn=hal_text_field(doc.get("journalEissn_s")),
     )
-    if publisher_raw:
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := hal_text_field(doc.get("journalTitle_s")):
-        journal_obj["title"] = jt
-    if jissn := hal_text_field(doc.get("journalIssn_s")):
-        journal_obj["issn"] = jissn
-    if jeissn := hal_text_field(doc.get("journalEissn_s")):
-        journal_obj["eissn"] = jeissn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-
-    biblio_json = biblio if biblio else None
 
     # URLs
     uri = hal_text_field(doc.get("uri_s"))

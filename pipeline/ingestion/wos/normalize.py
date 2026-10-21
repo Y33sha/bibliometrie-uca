@@ -12,6 +12,7 @@ from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
@@ -50,6 +51,11 @@ from pipeline.transformation.publishing.publishers.store import PublisherStore
 # =============================================================
 # UTILITAIRES
 # =============================================================
+
+
+def _text_of(value: JsonValue) -> str | None:
+    """Numérotation que l'API donne en nombre ou en chaîne, en texte ; `None` si vide."""
+    return str(value) if value else None
 
 
 def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
@@ -246,37 +252,20 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Biblio
+    # Numérotation, éditeur et revue tels que WoS les nomme, en parallèle des publishers/journals créés via find_or_create_*.
     page = at_path(publication_info, "page")
-    if isinstance(page, str):
-        page = {}
-    biblio: dict[str, JsonValue] = {}
-    vol = publication_info.get("vol")
-    if vol:
-        biblio["volume"] = str(vol)
-    issue_val = publication_info.get("issue")
-    if issue_val:
-        biblio["issue"] = str(issue_val)
-    if isinstance(page, dict):
-        if page.get("begin"):
-            biblio["first_page"] = str(page["begin"])
-        if page.get("end"):
-            biblio["last_page"] = str(page["end"])
-
-    # Publisher + journal bruts (traçabilité du nom tel que vu par WoS, en parallèle des publishers/journals créés via find_or_create_*).
     issn_val = _get_api_issn(dynamic, "issn")
     eissn_val = _get_api_issn(dynamic, "eissn")
-    if publisher_name:
-        biblio["publisher"] = publisher_name
-    journal_obj: dict[str, str] = {}
-    if journal_title:
-        journal_obj["title"] = journal_title
-    if issn_val:
-        journal_obj["issn"] = issn_val
-    if eissn_val:
-        journal_obj["eissn"] = eissn_val
-    if journal_obj:
-        biblio["journal"] = journal_obj
+    biblio = compact_biblio(
+        volume=_text_of(publication_info.get("vol")),
+        issue=_text_of(publication_info.get("issue")),
+        first_page=_text_of(page.get("begin")),
+        last_page=_text_of(page.get("end")),
+        publisher=publisher_name,
+        journal_title=journal_title,
+        journal_issn=issn_val,
+        journal_eissn=eissn_val,
+    )
 
     # Abstract
     frm = at_path(static, "fullrecord_metadata")
@@ -391,24 +380,16 @@ def extract_from_export(
     def field(tag: str) -> str | None:
         return as_str(raw.get(tag))
 
-    biblio: dict[str, JsonValue] = {
-        key: value
-        for key, tag in (
-            ("volume", "VL"),
-            ("issue", "IS"),
-            ("first_page", "BP"),
-            ("last_page", "EP"),
-            ("publisher", "PU"),
-        )
-        if (value := field(tag))
-    }
-    journal_obj = {
-        key: value
-        for key, tag in (("title", "SO"), ("issn", "SN"), ("eissn", "EI"))
-        if (value := field(tag))
-    }
-    if journal_obj:
-        biblio["journal"] = journal_obj
+    biblio = compact_biblio(
+        volume=field("VL"),
+        issue=field("IS"),
+        first_page=field("BP"),
+        last_page=field("EP"),
+        publisher=field("PU"),
+        journal_title=field("SO"),
+        journal_issn=field("SN"),
+        journal_eissn=field("EI"),
+    )
     subjects = list(dict.fromkeys(split_export_list(field("WC")) + split_export_list(field("SC"))))
     doc_types = split_export_list(field("DT"))
     languages = split_export_list(field("LA"))

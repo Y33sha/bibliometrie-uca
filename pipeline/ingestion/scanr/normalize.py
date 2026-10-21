@@ -11,6 +11,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
@@ -226,20 +227,13 @@ def insert_scanr_document(  # noqa: C901
 
     # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/journals créés via find_or_create_*).
     source = as_mapping(doc.get("source"))
-    biblio: dict[str, JsonValue] = {}
-    if publisher_raw := as_str(source.get("publisher")):
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := as_str(source.get("title")):
-        journal_obj["title"] = jt
     jissn, jeissn = _extract_journal_issns(source)
-    if jissn:
-        journal_obj["issn"] = jissn
-    if jeissn:
-        journal_obj["eissn"] = jeissn
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    biblio_json = biblio if biblio else None
+    biblio_json = compact_biblio(
+        publisher=as_str(source.get("publisher")),
+        journal_title=as_str(source.get("title")),
+        journal_issn=jissn,
+        journal_eissn=jeissn,
+    )
 
     return queries.upsert_source_record(
         conn,

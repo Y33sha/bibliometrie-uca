@@ -25,6 +25,7 @@ from domain.journals.journal import JournalType, ManualField
 from domain.journals.series import ContainerLevel, container_level, holds_volumes
 from domain.normalize import normalize_text
 from domain.publications.identifiers import ISSN
+from domain.source_records.biblio import BiblioKey, JournalKey
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import journal_issns, journals
 from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
@@ -69,11 +70,12 @@ class JournalTitleTypeRow(NamedTuple):
 
 
 # ISSN des enregistrements de chaque revue, toutes sources, tels que reçus : `find_journals_to_check_in_sudoc` les normalise.
-_DOCUMENT_ISSNS = text("""
+_DOCUMENT_ISSNS = text(f"""
     SELECT DISTINCT s.journal_id, trim(v.issn) AS issn
     FROM source_records s
     CROSS JOIN LATERAL (
-        VALUES (s.biblio->'journal'->>'issn'), (s.biblio->'journal'->>'eissn')
+        VALUES (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.ISSN}'),
+               (s.biblio->'{BiblioKey.JOURNAL}'->>'{JournalKey.EISSN}')
     ) AS v(issn)
     WHERE s.journal_id IS NOT NULL AND v.issn IS NOT NULL
 """)

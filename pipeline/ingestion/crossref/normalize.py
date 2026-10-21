@@ -18,10 +18,11 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
+from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
-from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.source_contributions import (
@@ -153,29 +154,17 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
 
     `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
     """
-    biblio: dict[str, JsonValue] = {}
-    for src_key, dest_key in (
-        ("volume", "volume"),
-        ("issue", "issue"),
-        ("page", "page"),
-        ("article-number", "article_number"),
-    ):
-        val = msg.get(src_key)
-        if isinstance(val, str) and val.strip():
-            biblio[dest_key] = val.strip()
-    if publisher_raw := get_publisher_name(msg):
-        biblio["publisher"] = publisher_raw
-    journal_obj: dict[str, str] = {}
-    if jt := get_container_title(msg):
-        journal_obj["title"] = jt
     issn_val, eissn_val = get_issns(msg)
-    if issn_val:
-        journal_obj["issn"] = issn_val
-    if eissn_val:
-        journal_obj["eissn"] = eissn_val
-    if journal_obj:
-        biblio["journal"] = journal_obj
-    return biblio or None
+    return compact_biblio(
+        volume=as_text(msg.get("volume")),
+        issue=as_text(msg.get("issue")),
+        page=as_text(msg.get("page")),
+        article_number=as_text(msg.get("article-number")),
+        publisher=get_publisher_name(msg),
+        journal_title=get_container_title(msg),
+        journal_issn=issn_val,
+        journal_eissn=eissn_val,
+    )
 
 
 # =============================================================

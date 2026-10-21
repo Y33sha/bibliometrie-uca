@@ -7,6 +7,7 @@ import re
 
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
+from domain.source_records.biblio import BiblioKey
 from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
@@ -48,9 +49,9 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
     biblio = source.biblio or {}
     if source_extras.get(SourceExtra.PROCEEDINGS) is True:
         return True
-    if _PAGE_RANGE.search(as_str(biblio.get("pages")) or ""):
+    if _PAGE_RANGE.search(as_str(biblio.get(BiblioKey.PAGES)) or ""):
         return True
-    publisher = normalize_text(as_str(biblio.get("publisher")) or "")
+    publisher = normalize_text(as_str(biblio.get(BiblioKey.PUBLISHER)) or "")
     if publisher and publisher not in _UNKNOWN_PUBLISHERS:
         return True
     congress = normalize_text(source.container_title or "")
