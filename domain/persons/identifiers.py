@@ -141,14 +141,12 @@ class ORCID:
 
 # ── IdHAL (personne) ───────────────────────────────────────────────
 
-# Slug HAL : minuscules, chiffres, tirets. Certains comptes sont numériques
-# (l'API HAL distingue idHal_s et idHal_i). On accepte les deux formes,
-# stockées en base comme texte.
-_IDHAL_CANONICAL = re.compile(r"^[a-z0-9][a-z0-9-]{1,59}$")
+# Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`.
+_IDHAL_CANONICAL = re.compile(r"^\S+$")
 
 
 def _normalize_idhal(raw: str | None) -> str | None:
-    """Normalise un IdHAL personne : trim, lowercase, vérifie la forme slug."""
+    """Normalise un IdHAL personne : trim, lowercase, refuse une valeur vide ou qui contient un espace. HAL ne distingue pas la casse."""
     if not raw:
         return None
     s = raw.strip().lower()
@@ -159,9 +157,9 @@ def _normalize_idhal(raw: str | None) -> str | None:
 
 @dataclass(frozen=True)
 class IdHAL:
-    """Identifiant IdHAL d'une personne (login HAL, forme slug).
+    """Identifiant IdHAL d'une personne, choisi par la personne à sa création.
 
-    Ex. `jean-dupont`, `jdupont`, ou une forme numérique.
+    Ex. `jean-dupont`, `jdupont`, `jean.dupont`.
     """
 
     value: str

@@ -65,7 +65,9 @@ class TestIdHAL:
         [
             ("jean-dupont", "jean-dupont"),  # slug
             ("jdupont", "jdupont"),  # slug court
-            ("123456", "123456"),  # legacy numérique (idHal_i)
+            ("123456", "123456"),  # numérique
+            ("a", "a"),  # un caractère, présent dans HAL
+            ("fabrice.rojat", "fabrice.rojat"),  # point, présent dans HAL
             ("Jean-Dupont", "jean-dupont"),  # minuscules
             ("  jean-dupont  ", "jean-dupont"),  # strip whitespace
         ],
@@ -77,10 +79,8 @@ class TestIdHAL:
         "raw",
         [
             "",  # vide
-            "j",  # trop court
-            "-jean-dupont",  # tiret en tête
-            "jean_dupont",  # underscore
-            "jean.dupont",  # caractère spécial
+            "   ",  # blanc
+            "jean dupont",  # espace
         ],
     )
     def test_raises_on_invalid(self, raw):
@@ -91,7 +91,7 @@ class TestIdHAL:
         assert IdHAL.try_parse(None) is None
 
     def test_try_parse_invalid(self):
-        assert IdHAL.try_parse("j") is None
+        assert IdHAL.try_parse("jean dupont") is None
 
     def test_try_parse_valid(self):
         assert IdHAL.try_parse("jean-dupont") is not None
