@@ -29,9 +29,9 @@ from domain.publications.author_grouping import (
 from domain.publications.list_copies import copied_source_contributions
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.cpu import available_cpus
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, rien_a_faire
+from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente, progression
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.author_grouping.queries import (
     AuthorGroupingQueries,
@@ -262,9 +262,9 @@ def build_groups(
     """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`)."""
     dirty = queries.fetch_dirty_publications(conn)
     publication_ids = [publication_id for publication_id, _ in dirty]
-    etape(logger, "auteurs à aligner dans %s", accord(len(publication_ids), "publication"))
+    step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
-        rien_a_faire(logger)
+        nothing_to_do(logger)
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
     methods: Counter[str] = Counter()
@@ -272,18 +272,18 @@ def build_groups(
     workers = min(available_cpus(), len(publication_ids))
     with (
         ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
-        progression(len(publication_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement,
+        track_progress(len(publication_ids), LAST_BRANCH.rstrip(), logger) as progress,
     ):
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
-            group_count += regroup(conn, queries, batch, methods, avancement.avance, mapper)
+            group_count += regroup(conn, queries, batch, methods, progress.advance, mapper)
             conn.commit()
-    etape(logger, "Recouvrement des listes d'auteurs")
+    step(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
-    with attente(DERNIERE_BRANCHE, logger) as ligne:
+    with waiting(LAST_BRANCH, logger) as ligne:
         queries.refresh_alignment(conn)
         conn.commit()
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),
@@ -291,7 +291,7 @@ def build_groups(
         **{str(method): count for method, count in methods.items()},
     }
     metrics.report = (
-        f"{accord(len(publication_ids), 'publication')}, {accord(group_count, 'groupe')}"
+        f"{quantity(len(publication_ids), 'publication')}, {quantity(group_count, 'groupe')}"
     )
     return metrics
 

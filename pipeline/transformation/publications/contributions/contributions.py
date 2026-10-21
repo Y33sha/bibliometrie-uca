@@ -23,9 +23,9 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.contributions.address_publication_count import (
     AddressPublicationCountQueries,
@@ -196,12 +196,12 @@ def _delete_empty_containers(
     """Supprime les référentiels vides ; chaque suppression écrit sa ligne et reporte ses compteurs à la phase."""
     if not steps:
         return
-    etape(ctx.logger, "Référentiels vides")
-    for indice, (libelle, run) in enumerate(steps):
+    step(ctx.logger, "Référentiels vides")
+    for indice, (label, run) in enumerate(steps):
         sub = run(ctx)
         metrics.merge(sub)
-        branche = DERNIERE_BRANCHE if indice == len(steps) - 1 else BRANCHE
-        ctx.logger.info("%s%s : %s", branche, libelle, sub.report or "rien à faire")
+        branche = LAST_BRANCH if indice == len(steps) - 1 else BRANCH
+        ctx.logger.info("%s%s : %s", branche, label, sub.report or "rien à faire")
 
 
 def _refresh_publication_counts(
@@ -216,27 +216,27 @@ def _refresh_publication_counts(
 
     Chaque décompte dure : sa ligne annonce le travail en cours, puis cède la place à son résultat.
     """
-    etape(logger, "Recalcul des décomptes de publications")
+    step(logger, "Recalcul des décomptes de publications")
 
-    with attente(f"{BRANCHE}par adresse", logger) as ligne:
+    with waiting(f"{BRANCH}par adresse", logger) as ligne:
         with open_tx() as conn:
             adresses = address_publication_count_queries.recompute_publication_count(conn)
-        ligne.conclut(
-            f"{BRANCHE}{accord(adresses, 'adresse')} {forme(adresses, 'mise à jour', 'mises à jour')}"
+        ligne.conclude(
+            f"{BRANCH}{quantity(adresses, 'adresse')} {inflect(adresses, 'mise à jour', 'mises à jour')}"
         )
 
-    with attente(f"{BRANCHE}par revue", logger) as ligne:
+    with waiting(f"{BRANCH}par revue", logger) as ligne:
         with open_tx() as conn:
             revues = publication_counts_queries.refresh_journal_publication_counts(conn)
-        ligne.conclut(
-            f"{BRANCHE}{accord(revues, 'revue')} {forme(revues, 'mise à jour', 'mises à jour')}"
+        ligne.conclude(
+            f"{BRANCH}{quantity(revues, 'revue')} {inflect(revues, 'mise à jour', 'mises à jour')}"
         )
 
-    with attente(f"{DERNIERE_BRANCHE}par éditeur", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}par éditeur", logger) as ligne:
         with open_tx() as conn:
             editeurs = publication_counts_queries.refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
-        ligne.conclut(f"{DERNIERE_BRANCHE}{accord(editeurs, 'éditeur')} mis à jour")
+        ligne.conclude(f"{LAST_BRANCH}{quantity(editeurs, 'éditeur')} mis à jour")
 
 
 # ── Câblage ───────────────────────────────────────────────────

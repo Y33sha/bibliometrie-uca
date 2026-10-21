@@ -20,12 +20,12 @@ from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import (
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unavailable
@@ -73,14 +73,14 @@ def _resolve(
         for prefix in repo.get_prefixes_to_resolve()
         if str(DoiPrefix.try_parse(prefix)) == prefix
     ]
-    etape(log, "Agences d'enregistrement des préfixes DOI")
+    step(log, "Agences d'enregistrement des préfixes DOI")
     if not prefixes:
-        rien_a_faire(log)
+        nothing_to_do(log)
     else:
         log.info(
             "%s%s à résoudre",
-            DERNIERE_BRANCHE,
-            accord(len(prefixes), "préfixe DOI", "préfixes DOI"),
+            LAST_BRANCH,
+            quantity(len(prefixes), "préfixe DOI", "préfixes DOI"),
         )
 
     new_by_ra: dict[str, int] = {}
@@ -108,7 +108,7 @@ def _resolve(
     }
     resolus = metrics.extras.get("resolved", 0)
     total = metrics.total
-    metrics.report = f"{resolus}/{total} {forme(total, 'préfixe')} {forme(total, 'résolu')}"
+    metrics.report = f"{resolus}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
     return metrics
 
 

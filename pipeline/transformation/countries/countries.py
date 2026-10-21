@@ -18,7 +18,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.countries import (
@@ -64,10 +64,10 @@ class CountriesPhase:
         initial = _etat_des_adresses(ctx.open_tx)
 
         def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            etape(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
+            step(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
             with ctx.open_tx() as conn:
                 added = CountryCandidatesStore(conn).add_ror()
-            ctx.logger.info("%spays trouvé pour %s", DERNIERE_BRANCHE, accord(added, "adresse"))
+            ctx.logger.info("%spays trouvé pour %s", LAST_BRANCH, quantity(added, "adresse"))
             return PhaseMetrics(new=added)
 
         def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -79,13 +79,13 @@ class CountriesPhase:
             return metrics
 
         def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            etape(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
+            step(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
             with ctx.open_tx() as conn:
                 changed = resolve_address_countries(conn)
             ctx.logger.info(
                 "%s%s",
-                DERNIERE_BRANCHE,
-                accord(changed, "adresse mise à jour", "adresses mises à jour"),
+                LAST_BRANCH,
+                quantity(changed, "adresse mise à jour", "adresses mises à jour"),
             )
             return PhaseMetrics(updated=changed)
 

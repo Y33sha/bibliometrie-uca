@@ -29,7 +29,7 @@ from domain.publications.relations import (
     infer_shared_key_relation,
 )
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.relations_queries import (
@@ -239,37 +239,37 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
     ajoutees = _count_by_pair_label(rebuild.added_by_type)
     total = sum(ajoutees.values())
     if total:
-        etape(
+        step(
             logger,
             "%s entre publications",
-            accord(total, "nouvelle relation", "nouvelles relations"),
+            quantity(total, "nouvelle relation", "nouvelles relations"),
         )
         logger.info("")
         largeur = max(len(str(count)) for count in ajoutees.values())
-        for libelle, count in ajoutees.items():
-            logger.info("     %s %s", str(count).rjust(largeur), libelle)
+        for label, count in ajoutees.items():
+            logger.info("     %s %s", str(count).rjust(largeur), label)
     else:
-        etape(logger, "Relations entre publications")
+        step(logger, "Relations entre publications")
 
     if rebuild.removed:
         if total:
             logger.info("")
         logger.info(
             "%s%s %s",
-            DERNIERE_BRANCHE,
-            accord(rebuild.removed, "relation"),
-            forme(rebuild.removed, "retirée"),
+            LAST_BRANCH,
+            quantity(rebuild.removed, "relation"),
+            inflect(rebuild.removed, "retirée"),
         )
     elif not total:
-        logger.info("%saucun changement", DERNIERE_BRANCHE)
+        logger.info("%saucun changement", LAST_BRANCH)
 
 
 def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]:
     """Regroupe les compteurs par nature du lien : un type et son inverse désignent le même."""
     par_libelle: dict[str, int] = {}
     for relation_type, count in added_by_type:
-        libelle = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
-        par_libelle[libelle] = par_libelle.get(libelle, 0) + count
+        label = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
+        par_libelle[label] = par_libelle.get(label, 0) + count
     return dict(sorted(par_libelle.items(), key=lambda item: item[1], reverse=True))
 
 

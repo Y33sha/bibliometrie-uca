@@ -24,7 +24,7 @@ from pipeline.ingestion.hal.api import HalClient
 from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,7 @@ def harvest_union(
     config: HalHarvestConfig,
     conn: Connection,
     logger: ScopedOrPlainLogger,
-    avancement: Progression,
+    progress: Progress,
     *,
     years: list[int] | None = None,
     since: str | None = None,
@@ -72,7 +72,7 @@ def harvest_union(
 ) -> PhaseMetrics:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
-    Chaque document est écrit une fois dans `staging` et fait avancer `avancement`. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
     """
     query = build_query(years=years, since=since)
     fq = build_collections_fq(list(config.all_collections))
@@ -97,7 +97,7 @@ def harvest_union(
             )
         conn.commit()
 
-        avancement.avance(len(docs))
+        progress.advance(len(docs))
 
         # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide
         # borne aussi la boucle, en cas d'incohérence du serveur.
@@ -134,12 +134,12 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
         if window.since:
             return self._extrait_d_un_tenant(
                 client.count(build_query(years=years, since=window.since), fq),
-                lambda avancement: harvest_union(
+                lambda progress: harvest_union(
                     client,
                     config,
                     self.conn,
                     scoped_logger(self.logger, self.SOURCE),
-                    avancement,
+                    progress,
                     years=years,
                     since=window.since,
                     breaker_tripped=self._breaker_tripped,
@@ -149,13 +149,13 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
         def compte(annee: int) -> int:
             return client.count(build_query(years=[annee]), fq)
 
-        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
+        def extrait(annee: int, progress: Progress) -> PhaseMetrics:
             return harvest_union(
                 client,
                 config,
                 self.conn,
                 scoped_logger(self.logger, self.SOURCE, str(annee)),
-                avancement,
+                progress,
                 years=[annee],
                 breaker_tripped=self._breaker_tripped,
             )

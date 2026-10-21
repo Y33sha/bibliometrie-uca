@@ -104,24 +104,24 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lanc
 
     class _Spy:
         avances = 0
-        retenus = 0
+        kept = 0
 
-        def avance(self, n=1):
+        def advance(self, n=1):
             self.avances += n
 
-        def retient(self, n=1):
-            self.retenus += n
+        def keep(self, n=1):
+            self.kept += n
 
     spy = _Spy()
     options = {}
 
     @contextmanager
-    def _progression(total, libelle, logger, **kwargs):
+    def _track_progress(total, label, logger, **kwargs):
         options.update(kwargs)
         yield spy
 
-    monkeypatch.setattr(stale_refetch, "progression", _progression)
+    monkeypatch.setattr(stale_refetch, "track_progress", _track_progress)
     lancer(_QUATRE_ISSUES)
 
-    assert options.get("compte_retenus") is True
-    assert (spy.avances, spy.retenus) == (4, 2)
+    assert options.get("count_kept") is True
+    assert (spy.avances, spy.kept) == (4, 2)

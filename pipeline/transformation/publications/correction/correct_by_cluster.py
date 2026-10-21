@@ -40,7 +40,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     source_record_own_ids,
 )
 from domain.types import JsonValue
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     DoiClusterRow,
@@ -149,21 +149,21 @@ def run(
     conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, et le DOI inconnu de doi.org."""
-    etape(logger, "Corrections de DOI par confrontation de documents")
+    step(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = queries.fetch_doi_cluster_candidates(conn)
-    logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
+    logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
 
     updates = compute_updates(rows)
-    logger.info("%s%s à appliquer", BRANCHE, accord(len(updates), "correction"))
+    logger.info("%s%s à appliquer", BRANCH, quantity(len(updates), "correction"))
     removals = sum(1 for u in updates if CorrectionKey.REMOVED_EXTERNAL_IDS in u.corrections)
     logger.info(
         "%sidentifiants partagés avec une autre œuvre retirés de %s",
-        BRANCHE,
-        accord(removals, "enregistrement source", "enregistrements sources"),
+        BRANCH,
+        quantity(removals, "enregistrement source", "enregistrements sources"),
     )
     case_counts = tally_doi_corrections(updates)
 
     persist_in_batches(conn, updates, queries.persist_doi_corrections)
-    logger.info("%sTerminé en %.1fs", DERNIERE_BRANCHE, time.perf_counter() - t0)
+    logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
     return ClusterCorrectionStats(len(rows), len(updates), case_counts)

@@ -29,15 +29,15 @@ from domain.source_records.keys import (
 from domain.types import JsonValue
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
-from pipeline.runtime.observability.libelles import (
-    BRANCHE,
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
-from pipeline.runtime.observability.progression import attente, progression
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.publications import lifecycle
 
 # ─── SQL ─────────────────────────────────────────────────────────
@@ -328,17 +328,17 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     mark_publication_siblings_dirty(conn)
     dirty_ids = fetch_dirty_source_record_ids(conn)
     if not dirty_ids:
-        etape(logger, "Aucun document nouveau ou mis à jour")
-        rien_a_faire(logger)
+        step(logger, "Aucun document nouveau ou mis à jour")
+        nothing_to_do(logger)
         return ReconcileStats()
-    etape(
+    step(
         logger,
         "%s %s (%s)",
-        accord(len(dirty_ids), "document"),
-        forme(len(dirty_ids), "examiné"),
+        quantity(len(dirty_ids), "document"),
+        inflect(len(dirty_ids), "examiné"),
         "reconstruction complète" if rebuild else "nouveaux ou mis à jour",
     )
-    with attente(BRANCHE, logger) as ligne:
+    with waiting(BRANCH, logger) as ligne:
         rows = fetch_reconciliation_universe(conn)
         rows_by_source_record = {row.id: row for row in rows}
         existing_publication_by_doi = fetch_publication_ids_by_doi(conn)
@@ -353,10 +353,10 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
         a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)
         existantes = len(plan.groups) - a_creer
-        ligne.conclut(
-            f"{BRANCHE}résolus en {accord(len(plan.groups), 'publication')} "
-            f"({existantes} déjà {forme(existantes, 'existante')}, {accord(a_creer, 'nouvelle')} ; "
-            f"{accord(len(plan.dissolved), 'doublon')} à fusionner)"
+        ligne.conclude(
+            f"{BRANCH}résolus en {quantity(len(plan.groups), 'publication')} "
+            f"({existantes} déjà {inflect(existantes, 'existante')}, {quantity(a_creer, 'nouvelle')} ; "
+            f"{quantity(len(plan.dissolved), 'doublon')} à fusionner)"
         )
 
     survivors: set[int] = set()
@@ -367,7 +367,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     splits = 0
 
     t0 = time.perf_counter()
-    with attente(f"{DERNIERE_BRANCHE}application", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}application", logger) as ligne:
         # 1. Groupes : rattacher chaque enregistrement source à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
         for group in plan.groups:
             target = group.target_publication_id
@@ -412,14 +412,14 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         for dissolved in plan.dissolved:
             lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
 
-        ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+        ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
     # 4. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)
-    etape(logger, "Recalcul des métadonnées consolidées")
-    with progression(len(survivor_ids), DERNIERE_BRANCHE.rstrip(), logger) as avancement:
+    step(logger, "Recalcul des métadonnées consolidées")
+    with track_progress(len(survivor_ids), LAST_BRANCH.rstrip(), logger) as progress:
         for publication_id in survivor_ids:
-            avancement.avance()
+            progress.advance()
             with savepoint(conn):
                 lifecycle.refresh(conn, publication_id)
 

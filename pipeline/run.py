@@ -52,9 +52,9 @@ from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
 from pipeline.runtime.modes import MODE_NAMES
 from pipeline.runtime.observability.exception_chain import failure_message, is_user_interruption
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import ecrire_hors_barre, set_flux_barres
+from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
@@ -67,8 +67,8 @@ from pipeline.transformation.publishing import publishers_journals, resolve_ra
 from pipeline.transformation.structures import affiliations
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
-set_console_writer(ecrire_hors_barre)
-set_flux_barres(console_stream())
+set_console_writer(write_above_bars)
+set_bar_stream(console_stream())
 
 # Seuil du root logger, où émettent les modules qui appellent `logging.getLogger(__name__)` :
 # les bibliothèques tierces y écrivent trop d'information pour la laisser passer.
@@ -265,7 +265,7 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 
 def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    return {"delai": accord(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
+    return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
 
 
 _CHAMPS_DE_LIBELLE: dict[str, Callable[["Connection"], dict[str, str]]] = {
@@ -277,17 +277,17 @@ _CHAMPS_DE_LIBELLE: dict[str, Callable[["Connection"], dict[str, str]]] = {
 def _libelle_de_phase(name: str) -> str | None:
     """Ce que la phase produit, ses champs remplis par la configuration."""
     # `PHASE_LIBELLES` couvre les phases du pipeline ; les tests en nomment d'autres.
-    libelle = PHASE_LIBELLES.get(name)
+    label = PHASE_LIBELLES.get(name)
     champs = _CHAMPS_DE_LIBELLE.get(name)
-    if libelle is None or champs is None:
-        return libelle
+    if label is None or champs is None:
+        return label
     with open_tx() as conn:
-        return libelle.format(**champs(conn))
+        return label.format(**champs(conn))
 
 
-def _titre_de_phase(name: str, libelle: str | None) -> list[str]:
+def _titre_de_phase(name: str, label: str | None) -> list[str]:
     """Lignes ouvrant une phase : son nom, et ce qu'elle produit."""
-    return _encadre([f"{PHASE_MARKER}{name}", *([libelle] if libelle else [])])
+    return _encadre([f"{PHASE_MARKER}{name}", *([label] if label else [])])
 
 
 TITRE_PIPELINE = (

@@ -14,7 +14,7 @@ from pipeline.graph import TASKS, Task
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
 
@@ -67,7 +67,7 @@ def run_tasks(
         previous_section = steps[selected[start - 1].name].section if start else None
         section = steps[selected[start].name].section
         if section is not None and section != previous_section:
-            etape(ctx.logger, section)
+            step(ctx.logger, section)
         chunk = selected[start:end]
         if len(chunk) == 1:
             task = chunk[0]
@@ -103,7 +103,7 @@ def _write_lines(
         last = step.section != next_section and rank == len(lines) - 1
         ctx.logger.info(
             "%s%s : %s",
-            DERNIERE_BRANCHE if last else BRANCHE,
+            LAST_BRANCH if last else BRANCH,
             label,
             outcome,
             extra={"detail": step.section is None or (step.progress_bar and rank == 0)},

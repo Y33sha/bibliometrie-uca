@@ -124,9 +124,7 @@ def insert_source_document(
 
     # Keywords : sujets (mots-clés auteur)
     sujets = as_sequence(these.get("sujets"))
-    keywords = [
-        libelle for s in sujets if (libelle := as_str(as_mapping(s).get("libelle")))
-    ] or None
+    keywords = [label for s in sujets if (label := as_str(as_mapping(s).get("libelle")))] or None
 
     # Topics : discipline + sujets Rameau
     topics: dict[str, JsonValue] = {}
@@ -134,7 +132,7 @@ def insert_source_document(
     if discipline:
         topics["discipline"] = discipline
     rameau = as_sequence(these.get("sujetsRameau"))
-    rameau_list = [libelle for r in rameau if (libelle := as_str(as_mapping(r).get("libelle")))]
+    rameau_list = [label for r in rameau if (label := as_str(as_mapping(r).get("libelle")))]
     if rameau_list:
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None

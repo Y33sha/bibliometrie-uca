@@ -26,16 +26,16 @@ from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import (
-    BRANCHE,
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.task_runner import SingleTaskPhase
 from pipeline.transformation.publications.oa_status_queries import OaStatusQueries
 
@@ -136,27 +136,27 @@ async def _verifier(
         }
         return metrics
 
-    etape(logger, "Vérification du statut open access sur Unpaywall")
+    step(logger, "Vérification du statut open access sur Unpaywall")
     if not total:
-        rien_a_faire(logger)
+        nothing_to_do(logger)
         return _result()
 
     logger.info(
         "%s%s %s ou %s depuis plus de %s",
-        BRANCHE,
-        accord(stale_total, "DOI", "DOI"),
-        forme(stale_total, "jamais vérifié"),
-        forme(stale_total, "vérifié"),
-        accord(staleness_days, "jour"),
+        BRANCH,
+        quantity(stale_total, "DOI", "DOI"),
+        inflect(stale_total, "jamais vérifié"),
+        inflect(stale_total, "vérifié"),
+        quantity(staleness_days, "jour"),
     )
     if max_per_run and max_per_run < stale_total:
         reportes = stale_total - total
         logger.info(
             "%splafond de %s par run ⇒ %s %s au prochain",
-            BRANCHE,
+            BRANCH,
             max_per_run,
             reportes,
-            forme(reportes, "reporté"),
+            inflect(reportes, "reporté"),
         )
 
     sem = asyncio.Semaphore(max_concurrent)
@@ -168,7 +168,7 @@ async def _verifier(
                 return doi, await fetcher(client, doi)
 
         # Par paquets : les requêtes d'un paquet partent en concurrence (débit borné par `sem`), puis ses écritures sont committées.
-        with progression(total, BRANCHE.rstrip(), logger) as avancement:
+        with track_progress(total, BRANCH.rstrip(), logger) as bar:
             for start in range(0, total, BATCH_SIZE):
                 chunk = dois[start : start + BATCH_SIZE]
                 verdicts: list[tuple[str, str | None]] = []
@@ -182,17 +182,17 @@ async def _verifier(
                         verdicts.append((doi, outcome))
                 await asyncio.to_thread(_apply_verdicts, conn, queries, verdicts, progress)
                 await asyncio.to_thread(conn.commit)
-                avancement.avance(len(chunk))
+                bar.advance(len(chunk))
 
     bilan = [
-        accord(progress["new"], "nouveau", "nouveaux"),
-        accord(progress["updated"], "modifié"),
-        accord(progress["unchanged"], "inchangé"),
-        accord(progress["not_found"], "non trouvé", "non trouvés"),
+        quantity(progress["new"], "nouveau", "nouveaux"),
+        quantity(progress["updated"], "modifié"),
+        quantity(progress["unchanged"], "inchangé"),
+        quantity(progress["not_found"], "non trouvé", "non trouvés"),
     ]
     if progress["unavailable"]:
-        bilan.append(accord(progress["unavailable"], "reporté"))
-    logger.info("%s%s", DERNIERE_BRANCHE, ", ".join(bilan))
+        bilan.append(quantity(progress["unavailable"], "reporté"))
+    logger.info("%s%s", LAST_BRANCH, ", ".join(bilan))
 
     return _result()
 

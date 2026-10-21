@@ -11,7 +11,7 @@ from sqlalchemy import Connection, text
 from domain.normalize import normalize_text
 from domain.source_records.source_extras import SourceExtra
 from infrastructure.sql_fragments import source_extra_json
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
+from pipeline.runtime.observability.log_format import LAST_BRANCH, step
 from pipeline.transformation.structures.detections import (
     IDREF_STRUCTURES,
     Detection,
@@ -29,7 +29,7 @@ _PARTNERS = text(f"""
 
 def resolve_thesis_partners(conn: Connection, logger: logging.Logger) -> int:
     """Rattache chaque PPN de laboratoire partenaire aux structures que ses noms désignent. Rend le nombre de PPN rattachés à au moins une structure. Le commit est à la charge de l'appelant."""
-    etape(logger, "Identification des laboratoires partenaires de thèse")
+    step(logger, "Identification des laboratoires partenaires de thèse")
     matcher = StructureNameMatcher.load(conn)
     detected: dict[tuple[str, int], int] = {}
     names_by_ppn: dict[str, list[str]] = defaultdict(list)
@@ -47,7 +47,7 @@ def resolve_thesis_partners(conn: Connection, logger: logging.Logger) -> int:
     resolved = len({ppn for ppn, _ in detected})
     logger.info(
         "%s%d laboratoires partenaires rattachés sur %d",
-        DERNIERE_BRANCHE,
+        LAST_BRANCH,
         resolved,
         len(names_by_ppn),
     )

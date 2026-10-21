@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, text
 from pipeline.runtime.lock import (
     PIPELINE_LOCK_KEY,
     PipelineAlreadyRunningError,
-    _detenteur,
+    _holder,
     pipeline_lock,
 )
 from tests.integration.conftest import _source_contribution_url
@@ -67,7 +67,7 @@ def test_une_autre_base_du_cluster_ne_passe_pas_pour_le_detenteur(sa_engine_pipe
             conn.execute(text("SELECT pg_advisory_lock(:cle)"), {"cle": PIPELINE_LOCK_KEY})
             try:
                 with sa_engine_pipeline.connect() as local:
-                    assert _detenteur(local) == "une autre exécution"
+                    assert _holder(local) == "une autre exécution"
             finally:
                 conn.execute(text("SELECT pg_advisory_unlock(:cle)"), {"cle": PIPELINE_LOCK_KEY})
     finally:

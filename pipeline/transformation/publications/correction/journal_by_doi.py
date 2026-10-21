@@ -8,7 +8,7 @@ from sqlalchemy import Connection
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.source_records.metadata_correction.journal_by_doi import attach_journal_by_doi
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape, forme
+from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     JournalCorrectionRow,
@@ -49,7 +49,7 @@ def run(
     conn: Connection, queries: PgMetadataCorrectionQueries, logger: logging.Logger
 ) -> JournalByDoiStats:
     """Rattache leur revue aux `source_records` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
-    etape(logger, "Revues non renseignées, identifiables par le DOI du document")
+    step(logger, "Revues non renseignées, identifiables par le DOI du document")
     namespaces = queries.fetch_journal_doi_namespaces(conn)
     rows = queries.fetch_journal_by_doi_candidates(conn)
 
@@ -60,10 +60,10 @@ def run(
     persist_in_batches(conn, updates, queries.persist_journal_corrections)
     logger.info(
         "%s%s %s à %s%s",
-        DERNIERE_BRANCHE,
-        accord(len(journals), "enregistrement source", "enregistrements sources"),
-        forme(len(journals), "rattaché"),
-        accord(len(set(journals)), "revue"),
-        f", {accord(detached, 'rattachement')} {forme(detached, 'retiré')}" if detached else "",
+        LAST_BRANCH,
+        quantity(len(journals), "enregistrement source", "enregistrements sources"),
+        inflect(len(journals), "rattaché"),
+        quantity(len(set(journals)), "revue"),
+        f", {quantity(detached, 'rattachement')} {inflect(detached, 'retiré')}" if detached else "",
     )
     return JournalByDoiStats(len(rows), len(journals))

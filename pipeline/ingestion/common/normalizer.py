@@ -17,13 +17,13 @@ from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
 from pipeline.ingestion.common.source_records import SourceRecordQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.runtime.observability.libelles import (
-    SUITE_DE_BRANCHE,
-    accord,
-    branche_de_source,
+from pipeline.runtime.observability.log_format import (
+    BRANCH_CONTINUATION,
+    quantity,
+    source_branch,
 )
 from pipeline.runtime.observability.logging_scope import scoped_logger
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
@@ -125,11 +125,11 @@ class SourceNormalizer(ABC):
             return
         self.logger.info(
             "%s%s aux métadonnées incomplètes",
-            SUITE_DE_BRANCHE,
-            accord(len(identifiants), "document"),
+            BRANCH_CONTINUATION,
+            quantity(len(identifiants), "document"),
         )
         for identifiant in identifiants:
-            self.logger.info("%s%s", SUITE_DE_BRANCHE, identifiant)
+            self.logger.info("%s%s", BRANCH_CONTINUATION, identifiant)
 
     def run(self) -> NormalizeStats:
         """Entry point : pilote la boucle de normalisation."""
@@ -152,9 +152,9 @@ class SourceNormalizer(ABC):
             # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
             incomplets: list[str] = []
 
-            with progression(total, branche_de_source(self.SOURCE), slog) as avancement:
+            with track_progress(total, source_branch(self.SOURCE), slog) as progress:
                 for row in self._iter_rows(self.conn):
-                    avancement.avance()
+                    progress.advance()
                     try:
                         result = self._process_one(self.conn, row)
                     except Exception as e:

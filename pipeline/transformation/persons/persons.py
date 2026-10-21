@@ -35,9 +35,9 @@ from infrastructure.sql_fragments import (
     pinned,
 )
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
@@ -113,22 +113,22 @@ class PersonsPhase:
 
             n_enforced = enforce_confirmed_source_contributions(conn)
             if n_enforced:
-                etape(logger, "Épinglages réappliqués")
+                step(logger, "Épinglages réappliqués")
                 logger.info(
                     "%s%s",
-                    DERNIERE_BRANCHE,
-                    accord(
+                    LAST_BRANCH,
+                    quantity(
                         n_enforced, "contribution source recalée", "contributions sources recalées"
                     ),
                 )
 
             n_copies = detach_copies(conn)
             if n_copies:
-                etape(logger, "Auteurs en double dans la liste d'un enregistrement source")
+                step(logger, "Auteurs en double dans la liste d'un enregistrement source")
                 logger.info(
                     "%s%s de leur personne",
-                    DERNIERE_BRANCHE,
-                    accord(n_copies, "doublon détaché", "doublons détachés"),
+                    LAST_BRANCH,
+                    quantity(n_copies, "doublon détaché", "doublons détachés"),
                 )
 
             arbitration = arbitrate_identifier_conflicts(conn, logger, repo=repo)
@@ -155,10 +155,10 @@ class PersonsPhase:
         t0 = time.perf_counter()
         with (
             ctx.open_tx() as conn,
-            attente(f"{DERNIERE_BRANCHE}rafraîchissement en cours", ctx.logger) as ligne,
+            waiting(f"{LAST_BRANCH}rafraîchissement en cours", ctx.logger) as ligne,
         ):
             counts = populate(conn)
-            ligne.conclut(f"{DERNIERE_BRANCHE}Terminé en {time.perf_counter() - t0:.1f}s")
+            ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
         return PhaseMetrics(extras=counts._asdict())
 
     def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

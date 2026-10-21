@@ -24,7 +24,7 @@ from pipeline.ingestion.datacite.api import DataciteClient
 from pipeline.ingestion.datacite.fields import record_doi
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,7 @@ def harvest_year(
     conn: Connection,
     year: int,
     keywords: list[str],
-    avancement: Progression,
+    progress: Progress,
     metrics: PhaseMetrics,
     *,
     breaker_tripped: Callable[[], bool] = lambda: False,
@@ -65,7 +65,7 @@ def harvest_year(
                     conn, metrics, source="datacite", source_id=doi, doi=doi, raw_data=record
                 )
         conn.commit()
-        avancement.avance(len(page.records))
+        progress.advance(len(page.records))
         next_url = page.next_url
         if next_url is None or breaker_tripped():
             return
@@ -101,7 +101,7 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
 
-        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
+        def extrait(annee: int, progress: Progress) -> PhaseMetrics:
             # Une erreur garde les métriques des pages déjà écrites.
             metrics = PhaseMetrics()
             try:
@@ -110,7 +110,7 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
                     self.conn,
                     annee,
                     keywords,
-                    avancement,
+                    progress,
                     metrics,
                     breaker_tripped=self._breaker_tripped,
                 )

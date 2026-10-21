@@ -68,18 +68,18 @@ class _ParAnnee(SourceHarvester):
     def __init__(self, logger, volumes: dict[int, int]) -> None:
         super().__init__(MagicMock(), logger, MagicMock())
         self.volumes = volumes
-        self.libelles: list[str] = []
+        self.log_format: list[str] = []
         self.totaux: list[int | None] = []
-        self.avancement = None
+        self.progress = None
 
     def load_config(self, conn):  # type: ignore[no-untyped-def]
         return None
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        def extrait(annee, avancement):
-            self.avancement = avancement
-            self.libelles.append(avancement._libelle)
-            self.totaux.append(avancement._total)
+        def extrait(annee, progress):
+            self.progress = progress
+            self.log_format.append(progress._label)
+            self.totaux.append(progress._total)
             return PhaseMetrics(new=1, unchanged=self.volumes[annee] - 1)
 
         return self._extrait_par_annee(list(self.volumes), self.volumes.__getitem__, extrait)
@@ -95,13 +95,13 @@ class TestExtractionParAnnee:
     def test_le_libelle_suit_l_annee_en_cours(self, logger):
         ext = _ParAnnee(logger, {2023: 2, 2024: 3})
         ext.run(_args())
-        assert "2023" in ext.libelles[0]
-        assert "2024" in ext.libelles[1]
+        assert "2023" in ext.log_format[0]
+        assert "2024" in ext.log_format[1]
 
     def test_une_extraction_complete_affiche_la_plage_d_annees(self, logger):
         ext = _ParAnnee(logger, {2023: 2, 2024: 3})
         ext.run(_args())
-        assert ext.avancement._libelle.rstrip().endswith("2023-2024")
+        assert ext.progress._label.rstrip().endswith("2023-2024")
 
     def test_le_total_de_la_barre_somme_les_annees(self, logger):
         ext = _ParAnnee(logger, {2023: 2, 2024: 3})
@@ -131,7 +131,7 @@ class _DUnTenant(_ParAnnee):
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
         return self._extrait_d_un_tenant(
-            2, lambda avancement: PhaseMetrics(new=2), par="ORCID, IdRef"
+            2, lambda progress: PhaseMetrics(new=2), par="ORCID, IdRef"
         )
 
 

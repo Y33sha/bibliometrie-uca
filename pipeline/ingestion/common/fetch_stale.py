@@ -33,7 +33,7 @@ from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
 from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
 from pipeline.runtime.config import delay, get_years
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
@@ -58,7 +58,7 @@ class FetchStalePhase:
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
         if not options.policy.fetch_stale:
-            logger.info("%sSautée en mode %s", DERNIERE_BRANCHE, options.mode)
+            logger.info("%sSautée en mode %s", LAST_BRANCH, options.mode)
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
 

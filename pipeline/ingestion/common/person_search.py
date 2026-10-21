@@ -24,10 +24,10 @@ from pipeline.ingestion.common.harvester import (
     SourceHarvester,
     stage_document,
 )
-from pipeline.runtime.observability.libelles import accord, forme
+from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 # Identifiants d'une personne ou d'un lot de personnes, par type.
 type Identifiers = Mapping[PersonIdentifierType, list[str]]
@@ -126,11 +126,11 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         ]
         seen: set[str] = set()
 
-        def extrait(avancement: Progression) -> PhaseMetrics:
+        def extrait(progress: Progress) -> PhaseMetrics:
             metrics = PhaseMetrics()
             for i, batch in enumerate(batches):
                 remaining = len(persons) - i * self.BATCH_SIZE
-                skipped = f"{accord(remaining, 'personne')} {forme(remaining, 'sautée')}"
+                skipped = f"{quantity(remaining, 'personne')} {inflect(remaining, 'sautée')}"
                 if self._stop_on_tripped(skipped):
                     break
                 label = f"lot {i + 1}"
@@ -143,7 +143,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
                     scoped_logger(self.logger, self.SOURCE, label).error(
                         "erreur : %s — passage au suivant", e
                     )
-                avancement.avance(len(batch))
+                progress.advance(len(batch))
             return metrics
 
         labels = ", ".join(

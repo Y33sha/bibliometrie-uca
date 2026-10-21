@@ -20,10 +20,10 @@ from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.runtime.observability.libelles import branche_de_source
+from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 
 COMMIT_EVERY = 50
 
@@ -138,7 +138,7 @@ async def refresh(
             await asyncio.sleep(refetch.request_delay_s)
         return outcome
 
-    with progression(total, branche_de_source(source), slog, compte_retenus=True) as avancement:
+    with track_progress(total, source_branch(source), slog, count_kept=True) as progress:
 
         def _write(conn: Connection, source_id: str, outcome: FetchOutcome) -> None:
             nonlocal processed
@@ -157,9 +157,9 @@ async def refresh(
                     raw_data=outcome.raw_data,
                 )
                 metrics.add(updated=1) if changed else metrics.add(unchanged=1)
-                avancement.retient()
+                progress.keep()
             processed += 1
-            avancement.avance()
+            progress.advance()
 
         await run_fetch_pool(
             stale,

@@ -11,7 +11,7 @@ from sqlalchemy import Connection, text
 
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.countries.place_name_detector import PlaceNameDetector
 from pipeline.transformation.countries.store import CountryCandidatesStore
@@ -24,7 +24,7 @@ _LABELS = {PlaceNameKind.INSTITUTION: "institutions", PlaceNameKind.CITY: "ville
 
 
 def load_place_forms(conn: Connection, kind: PlaceNameKind) -> dict[str, str]:
-    """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
+    """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{inflect: code ISO}`."""
     rows = conn.execute(
         text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = :kind"),
         {"kind": kind.value},
@@ -37,7 +37,7 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
 
     `seen` = adresses examinées, `new` = adresses qui reçoivent un candidat.
     """
-    etape(logger, "Pays des adresses d'après les noms de villes et d'institutions")
+    step(logger, "Pays des adresses d'après les noms de villes et d'institutions")
     store = CountryCandidatesStore(conn)
     rows = store.dirty_addresses()
     added = 0
@@ -51,9 +51,9 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
         n = store.replace_for_dirty_addresses(method, proposals)
         logger.info(
             "%s%s : pays trouvé pour %s",
-            BRANCHE if method is CountryDetectionMethod.INSTITUTION else DERNIERE_BRANCHE,
+            BRANCH if method is CountryDetectionMethod.INSTITUTION else LAST_BRANCH,
             _LABELS[kind],
-            accord(n, "adresse"),
+            quantity(n, "adresse"),
         )
         added += n
     return PhaseMetrics(seen=len(rows), new=added)

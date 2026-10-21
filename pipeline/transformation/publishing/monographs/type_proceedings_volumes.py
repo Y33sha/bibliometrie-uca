@@ -10,7 +10,7 @@ from sqlalchemy import Connection, bindparam, text
 
 from domain.monographs.proceedings import MonographRecord, is_proceedings_volume
 from infrastructure.sql_fragments import declares_conference_sql
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LIBELLE = "Nature des monographies"
@@ -112,6 +112,6 @@ def run_type_proceedings_volumes(conn: Connection, logger: logging.Logger) -> Ph
         monographs_to_proceedings=len(to_proceedings),
         monographs_to_books=len(to_books),
     )
-    volumes = accord(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
-    metrics.report = f"{volumes}, {accord(len(to_books), 'livre reconnu', 'livres reconnus')}"
+    volumes = quantity(len(to_proceedings), "volume d'actes reconnu", "volumes d'actes reconnus")
+    metrics.report = f"{volumes}, {quantity(len(to_books), 'livre reconnu', 'livres reconnus')}"
     return metrics

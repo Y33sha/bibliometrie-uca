@@ -30,7 +30,7 @@ from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import rien_a_faire
+from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -131,7 +131,7 @@ class FetchMissingPhase:
         doi_metrics = [by_task[_doi_task(target)] for target in doi_targets]
         # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
         if doi_metrics and all(m.total == 0 and not m.signals for m in doi_metrics):
-            rien_a_faire(ctx.logger)
+            nothing_to_do(ctx.logger)
 
         metrics = PhaseMetrics()
         by_channel: dict[str, dict[str, float | None]] = {}

@@ -39,15 +39,15 @@ from infrastructure.sql_fragments import (
     pinned,
     trusted_identifier_sql,
 )
-from pipeline.runtime.observability.libelles import (
-    BRANCHE,
-    DERNIERE_BRANCHE,
-    accord,
-    etape,
-    forme,
-    rien_a_faire,
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    nothing_to_do,
+    quantity,
+    step,
 )
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.persons.store import PersonsStore
 
 
@@ -345,7 +345,7 @@ def resolve_identifier_transfers(
     """
     pending = [c for c in conflicts if c.owner_status == "pending"]
     if not pending:
-        rien_a_faire(logger)
+        nothing_to_do(logger)
         return {"conflicts": len(conflicts), "pending": 0, "transferred": 0}
 
     # Nom-prénom + formes confirmées des personnes impliquées (propriétaires et candidats).
@@ -387,24 +387,24 @@ def resolve_identifier_transfers(
         detached = null_identifier_source_contributions(conn, id_type, id_value, owner_id)
         logger.info(
             "%sTransfert %s=%s : personne %d → %d (consensus %r), %s %s",
-            BRANCHE,
+            BRANCH,
             id_type,
             id_value,
             owner_id,
             target,
             cons,
-            accord(detached, "contribution source", "contributions sources"),
-            forme(detached, "détachée"),
+            quantity(detached, "contribution source", "contributions sources"),
+            inflect(detached, "détachée"),
         )
         transferred += 1
 
     # Un conflit dont l'attribution est confirmée par l'admin est tranché : seuls les autres comptent.
     logger.info(
         "%s%s à arbitrer → %s %s",
-        DERNIERE_BRANCHE,
-        accord(len(pending), "conflit"),
-        accord(transferred, "identifiant"),
-        forme(transferred, "transféré"),
+        LAST_BRANCH,
+        quantity(len(pending), "conflit"),
+        quantity(transferred, "identifiant"),
+        inflect(transferred, "transféré"),
     )
     return {"conflicts": len(conflicts), "pending": len(pending), "transferred": transferred}
 
@@ -419,20 +419,20 @@ def arbitrate_identifier_conflicts(
 
     Retourne `{neutralized, detached, transferred}`. Le commit est laissé au caller.
     """
-    etape(logger, "Identifiants mal placés et conflits d'attribution")
-    with attente(BRANCHE, logger) as ligne:
+    step(logger, "Identifiants mal placés et conflits d'attribution")
+    with waiting(BRANCH, logger) as ligne:
         consensus = compute_identifier_consensus(conn)
         requalified = requalify_misplaced_identifiers(conn, consensus)
         if requalified["neutralized"]:
-            ligne.conclut(
-                f"{BRANCHE}Identifiants mal placés neutralisés sur "
-                f"{accord(requalified['neutralized'], 'contribution source', 'contributions sources')}"
+            ligne.conclude(
+                f"{BRANCH}Identifiants mal placés neutralisés sur "
+                f"{quantity(requalified['neutralized'], 'contribution source', 'contributions sources')}"
             )
         else:
-            ligne.efface()
-    with attente(BRANCHE, logger) as ligne:
+            ligne.erase()
+    with waiting(BRANCH, logger) as ligne:
         conflicts = detect_identifier_conflicts(conn)
-        ligne.efface()
+        ligne.erase()
     transferred = resolve_identifier_transfers(
         conn, conflicts, consensus=consensus, repo=repo, logger=logger
     )["transferred"]

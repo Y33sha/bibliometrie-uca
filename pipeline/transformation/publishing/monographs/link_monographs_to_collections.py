@@ -12,7 +12,7 @@ from domain.journals.journal import JournalType
 from domain.journals.series import VolumeTitle, group_series
 from domain.monographs.collection import MonographJournalChoice, choose_monograph_journal
 from infrastructure.sql_fragments import has_active_issn
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.find_or_create import find_or_create_journal
 from pipeline.transformation.publishing.journals.store import JournalStore
@@ -144,8 +144,8 @@ def run_link_monographs_to_collections(conn: Connection, logger: logging.Logger)
         monograph_series=len(set(series.values())),
     )
     metrics.report = (
-        f"{accord(len(set(series.values())), 'série sans ISSN', 'séries sans ISSN')}, "
-        f"{accord(len(changes), 'monographie rattachée', 'monographies rattachées')}, "
-        f"{accord(len(conflicts), 'conflit', 'conflits')}"
+        f"{quantity(len(set(series.values())), 'série sans ISSN', 'séries sans ISSN')}, "
+        f"{quantity(len(changes), 'monographie rattachée', 'monographies rattachées')}, "
+        f"{quantity(len(conflicts), 'conflit', 'conflits')}"
     )
     return metrics

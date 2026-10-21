@@ -13,8 +13,8 @@ import time
 
 from sqlalchemy import Connection, text
 
-from pipeline.runtime.observability.libelles import BRANCHE, DERNIERE_BRANCHE, accord, etape
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
+from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.countries.resolution import resolve_address_countries
 
 # CTE des contributions sources à recalculer : marquées `countries_dirty`, ou liées à une adresse marquée `countries_dirty`.
@@ -177,28 +177,26 @@ def clear_countries_dirty(conn: Connection) -> None:
 
 def refresh(conn: Connection, logger: logging.Logger) -> int:
     """Recalcule les caches pays (source_contributions → source_records → publications), scopé aux `countries_dirty`, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
-    etape(logger, "Rafraîchissement des pays associés aux publications")
+    step(logger, "Rafraîchissement des pays associés aux publications")
     steps = (
         ("contribution source", "contributions sources", refresh_source_contribution_countries),
         ("enregistrement source", "enregistrements sources", refresh_source_record_countries),
         ("publication", "publications", refresh_publication_countries),
     )
     updated = 0
-    for singular, plural, step in steps:
+    for singular, plural, refresh_step in steps:
         t0 = time.perf_counter()
-        with attente(f"{BRANCHE}{plural} : en cours", logger) as ligne:
-            updated = step(conn)
-            ligne.conclut(
-                f"{BRANCHE}{accord(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
+        with waiting(f"{BRANCH}{plural} : en cours", logger) as ligne:
+            updated = refresh_step(conn)
+            ligne.conclude(
+                f"{BRANCH}{quantity(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
                 f" en {time.perf_counter() - t0:.1f} s"
             )
     t0 = time.perf_counter()
-    with attente(
-        f"{DERNIERE_BRANCHE}effacement des marqueurs de recalcul : en cours", logger
-    ) as ligne:
+    with waiting(f"{LAST_BRANCH}effacement des marqueurs de recalcul : en cours", logger) as ligne:
         clear_countries_dirty(conn)
-        ligne.conclut(
-            f"{DERNIERE_BRANCHE}marqueurs de recalcul effacés en {time.perf_counter() - t0:.1f} s"
+        ligne.conclude(
+            f"{LAST_BRANCH}marqueurs de recalcul effacés en {time.perf_counter() - t0:.1f} s"
         )
     return updated
 

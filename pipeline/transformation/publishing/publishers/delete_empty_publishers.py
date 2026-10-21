@@ -7,7 +7,7 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LIBELLE = "Éditeurs vides"
@@ -41,5 +41,5 @@ def run_delete_empty_publishers(conn: Connection, logger: logging.Logger) -> Pha
         # Ligne de détail : le terminal la masque, le journal la garde.
         logger.info("Éditeur vide supprimé : %d « %s »", publisher_id, name, extra={"detail": True})
     metrics.add(seen=len(deleted), publishers_deleted=len(deleted))
-    metrics.report = accord(len(deleted), "éditeur supprimé", "éditeurs supprimés")
+    metrics.report = quantity(len(deleted), "éditeur supprimé", "éditeurs supprimés")
     return metrics

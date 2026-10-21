@@ -30,10 +30,10 @@ from pipeline.ingestion.common.failed_lookups import (
     record_failed_lookup,
 )
 from pipeline.ingestion.complements.doi_org import doi_existence
-from pipeline.runtime.observability.libelles import branche_de_source
+from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,9 +192,7 @@ async def fetch_missing_doi(
             await asyncio.sleep(search.request_delay_s)
         return result
 
-    with progression(
-        total, branche_de_source(search.source_key), slog, compte_retenus=True
-    ) as avancement:
+    with track_progress(total, source_branch(search.source_key), slog, count_kept=True) as bar:
 
         def _write(conn: Connection, item: tuple[int, list[str]], result: DoiBatchResult) -> None:
             batch_idx, batch = item
@@ -221,8 +219,8 @@ async def fetch_missing_doi(
                 )
 
             progress["processed"] += len(batch)
-            avancement.avance(len(batch))
-            avancement.retient(batch_inserted)
+            bar.advance(len(batch))
+            bar.keep(batch_inserted)
 
         await run_fetch_pool(
             list(enumerate(batches)),

@@ -20,14 +20,14 @@ from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.runtime.config import get_years
-from pipeline.runtime.observability.libelles import (
-    SUITE_DE_BRANCHE,
-    accord,
-    branche_de_source,
-    forme,
+from pipeline.runtime.observability.log_format import (
+    BRANCH_CONTINUATION,
+    inflect,
+    quantity,
+    source_branch,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression, progression
+from pipeline.runtime.observability.progress import Progress, track_progress
 
 __all__ = [
     "HarvestConfigError",
@@ -167,15 +167,15 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
     # ── Barre et bilan de la source ─────────────────────────────
 
-    def _libelle(self, portee: str | None = None) -> str:
+    def _label(self, scope: str | None = None) -> str:
         """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
-        return branche_de_source(self.SOURCE, portee)
+        return source_branch(self.SOURCE, scope)
 
     def _extrait_par_annee(
         self,
         annees: list[int],
         compte: Callable[[int], int],
-        extrait: Callable[[int, Progression], PhaseMetrics],
+        extrait: Callable[[int, Progress], PhaseMetrics],
     ) -> PhaseMetrics:
         """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
 
@@ -187,37 +187,37 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         if not annees:
             return metrics
         total = sum(compte(annee) for annee in annees)
-        with progression(total, self._libelle(str(annees[0])), self.logger) as avancement:
+        with track_progress(total, self._label(str(annees[0])), self.logger) as progress:
             for i, annee in enumerate(annees):
                 restantes = annees[i:]
                 sautees = (
-                    f"{forme(len(restantes), 'année')} {', '.join(map(str, restantes))} "
-                    f"{forme(len(restantes), 'sautée')}"
+                    f"{inflect(len(restantes), 'année')} {', '.join(map(str, restantes))} "
+                    f"{inflect(len(restantes), 'sautée')}"
                 )
                 if self._stop_on_tripped(sautees):
                     break
-                avancement.renomme(self._libelle(str(annee)))
+                progress.relabel(self._label(str(annee)))
                 try:
-                    metrics.merge(extrait(annee, avancement))
+                    metrics.merge(extrait(annee, progress))
                 except SourceUnavailableError:
                     self._warn_stopped(sautees)
                     break
             else:
                 plage = f"{annees[0]}-{annees[-1]}" if len(annees) > 1 else str(annees[0])
-                avancement.renomme(self._libelle(plage))
+                progress.relabel(self._label(plage))
         self._ecrit_bilan(metrics)
         return metrics
 
     def _extrait_d_un_tenant(
         self,
         total: int,
-        extrait: Callable[[Progression], PhaseMetrics],
+        extrait: Callable[[Progress], PhaseMetrics],
         *,
         par: str | None = None,
     ) -> PhaseMetrics:
         """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
-        with progression(total, self._libelle(), self.logger) as avancement:
-            metrics = extrait(avancement)
+        with track_progress(total, self._label(), self.logger) as progress:
+            metrics = extrait(progress)
         self._ecrit_bilan(metrics, par=par)
         return metrics
 
@@ -236,13 +236,13 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         n = metrics.total if trouves is None else trouves
         self.logger.info(
             "%s%s %s%s : %s, %s, %s",
-            SUITE_DE_BRANCHE,
-            accord(n, self.DOCUMENT),
-            forme(n, *trouve),
+            BRANCH_CONTINUATION,
+            quantity(n, self.DOCUMENT),
+            inflect(n, *trouve),
             f" par {par}" if par else "",
-            accord(metrics.new, *nouveau),
-            accord(metrics.updated, *mis_a_jour),
-            accord(metrics.unchanged, *inchange),
+            quantity(metrics.new, *nouveau),
+            quantity(metrics.updated, *mis_a_jour),
+            quantity(metrics.unchanged, *inchange),
         )
 
     # ── Hooks métier ────────────────────────────────────────────

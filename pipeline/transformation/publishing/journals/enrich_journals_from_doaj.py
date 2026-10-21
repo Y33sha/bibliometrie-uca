@@ -22,9 +22,9 @@ from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
 from infrastructure.db.tables import journal_issns, journals
 from pipeline.http.dump_download import DumpUnavailableError
-from pipeline.runtime.observability.libelles import BRANCHE, accord
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import attente
+from pipeline.runtime.observability.progress import waiting
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
 LIBELLE = "Import du DOAJ"
@@ -199,8 +199,8 @@ def run_enrich_journals_from_doaj(
         return metrics
 
     try:
-        with attente(f"{BRANCHE}{LIBELLE}", logger) as ligne:
-            ligne.efface()
+        with waiting(f"{BRANCH}{LIBELLE}", logger) as ligne:
+            ligne.erase()
             with download_dump() as rows:
                 stats = run_import_doaj_dump(conn, logger, rows=rows)
     except DumpUnavailableError as e:
@@ -219,5 +219,5 @@ def run_enrich_journals_from_doaj(
         )
         metrics.report = "aucune revue reconnue, revues inchangées"
         return metrics
-    metrics.report = accord(stats.matched, "revue mise à jour", "revues mises à jour")
+    metrics.report = quantity(stats.matched, "revue mise à jour", "revues mises à jour")
     return metrics

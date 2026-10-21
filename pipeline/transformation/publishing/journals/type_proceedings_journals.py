@@ -20,7 +20,7 @@ from domain.journals.containers import (
 from domain.journals.issns import IssnStatus
 from domain.journals.journal import JournalType
 from infrastructure.db.tables import journal_issns, journals
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import TYPE_NOT_MANUAL, JournalStore
@@ -117,7 +117,7 @@ def run_type_proceedings_journals(conn: Connection, logger: logging.Logger) -> P
             extra={"detail": True},
         )
     metrics.add(seen=len(reasons), journals_typed_proceedings=len(reasons))
-    metrics.report = accord(
+    metrics.report = quantity(
         len(reasons), "revue typée recueil d'actes", "revues typées recueils d'actes"
     )
     return metrics

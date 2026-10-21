@@ -19,9 +19,9 @@ from sqlalchemy import Connection, text
 
 from domain.journals.titles import compatible_titles, nested_titles
 from infrastructure.sql_fragments import active_issns, has_active_issn
-from pipeline.runtime.observability.libelles import BRANCHE, accord
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import JournalStore
 
@@ -297,7 +297,7 @@ def run_merge_duplicate_journals(
         publication_et_titre,
     )
     if metrics.total:
-        metrics.report = accord(
+        metrics.report = quantity(
             metrics.extras.get("journals_merged", 0), "revue fusionnée", "revues fusionnées"
         )
     return metrics
@@ -321,7 +321,7 @@ def _compatible_pairs(pairs: Sequence[JournalPublicationPair]) -> list[MergeGrou
         if not compatible_titles(a.title, b.title):
             continue
         target, source = sorted((a, b), key=_merge_priority, reverse=True)
-        label = accord(pair.publications, "publication commune", "publications communes")
+        label = quantity(pair.publications, "publication commune", "publications communes")
         groups.append((label, (target.id, source.id)))
     return groups
 
@@ -342,9 +342,9 @@ def _merge_groups(
 ) -> None:
     """Fusionne chaque groupe dans sa première revue. Une revue déjà absorbée est passée ; une cible déjà absorbée cède la place à celle qui l'a absorbée."""
     metrics.add(seen=len(groups))
-    with progression(
-        len(groups), f"{BRANCHE}{LIBELLE} ({regle})", logger, efface=True
-    ) as avancement:
+    with track_progress(
+        len(groups), f"{BRANCH}{LIBELLE} ({regle})", logger, erase=True
+    ) as progress:
         for label, journal_ids in groups:
             target = _survivor(journal_ids[0], absorbed)
             sources = [s for s in journal_ids[1:] if s not in absorbed and s != target]
@@ -362,7 +362,7 @@ def _merge_groups(
                     journal_label(summaries[source]),
                     extra={"detail": True},
                 )
-            avancement.avance()
+            progress.advance()
 
 
 def _survivor(journal_id: int, absorbed: dict[int, int]) -> int:

@@ -13,7 +13,7 @@ from domain.journals.doi_namespaces import DoiNamespace, designated_by_namespace
 from domain.journals.journal import JournalType
 from infrastructure.db.tables import journal_doi_namespaces
 from infrastructure.sql_fragments import corrected
-from pipeline.runtime.observability.libelles import accord
+from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 LIBELLE = "Espaces de noms DOI"
@@ -62,7 +62,7 @@ def run_learn_journal_doi_namespaces(conn: Connection, logger: logging.Logger) -
     metrics = PhaseMetrics()
     metrics.add(seen=len(pairs), journal_doi_namespaces=len(namespaces))
     metrics.report = (
-        f"{accord(len(namespaces), 'espace de noms', 'espaces de noms')} "
-        f"pour {accord(journals, 'revue')}"
+        f"{quantity(len(namespaces), 'espace de noms', 'espaces de noms')} "
+        f"pour {quantity(journals, 'revue')}"
     )
     return metrics

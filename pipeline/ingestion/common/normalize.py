@@ -45,9 +45,9 @@ from pipeline.ingestion.scanr.normalize import ScanrNormalizer
 from pipeline.ingestion.theses.normalize import ThesesNormalizer
 from pipeline.ingestion.wos.normalize import WosNormalizer
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import (
-    DERNIERE_BRANCHE,
-    accord,
+from pipeline.runtime.observability.log_format import (
+    LAST_BRANCH,
+    quantity,
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
@@ -134,25 +134,25 @@ class NormalizePhase:
         if disparues:
             ctx.logger.info(
                 "%s%s (disparus de leur source)",
-                DERNIERE_BRANCHE,
-                accord(disparues, "document supprimé", "documents supprimés"),
+                LAST_BRANCH,
+                quantity(disparues, "document supprimé", "documents supprimés"),
             )
         else:
-            ctx.logger.info("%saucun document disparu de sa source", DERNIERE_BRANCHE)
+            ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
         return PhaseMetrics(extras={"disappeared": disparues})
 
     def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         supprimees = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
         if supprimees:
-            metrics.report = f"{accord(supprimees, 'ligne supprimée', 'lignes supprimées')}"
+            metrics.report = f"{quantity(supprimees, 'ligne supprimée', 'lignes supprimées')}"
         return metrics
 
     def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         supprimees = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
         if supprimees:
-            metrics.report = f"{accord(supprimees, 'adresse supprimée', 'adresses supprimées')}"
+            metrics.report = f"{quantity(supprimees, 'adresse supprimée', 'adresses supprimées')}"
         return metrics
 
 

@@ -16,7 +16,7 @@ from sqlalchemy import Connection, any_, func, literal, select, update
 from domain.journals.journal import JournalType, ManualField
 from infrastructure.db.tables import journals
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.runtime.observability.libelles import forme
+from pipeline.runtime.observability.log_format import inflect
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.store import JournalStore
 
@@ -151,5 +151,7 @@ def run_enrich_journals_from_openalex(
 
 def _bilan(total: int, updated: int) -> PhaseMetrics:
     metrics = PhaseMetrics(seen=total, updated=updated)
-    metrics.report = f"{updated}/{total} {forme(total, 'revue mise à jour', 'revues mises à jour')}"
+    metrics.report = (
+        f"{updated}/{total} {inflect(total, 'revue mise à jour', 'revues mises à jour')}"
+    )
     return metrics

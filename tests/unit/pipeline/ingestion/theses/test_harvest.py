@@ -15,7 +15,7 @@ from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.theses import harvest
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.ingestion.theses.harvest import ThesesHarvester, build_query, harvest_theses
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 _LOGGER = logging.getLogger("test")
@@ -61,13 +61,13 @@ def _client(pages: list[list[dict]], *, total: int | None = None) -> MagicMock:
     return client
 
 
-def _extraire(client: MagicMock, *, avancement: Progression | None = None, **kwargs):
+def _extraire(client: MagicMock, *, progress: Progress | None = None, **kwargs):
     return harvest_theses(
         client,
         MagicMock(),
         ["PPN1"],
         _LOGGER,
-        avancement or Progression(None, "theses.fr", None),
+        progress or Progress(None, "theses.fr", None),
         **kwargs,
     )
 
@@ -89,12 +89,12 @@ def test_ventilation_par_issue_de_l_ecriture(ecritures):
 
 
 def test_filtre_annee_sur_le_prefixe_du_nnt(ecritures):
-    avancement = Progression(None, "theses.fr", None, compte_retenus=True)
+    progress = Progress(None, "theses.fr", None, count_kept=True)
     metrics = _extraire(
-        _client([[_these("2020AAA1"), _these("2021AAA1")]]), avancement=avancement, year=2021
+        _client([[_these("2020AAA1"), _these("2021AAA1")]]), progress=progress, year=2021
     )
     assert (metrics.total, metrics.new) == (2, 1)
-    assert avancement._retenus == 1
+    assert progress._kept == 1
 
 
 def test_une_annee_retient_aussi_les_theses_en_cours(ecritures):

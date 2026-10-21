@@ -19,9 +19,9 @@ from domain.normalize import normalize_text, to_plain_text
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.runtime.observability.libelles import BRANCHE, accord
+from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import progression
+from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.doi_prefixes import (
     Agency,
     DoiPrefixesQueries,
@@ -134,7 +134,7 @@ def _resolve(
     rows = repo.get_prefixes_pending_publisher(agency)
     if not rows:
         return metrics
-    with progression(len(rows), f"{BRANCHE}{LIBELLES[agency]}", log, efface=True) as avancement:
+    with track_progress(len(rows), f"{BRANCH}{LIBELLES[agency]}", log, erase=True) as progress:
         # Nom déjà stocké : rattachement direct, sans requête.
         for row in rows:
             if row.publisher_name_normalized is not None:
@@ -148,7 +148,7 @@ def _resolve(
                     repo,
                     publisher_store,
                 )
-                avancement.avance()
+                progress.advance()
         to_fetch = [row for row in rows if row.publisher_name_normalized is None]
 
         def _write(
@@ -166,7 +166,7 @@ def _resolve(
             else:
                 name_raw, name_normalized = _store_publisher_metadata(row, answer, repo)
                 _attach(row, agency, name_raw, name_normalized, metrics, log, repo, publisher_store)
-            avancement.avance()
+            progress.advance()
 
         asyncio.run(
             run_fetch_pool(
@@ -183,13 +183,13 @@ def _resolve(
         log.warning("resolve_publishers : circuit-breaker %s coupé, arrêt", agency)
 
     metrics.report = (
-        f"{accord(metrics.total, 'préfixe')} : "
-        f"{accord(metrics.extras.get('publisher_matched', 0), 'éditeur reconnu', 'éditeurs reconnus')}, "
-        f"{accord(metrics.extras.get('publisher_created', 0), 'créé', 'créés')}, "
-        f"{accord(metrics.extras.get('no_publisher', 0), 'inconnu', 'inconnus')}"
+        f"{quantity(metrics.total, 'préfixe')} : "
+        f"{quantity(metrics.extras.get('publisher_matched', 0), 'éditeur reconnu', 'éditeurs reconnus')}, "
+        f"{quantity(metrics.extras.get('publisher_created', 0), 'créé', 'créés')}, "
+        f"{quantity(metrics.extras.get('no_publisher', 0), 'inconnu', 'inconnus')}"
     )
     if metrics.errors:
-        metrics.report += f", {accord(metrics.errors, 'reporté', 'reportés')}"
+        metrics.report += f", {quantity(metrics.errors, 'reporté', 'reportés')}"
     return metrics
 
 

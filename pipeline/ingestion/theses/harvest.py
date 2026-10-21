@@ -22,7 +22,7 @@ from pipeline.ingestion.theses.api import ThesesClient
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression, progression
+from pipeline.runtime.observability.progress import Progress, track_progress
 
 
 @dataclass(frozen=True)
@@ -43,14 +43,14 @@ def harvest_theses(
     conn: Connection,
     ppns: list[str],
     logger: ScopedOrPlainLogger,
-    avancement: Progression,
+    progress: Progress,
     *,
     year: int | None = None,
     breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> PhaseMetrics:
     """Moissonne les thèses des établissements, page après page.
 
-    Si `year` est fourni, retient les thèses soutenues cette année-là (NNT commençant par l'année) et toutes les thèses en cours. `avancement` compte les thèses parcourues, et retient celles que le filtre garde. Le total des métriques porte sur toutes les thèses parcourues.
+    Si `year` est fourni, retient les thèses soutenues cette année-là (NNT commençant par l'année) et toutes les thèses en cours. `progress` compte les thèses parcourues, et retient celles que le filtre garde. Le total des métriques porte sur toutes les thèses parcourues.
     """
     query = build_query(ppns)
     metrics = PhaseMetrics()
@@ -66,7 +66,7 @@ def harvest_theses(
         data = client.fetch_page(query, debut=debut)
         if total is None:
             total = as_int(data.get("totalHits")) or 0
-            avancement.fixer_total(total)
+            progress.set_total(total)
             metrics.add(seen=total)
         theses = [as_mapping(t) for t in as_sequence(data.get("theses"))]
         if not theses:
@@ -86,11 +86,11 @@ def harvest_theses(
                 doi=extract_doi(these),
                 raw_data=these,
             )
-            avancement.retient()
+            progress.keep()
 
         conn.commit()
         debut += len(theses)
-        avancement.avance(len(theses))
+        progress.advance(len(theses))
 
     return metrics
 
@@ -112,16 +112,16 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
 
     def harvest_all(self, window: HarvestWindow, config: ThesesHarvestConfig) -> PhaseMetrics:
         # La colonne du périmètre reste vide sans `--year` : la barre s'aligne sur celles des autres sources.
-        portee = str(window.year) if window.year is not None else ""
-        with progression(
-            None, self._libelle(portee), self.logger, compte_retenus=window.year is not None
-        ) as avancement:
+        scope = str(window.year) if window.year is not None else ""
+        with track_progress(
+            None, self._label(scope), self.logger, count_kept=window.year is not None
+        ) as progress:
             metrics = harvest_theses(
                 self._client,
                 self.conn,
                 config.ppns,
                 scoped_logger(self.logger, self.SOURCE),
-                avancement,
+                progress,
                 year=window.year,
                 breaker_tripped=self._breaker_tripped,
             )

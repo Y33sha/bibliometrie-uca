@@ -40,7 +40,7 @@ from pipeline.ingestion.common.harvester import (
 )
 from pipeline.ingestion.credentials import get_scanr_credentials, get_wos_api_key
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.libelles import BRANCHE
+from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -96,7 +96,7 @@ class HarvestPhase:
                 if depuis is not None and source == "hal":
                     ctx.logger.info(
                         "%sMode incrémental : enregistrements HAL modifiés depuis le %s (%s)",
-                        BRANCHE,
+                        BRANCH,
                         date_to_french(depuis[0]),
                         depuis[1],
                     )

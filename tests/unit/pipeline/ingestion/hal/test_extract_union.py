@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.hal.harvest import HalHarvestConfig, harvest_union
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 _LOGGER = logging.getLogger("test")
 _CONFIG = HalHarvestConfig(all_collections={"C": "Coll"})
@@ -37,7 +37,7 @@ def _extrait(client: MagicMock, **options):
         _CONFIG,
         MagicMock(),
         _LOGGER,
-        Progression(None, "HAL", None),
+        Progress(None, "HAL", None),
         years=[2025],
         **options,
     )

@@ -15,7 +15,7 @@ from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.scanr import harvest
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.ingestion.scanr.harvest import ScanrHarvester, build_query, harvest_year
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
 
 
@@ -78,7 +78,7 @@ def _client(pages: list[dict]) -> MagicMock:
 
 
 def _extraire(client: MagicMock):
-    return harvest_year(client, MagicMock(), 2024, ["S1"], Progression(None, "ScanR", None))
+    return harvest_year(client, MagicMock(), 2024, ["S1"], Progress(None, "ScanR", None))
 
 
 def test_pagination_jusqu_a_la_page_vide(ecritures):

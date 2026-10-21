@@ -22,7 +22,7 @@ from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
 from pipeline.ingestion.wos.fields import extract_doi, extract_ut
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progression import Progression
+from pipeline.runtime.observability.progress import Progress
 
 # Pause longue toutes les `_BREATHER_EVERY` pages.
 _BREATHER_EVERY = 10
@@ -47,7 +47,7 @@ def harvest_year(
     year: int,
     affiliations: list[str],
     logger: ScopedOrPlainLogger,
-    avancement: Progression,
+    progress: Progress,
 ) -> PhaseMetrics:
     """Moissonne les records d'une année, page après page.
 
@@ -91,7 +91,7 @@ def harvest_year(
                 raw_data=record,
             )
         conn.commit()
-        avancement.avance(len(records))
+        progress.advance(len(records))
         first_record += len(records)
 
         if first_record > _WOS_FIRST_RECORD_LIMIT:
@@ -147,10 +147,10 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
 
-        def extrait(annee: int, avancement: Progression) -> PhaseMetrics:
+        def extrait(annee: int, progress: Progress) -> PhaseMetrics:
             slog = scoped_logger(self.logger, self.SOURCE, str(annee))
             try:
-                metrics = harvest_year(client, self.conn, annee, affiliations, slog, avancement)
+                metrics = harvest_year(client, self.conn, annee, affiliations, slog, progress)
             except SourceUnavailableError:
                 raise
             except Exception as e:
