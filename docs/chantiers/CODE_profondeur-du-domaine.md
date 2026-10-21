@@ -43,6 +43,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
 - La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
 - `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `corrections` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
+- `application.ports` est la zone neutre de `infrastructure/` et du pipeline. `domain/config.py` reste dans le domaine : il définit les réglages et valide les valeurs saisies.
 
 ## Phasage
 
@@ -83,6 +84,11 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 - [x] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) et `docs/playbooks/ajouter-une-regle-de-correction.md` ; noms `corrections` et `source_extras` dans les fiches des autres chantiers.
 
+### Phase 6 — Registres hors du domaine
+
+- [x] Registre du pivot dans le read model des statistiques, avec sa liaison SQL ; `domain/stats.py` retiré. 91659c168
+- [x] Structures de transport des exécutions de phase dans `application/ports/pipeline/phase_executions.py` ; le contrat d'import ouvre `application.ports` au pipeline. a12c5a72c
+
 ## Questions ouvertes
 
 - Types de document absents de la table de leur source, traduits en `other` (base locale, 2026-10-21) :
@@ -91,5 +97,3 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
   - OpenAlex : `reference-entry` (138).
   - DataCite : `StudyRegistration` (197), `Presentation` (94), `Technical note` (68), `Project` (34), `Wissenschaftlicher Artikel` (19), `article validé par les pairs` (14), `Journal Issue` (14), `RegistrationComponent` (14), `oceanographic cruise` (12), `Paratext` (10), `OutputManagementPlan` (10), `Project milestone` (10), `InteractiveResource` (8), `Protein-ligand binding data` (5), `Paper` (5). S'y ajoutent 49 valeurs à moins de 5 enregistrements sources, souvent des variantes de valeurs de la table (`Article de colloque`, `Book section`, `Doctoral Thesis`, `PhDThesis`).
 
-- `domain/` contient des contrats entre couches qui ne sont pas des règles métier : `config`, `stats`, `pipeline_runs`. Import-linter interdit `pipeline → application`, donc `domain/` est le seul paquet commun. Un paquet neutre déclaré dans import-linter, ou le statu quo.
-- Registre des dimensions de statistiques : dans le read model, avec sa liaison SQL, ou dans le paquet neutre.
