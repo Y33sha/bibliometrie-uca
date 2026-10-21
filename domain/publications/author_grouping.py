@@ -10,6 +10,7 @@ from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import lru_cache
+from typing import NamedTuple
 
 from domain.persons.name_matching import first_name_initials, full_first_name_extends, is_initials
 
@@ -170,6 +171,11 @@ JARO_WINKLER_THRESHOLDS: dict[ComparisonLevel, float] = {
 }
 """Similarité de Jaro-Winkler minimale de chaque niveau ; l'estimation des poids du modèle les reprend."""
 
+# Seuils lus une fois : `comparison_levels` s'exécute pour chaque paire du résidu.
+_JW_092 = JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_092]
+_JW_08 = JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_08]
+_JW_09 = JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_09]
+
 
 def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel | None]:
     """Niveau de chaque comparaison du modèle du résidu entre deux auteurs ; `None` quand une valeur manque."""
@@ -183,9 +189,9 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
         levels[Comparison.LAST_NAME] = ComparisonLevel.REVERSED
     elif set(lx.split()) <= set(ly.split()) or set(ly.split()) <= set(lx.split()):
         levels[Comparison.LAST_NAME] = ComparisonLevel.WORDS_INCLUDED
-    elif jaro_winkler(lx, ly) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_092]:
+    elif jaro_winkler(lx, ly) >= _JW_092:
         levels[Comparison.LAST_NAME] = ComparisonLevel.JW_092
-    elif jaro_winkler(lx, ly) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_08]:
+    elif jaro_winkler(lx, ly) >= _JW_08:
         levels[Comparison.LAST_NAME] = ComparisonLevel.JW_08
     else:
         levels[Comparison.LAST_NAME] = ComparisonLevel.ELSE
@@ -198,7 +204,7 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
         _initials(fx).startswith(_initials(fy)) or _initials(fy).startswith(_initials(fx))
     ):
         levels[Comparison.FIRST_NAME] = ComparisonLevel.INITIALS_MATCH
-    elif jaro_winkler(fx, fy) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_09]:
+    elif jaro_winkler(fx, fy) >= _JW_09:
         levels[Comparison.FIRST_NAME] = ComparisonLevel.JW_09
     else:
         levels[Comparison.FIRST_NAME] = ComparisonLevel.ELSE
@@ -484,6 +490,51 @@ class _SourceRecordLinks:
                 for s, g in zip(ss, gs, strict=True):
                     self.link(s, g, GroupingMethod.ORDER)
 
+    def resolve(
+        self,
+        source_record_id: int,
+        *,
+        model: ResidualModel | None = None,
+        assign: Assign | None = None,
+        on_residual: ResidualSink | None = None,
+    ) -> dict[int, "_Link"]:
+        """Liens des contributions sources de l'enregistrement source vers les groupes : noms et identifiants, filtre d'ordre deux fois, ordre dans les trous, puis le résidu par le modèle quand `model` et `assign` sont donnés. `on_residual` reçoit le résidu de la règle, avant le modèle."""
+        self.name_steps()
+        self.order_filter()
+        self.name_steps()
+        self.order_filter()
+        self.order_in_gaps()
+        if on_residual is not None:
+            contribution_gaps, group_gaps = self.gaps()
+            on_residual(
+                source_record_id,
+                [
+                    _author(s, contribution_gaps[s.id])
+                    for s in self.contributions
+                    if s.id in contribution_gaps
+                ],
+                [
+                    _author(g.reference, group_gaps[g.index])
+                    for g in self.groups
+                    if g.index in group_gaps
+                ],
+            )
+        links = {s: _Link(g, self.methods[s]) for s, g in self.links.items()}
+        if model is not None and assign is not None:
+            residual = _residual_links(self, self.source_contributions, model, assign)
+            for contribution, (g, score, margin) in residual.items():
+                links[contribution] = _Link(g, GroupingMethod.MODEL, score, margin)
+        return links
+
+
+class _Link(NamedTuple):
+    """Lien d'une contribution source vers le groupe d'indice `group`, avec le score et la marge d'un lien du modèle."""
+
+    group: int
+    method: GroupingMethod
+    score: float | None = None
+    margin: float | None = None
+
 
 def _author(s: SourceContribution, gap_index: int) -> Author:
     return Author(s.last_name, s.first_name, s.orcid, s.idref, gap_index)
@@ -606,44 +657,18 @@ def align_publication(
         if i and _inverted(contributions, groups):
             contributions = [_swapped(s) for s in contributions]
             source_contributions.update((s.id, s) for s in contributions)
-        links: dict[int, int] = {}
-        methods: dict[int, GroupingMethod] = {}
-        scores: dict[int, tuple[float, float]] = {}
-        if i:
-            record_links = _SourceRecordLinks(contributions, groups, source_contributions)
-            record_links.name_steps()
-            record_links.order_filter()
-            record_links.name_steps()
-            record_links.order_filter()
-            record_links.order_in_gaps()
-            if on_residual is not None:
-                contribution_gaps, group_gaps = record_links.gaps()
-                on_residual(
-                    source_record_id,
-                    [
-                        _author(s, contribution_gaps[s.id])
-                        for s in contributions
-                        if s.id in contribution_gaps
-                    ],
-                    [
-                        _author(g.reference, group_gaps[g.index])
-                        for g in groups
-                        if g.index in group_gaps
-                    ],
-                )
-            if model is not None and assign is not None:
-                residual = _residual_links(record_links, source_contributions, model, assign)
-                for contribution, (g, link_score, link_margin) in residual.items():
-                    record_links.links[contribution] = g
-                    record_links.methods[contribution] = GroupingMethod.MODEL
-                    scores[contribution] = (link_score, link_margin)
-            links, methods = record_links.links, record_links.methods
+        links = (
+            _SourceRecordLinks(contributions, groups, source_contributions).resolve(
+                source_record_id, model=model, assign=assign, on_residual=on_residual
+            )
+            if i
+            else {}
+        )
         by_index = {g.index: g for g in groups}
         for s in contributions:
-            if s.id in links:
-                score, margin = scores.get(s.id, (None, None))
-                member = Member(s.id, source_record_id, methods[s.id], score, margin)
-                by_index[links[s.id]].members.append(member)
+            if (link := links.get(s.id)) is not None:
+                member = Member(s.id, source_record_id, link.method, link.score, link.margin)
+                by_index[link.group].members.append(member)
             else:
                 member = Member(s.id, source_record_id, GroupingMethod.REFERENCE)
                 groups.append(Group(len(groups), s, [member]))

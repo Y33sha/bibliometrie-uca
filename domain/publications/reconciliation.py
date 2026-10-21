@@ -19,8 +19,10 @@ Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invaria
 from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from typing import NamedTuple
 
 from domain.entity_resolution import connected_components
+from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 
 
@@ -42,6 +44,16 @@ class ReconcileMember:
     title_normalized: str | None = None
     publication_year: int | None = None
     doc_type: str | None = None
+
+    @property
+    def can_found_publication(self) -> bool:
+        """L'enregistrement source est in-périmètre et d'un type du périmètre métier."""
+        return self.in_perimeter and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
+
+    @property
+    def materializable(self) -> bool:
+        """L'enregistrement source a les métadonnées minimales d'une publication (`has_minimal_publication_metadata`)."""
+        return has_minimal_publication_metadata(self.title_normalized, self.publication_year)
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +111,13 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
     return partitions
 
 
-# Revendication d'une partition : (publication préférée | None pour create, force, min_source_record, source_record_ids).
-type _Claim = tuple[int | None, bool, int, tuple[int, ...]]
+class _Claim(NamedTuple):
+    """Revendication d'une partition. `preferred` est la publication revendiquée, `None` pour une création ; `strong` vaut pour le porteur du DOI."""
+
+    preferred: int | None
+    strong: bool
+    min_source_record: int
+    source_record_ids: tuple[int, ...]
 
 
 def _claim(
@@ -112,10 +129,9 @@ def _claim(
       (revendication **forte**, départage `min`), sinon la publication du plus petit `source_record_id`
       *parmi les enregistrements sources matérialisés* (**faible**).
     - Partition d'orphelins (aucun enregistrement source matérialisé) → `preferred = None` (**create**) si ≥1 membre
-      peut fonder une publication (in-périmètre et d'un type du périmètre métier, cf.
-      `_can_found_publication`) **et** ≥1 membre est matérialisable (titre + année — gate
-      `has_minimal_publication_metadata`, sinon `publication_year NOT NULL` ferait échouer la création) ;
-      sinon `None` (**skip**, les enregistrements sources restent orphelins).
+      peut fonder une publication (`ReconcileMember.can_found_publication`) **et** ≥1 membre est
+      matérialisable (`ReconcileMember.materializable`) ; sinon `None` (**skip**, les enregistrements
+      sources restent orphelins).
 
     Porteur du DOI **hors voisinage** (`existing_publication_by_doi`) : une publication existante a
     déjà le DOI de la partition sans qu'aucun enregistrement source du voisinage n'y soit rattaché (orpheline après
@@ -137,22 +153,16 @@ def _claim(
             }
         )
         if carriers:
-            return carriers[0], True, min_source_record, source_record_ids
+            return _Claim(carriers[0], True, min_source_record, source_record_ids)
         if external_carrier is not None:
-            return external_carrier, True, min_source_record, source_record_ids
+            return _Claim(external_carrier, True, min_source_record, source_record_ids)
         anchor_publication = min(materialized, key=lambda m: m.source_record_id).publication_id
-        return anchor_publication, False, min_source_record, source_record_ids
+        return _Claim(anchor_publication, False, min_source_record, source_record_ids)
     if external_carrier is not None:
-        return external_carrier, True, min_source_record, source_record_ids
-    creatable = any(m.title_normalized and m.publication_year for m in part)
-    if creatable and any(_can_found_publication(m) for m in part):
-        return None, False, min_source_record, source_record_ids  # create
+        return _Claim(external_carrier, True, min_source_record, source_record_ids)
+    if any(m.materializable for m in part) and any(m.can_found_publication for m in part):
+        return _Claim(None, False, min_source_record, source_record_ids)  # create
     return None  # skip
-
-
-def _can_found_publication(member: ReconcileMember) -> bool:
-    """Un enregistrement source fonde une publication s'il est in-périmètre et d'un type du périmètre métier."""
-    return member.in_perimeter and member.doc_type not in OUT_OF_SCOPE_DOC_TYPES
 
 
 def plan_reconciliation(
@@ -188,31 +198,25 @@ def plan_reconciliation(
     groups: list[WorkGroup] = []
     detached: list[int] = []
     target_of_source_record: dict[int, int | None] = {}
-    for preferred, _strong, _min_source_record, source_record_ids in sorted(
-        claims, key=lambda c: (c[0] is None, not c[1], c[2])
+    for claim in sorted(
+        claims, key=lambda c: (c.preferred is None, not c.strong, c.min_source_record)
     ):
-        if preferred is not None and preferred not in awarded:
-            awarded.add(preferred)
-            target: int | None = preferred
+        if claim.preferred is not None and claim.preferred not in awarded:
+            awarded.add(claim.preferred)
+            target: int | None = claim.preferred
         else:
             target = None  # création, ou publication existante déjà prise → nouvelle publication
-            if not any(
-                by_id[source_record_id].publication_year for source_record_id in source_record_ids
-            ):
-                detached.extend(source_record_ids)
+            if not any(by_id[i].publication_year for i in claim.source_record_ids):
+                detached.extend(claim.source_record_ids)
                 continue
-        groups.append(WorkGroup(target, source_record_ids))
-        for source_record_id in source_record_ids:
+        groups.append(WorkGroup(target, claim.source_record_ids))
+        for source_record_id in claim.source_record_ids:
             target_of_source_record[source_record_id] = target
 
     # Publications dissoutes : publication courante qui ne survit comme ancre d'aucun groupe et ne retient aucun
     # enregistrement source résiduel. Successeur = l'ancre où la partition de son plus petit enregistrement source a abouti.
     # Les orphelins, sans publication, sont ignorés ici.
-    assigned = {
-        source_record_id
-        for _, _, _, source_record_ids in claims
-        for source_record_id in source_record_ids
-    }
+    assigned = {i for claim in claims for i in claim.source_record_ids}
     universe_publication_ids = {m.publication_id for m in members if m.publication_id is not None}
     residual_publication_ids = {
         m.publication_id
