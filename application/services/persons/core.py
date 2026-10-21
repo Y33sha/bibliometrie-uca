@@ -222,29 +222,6 @@ def update_identifier_status(
     return IdentifierStatusResult(row["id"], row["status"], row["person_id"], propagated)
 
 
-def reassign_identifier(
-    ident_id: int,
-    target_person_id: int,
-    *,
-    repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    """Réattribue un identifiant à une autre personne (status → pending).
-
-    Lève `NotFoundError` si l'identifiant ou la personne cible n'existe pas : sans la seconde garde, la clé étrangère refuserait la réattribution par une erreur d'intégrité.
-    """
-    if repo.find_by_id(target_person_id) is None:
-        raise NotFoundError(f"Personne {target_person_id} introuvable")
-    repo.reassign_identifier(ident_id, target_person_id)
-    emit_event(
-        audit_repo,
-        "person_identifier.reassigned",
-        "person",
-        target_person_id,
-        {"ident_id": ident_id},
-    )
-
-
 # ── Formes de noms ──
 
 

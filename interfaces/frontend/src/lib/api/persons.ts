@@ -3,7 +3,6 @@ import type { components } from './schema';
 
 type AddIdentifierResponse = components['schemas']['AddIdentifierResponse'];
 type IdentifierStatusResponse = components['schemas']['IdentifierStatusResponse'];
-type IdentifierReassignResponse = components['schemas']['IdentifierReassignResponse'];
 type MergeResponse = components['schemas']['MergeResponse'];
 type OkResponse = components['schemas']['OkResponse'];
 type NameFormStatusResponse = components['schemas']['NameFormStatusResponse'];
@@ -62,13 +61,6 @@ export function setIdentifierStatus(
 	status: string
 ): Promise<IdentifierStatusResponse> {
 	return patch<IdentifierStatusResponse>(`/api/persons/identifiers/${identId}/status`, { status });
-}
-
-export function reassignIdentifier(
-	identId: number,
-	body: Record<string, unknown>
-): Promise<IdentifierReassignResponse> {
-	return patch<IdentifierReassignResponse>(`/api/persons/identifiers/${identId}/reassign`, body);
 }
 
 export function markDistinct(

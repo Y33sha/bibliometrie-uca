@@ -40,7 +40,7 @@ Routeur `interfaces/api/routers/persons.py`, commandes dans `application/service
 
 **Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — contributions sources, contributions, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses contributions sources y sont détachées et la contribution supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
 
-**Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
+**Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation, rejet ou retour en attente. Ajouter à une personne un identifiant rejeté chez une autre le lui réattribue, en attente ; un identifiant en attente ou confirmé chez une autre personne est refusé.
 
 **Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes calculées.
 

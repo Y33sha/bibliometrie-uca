@@ -28,7 +28,7 @@ Connaissances écrites à plusieurs endroits :
 
 Règles du domaine contournées :
 
-- `reattribute_to` (`domain/persons/identifier_attribution.py`) part seulement de `rejected` ; l'admin réattribue depuis tout statut (`person_repository/_identifiers.py`), et `update_identifier_status` accepte toute transition ;
+- `reattribute_to` (`domain/persons/identifier_attribution.py`) réattribue seulement un identifiant `rejected` ; l'endpoint `PATCH /api/persons/identifiers/{id}/reassign`, sans appelant dans le frontend, réattribue depuis tout statut ;
 - `allow_person_creation` (`domain/persons/creation.py`) décide sur la source `theses`. ScanR donne aussi les rôles de jury : 2 324 contributions sources ScanR dans le périmètre, à rôles de jury seuls, sur la base locale du 2026-10-20 ; aucune personne ne vient de ces seules contributions, 8 restent sans personne ;
 - IdRef et idHAL sont normalisés seulement à l'écriture dans `person_identifiers` : HAL découpe l'IdRef à la main, ScanR le garde brut, et le matching compare une valeur brute à une valeur normalisée ;
 - `map_doc_type` cherche une valeur absente de la table de sa source dans les tables des autres sources, dans l'ordre du dict ; une valeur inconnue devient `other` sans signal.
@@ -46,8 +46,8 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 1 — Personnes
 
-- [ ] `allow_person_creation` décidé sur les rôles.
-- [ ] Transitions de `AttributionStatus` dans le domaine ; les chemins admin passent par l'agrégat.
+- [x] `allow_person_creation` décidé sur les rôles. 49c40081a
+- [x] Réattribution d'un identifiant seulement par l'agrégat : endpoint de réattribution retiré ; docstring de `AttributionStatus` alignée sur l'usage de l'admin.
 - [ ] Identifiants personne normalisés à l'ingestion par `normalized_identifier_value`.
 - [ ] Cascade de matching en une entrée de domaine, sur un index de personnes ; `NameFormDecision` et `PersonMatchDecision` fusionnées.
 - [ ] Verdict d'une forme de nom en Python, sur `AttributionStatus`.
