@@ -153,11 +153,11 @@ _IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
 def _normalize_idref(raw: str | None) -> str | None:
     """Normalise un IdRef (PPN) : 9 caractères, dernier peut être X.
 
-    Accepte une URL idref.fr en entrée.
+    Accepte une URL idref.fr en entrée. Les blancs sont retirés.
     """
     if not raw:
         return None
-    s = raw.strip()
+    s = "".join(raw.split())
     # URL éventuelle
     m = _IDREF_URL_RE.search(s)
     if m:

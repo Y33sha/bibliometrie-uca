@@ -109,6 +109,8 @@ class TestIdRef:
             ("05547854x", "05547854X"),  # x minuscule → X
             ("https://www.idref.fr/252404955/id", "252404955"),  # strip URL
             ("idref.fr/252404955", "252404955"),  # strip préfixe nu
+            # URL répétée, blanc avant le PPN
+            ("https://www.idref.fr/https://www.idref.fr/ 089437810", "089437810"),
         ],
     )
     def test_normalizes(self, raw, expected):
