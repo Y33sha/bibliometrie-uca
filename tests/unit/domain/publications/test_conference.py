@@ -44,7 +44,7 @@ class TestAttestsPublication:
 
     def test_champs_editoriaux_hal(self):
         assert attests_publication(_source_record(source_extras={"proceedings": True}))
-        assert attests_publication(_source_record(biblio={"pages": "pp. 465-470"}))
+        assert attests_publication(_source_record(biblio={"first_page": "465", "last_page": "470"}))
         assert attests_publication(_source_record(biblio={"publisher": "Dykinson S. L."}))
         assert attests_publication(
             _source_record(source_extras={"source_title": "Actes des 8èmes journées"})
@@ -53,7 +53,7 @@ class TestAttestsPublication:
     def test_bruit_hal_sans_valeur(self):
         assert not attests_publication(_source_record(source_extras={"proceedings": False}))
         assert not attests_publication(
-            _source_record(biblio={"pages": "21 p.", "publisher": "s.n."})
+            _source_record(biblio={"first_page": "21", "publisher": "s.n."})
         )
         assert not attests_publication(
             _source_record(source_extras={"source_title": "Colloque de 2020"})

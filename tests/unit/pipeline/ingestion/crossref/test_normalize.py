@@ -265,9 +265,18 @@ class TestGetBiblio:
         ) == {
             "volume": "12",
             "issue": "3",
-            "page": "45-67",
+            "first_page": "45",
+            "last_page": "67",
             "article_number": "e12345",
         }
+
+    def test_page_seule_egale_au_numero_d_article_ecartee(self):
+        assert get_biblio({"page": "e12345", "article-number": "e12345"}) == {
+            "article_number": "e12345"
+        }
+
+    def test_page_seule_gardee(self):
+        assert get_biblio({"page": "1191"}) == {"first_page": "1191"}
 
     def test_partial_fields(self):
         # Seuls les champs présents et non-vides sont inclus.

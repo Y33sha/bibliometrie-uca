@@ -94,17 +94,17 @@ class TestGetPublicationSources:
             "100-120",
         )
 
-    def test_pages_as_given_by_source(self, sa_sync_conn):
+    def test_single_page(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         _source_record(
             sa_sync_conn,
             publication,
             source="crossref",
             source_id="10.1/y",
-            biblio={"page": "e1234", "article_number": "e1234"},
+            biblio={"first_page": "e1234", "article_number": "e1235"},
         )
         [record] = _records(sa_sync_conn, publication)
-        assert (record.pages, record.article_number) == ("e1234", "e1234")
+        assert (record.pages, record.article_number) == ("e1234", "e1235")
 
     def test_language_name_and_source_value(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)

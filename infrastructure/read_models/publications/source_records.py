@@ -31,9 +31,7 @@ def _text(mapping: Mapping[str, object], key: str) -> str | None:
 
 
 def _pages(biblio: Mapping[str, object]) -> str | None:
-    """Plage de pages telle que la source la donne (`pages` pour HAL, `page` pour Crossref), sinon composée de `first_page` et `last_page`."""
-    if given := _text(biblio, BiblioKey.PAGES) or _text(biblio, BiblioKey.PAGE):
-        return given
+    """Plage de pages composée de `first_page` et `last_page`."""
     first, last = _text(biblio, BiblioKey.FIRST_PAGE), _text(biblio, BiblioKey.LAST_PAGE)
     if first and last and first != last:
         return f"{first}-{last}"

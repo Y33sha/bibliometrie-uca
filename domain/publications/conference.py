@@ -20,9 +20,6 @@ _SUPPLANTED_BY_CONFERENCE = frozenset(
 # Titre d'un recueil de résumés : « Book of abstracts », « Recueil des résumés », « Abstracts with programs ».
 _ABSTRACTS = re.compile(r"\babstracts?\b|\bresumes\b")
 
-# Plage de pages (« 229-251 », « pp. 465-470 ») : un décompte (« 21 p. ») ou « np » n'atteste pas un texte publié.
-_PAGE_RANGE = re.compile(r"\d+\s*[-–]\s*\d+")
-
 # Éditeur inconnu, en toutes lettres ou abrégé.
 _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 
@@ -49,7 +46,7 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
     biblio = source.biblio or {}
     if source_extras.get(SourceExtra.PROCEEDINGS) is True:
         return True
-    if _PAGE_RANGE.search(as_str(biblio.get(BiblioKey.PAGES)) or ""):
+    if biblio.get(BiblioKey.LAST_PAGE):
         return True
     publisher = normalize_text(as_str(biblio.get(BiblioKey.PUBLISHER)) or "")
     if publisher and publisher not in _UNKNOWN_PUBLISHERS:

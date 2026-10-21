@@ -16,6 +16,7 @@ import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
@@ -29,6 +30,7 @@ from pipeline.ingestion.hal.normalize import (
     get_container_facts,
     get_title,
     insert_hal_document,
+    page_range,
     parse_tei_isbns,
     process_work,
     upsert_containers,
@@ -365,7 +367,21 @@ class TestInsertHalDocument:
     def test_biblio_built_from_volume_issue_pages(self):
         queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
-        assert captured.biblio == {"volume": "10", "issue": "2", "pages": "100-120"}
+        assert captured.biblio == {
+            "volume": "10",
+            "issue": "2",
+            "first_page": "100",
+            "last_page": "120",
+        }
+
+    def test_page_seule_d_un_livre_ecartee(self):
+        assert page_range("288", "OUV") == PageRange()
+        assert page_range("1449", "COUV") == PageRange()
+        assert page_range("12-25", "COUV") == PageRange("12", "25")
+        assert page_range("p. 29", "COUV") == PageRange("29")
+
+    def test_page_seule_d_un_article_gardee(self):
+        assert page_range("22045", "ART") == PageRange("22045")
 
     def test_biblio_empty(self):
         queries = FakeSourceRecordQueries()

@@ -15,6 +15,7 @@ from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
+from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
     clean_doi,
     find_isbns,
@@ -24,7 +25,8 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
-from domain.source_records.biblio import compact_biblio
+from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
+from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
@@ -169,6 +171,15 @@ def extract_publication_metadata(
 # SOURCE DOCUMENTS (HAL)
 # =============================================================
 
+_BOOK_TYPES = frozenset({DocType.BOOK, DocType.BOOK_CHAPTER})
+
+
+def page_range(page_s: str | None, raw_doc_type: str | None) -> PageRange:
+    """Pagination HAL (`page_s`). Sur un livre ou un chapitre, un nombre seul est le nombre de pages de l'ouvrage : il est écarté."""
+    if (page_s or "").strip().isdigit() and map_doc_type(raw_doc_type or "", "hal") in _BOOK_TYPES:
+        return PageRange()
+    return parse_pages(page_s)
+
 
 def build_hal_external_ids(
     doc: Mapping[str, JsonValue], hal_id: str, nnt: str | None
@@ -230,7 +241,7 @@ def insert_hal_document(
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
-        pages=hal_text_field(doc.get("page_s")),
+        **page_range(hal_text_field(doc.get("page_s")), publication_meta.doc_type)._asdict(),
         publisher=hal_text_field(doc.get("journalPublisher_s"))
         or hal_text_field(doc.get("publisher_s")),
         journal_title=hal_text_field(doc.get("journalTitle_s")),

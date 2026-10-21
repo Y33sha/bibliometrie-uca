@@ -18,7 +18,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
-from domain.source_records.biblio import compact_biblio
+from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
@@ -149,17 +149,26 @@ def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | Non
     return ext or None
 
 
+def page_range(page: str | None, article_number: str | None) -> PageRange:
+    """Pagination Crossref (`page`). Une page seule égale au numéro d'article est écartée."""
+    pages = parse_pages(page)
+    if pages.last_page is None and pages.first_page == article_number:
+        return PageRange()
+    return pages
+
+
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume, issue, page, article-number + publisher/journal bruts.
+    """Volume, issue, pages, article-number + publisher/journal bruts.
 
     `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
     """
     issn_val, eissn_val = get_issns(msg)
+    article_number = as_text(msg.get("article-number"))
     return compact_biblio(
         volume=as_text(msg.get("volume")),
         issue=as_text(msg.get("issue")),
-        page=as_text(msg.get("page")),
-        article_number=as_text(msg.get("article-number")),
+        **page_range(as_text(msg.get("page")), article_number)._asdict(),
+        article_number=article_number,
         publisher=get_publisher_name(msg),
         journal_title=get_container_title(msg),
         journal_issn=issn_val,
