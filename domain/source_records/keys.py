@@ -7,14 +7,20 @@ Une *clé de confirmation* est un attribut cross-source par lequel deux `source_
 
 La projection est la définition Python des clés de confirmation. La réconciliation des publications (`pipeline/transformation/publications/reconciliation.py`) la consomme. Son voisinage SQL (`_UNIVERSE_SQL`) réécrit ces clés ; `TestUniverseMatchesPythonTokens` vérifie que les deux concordent.
 
-Les valeurs sont lues sur la `source_record` **corrigée** (colonnes typées + `external_ids`), déjà normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par les VO : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant. Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
+Un identifiant de `external_ids` devient une clé de confirmation par son ajout à `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Le voisinage SQL d'un identifiant scalaire en dérive. Une clé composite demande son calcul dans `project_confirmation_keys` et sa branche dans `_UNIVERSE_SQL`. `run_pipeline --only publications --rebuild-publications` applique une clé au stock.
+
+Les valeurs sont lues sur la `source_record` **corrigée** (colonnes typées + `external_ids`), déjà normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par le normaliseur de leur type : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant. Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 
-from domain.publications.identifiers import DOI, NNT, PMID, ArxivId, HALId
-from domain.source_records.external_ids import MULTIVALUED_ID_TYPES, ExternalIdType
+from domain.publications.identifiers import DOI
+from domain.source_records.external_ids import (
+    MULTIVALUED_ID_TYPES,
+    ExternalIdType,
+    external_id_normalizer,
+)
 
 # Types d'`external_ids` par lesquels deux `source_records` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
 CONFIRMATION_ID_TYPES = (
@@ -50,24 +56,36 @@ class ConfirmationKeys:
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
-        """Jeu de tokens `(type, valeur)` portés par la `source_record`, pour le clustering.
+        """Jeu de tokens `(nom de la clé, valeur)` de la `source_record`, pour le clustering.
 
         Chaque token est namespacé par son type : un DOI `x` et un NNT `x` ne s'apparentent pas. Deux `source_records` partageant un token sont reliées dans le graphe de composantes (cf. `connected_components`). Une clé absente ne produit pas de token.
         """
-        toks: set[tuple[str, str]] = set()
-        if self.doi:
-            toks.add(("doi", self.doi))
-        if self.nnt:
-            toks.add((ExternalIdType.NNT, self.nnt))
-        if self.pmid:
-            toks.add((ExternalIdType.PMID, self.pmid))
-        if self.arxiv_id:
-            toks.add((ExternalIdType.ARXIV_ID, self.arxiv_id))
-        if self.metadata_block:
-            toks.add(("metadata_block", self.metadata_block))
-        if self.hal_id:
-            toks.add((ExternalIdType.HAL_ID, self.hal_id))
-        return frozenset(toks)
+        return frozenset(
+            (name, value) for name in _KEY_NAMES if (value := getattr(self, name)) is not None
+        )
+
+
+_KEY_NAMES = tuple(f.name for f in fields(ConfirmationKeys))
+assert set(_KEY_NAMES) == {"doi", "metadata_block", *CONFIRMATION_ID_TYPES}, (
+    "champs de ConfirmationKeys désynchronisés de CONFIRMATION_ID_TYPES"
+)
+
+
+# Nom, normaliseur et multivaluation de chaque identifiant de confirmation.
+_CONFIRMATION_IDS = tuple(
+    (str(t), external_id_normalizer(t), t in MULTIVALUED_ID_TYPES) for t in CONFIRMATION_ID_TYPES
+)
+
+
+def _confirmation_ids(ids: Mapping[str, object]) -> dict[str, str | None]:
+    """Valeur normalisée de chaque identifiant de confirmation de `ids`. Un type multivalué a pour valeur le premier élément de sa liste."""
+    values: dict[str, str | None] = {}
+    for name, normalize, multivalued in _CONFIRMATION_IDS:
+        raw = ids.get(name)
+        if multivalued:
+            raw = raw[0] if isinstance(raw, list) and raw else None
+        values[name] = normalize(raw) if isinstance(raw, str) else None
+    return values
 
 
 def project_confirmation_keys(
@@ -79,25 +97,10 @@ def project_confirmation_keys(
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_record`.
 
-    `external_ids` porte `nnt`, `pmid`, `arxiv_id`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute `source_record` à `doc_type` présent, `publication_year` présent et `title_normalized` plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
+    Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement, comme une clé absente. `metadata_block` est posée pour toute `source_record` à `doc_type` présent, `publication_year` présent et `title_normalized` plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
     """
     ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
-
     doi_vo = DOI.try_parse(doi) if isinstance(doi, str) else None
-
-    nnt_raw = ids.get(ExternalIdType.NNT)
-    nnt_vo = NNT.try_parse(nnt_raw) if isinstance(nnt_raw, str) else None
-
-    pmid_raw = ids.get(ExternalIdType.PMID)
-    pmid_vo = PMID.try_parse(pmid_raw) if isinstance(pmid_raw, str) else None
-
-    arxiv_raw = ids.get(ExternalIdType.ARXIV_ID)
-    arxiv_vo = ArxivId.try_parse(arxiv_raw) if isinstance(arxiv_raw, str) else None
-
-    raw_hal = ids.get(ExternalIdType.HAL_ID)
-    first_hal = raw_hal[0] if isinstance(raw_hal, list) and raw_hal else None
-    hal_vo = HALId.try_parse(first_hal) if isinstance(first_hal, str) else None
-
     metadata_block = (
         f"{doc_type}|{title_normalized}|{publication_year}"
         if doc_type
@@ -106,12 +109,8 @@ def project_confirmation_keys(
         and publication_year is not None
         else None
     )
-
     return ConfirmationKeys(
         doi=str(doi_vo) if doi_vo else None,
-        nnt=str(nnt_vo) if nnt_vo else None,
-        pmid=str(pmid_vo) if pmid_vo else None,
-        arxiv_id=str(arxiv_vo) if arxiv_vo else None,
-        hal_id=str(hal_vo) if hal_vo else None,
         metadata_block=metadata_block,
+        **_confirmation_ids(ids),
     )
