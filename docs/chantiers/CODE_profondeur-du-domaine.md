@@ -40,6 +40,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - Une règle répétée en SQL et en Python a un test de parité.
 - `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
 - La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
+- `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `raw_metadata` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
 
 ## Phasage
 
@@ -52,11 +53,12 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 2 — Correction des métadonnées
 
+- [ ] Colonnes `raw_doc_type` et `raw_language` ; type et langue traduits par `normalize` ; lecteurs de la valeur de la source branchés sur ces colonnes ; marqueurs `DOC_TYPE_MAP` et `LANGUAGE_MAP` retirés ; oneshot pour les données existantes.
+- [ ] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées.
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
 - [ ] Revue par espace de noms DOI en fonction de domaine.
 - [ ] Registre des clés de `raw_metadata` et de leur sous-étape ; `effective_external_ids`.
 - [ ] Prédicats d'égalité lus par nom de champ ; champs propres aux enregistrements sources marqués ; fabrique `MetadataForCorrection.for_publication`.
-- [ ] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées.
 
 ### Phase 3 — Doublons ponctuels
 
@@ -76,6 +78,5 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ## Questions ouvertes
 
-- `source_records.doc_type` contient le vocabulaire de la source jusqu'à `metadata_correction`. Le traduire dès `normalize`, avec le type source dans une colonne dédiée, retirerait le marqueur `DOC_TYPE_MAP` et le remapping des phases antérieures. Décision de schéma.
 - `domain/` contient des contrats entre couches qui ne sont pas des règles métier : `config`, `stats`, `pipeline_runs`. Import-linter interdit `pipeline → application`, donc `domain/` est le seul paquet commun. Un paquet neutre déclaré dans import-linter, ou le statu quo.
 - Registre des dimensions de statistiques : dans le read model, avec sa liaison SQL, ou dans le paquet neutre.
