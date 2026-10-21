@@ -6,8 +6,6 @@ Plusieurs règles métier sont découpées entre `domain/` et ses appelants. Le 
 
 Règles assemblées par l'appelant :
 
-- matching des personnes : `decide_person_match` (`domain/persons/matching.py`) reçoit six résultats précalculés par `pipeline/transformation/persons/cascade.py`, qui appelle `decide_match_by_identifier` par type d'identifiant, applique `trusted_identifier` à l'ORCID et passe le même `rejected_person_ids` à deux fonctions ;
-- verdict d'une forme de nom : décidé dans un `CASE` de `fetch_name_form_status_map` (`cascade.py`), comparé à des chaînes dans `matching.py` ;
 - correction unaire d'un enregistrement source : `compute_update` (`pipeline/transformation/publications/correction/correct_unary.py`) enchaîne mapping, règles, type du dépôt HAL d'origine, retrait des clés de thèse et réapplication des retraits de la sous-étape cluster ;
 - revue d'un enregistrement source par l'espace de noms de son DOI : la règle est dans `correction/journal_by_doi.py`, le domaine en garde une constante ;
 - alignement des auteurs : `align_publication` (`domain/publications/author_grouping.py`) écrit dans les champs de `_SourceRecordLinks` après une séquence fixe d'étapes.
@@ -41,6 +39,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - Le SQL rend des faits bruts ; le verdict se calcule en Python. Une règle qui doit rester en SQL a un fragment unique dans `infrastructure/sql_fragments.py`.
 - Une règle répétée en SQL et en Python a un test de parité.
 - `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
+- La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
 
 ## Phasage
 
@@ -49,8 +48,6 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] `allow_person_creation` décidé sur les rôles. 49c40081a
 - [x] Réattribution d'un identifiant seulement par l'agrégat : endpoint de réattribution retiré ; docstring de `AttributionStatus` alignée sur l'usage de l'admin.
 - [x] Identifiants personne normalisés à l'ingestion par `compact_identifiers`. c309a275e
-- [ ] Cascade de matching en une entrée de domaine, sur un index de personnes ; `NameFormDecision` et `PersonMatchDecision` fusionnées.
-- [ ] Verdict d'une forme de nom en Python, sur `AttributionStatus`.
 - [ ] Un prédicat « prénom réduit à des initiales », un prédicat « prénom plein qui prolonge les initiales ».
 
 ### Phase 2 — Correction des métadonnées

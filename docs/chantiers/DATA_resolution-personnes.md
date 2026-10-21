@@ -82,7 +82,13 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 - [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [ ] Correction du stock : doubles rattachements (une personne rattachée à deux contributions sources d'un même enregistrement source), personnes qui ont les identifiants de deux personnes, ORCID en attente rattachés à une autre personne que leur titulaire (21 groupes dans la relecture du 2026-10-19).
 
-### Phase 5 — Fin de chantier
+### Phase 5 — Règles de la résolution dans le domaine
+
+- [ ] Une entrée de domaine rend la décision complète d'une contribution source, pour les deux passes de la cascade. Elle lit un index de personnes en mémoire, que le pipeline met à jour après chaque écriture : formes de nom, homonymes par nom de famille, ancres entre sources. Elle renvoie les refus de corroboration. `NameFormDecision` et `PersonMatchDecision` fusionnent.
+- [ ] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par cette entrée : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre.
+- [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
+
+### Phase 6 — Fin de chantier
 
 - [ ] Mise à jour de la documentation.
 
@@ -94,4 +100,4 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 - Les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
 - Les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de contributions sources. Comment les traduire en contraintes sur les contributions sources ?
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres contributions sources.
-- `publications.reconcile`, aujourd'hui un seul nœud du graphe : le scinder selon les étapes de la forme par paires, si elle est retenue.
+- `publications.reconcile`, aujourd'hui une seule tâche du graphe : le scinder selon les étapes de la forme par paires, si elle est retenue.
