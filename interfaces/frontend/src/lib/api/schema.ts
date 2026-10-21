@@ -3090,7 +3090,7 @@ export interface components {
          * EcoleDoctorale
          * @description École doctorale d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
          *
-         *     Lu depuis la colonne JSONB `meta.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
+         *     Lu depuis la colonne JSONB `source_extras.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
          */
         EcoleDoctorale: {
             /** Nom */
@@ -4071,7 +4071,7 @@ export interface components {
          * PartenaireThese
          * @description Partenaire de recherche d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
          *
-         *     Lu depuis la colonne JSONB `meta.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
+         *     Lu depuis la colonne JSONB `source_extras.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
          */
         PartenaireThese: {
             /** Nom */
