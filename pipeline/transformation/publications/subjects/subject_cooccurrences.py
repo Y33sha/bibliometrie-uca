@@ -8,16 +8,13 @@ Idempotent : le résultat ne dépend que de l'état courant de `publication_subj
 
 import logging
 
-from sqlalchemy import Connection
-
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.progress import waiting
-from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 
 
 def run(
-    conn: Connection,
-    queries: SubjectsIngestionQueries,
+    store: SubjectStore,
     logger: logging.Logger,
 ) -> dict[str, int]:
     """Recalcule usage_counts + rafraîchit la matview cooccurrences. Retourne un dict de stats.
@@ -26,12 +23,12 @@ def run(
     """
     step(logger, "Rafraîchissement des décomptes")
     with waiting(f"{BRANCH}publications par sujet", logger) as line:
-        n_updated = queries.recompute_usage_counts(conn)
+        n_updated = store.recompute_usage_counts()
         # « mis à jour » ne varie pas au pluriel.
         line.conclude(f"{BRANCH}publications par sujet : {quantity(n_updated, 'sujet')} mis à jour")
 
     with waiting(f"{LAST_BRANCH}co-occurrences entre sujets", logger) as line:
-        n_pairs = queries.refresh_cooccurrences(conn)
+        n_pairs = store.refresh_cooccurrences()
         line.conclude(f"{LAST_BRANCH}co-occurrences entre sujets : décomptes rafraîchis")
 
     return {"usage_counts_updated": n_updated, "cooccurrence_pairs": n_pairs}

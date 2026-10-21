@@ -14,8 +14,6 @@ On lit les `source_records` (et non `publications_detail`) pour préserver l'att
 
 import logging
 
-from sqlalchemy import Connection
-
 from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
@@ -28,15 +26,14 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publications.subjects.subject_cache import SubjectCache
 from pipeline.transformation.publications.subjects.subject_extractors import SUBJECT_EXTRACTORS
-from pipeline.transformation.publications.subjects.subjects_queries import (
+from pipeline.transformation.publications.subjects.subject_store import (
     PublicationSubjectLink,
-    SubjectsIngestionQueries,
+    SubjectStore,
 )
 
 
 def run(
-    conn: Connection,
-    queries: SubjectsIngestionQueries,
+    store: SubjectStore,
     logger: logging.Logger,
     *,
     rebuild: bool = False,
@@ -47,16 +44,16 @@ def run(
 
     `rebuild` marque d'abord toutes les publications à ingérer : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
     """
-    subjects_before = queries.count_all_subjects(conn)
+    subjects_before = store.count_all_subjects()
     step(logger, "Liens publications-sujets")
 
     if rebuild:
-        queries.mark_all_publications_to_reingest(conn)
-    publication_ids = queries.select_publications_to_reingest(conn)
+        store.mark_all_publications_to_reingest()
+    publication_ids = store.select_publications_to_reingest()
     if not publication_ids:
-        queries.purge_orphan_subjects(conn)
+        store.purge_orphan_subjects()
         nothing_to_do(logger)
-        subjects_after = queries.count_all_subjects(conn)
+        subjects_after = store.count_all_subjects()
         metrics = PhaseMetrics()
         metrics.details["summary"] = {
             "subjects_added": subjects_after - subjects_before,
@@ -65,8 +62,8 @@ def run(
         }
         return metrics
 
-    queries.clear_publication_subjects_for_publications(conn, publication_ids=publication_ids)
-    rows = queries.select_source_records_for_publications(conn, publication_ids=publication_ids)
+    store.clear_publication_subjects_for_publications(publication_ids=publication_ids)
+    rows = store.select_source_records_for_publications(publication_ids=publication_ids)
     logger.info(
         "%s%s à traiter (%s), soit %s",
         BRANCH,
@@ -77,7 +74,7 @@ def run(
         quantity(len(rows), "document source", "documents sources"),
     )
 
-    cache = SubjectCache(queries)
+    cache = SubjectCache(store)
     n_links = 0
     with track_progress(len(rows), LAST_BRANCH.rstrip(), logger) as progress:
         for r in rows:
@@ -89,15 +86,15 @@ def run(
             links = [
                 PublicationSubjectLink(
                     r.publication_id,
-                    cache.get_or_upsert(conn, label=label, language=language),
+                    cache.get_or_upsert(label=label, language=language),
                 )
                 for label in extractor(r.topics)
             ]
-            n_links += cache.link_bulk(conn, source=r.source, rows=links)
+            n_links += cache.link_bulk(source=r.source, rows=links)
 
-    queries.mark_subjects_ingested(conn, publication_ids=publication_ids)
-    queries.purge_orphan_subjects(conn)
-    subjects_after = queries.count_all_subjects(conn)
+    store.mark_subjects_ingested(publication_ids=publication_ids)
+    store.purge_orphan_subjects()
+    subjects_after = store.count_all_subjects()
 
     metrics = PhaseMetrics()
     metrics.add(new=n_links, seen=len(rows))

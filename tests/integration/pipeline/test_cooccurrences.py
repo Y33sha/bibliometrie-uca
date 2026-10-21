@@ -6,11 +6,9 @@ import logging
 from sqlalchemy import text
 
 from pipeline.transformation.publications.subjects.subject_cooccurrences import run
-from pipeline.transformation.publications.subjects.subjects_queries import SubjectsIngestionQueries
+from pipeline.transformation.publications.subjects.subject_store import SubjectStore
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
-
-_Q = SubjectsIngestionQueries()
 
 
 class TestRecomputeUsageCounts:
@@ -23,7 +21,7 @@ class TestRecomputeUsageCounts:
         insert_publication_subject(sa_sync_conn, p1, subject_id=s_id, source="openalex")
         insert_publication_subject(sa_sync_conn, p2, subject_id=s_id, source="hal")
 
-        _Q.recompute_usage_counts(sa_sync_conn)
+        SubjectStore(sa_sync_conn).recompute_usage_counts()
         usage = sa_sync_conn.execute(
             text("SELECT usage_count FROM subjects WHERE id = :id"), {"id": s_id}
         ).scalar_one()
@@ -35,7 +33,7 @@ class TestRecomputeUsageCounts:
         sa_sync_conn.execute(
             text("UPDATE subjects SET usage_count = 5 WHERE id = :id"), {"id": s_id}
         )
-        _Q.recompute_usage_counts(sa_sync_conn)
+        SubjectStore(sa_sync_conn).recompute_usage_counts()
         usage = sa_sync_conn.execute(
             text("SELECT usage_count FROM subjects WHERE id = :id"), {"id": s_id}
         ).scalar_one()
@@ -55,7 +53,7 @@ class TestRefreshCooccurrences:
         for s in (a, b, c):
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
-        n = _Q.refresh_cooccurrences(sa_sync_conn)
+        n = SubjectStore(sa_sync_conn).refresh_cooccurrences()
         assert n == 1  # Seule la paire (a,b) avec count=2 passe le seuil de la matview.
 
         row = sa_sync_conn.execute(
@@ -76,7 +74,7 @@ class TestRefreshCooccurrences:
         insert_publication_subject(sa_sync_conn, p1, subject_id=s, source="hal")
         insert_publication_subject(sa_sync_conn, p2, subject_id=s, source="hal")
 
-        n = _Q.refresh_cooccurrences(sa_sync_conn)
+        n = SubjectStore(sa_sync_conn).refresh_cooccurrences()
         assert n == 0
 
     def test_idempotent(self, sa_sync_conn):
@@ -87,8 +85,8 @@ class TestRefreshCooccurrences:
         for p in (p1, p2):
             insert_publication_subject(sa_sync_conn, p, subject_id=a)
             insert_publication_subject(sa_sync_conn, p, subject_id=b)
-        _Q.refresh_cooccurrences(sa_sync_conn)
-        _Q.refresh_cooccurrences(sa_sync_conn)
+        SubjectStore(sa_sync_conn).refresh_cooccurrences()
+        SubjectStore(sa_sync_conn).refresh_cooccurrences()
         n = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM subject_cooccurrences")
         ).scalar_one()
@@ -105,7 +103,7 @@ class TestRunOrchestrator:
             insert_publication_subject(sa_sync_conn, p1, subject_id=s)
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
-        stats = run(sa_sync_conn, SubjectsIngestionQueries(), logging.getLogger("test"))
+        stats = run(SubjectStore(sa_sync_conn), logging.getLogger("test"))
         assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
         # usage_count des deux sujets = 2.
         rows = sa_sync_conn.execute(

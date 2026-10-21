@@ -1,25 +1,23 @@
-"""Tests d'intégration pour `pipeline.transformation.publications.subjects.subjects_queries`."""
+"""Tests d'intégration pour `pipeline.transformation.publications.subjects.subject_store`."""
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.subjects.subjects_queries import (
+from pipeline.transformation.publications.subjects.subject_store import (
     PublicationSubjectLink,
-    SubjectsIngestionQueries,
+    SubjectStore,
 )
 from tests.integration.helpers.publications import insert_publication
 
-_Q = SubjectsIngestionQueries()
-
 
 def _link(conn, publication_id, subject_id, source):
-    return _Q.link_publication_subjects_bulk(
-        conn, source=source, rows=[PublicationSubjectLink(publication_id, subject_id)]
+    return SubjectStore(conn).link_publication_subjects_bulk(
+        source=source, rows=[PublicationSubjectLink(publication_id, subject_id)]
     )
 
 
 class TestUpsertSubject:
     def test_creates_new(self, sa_sync_conn):
-        sid = _Q.upsert_subject(sa_sync_conn, label="machine learning")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="machine learning")
         assert sid > 0
         row = sa_sync_conn.execute(
             text("SELECT label, language FROM subjects WHERE id = :id"), {"id": sid}
@@ -28,15 +26,15 @@ class TestUpsertSubject:
         assert row.language is None
 
     def test_stores_language(self, sa_sync_conn):
-        sid = _Q.upsert_subject(sa_sync_conn, label="Machine Learning", language="en")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="Machine Learning", language="en")
         language = sa_sync_conn.execute(
             text("SELECT language FROM subjects WHERE id = :id"), {"id": sid}
         ).scalar_one()
         assert language == "en"
 
     def test_dedup_case_insensitive(self, sa_sync_conn):
-        a = _Q.upsert_subject(sa_sync_conn, label="Machine Learning")
-        b = _Q.upsert_subject(sa_sync_conn, label="machine learning")
+        a = SubjectStore(sa_sync_conn).upsert_subject(label="Machine Learning")
+        b = SubjectStore(sa_sync_conn).upsert_subject(label="machine learning")
         assert a == b
         # La casse originale est conservée.
         label = sa_sync_conn.execute(
@@ -45,13 +43,13 @@ class TestUpsertSubject:
         assert label == "Machine Learning"
 
     def test_normalizes_whitespace(self, sa_sync_conn):
-        a = _Q.upsert_subject(sa_sync_conn, label="  machine    learning  ")
-        b = _Q.upsert_subject(sa_sync_conn, label="machine learning")
+        a = SubjectStore(sa_sync_conn).upsert_subject(label="  machine    learning  ")
+        b = SubjectStore(sa_sync_conn).upsert_subject(label="machine learning")
         assert a == b
 
     def test_language_first_non_null_wins(self, sa_sync_conn):
-        sid = _Q.upsert_subject(sa_sync_conn, label="Biology", language="en")
-        _Q.upsert_subject(sa_sync_conn, label="biology", language="fr")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="Biology", language="en")
+        SubjectStore(sa_sync_conn).upsert_subject(label="biology", language="fr")
         language = sa_sync_conn.execute(
             text("SELECT language FROM subjects WHERE id = :id"), {"id": sid}
         ).scalar_one()
@@ -61,7 +59,7 @@ class TestUpsertSubject:
 class TestLinkAndClear:
     def test_link_creates_row(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="x")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         _link(sa_sync_conn, publication, sid, "hal")
         source = sa_sync_conn.execute(
             text(
@@ -74,7 +72,7 @@ class TestLinkAndClear:
 
     def test_link_same_subject_two_sources(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="x")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         _link(sa_sync_conn, publication, sid, "hal")
         _link(sa_sync_conn, publication, sid, "openalex")
         n = sa_sync_conn.execute(
@@ -85,7 +83,7 @@ class TestLinkAndClear:
 
     def test_link_idempotent_same_source(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="x")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         _link(sa_sync_conn, publication, sid, "openalex")
         _link(sa_sync_conn, publication, sid, "openalex")
         n = sa_sync_conn.execute(
@@ -100,9 +98,8 @@ class TestLinkAndClear:
     def test_bulk_dedupes_within_a_batch(self, sa_sync_conn):
         """Deux annotations d'une même source visant le même sujet ne donnent qu'un lien."""
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="x")
-        sent = _Q.link_publication_subjects_bulk(
-            sa_sync_conn,
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
+        sent = SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
             source="hal",
             rows=[
                 PublicationSubjectLink(publication, sid),
@@ -114,14 +111,13 @@ class TestLinkAndClear:
     def test_bulk_counts_only_new_links(self, sa_sync_conn):
         """Le retour compte les liens réellement insérés, pas ceux déjà présents."""
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="x")
-        sid2 = _Q.upsert_subject(sa_sync_conn, label="y")
-        _Q.link_publication_subjects_bulk(
-            sa_sync_conn, source="hal", rows=[PublicationSubjectLink(publication, sid)]
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
+        sid2 = SubjectStore(sa_sync_conn).upsert_subject(label="y")
+        SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
+            source="hal", rows=[PublicationSubjectLink(publication, sid)]
         )
         # Ré-insertion du lien existant + un nouveau : seul le nouveau est compté.
-        n = _Q.link_publication_subjects_bulk(
-            sa_sync_conn,
+        n = SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
             source="hal",
             rows=[
                 PublicationSubjectLink(publication, sid),
@@ -133,8 +129,8 @@ class TestLinkAndClear:
     def test_clear_preserves_rejected_links(self, sa_sync_conn):
         """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
         publication = insert_publication(sa_sync_conn)
-        kept = _Q.upsert_subject(sa_sync_conn, label="rejete")
-        dropped = _Q.upsert_subject(sa_sync_conn, label="ordinaire")
+        kept = SubjectStore(sa_sync_conn).upsert_subject(label="rejete")
+        dropped = SubjectStore(sa_sync_conn).upsert_subject(label="ordinaire")
         _link(sa_sync_conn, publication, kept, "hal")
         _link(sa_sync_conn, publication, dropped, "hal")
         sa_sync_conn.execute(
@@ -142,8 +138,8 @@ class TestLinkAndClear:
             {"s": kept},
         )
         assert (
-            _Q.clear_publication_subjects_for_publications(
-                sa_sync_conn, publication_ids=[publication]
+            SubjectStore(sa_sync_conn).clear_publication_subjects_for_publications(
+                publication_ids=[publication]
             )
             == 1
         )
@@ -159,7 +155,7 @@ class TestLinkAndClear:
 
     def test_subject_survives_publication_delete(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        sid = _Q.upsert_subject(sa_sync_conn, label="orphan candidate")
+        sid = SubjectStore(sa_sync_conn).upsert_subject(label="orphan candidate")
         _link(sa_sync_conn, publication, sid, "hal")
         sa_sync_conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": publication})
         n_links = sa_sync_conn.execute(
