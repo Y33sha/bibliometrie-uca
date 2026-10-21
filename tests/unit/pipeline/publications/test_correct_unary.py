@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 from domain.source_records.corrections import stash_entry
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
+from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_update,
     compute_updates,
@@ -26,24 +27,28 @@ def test_tally_corrections_compte_les_regles():
     updates = [
         CorrectionUpdate(
             2,
-            "thesis",
-            None,
-            {},
-            {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+            CorrectedSourceRecord(
+                "thesis",
+                None,
+                {},
+                {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+            ),
         ),
         # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
         CorrectionUpdate(
             3,
-            "media",
-            "green",
-            {},
-            {
-                "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
-                "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
-            },
+            CorrectedSourceRecord(
+                "media",
+                "green",
+                {},
+                {
+                    "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+                    "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
+                },
+            ),
         ),
         # correction défaite : mise à jour sans règle
-        CorrectionUpdate(4, "article", None, {}, {}),
+        CorrectionUpdate(4, CorrectedSourceRecord("article", None, {}, {})),
     ]
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
@@ -87,8 +92,8 @@ def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
     # (préfixe ≠ registre de thèses) → article.
     upd = _update(_source_record(doc_type="thesis", journal_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.corrections == {
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections == {
         "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
     }
 
@@ -138,8 +143,8 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
         )
     )
     assert upd is not None
-    assert upd.external_ids == {"hal_id": ["hal-99"]}
-    assert upd.corrections["removed_external_ids"] == removal["removed_external_ids"]
+    assert upd.corrected.external_ids == {"hal_id": ["hal-99"]}
+    assert upd.corrected.corrections["removed_external_ids"] == removal["removed_external_ids"]
 
 
 def test_thesis_to_article_strips_dissertation_keys():
@@ -154,9 +159,9 @@ def test_thesis_to_article_strips_dissertation_keys():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
-    assert upd.corrections["external_ids"] == {
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
+    assert upd.corrected.corrections["external_ids"] == {
         "raw": {"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
         "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE",
     }
@@ -173,9 +178,9 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.external_ids == {"pmid": "123"}
-    assert "external_ids" not in upd.corrections
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.external_ids == {"pmid": "123"}
+    assert "external_ids" not in upd.corrected.corrections
 
 
 def test_journal_id_wins_over_theses_fr_url_conflation():
@@ -191,15 +196,15 @@ def test_journal_id_wins_over_theses_fr_url_conflation():
         )
     )
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
 
 
 def test_journal_media_corrects_and_stashes_the_value_before_correction():
     upd = _update(_source_record(source="hal", doc_type="article", journal_type="media"))
     assert upd is not None
-    assert upd.doc_type == "media"
-    assert upd.corrections == {
+    assert upd.corrected.doc_type == "media"
+    assert upd.corrected.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
@@ -207,8 +212,8 @@ def test_journal_media_corrects_and_stashes_the_value_before_correction():
 def test_theses_fr_url_corrects_doc_type_and_stashes_raw():
     upd = _update(_source_record(doc_type="article", urls=["https://theses.fr/2020ABCD"]))
     assert upd is not None
-    assert upd.doc_type == "thesis"
-    assert upd.corrections == {
+    assert upd.corrected.doc_type == "thesis"
+    assert upd.corrected.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}
     }
 
@@ -232,16 +237,16 @@ def test_self_heals_when_rule_no_longer_applies():
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.corrections == {}
+    assert upd.corrected.doc_type == "article"
+    assert upd.corrected.corrections == {}
 
 
 def test_expired_embargo_promotes_oa_status_to_green():
     # oa_status `embargoed` + embargo expiré (calculé au fetch) → `green`, brut stashé.
     upd = _update(_source_record(oa_status="embargoed", embargo_expired=True))
     assert upd is not None
-    assert upd.oa_status == "green"
-    assert upd.corrections["oa_status"] == {
+    assert upd.corrected.oa_status == "green"
+    assert upd.corrected.corrections["oa_status"] == {
         "raw": "embargoed",
         "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
     }
@@ -265,7 +270,7 @@ def test_preserves_unmanaged_corrections_keys():
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.corrections == {
+    assert upd.corrected.corrections == {
         "doi": {"raw": "10.1/book", "corrected_by": "OUVRAGE_VS_CHAPITRE"},
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"},
     }
@@ -300,8 +305,11 @@ def test_scanr_from_hal_takes_corrected_hal_type():
     updates = compute_updates([hal, scanr], {"hal-04565713": hal})
 
     (scanr_update,) = [u for u in updates if u.id == 2]
-    assert scanr_update.doc_type == "poster"
-    assert scanr_update.corrections["doc_type"]["corrected_by"] == "SCANR_FROM_HAL_TO_HAL_TYPE"
+    assert scanr_update.corrected.doc_type == "poster"
+    assert (
+        scanr_update.corrected.corrections["doc_type"]["corrected_by"]
+        == "SCANR_FROM_HAL_TO_HAL_TYPE"
+    )
 
 
 def test_scanr_without_hal_deposit_keeps_its_type():

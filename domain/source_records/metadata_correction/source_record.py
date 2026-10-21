@@ -23,7 +23,7 @@ from domain.types import JsonValue
 
 
 class CorrectedSourceRecord(NamedTuple):
-    """Valeurs corrigées d'un enregistrement source, et `corrections` complète : les entrées de la correction unaire recalculées, celles des autres sous-étapes gardées."""
+    """Valeurs corrigées d'un enregistrement source, et `corrections` complète : les entrées de la correction unaire recalculées, celles des autres sous-étapes gardées. Chaque champ a le nom de sa colonne de `source_records`."""
 
     doc_type: str | None
     oa_status: str | None
@@ -46,10 +46,10 @@ def correct_source_record(
     corrections: Mapping[str, JsonValue],
     *,
     origin_doc_type: str | None = None,
-) -> CorrectedSourceRecord:
-    """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` permet de reconstruire.
+) -> CorrectedSourceRecord | None:
+    """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` permet de reconstruire. Rend `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
-    `facts` et `external_ids` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
+    `facts`, `external_ids` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
 
     Une conflation thèse-article corrigée en article perd ses clés de thèse (`strip_dissertation_keys`). Les identifiants retirés par la sous-étape cluster restent retirés.
     """
@@ -86,4 +86,7 @@ def correct_source_record(
     new_external_ids = without_values(
         new_external_ids, new_corrections.get(CorrectionKey.REMOVED_EXTERNAL_IDS)
     )
-    return CorrectedSourceRecord(doc_type, oa_status, new_external_ids, new_corrections)
+    result = CorrectedSourceRecord(doc_type, oa_status, new_external_ids, new_corrections)
+    if result == (facts.doc_type, facts.oa_status, external_ids, dict(corrections)):
+        return None
+    return result

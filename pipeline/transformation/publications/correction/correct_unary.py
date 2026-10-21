@@ -64,10 +64,7 @@ def compute_update(
     corrected = correct_source_record(
         row.facts, row.external_ids, row.corrections, origin_doc_type=origin_doc_type
     )
-    current = (row.facts.doc_type, row.facts.oa_status, row.external_ids, row.corrections)
-    if tuple(corrected) == current:
-        return None
-    return CorrectionUpdate(row.id, *corrected)
+    return CorrectionUpdate(row.id, corrected) if corrected is not None else None
 
 
 @dataclass
@@ -86,7 +83,7 @@ def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, i
     for update in updates:
         fired = False
         for field in UNARY_KEYS:
-            entry = update.corrections.get(field)
+            entry = update.corrected.corrections.get(field)
             rule = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
             if isinstance(rule, str):
                 rule_counts[rule] = rule_counts.get(rule, 0) + 1

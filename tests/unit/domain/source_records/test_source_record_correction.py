@@ -16,13 +16,21 @@ def _facts(**overrides: object) -> MetadataForCorrection:
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
 
 
+def test_enregistrement_deja_corrige():
+    assert correct_source_record(_facts(), {}, {}) is None
+
+
 def test_entrees_des_autres_sous_etapes_gardees():
     others = {
         CorrectionKey.DOI: stash_entry("10.1/x", "OUVRAGE_VS_CHAPITRE"),
         CorrectionKey.JOURNAL_ID: stash_entry(None, "JOURNAL_BY_DOI_NAMESPACE"),
     }
-    corrected = correct_source_record(_facts(), {}, others)
-    assert corrected.corrections == others
+    corrected = correct_source_record(_facts(journal_type="media"), {}, others)
+    assert corrected is not None
+    assert corrected.corrections == {
+        **others,
+        CorrectionKey.DOC_TYPE: stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+    }
 
 
 def test_retrait_par_cluster_reapplique():
@@ -31,9 +39,10 @@ def test_retrait_par_cluster_reapplique():
     )
     corrected = correct_source_record(
         _facts(),
-        {"hal_id": ["hal-2"]},
+        {"hal_id": ["hal-1", "hal-2"]},
         {CorrectionKey.REMOVED_EXTERNAL_IDS: removal},
     )
+    assert corrected is not None
     assert corrected.external_ids == {"hal_id": ["hal-2"]}
 
 
@@ -43,4 +52,5 @@ def test_correction_defaite_quand_la_regle_ne_s_applique_plus():
         {},
         {CorrectionKey.DOC_TYPE: stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA")},
     )
+    assert corrected is not None
     assert (corrected.doc_type, corrected.corrections) == ("article", {})
