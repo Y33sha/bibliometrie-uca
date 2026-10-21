@@ -2,7 +2,7 @@
 
 Couvre les helpers (get_title, get_container_facts, extract_publication_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
-Pattern : `FakeSourceRecordQueries` + `FakeContributionsBatchQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourceRecordQueries` + `FakeSourceContributionStore` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from pipeline.ingestion.hal.normalize import (
 from pipeline.ingestion.hal.payload import hal_text_field
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeContributionsBatchQueries,
+    FakeSourceContributionStore,
     FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
@@ -598,9 +598,9 @@ class TestBuildHalAuthorRecords:
 class TestProcessAuthors:
     def test_synchronises_even_when_empty(self):
         """Sans auteur, le writer synchronise quand même : les contributions sources en base sont supprimées."""
-        contribution_queries = FakeContributionsBatchQueries()
-        normalize_hal.process_contributions(MagicMock(), contribution_queries, {}, 10)
-        assert contribution_queries.synced_for == [10]
+        contribution_store = FakeSourceContributionStore()
+        normalize_hal.process_contributions(MagicMock(), contribution_store, {}, 10)
+        assert contribution_store.synced_for == [10]
 
 
 # ── process_work ─────────────────────────────────────────────────
@@ -625,7 +625,7 @@ class TestProcessWork:
             "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
-            "contribution_queries": FakeContributionsBatchQueries(),
+            "contribution_store": FakeSourceContributionStore(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -710,7 +710,7 @@ def _make_normalizer():
         queries=FakeSourceRecordQueries(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=FakeContributionsBatchQueries(),
+        contribution_store=FakeSourceContributionStore(),
     )
 
 

@@ -574,7 +574,7 @@ class TestProcessContributions:
         monkeypatch.setattr(
             normalize_crossref,
             "sync_source_contributions",
-            lambda conn, queries, source, spid, block, build: vus.update(
+            lambda store, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -628,7 +628,7 @@ class TestProcessWork:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
-            contribution_queries=MagicMock(),
+            contribution_store=MagicMock(),
         )
 
     def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
@@ -673,7 +673,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     row = staging_row()
 

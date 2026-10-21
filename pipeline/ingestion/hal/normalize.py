@@ -32,7 +32,7 @@ from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
@@ -582,14 +582,13 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
 def process_contributions(
     conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     doc: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources HAL de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "hal",
         source_record_id,
         extract_hal_author_block(doc),
@@ -610,7 +609,7 @@ def process_work(
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     staging_id = staging_row.id
@@ -641,7 +640,7 @@ def process_work(
         hal_id,
         publication_meta,
     )
-    process_contributions(conn, contribution_queries, doc, source_record_id)
+    process_contributions(conn, contribution_store, doc, source_record_id)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -663,5 +662,5 @@ class HalNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            contribution_store=self._contribution_queries,
         )

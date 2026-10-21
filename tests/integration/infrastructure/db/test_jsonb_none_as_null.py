@@ -7,7 +7,7 @@ deux formes échappe aux contraintes et aux index qui raisonnent sur NULL.
 from sqlalchemy import bindparam, text
 
 from infrastructure.db.jsonb import Jsonb
-from pipeline.ingestion.common.source_contribution_queries import key_hash_sql
+from pipeline.ingestion.common.source_contribution_store import key_hash_sql
 
 
 def test_parametre_lie_none_donne_null_sql(sa_sync_conn):

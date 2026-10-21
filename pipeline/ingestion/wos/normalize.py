@@ -19,7 +19,7 @@ from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -618,15 +618,14 @@ def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
 
 def process_contributions(
     conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     logger: logging.Logger,
     rec: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources WoS de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "wos",
         source_record_id,
         extract_wos_author_block(rec),
@@ -648,7 +647,7 @@ def process_record(
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     staging_id = staging_row.id
@@ -670,7 +669,7 @@ def process_record(
     )
 
     source_record_id = insert_wos_document(conn, queries, rec, staging_id, publication_meta)
-    process_contributions(conn, contribution_queries, logger, rec, source_record_id)
+    process_contributions(conn, contribution_store, logger, rec, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -693,5 +692,5 @@ class WosNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            contribution_store=self._contribution_queries,
         )

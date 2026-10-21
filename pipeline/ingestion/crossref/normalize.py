@@ -24,7 +24,7 @@ from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -327,14 +327,13 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
 
 def process_contributions(
     conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     msg: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources Crossref de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "crossref",
         source_record_id,
         extract_crossref_author_block(msg),
@@ -355,7 +354,7 @@ def process_work(
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -400,7 +399,7 @@ def process_work(
             source_extras=source_extras,
         ),
     )
-    process_contributions(conn, contribution_queries, msg, source_record_id)
+    process_contributions(conn, contribution_store, msg, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -421,5 +420,5 @@ class CrossrefNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            contribution_store=self._contribution_queries,
         )

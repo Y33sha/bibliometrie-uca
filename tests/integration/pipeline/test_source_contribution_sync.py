@@ -7,8 +7,8 @@ from sqlalchemy import text
 from domain.persons.contributor_name import ContributorName
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.common.source_contribution_queries import (
-    ContributionsBatchQueries,
+from pipeline.ingestion.common.source_contribution_store import (
+    SourceContributionStore,
     mark_source_contributions_to_resync,
 )
 from pipeline.ingestion.common.source_contributions import (
@@ -27,15 +27,13 @@ _source_record = partial(
     insert_source_record, source="crossref", source_id="10.9999/sync", title="t"
 )
 
-_Q = ContributionsBatchQueries()
-
 
 def _rec(position: int, raw: str, **fields) -> AuthorRecord:
     return AuthorRecord(position, ContributorName(raw=raw), **fields)
 
 
 def _write(conn, source_record: int, records: list[AuthorRecord]) -> None:
-    write_source_contributions(conn, _Q, "crossref", source_record, records)
+    write_source_contributions(SourceContributionStore(conn), "crossref", source_record, records)
 
 
 def _source_contributions(conn, source_record: int) -> dict[int, tuple[int, str]]:
@@ -426,7 +424,9 @@ def _build_upper(block) -> list[AuthorRecord]:
 
 
 def _sync(conn, source_record: int, names: list[str], build=_build) -> None:
-    sync_source_contributions(conn, _Q, "crossref", source_record, {"names": names}, build)
+    sync_source_contributions(
+        SourceContributionStore(conn), "crossref", source_record, {"names": names}, build
+    )
 
 
 def test_bloc_inchange_laisse_les_contributions_sources_en_l_etat(sa_sync_conn):
@@ -463,7 +463,7 @@ def test_bloc_modifie_synchronise_et_enregistre_son_empreinte(sa_sync_conn):
         "Dupont, Jean",
         "Martin, Paul",
     ]
-    assert _Q.fetch_authors_hash(conn, source_record) == fingerprint(
+    assert SourceContributionStore(conn).fetch_authors_hash(source_record) == fingerprint(
         {"names": ["Dupont, Jean", "Martin, Paul"]}
     )
 
@@ -483,14 +483,16 @@ def test_contribution_source_sans_position_garde_sa_confirmation(sa_sync_conn):
             *extra,
         ]
 
-    write_source_contributions(conn, _Q, "theses", source_record, thesis())
+    write_source_contributions(SourceContributionStore(conn), "theses", source_record, thesis())
     director_id = _source_contributions(conn, source_record)[None][0]
     person = _pin(conn, director_id)
 
     reviewer = AuthorRecord(
         None, ContributorName(raw="Durand, Paul"), roles=["reviewer"], addresses=lab
     )
-    write_source_contributions(conn, _Q, "theses", source_record, thesis(reviewer))
+    write_source_contributions(
+        SourceContributionStore(conn), "theses", source_record, thesis(reviewer)
+    )
 
     rows = conn.execute(
         text(

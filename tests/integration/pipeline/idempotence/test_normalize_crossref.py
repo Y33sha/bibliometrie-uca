@@ -92,7 +92,7 @@ def _run_normalize_crossref(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
         SourceRecordQueries,
     )
@@ -103,7 +103,7 @@ def _run_normalize_crossref(conn):
 
     queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    contribution_queries = ContributionsBatchQueries()
+    contribution_store = SourceContributionStore(conn)
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = CrossrefNormalizer(
@@ -113,7 +113,7 @@ def _run_normalize_crossref(conn):
         queries,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
-        contribution_queries=contribution_queries,
+        contribution_store=contribution_store,
     )
 
     rows = conn.execute(

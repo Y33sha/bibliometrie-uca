@@ -161,7 +161,7 @@ def run_normalize_scanr(conn):
 
     from sqlalchemy import text
 
-    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
         SourceRecordQueries,
     )
@@ -172,7 +172,7 @@ def run_normalize_scanr(conn):
 
     queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    contribution_queries = ContributionsBatchQueries()
+    contribution_store = SourceContributionStore(conn)
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = ScanrNormalizer(
@@ -182,7 +182,7 @@ def run_normalize_scanr(conn):
         queries,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
-        contribution_queries=contribution_queries,
+        contribution_store=contribution_store,
     )
 
     rows = conn.execute(

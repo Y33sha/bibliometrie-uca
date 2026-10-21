@@ -20,7 +20,7 @@ from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
@@ -192,12 +192,11 @@ def process_contributions(
     thesis: Mapping[str, JsonValue],
     source_record_id: int,
     *,
-    batch_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> None:
     """Synchronise les contributions sources de la thèse depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        batch_queries,
+        contribution_store,
         "theses",
         source_record_id,
         extract_theses_author_block(thesis),
@@ -216,7 +215,7 @@ def process_work(
     staging_row: StagingRow,
     *,
     staging_queries: StagingQueries,
-    batch_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> bool:
     """Traite une thèse du staging."""
     staging_id = staging_row.id
@@ -228,7 +227,7 @@ def process_work(
     source_record_id = insert_source_document(
         conn, queries, thesis, staging_id, theses_id, publication_meta
     )
-    process_contributions(conn, thesis, source_record_id, batch_queries=batch_queries)
+    process_contributions(conn, thesis, source_record_id, contribution_store=contribution_store)
     staging_queries.mark_done(conn, staging_id)
 
     return True
@@ -244,11 +243,11 @@ class ThesesNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: SourceRecordQueries,
-        batch_queries: ContributionsBatchQueries,
+        contribution_store: SourceContributionStore,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
-        self._batch_queries = batch_queries
+        self._batch_queries = contribution_store
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         publication_meta = extract_publication_metadata(row.raw_data)
@@ -260,5 +259,5 @@ class ThesesNormalizer(SourceNormalizer):
             self._queries,
             row,
             staging_queries=self._staging,
-            batch_queries=self._batch_queries,
+            contribution_store=self._batch_queries,
         )

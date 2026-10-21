@@ -47,7 +47,7 @@ def _insert_hal_staging(conn, doc):
 def _run_normalize_hal(conn):
     """Exécute la normalisation HAL sur les staging non traités."""
 
-    from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
         SourceRecordQueries,
     )
@@ -58,7 +58,7 @@ def _run_normalize_hal(conn):
 
     queries = SourceRecordQueries()
     staging_queries = StagingQueries()
-    contribution_queries = ContributionsBatchQueries()
+    contribution_store = SourceContributionStore(conn)
     container_stores = ContainerStores.of(conn)
     publisher_store = PublisherStore(conn)
 
@@ -85,7 +85,7 @@ def _run_normalize_hal(conn):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=staging_queries,
-            contribution_queries=contribution_queries,
+            contribution_store=contribution_store,
         ):
             processed += 1
     return processed

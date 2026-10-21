@@ -284,7 +284,7 @@ class TestProcessContributions:
         monkeypatch.setattr(
             normalize_datacite,
             "sync_source_contributions",
-            lambda conn, queries, source, spid, block, build: vus.update(
+            lambda store, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -400,7 +400,7 @@ class TestProcessWork:
             "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries,
-            "contribution_queries": MagicMock(),
+            "contribution_store": MagicMock(),
         }
 
     @pytest.fixture(autouse=True)
@@ -493,7 +493,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     row = staging_row()
 
@@ -509,7 +509,7 @@ def test_metadonnees_minimales_d_attributs_illisibles():
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,

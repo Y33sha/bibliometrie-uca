@@ -20,7 +20,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
 from interfaces.cli.oneshot.backfill_author_counts import backfill_source_records
-from pipeline.ingestion.common.source_contribution_queries import (
+from pipeline.ingestion.common.source_contribution_store import (
     CONTRIBUTOR_INFORMATION_KEY_COLUMNS,
     delete_orphan_contributor_information,
     key_hash_sql,

@@ -665,7 +665,7 @@ class TestProcessWork:
             "container_stores": MagicMock(),
             "publisher_store": MagicMock(),
             "staging_queries": staging_queries or FakeStagingQueries(),
-            "contribution_queries": MagicMock(),
+            "contribution_store": MagicMock(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -722,7 +722,7 @@ def _make_normalizer():
         queries=FakeSourceRecordQueries(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
 
 
@@ -748,5 +748,5 @@ class TestOpenalexNormalizerClass:
             "container_stores",
             "publisher_store",
             "staging_queries",
-            "contribution_queries",
+            "contribution_store",
         }

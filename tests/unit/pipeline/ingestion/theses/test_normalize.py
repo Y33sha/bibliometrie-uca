@@ -26,7 +26,7 @@ from pipeline.ingestion.theses.normalize import (
     process_work,
 )
 from tests.helpers.normalize_doubles import (
-    FakeContributionsBatchQueries,
+    FakeSourceContributionStore,
     FakeSourceRecordQueries,
     FakeStagingQueries,
     staging_row,
@@ -261,17 +261,17 @@ class TestBuildThesesAuthorRecords:
 
 class TestProcessContributions:
     def test_contributions_sources_ecrites_par_le_writer_partage(self):
-        batch = FakeContributionsBatchQueries()
-        process_contributions(MagicMock(), _these(), 10, batch_queries=batch)
+        batch = FakeSourceContributionStore()
+        process_contributions(MagicMock(), _these(), 10, contribution_store=batch)
         assert batch.synced_for == [10]
         assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
 
     def test_renormalisation_garde_les_contributions_sources(self):
         """Une thèse modifiée garde l'identifiant des contributions sources dont les informations du contributeur restent les mêmes, directeur compris."""
-        batch = FakeContributionsBatchQueries()
-        process_contributions(MagicMock(), _these(), 10, batch_queries=batch)
+        batch = FakeSourceContributionStore()
+        process_contributions(MagicMock(), _these(), 10, contribution_store=batch)
         modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
-        process_contributions(MagicMock(), modified, 10, batch_queries=batch)
+        process_contributions(MagicMock(), modified, 10, contribution_store=batch)
         assert [len(b) for b in batch.upserted_batches] == [2, 1]
         assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
 
@@ -284,7 +284,7 @@ class TestProcessWork:
         return {
             "queries": queries or FakeSourceRecordQueries(),
             "staging_queries": staging_queries or FakeStagingQueries(),
-            "batch_queries": MagicMock(),
+            "contribution_store": MagicMock(),
         }
 
     def test_happy_path(self, monkeypatch):
@@ -316,7 +316,7 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_queries=FakeStagingQueries(),
         queries=FakeSourceRecordQueries(),
-        batch_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
 
 

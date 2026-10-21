@@ -1069,7 +1069,7 @@ class TestProcessRecord:
         queries = MagicMock()
         queries.upsert_source_record.return_value = 555
         staging_queries = MagicMock()
-        contribution_queries = MagicMock()
+        contribution_store = MagicMock()
 
         row = staging_row(staging_id=1, source_id="WOS:1", doi="10.1/x")
         result = process_record(
@@ -1080,12 +1080,12 @@ class TestProcessRecord:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging_queries,
-            contribution_queries=contribution_queries,
+            contribution_store=contribution_store,
         )
 
         assert result is True
         # Synchronisation des contributions sources (via le writer partagé).
-        contribution_queries.fetch_stored_source_contributions.assert_called_once()
+        contribution_store.fetch_stored_source_contributions.assert_called_once()
         # `mark_done` appelée avec le bon staging_id.
         staging_queries.mark_done.assert_called_once_with(None, 1)
 
@@ -1132,7 +1132,7 @@ class TestProcessRecord:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=MagicMock(),
-            contribution_queries=MagicMock(),
+            contribution_store=MagicMock(),
         )
 
         assert captured["ut"] == "WOS:fallback"
@@ -1155,7 +1155,7 @@ class TestProcessRecord:
                 container_stores=MagicMock(),
                 publisher_store=MagicMock(),
                 staging_queries=MagicMock(),
-                contribution_queries=MagicMock(),
+                contribution_store=MagicMock(),
             )
 
 
@@ -1171,7 +1171,7 @@ class TestWosNormalizer:
             queries=MagicMock(),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            contribution_queries=MagicMock(),
+            contribution_store=MagicMock(),
         )
 
         captured: dict[str, Any] = {}
@@ -1193,5 +1193,5 @@ class TestWosNormalizer:
             "container_stores",
             "publisher_store",
             "staging_queries",
-            "contribution_queries",
+            "contribution_store",
         }

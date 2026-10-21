@@ -837,7 +837,7 @@ contributor_information = Table(
     # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
     # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
     # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
-    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_queries.py).
+    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_store.py).
     Column(
         "key_hash",
         Text,

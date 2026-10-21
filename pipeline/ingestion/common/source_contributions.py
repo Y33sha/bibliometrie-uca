@@ -13,8 +13,6 @@ from collections import defaultdict
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 
-from sqlalchemy import Connection
-
 from domain.country_detection import SOURCE_COUNTRY_METHODS
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
@@ -30,12 +28,12 @@ from domain.source_records.source_contribution_sync import (
 from domain.structures.identifiers import RorId
 from domain.types import JsonValue
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.common.source_contribution_queries import (
+from pipeline.ingestion.common.source_contribution_store import (
     ContributionAddressItem,
     ContributionRorItem,
-    ContributionsBatchQueries,
     ContributorNameFields,
     SourceContributionItem,
+    SourceContributionStore,
     StoredSourceContributionRow,
 )
 
@@ -90,8 +88,7 @@ def contributor_identifiers(**ids: str | int | None) -> dict[str, JsonValue] | N
 
 
 def sync_source_contributions(
-    conn: Connection,
-    queries: ContributionsBatchQueries,
+    store: SourceContributionStore,
     source: str,
     source_record_id: int,
     block: AuthorBlock,
@@ -102,15 +99,14 @@ def sync_source_contributions(
     Une empreinte de bloc égale à celle de la dernière synchronisation laisse les contributions sources en l'état. `mark_source_contributions_to_resync` vide cette empreinte, pour appliquer une règle de normalisation modifiée.
     """
     block_hash = fingerprint(dict(block))
-    if queries.fetch_authors_hash(conn, source_record_id) == block_hash:
+    if store.fetch_authors_hash(source_record_id) == block_hash:
         return
-    write_source_contributions(conn, queries, source, source_record_id, build(block))
-    queries.set_authors_hash(conn, source_record_id, block_hash)
+    write_source_contributions(store, source, source_record_id, build(block))
+    store.set_authors_hash(source_record_id, block_hash)
 
 
 def write_source_contributions(
-    conn: Connection,
-    queries: ContributionsBatchQueries,
+    store: SourceContributionStore,
     source: str,
     source_record_id: int,
     records: list[AuthorRecord],
@@ -155,7 +151,7 @@ def write_source_contributions(
             }
         )
 
-    stored = queries.fetch_stored_source_contributions(conn, source_record_id)
+    stored = store.fetch_stored_source_contributions(source_record_id)
     plan = plan_source_contribution_sync(
         [
             StoredSourceContribution(
@@ -179,45 +175,43 @@ def write_source_contributions(
         ],
     )
     if plan.regroup:
-        queries.mark_contributions_dirty(conn, source_record_id)
+        store.mark_contributions_dirty(source_record_id)
     authors = [
         (item["last_name_normalized"], item["first_name_normalized"] or "")
         for item in items
         if is_individual_author(item["roles"], item["collective"])
     ]
-    queries.set_author_counts(conn, source_record_id, len(authors), len(set(authors)))
+    store.set_author_counts(source_record_id, len(authors), len(set(authors)))
 
-    queries.delete_source_contributions(conn, list(plan.deletes))
-    queries.update_source_contributions_batch(
-        conn,
+    store.delete_source_contributions(list(plan.deletes))
+    store.update_source_contributions_batch(
         [
             {**items[key], "id": source_contribution_id}
             for source_contribution_id, key in plan.updates
         ],
     )
-    queries.delete_source_contribution_addresses(
-        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    store.delete_source_contribution_addresses(
+        [source_contribution_id for source_contribution_id, _ in plan.updates]
     )
-    queries.delete_source_contribution_rors(
-        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    store.delete_source_contribution_rors(
+        [source_contribution_id for source_contribution_id, _ in plan.updates]
     )
-    queries.delete_source_contribution_hal_structures(
-        conn, [source_contribution_id for source_contribution_id, _ in plan.updates]
+    store.delete_source_contribution_hal_structures(
+        [source_contribution_id for source_contribution_id, _ in plan.updates]
     )
-    queries.upsert_source_contributions_batch(conn, [items[key] for key in plan.inserts])
+    store.upsert_source_contributions_batch([items[key] for key in plan.inserts])
 
     source_contribution_id_by_key = {
         key: source_contribution_id for source_contribution_id, key in plan.updates
     }
     if plan.inserts:
         source_contribution_id_by_key |= _inserted_ids(
-            queries.fetch_stored_source_contributions(conn, source_record_id),
+            store.fetch_stored_source_contributions(source_record_id),
             known_ids={s.id for s in stored},
             inserted={key: items[key] for key in plan.inserts},
         )
     addr_id_by_text = write_addresses(
-        conn,
-        queries,
+        store,
         source,
         [
             (source_contribution_id_by_key[key], records[key].addresses)
@@ -239,9 +233,8 @@ def write_source_contributions(
                     ror_id=ror_id.value,
                     addr_id=addr_id,
                 )
-    queries.insert_source_contribution_rors_batch(conn, list(ror_items.values()))
-    queries.insert_source_contribution_hal_structures_batch(
-        conn,
+    store.insert_source_contribution_rors_batch(list(ror_items.values()))
+    store.insert_source_contribution_hal_structures_batch(
         [
             (source_contribution_id, hal_structure_id)
             for key, source_contribution_id in sorted(source_contribution_id_by_key.items())
@@ -310,8 +303,7 @@ def _item_contributor_information(item: SourceContributionItem) -> Hashable:
 
 
 def write_addresses(
-    conn: Connection,
-    queries: ContributionsBatchQueries,
+    store: SourceContributionStore,
     source: str,
     source_contribution_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
@@ -336,17 +328,16 @@ def write_addresses(
     for raw, norm in norm_by_text.items():
         if norm:
             first_text_by_norm.setdefault(norm, raw)
-    queries.upsert_addresses_batch(
-        conn, [{"raw": raw, "norm": norm} for norm, raw in first_text_by_norm.items()]
+    store.upsert_addresses_batch(
+        [{"raw": raw, "norm": norm} for norm, raw in first_text_by_norm.items()]
     )
-    addr_id_by_norm = queries.fetch_address_ids_by_normalized_text(conn, list(addr_countries))
+    addr_id_by_norm = store.fetch_address_ids_by_normalized_text(list(addr_countries))
     addr_id_by_text = {
         raw: addr_id_by_norm[norm] for raw, norm in norm_by_text.items() if norm in addr_id_by_norm
     }
 
     if method := SOURCE_COUNTRY_METHODS.get(source):
-        queries.insert_address_country_candidates(
-            conn,
+        store.insert_address_country_candidates(
             method,
             [
                 (aid, sorted(countries))
@@ -368,5 +359,5 @@ def write_addresses(
             link_values.append(
                 {"source_contribution_id": source_contribution_id, "addr_id": addr_id}
             )
-    queries.insert_source_contribution_addresses_batch(conn, link_values)
+    store.insert_source_contribution_addresses_batch(link_values)
     return addr_id_by_text

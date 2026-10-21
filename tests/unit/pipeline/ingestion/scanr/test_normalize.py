@@ -512,7 +512,7 @@ class TestProcessContributions:
         monkeypatch.setattr(
             normalize_scanr,
             "sync_source_contributions",
-            lambda conn, queries, source, spid, block, build: vus.update(
+            lambda store, source, spid, block, build: vus.update(
                 source=source, spid=spid, records=build(block)
             ),
         )
@@ -541,7 +541,7 @@ class TestProcessWork:
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
             staging_queries=staging,
-            contribution_queries=MagicMock(),
+            contribution_store=MagicMock(),
         )
         return rendu, queries, staging
 
@@ -569,7 +569,7 @@ class TestProcessWork:
             queries=MagicMock(),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            contribution_queries=MagicMock(),
+            contribution_store=MagicMock(),
         )
         assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
 
@@ -589,7 +589,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         queries=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
-        contribution_queries=MagicMock(),
+        contribution_store=MagicMock(),
     )
     row = staging_row()
 

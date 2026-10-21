@@ -14,7 +14,7 @@ from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_records import SourceRecordQueries
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.runtime.observability.log_format import (
@@ -204,10 +204,10 @@ class BibliographicNormalizer(SourceNormalizer):
         queries: SourceRecordQueries,
         container_stores: ContainerStores,
         publisher_store: PublisherStore,
-        contribution_queries: ContributionsBatchQueries,
+        contribution_store: SourceContributionStore,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
         self._container_stores = container_stores
         self._publisher_store = publisher_store
-        self._contribution_queries = contribution_queries
+        self._contribution_queries = contribution_store

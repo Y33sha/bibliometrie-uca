@@ -26,8 +26,8 @@ from pipeline.ingestion.common.normalizer import (
     NormalizeStats,
     SourceNormalizer,
 )
-from pipeline.ingestion.common.source_contribution_queries import (
-    ContributionsBatchQueries,
+from pipeline.ingestion.common.source_contribution_store import (
+    SourceContributionStore,
     delete_orphan_addresses,
     delete_orphan_contributor_information,
     mark_source_contributions_to_resync,
@@ -222,7 +222,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
             SourceRecordQueries(),
             container_stores=ContainerStores.of(conn),
             publisher_store=PublisherStore(conn),
-            contribution_queries=ContributionsBatchQueries(),
+            contribution_store=SourceContributionStore(conn),
         )
 
     return {
@@ -231,7 +231,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
             logger,
             StagingQueries(raw_store),
             SourceRecordQueries(),
-            batch_queries=ContributionsBatchQueries(),
+            contribution_store=SourceContributionStore(conn),
         ),
         "crossref": _biblio(CrossrefNormalizer),
         "datacite": _biblio(DataciteNormalizer),

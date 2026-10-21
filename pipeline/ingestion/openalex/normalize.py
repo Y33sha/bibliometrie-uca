@@ -30,7 +30,7 @@ from domain.types import (
 )
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_queries import ContributionsBatchQueries
+from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -473,14 +473,13 @@ def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
 
 def process_contributions(
     conn: Connection,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
     work: Mapping[str, JsonValue],
     source_record_id: int,
 ) -> None:
     """Synchronise les contributions sources OpenAlex de l'enregistrement source depuis son bloc auteurs."""
     sync_source_contributions(
-        conn,
-        contribution_queries,
+        contribution_store,
         "openalex",
         source_record_id,
         extract_openalex_author_block(work),
@@ -501,7 +500,7 @@ def process_work(
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
     staging_queries: StagingQueries,
-    contribution_queries: ContributionsBatchQueries,
+    contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
@@ -521,7 +520,7 @@ def process_work(
     source_record_id = insert_openalex_document(
         conn, queries, work, staging_id, publication_meta, primary
     )
-    process_contributions(conn, contribution_queries, work, source_record_id)
+    process_contributions(conn, contribution_store, work, source_record_id)
     staging_queries.mark_done(conn, staging_id)
     return True
 
@@ -544,5 +543,5 @@ class OpenalexNormalizer(BibliographicNormalizer):
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_queries=self._staging,
-            contribution_queries=self._contribution_queries,
+            contribution_store=self._contribution_queries,
         )
