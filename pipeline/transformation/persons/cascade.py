@@ -50,7 +50,7 @@ from domain.persons.matching import (
     trusted_identifier,
 )
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
-from domain.persons.name_matching import first_name_initials, initials_extend
+from domain.persons.name_matching import first_name_initials, full_first_name_extends
 from domain.persons.person import validated_name
 from domain.sources.registry import require_known_source
 from infrastructure.repositories.person_repository import PgPersonRepository
@@ -422,8 +422,7 @@ class _Cascade:
         if (
             initials is None
             or first_name is None
-            or first_name_initials(first_name) is not None
-            or not initials_extend(initials, first_name)
+            or not full_first_name_extends(initials, first_name)
         ):
             return
         self._repo.update_name(pid, *validated_name(namesake.last_name, first_name))

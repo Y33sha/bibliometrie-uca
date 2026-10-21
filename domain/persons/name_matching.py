@@ -117,6 +117,11 @@ def initials_extend(initials: tuple[str, ...], first_name: str) -> bool:
     return bool(initials) and own[: len(initials)] == initials
 
 
+def full_first_name_extends(initials: tuple[str, ...], first_name: str) -> bool:
+    """Vrai si `first_name` est un prénom plein que `initials` commencent (`initials_extend`) : (« a »,) et « Abdellah », mais ni « A. B. » ni un prénom vide."""
+    return first_name_initials(first_name) is None and initials_extend(initials, first_name)
+
+
 def _name_words(*parts: str) -> list[str]:
     """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
 

@@ -11,6 +11,8 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import lru_cache
 
+from domain.persons.name_matching import first_name_initials, full_first_name_extends, is_initials
+
 
 class GroupingMethod(StrEnum):
     """Origine de l'appartenance d'une contribution source à son groupe. Mappe l'enum PostgreSQL `grouping_method`."""
@@ -29,19 +31,21 @@ class GroupingMethod(StrEnum):
 
 def full_first_name(first_name: str) -> str:
     """Prénom complet, ou chaîne vide quand le prénom se réduit à des initiales."""
-    return first_name if any(len(part) > 1 for part in first_name.split()) else ""
+    return "" if not first_name or _is_initials(first_name) else first_name
 
 
+@lru_cache(maxsize=1_000_000)
 def with_known_first_name(first_name: str, known: str) -> str:
     """Prénom d'une contribution source pour l'alignement : `known` quand son prénom est absent ou fait d'initiales que `known` prolonge (« z » et « zhihao »), sinon son prénom.
 
     `known` : prénom de la personne à laquelle un humain a rattaché l'ORCID ou l'IdRef de la contribution source.
     """
-    if (
-        full_first_name(known)
-        and not full_first_name(first_name)
-        and _initials(known).startswith(_initials(first_name))
-    ):
+    if not full_first_name(known) or full_first_name(first_name):
+        return first_name
+    if not first_name:
+        return known
+    initials = first_name_initials(first_name)
+    if initials is not None and full_first_name_extends(initials, known):
         return known
     return first_name
 
@@ -127,9 +131,7 @@ def _initials(first_name: str) -> str:
     return "".join(part[:1] for part in first_name.split())
 
 
-@lru_cache(maxsize=1_000_000)
-def _only_initials(first_name: str) -> bool:
-    return all(len(part) <= 1 for part in first_name.split())
+_is_initials = lru_cache(maxsize=1_000_000)(is_initials)
 
 
 class Comparison(StrEnum):
@@ -184,7 +186,7 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
         levels[Comparison.FIRST_NAME] = None
     elif fx == fy:
         levels[Comparison.FIRST_NAME] = ComparisonLevel.FIRST_NAME_EXACT
-    elif (_only_initials(fx) or _only_initials(fy)) and (
+    elif (_is_initials(fx) or _is_initials(fy)) and (
         _initials(fx).startswith(_initials(fy)) or _initials(fy).startswith(_initials(fx))
     ):
         levels[Comparison.FIRST_NAME] = ComparisonLevel.INITIALS_MATCH
