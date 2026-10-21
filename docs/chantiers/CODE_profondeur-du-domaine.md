@@ -48,7 +48,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 - [x] `allow_person_creation` décidé sur les rôles. 49c40081a
 - [x] Réattribution d'un identifiant seulement par l'agrégat : endpoint de réattribution retiré ; docstring de `AttributionStatus` alignée sur l'usage de l'admin.
-- [ ] Identifiants personne normalisés à l'ingestion par `normalized_identifier_value`.
+- [x] Identifiants personne normalisés à l'ingestion par `compact_identifiers`. c309a275e
 - [ ] Cascade de matching en une entrée de domaine, sur un index de personnes ; `NameFormDecision` et `PersonMatchDecision` fusionnées.
 - [ ] Verdict d'une forme de nom en Python, sur `AttributionStatus`.
 - [ ] Un prédicat « prénom réduit à des initiales », un prédicat « prénom plein qui prolonge les initiales ».
