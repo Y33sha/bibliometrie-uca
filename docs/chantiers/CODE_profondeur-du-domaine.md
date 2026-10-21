@@ -17,10 +17,10 @@ Connaissances écrites à plusieurs endroits :
 - la propriété des clés de `corrections` : chaque sous-étape de `metadata_correction` filtre ses clés à sa façon ;
 - `CONVERGENCE_CASES`, re-listé dans `author_grouping/queries.py` ;
 - « enregistrement ScanR issu de HAL », à quatre endroits, dont un `LIKE 'hal%'` sans validation de l'identifiant ;
-- `meta ? 'conference'`, dans `metadata_correction_queries.py` et `type_proceedings_volumes.py` ;
+- `source_extras ? 'conference'`, dans `metadata_correction_queries.py` et `type_proceedings_volumes.py` ;
 - « prénom plein qui prolonge les initiales », à quatre endroits ;
 - les seuils de comparaison des auteurs, dans `author_grouping.py` et `interfaces/cli/dev/estimate_residual_weights.py` ;
-- les clés des JSON `meta` et `biblio` : écrites par `pipeline/ingestion/hal/payload.py`, lues par chaîne dans `domain/publications/conference.py` et `relations.py` ;
+- les clés des JSON `source_extras` et `biblio` : écrites par `pipeline/ingestion/hal/payload.py`, lues par chaîne dans `domain/publications/conference.py` et `relations.py` ;
 - le registre des dimensions de statistiques (`domain/stats.py`) et leur liaison SQL (`infrastructure/read_models/stats/pivot.py`), synchronisés par des `assert`.
 
 Règles du domaine contournées :
@@ -59,8 +59,9 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées. d473dd1b8
 - [x] Règles des volumes Crossref sur la colonne `source_records.author_count` ; titre qui commence par un mot de volume sans condition d'auteurs. 70201133b
 - [x] Colonne `raw_metadata` renommée `corrections`. e102ffc2f
+- [x] Colonnes `meta` de `source_records` et `publications` renommées `source_extras` ; trace des corrections d'une publication dans `publications.corrections`. 3b584b73c
 - [ ] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ.
-- [ ] Module propriétaire du format des JSON `meta` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `meta` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
+- [ ] Module propriétaire du format des JSON `source_extras` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `source_extras` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
 - [ ] Projection SQL des faits des règles à côté des règles.
 - [ ] Registre des clés de `corrections` et de leur sous-étape ; `effective_external_ids`.
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
@@ -79,7 +80,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 5 — Documentation
 
-- [ ] Mise à jour de `docs/pipeline/08-persons.md`, `06-metadata-correction.md`, `docs/agregats/` et `docs/playbooks/ajouter-une-regle-de-correction.md`.
+- [ ] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) et `docs/playbooks/ajouter-une-regle-de-correction.md` ; noms `corrections` et `source_extras` dans les fiches des autres chantiers.
 
 ## Questions ouvertes
 
