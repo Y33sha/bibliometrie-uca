@@ -2,6 +2,10 @@
 
 ## Chantiers non archivés
 
+### En cours
+
+- [Résolution des personnes par groupe](DATA_resolution-personnes.md)
+
 ### En pause
 
 - [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
@@ -23,7 +27,7 @@
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
-- [Résolution des personnes](DATA_resolution-personnes.md)
+- [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Une source, un adaptateur](CODE_adaptateur-par-source.md)

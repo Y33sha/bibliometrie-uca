@@ -110,7 +110,7 @@ Traité par le chantier [Le pipeline en paquet racine](2026-10-12_CODE_pipeline-
 
 ## Hors de la cible, à décider plus tard
 
-- Résolution des entités (algorithme, forme par paires) : chantier [Résolution des personnes](../DATA_resolution-personnes.md).
+- Résolution des entités (algorithme, forme par paires) : chantier [Résolution probabiliste des personnes](../DATA_resolution-personnes-probabiliste.md).
 - Outillage : orchestrateur par *assets* (Dagster), dbt, publication en bloc après contrôle (*Write-Audit-Publish*).
 
 ## Documents liés
