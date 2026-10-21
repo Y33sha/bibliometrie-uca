@@ -12,8 +12,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sqlalchemy import Connection
-
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
@@ -226,7 +224,6 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
 
 
 def process_contributions(
-    conn: Connection,
     contribution_store: SourceContributionStore,
     attributes: Mapping[str, JsonValue],
     source_record_id: int,
@@ -247,7 +244,6 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
     record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
@@ -306,7 +302,7 @@ def process_work(
             source_extras=extract_datacite_source_extras(attributes),
         ),
     )
-    process_contributions(conn, contribution_store, attributes, source_record_id)
+    process_contributions(contribution_store, attributes, source_record_id)
     staging_store.mark_done(staging_id)
     return True
 
@@ -323,14 +319,13 @@ class DataciteNormalizer(BibliographicNormalizer):
             attributes, max_year=today().year + 1
         )
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_store=self._staging,
-            contribution_store=self._contribution_queries,
+            contribution_store=self._contribution_store,
         )

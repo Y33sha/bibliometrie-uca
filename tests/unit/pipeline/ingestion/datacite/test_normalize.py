@@ -295,7 +295,7 @@ class TestProcessContributions:
             ]
         }
 
-        process_contributions(MagicMock(), MagicMock(), attrs, 555)
+        process_contributions(MagicMock(), attrs, 555)
 
         assert (vus["source"], vus["spid"]) == ("datacite", 555)
         assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
@@ -422,7 +422,7 @@ class TestProcessWork:
 
     def _run(self, raw, record_store, staging, logger, doi=None):
         row = staging_row(staging_id=42, raw=raw, doi=doi)
-        return process_work(MagicMock(), record_store, row, **self._kwargs(record_store, staging))
+        return process_work(record_store, row, **self._kwargs(record_store, staging))
 
     def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
         rendu = self._run({"attributes": _attributs()}, record_store, staging, logger)
@@ -484,7 +484,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_datacite,
         "process_work",
-        lambda conn, record_store, row, **kw: vus.update(row=row, **kw) or True,
+        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = DataciteNormalizer(
         conn=MagicMock(),
@@ -497,7 +497,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     )
     row = staging_row()
 
-    assert normalizer.normalize_record(MagicMock(), row) is True
+    assert normalizer.normalize_record(row) is True
     assert vus["row"] is row
 
 

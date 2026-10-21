@@ -4,8 +4,6 @@ import logging
 from collections.abc import Mapping, Sequence
 from functools import partial
 
-from sqlalchemy import Connection
-
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
@@ -499,7 +497,6 @@ def extract_publication_metadata(
 
 
 def insert_wos_document(
-    conn: Connection,
     record_store: SourceRecordStore,
     rec: Mapping[str, JsonValue],
     staging_id: int,
@@ -616,7 +613,6 @@ def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
     contribution_store: SourceContributionStore,
     logger: logging.Logger,
     rec: Mapping[str, JsonValue],
@@ -638,7 +634,6 @@ def process_contributions(
 
 
 def process_record(
-    conn: Connection,
     record_store: SourceRecordStore,
     logger: logging.Logger,
     staging_row: StagingRow,
@@ -667,8 +662,8 @@ def process_record(
         rec, containers.journal_id, containers.monograph_id
     )
 
-    source_record_id = insert_wos_document(conn, record_store, rec, staging_id, publication_meta)
-    process_contributions(conn, contribution_store, logger, rec, source_record_id)
+    source_record_id = insert_wos_document(record_store, rec, staging_id, publication_meta)
+    process_contributions(contribution_store, logger, rec, source_record_id)
     staging_store.mark_done(staging_id)
     return True
 
@@ -681,15 +676,14 @@ class WosNormalizer(BibliographicNormalizer):
         rec = extract_record(row.raw_data, row.doi)
         return as_str(rec.get("title")), as_int(rec.get("publication_year"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_record(
-            conn,
-            self._queries,
+            self._record_store,
             self.logger,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_store=self._staging,
-            contribution_store=self._contribution_queries,
+            contribution_store=self._contribution_store,
         )

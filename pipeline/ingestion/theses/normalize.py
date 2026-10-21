@@ -110,7 +110,6 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
 
 
 def insert_source_document(
-    conn: Connection,
     record_store: SourceRecordStore,
     thesis: Mapping[str, JsonValue],
     staging_id: int,
@@ -187,7 +186,6 @@ def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
 
 
 def process_contributions(
-    conn: Connection,
     thesis: Mapping[str, JsonValue],
     source_record_id: int,
     *,
@@ -209,7 +207,6 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
     record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
@@ -224,9 +221,9 @@ def process_work(
     publication_meta = extract_publication_metadata(thesis)
 
     source_record_id = insert_source_document(
-        conn, record_store, thesis, staging_id, theses_id, publication_meta
+        record_store, thesis, staging_id, theses_id, publication_meta
     )
-    process_contributions(conn, thesis, source_record_id, contribution_store=contribution_store)
+    process_contributions(thesis, source_record_id, contribution_store=contribution_store)
     staging_store.mark_done(staging_id)
 
     return True
@@ -245,18 +242,17 @@ class ThesesNormalizer(SourceNormalizer):
         contribution_store: SourceContributionStore,
     ) -> None:
         super().__init__(conn, logger, staging_store)
-        self._queries = record_store
-        self._batch_queries = contribution_store
+        self._record_store = record_store
+        self._contribution_store = contribution_store
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         publication_meta = extract_publication_metadata(row.raw_data)
         return publication_meta.title, publication_meta.publication_year
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             staging_store=self._staging,
-            contribution_store=self._batch_queries,
+            contribution_store=self._contribution_store,
         )

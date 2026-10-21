@@ -303,7 +303,6 @@ class TestInsertHalDocument:
         if publication_meta is None:
             publication_meta = extract_publication_metadata(doc, journal_id=None)
         insert_hal_document(
-            MagicMock(),
             record_store,
             doc,
             staging_id=1,
@@ -599,7 +598,7 @@ class TestProcessAuthors:
     def test_synchronises_even_when_empty(self):
         """Sans auteur, le writer synchronise quand même : les contributions sources en base sont supprimées."""
         contribution_store = FakeSourceContributionStore()
-        normalize_hal.process_contributions(MagicMock(), contribution_store, {}, 10)
+        normalize_hal.process_contributions(contribution_store, {}, 10)
         assert contribution_store.synced_for == [10]
 
 
@@ -636,7 +635,7 @@ class TestProcessWork:
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
         row = staging_row(staging_id=1, source_id="hal-1", raw=raw)
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_store=sq))
+        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
         assert result is True
         assert sq.marked_done == [1]
 
@@ -646,7 +645,7 @@ class TestProcessWork:
         row = staging_row(
             staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
         )
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_store=sq))
+        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
         assert result is False
         assert sq.marked_done == []
 
@@ -674,7 +673,7 @@ class TestProcessWork:
             "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
         }
         row = staging_row(raw=raw)
-        process_work(MagicMock(), staging_row=row, **self._kwargs())
+        process_work(staging_row=row, **self._kwargs())
         assert captured["called"] is False
 
     def test_exception_propagated(self, monkeypatch):
@@ -696,7 +695,7 @@ class TestProcessWork:
         }
         row = staging_row(source_id="hal-x", raw=raw)
         with pytest.raises(RuntimeError, match="kaboom"):
-            process_work(MagicMock(), staging_row=row, **self._kwargs())
+            process_work(staging_row=row, **self._kwargs())
 
 
 # ── HalNormalizer (classe) ───────────────────────────────────────
@@ -725,5 +724,5 @@ class TestHalNormalizerClass:
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
-        result = norm.normalize_record(MagicMock(), staging_row())
+        result = norm.normalize_record(staging_row())
         assert result is True

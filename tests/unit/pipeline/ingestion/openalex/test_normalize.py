@@ -360,7 +360,7 @@ class TestInsertOpenalexDocument:
         if publication_meta is None:
             publication_meta = extract_publication_metadata(work, journal_id=None)
         insert_openalex_document(
-            MagicMock(), record_store, work, staging_id=1, publication_meta=publication_meta
+            record_store, work, staging_id=1, publication_meta=publication_meta
         )
         return record_store.upserted_documents[-1]
 
@@ -679,7 +679,7 @@ class TestProcessWork:
             staging_id=1, source_id="W1", doi="10.1/a", raw={"id": "https://openalex.org/W1"}
         )
         kw = self._kwargs(record_store=record_store, staging_store=sq)
-        result = process_work(MagicMock(), staging_row=row, **kw)
+        result = process_work(staging_row=row, **kw)
         assert result is True
         assert sq.marked_done == [1]
 
@@ -700,7 +700,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_openalex, "process_contributions", lambda *a, **kw: None)
 
         row = staging_row()
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs())
+        result = process_work(staging_row=row, **self._kwargs())
         assert result is True
 
     def test_exception_propagated(self, monkeypatch):
@@ -712,7 +712,7 @@ class TestProcessWork:
         )
         row = staging_row(staging_id=1, source_id="W1")
         with pytest.raises(RuntimeError, match="boom"):
-            process_work(MagicMock(), staging_row=row, **self._kwargs())
+            process_work(staging_row=row, **self._kwargs())
 
 
 # ── OpenalexNormalizer (classe) ──────────────────────────────────
@@ -745,7 +745,7 @@ class TestOpenalexNormalizerClass:
             return True
 
         monkeypatch.setattr(normalize_openalex, "process_work", fake_process)
-        result = norm.normalize_record(MagicMock(), staging_row())
+        result = norm.normalize_record(staging_row())
         assert result is True
         # Les dépendances injectées sont passées en kwargs.
         assert set(captured.keys()) >= {

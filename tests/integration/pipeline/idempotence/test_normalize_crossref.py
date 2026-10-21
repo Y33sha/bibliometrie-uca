@@ -127,7 +127,7 @@ def _run_normalize_crossref(conn):
         staging_row = StagingRow(
             id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
         )
-        if normalizer.process_work(conn, staging_row):
+        if normalizer.process_work(staging_row):
             processed += 1
     return processed
 

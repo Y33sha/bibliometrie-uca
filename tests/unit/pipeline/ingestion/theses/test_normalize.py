@@ -164,7 +164,6 @@ class TestInsertSourceDocument:
         publication_meta: PublicationMetadata | None = None,
     ) -> dict:
         insert_source_document(
-            MagicMock(),
             record_store,
             thesis,
             staging_id=1,
@@ -262,16 +261,16 @@ class TestBuildThesesAuthorRecords:
 class TestProcessContributions:
     def test_contributions_sources_ecrites_par_le_writer_partage(self):
         batch = FakeSourceContributionStore()
-        process_contributions(MagicMock(), _these(), 10, contribution_store=batch)
+        process_contributions(_these(), 10, contribution_store=batch)
         assert batch.synced_for == [10]
         assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
 
     def test_renormalisation_garde_les_contributions_sources(self):
         """Une thèse modifiée garde l'identifiant des contributions sources dont les informations du contributeur restent les mêmes, directeur compris."""
         batch = FakeSourceContributionStore()
-        process_contributions(MagicMock(), _these(), 10, contribution_store=batch)
+        process_contributions(_these(), 10, contribution_store=batch)
         modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
-        process_contributions(MagicMock(), modified, 10, contribution_store=batch)
+        process_contributions(modified, 10, contribution_store=batch)
         assert [len(b) for b in batch.upserted_batches] == [2, 1]
         assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
 
@@ -291,7 +290,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda thesis: [])
         sq = FakeStagingStore()
         row = staging_row(staging_id=42, raw={"titrePrincipal": "T"})
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_store=sq))
+        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
         assert result is True
         assert sq.marked_done == [42]
 
@@ -304,7 +303,7 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_theses, "insert_source_document", boom)
         row = staging_row(source_id="hal-x", raw={"titrePrincipal": "T"})
         with pytest.raises(RuntimeError, match="kaboom"):
-            process_work(MagicMock(), staging_row=row, **self._kwargs())
+            process_work(staging_row=row, **self._kwargs())
 
 
 # ── ThesesNormalizer (classe) ────────────────────────────────────
@@ -326,7 +325,7 @@ class TestThesesNormalizerClass:
 
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()
-        norm.preload_caches(MagicMock())
+        norm.preload_caches()
         monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
-        result = norm.normalize_record(MagicMock(), staging_row())
+        result = norm.normalize_record(staging_row())
         assert result is True

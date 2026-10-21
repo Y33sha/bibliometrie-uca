@@ -82,10 +82,10 @@ class _Norm(SourceNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return "Titre", 2024
 
-    def normalize_record(self, conn, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         return True
 
-    def process_work(self, conn, row: StagingRow) -> bool | None:
+    def process_work(self, row: StagingRow) -> bool | None:
         self.processed_rows.append(row)
         if row.source_id in self.raises_on:
             raise RuntimeError(f"boom on {row.source_id}")
@@ -95,7 +95,7 @@ class _Norm(SourceNormalizer):
             return self.results[idx]
         return True
 
-    def preload_caches(self, conn):
+    def preload_caches(self):
         self.preload_called = True
 
     def cleanup(self):
@@ -203,7 +203,7 @@ class TestRunKeyboardInterrupt:
         staging.pending_rows = [_row("a")]
 
         class _Kb(_Norm):
-            def process_work(self, conn, row):
+            def process_work(self, row):
                 raise KeyboardInterrupt
 
         norm = _Kb(staging, results=[True])
@@ -223,7 +223,7 @@ class TestRunKeyboardInterrupt:
         staging.pending_rows = [_row("a")]
 
         class _Kb(_Norm):
-            def process_work(self, conn, row):
+            def process_work(self, row):
                 self.conn.invalidated = True
                 self.conn.rollback.side_effect = RuntimeError("Can't reconnect until invalid")
                 raise KeyboardInterrupt
@@ -243,7 +243,7 @@ class TestRunFatalException:
         staging.pending_rows = [_row("a")]
 
         class _Fatal(_Norm):
-            def preload_caches(self, conn):
+            def preload_caches(self):
                 raise RuntimeError("fatal preload")
 
         norm = _Fatal(staging)
@@ -268,7 +268,7 @@ class TestIterRowsSubBatch:
         a, b, c = _row("a"), _row("b"), _row("c")
         staging.batch_id_rows = {(10, 20): [a, b], (30,): [c]}
         norm = _SubBatch(staging)
-        rows = list(norm._iter_rows(MagicMock()))
+        rows = list(norm._iter_rows())
         assert rows == [a, b, c]
 
 
@@ -291,7 +291,7 @@ class _MinimalNorm(SourceNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return row.raw_data.get("title"), row.raw_data.get("year")  # type: ignore[return-value]
 
-    def normalize_record(self, conn, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         self.normalized.append(row)
         return True
 
@@ -301,7 +301,7 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=1, source_id="a", doi=None, raw_data={})
-        assert norm.process_work(MagicMock(), row) is None
+        assert norm.process_work(row) is None
         staging.mark_done.assert_called_once()
         staging.discard_source_record.assert_not_called()
 
@@ -310,7 +310,7 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
-        assert norm.process_work(MagicMock(), row) is False
+        assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(7)
         staging.mark_done.assert_called_once_with(7)
         assert norm.normalized == []
@@ -319,9 +319,9 @@ class TestProcessWorkMinimalMetadata:
         """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplète."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
-        norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]
+        norm.normalize_record = lambda row: False  # type: ignore[method-assign]
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
-        assert norm.process_work(MagicMock(), row) is False
+        assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(3)
         staging.mark_done.assert_called_once_with(3)
 
@@ -329,6 +329,6 @@ class TestProcessWorkMinimalMetadata:
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         row = StagingRow(id=2, source_id="b", doi=None, raw_data={"title": "T", "year": 2020})
-        assert norm.process_work(MagicMock(), row) is True
+        assert norm.process_work(row) is True
         assert norm.normalized == [row]
         staging.discard_source_record.assert_not_called()

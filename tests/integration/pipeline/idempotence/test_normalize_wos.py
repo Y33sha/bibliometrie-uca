@@ -85,7 +85,6 @@ def run_normalize_wos(conn):
     processed = 0
     for row in rows:
         if process_record(
-            conn,
             record_store,
             logger,
             row,

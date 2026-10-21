@@ -3,8 +3,6 @@
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
-from sqlalchemy import Connection
-
 from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
@@ -262,7 +260,6 @@ def extract_publication_metadata(
 
 
 def insert_openalex_document(  # noqa: C901
-    conn: Connection,
     record_store: SourceRecordStore,
     work: Mapping[str, JsonValue],
     staging_id: int,
@@ -471,7 +468,6 @@ def extract_openalex_author_block(work: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
     contribution_store: SourceContributionStore,
     work: Mapping[str, JsonValue],
     source_record_id: int,
@@ -492,7 +488,6 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
     record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
@@ -517,9 +512,9 @@ def process_work(
     )
 
     source_record_id = insert_openalex_document(
-        conn, record_store, work, staging_id, publication_meta, primary
+        record_store, work, staging_id, publication_meta, primary
     )
-    process_contributions(conn, contribution_store, work, source_record_id)
+    process_contributions(contribution_store, work, source_record_id)
     staging_store.mark_done(staging_id)
     return True
 
@@ -533,14 +528,13 @@ class OpenalexNormalizer(BibliographicNormalizer):
         title = as_str(work.get("title")) or as_str(work.get("display_name"))
         return title, as_int(work.get("publication_year"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_store=self._staging,
-            contribution_store=self._contribution_queries,
+            contribution_store=self._contribution_store,
         )

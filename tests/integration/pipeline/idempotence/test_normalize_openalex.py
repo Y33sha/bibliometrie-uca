@@ -131,7 +131,6 @@ def run_normalize_oa(conn):
             id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
         )
         if process_work(
-            conn,
             record_store,
             staging_row,
             container_stores=container_stores,

@@ -8,7 +8,6 @@ from xml.etree.ElementTree import Element, ParseError
 
 import defusedxml.ElementTree as ET
 from defusedxml.common import DefusedXmlException
-from sqlalchemy import Connection
 
 from domain.dates import today
 from domain.journals.containers import ContainerDescription
@@ -207,7 +206,6 @@ def build_hal_external_ids(
 
 
 def insert_hal_document(
-    conn: Connection,
     record_store: SourceRecordStore,
     doc: Mapping[str, JsonValue],
     staging_id: int,
@@ -580,7 +578,6 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
 
 
 def process_contributions(
-    conn: Connection,
     contribution_store: SourceContributionStore,
     doc: Mapping[str, JsonValue],
     source_record_id: int,
@@ -601,7 +598,6 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
     record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
@@ -632,14 +628,13 @@ def process_work(
     )
 
     source_record_id = insert_hal_document(
-        conn,
         record_store,
         doc,
         staging_id,
         hal_id,
         publication_meta,
     )
-    process_contributions(conn, contribution_store, doc, source_record_id)
+    process_contributions(contribution_store, doc, source_record_id)
     staging_store.mark_done(staging_id)
 
     return True
@@ -652,14 +647,13 @@ class HalNormalizer(BibliographicNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_store=self._staging,
-            contribution_store=self._contribution_queries,
+            contribution_store=self._contribution_store,
         )

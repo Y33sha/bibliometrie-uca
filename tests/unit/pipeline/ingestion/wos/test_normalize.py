@@ -904,7 +904,7 @@ class TestInsertWosDocument:
         )
 
         result = insert_wos_document(
-            None, record_store, rec, staging_id=10, publication_meta=publication_meta
+            record_store, rec, staging_id=10, publication_meta=publication_meta
         )
 
         assert result == 555
@@ -936,9 +936,7 @@ class TestInsertWosDocument:
             language=None,
             container_title=None,
         )
-        insert_wos_document(
-            None, record_store, rec, staging_id=5, publication_meta=publication_meta
-        )
+        insert_wos_document(record_store, rec, staging_id=5, publication_meta=publication_meta)
 
         row_arg = record_store.upsert_source_record.call_args.args[0]
         assert row_arg.journal_id is None
@@ -1075,7 +1073,6 @@ class TestProcessRecord:
 
         row = staging_row(staging_id=1, source_id="WOS:1", doi="10.1/x")
         result = process_record(
-            None,
             record_store,
             logger,
             row,
@@ -1127,7 +1124,6 @@ class TestProcessRecord:
 
         row = staging_row(staging_id=1, source_id="WOS:fallback", doi=None)
         process_record(
-            None,
             record_store,
             logger,
             row,
@@ -1150,7 +1146,6 @@ class TestProcessRecord:
         row = staging_row(staging_id=1, source_id="WOS:err", doi=None)
         with pytest.raises(ValueError, match="boom"):
             process_record(
-                None,
                 MagicMock(),
                 logger,
                 row,
@@ -1178,7 +1173,7 @@ class TestWosNormalizer:
 
         captured: dict[str, Any] = {}
 
-        def fake_process(conn, record_store, log, row, **kw):
+        def fake_process(record_store, log, row, **kw):
             captured["row"] = row
             captured["kwargs"] = kw
             return True
@@ -1186,7 +1181,7 @@ class TestWosNormalizer:
         monkeypatch.setattr(normalize_wos, "process_record", fake_process)
 
         row = staging_row(staging_id=7, source_id="WOS:7")
-        result = norm.normalize_record(MagicMock(), row)
+        result = norm.normalize_record(row)
 
         assert result is True
         assert captured["row"] == row

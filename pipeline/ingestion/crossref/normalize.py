@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from sqlalchemy import Connection
-
 from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.journals.series import split_collection_and_volume
@@ -326,7 +324,6 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def process_contributions(
-    conn: Connection,
     contribution_store: SourceContributionStore,
     msg: Mapping[str, JsonValue],
     source_record_id: int,
@@ -347,7 +344,6 @@ def process_contributions(
 
 
 def process_work(
-    conn: Connection,
     record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
@@ -398,7 +394,7 @@ def process_work(
             source_extras=source_extras,
         ),
     )
-    process_contributions(conn, contribution_store, msg, source_record_id)
+    process_contributions(contribution_store, msg, source_record_id)
     staging_store.mark_done(staging_id)
     return True
 
@@ -410,14 +406,13 @@ class CrossrefNormalizer(BibliographicNormalizer):
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
-    def normalize_record(self, conn: Connection, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool | None:
         container_stores, publisher_store = self._container_stores, self._publisher_store
         return process_work(
-            conn,
-            self._queries,
+            self._record_store,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
             staging_store=self._staging,
-            contribution_store=self._contribution_queries,
+            contribution_store=self._contribution_store,
         )

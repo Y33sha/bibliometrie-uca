@@ -58,7 +58,7 @@ class TestInsertScanrDocumentLicense:
     def _call(self, evidence: dict) -> Any:
         record_store = FakeSourceRecordStore()
         insert_scanr_document(
-            MagicMock(), record_store, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META
+            record_store, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META
         )
         return record_store.upserted_documents[-1]
 
@@ -77,7 +77,6 @@ class TestInsertScanrDocumentLicense:
 class TestInsertScanrDocumentBiblio:
     def _call(self, record_store, doc) -> dict[str, Any]:
         insert_scanr_document(
-            MagicMock(),
             record_store,
             doc,
             staging_id=1,
@@ -137,7 +136,6 @@ class TestInsertScanrDocumentExternalIds:
     def _call(self, doc, publication_meta) -> dict[str, Any]:
         record_store = FakeSourceRecordStore()
         insert_scanr_document(
-            MagicMock(),
             record_store,
             doc,
             staging_id=1,
@@ -389,7 +387,6 @@ class TestInsertScanrDocumentIdentifiants:
     def _call(self, doc, publication_meta=None) -> Any:
         record_store = FakeSourceRecordStore()
         insert_scanr_document(
-            MagicMock(),
             record_store,
             doc,
             staging_id=1,
@@ -426,7 +423,6 @@ class TestInsertScanrDocumentChamps:
     def _call(self, doc, publication_meta=None) -> Any:
         record_store = FakeSourceRecordStore()
         insert_scanr_document(
-            MagicMock(),
             record_store,
             doc,
             staging_id=1,
@@ -517,7 +513,7 @@ class TestProcessContributions:
             ),
         )
 
-        process_contributions(MagicMock(), MagicMock(), {"authors": []}, 555)
+        process_contributions(MagicMock(), {"authors": []}, 555)
 
         assert (vus["source"], vus["spid"]) == ("scanr", 555)
 
@@ -535,7 +531,6 @@ class TestProcessWork:
         record_store = FakeSourceRecordStore()
         staging = FakeStagingStore()
         rendu = process_work(
-            MagicMock(),
             record_store,
             staging_row(staging_id=42, source_id="sc-1", raw=raw),
             container_stores=MagicMock(),
@@ -580,7 +575,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_scanr,
         "process_work",
-        lambda conn, record_store, row, **kw: vus.update(row=row, **kw) or True,
+        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = ScanrNormalizer(
         conn=MagicMock(),
@@ -593,5 +588,5 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     )
     row = staging_row()
 
-    assert normalizer.normalize_record(MagicMock(), row) is True
+    assert normalizer.normalize_record(row) is True
     assert vus["row"] is row

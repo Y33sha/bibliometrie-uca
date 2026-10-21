@@ -581,7 +581,6 @@ class TestProcessContributions:
 
         process_contributions(
             MagicMock(),
-            MagicMock(),
             {"author": [{"family": "Dupont"}]},
             555,
         )
@@ -622,7 +621,6 @@ class TestProcessWork:
 
     def _run(self, raw, record_store, staging, logger):
         return process_work(
-            MagicMock(),
             record_store,
             staging_row(staging_id=42, raw=raw),
             container_stores=MagicMock(),
@@ -664,7 +662,7 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_crossref,
         "process_work",
-        lambda conn, record_store, row, **kw: vus.update(row=row, **kw) or True,
+        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = CrossrefNormalizer(
         conn=MagicMock(),
@@ -677,5 +675,5 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     )
     row = staging_row()
 
-    assert normalizer.normalize_record(MagicMock(), row) is True
+    assert normalizer.normalize_record(row) is True
     assert vus["row"] is row

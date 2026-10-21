@@ -94,7 +94,6 @@ def run_normalize_hal(conn):
             raw_data=row.raw_data,
         )
         if process_work(
-            conn,
             record_store,
             staging_row,
             container_stores=container_stores,
