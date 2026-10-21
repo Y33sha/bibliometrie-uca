@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict hIh4syP4Bk9m1aKIGibBkP58ttNKuas5ypYfhKSA8mxbOolRnMls795zNzWsaSk
+\restrict 3b4QLNCX1bgMcxfdnoMNCfF9RFhTwxO5FuAG2OfI1MqoBuPaUmXqq1aaerKUWdP
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1101,6 +1101,8 @@ CREATE TABLE sources.source_records (
     license public.license_type,
     author_count integer DEFAULT 0 NOT NULL,
     distinct_author_count integer DEFAULT 0 NOT NULL,
+    raw_doc_type text,
+    raw_language text,
     CONSTRAINT source_records_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text))),
     CONSTRAINT source_records_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
@@ -1126,6 +1128,20 @@ COMMENT ON COLUMN sources.source_records.author_count IS 'Contributions sources 
 --
 
 COMMENT ON COLUMN sources.source_records.distinct_author_count IS 'Noms complets normalisés distincts parmi les contributions sources comptées par author_count.';
+
+
+--
+-- Name: COLUMN source_records.raw_doc_type; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.raw_doc_type IS 'Type de document donné par la source, dans son vocabulaire.';
+
+
+--
+-- Name: COLUMN source_records.raw_language; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.raw_language IS 'Langue donnée par la source, dans son vocabulaire.';
 
 
 --
@@ -4925,5 +4941,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hIh4syP4Bk9m1aKIGibBkP58ttNKuas5ypYfhKSA8mxbOolRnMls795zNzWsaSk
+\unrestrict 3b4QLNCX1bgMcxfdnoMNCfF9RFhTwxO5FuAG2OfI1MqoBuPaUmXqq1aaerKUWdP
 

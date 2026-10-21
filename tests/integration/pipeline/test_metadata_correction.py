@@ -43,8 +43,7 @@ def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
 def _apply(conn) -> int:
     """Joue la passe unaire sans committer (transaction de test rollbackée)."""
     rows = _Q.fetch_for_unary_correction(conn)
-    language_forms = _Q.fetch_language_forms(conn)
-    updates = [u for r in rows if (u := compute_update(r, language_forms)) is not None]
+    updates = [u for r in rows if (u := compute_update(r)) is not None]
     return _Q.persist_corrections(conn, updates)
 
 
@@ -161,15 +160,6 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
     doc_type, raw = _state(conn, source_record)
     assert doc_type == "media"
     assert raw["doc_type"]["corrected_by"] == "DOI_REGISTRANT_MEDIA_TO_MEDIA"
-
-
-def test_hal_code_mapped_to_canonical(sa_sync_conn):
-    conn = sa_sync_conn
-    source_record = _source_record(conn, source_id="hal-1", doc_type="ART", source="hal")
-    assert _apply(conn) == 1
-    doc_type, raw = _state(conn, source_record)
-    assert doc_type == "article"  # ART → article par mapping
-    assert raw == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
 
 
 def test_reversibility_invariant(sa_sync_conn):
@@ -711,22 +701,3 @@ def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_con
     ).one()
     assert row.doi == "10.9002/file1"
     assert row.raw_metadata == {}
-
-
-def test_language_mapped_to_referential_code_with_source_value_kept(sa_sync_conn):
-    # WoS donne le nom anglais de la langue ; la forme `english` du référentiel le ramène à `en`.
-    conn = sa_sync_conn
-    source_record = _source_record(conn, source="wos", source_id="wos-1", doc_type="article")
-    conn.execute(
-        text("UPDATE source_records SET language = 'English' WHERE id = :id"), {"id": source_record}
-    )
-    _apply(conn)
-    row = conn.execute(
-        text(
-            "SELECT language, raw_metadata->'language' AS source_value "
-            "FROM source_records WHERE id = :id"
-        ),
-        {"id": source_record},
-    ).one()
-    assert row.language == "en"
-    assert row.source_value == {"raw": "English", "corrected_by": "LANGUAGE_MAP"}

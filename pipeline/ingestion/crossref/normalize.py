@@ -1,7 +1,7 @@
 """Normalisation des données CrossRef : staging → tables structurées.
 
 Particularités CrossRef :
-- `doc_type` stocké tel quel depuis `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`) ; la phase `metadata_correction` le traduit par `domain.source_records.doc_types._SOURCE_MAPS["crossref"]`. `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
+- `raw_doc_type` : `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
 """
 
@@ -392,11 +392,11 @@ def process_work(
             external_ids=external_ids,
             title=title,
             publication_year=publication_year,
-            doc_type=crossref_raw_doc_type(msg),
+            raw_doc_type=crossref_raw_doc_type(msg),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
             container_title=get_container_title(msg) if not containers.journal_id else None,
-            language=get_language(msg),
+            raw_language=get_language(msg),
             biblio=biblio,
             abstract=get_abstract(msg),
             keywords=get_keywords(msg),

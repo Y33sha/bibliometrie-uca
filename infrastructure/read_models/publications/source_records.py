@@ -11,7 +11,6 @@ from application.ports.read_models.publications_queries import (
 )
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import stashed_raw
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
@@ -132,11 +131,12 @@ def get_publication_sources(
     if title is None:
         return None
     rows = conn.execute(
-        text(f"""
+        text("""
             SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
                    sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
                    lang.name AS language_name,
-                   {stashed_raw("language")} AS language_raw,
+                   CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
+                        THEN sr.raw_language END AS language_raw,
                    sr.oa_status, sr.container_title, sr.biblio,
                    j.id AS journal_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name

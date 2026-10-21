@@ -120,7 +120,7 @@ def extract_publication_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un document HAL.
 
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`), pas la valeur canonique : la résolution source→enum (`map_doc_type`) relève de la phase `metadata_correction`, pas du brut stocké dans `source_records`.
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`).
     """
     title = get_title(doc)
     raw_type = hal_text_field(doc.get("docType_s")) or ""
@@ -265,11 +265,11 @@ def insert_hal_document(
             external_ids=external_ids,
             title=publication_meta.title or "",
             publication_year=publication_meta.publication_year,
-            doc_type=publication_meta.doc_type,
+            raw_doc_type=publication_meta.doc_type,
             journal_id=publication_meta.journal_id,
             monograph_id=publication_meta.monograph_id,
             container_title=publication_meta.container_title,
-            language=publication_meta.language,
+            raw_language=publication_meta.language,
             biblio=biblio_json,
             meta=extract_hal_meta(doc),
             abstract=abstract,

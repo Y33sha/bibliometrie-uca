@@ -324,12 +324,12 @@ class TestInsertHalDocument:
     def test_doc_type_concatenated_with_subtype(self):
         queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"docType_s": "ART", "docSubType_s": "review"})
-        assert captured.doc_type == "ART_review"
+        assert captured.raw_doc_type == "ART_review"
 
     def test_doc_type_no_subtype(self):
         queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"docType_s": "BOOK"})
-        assert captured.doc_type == "BOOK"
+        assert captured.raw_doc_type == "BOOK"
 
     def test_nnt_goes_in_external_ids(self):
         queries = FakeSourceRecordQueries()
@@ -438,7 +438,7 @@ class TestInsertHalDocument:
         assert captured.journal_id == 7
         assert captured.oa_status == "gold"
         assert captured.embargo_until == date(2027, 1, 1)
-        assert captured.language == "fr"
+        assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 
 

@@ -353,10 +353,11 @@ def seed_source_record(
     publication_id: int | None = None,
     journal_id: int | None = None,
     doc_type: str | None = None,
+    raw_doc_type: str | None = None,
     doi: str | None = None,
     raw_metadata: dict[str, object] | None = None,
 ) -> int:
-    """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma."""
+    """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma. `raw_doc_type` vaut par défaut `doc_type`."""
     values = {
         "source": source,
         "source_id": source_id or uniq("sid"),
@@ -365,6 +366,7 @@ def seed_source_record(
         "publication_id": publication_id,
         "journal_id": journal_id,
         "doc_type": doc_type,
+        "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
         "doi": doi,
         "raw_metadata": json.dumps(raw_metadata) if raw_metadata is not None else None,
     }

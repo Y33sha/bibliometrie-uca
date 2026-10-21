@@ -1,27 +1,21 @@
 """Phase `metadata_correction` — sous-étape unaire (corrections per-record).
 
-Pour chaque `source_record` : reconstruit le brut normalisé (via `raw_metadata`), **mappe** le `doc_type` source vers le canonique (`map_doc_type`) et la langue vers le code du référentiel `languages`, puis applique les règles de correction `effective_metadata` (per-record + journal-dépendantes — les journaux sont typés à ce stade, la phase tourne après `publishers_journals`) sur les valeurs canoniques. Écrit les métadonnées corrigées dans les colonnes typées et stashe le brut source dans `raw_metadata`.
+Pour chaque `source_record` : reconstruit les valeurs d'avant correction (via `raw_metadata`), puis applique les règles de correction `effective_metadata` (per-record + journal-dépendantes — les journaux sont typés à ce stade, la phase tourne après `publishers_journals`). `doc_type` arrive traduit par la normalisation dans le vocabulaire du référentiel, celui des règles. Écrit les métadonnées corrigées dans les colonnes typées et stashe la valeur d'avant correction dans `raw_metadata`.
 
-Le mapping avant la correction est ce qui rend les règles gatées sur `doc_type` opérantes pour toutes les sources : sans lui, une `source_record` HAL porte `ART` (≠ `article`), et aucune règle canonique ne matche.
+Idempotent et auto-cicatrisant : la correction repart toujours de la valeur d'avant correction, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit la valeur, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
 
-Idempotent et auto-cicatrisant : la correction repart toujours du **brut reconstruit**, jamais de la valeur déjà corrigée. Un re-normalize qui réécrit le brut, ou un changement de `journal_type` qui (dé)clenche une règle, est rattrapé au run suivant sans état à entretenir.
-
-Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`language`/`external_ids` ; cluster : `doi`/`removed_external_ids` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas. La sous-étape unaire réapplique aux identifiants externes le retrait noté par la sous-étape cluster.
+Les sous-étapes de la phase écrivent `raw_metadata` sur des clés disjointes (unaire : `doc_type`/`oa_status`/`external_ids` ; cluster : `doi`/`removed_external_ids` ; `journal_by_doi` : `journal_id`) ; chaque passe préserve donc les clés qu'elle ne gère pas. La sous-étape unaire réapplique aux identifiants externes le retrait noté par la sous-étape cluster.
 """
 
 import logging
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.source_records.doc_types import map_doc_type
-from domain.source_records.languages import language_code
 from domain.source_records.metadata_correction.rules import (
-    CorrectedFields,
     MetadataCorrectionRule,
-    MetadataForCorrection,
     effective_metadata,
     origin_doc_type_correction,
     strip_dissertation_keys,
@@ -45,22 +39,12 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (`doi` et `removed_external_ids`, gérés par la sous-étape cluster ; `journal_id`, par la sous-étape `journal_by_doi`) sont préservées.
-_UNARY_FIELDS = ("doc_type", "oa_status", "language", "external_ids")
-
-# Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping source→canonique a changé la valeur (aucune règle de correction n'a firé).
-DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
-
-# Provenance inscrite dans `raw_metadata.language.corrected_by` : la valeur de la source est ramenée au code du référentiel des langues.
-LANGUAGE_MAP_MARKER = "LANGUAGE_MAP"
-
-# Traductions de vocabulaire : elles ne comptent pas comme des corrections.
-_VOCABULARY_MARKERS = frozenset({DOC_TYPE_MAP_MARKER, LANGUAGE_MAP_MARKER})
+_UNARY_FIELDS = ("doc_type", "oa_status", "external_ids")
 
 
 def compute_updates(
     rows: list[UnaryCorrectionRow],
     hal_rows: Mapping[str, UnaryCorrectionRow],
-    language_forms: Mapping[str, str],
 ) -> list[CorrectionUpdate]:
     """Mises à jour à persister pour `rows`. `hal_rows` : enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR de `rows`."""
     updates: list[CorrectionUpdate] = []
@@ -71,7 +55,7 @@ def compute_updates(
             else None
         )
         origin_doc_type = corrected_doc_type(origin) if origin else None
-        if (update := compute_update(row, language_forms, origin_doc_type)) is not None:
+        if (update := compute_update(row, origin_doc_type)) is not None:
             updates.append(update)
     return updates
 
@@ -88,52 +72,36 @@ def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
 
 
 def corrected_doc_type(row: UnaryCorrectionRow) -> str | None:
-    """Type corrigé d'une `source_record` : correspondance du vocabulaire de la source, puis règles de correction."""
+    """Type corrigé d'une `source_record` par les règles de correction."""
     raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)
-    mapped, corrected = _map_and_correct_doc_type(raw, row.source)
-    return corrected.doc_type.value if corrected.doc_type is not None else mapped
-
-
-def _map_and_correct_doc_type(
-    raw: MetadataForCorrection, source: str
-) -> tuple[str | None, CorrectedFields]:
-    mapped = map_doc_type(raw.doc_type, source) if raw.doc_type is not None else None
-    return mapped, effective_metadata(replace(raw, doc_type=mapped))
+    corrected = effective_metadata(raw)
+    return corrected.doc_type.value if corrected.doc_type is not None else raw.doc_type
 
 
 def compute_update(
     row: UnaryCorrectionRow,
-    language_forms: Mapping[str, str],
     origin_doc_type: str | None = None,
 ) -> CorrectionUpdate | None:
-    """Recalcule les métadonnées corrigées d'une `source_record` depuis son brut reconstruit. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
+    """Recalcule les métadonnées corrigées d'une `source_record` depuis ses valeurs d'avant correction. Retourne la mise à jour à persister, ou `None` si rien ne change (colonnes + `raw_metadata` identiques).
 
-    `doc_type` subit deux transformations enchaînées : **mapping** source→canonique (`map_doc_type`) puis **correction** (`effective_metadata`, dont les whitelists sont canoniques). `oa_status` n'a que la correction (pas de mapping). `language` n'a que le mapping : `language_forms` associe chaque forme connue au code de sa langue, et une valeur inconnue donne `None`. Le `raw` stashé est toujours la valeur **source d'origine** ; `corrected_by` porte la règle, ou `DOC_TYPE_MAP` / `LANGUAGE_MAP` quand seul le mapping a changé la valeur.
+    Le `raw` stashé est la valeur d'avant correction ; `corrected_by` nomme la règle.
 
     `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu, qui prime sur le sien.
 
     Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, la sous-étape `journal_by_doi` gère `journal_id`)."""
     raw = hydrate_raw_view(row.for_correction(), row.raw_metadata)
+    corrected = effective_metadata(raw)
 
-    # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire), puis correction sur la valeur canonique.
-    raw_doc_type = raw.doc_type
-    mapped_doc_type, corrected = _map_and_correct_doc_type(raw, row.source)
-
-    new_doc_type = mapped_doc_type
+    new_doc_type = raw.doc_type
     doc_type_by: str | None = None
-    if corrected.doc_type is not None and corrected.doc_type.value != mapped_doc_type:
+    if corrected.doc_type is not None and corrected.doc_type.value != raw.doc_type:
         new_doc_type = corrected.doc_type.value
         doc_type_by = corrected.doc_type.rule.value
-    elif mapped_doc_type != raw_doc_type:
-        doc_type_by = DOC_TYPE_MAP_MARKER
     if origin := origin_doc_type_correction(new_doc_type, origin_doc_type):
         new_doc_type = origin.value
         doc_type_by = origin.rule.value
 
     new_oa_status = raw.oa_status
-
-    raw_language = raw_value(row.raw_metadata, "language", row.language)
-    new_language = language_code(raw_language, language_forms)
 
     # external_ids : déconfliction des clés-thèse quand la correction thèse→article a firé (conflation). On repart du brut reconstruit, donc auto-cicatrisant.
     raw_external_ids = raw_value(row.raw_metadata, "external_ids", row.external_ids)
@@ -147,12 +115,10 @@ def compute_update(
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k not in _UNARY_FIELDS}
 
     if doc_type_by is not None:
-        raw_metadata["doc_type"] = stash_entry(raw_doc_type, doc_type_by)
+        raw_metadata["doc_type"] = stash_entry(raw.doc_type, doc_type_by)
     if corrected.oa_status is not None and corrected.oa_status.value != raw.oa_status:
         new_oa_status = corrected.oa_status.value
         raw_metadata["oa_status"] = stash_entry(raw.oa_status, corrected.oa_status.rule.value)
-    if new_language != raw_language:
-        raw_metadata["language"] = stash_entry(raw_language, LANGUAGE_MAP_MARKER)
     if thesis_to_article:
         stripped = strip_dissertation_keys(raw_external_ids)
         if stripped != raw_external_ids:
@@ -166,19 +132,16 @@ def compute_update(
     if (
         new_doc_type == row.doc_type
         and new_oa_status == row.oa_status
-        and new_language == row.language
         and new_external_ids == row.external_ids
         and raw_metadata == row.raw_metadata
     ):
         return None
-    return CorrectionUpdate(
-        row.id, new_doc_type, new_oa_status, new_language, new_external_ids, raw_metadata
-    )
+    return CorrectionUpdate(row.id, new_doc_type, new_oa_status, new_external_ids, raw_metadata)
 
 
 @dataclass
 class UnaryCorrectionStats:
-    """Bilan de la passe unaire : `source_records` examinées, `source_records` réellement corrigées (au moins une règle de correction, hors traduction de vocabulaire `DOC_TYPE_MAP` ou `LANGUAGE_MAP`), et nombre de déclenchements par règle."""
+    """Bilan de la passe unaire : `source_records` examinées, `source_records` corrigées par au moins une règle, et nombre de déclenchements par règle."""
 
     examined: int
     corrected: int
@@ -186,7 +149,7 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(source_records réellement corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Les traductions de vocabulaire (`DOC_TYPE_MAP`, `LANGUAGE_MAP`) ne sont pas des corrections : elles ne comptent ni dans les `source_records` corrigées ni dans la ventilation."""
+    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
@@ -194,7 +157,7 @@ def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, i
         for field in _UNARY_FIELDS:
             entry = update.raw_metadata.get(field)
             rule = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
-            if isinstance(rule, str) and rule not in _VOCABULARY_MARKERS:
+            if isinstance(rule, str):
                 rule_counts[rule] = rule_counts.get(rule, 0) + 1
                 fired = True
         if fired:
@@ -211,11 +174,10 @@ def run(
     etape(logger, "Corrections de métadonnées par document")
     t0 = time.perf_counter()
     rows = queries.fetch_for_unary_correction(conn)
-    language_forms = queries.fetch_language_forms(conn)
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
     hal_rows = {row.source_id: row for row in rows if row.source == "hal"}
-    updates = compute_updates(rows, hal_rows, language_forms)
+    updates = compute_updates(rows, hal_rows)
     corrected, rule_counts = tally_corrections(updates)
     logger.info("%s%s à corriger", BRANCHE, accord(corrected, "document"))
 

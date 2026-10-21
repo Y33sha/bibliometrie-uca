@@ -25,11 +25,13 @@ def insert_source_record(
     doi: str | None = None,
     publication_year: int | None = None,
     doc_type: str | None = None,
+    raw_doc_type: str | None = None,
     journal_id: int | None = None,
     monograph_id: int | None = None,
     staging_id: int | None = None,
     container_title: str | None = None,
     language: str | None = None,
+    raw_language: str | None = None,
     keywords: list[str] | None = None,
     countries: list[str] | None = None,
     hal_collections: list[str] | None = None,
@@ -44,7 +46,7 @@ def insert_source_record(
     topics: object = None,
     raw_metadata: dict[str, object] | None = None,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`."""
     return insert_row(
         conn,
         "source_records",
@@ -58,11 +60,13 @@ def insert_source_record(
             "doi": doi,
             "publication_year": publication_year,
             "doc_type": doc_type,
+            "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
             "journal_id": journal_id,
             "monograph_id": monograph_id,
             "staging_id": staging_id,
             "container_title": container_title,
             "language": language,
+            "raw_language": language if raw_language is None else raw_language,
             "keywords": keywords,
             "countries": countries,
             "hal_collections": hal_collections,

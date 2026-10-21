@@ -913,10 +913,10 @@ class TestInsertWosDocument:
         assert row_arg.doi == "10.1/x"
         assert row_arg.title == "T"
         assert row_arg.publication_year == 2024
-        assert row_arg.doc_type == "article"
+        assert row_arg.raw_doc_type == "article"
         assert row_arg.journal_id == 42
         assert row_arg.oa_status == "gold"
-        assert row_arg.language == "en"
+        assert row_arg.raw_language == "en"
         assert row_arg.abstract == "abs"
         assert row_arg.impact == {"cited_by_count": 9}
         assert row_arg.staging_id == 10

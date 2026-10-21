@@ -1,6 +1,5 @@
 """Tests d'intégration pour `infrastructure.read_models.publications.source_records`."""
 
-import json
 from functools import partial
 
 from sqlalchemy import text
@@ -112,13 +111,10 @@ class TestGetPublicationSources:
         _source_record(sa_sync_conn, publication, source="wos", source_id="WOS:1")
         sa_sync_conn.execute(
             text(
-                "UPDATE source_records SET language = 'en', "
-                "raw_metadata = CAST(:rm AS jsonb) WHERE publication_id = :pid"
+                "UPDATE source_records SET language = 'en', raw_language = 'English' "
+                "WHERE publication_id = :pid"
             ),
-            {
-                "rm": json.dumps({"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}),
-                "pid": publication,
-            },
+            {"pid": publication},
         )
         [record] = _records(sa_sync_conn, publication)
         assert (record.language, record.language_name, record.language_raw) == (
@@ -126,6 +122,19 @@ class TestGetPublicationSources:
             "Anglais",
             "English",
         )
+
+    def test_source_value_absent_when_equal_to_the_code(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        _source_record(sa_sync_conn, publication, source="openalex", source_id="W2")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_records SET language = 'en', raw_language = 'en' "
+                "WHERE publication_id = :pid"
+            ),
+            {"pid": publication},
+        )
+        [record] = _records(sa_sync_conn, publication)
+        assert record.language_raw is None
 
 
 class TestSourceContributions:

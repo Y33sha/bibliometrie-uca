@@ -23,7 +23,7 @@ def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
         "staging_id": staging_id,
         "title": "Ma thèse",
         "publication_year": 2023,
-        "doc_type": "thesis",
+        "raw_doc_type": "thesis",
     }
     return SourceRecordUpsert(**{**defaults, **overrides})
 
@@ -31,7 +31,9 @@ def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
 class TestUpsertSourceRecord:
     def test_inserts_new(self, sa_sync_conn):
         staging_id = _thesis_staging(sa_sync_conn)
-        source_record_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, language="fr"))
+        source_record_id = _Q.upsert_source_record(
+            sa_sync_conn, _row(staging_id, raw_language="fr")
+        )
         row = sa_sync_conn.execute(
             text("SELECT title, language FROM source_records WHERE id = :id"),
             {"id": source_record_id},
@@ -39,20 +41,40 @@ class TestUpsertSourceRecord:
         assert row.title == "Ma thèse"
         assert row.language == "fr"
 
+    def test_translates_doc_type_and_language_and_keeps_source_values(self, sa_sync_conn):
+        staging_id = insert_staging(sa_sync_conn, source="hal", source_id="hal-stg")
+        source_record_id = _Q.upsert_source_record(
+            sa_sync_conn,
+            _row(
+                staging_id,
+                source="hal",
+                source_id="hal-01",
+                raw_doc_type="ART",
+                raw_language="English",
+            ),
+        )
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT doc_type, raw_doc_type, language, raw_language FROM source_records WHERE id = :id"
+            ),
+            {"id": source_record_id},
+        ).one()
+        assert tuple(row) == ("article", "ART", "en", "English")
+
     def test_reimport_keeps_row_identity(self, sa_sync_conn):
         """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
         staging_id = _thesis_staging(sa_sync_conn)
         first = _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
-        second = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, language="fr"))
+        second = _Q.upsert_source_record(sa_sync_conn, _row(staging_id, raw_language="fr"))
         assert first == second
 
     def test_reimport_overwrites_metadata(self, sa_sync_conn):
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = _Q.upsert_source_record(
-            sa_sync_conn, _row(staging_id, title="Titre initial", language="en")
+            sa_sync_conn, _row(staging_id, title="Titre initial", raw_language="en")
         )
         _Q.upsert_source_record(
-            sa_sync_conn, _row(staging_id, title="Titre corrigé", language="fr")
+            sa_sync_conn, _row(staging_id, title="Titre corrigé", raw_language="fr")
         )
         row = sa_sync_conn.execute(
             text("SELECT title, language FROM source_records WHERE id = :id"),
@@ -66,7 +88,9 @@ class TestUpsertSourceRecord:
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = _Q.upsert_source_record(
             sa_sync_conn,
-            _row(staging_id, impact={"cited_by_count": 500}, abstract="Un résumé", language="fr"),
+            _row(
+                staging_id, impact={"cited_by_count": 500}, abstract="Un résumé", raw_language="fr"
+            ),
         )
         _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
         row = sa_sync_conn.execute(

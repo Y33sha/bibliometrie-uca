@@ -641,7 +641,7 @@ class TestProcessWork:
         assert document.source == "crossref"
         assert document.doi == "10.1000/abc"
         assert document.publication_year == 2024
-        assert document.doc_type == "journal-article"
+        assert document.raw_doc_type == "journal-article"
         assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
 
     @pytest.mark.parametrize(

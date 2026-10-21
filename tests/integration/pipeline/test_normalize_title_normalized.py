@@ -24,7 +24,7 @@ def test_upsert_writes_title_normalized(sa_sync_conn):
             staging_id=staging_id,
             title=raw_title,
             publication_year=2020,
-            doc_type="article",
+            raw_doc_type="article",
         ),
     )
     stored = conn.execute(

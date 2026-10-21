@@ -230,7 +230,7 @@ def extract_publication_metadata(
 ) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'un work OpenAlex.
 
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex (mapping canonique en aval, dans `map_doc_type(source="openalex")`).
+    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex.
     """
     title = as_str(work.get("title")) or as_str(work.get("display_name")) or ""
     if primary is None:
@@ -354,11 +354,11 @@ def insert_openalex_document(  # noqa: C901
             external_ids=external_ids or None,
             title=publication_meta.title or "",
             publication_year=publication_meta.publication_year,
-            doc_type=publication_meta.doc_type,
+            raw_doc_type=publication_meta.doc_type,
             journal_id=publication_meta.journal_id,
             monograph_id=publication_meta.monograph_id,
             container_title=publication_meta.container_title,
-            language=publication_meta.language,
+            raw_language=publication_meta.language,
             biblio=biblio_json,
             abstract=abstract,
             keywords=keywords,

@@ -456,8 +456,9 @@ class TestRecordTypesOfUnknownJournals:
             source_id="10.1/a",
             title="A",
             doc_type="conference_paper",
+            raw_doc_type="book-chapter",
             journal_id=jid,
-            raw_metadata={"doc_type": {"raw": "book-chapter", "corrected_by": "X"}},
+            raw_metadata={"doc_type": {"raw": "book_chapter", "corrected_by": "X"}},
         )
         insert_source_record(
             sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid

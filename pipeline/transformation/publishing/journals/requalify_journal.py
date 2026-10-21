@@ -21,7 +21,7 @@ def correct_journal_records(conn: Connection, journal_id: int) -> int:
         row.source_id: row
         for row in queries.fetch_for_unary_correction_by_hal_ids(conn, hal_origin_ids(rows))
     }
-    updates = compute_updates(rows, hal_rows, queries.fetch_language_forms(conn))
+    updates = compute_updates(rows, hal_rows)
     return queries.persist_corrections(conn, updates)
 
 

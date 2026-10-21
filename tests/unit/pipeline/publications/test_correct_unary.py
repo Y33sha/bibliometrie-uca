@@ -1,12 +1,10 @@
-"""Tests purs de `compute_update` : mapping source→canonique puis correction unaire idempotente."""
+"""Tests purs de `compute_update` : correction unaire idempotente."""
 
 import logging
 from unittest.mock import MagicMock
 
 from domain.source_records.raw_metadata import stash_entry
 from pipeline.transformation.publications.correction.correct_unary import (
-    DOC_TYPE_MAP_MARKER,
-    LANGUAGE_MAP_MARKER,
     compute_update,
     compute_updates,
     hal_origin_ids,
@@ -18,55 +16,36 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
     UnaryCorrectionRow,
 )
 
-# Formes du référentiel des langues, chacune associée au code de sa langue.
-_FORMS = {"en": "en", "eng": "en", "english": "en", "fr": "fr", "fra": "fr"}
-
 
 def _update(source_record: UnaryCorrectionRow) -> CorrectionUpdate | None:
-    return compute_update(source_record, _FORMS)
+    return compute_update(source_record)
 
 
-def test_tally_corrections_exclut_les_traductions_de_vocabulaire():
+def test_tally_corrections_compte_les_regles():
     updates = [
-        # mapping de vocabulaire seul → pas une correction
-        CorrectionUpdate(
-            1, "article", None, None, {}, {"doc_type": stash_entry("ART", DOC_TYPE_MAP_MARKER)}
-        ),
-        # langue ramenée au référentiel → pas une correction
-        CorrectionUpdate(
-            4,
-            "article",
-            None,
-            "en",
-            {},
-            {"language": stash_entry("English", LANGUAGE_MAP_MARKER)},
-        ),
-        # règle réelle sur doc_type
         CorrectionUpdate(
             2,
             "thesis",
             None,
-            None,
             {},
             {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
         ),
-        # deux champs corrigés sur une même enregistrement source → 1 enregistrement source, 2 déclenchements
+        # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
         CorrectionUpdate(
             3,
             "media",
             "green",
-            None,
             {},
             {
                 "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
                 "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
             },
         ),
+        # correction défaite : mise à jour sans règle
+        CorrectionUpdate(4, "article", None, {}, {}),
     ]
     corrected, rule_counts = tally_corrections(updates)
-    assert (
-        corrected == 2
-    )  # enregistrement source 1 et 4 = traductions seules (exclues) ; enregistrement source 2 et 3 corrigées
+    assert corrected == 2
     assert rule_counts == {
         "THESIS_WITH_JOURNAL_TO_ARTICLE": 1,
         "JOURNAL_TYPE_MEDIA_TO_MEDIA": 1,
@@ -84,7 +63,6 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         "doi": None,
         "journal_id": None,
         "oa_status": None,
-        "language": None,
         "urls": None,
         "external_ids": {},
         "journal_type": None,
@@ -103,17 +81,8 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
     return UnaryCorrectionRow(**base)  # type: ignore[arg-type]
 
 
-def test_no_rule_no_mapping_change_returns_none():
-    # OpenAlex 'article' → map = 'article' (inchangé), aucune règle → no-op.
+def test_no_rule_returns_none():
     assert _update(_source_record(doc_type="article")) is None
-
-
-def test_hal_code_mapped_to_canonical_with_marker():
-    # ART (HAL) → 'article' par mapping seul, sans règle : marqueur DOC_TYPE_MAP.
-    upd = _update(_source_record(source="hal", doc_type="ART"))
-    assert upd is not None
-    assert upd.doc_type == "article"
-    assert upd.raw_metadata == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
 
 
 def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
@@ -229,14 +198,12 @@ def test_journal_id_wins_over_theses_fr_url_conflation():
     assert upd.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
 
 
-def test_hal_code_mapped_then_rule_corrects():
-    # ART → 'article' (map) → journal media → 'media' (règle). map-then-correct chaîné ;
-    # corrected_by = la règle (pas le marqueur), raw = la valeur source ART.
-    upd = _update(_source_record(source="hal", doc_type="ART", journal_type="media"))
+def test_journal_media_corrects_and_stashes_the_value_before_correction():
+    upd = _update(_source_record(source="hal", doc_type="article", journal_type="media"))
     assert upd is not None
     assert upd.doc_type == "media"
     assert upd.raw_metadata == {
-        "doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+        "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
 
@@ -291,7 +258,6 @@ def test_active_embargo_oa_status_untouched():
 
 
 def test_null_doc_type_left_null_when_no_rule():
-    # Pas de mapping forcé pour None (pas de représentation à traduire) ; aucune règle → no-op.
     assert _update(_source_record(doc_type=None)) is None
 
 
@@ -310,45 +276,22 @@ def test_preserves_unmanaged_raw_metadata_keys():
     }
 
 
-def test_language_code_of_referential_untouched():
-    assert _update(_source_record(language="en")) is None
-
-
-def test_language_name_mapped_to_code_with_marker():
-    # WoS donne le nom anglais : la forme `english` le ramène à `en`, valeur source stashée.
-    upd = _update(_source_record(source="wos", language="English"))
-    assert upd is not None
-    assert upd.language == "en"
-    assert upd.raw_metadata == {"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}}
-
-
-def test_unknown_language_gives_none_with_source_value_kept():
-    upd = _update(_source_record(source="hal", language="und"))
-    assert upd is not None
-    assert upd.language is None
-    assert upd.raw_metadata == {"language": {"raw": "und", "corrected_by": "LANGUAGE_MAP"}}
-
-
 def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
-    """Un type de document seulement traduit (`ART` → `article`) est mis à jour sans être corrigé."""
+    """Une correction défaite donne une mise à jour, sans compter comme une correction."""
     queries = MagicMock()
     queries.fetch_for_unary_correction.return_value = [
-        _source_record(id=1, source="hal", doc_type="ART"),
+        _source_record(
+            id=1,
+            doc_type="media",
+            raw_metadata={
+                "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+            },
+        ),
         _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),
     ]
-    queries.fetch_language_forms.return_value = _FORMS
     with caplog.at_level(logging.INFO, logger="test"):
         run(MagicMock(), queries, logging.getLogger("test"))
     assert "  ├─ 1 document à corriger" in caplog.messages
-
-
-def test_language_already_mapped_is_idempotent_noop():
-    source_record = _source_record(
-        source="wos",
-        language="en",
-        raw_metadata={"language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"}},
-    )
-    assert _update(source_record) is None
 
 
 # ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
@@ -356,10 +299,10 @@ def test_language_already_mapped_is_idempotent_noop():
 
 def test_scanr_from_hal_takes_corrected_hal_type():
     """Un enregistrement source ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis l'enregistrement source HAL."""
-    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
+    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 
-    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, {})
+    updates = compute_updates([hal, scanr], {"hal-04565713": hal})
 
     (scanr_update,) = [u for u in updates if u.id == 2]
     assert scanr_update.doc_type == "poster"
@@ -368,13 +311,13 @@ def test_scanr_from_hal_takes_corrected_hal_type():
 
 def test_scanr_without_hal_deposit_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
-    assert compute_updates([scanr], {}, {}) == []
+    assert compute_updates([scanr], {}) == []
 
 
 def test_scanr_from_another_origin_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="doi10.1/x", doc_type="other")
-    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="POSTER")
-    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, {})] == []
+    hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
+    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal})] == []
 
 
 def test_hal_origin_ids():

@@ -27,7 +27,7 @@ from infrastructure.sql_fragments import corrected, diamond_journal_sql, raw_col
 class UnaryCorrectionRow(NamedTuple):
     """Une `source_record` candidate à la correction unaire, jointe à son journal.
 
-    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source` pour `map_doc_type`, `source_id` pour retrouver le dépôt HAL d'un enregistrement source ScanR, `language` pour sa correspondance avec le référentiel des langues, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
+    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source_id` pour retrouver le dépôt HAL d'un enregistrement source ScanR, `external_ids` et `raw_metadata` pour le stash et la reconstruction du brut.
 
     L'adapter construit les lignes par appariement de noms : chaque champ a le nom de la colonne qui l'alimente.
     """
@@ -40,7 +40,6 @@ class UnaryCorrectionRow(NamedTuple):
     doi: str | None
     journal_id: int | None
     oa_status: str | None
-    language: str | None
     urls: list[str] | None
     external_ids: dict[str, JsonValue]
     journal_type: str | None
@@ -84,7 +83,6 @@ class CorrectionUpdate(NamedTuple):
     id: int
     doc_type: str | None
     oa_status: str | None
-    language: str | None
     external_ids: dict[str, JsonValue]
     raw_metadata: dict[str, JsonValue]
 
@@ -161,7 +159,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 _SELECT = f"""
     SELECT sr.id, sr.source::text AS source, sr.source_id,
            sr.title, sr.doc_type, sr.doi,
-           sr.journal_id, sr.oa_status, sr.language,
+           sr.journal_id, sr.oa_status,
            sr.urls, sr.external_ids,
            j.journal_type::text AS journal_type, j.oa_model,
            sr.raw_metadata,
@@ -187,7 +185,7 @@ _SELECT = f"""
 # s'interpole dans le SQL — un paramètre lié ne peut porter qu'une valeur, jamais un
 # identifiant —, donc il ne vient d'aucune autre origine que cette liste.
 _CORRECTABLE_COLUMNS: frozenset[str] = frozenset(
-    {"doc_type", "oa_status", "language", "external_ids", "raw_metadata", "journal_id", "doi"}
+    {"doc_type", "oa_status", "external_ids", "raw_metadata", "journal_id", "doi"}
 )
 
 # Garde-fou de dérive : une colonne renommée dans le schéma fait échouer l'import, plutôt que
@@ -268,17 +266,12 @@ class PgMetadataCorrectionQueries:
         )
         return rows_as(UnaryCorrectionRow, rows)
 
-    def fetch_language_forms(self, conn: Connection) -> dict[str, str]:
-        """Formes de `language_forms`, chacune associée au code de sa langue."""
-        rows = conn.execute(text("SELECT form_normalized, language_code FROM language_forms"))
-        return {r.form_normalized: r.language_code for r in rows}
-
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation ; celle-ci recalcule aussi la langue de la publication. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         return _persist_updates(
             conn,
             [u._asdict() for u in updates],
-            set_columns=("doc_type", "oa_status", "language", "external_ids", "raw_metadata"),
+            set_columns=("doc_type", "oa_status", "external_ids", "raw_metadata"),
             jsonb_params=("external_ids", "raw_metadata"),
         )
 
@@ -293,8 +286,7 @@ class PgMetadataCorrectionQueries:
         """`source_records` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`raw_metadata ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
         rows = conn.execute(
             text(f"""
-                SELECT id, source::text AS source,
-                       {raw_column("doc_type", "source_records")} AS raw_doc_type,
+                SELECT id, source::text AS source, raw_doc_type,
                        doi, journal_id, raw_metadata
                 FROM source_records
                 WHERE (journal_id IS NULL AND doi IS NOT NULL)

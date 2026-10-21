@@ -9,7 +9,6 @@ from typing import NamedTuple
 from sqlalchemy import Connection, bindparam, text
 
 from domain.monographs.proceedings import MonographRecord, is_proceedings_volume
-from infrastructure.sql_fragments import raw_column
 from pipeline.runtime.observability.libelles import accord
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -27,20 +26,20 @@ class MonographProceedingsFacts(NamedTuple):
     records: tuple[MonographRecord, ...]
 
 
-_PROCEEDINGS_FACTS = text(f"""
+_PROCEEDINGS_FACTS = text("""
     SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
            coalesce(
-               array_agg(sr.source::text ORDER BY sr.id) FILTER (WHERE sr.id IS NOT NULL), '{{}}'
+               array_agg(sr.source::text ORDER BY sr.id) FILTER (WHERE sr.id IS NOT NULL), '{}'
            ) AS sources,
            coalesce(
-               array_agg({raw_column("doc_type")} ORDER BY sr.id)
+               array_agg(sr.raw_doc_type ORDER BY sr.id)
                    FILTER (WHERE sr.id IS NOT NULL),
-               '{{}}'
+               '{}'
            ) AS raw_doc_types,
            coalesce(
                array_agg(coalesce(sr.meta ? 'conference', false) ORDER BY sr.id)
                    FILTER (WHERE sr.id IS NOT NULL),
-               '{{}}'
+               '{}'
            ) AS declares
     FROM monographs m
     LEFT JOIN journals j ON j.id = m.journal_id

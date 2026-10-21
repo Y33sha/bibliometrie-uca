@@ -3,7 +3,7 @@
 Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
-- `doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`) ; le mapping vers l'enum canonique vit dans `_SOURCE_MAPS["datacite"]` et est appliqué au refresh.
+- `raw_doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`).
 - `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
@@ -305,11 +305,11 @@ def process_work(
             external_ids=external_ids or None,
             title=title,
             publication_year=publication_year,
-            doc_type=extract_datacite_doc_type_token(attributes),
+            raw_doc_type=extract_datacite_doc_type_token(attributes),
             journal_id=containers.journal_id,
             monograph_id=containers.monograph_id,
             container_title=container_title if not containers.journal_id else None,
-            language=get_language(attributes),
+            raw_language=get_language(attributes),
             biblio=get_biblio(attributes),
             abstract=get_abstract(attributes),
             keywords=get_keywords(attributes),
