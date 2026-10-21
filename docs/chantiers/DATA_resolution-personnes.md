@@ -137,7 +137,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 ## Questions ouvertes
 
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
-- Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
+- Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md). Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
 - `resolution_mode` d'un groupe rattaché par une décision humaine : valeur dédiée, ou lecture de l'épinglage.
 - Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.

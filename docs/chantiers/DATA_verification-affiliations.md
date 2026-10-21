@@ -8,6 +8,8 @@ Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les lien
 
 ## Décisions
 
+- Un groupe dont certaines contributions sources donnent un indice de périmètre et d'autres une affiliation hors périmètre est un cas conflictuel. Une file d'administration le présente pour décision.
+
 ## Phasage
 
 ### Phase 1 — Mesure
@@ -58,6 +60,7 @@ Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les lien
 ### Phase 3 — Règles
 
 - [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
+- [ ] File d'administration des groupes aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes par groupe](DATA_resolution-personnes.md).
 
 ### Phase 4 — Fin de chantier
 
