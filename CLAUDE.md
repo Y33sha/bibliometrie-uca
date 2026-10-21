@@ -88,5 +88,5 @@ Les quatre dernières sont des enrichissements, hors résolution d'entités : `-
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_OWNER_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh [<instance>]` (uvicorn sur `API_PORT`, vite sur `FRONT_PORT`, réglés dans `.env`)
-- Envoi de la branche : `ship`, fonction shell du poste (`~/.bashrc`), rebase sur `master`, pousse, ouvre la pull request et arme la fusion automatique en rebase. Le push déclenche les contrôles pre-push.
+- Envoi de la branche : `ship`, fonction shell du poste (`~/.bashrc`), pousse, ouvre la pull request et arme la fusion automatique par merge commit. Le push déclenche les contrôles pre-push.
 - Logging : utiliser `infrastructure/observability/log.py`
