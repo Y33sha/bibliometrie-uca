@@ -10,7 +10,6 @@ from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import compact_identifiers
 from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
 from domain.source_records.external_ids import ExternalIdType
@@ -24,6 +23,7 @@ from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -593,7 +593,7 @@ def build_wos_author_records(
         return []
 
     ids_by_position = [
-        compact_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept
+        contributor_identifiers(researcher_id=as_str(a.get("researcher_id"))) for a in authors_kept
     ]
 
     records: list[AuthorRecord] = []

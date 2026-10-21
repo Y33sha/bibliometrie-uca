@@ -181,9 +181,8 @@ class TestExtractOpenalexOrcid:
         assert _extract_openalex_orcid({}) is None
 
     def test_raw_orcid_present(self):
-        # On lit `raw_orcid` (déposé par l'auteur), normalisé (préfixe URL strippé).
         result = _extract_openalex_orcid({"raw_orcid": "https://orcid.org/0000-0001-2345-6789"})
-        assert result == "0000-0001-2345-6789"
+        assert result == "https://orcid.org/0000-0001-2345-6789"
 
     def test_author_orcid_ignored(self):
         """`author.orcid` (entité désambiguïsée OA) est ignoré au profit de `raw_orcid`."""

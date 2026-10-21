@@ -8,6 +8,7 @@ Coût : un nombre constant d'allers-retours Python↔PG par document.
 from __future__ import annotations
 
 import json
+import logging
 from collections import defaultdict
 from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -18,7 +19,7 @@ from domain.country_detection import SOURCE_COUNTRY_METHODS
 from domain.normalize import normalize_text, sanitize_raw_text
 from domain.persons.collective_names import is_collective_name
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import shared_identifier_neutralizations
+from domain.persons.identifiers import compact_identifiers, shared_identifier_neutralizations
 from domain.publications.contribution_roles import ContributionRole, is_individual_author
 from domain.source_records.source_contribution_sync import (
     IncomingSourceContribution,
@@ -37,6 +38,8 @@ from pipeline.ingestion.common.source_contribution_queries import (
     SourceContributionItem,
     StoredSourceContributionRow,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -76,6 +79,14 @@ class AuthorRecord:
 
 AuthorBlock = Mapping[str, JsonValue]
 """Partie auteurs d'un payload source : seule entrée de la construction des `AuthorRecord` d'un enregistrement source."""
+
+
+def contributor_identifiers(**ids: str | int | None) -> dict[str, JsonValue] | None:
+    """Identifiants d'une contribution source, depuis les valeurs brutes de la source (`compact_identifiers`). Une valeur mal formée est journalisée et écartée."""
+    identifiers = compact_identifiers(**ids)
+    for id_type, raw in identifiers.malformed:
+        logger.warning("Identifiant mal formé écarté : %s=%r", id_type, raw)
+    return identifiers.values
 
 
 def sync_source_contributions(

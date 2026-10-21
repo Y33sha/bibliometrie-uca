@@ -18,10 +18,7 @@ from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
+from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
@@ -36,6 +33,7 @@ from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -206,7 +204,7 @@ def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[A
         return []
 
     ids_by_position = [
-        compact_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
+        contributor_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
         for c in creators
     ]
 

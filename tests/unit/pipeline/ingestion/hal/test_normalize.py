@@ -476,7 +476,7 @@ class TestBuildHalAuthorRecords:
         record = build_hal_author_records(doc)[0]
         # Pas de TEI → nom Solr en chaîne brute, pas d'idhal (le 3e segment du composite est ignoré).
         assert record.name == ContributorName(raw="Marie Dupont")
-        assert record.identifiers == {"hal_person_id": 749496}
+        assert record.identifiers == {"hal_person_id": "749496"}
 
     def test_nom_et_prenom_viennent_du_tei(self):
         label_xml = (
@@ -509,7 +509,7 @@ class TestBuildHalAuthorRecords:
         }
         assert build_hal_author_records(extract_hal_author_block(doc))[0].identifiers == {
             "idhal": "marie-dupont",
-            "hal_person_id": 749496,
+            "hal_person_id": "749496",
         }
 
     def test_composite_numeric_idhal_not_promoted(self):
@@ -522,7 +522,7 @@ class TestBuildHalAuthorRecords:
             ],
         }
         assert build_hal_author_records(doc)[0].identifiers == {
-            "hal_person_id": 921527,
+            "hal_person_id": "921527",
         }
 
     def test_composite_with_zero_person_id_filtered(self):
@@ -551,9 +551,9 @@ class TestBuildHalAuthorRecords:
             "label_xml": label_xml,
         }
         records = build_hal_author_records(extract_hal_author_block(doc))
-        assert records[0].identifiers == {"hal_person_id": 749496, "idref": "111111111"}
-        assert records[1].identifiers == {"hal_person_id": 749496, "idref": "111111111"}
-        assert records[2].identifiers == {"hal_person_id": 555}
+        assert records[0].identifiers == {"hal_person_id": "749496", "idref": "111111111"}
+        assert records[1].identifiers == {"hal_person_id": "749496", "idref": "111111111"}
+        assert records[2].identifiers == {"hal_person_id": "555"}
 
     def test_structures_from_tei_without_address(self):
         """Les structures HAL et leurs ROR, lus dans le TEI, vont sur la contribution source ; la contribution source est sans adresse."""

@@ -241,7 +241,11 @@ class TestBuildScanrAuthorRecords:
             "authors": [
                 {"fullName": "Paul Durand", "role": "author"},
                 {"fullName": "Paul Durand", "role": "author"},
-                {"fullName": "Paul Durand", "role": "rapporteur", "denormalized": {"idref": "1"}},
+                {
+                    "fullName": "Paul Durand",
+                    "role": "rapporteur",
+                    "denormalized": {"idref": "123456789"},
+                },
             ]
         }
         assert len(build_scanr_author_records(doc)) == 3

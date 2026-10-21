@@ -10,10 +10,6 @@ from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -37,6 +33,7 @@ from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -392,7 +389,7 @@ def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
 
     On retient `raw_orcid` et on ignore `author.orcid`.
     """
-    return normalize_orcid(as_str(authorship.get("raw_orcid")))
+    return as_str(authorship.get("raw_orcid"))
 
 
 # =============================================================
@@ -429,7 +426,9 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
-    ids_by_position = [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
+    ids_by_position = [
+        contributor_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships
+    ]
 
     records: list[AuthorRecord] = []
     for position, authorship in enumerate(authorships):

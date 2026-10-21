@@ -26,17 +26,21 @@ def test_returns_empty_list_when_no_titlestmt():
     assert parse_tei_author_identifiers(xml) == []
 
 
-def test_strips_orcid_and_idref_url_prefixes():
+def test_keeps_tei_values():
     xml = _tei("""
       <author>
         <persName><forename>Cédric</forename><surname>Delattre</surname></persName>
         <idno type="idhal" notation="string">cedric-delattre</idno>
         <idno type="ORCID">https://orcid.org/0000-0003-3605-1929</idno>
-        <idno type="IDREF">https://www.idref.fr/099757427</idno>
+        <idno type="IDREF">https://www.idref.fr/099757427/id</idno>
       </author>
     """)
     assert parse_tei_author_identifiers(xml) == [
-        {"idhal": "cedric-delattre", "orcid": "0000-0003-3605-1929", "idref": "099757427"}
+        {
+            "idhal": "cedric-delattre",
+            "orcid": "https://orcid.org/0000-0003-3605-1929",
+            "idref": "https://www.idref.fr/099757427/id",
+        }
     ]
 
 
@@ -53,7 +57,7 @@ def test_preserves_author_positions_with_gaps():
     result = parse_tei_author_identifiers(xml)
     assert len(result) == 3
     assert result[0] == {}
-    assert result[1] == {"orcid": "0000-0000-0000-0001"}
+    assert result[1] == {"orcid": "https://orcid.org/0000-0000-0000-0001"}
     assert result[2] == {}
 
 

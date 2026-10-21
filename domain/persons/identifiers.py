@@ -13,6 +13,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 from domain.errors import ValidationError
 from domain.types import JsonValue
@@ -295,16 +296,34 @@ def normalized_identifier_value(id_type: str, raw: str) -> str:
     return value_object(raw).value
 
 
-# ── Construction du dict JSONB `source_contributions.identifiers` ────
+# ── Identifiants d'une contribution source (`contributor_information.identifiers`) ──
 
 
-def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
-    """Construit le dict d'identifiants pour `source_contributions.identifiers`.
+class ContributorIdentifiers(NamedTuple):
+    """Identifiants d'une contribution source : `values` pour `contributor_information.identifiers`, `malformed` pour les couples `(type, valeur brute)` écartés."""
 
-    Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict vide → None.
+    values: dict[str, JsonValue] | None
+    malformed: tuple[tuple[str, str], ...]
+
+
+def compact_identifiers(**ids: str | int | None) -> ContributorIdentifiers:
+    """Construit les identifiants d'une contribution source depuis les valeurs brutes de la source.
+
+    Une valeur falsy (None, 0, "") est absente. Un identifiant de `PersonIdentifierType` prend la forme normalisée par le value object de son type ; une valeur mal formée va dans `malformed`. Les autres clés gardent leur valeur. Sans identifiant, `values` vaut None.
     """
-    out: dict[str, JsonValue] = {k: v for k, v in ids.items() if v}
-    return out or None
+    values: dict[str, JsonValue] = {}
+    malformed: list[tuple[str, str]] = []
+    for id_type, raw in ids.items():
+        if not raw:
+            continue
+        value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
+        if value_object is None:
+            values[id_type] = raw
+        elif parsed := value_object.try_parse(str(raw)):
+            values[id_type] = parsed.value
+        else:
+            malformed.append((id_type, str(raw)))
+    return ContributorIdentifiers(values or None, tuple(malformed))
 
 
 class IdentifierNeutralization(StrEnum):

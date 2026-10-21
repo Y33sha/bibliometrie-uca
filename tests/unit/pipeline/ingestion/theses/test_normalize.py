@@ -235,7 +235,7 @@ class TestInsertSourceDocument:
 def _these(**fields):
     """Thèse avec un auteur (IdRef connu) et un directeur."""
     return {
-        "auteurs": [{"nom": "Dupont", "prenom": "Marie", "ppn": "123"}],
+        "auteurs": [{"nom": "Dupont", "prenom": "Marie", "ppn": "123456789"}],
         "directeurs": [{"nom": "Martin", "prenom": "Jean"}],
         **fields,
     }
@@ -245,7 +245,7 @@ class TestBuildThesesAuthorRecords:
     def test_seuls_les_auteurs_ont_une_position(self):
         records = build_theses_author_records(extract_theses_author_block(_these()))
         assert [(r.position, r.roles, r.identifiers) for r in records] == [
-            (0, ["author"], {"idref": "123"}),
+            (0, ["author"], {"idref": "123456789"}),
             (None, ["thesis_director"], None),
         ]
 

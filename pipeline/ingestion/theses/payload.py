@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import THESES_FIELD_ROLES, ContributionRole, merge_roles
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from pipeline.ingestion.common.source_contributions import contributor_identifiers
 
 
 def derive_theses_doc_type(date_soutenance: str | None) -> str:
@@ -34,7 +35,7 @@ class ThesisContribution:
     roles: list[ContributionRole]
     name: ContributorName
     author_position: int | None
-    identifiers: dict[str, str] | None
+    identifiers: dict[str, JsonValue] | None
     is_author: bool
 
 
@@ -76,7 +77,7 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContr
         merged = merge_roles([roles_par_personne[key]])
         is_author = ContributionRole.AUTHOR in merged
         ppn = as_str(person.get("ppn"))
-        identifiers = {"idref": ppn} if ppn else None
+        identifiers = contributor_identifiers(idref=ppn)
 
         out.append(
             ThesisContribution(

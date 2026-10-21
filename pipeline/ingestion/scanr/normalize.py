@@ -8,10 +8,6 @@ from domain.countries import normalize_country_code
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
@@ -26,6 +22,7 @@ from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -287,8 +284,8 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [
-        compact_identifiers(
-            orcid=normalize_orcid(as_str(as_mapping(a.get("denormalized")).get("orcid"))),
+        contributor_identifiers(
+            orcid=as_str(as_mapping(a.get("denormalized")).get("orcid")),
             idref=as_str(as_mapping(a.get("denormalized")).get("idref")),
         )
         for a in authors

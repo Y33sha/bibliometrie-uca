@@ -14,10 +14,6 @@ from domain.dates import today
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
@@ -37,6 +33,7 @@ from pipeline.ingestion.common.source_contribution_queries import ContributionsB
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -397,7 +394,7 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
 
     L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
 
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal` (formes normalisées : préfixes d'URL strippés). Renvoie `[]` si `label_xml` est absent ou mal formé.
+    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal`, avec les valeurs du TEI. Renvoie `[]` si `label_xml` est absent ou mal formé.
     """
     out: list[dict[str, str]] = []
     for author in _tei_title_authors(label_xml):
@@ -409,11 +406,9 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
             if not val:
                 continue
             if typ == "ORCID":
-                orcid = normalize_orcid(val)
-                if orcid:
-                    ids["orcid"] = orcid
+                ids["orcid"] = val
             elif typ == "IDREF":
-                ids["idref"] = val.rsplit("/", 1)[-1].strip()
+                ids["idref"] = val
             elif typ == "IDHAL":
                 # HAL émet souvent deux <idno type="idhal"> par auteur, distingués par notation="string" (slug `prenom-nom`, le vrai idhal) et notation="numeric" (le hal_person_id ré-étiqueté idhal).
                 # Seul le slug nous intéresse ici — le hal_person_id est capturé via le composite Solr.
@@ -540,7 +535,7 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
                     pass
 
     ids_by_position = [
-        compact_identifiers(
+        contributor_identifiers(
             orcid=(as_str(tei_ids[pos].get("orcid")) if pos < len(tei_ids) else None),
             idref=(as_str(tei_ids[pos].get("idref")) if pos < len(tei_ids) else None),
             idhal=(as_str(tei_ids[pos].get("idhal")) if pos < len(tei_ids) else None),

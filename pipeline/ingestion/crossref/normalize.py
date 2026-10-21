@@ -15,10 +15,6 @@ from domain.dates import today
 from domain.journals.containers import ContainerDescription, ContainerRole, container_role
 from domain.journals.series import split_collection_and_volume
 from domain.persons.contributor_name import ContributorName
-from domain.persons.identifiers import (
-    compact_identifiers,
-    normalize_orcid,
-)
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
@@ -32,6 +28,7 @@ from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
+    contributor_identifiers,
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
@@ -297,9 +294,7 @@ def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRe
         return []
 
     ids_by_position = [
-        compact_identifiers(orcid=normalize_orcid(as_str(a.get("ORCID"))))
-        if isinstance(a, dict)
-        else None
+        contributor_identifiers(orcid=as_str(a.get("ORCID"))) if isinstance(a, dict) else None
         for a in authors
     ]
 
