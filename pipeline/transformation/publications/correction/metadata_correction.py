@@ -3,7 +3,7 @@
 Trois tâches (`pipeline.graph`), chacune dans sa propre transaction, dans l'ordre du graphe :
 
 1. **journal_by_doi** — rattache la revue manquante que désigne l'espace de noms du DOI. En premier : le `journal_id` qu'il commit est consommé par l'étape suivante (`journal_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
-2. **unaire** (per-record) — mapping `doc_type` source→canonique puis règles de correction `effective_metadata`.
+2. **unaire** (per-record) — règles de correction `effective_metadata`.
 3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre et des DOI inconnus de doi.org.
 """
 

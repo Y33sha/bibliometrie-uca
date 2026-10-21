@@ -28,7 +28,7 @@ from domain.types import JsonValue
 class MetadataForCorrection:
     """Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs que lisent les prédicats des règles, et eux seuls.
 
-    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit le brut d'origine depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
+    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit les valeurs d'avant correction depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
     Deux niveaux alimentent ce contrat. Une `source_record` renseigne tous les champs. Une publication renseigne ceux que l'agrégation arbitre. `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume`, `group_title`, `source` et `author_count` sont des faits d'un enregistrement source, absents de la publication : les règles qui les lisent restent muettes à ce niveau.
 
@@ -202,7 +202,7 @@ class _AppliesTo(TypedDict, total=False):
 
     Toutes les clés présentes sont AND-ées. Les clés absentes sont ignorées (pas de prédicat sur ce champ).
 
-    - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
+    - `doc_type` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types plausibles, épargne les types-référents (thesis, book, …).
     - `journal_type` : `str` — équivalence sur `source_record.journal_type` (champ joint depuis `journals`).
     - `oa_model` : `str` — équivalence sur `source_record.oa_model` (champ joint depuis `journals`).
     - `url_contains` : `str` — substring présente dans au moins une des `source_record.urls`.
@@ -258,7 +258,7 @@ class _RuleDefinition(TypedDict):
     applies_correction: _AppliesCorrection
 
 
-# Whitelist récurrente : sources brutes plausibles pour une reclassification par titre.
+# Whitelist récurrente : types plausibles pour une reclassification par titre.
 _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 
 
@@ -293,12 +293,12 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.ARTICLE},
     },
-    # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
+    # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type`.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
         "applies_to": {"journal_type": JournalType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type` brut. The Conversation dépose ses articles sans titre de revue.
+    # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type`. The Conversation dépose ses articles sans titre de revue.
     MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA: {
         "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
