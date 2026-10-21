@@ -154,10 +154,10 @@ D'autres modules réunissent des connaissances sans rapport :
 
 ### Phase 9 — Conventions restantes
 
-- [ ] Identifiants en anglais : `runtime/observability/` (`libelles.py`, `progression.py`) et ses appelants.
-- [ ] Identifiants en anglais : `run.py`, `graph.py`, constantes `LIBELLE` de `publishing/`.
-- [ ] Identifiants en anglais : `ingestion/`.
-- [ ] Identifiants en anglais : `transformation/`.
+- [x] Identifiants en anglais : `runtime/observability/` (`log_format.py`, `progress.py`) et ses appelants. 4851f94a8
+- [x] Identifiants en anglais : `run.py`, `graph.py`, constantes `LABEL` de `publishing/`. f74620b25
+- [x] Identifiants en anglais : `ingestion/`. 2094f2732
+- [x] Identifiants en anglais : `transformation/`. 528b8fbf3
 - [ ] Classes à suffixe `Queries` ou préfixe `Pg` : store d'entité ou SQL du module qui l'utilise.
 
 ## Questions ouvertes
