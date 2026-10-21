@@ -70,7 +70,7 @@ class TestGetPublicationDetail:
                 publication,
                 source="openalex",
                 source_id=source_id,
-                raw_metadata={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
+                corrections={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
             )
         detail = get_publication_detail(sa_sync_conn, publication)
         assert detail is not None

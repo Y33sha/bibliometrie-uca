@@ -934,12 +934,12 @@ class TestRequalifyPublicationsForJournal:
 
         source_record_row = _fetch_one(
             sa_sync_conn,
-            "SELECT doc_type, raw_metadata FROM source_records WHERE id = :id",
+            "SELECT doc_type, corrections FROM source_records WHERE id = :id",
             id=source_record,
         )
         # La colonne enregistrement source est persistée (ce que lira le matcher), avec le brut réversible.
         assert source_record_row.doc_type == "media"
-        assert source_record_row.raw_metadata == {
+        assert source_record_row.corrections == {
             "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
         }
         publication_row = _fetch_one(
@@ -971,11 +971,11 @@ class TestRequalifyPublicationsForJournal:
 
         source_record_row = _fetch_one(
             sa_sync_conn,
-            "SELECT doc_type, raw_metadata FROM source_records WHERE id = :id",
+            "SELECT doc_type, corrections FROM source_records WHERE id = :id",
             id=source_record,
         )
         assert source_record_row.doc_type == "article"
-        assert source_record_row.raw_metadata == {}
+        assert source_record_row.corrections == {}
         publication_row = _fetch_one(
             sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=publication
         )

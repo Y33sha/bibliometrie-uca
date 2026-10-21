@@ -9,7 +9,7 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
-from domain.source_records.raw_metadata import CORRECTED_BY, RAW
+from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -202,24 +202,24 @@ def source_contribution_perimeter_evidence(source_contribution_ids: str | None =
 
 
 def corrected(field: str, source_record: str = "sr") -> str:
-    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.raw_metadata`)."""
-    return f"{source_record}.raw_metadata ? '{field}'"
+    """Condition vraie quand la phase `metadata_correction` a corrigé le champ `field` de l'enregistrement source aliasé `source_record` (`domain.source_records.corrections`)."""
+    return f"{source_record}.corrections ? '{field}'"
 
 
 def corrected_by(field: str, source_record: str = "sr") -> str:
     """Règle qui a corrigé le champ `field` de l'enregistrement source aliasé `source_record`. NULL quand le champ est intact."""
-    return f"{source_record}.raw_metadata -> '{field}' ->> '{CORRECTED_BY}'"
+    return f"{source_record}.corrections -> '{field}' ->> '{CORRECTED_BY}'"
 
 
 def stashed_raw(field: str, source_record: str = "sr") -> str:
     """Valeur que la source donne pour le champ `field` de l'enregistrement source aliasé `source_record`, quand une correction l'a changée. NULL quand le champ est intact."""
-    return f"{source_record}.raw_metadata -> '{field}' ->> '{RAW}'"
+    return f"{source_record}.corrections -> '{field}' ->> '{RAW}'"
 
 
 def raw_column(field: str, source_record: str = "sr") -> str:
     """Valeur que la source donne pour la colonne texte `field` de l'enregistrement source aliasé `source_record` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
     return (
-        f"CASE WHEN {source_record}.raw_metadata -> '{field}' ? '{RAW}'"
+        f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
         f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
     )
 

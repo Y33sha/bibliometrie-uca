@@ -44,7 +44,7 @@ def insert_source_record(
     biblio: dict[str, object] | None = None,
     meta: dict[str, object] | None = None,
     topics: object = None,
-    raw_metadata: dict[str, object] | None = None,
+    corrections: dict[str, object] | None = None,
 ) -> int:
     """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`."""
     return insert_row(
@@ -79,9 +79,9 @@ def insert_source_record(
             "biblio": _jsonb(biblio),
             "meta": _jsonb(meta),
             "topics": _jsonb(topics),
-            "raw_metadata": _jsonb(raw_metadata),
+            "corrections": _jsonb(corrections),
         },
-        dict.fromkeys(("external_ids", "biblio", "meta", "topics", "raw_metadata"), "jsonb"),
+        dict.fromkeys(("external_ids", "biblio", "meta", "topics", "corrections"), "jsonb"),
     )
 
 

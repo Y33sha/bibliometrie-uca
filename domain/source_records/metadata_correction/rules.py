@@ -28,7 +28,7 @@ from domain.types import JsonValue
 class MetadataForCorrection:
     """Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs que lisent les prédicats des règles, et eux seuls.
 
-    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit les valeurs d'avant correction depuis le sidecar `raw_metadata`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
+    Les valeurs sont celles des colonnes, potentiellement déjà corrigées d'un run précédent ; `hydrate_raw_view` reconstruit les valeurs d'avant correction depuis le sidecar `corrections`. `journal_type` et `oa_model` sont joints depuis `journals`, ce qui rend les règles journal-dépendantes décidables sans threader de repo.
 
     Deux niveaux alimentent ce contrat. Une `source_record` renseigne tous les champs. Une publication renseigne ceux que l'agrégation arbitre. `urls`, `self_declared_preprint`, `declares_conference`, `registrant_publisher_type`, `in_proceedings_volume`, `group_title`, `source` et `author_count` sont des faits d'un enregistrement source, absents de la publication : les règles qui les lisent restent muettes à ce niveau.
 
@@ -70,7 +70,7 @@ class MetadataForCorrection:
 class MetadataCorrectionRule(StrEnum):
     """Identifiants des règles de correction figées. Une règle = un membre.
 
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_records.raw_metadata.<champ>.corrected_by` côté source_record, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
+    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_records.corrections.<champ>.corrected_by` côté source_record, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
     """
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
@@ -482,7 +482,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
     # (`embargo_expired`, calculé à la lecture) devient `green`. Promotion à l'échéance sans
     # ré-import HAL — seule règle date-dépendante (la date est lue en SQL, hors de la
-    # fonction pure). Trace dans `raw_metadata.oa_status` ; corrige un champ orthogonal au
+    # fonction pure). Trace dans `corrections.oa_status` ; corrige un champ orthogonal au
     # `doc_type`, donc aucun chaînage avec les règles ci-dessus.
     MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},

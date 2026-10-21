@@ -65,7 +65,7 @@ def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
 
     assert _apply_journal_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert jid == media_journal
@@ -93,7 +93,7 @@ def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
     conn.execute(text("DELETE FROM journal_doi_namespaces WHERE journal_id = :id"), {"id": journal})
     assert _apply_journal_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert jid is None
@@ -102,7 +102,7 @@ def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
 
 def _state(conn, source_record_id: int) -> tuple:
     return conn.execute(
-        text("SELECT doc_type, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT doc_type, corrections FROM source_records WHERE id = :id"),
         {"id": source_record_id},
     ).one()
 
@@ -168,10 +168,10 @@ def test_reversibility_invariant(sa_sync_conn):
     _source_record(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
     _apply(conn)
 
-    # COALESCE(raw_metadata->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
+    # COALESCE(corrections->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
     reconstructed = conn.execute(
         text(
-            "SELECT COALESCE(raw_metadata->'doc_type'->>'raw', doc_type) "
+            "SELECT COALESCE(corrections->'doc_type'->>'raw', doc_type) "
             "FROM source_records WHERE source_id = 'W_media'"
         )
     ).scalar_one()
@@ -228,17 +228,17 @@ def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
 
     assert _apply(conn) == 1
     row = conn.execute(
-        text("SELECT doc_type, external_ids, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT doc_type, external_ids, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert row.doc_type == "article"  # mistype corrigé
     assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
-    assert row.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
-    assert row.raw_metadata["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.corrections["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
     # Réversibilité : le brut external_ids est reconstructible.
     raw_nnt = conn.execute(
         text(
-            "SELECT raw_metadata->'external_ids'->'raw'->>'nnt' FROM source_records WHERE id = :id"
+            "SELECT corrections->'external_ids'->'raw'->>'nnt' FROM source_records WHERE id = :id"
         ),
         {"id": source_record},
     ).scalar_one()
@@ -260,11 +260,11 @@ def test_expired_embargo_promoted_to_green(sa_sync_conn):
     )
     assert _apply(conn) == 1
     row = conn.execute(
-        text("SELECT oa_status::text AS oa, raw_metadata FROM source_records WHERE id = :id"),
+        text("SELECT oa_status::text AS oa, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert row.oa == "green"
-    assert row.raw_metadata["oa_status"] == {
+    assert row.corrections["oa_status"] == {
         "raw": "embargoed",
         "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
     }
@@ -347,15 +347,13 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     ).scalar_one()
     assert chap_doi is None
     chap_raw = conn.execute(
-        text("SELECT raw_metadata FROM source_records WHERE id = :id"), {"id": chapter}
+        text("SELECT corrections FROM source_records WHERE id = :id"), {"id": chapter}
     ).scalar_one()
     assert chap_raw == {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
 
     # Réversibilité : le DOI brut du chapitre reste reconstructible.
     reconstructed = conn.execute(
-        text(
-            "SELECT COALESCE(raw_metadata->'doi'->>'raw', doi) FROM source_records WHERE id = :id"
-        ),
+        text("SELECT COALESCE(corrections->'doi'->>'raw', doi) FROM source_records WHERE id = :id"),
         {"id": chapter},
     ).scalar_one()
     assert reconstructed == "10.1/x"
@@ -374,10 +372,10 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     )
     assert _apply_cluster(conn) == 1
     chap_doi = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": chapter}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": chapter}
     ).one()
     assert chap_doi.doi == "10.1/x"
-    assert chap_doi.raw_metadata == {}
+    assert chap_doi.corrections == {}
 
 
 def test_chapters_same_title_untouched(sa_sync_conn):
@@ -428,11 +426,11 @@ def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
     assert _apply_cluster(conn) == 2
     for source_record in (c1, c2):
         row = conn.execute(
-            text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"),
+            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
             {"id": source_record},
         ).one()
         assert row.doi is None
-        assert row.raw_metadata["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
+        assert row.corrections["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
 
 
 def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
@@ -480,10 +478,10 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 
     assert _apply_cluster(conn) == 2
     raw = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": first}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": first}
     ).one()
     assert raw.doi is None
-    assert raw.raw_metadata == {
+    assert raw.corrections == {
         "doi": {"raw": "10.1364/ao.xx.xxxxxx", "corrected_by": "UNRESOLVED_DOI_TO_NULL"}
     }
 
@@ -500,7 +498,7 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 # ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──
 
 
-def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=None):
+def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=None):
     """Enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
     meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
     return _typed_source_record(
@@ -510,7 +508,7 @@ def _seed_datacite(conn, *, source_id, doi, doc_type, relations, raw_metadata=No
         doi=doi,
         doc_type=doc_type,
         meta=meta,
-        raw_metadata=raw_metadata,
+        corrections=corrections,
     )
 
 
@@ -541,11 +539,11 @@ def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
         doi="10.48550/arxiv.1",
         doc_type="preprint",
         relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
-        raw_metadata=stash,
+        corrections=stash,
     )
     oa = _typed_source_record(conn, source_id="oa", doi="10.48550/arxiv.1", doc_type="article")
     conn.execute(
-        text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
+        text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE id = :id"),
         {"raw": json.dumps(stash), "id": oa},
     )
     assert _apply_cluster(conn) == 2
@@ -616,11 +614,11 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
     assert _doi(conn, parent) == "10.9001/set"  # le parent garde son DOI
     for source_record in (piece, sibling):
         row = conn.execute(
-            text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"),
+            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
             {"id": source_record},
         ).one()
         assert row.doi == "10.9001/set"
-        assert row.raw_metadata["doi"] == {
+        assert row.corrections["doi"] == {
             "raw": "10.9002/file1",
             "corrected_by": "DATACITE_PACKAGE_PIECE",
         }
@@ -697,7 +695,7 @@ def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_con
     )
     assert _apply_cluster(conn) == 1
     row = conn.execute(
-        text("SELECT doi, raw_metadata FROM source_records WHERE id = :id"), {"id": piece}
+        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": piece}
     ).one()
     assert row.doi == "10.9002/file1"
-    assert row.raw_metadata == {}
+    assert row.corrections == {}

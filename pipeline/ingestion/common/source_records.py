@@ -86,7 +86,7 @@ _FIELDS = fields(SourceRecordUpsert)
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
 _COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
 
-# Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `raw_metadata` se vide : les
+# Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `corrections` se vide : les
 # valeurs d'origine qu'il garde viennent de l'import précédent, et la phase `metadata_correction` refait ses
 # corrections sur les valeurs fraîches.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
@@ -110,7 +110,7 @@ _UPSERT_SQL = text(
     VALUES ({", ".join(_value(c) for c in _COLUMNS)})
     ON CONFLICT (source, source_id) DO UPDATE SET
         {", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATED_COLUMNS)},
-        raw_metadata = '{{}}'::jsonb,
+        corrections = '{{}}'::jsonb,
         keys_dirty = true,
         updated_at = clock_timestamp()
     RETURNING id

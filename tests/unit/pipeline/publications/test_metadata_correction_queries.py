@@ -21,12 +21,12 @@ class TestColonnesCorrigibles:
             _persist_updates(None, [{"id": 1}], set_columns=("doc_type", "colonne_inconnue"))
 
     def test_colonnes_connues_acceptees(self):
-        assert _persist_updates(None, [], set_columns=("doc_type", "raw_metadata")) == 0
+        assert _persist_updates(None, [], set_columns=("doc_type", "corrections")) == 0
 
     def test_les_appelants_reels_passent_la_garde(self):
         for colonnes in (
-            ("doc_type", "oa_status", "external_ids", "raw_metadata"),
-            ("journal_id", "raw_metadata"),
-            ("doi", "raw_metadata"),
+            ("doc_type", "oa_status", "external_ids", "corrections"),
+            ("journal_id", "corrections"),
+            ("doi", "corrections"),
         ):
             assert _persist_updates(None, [], set_columns=colonnes) == 0

@@ -458,7 +458,7 @@ class TestRecordTypesOfUnknownJournals:
             doc_type="conference_paper",
             raw_doc_type="book-chapter",
             journal_id=jid,
-            raw_metadata={"doc_type": {"raw": "book_chapter", "corrected_by": "X"}},
+            corrections={"doc_type": {"raw": "book_chapter", "corrected_by": "X"}},
         )
         insert_source_record(
             sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid
@@ -500,7 +500,7 @@ class TestDoiNamespaces:
             journal_id=journal_id,
         )
         sa_sync_conn.execute(
-            text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE doi = :doi"),
+            text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE doi = :doi"),
             {"raw": '{"journal_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
         )
         pairs = [p for p in find_doi_journal_pairs(sa_sync_conn) if p.journal_id == journal_id]

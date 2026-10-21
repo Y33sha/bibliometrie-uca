@@ -3,7 +3,7 @@
 import logging
 
 from domain.journals.doi_namespaces import DoiNamespace
-from domain.source_records.raw_metadata import stash_entry
+from domain.source_records.corrections import stash_entry
 from pipeline.transformation.publications.correction.journal_by_doi import compute_updates, run
 from pipeline.transformation.publications.correction.metadata_correction_queries import (
     JournalCorrectionRow,
@@ -25,7 +25,7 @@ def _row(**overrides: object) -> JournalCorrectionRow:
         "raw_doc_type": "journal-article",
         "doi": None,
         "journal_id": None,
-        "raw_metadata": {},
+        "corrections": {},
     }
     base.update(overrides)
     return JournalCorrectionRow(**base)  # type: ignore[arg-type]
@@ -52,19 +52,19 @@ def test_revue_de_la_source_conservee():
 
 
 def test_rattachement_idempotent():
-    row = _row(doi="10.64628/aak.335cx4kw5", journal_id=7, raw_metadata={"journal_id": _STASH})
+    row = _row(doi="10.64628/aak.335cx4kw5", journal_id=7, corrections={"journal_id": _STASH})
     assert compute_updates([row], _NAMESPACES) == []
 
 
 def test_rattachement_retire_quand_l_espace_disparait():
-    row = _row(doi="10.9001/gone.1", journal_id=7, raw_metadata={"journal_id": _STASH})
+    row = _row(doi="10.9001/gone.1", journal_id=7, corrections={"journal_id": _STASH})
     assert compute_updates([row], _NAMESPACES) == [JournalCorrectionUpdate(1, None, {})]
 
 
-def test_autres_cles_de_raw_metadata_preservees():
+def test_autres_cles_de_corrections_preservees():
     row = _row(
         doi="10.64628/aak.335cx4kw5",
-        raw_metadata={"doc_type": stash_entry("preprint", "SOME_RULE")},
+        corrections={"doc_type": stash_entry("preprint", "SOME_RULE")},
     )
     assert compute_updates([row], _NAMESPACES) == [
         JournalCorrectionUpdate(
@@ -92,7 +92,7 @@ def test_chapitre_rattache_a_tort_retrouve_sa_revue_brute():
         doi="10.64628/aak.335cx4kw5",
         raw_doc_type="book-chapter",
         journal_id=7,
-        raw_metadata={"journal_id": _STASH},
+        corrections={"journal_id": _STASH},
     )
     assert compute_updates([row], _NAMESPACES) == [JournalCorrectionUpdate(1, None, {})]
 
@@ -121,7 +121,7 @@ def test_le_bilan_compte_les_revues_distinctes(caplog):
         _row(id=1, doi="10.64628/aak.1"),
         _row(id=2, doi="10.64628/aak.2"),
         _row(id=3, doi="10.5194/acp-3"),
-        _row(id=4, doi="10.1/x", journal_id=7, raw_metadata={"journal_id": _STASH}),
+        _row(id=4, doi="10.1/x", journal_id=7, corrections={"journal_id": _STASH}),
     ]
     with caplog.at_level(logging.INFO, logger="test"):
         run(_Conn(), _Queries(rows), logging.getLogger("test"))  # type: ignore[arg-type]

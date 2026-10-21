@@ -1244,7 +1244,7 @@ source_records = Table(
     Column("biblio", Jsonb),
     Column("meta", Jsonb),
     Column(
-        "raw_metadata",
+        "corrections",
         Jsonb,
         nullable=False,
         server_default=text("'{}'::jsonb"),
@@ -1288,8 +1288,8 @@ source_records = Table(
         name="source_records_impact_is_object",
     ),
     CheckConstraint(
-        "jsonb_typeof(raw_metadata) = 'object'",
-        name="source_records_raw_metadata_is_object",
+        "jsonb_typeof(corrections) = 'object'",
+        name="source_records_corrections_is_object",
     ),
     schema="sources",
 )

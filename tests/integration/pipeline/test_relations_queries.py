@@ -238,7 +238,7 @@ def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, 
         doi=doi,
         doc_type=doc_type,
         meta={"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]},
-        raw_metadata={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
+        corrections={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
     )
 
 

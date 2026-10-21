@@ -1,13 +1,13 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre, volume d'actes/communication) + `compute_updates`."""
 
+from domain.source_records.corrections import stash_entry
 from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
     DoiClusterMember,
     resolve_cluster_doi_corrections,
 )
-from domain.source_records.raw_metadata import stash_entry
 from pipeline.transformation.publications.correction.correct_by_cluster import (
     compute_updates,
     tally_doi_corrections,
@@ -41,7 +41,7 @@ def _row(
     doc_type,
     doi,
     title="t",
-    raw_metadata=None,
+    corrections=None,
     raw_doi="10.1/x",
     canonical_doi=None,
     same_work_case=None,
@@ -52,7 +52,7 @@ def _row(
         doc_type,
         doi,
         title,
-        raw_metadata or {},
+        corrections or {},
         raw_doi,
         canonical_doi,
         same_work_case,
@@ -373,7 +373,7 @@ def test_version_doi_substituted_to_concept():
     assert {u.id for u in updates} == {1, 2}
     assert all(u.doi == "10.5281/zenodo.1" for u in updates)
     assert all(
-        u.raw_metadata["doi"]
+        u.corrections["doi"]
         == {"raw": "10.5281/zenodo.10", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}
         for u in updates
     )
@@ -417,7 +417,7 @@ def test_preprint_deja_substitue_retrouve_son_doi():
         1,
         "article",
         "10.1007/jhep07(2023)066",
-        raw_metadata={
+        corrections={
             "doi": {
                 "raw": "10.48550/arxiv.2210.12000",
                 "corrected_by": "DATACITE_VERSION_TO_CONCEPT",
@@ -468,7 +468,7 @@ def test_self_heals_when_canonical_gone():
         1,
         "dataset",
         "10.5281/zenodo.1",
-        raw_metadata={
+        corrections={
             "doi": {"raw": "10.5281/zenodo.10", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}
         },
         raw_doi="10.5281/zenodo.10",
@@ -493,7 +493,7 @@ def test_chapter_chapter_both_nulled():
     assert {u.id for u in updates} == {1, 2}
     assert all(u.doi is None for u in updates)
     assert all(
-        u.raw_metadata["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS" for u in updates
+        u.corrections["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS" for u in updates
     )
 
 
@@ -503,7 +503,7 @@ def test_idempotent_when_already_nulled():
         2,
         "book_chapter",
         None,
-        raw_metadata={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
+        corrections={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
     )
     assert compute_updates([book, chapter]) == []
 
@@ -513,7 +513,7 @@ def test_self_heals_when_book_gone():
         2,
         "book_chapter",
         None,
-        raw_metadata={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
+        corrections={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
     )
     assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, {})]
 
@@ -537,7 +537,7 @@ def test_volume_perd_le_hal_id_de_ses_communications():
 
     assert updates[1].doi == "10.1/x"
     assert updates[1].external_ids == {"hal_id": ["hal-2"], "pmid": "99"}
-    assert updates[1].raw_metadata["removed_external_ids"] == {
+    assert updates[1].corrections["removed_external_ids"] == {
         "before": {"hal_id": ["hal-1", "hal-2"]},
         "removed": {"hal_id": ["hal-1"]},
         "corrected_by": "ACTES_VS_COMMUNICATION",
@@ -561,8 +561,8 @@ def test_retrait_stable_d_un_run_a_l_autre():
         2, "poster", "10.1/x", title="total pain", external_ids={"hal_id": ["hal-1"]}
     )
     first = {u.id: u for u in compute_updates([volume, communication])}
-    volume = volume._replace(external_ids=first[1].external_ids, raw_metadata=first[1].raw_metadata)
-    communication = communication._replace(doi=None, raw_metadata=first[2].raw_metadata)
+    volume = volume._replace(external_ids=first[1].external_ids, corrections=first[1].corrections)
+    communication = communication._replace(doi=None, corrections=first[2].corrections)
     assert compute_updates([volume, communication]) == []
 
 
@@ -572,7 +572,7 @@ def test_identifiants_restaures_quand_la_divergence_disparait():
         "proceedings",
         "10.1/x",
         title="eapc abstract book",
-        raw_metadata={
+        corrections={
             "removed_external_ids": {
                 "before": {"hal_id": ["hal-1", "hal-2"]},
                 "removed": {"hal_id": ["hal-1"]},

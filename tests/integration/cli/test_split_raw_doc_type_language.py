@@ -1,4 +1,4 @@
-"""Oneshot `split_raw_doc_type_language` : valeurs de la source dans `raw_doc_type` et `raw_language`, `raw_metadata` réduit aux corrections par une règle."""
+"""Oneshot `split_raw_doc_type_language` : valeurs de la source dans `raw_doc_type` et `raw_language`, `corrections` réduit aux corrections par une règle."""
 
 from sqlalchemy import text
 
@@ -27,20 +27,20 @@ def _insert(conn, source_id, **columns) -> int:
 def _state(conn, source_record):
     return conn.execute(
         text("""
-            SELECT doc_type, raw_doc_type, language, raw_language, raw_metadata, keys_dirty
+            SELECT doc_type, raw_doc_type, language, raw_language, corrections, keys_dirty
             FROM source_records WHERE id = :id
         """),
         {"id": source_record},
     ).one()
 
 
-def test_traduction_seule_retiree_de_raw_metadata(sa_sync_conn):
+def test_traduction_seule_retiree_de_corrections(sa_sync_conn):
     source_record = _insert(
         sa_sync_conn,
         "hal-1",
         doc_type="article",
         language="en",
-        raw_metadata={
+        corrections={
             "doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"},
             "language": {"raw": "English", "corrected_by": "LANGUAGE_MAP"},
         },
@@ -57,14 +57,14 @@ def test_regle_gardee_avec_la_valeur_traduite(sa_sync_conn):
         sa_sync_conn,
         "hal-2",
         doc_type="media",
-        raw_metadata={"doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
+        corrections={"doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
     )
 
     _run(sa_sync_conn)
 
     row = _state(sa_sync_conn, source_record)
     assert (row.doc_type, row.raw_doc_type) == ("media", "ART")
-    assert row.raw_metadata == {
+    assert row.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
@@ -83,7 +83,7 @@ def test_second_passage_sans_effet(sa_sync_conn):
         sa_sync_conn,
         "hal-4",
         doc_type="media",
-        raw_metadata={"doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
+        corrections={"doc_type": {"raw": "ART", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
     )
     _run(sa_sync_conn)
 

@@ -174,7 +174,7 @@ def topics_by_source(
 def arbitrate_doc_type_with_article_subtype(sources: list[SourceRecord]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
-    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_record`) ; l'arbitrage opère directement sur les colonnes, sans re-mapper.
+    Les `doc_type` lus sont traduits par la normalisation et corrigés par la phase `metadata_correction`.
 
     CrossRef (priorité 2) renvoie `journal-article` pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Le premier sous-type d'article, toutes sources confondues, l'emporte sur `article`. Un `data_paper` déclaré par HAL seul compte pour `article`.
     """

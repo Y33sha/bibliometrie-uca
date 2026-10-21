@@ -38,8 +38,8 @@ _RECORDS = text(f"""
            sr.monograph_id, m.title AS monograph_title
     FROM source_records sr
     CROSS JOIN LATERAL (
-        SELECT CASE WHEN sr.raw_metadata ? 'journal_id'
-                    THEN (sr.raw_metadata->'journal_id'->>'raw')::int
+        SELECT CASE WHEN sr.corrections ? 'journal_id'
+                    THEN (sr.corrections->'journal_id'->>'raw')::int
                     ELSE sr.journal_id END AS id
     ) normalized
     LEFT JOIN journals j ON j.id = normalized.id

@@ -120,7 +120,7 @@ class TestUpsertSourceRecord:
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
         sa_sync_conn.execute(
-            text("UPDATE source_records SET raw_metadata = CAST(:raw AS jsonb) WHERE id = :id"),
+            text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE id = :id"),
             {
                 "raw": '{"doc_type": {"raw": "conference-paper", "corrected_by": "X"}}',
                 "id": source_record_id,
@@ -129,7 +129,7 @@ class TestUpsertSourceRecord:
         _Q.upsert_source_record(sa_sync_conn, _row(staging_id))
         assert (
             sa_sync_conn.execute(
-                text("SELECT raw_metadata FROM source_records WHERE id = :id"),
+                text("SELECT corrections FROM source_records WHERE id = :id"),
                 {"id": source_record_id},
             ).scalar_one()
             == {}

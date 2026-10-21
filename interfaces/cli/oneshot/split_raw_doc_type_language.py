@@ -1,13 +1,13 @@
 # STATUS: oneshot (2026-10-21)
-"""Remplit `raw_doc_type` et `raw_language` de `source_records`, et met `raw_metadata` dans la forme où il garde seulement les corrections par une règle.
+"""Remplit `raw_doc_type` et `raw_language` de `source_records`, et met `corrections` dans la forme où il garde seulement les corrections par une règle.
 
 Pour chaque enregistrement source dont `raw_doc_type` est vide :
 
-- `raw_doc_type` reçoit le type de la source : la valeur gardée dans `raw_metadata`, sinon `doc_type` ;
-- une entrée `doc_type` de `raw_metadata` posée par la traduction (`DOC_TYPE_MAP`) disparaît, et `doc_type` reçoit la traduction du type de la source ;
+- `raw_doc_type` reçoit le type de la source : la valeur gardée dans `corrections`, sinon `doc_type` ;
+- une entrée `doc_type` de `corrections` posée par la traduction (`DOC_TYPE_MAP`) disparaît, et `doc_type` reçoit la traduction du type de la source ;
 - une entrée `doc_type` posée par une règle garde la règle et reçoit la traduction du type de la source.
 
-Pour chaque enregistrement source dont `raw_language` est vide, `raw_language` reçoit la langue de la source, l'entrée `language` de `raw_metadata` disparaît, et `language` reçoit le code de la langue.
+Pour chaque enregistrement source dont `raw_language` est vide, `raw_language` reçoit la langue de la source, l'entrée `language` de `corrections` disparaît, et `language` reçoit le code de la langue.
 
 Un enregistrement source dont `doc_type` change est marqué `keys_dirty`.
 
@@ -25,9 +25,9 @@ from typing import cast
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.source_records.corrections import CORRECTED_BY, RAW, stash_entry
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.languages import language_code
-from domain.source_records.raw_metadata import CORRECTED_BY, RAW, stash_entry
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
@@ -59,7 +59,7 @@ class Update:
     language: str | None
     raw_language: str | None
     doc_type_entry: dict[str, JsonValue] | None
-    """Entrée `doc_type` de `raw_metadata` ; `None` la retire."""
+    """Entrée `doc_type` de `corrections` ; `None` la retire."""
     keys_dirty: bool
 
 
@@ -116,7 +116,7 @@ def fetch_rows(conn: Connection) -> list[Row]:
         for r in conn.execute(
             text("""
                 SELECT id, source::text, doc_type, language, raw_doc_type, raw_language,
-                       raw_metadata -> 'doc_type', raw_metadata -> 'language'
+                       corrections -> 'doc_type', corrections -> 'language'
                 FROM source_records
                 WHERE raw_doc_type IS NULL OR raw_language IS NULL
             """)
@@ -135,9 +135,9 @@ def apply(conn: Connection, updates: list[Update]) -> int:
                 raw_doc_type = t.raw_doc_type,
                 language = t.language,
                 raw_language = t.raw_language,
-                raw_metadata = CASE
-                    WHEN t.doc_type_entry IS NULL THEN sr.raw_metadata - 'doc_type' - 'language'
-                    ELSE (sr.raw_metadata - 'language')
+                corrections = CASE
+                    WHEN t.doc_type_entry IS NULL THEN sr.corrections - 'doc_type' - 'language'
+                    ELSE (sr.corrections - 'language')
                          || jsonb_build_object('doc_type', t.doc_type_entry)
                 END,
                 keys_dirty = sr.keys_dirty OR t.keys_dirty,

@@ -28,7 +28,7 @@ class DoiJournalRow(NamedTuple):
     journal_type: JournalType
 
 
-# Une revue posée par son espace de noms laisse sa trace dans `raw_metadata.journal_id`.
+# Une revue posée par son espace de noms laisse sa trace dans `corrections.journal_id`.
 _DOI_JOURNAL_PAIRS = text(f"""
     SELECT s.doi, s.journal_id, j.journal_type
     FROM source_records s
