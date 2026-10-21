@@ -90,18 +90,22 @@ class TestMapDocType:
         """Un article décrivant un logiciel reste un article de données."""
         assert map_doc_type("software-paper", source="openalex") == "data_paper"
 
-    def test_inconnu_vers_other(self):
-        assert map_doc_type("foo_bar_baz") == "other"
+    def test_inconnu_vers_none(self):
+        assert map_doc_type("foo_bar_baz", source="hal") is None
 
-    def test_none_vers_other(self):
-        assert map_doc_type(None) == "other"
+    def test_vide_vers_other(self):
+        assert map_doc_type("", source="hal") == "other"
 
-    def test_la_nomenclature_de_la_source_prime_sur_la_recherche_globale(self):
+    def test_chaque_source_a_sa_nomenclature(self):
         """HAL range « proceedings » en communication, Crossref en actes."""
         assert map_doc_type("proceedings", source="crossref") == "proceedings"
 
-    def test_une_valeur_absente_de_la_source_se_cherche_ailleurs(self):
-        assert map_doc_type("dissertation") == "thesis"
+    def test_une_valeur_absente_de_la_table_de_la_source_est_inconnue(self):
+        """« dissertation » figure dans la table de DataCite, pas dans celle de HAL."""
+        assert map_doc_type("dissertation", source="hal") is None
+
+    def test_un_type_du_referentiel_se_traduit_par_lui_meme(self):
+        assert map_doc_type("conference_paper", source="wos") == "conference_paper"
 
 
 class TestMapDocTypeComposite:
@@ -120,4 +124,7 @@ class TestMapDocTypeComposite:
         assert map_doc_type("Note; Reprint", source="wos") == "other"
 
     def test_un_composite_sans_partie_donne_other(self):
-        assert map_doc_type(";") == "other"
+        assert map_doc_type(";", source="wos") == "other"
+
+    def test_un_composite_de_parties_inconnues_est_inconnu(self):
+        assert map_doc_type("Foo; Bar", source="wos") is None

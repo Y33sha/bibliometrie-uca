@@ -64,7 +64,7 @@ class Update:
 
 
 def _translated(raw: str | None, source: str) -> str | None:
-    return None if raw is None else map_doc_type(raw, source)
+    return None if raw is None else map_doc_type(raw, source) or "other"
 
 
 def plan_row(row: Row, forms: Mapping[str, str]) -> Update | None:

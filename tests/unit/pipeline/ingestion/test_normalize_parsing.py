@@ -91,7 +91,7 @@ class TestOADocTypeMap:
             "preprint",
             "dissertation",
         ]:
-            assert map_doc_type(t, "openalex") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "openalex") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["openalex"].values():
@@ -169,7 +169,7 @@ class TestHALGetTitle:
 class TestHALDocTypeMap:
     def test_covers_common_types(self):
         for t in ["ART", "COMM", "OUV", "COUV", "THESE", "HDR"]:
-            assert map_doc_type(t, "hal") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "hal") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["hal"].values():
@@ -229,7 +229,7 @@ class TestWoSDocTypeMap:
             "proceedings paper",
             "editorial material",
         ]:
-            assert map_doc_type(t, "wos") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "wos") not in (None, "other"), f"{t} non mappé"
 
 
 # ── CrossRef ────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ class TestCrossRefDocTypeMap:
             "peer-review",
             "report",
         ]:
-            assert map_doc_type(t, "crossref") != "other", f"{t} non mappé"
+            assert map_doc_type(t, "crossref") not in (None, "other"), f"{t} non mappé"
 
     def test_all_values_valid(self):
         for v in _SOURCE_MAPS["crossref"].values():

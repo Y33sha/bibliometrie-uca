@@ -149,6 +149,22 @@ class TestUpsertSourceRecord:
             == {}
         )
 
+    def test_unknown_doc_type_gives_other_and_is_logged(self, sa_sync_conn, caplog):
+        staging_id = _thesis_staging(sa_sync_conn)
+        source_record_id = _Q.upsert_source_record(
+            sa_sync_conn, _row(staging_id, raw_doc_type="StudyRegistration")
+        )
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT doc_type FROM source_records WHERE id = :id"),
+                {"id": source_record_id},
+            ).scalar_one()
+            == "other"
+        )
+        assert [r.getMessage() for r in caplog.records if "Type de document" in r.getMessage()] == [
+            "Type de document inconnu (theses 2023ABC001) : 'StudyRegistration'"
+        ]
+
     def test_external_ids_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
         """Chaque valeur passe par son value object. Une valeur invalide ou une clé inconnue est écartée et journalisée."""
         staging_id = _thesis_staging(sa_sync_conn)

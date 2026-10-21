@@ -127,9 +127,7 @@ class SourceRecordQueries:
     def upsert_source_record(self, conn: Connection, row: SourceRecordUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
-        params["doc_type"] = (
-            None if row.raw_doc_type is None else map_doc_type(row.raw_doc_type, row.source)
-        )
+        params["doc_type"] = _doc_type(row)
         params["language"] = language_code(row.raw_language, self._forms(conn))
         params["external_ids"] = _external_ids(row)
         return scalar_int(conn.execute(_UPSERT_SQL, params))
@@ -138,6 +136,23 @@ class SourceRecordQueries:
         if self._language_forms is None:
             self._language_forms = fetch_language_forms(conn)
         return self._language_forms
+
+
+def _doc_type(row: SourceRecordUpsert) -> str | None:
+    """Type du référentiel de `row.raw_doc_type` (`map_doc_type`). Un type inconnu de la table de sa source donne `other` et est journalisé."""
+    if row.raw_doc_type is None:
+        return None
+    doc_type = map_doc_type(row.raw_doc_type, row.source)
+    if doc_type is None:
+        logger.warning(
+            "Type de document inconnu (%s %s) : %r",
+            row.source,
+            row.source_id,
+            row.raw_doc_type,
+            extra={"detail": True},
+        )
+        return "other"
+    return doc_type
 
 
 def fetch_language_forms(conn: Connection) -> dict[str, str]:
