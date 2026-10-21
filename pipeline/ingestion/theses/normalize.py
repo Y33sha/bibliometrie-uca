@@ -38,18 +38,18 @@ from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_t
 # =============================================================
 
 
-def extract_publication_metadata(these: Mapping[str, JsonValue]) -> PublicationMetadata:
+def extract_publication_metadata(thesis: Mapping[str, JsonValue]) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'une thèse."""
-    title = as_str(these.get("titrePrincipal"))
-    defense_date = french_date_to_iso(as_str(these.get("dateSoutenance")))
-    date_inscription = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
+    title = as_str(thesis.get("titrePrincipal"))
+    defense_date = french_date_to_iso(as_str(thesis.get("dateSoutenance")))
+    enrollment_date = french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
 
     # publication_year = soutenance > première inscription (cascade theses.fr)
-    year_source = defense_date or date_inscription
+    year_source = defense_date or enrollment_date
     publication_year = int(year_source[:4]) if year_source else None
 
-    doi = clean_doi(as_str(these.get("doi")))
-    nnt_clean = normalize_nnt(as_str(these.get("nnt")))
+    doi = clean_doi(as_str(thesis.get("doi")))
+    nnt_clean = normalize_nnt(as_str(thesis.get("nnt")))
 
     return PublicationMetadata(
         title=title,
@@ -69,26 +69,26 @@ def extract_publication_metadata(these: Mapping[str, JsonValue]) -> PublicationM
 # =============================================================
 
 
-def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
+def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Champs propres à theses.fr, pour `source_records.source_extras`."""
     source_extras: dict[str, JsonValue] = {}
-    ds = french_date_to_iso(as_str(these.get("dateSoutenance")))
-    di = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
+    ds = french_date_to_iso(as_str(thesis.get("dateSoutenance")))
+    di = french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
     if ds:
         source_extras[SourceExtra.DATE_SOUTENANCE] = ds
     if di:
         source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
-    discipline = these.get("discipline")
+    discipline = thesis.get("discipline")
     if discipline:
         source_extras[SourceExtra.DISCIPLINE] = discipline
 
-    if institution := these.get("etabSoutenanceN"):
+    if institution := thesis.get("etabSoutenanceN"):
         source_extras[SourceExtra.ETABLISSEMENT] = institution
-    if institution_ppn := as_str(these.get("etabSoutenancePpn")):
+    if institution_ppn := as_str(thesis.get("etabSoutenancePpn")):
         source_extras[SourceExtra.ETABLISSEMENT_PPN] = institution_ppn
 
-    doctoral_schools = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
+    doctoral_schools = [as_mapping(e) for e in as_sequence(thesis.get("ecolesDoctorale"))]
     doctoral_schools_clean = [
         {"nom": name, "ppn": as_str(e.get("ppn"))}
         for e in doctoral_schools
@@ -97,7 +97,7 @@ def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
     if doctoral_schools_clean:
         source_extras[SourceExtra.ECOLES_DOCTORALES] = doctoral_schools_clean
 
-    partners = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
+    partners = [as_mapping(p) for p in as_sequence(thesis.get("partenairesDeRecherche"))]
     partners_clean = [
         {"nom": name, "type": as_str(p.get("type")), "ppn": as_str(p.get("ppn")) or None}
         for p in partners
@@ -112,28 +112,28 @@ def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
 def insert_source_document(
     conn: Connection,
     queries: SourceRecordQueries,
-    these: Mapping[str, JsonValue],
+    thesis: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
     publication_meta: PublicationMetadata,
 ) -> int:
     """Crée/retrouve l'entrée source_records pour theses.fr.
 
-    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `publication_meta`, construit en amont par `extract_publication_metadata`. `these` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
+    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `publication_meta`, construit en amont par `extract_publication_metadata`. `thesis` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = publication_meta.nnt
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
-    subjects = as_sequence(these.get("sujets"))
+    subjects = as_sequence(thesis.get("sujets"))
     keywords = [label for s in subjects if (label := as_str(as_mapping(s).get("libelle")))] or None
 
     # Topics : discipline + sujets Rameau
     topics: dict[str, JsonValue] = {}
-    discipline = as_str(these.get("discipline"))
+    discipline = as_str(thesis.get("discipline"))
     if discipline:
         topics["discipline"] = discipline
-    rameau = as_sequence(these.get("sujetsRameau"))
+    rameau = as_sequence(thesis.get("sujetsRameau"))
     rameau_list = [label for r in rameau if (label := as_str(as_mapping(r).get("libelle")))]
     if rameau_list:
         topics["rameau"] = rameau_list
@@ -156,7 +156,7 @@ def insert_source_document(
             keywords=keywords,
             topics=topics_json,
             oa_status=publication_meta.oa_status,
-            source_extras=_build_source_extras(these),
+            source_extras=_build_source_extras(thesis),
         ),
     )
 
@@ -166,9 +166,9 @@ def insert_source_document(
 # =============================================================
 
 
-def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
+def extract_theses_author_block(thesis: Mapping[str, JsonValue]) -> AuthorBlock:
     """Bloc auteurs d'une thèse : les personnes de chaque rôle."""
-    return {field: these.get(field) for field in THESES_FIELD_ROLES}
+    return {field: thesis.get(field) for field in THESES_FIELD_ROLES}
 
 
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
@@ -189,7 +189,7 @@ def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
 
 def process_contributions(
     conn: Connection,
-    these: Mapping[str, JsonValue],
+    thesis: Mapping[str, JsonValue],
     source_record_id: int,
     *,
     batch_queries: ContributionsBatchQueries,
@@ -200,7 +200,7 @@ def process_contributions(
         batch_queries,
         "theses",
         source_record_id,
-        extract_theses_author_block(these),
+        extract_theses_author_block(thesis),
         build_theses_author_records,
     )
 
@@ -221,14 +221,14 @@ def process_work(
     """Traite une thèse du staging."""
     staging_id = staging_row.id
     theses_id = staging_row.source_id
-    these = staging_row.raw_data
+    thesis = staging_row.raw_data
 
-    publication_meta = extract_publication_metadata(these)
+    publication_meta = extract_publication_metadata(thesis)
 
     source_record_id = insert_source_document(
-        conn, queries, these, staging_id, theses_id, publication_meta
+        conn, queries, thesis, staging_id, theses_id, publication_meta
     )
-    process_contributions(conn, these, source_record_id, batch_queries=batch_queries)
+    process_contributions(conn, thesis, source_record_id, batch_queries=batch_queries)
     staging_queries.mark_done(conn, staging_id)
 
     return True

@@ -338,7 +338,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         inflect(len(dirty_ids), "examiné"),
         "reconstruction complète" if rebuild else "nouveaux ou mis à jour",
     )
-    with waiting(BRANCH, logger) as ligne:
+    with waiting(BRANCH, logger) as line:
         rows = fetch_reconciliation_universe(conn)
         rows_by_source_record = {row.id: row for row in rows}
         existing_publication_by_doi = fetch_publication_ids_by_doi(conn)
@@ -351,11 +351,11 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
             publication_sizes=publication_sizes,
         )
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
-        a_creer = sum(1 for g in plan.groups if g.target_publication_id is None)
-        existantes = len(plan.groups) - a_creer
-        ligne.conclude(
+        to_create = sum(1 for g in plan.groups if g.target_publication_id is None)
+        existing = len(plan.groups) - to_create
+        line.conclude(
             f"{BRANCH}résolus en {quantity(len(plan.groups), 'publication')} "
-            f"({existantes} déjà {inflect(existantes, 'existante')}, {quantity(a_creer, 'nouvelle')} ; "
+            f"({existing} déjà {inflect(existing, 'existante')}, {quantity(to_create, 'nouvelle')} ; "
             f"{quantity(len(plan.dissolved), 'doublon')} à fusionner)"
         )
 
@@ -367,7 +367,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
     splits = 0
 
     t0 = time.perf_counter()
-    with waiting(f"{LAST_BRANCH}application", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}application", logger) as line:
         # 1. Groupes : rattacher chaque enregistrement source à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
         for group in plan.groups:
             target = group.target_publication_id
@@ -412,7 +412,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         for dissolved in plan.dissolved:
             lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
 
-        ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
     # 4. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
     survivor_ids = sorted(survivors)

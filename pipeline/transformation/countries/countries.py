@@ -51,7 +51,7 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
     return AddressCountryStatus(row.total, row.with_country)
 
 
-def _etat_des_adresses(open_tx: OpenTransaction) -> AddressCountryStatus:
+def _address_status(open_tx: OpenTransaction) -> AddressCountryStatus:
     """Relève combien d'adresses ont un pays."""
     with open_tx() as conn:
         return count_address_country_status(conn)
@@ -61,7 +61,7 @@ def _etat_des_adresses(open_tx: OpenTransaction) -> AddressCountryStatus:
 class CountriesPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les tâches, borne l'entonnoir par les deux relevés et assemble les métriques."""
-        initial = _etat_des_adresses(ctx.open_tx)
+        initial = _address_status(ctx.open_tx)
 
         def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             step(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
@@ -108,7 +108,7 @@ class CountriesPhase:
         for task_metrics in by_task.values():
             metrics.merge(task_metrics)
 
-        final = _etat_des_adresses(ctx.open_tx)
+        final = _address_status(ctx.open_tx)
         total = final.total
         without_initial = total - initial.with_country
         metrics.details["summary"] = {

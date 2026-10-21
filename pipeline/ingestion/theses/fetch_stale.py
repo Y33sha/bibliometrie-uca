@@ -21,7 +21,7 @@ class ThesesStaleRefetch(StaleRefetch):
     request_delay_s = THESES_DELAY
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        these = await fetch_thesis(client, source_id)
-        if isinstance(these, NotFound | Unavailable):
-            return these
-        return FetchedRecord(doi=extract_doi(these), raw_data=these)
+        thesis = await fetch_thesis(client, source_id)
+        if isinstance(thesis, NotFound | Unavailable):
+            return thesis
+        return FetchedRecord(doi=extract_doi(thesis), raw_data=thesis)

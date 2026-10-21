@@ -280,10 +280,10 @@ def build_groups(
             conn.commit()
     step(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
-    with waiting(LAST_BRANCH, logger) as ligne:
+    with waiting(LAST_BRANCH, logger) as line:
         queries.refresh_alignment(conn)
         conn.commit()
-        ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),

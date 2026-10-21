@@ -57,7 +57,7 @@ async def fetch_thesis(
     if isinstance(outcome, NotFound | Unavailable):
         return outcome
     for entry in as_sequence(as_mapping(outcome).get("theses")):
-        these = as_mapping(entry)
-        if as_str(these.get("id")) == thesis_id:
-            return these
+        thesis = as_mapping(entry)
+        if as_str(thesis.get("id")) == thesis_id:
+            return thesis
     return NOT_FOUND

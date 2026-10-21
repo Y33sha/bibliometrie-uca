@@ -420,19 +420,19 @@ def arbitrate_identifier_conflicts(
     Retourne `{neutralized, detached, transferred}`. Le commit est laissé au caller.
     """
     step(logger, "Identifiants mal placés et conflits d'attribution")
-    with waiting(BRANCH, logger) as ligne:
+    with waiting(BRANCH, logger) as line:
         consensus = compute_identifier_consensus(conn)
         requalified = requalify_misplaced_identifiers(conn, consensus)
         if requalified["neutralized"]:
-            ligne.conclude(
+            line.conclude(
                 f"{BRANCH}Identifiants mal placés neutralisés sur "
                 f"{quantity(requalified['neutralized'], 'contribution source', 'contributions sources')}"
             )
         else:
-            ligne.erase()
-    with waiting(BRANCH, logger) as ligne:
+            line.erase()
+    with waiting(BRANCH, logger) as line:
         conflicts = detect_identifier_conflicts(conn)
-        ligne.erase()
+        line.erase()
     transferred = resolve_identifier_transfers(
         conn, conflicts, consensus=consensus, repo=repo, logger=logger
     )["transferred"]

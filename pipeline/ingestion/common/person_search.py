@@ -149,7 +149,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         labels = ", ".join(
             PERSON_IDENTIFIER_LABELS[t] for t in PersonIdentifierType if t in self.id_types
         )
-        return self._harvest_at_once(len(persons), harvest_step, par=labels)
+        return self._harvest_at_once(len(persons), harvest_step, by=labels)
 
     def _extract_batch(
         self,

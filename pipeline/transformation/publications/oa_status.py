@@ -66,7 +66,7 @@ class OaStatusPhase:
         with ctx.open_tx() as conn:
             metrics.merge(
                 asyncio.run(
-                    _verifier(
+                    _check(
                         conn,
                         self.queries,
                         ctx.logger,
@@ -80,7 +80,7 @@ class OaStatusPhase:
         return metrics
 
 
-async def _verifier(
+async def _check(
     conn: Connection,
     queries: OaStatusQueries,
     logger: logging.Logger,
@@ -150,13 +150,13 @@ async def _verifier(
         quantity(staleness_days, "jour"),
     )
     if max_per_run and max_per_run < stale_total:
-        reportes = stale_total - total
+        deferred = stale_total - total
         logger.info(
             "%splafond de %s par run ⇒ %s %s au prochain",
             BRANCH,
             max_per_run,
-            reportes,
-            inflect(reportes, "reporté"),
+            deferred,
+            inflect(deferred, "reporté"),
         )
 
     sem = asyncio.Semaphore(max_concurrent)
@@ -184,15 +184,15 @@ async def _verifier(
                 await asyncio.to_thread(conn.commit)
                 bar.advance(len(chunk))
 
-    bilan = [
+    summary = [
         quantity(progress["new"], "nouveau", "nouveaux"),
         quantity(progress["updated"], "modifié"),
         quantity(progress["unchanged"], "inchangé"),
         quantity(progress["not_found"], "non trouvé", "non trouvés"),
     ]
     if progress["unavailable"]:
-        bilan.append(quantity(progress["unavailable"], "reporté"))
-    logger.info("%s%s", LAST_BRANCH, ", ".join(bilan))
+        summary.append(quantity(progress["unavailable"], "reporté"))
+    logger.info("%s%s", LAST_BRANCH, ", ".join(summary))
 
     return _result()
 

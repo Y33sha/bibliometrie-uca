@@ -236,8 +236,8 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
 
     La table étant reconstruite entière à chaque run, le nombre d'arêtes écrites ne dit rien : presque toutes s'y trouvaient déjà. Seul l'écart avec l'état précédent porte une information.
     """
-    ajoutees = _count_by_pair_label(rebuild.added_by_type)
-    total = sum(ajoutees.values())
+    added = _count_by_pair_label(rebuild.added_by_type)
+    total = sum(added.values())
     if total:
         step(
             logger,
@@ -245,9 +245,9 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
             quantity(total, "nouvelle relation", "nouvelles relations"),
         )
         logger.info("")
-        largeur = max(len(str(count)) for count in ajoutees.values())
-        for label, count in ajoutees.items():
-            logger.info("     %s %s", str(count).rjust(largeur), label)
+        width = max(len(str(count)) for count in added.values())
+        for label, count in added.items():
+            logger.info("     %s %s", str(count).rjust(width), label)
     else:
         step(logger, "Relations entre publications")
 
@@ -266,11 +266,11 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
 
 def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]:
     """Regroupe les compteurs par nature du lien : un type et son inverse désignent le même."""
-    par_libelle: dict[str, int] = {}
+    by_label: dict[str, int] = {}
     for relation_type, count in added_by_type:
         label = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
-        par_libelle[label] = par_libelle.get(label, 0) + count
-    return dict(sorted(par_libelle.items(), key=lambda item: item[1], reverse=True))
+        by_label[label] = by_label.get(label, 0) + count
+    return dict(sorted(by_label.items(), key=lambda item: item[1], reverse=True))
 
 
 # ── Câblage ───────────────────────────────────────────────────

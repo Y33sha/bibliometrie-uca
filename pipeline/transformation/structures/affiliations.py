@@ -115,10 +115,10 @@ class AffiliationsPhase:
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
     """Pose les indices de l'entrée dans le périmètre sur les `source_contributions` : rafraîchit la matview `source_contribution_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
     t0 = time.perf_counter()
-    with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as line:
         refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
-        ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+        line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
 
 # ── Câblage ───────────────────────────────────────────────────

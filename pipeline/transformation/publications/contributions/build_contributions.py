@@ -24,14 +24,14 @@ def build(
     step(logger, "Liens publication-personne")
 
     # Étape 1 : Ajoute les paires attestées absentes, retire les orphelines.
-    with waiting(f"{BRANCH}création des liens en cours", logger) as ligne:
+    with waiting(f"{BRANCH}création des liens en cours", logger) as line:
         inserted = queries.insert_missing_contributions(conn)
-        ligne.conclude(
+        line.conclude(
             f"{BRANCH}{quantity(inserted, 'nouveau lien', 'nouveaux liens')} {inflect(inserted, 'créé')}"
         )
-    with waiting(f"{LAST_BRANCH}suppression des liens obsolètes en cours", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}suppression des liens obsolètes en cours", logger) as line:
         pruned = queries.prune_orphan_contributions(conn)
-        ligne.conclude(
+        line.conclude(
             f"{LAST_BRANCH}{quantity(pruned, 'lien')} {inflect(pruned, 'obsolète')} {inflect(pruned, 'supprimé')}"
         )
 

@@ -417,13 +417,13 @@ from pipeline.ingestion.theses.normalize import (
 
 class TestThesesExtractPublicationMetadata:
     def test_soutenue(self):
-        these = {
+        thesis = {
             "titrePrincipal": "Titre de la thèse",
             "dateSoutenance": "15/03/2023",
             "doi": "10.1234/test",
             "nnt": "2023ucfa0069",
         }
-        meta = extract_publication_metadata(these)
+        meta = extract_publication_metadata(thesis)
         assert meta.title == "Titre de la thèse"
         assert meta.doc_type == "thesis"
         assert meta.publication_year == 2023
@@ -433,11 +433,11 @@ class TestThesesExtractPublicationMetadata:
         assert meta.journal_id is None
 
     def test_en_cours_falls_back_to_inscription(self):
-        these = {
+        thesis = {
             "titrePrincipal": "Thèse en cours",
             "datePremiereInscriptionDoctorat": "01/09/2022",
         }
-        meta = extract_publication_metadata(these)
+        meta = extract_publication_metadata(thesis)
         assert meta.doc_type == "ongoing_thesis"
         assert meta.publication_year == 2022
         assert meta.doi is None
@@ -462,7 +462,7 @@ class TestThesesExtractPublicationMetadata:
 
 class TestThesesBuildSourceMeta:
     def test_full(self):
-        these = {
+        thesis = {
             "dateSoutenance": "15/03/2023",
             "datePremiereInscriptionDoctorat": "01/09/2020",
             "discipline": "Informatique",
@@ -472,7 +472,7 @@ class TestThesesBuildSourceMeta:
                 {"nom": "CNRS", "type": "org"},
             ],
         }
-        meta = _build_source_extras(these)
+        meta = _build_source_extras(thesis)
         assert meta == {
             "date_soutenance": "2023-03-15",
             "date_inscription": "2020-09-01",
@@ -493,11 +493,11 @@ class TestThesesBuildSourceMeta:
         assert meta == {"discipline": "Physique"}
 
     def test_filters_entries_without_nom(self):
-        these = {
+        thesis = {
             "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
             "partenairesDeRecherche": [{"type": "lab"}],
         }
-        assert _build_source_extras(these) is None
+        assert _build_source_extras(thesis) is None
 
 
 # ── contribution_roles ─────────────────────────────────────────────

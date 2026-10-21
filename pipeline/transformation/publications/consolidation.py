@@ -97,7 +97,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         """),
         {"id": publication_id},
     )
-    return [_source_record_from_row(vue) for vue in rows_as(_SourceRecordRow, result)]
+    return [_source_record_from_row(row) for row in rows_as(_SourceRecordRow, result)]
 
 
 def converged_secondary_ids(conn: Connection, publication_id: int) -> frozenset[int]:

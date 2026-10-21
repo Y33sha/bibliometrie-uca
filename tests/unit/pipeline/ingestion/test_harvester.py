@@ -130,7 +130,7 @@ class _DUnTenant(_ParAnnee):
     """Moissonneur d'un seul tenant, dont le bilan nomme le critère de recherche."""
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        return self._harvest_at_once(2, lambda progress: PhaseMetrics(new=2), par="ORCID, IdRef")
+        return self._harvest_at_once(2, lambda progress: PhaseMetrics(new=2), by="ORCID, IdRef")
 
 
 def test_le_bilan_nomme_le_critere_de_recherche(logger, caplog):

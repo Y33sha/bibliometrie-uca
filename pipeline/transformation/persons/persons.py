@@ -155,10 +155,10 @@ class PersonsPhase:
         t0 = time.perf_counter()
         with (
             ctx.open_tx() as conn,
-            waiting(f"{LAST_BRANCH}rafraîchissement en cours", ctx.logger) as ligne,
+            waiting(f"{LAST_BRANCH}rafraîchissement en cours", ctx.logger) as line,
         ):
             counts = populate(conn)
-            ligne.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
+            line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
         return PhaseMetrics(extras=counts._asdict())
 
     def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:

@@ -469,7 +469,7 @@ def run_cascade(
     )
     # Le chargement des index précède tout affichage de volume : il dure, et la phase resterait
     # muette jusqu'à ce qu'il rende la main.
-    with waiting(f"{BRANCH}chargement des contributions sources", logger) as ligne:
+    with waiting(f"{BRANCH}chargement des contributions sources", logger) as line:
         c = _Cascade(
             conn,
             repo=repo,
@@ -477,7 +477,7 @@ def run_cascade(
         )
         c.first_names_completed = completion.completed
         total = len(c.contributions)
-        ligne.conclude(
+        line.conclude(
             f"{BRANCH}{quantity(total, 'contribution source', 'contributions sources')} à examiner"
         )
 
@@ -500,14 +500,14 @@ def run_cascade(
     # hors périmètre, ou déjà liées en cross-source — n'attendent de cette passe qu'un
     # rattachement à une personne qu'elle vient de créer ; la passe suivante du run d'après les
     # rejuge contre l'état ferme complet.
-    sans_personne = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
-    non_identifiees = [a for a in sans_personne if a.allow_create]
+    without_person = [a for a in unresolved if a.in_perimeter and a.current_person_id is None]
+    unidentified = [a for a in without_person if a.allow_create]
     # Une création ajoute des personnes aux formes de nom sans en retirer : une forme indécidable le reste.
-    indecidables = [a for a in non_identifiees if c.name_form_undecidable(a)]
-    indecidables_ids = {a.source_contribution_id for a in indecidables}
+    undecidable = [a for a in unidentified if c.name_form_undecidable(a)]
+    undecidable_ids = {a.source_contribution_id for a in undecidable}
     # Les contributions sources au nom séparé par la source passent en tête : la personne créée prend leur découpage plutôt que celui du parseur, et les graphies brutes la rejoignent ensuite.
-    a_creer = sorted(
-        (a for a in non_identifiees if a.source_contribution_id not in indecidables_ids),
+    to_create = sorted(
+        (a for a in unidentified if a.source_contribution_id not in undecidable_ids),
         key=lambda a: not a.name.split_by_source,
     )
 
@@ -515,30 +515,30 @@ def run_cascade(
     logger.info(
         "%s%s %s",
         BRANCH,
-        quantity(len(non_identifiees), "contribution source", "contributions sources"),
-        inflect(len(non_identifiees), "non identifiée"),
+        quantity(len(unidentified), "contribution source", "contributions sources"),
+        inflect(len(unidentified), "non identifiée"),
     )
     logger.info(
         "%s%s (forme de nom ambiguë, ou candidats tous rejetés)",
         BRANCH,
-        quantity(len(indecidables), "indécidable"),
+        quantity(len(undecidable), "indécidable"),
     )
-    creees_avant = c.created
-    with track_progress(len(a_creer), BRANCH.rstrip(), logger, count_kept=True) as progress:
-        for a in a_creer:
+    created_before = c.created
+    with track_progress(len(to_create), BRANCH.rstrip(), logger, count_kept=True) as progress:
+        for a in to_create:
             progress.advance()
             if c.resolve_or_create(a):
                 progress.keep()
     # Les contributions sources qui ne peuvent pas créer de personne — rôle exclu, forme de nom ambiguë —
     # peuvent encore rejoindre en cross-source une personne créée pour une autre contribution source du groupe. Traitées
     # après toutes les créations, elles en reçoivent tous les ancrages.
-    for a in [*(a for a in sans_personne if not a.allow_create), *indecidables]:
+    for a in [*(a for a in without_person if not a.allow_create), *undecidable]:
         c.resolve_or_create(a)
     logger.info(
         "%s%s %s",
         LAST_BRANCH,
-        quantity(c.created - creees_avant, "personne"),
-        inflect(c.created - creees_avant, "créée"),
+        quantity(c.created - created_before, "personne"),
+        inflect(c.created - created_before, "créée"),
     )
     if orphans_log is not None:
         c.log_orphans(orphans_log)

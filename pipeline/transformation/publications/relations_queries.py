@@ -240,7 +240,7 @@ class PublicationRelationsQueries:
 
     # Colonnes qui identifient une arête, celles de la contrainte d'unicité : deux arêtes qui s'y
     # accordent sont le même lien. Le diff avant/après les compare.
-    _IDENTITE = "from_publication_id, relation_type, target_publication_id, target_doi"
+    _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, target_doi"
 
     def rebuild_relations(self, conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
         """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
@@ -248,14 +248,14 @@ class PublicationRelationsQueries:
         # disparaît. Un échec en cours de route annule sa création avec le reste de la transaction.
         conn.execute(
             text(
-                f"CREATE TEMP TABLE relations_avant AS "
-                f"SELECT {self._IDENTITE} FROM publication_relations"
+                f"CREATE TEMP TABLE relations_before AS "
+                f"SELECT {self._IDENTITY_COLUMNS} FROM publication_relations"
             )
         )
         conn.execute(text("DELETE FROM publication_relations"))
         written = 0 if not edges else self._insert_edges(conn, edges)
         rebuild = RelationsRebuild(written, self._count_added(conn), self._count_removed(conn))
-        conn.execute(text("DROP TABLE relations_avant"))
+        conn.execute(text("DROP TABLE relations_before"))
         return rebuild
 
     def _count_added(self, conn: Connection) -> list[tuple[str, int]]:
@@ -264,9 +264,9 @@ class PublicationRelationsQueries:
             text(f"""
                 SELECT relation_type::text AS rel_type, count(*) AS cnt
                 FROM (
-                    SELECT {self._IDENTITE} FROM publication_relations
+                    SELECT {self._IDENTITY_COLUMNS} FROM publication_relations
                     EXCEPT
-                    SELECT {self._IDENTITE} FROM relations_avant
+                    SELECT {self._IDENTITY_COLUMNS} FROM relations_before
                 ) ajoutees
                 GROUP BY relation_type
                 ORDER BY cnt DESC
@@ -280,9 +280,9 @@ class PublicationRelationsQueries:
             conn.execute(
                 text(f"""
                     SELECT count(*) FROM (
-                        SELECT {self._IDENTITE} FROM relations_avant
+                        SELECT {self._IDENTITY_COLUMNS} FROM relations_before
                         EXCEPT
-                        SELECT {self._IDENTITE} FROM publication_relations
+                        SELECT {self._IDENTITY_COLUMNS} FROM publication_relations
                     ) disparues
                 """)
             )

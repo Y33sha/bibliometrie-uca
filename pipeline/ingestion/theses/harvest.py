@@ -72,19 +72,19 @@ def harvest_theses(
         if not theses:
             break
 
-        for these in theses:
-            theses_id = extract_id(these)
+        for thesis in theses:
+            theses_id = extract_id(thesis)
             if not theses_id:
                 continue
-            if year is not None and not is_ongoing(these) and not theses_id.startswith(str(year)):
+            if year is not None and not is_ongoing(thesis) and not theses_id.startswith(str(year)):
                 continue
             stage_document(
                 conn,
                 metrics,
                 source="theses",
                 source_id=theses_id,
-                doi=extract_doi(these),
-                raw_data=these,
+                doi=extract_doi(thesis),
+                raw_data=thesis,
             )
             progress.keep()
 

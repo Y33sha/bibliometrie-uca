@@ -186,16 +186,16 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
     updated = 0
     for singular, plural, refresh_step in steps:
         t0 = time.perf_counter()
-        with waiting(f"{BRANCH}{plural} : en cours", logger) as ligne:
+        with waiting(f"{BRANCH}{plural} : en cours", logger) as line:
             updated = refresh_step(conn)
-            ligne.conclude(
+            line.conclude(
                 f"{BRANCH}{quantity(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
                 f" en {time.perf_counter() - t0:.1f} s"
             )
     t0 = time.perf_counter()
-    with waiting(f"{LAST_BRANCH}effacement des marqueurs de recalcul : en cours", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}effacement des marqueurs de recalcul : en cours", logger) as line:
         clear_countries_dirty(conn)
-        ligne.conclude(
+        line.conclude(
             f"{LAST_BRANCH}marqueurs de recalcul effacés en {time.perf_counter() - t0:.1f} s"
         )
     return updated

@@ -26,11 +26,11 @@ def _evidence(conn, publication_id: int) -> list[str]:
 
 def test_seuls_les_auteurs_font_entrer_une_publication(sa_sync_conn):
     insert_persons_perimeter(sa_sync_conn)
-    these = insert_publication(sa_sync_conn, "Thèse soutenue ailleurs", doc_type="thesis")
+    thesis = insert_publication(sa_sync_conn, "Thèse soutenue ailleurs", doc_type="thesis")
     article = insert_publication(sa_sync_conn, "Article")
     jury, auteur = insert_person(sa_sync_conn, "Jury"), insert_person(sa_sync_conn, "Auteur")
     insert_contribution(
-        sa_sync_conn, these, person_id=jury, in_perimeter=True, roles=["jury_member"]
+        sa_sync_conn, thesis, person_id=jury, in_perimeter=True, roles=["jury_member"]
     )
     insert_contribution(
         sa_sync_conn, article, person_id=auteur, in_perimeter=True, roles=["author"]
@@ -38,7 +38,7 @@ def test_seuls_les_auteurs_font_entrer_une_publication(sa_sync_conn):
 
     refresh_publications_perimeter_evidence(sa_sync_conn)
 
-    assert _evidence(sa_sync_conn, these) == []
+    assert _evidence(sa_sync_conn, thesis) == []
     assert _evidence(sa_sync_conn, article) == ["address"]
 
 
@@ -49,9 +49,9 @@ def test_these_soutenue_dans_l_etablissement(sa_sync_conn):
         {"ids": json.dumps({"theses": [_PPN]}), "id": universite},
     )
     refresh_perimeter_structures(sa_sync_conn)
-    these = insert_publication(sa_sync_conn, "Thèse soutenue ici", doc_type="thesis")
+    thesis = insert_publication(sa_sync_conn, "Thèse soutenue ici", doc_type="thesis")
     source_record = insert_source_record(
-        sa_sync_conn, these, source="theses", source_id="2021CLFAC001"
+        sa_sync_conn, thesis, source="theses", source_id="2021CLFAC001"
     )
     sa_sync_conn.execute(
         text(
@@ -62,4 +62,4 @@ def test_these_soutenue_dans_l_etablissement(sa_sync_conn):
 
     refresh_publications_perimeter_evidence(sa_sync_conn)
 
-    assert _evidence(sa_sync_conn, these) == ["thesis_institution"]
+    assert _evidence(sa_sync_conn, thesis) == ["thesis_institution"]

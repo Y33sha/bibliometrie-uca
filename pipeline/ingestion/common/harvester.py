@@ -213,12 +213,12 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         total: int,
         harvest_step: Callable[[Progress], PhaseMetrics],
         *,
-        par: str | None = None,
+        by: str | None = None,
     ) -> PhaseMetrics:
         """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
         with track_progress(total, self._label(), self.logger) as progress:
             metrics = harvest_step(progress)
-        self._write_summary(metrics, par=par)
+        self._write_summary(metrics, by=by)
         return metrics
 
     def _write_summary(
@@ -226,11 +226,11 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         metrics: PhaseMetrics,
         *,
         found: int | None = None,
-        par: str | None = None,
+        by: str | None = None,
     ) -> None:
         """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
 
-        `found` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `par` nomme le critère de recherche : « trouvés par ORCID ».
+        `found` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `by` nomme le critère de recherche : « trouvés par ORCID ».
         """
         found_form, new_form, updated_form, unchanged_form = _SUMMARY_FORMS[self.FEMININE]
         n = metrics.total if found is None else found
@@ -239,7 +239,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
             BRANCH_CONTINUATION,
             quantity(n, self.DOCUMENT),
             inflect(n, *found_form),
-            f" par {par}" if par else "",
+            f" par {by}" if by else "",
             quantity(metrics.new, *new_form),
             quantity(metrics.updated, *updated_form),
             quantity(metrics.unchanged, *unchanged_form),

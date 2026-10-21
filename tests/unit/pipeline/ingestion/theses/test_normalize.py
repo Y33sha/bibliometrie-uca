@@ -102,7 +102,7 @@ class TestBuildSourceMeta:
         }
 
     def test_full(self):
-        these = {
+        thesis = {
             "dateSoutenance": "15/03/2024",
             "datePremiereInscriptionDoctorat": "10/09/2020",
             "discipline": "Informatique",
@@ -113,7 +113,7 @@ class TestBuildSourceMeta:
                 {"nom": "LRL"},
             ],
         }
-        meta = _build_source_extras(these)
+        meta = _build_source_extras(thesis)
         assert meta is not None
         assert meta["date_soutenance"] == "2024-03-15"
         assert meta["date_inscription"] == "2020-09-10"
@@ -159,14 +159,14 @@ class TestInsertSourceDocument:
     def _call(
         self,
         queries: FakeSourceRecordQueries,
-        these: dict,
+        thesis: dict,
         *,
         publication_meta: PublicationMetadata | None = None,
     ) -> dict:
         insert_source_document(
             MagicMock(),
             queries,
-            these,
+            thesis,
             staging_id=1,
             theses_id="2024CLFAC001",
             publication_meta=publication_meta or self._publication_meta(),
@@ -187,8 +187,8 @@ class TestInsertSourceDocument:
 
     def test_keywords_from_sujets(self):
         queries = FakeSourceRecordQueries()
-        these = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
-        captured = self._call(queries, these)
+        thesis = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
+        captured = self._call(queries, thesis)
         assert captured.keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
@@ -203,11 +203,11 @@ class TestInsertSourceDocument:
 
     def test_topics_with_rameau(self):
         queries = FakeSourceRecordQueries()
-        these = {
+        thesis = {
             "discipline": "Informatique",
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
         }
-        captured = self._call(queries, these)
+        captured = self._call(queries, thesis)
         assert captured.topics == {
             "discipline": "Informatique",
             "rameau": ["Apprentissage automatique"],
@@ -251,11 +251,11 @@ class TestBuildThesesAuthorRecords:
 
     def test_aucune_adresse(self):
         """Partenaires et établissement de soutenance restent dans `meta` : aucune contribution source ne reçoit d'adresse."""
-        these = _these(
+        thesis = _these(
             partenairesDeRecherche=[{"nom": "LIMOS"}],
             etabSoutenanceN="Université Clermont Auvergne (2021-...)",
         )
-        records = build_theses_author_records(extract_theses_author_block(these))
+        records = build_theses_author_records(extract_theses_author_block(thesis))
         assert all(r.addresses == [] for r in records)
 
 
@@ -288,7 +288,7 @@ class TestProcessWork:
         }
 
     def test_happy_path(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [])
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda thesis: [])
         sq = FakeStagingQueries()
         row = staging_row(staging_id=42, raw={"titrePrincipal": "T"})
         result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))

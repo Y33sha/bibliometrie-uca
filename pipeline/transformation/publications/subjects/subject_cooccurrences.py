@@ -25,15 +25,13 @@ def run(
     Les deux recalculs balaient tous les liens publication-sujet : chaque ligne dit le travail en cours, puis cède la place à son résultat.
     """
     step(logger, "Rafraîchissement des décomptes")
-    with waiting(f"{BRANCH}publications par sujet", logger) as ligne:
+    with waiting(f"{BRANCH}publications par sujet", logger) as line:
         n_updated = queries.recompute_usage_counts(conn)
         # « mis à jour » ne varie pas au pluriel.
-        ligne.conclude(
-            f"{BRANCH}publications par sujet : {quantity(n_updated, 'sujet')} mis à jour"
-        )
+        line.conclude(f"{BRANCH}publications par sujet : {quantity(n_updated, 'sujet')} mis à jour")
 
-    with waiting(f"{LAST_BRANCH}co-occurrences entre sujets", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}co-occurrences entre sujets", logger) as line:
         n_pairs = queries.refresh_cooccurrences(conn)
-        ligne.conclude(f"{LAST_BRANCH}co-occurrences entre sujets : décomptes rafraîchis")
+        line.conclude(f"{LAST_BRANCH}co-occurrences entre sujets : décomptes rafraîchis")
 
     return {"usage_counts_updated": n_updated, "cooccurrence_pairs": n_pairs}

@@ -39,13 +39,13 @@ class CascadeResult(NamedTuple):
 def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
     """Écrit ce qui a identifié les personnes, méthode par méthode, nombres alignés à droite."""
     matched = result.matched_counts
-    total = sum(matched.get(methode, 0) for methode in _MATCHING_METHODS)
+    total = sum(matched.get(method, 0) for method in _MATCHING_METHODS)
     logger.info("%s%s, dont", LAST_BRANCH, quantity(total, "identification"))
 
-    largeur = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
+    width = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
     logger.info("")
-    for methode, label in _MATCHING_METHODS.items():
-        logger.info("     %s %s", f"{matched.get(methode, 0)}".rjust(largeur), label)
+    for method, label in _MATCHING_METHODS.items():
+        logger.info("     %s %s", f"{matched.get(method, 0)}".rjust(width), label)
 
 
 def build_metrics(

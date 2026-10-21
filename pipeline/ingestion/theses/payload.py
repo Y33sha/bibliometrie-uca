@@ -28,7 +28,7 @@ def derive_theses_doc_type(defense_date: str | None) -> str:
 class ThesisContribution:
     """Une personne d'une thèse, avec ses rôles fusionnés.
 
-    Produite par `aggregate_thesis_persons` à partir du dict `these` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
+    Produite par `aggregate_thesis_persons` à partir du dict `thesis` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
     """
 
     person: Mapping[str, JsonValue]
@@ -39,14 +39,14 @@ class ThesisContribution:
     is_author: bool
 
 
-def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContribution]:
-    """Agrège les personnes d'une thèse depuis `these` (API theses.fr).
+def aggregate_thesis_persons(thesis: Mapping[str, JsonValue]) -> list[ThesisContribution]:
+    """Agrège les personnes d'une thèse depuis `thesis` (API theses.fr).
 
     Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` (cf. `THESES_FIELD_ROLES`). Une personne qui apparaît dans plusieurs champs est dédupliquée (clé : PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés via `merge_roles`.
 
     En pratique, le cas multi-rôles concerne presque exclusivement le président du jury qui est aussi rapporteur (~1 % des contributions theses au 2026-05-08).
 
-    `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `these["auteurs"]`.
+    `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `thesis["auteurs"]`.
     """
     # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
     persons_by_key: dict[str, Mapping[str, JsonValue]] = {}
@@ -54,10 +54,10 @@ def aggregate_thesis_persons(these: Mapping[str, JsonValue]) -> list[ThesisContr
 
     for field, roles in THESES_FIELD_ROLES.items():
         if field == "president":
-            president = as_mapping(these.get("president"))
+            president = as_mapping(thesis.get("president"))
             persons = [president] if as_str(president.get("nom")) else []
         else:
-            persons = [as_mapping(p) for p in as_sequence(these.get(field))]
+            persons = [as_mapping(p) for p in as_sequence(thesis.get(field))]
 
         for person in persons:
             last_name = as_str(person.get("nom"))

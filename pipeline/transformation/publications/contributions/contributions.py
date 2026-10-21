@@ -97,7 +97,7 @@ class ContributionsPhase:
             with ctx.open_tx() as conn:
                 queries.propagate_contribution_attributes(conn)
                 in_perimeter = queries.count_contributions_in_perimeter(conn)
-            metrics = _chronometre(t0)
+            metrics = _timed(t0)
             metrics.details["in_perimeter"] = in_perimeter
             return metrics
 
@@ -105,14 +105,14 @@ class ContributionsPhase:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 queries.refresh_publications_perimeter_evidence(conn)
-            return _chronometre(t0)
+            return _timed(t0)
 
         def structures(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 queries.refresh_contribution_structures(conn)
                 queries.refresh_publication_structures(conn)
-            return _chronometre(t0)
+            return _timed(t0)
 
         def purge(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             metrics = PhaseMetrics()
@@ -133,21 +133,21 @@ class ContributionsPhase:
             )
             return PhaseMetrics()
 
-        synchronisation = "Synchronisation des tables"
+        sync_section = "Synchronisation des tables"
         by_task = run_tasks(
             "contributions",
             {
                 "contributions.build": TaskStep(build),
                 "contributions.propagate": TaskStep(
-                    propagate, section=synchronisation, label="Attributs des liens"
+                    propagate, section=sync_section, label="Attributs des liens"
                 ),
                 "contributions.publications_in_perimeter": TaskStep(
                     publications_in_perimeter,
-                    section=synchronisation,
+                    section=sync_section,
                     label="Périmètre des publications",
                 ),
                 "contributions.structures": TaskStep(
-                    structures, section=synchronisation, label="Structures des liens"
+                    structures, section=sync_section, label="Structures des liens"
                 ),
                 "contributions.purge_orphan_publications": TaskStep(purge),
                 "contributions.delete_empty_containers": TaskStep(empty_containers),
@@ -168,7 +168,7 @@ class ContributionsPhase:
         return metrics
 
 
-def _chronometre(t0: float) -> PhaseMetrics:
+def _timed(t0: float) -> PhaseMetrics:
     """Métriques d'une tâche de synchronisation, dont le bilan est sa durée."""
     metrics = PhaseMetrics()
     metrics.report = f"{time.perf_counter() - t0:.1f}s"
@@ -197,11 +197,11 @@ def _delete_empty_containers(
     if not steps:
         return
     step(ctx.logger, "Référentiels vides")
-    for indice, (label, run) in enumerate(steps):
+    for index, (label, run) in enumerate(steps):
         sub = run(ctx)
         metrics.merge(sub)
-        branche = LAST_BRANCH if indice == len(steps) - 1 else BRANCH
-        ctx.logger.info("%s%s : %s", branche, label, sub.report or "rien à faire")
+        branch = LAST_BRANCH if index == len(steps) - 1 else BRANCH
+        ctx.logger.info("%s%s : %s", branch, label, sub.report or "rien à faire")
 
 
 def _refresh_publication_counts(
@@ -220,23 +220,23 @@ def _refresh_publication_counts(
 
     with waiting(f"{BRANCH}par adresse", logger) as line:
         with open_tx() as conn:
-            adresses = address_publication_count_queries.recompute_publication_count(conn)
+            addresses = address_publication_count_queries.recompute_publication_count(conn)
         line.conclude(
-            f"{BRANCH}{quantity(adresses, 'adresse')} {inflect(adresses, 'mise à jour', 'mises à jour')}"
+            f"{BRANCH}{quantity(addresses, 'adresse')} {inflect(addresses, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{BRANCH}par revue", logger) as line:
         with open_tx() as conn:
-            revues = publication_counts_queries.refresh_journal_publication_counts(conn)
+            journals = publication_counts_queries.refresh_journal_publication_counts(conn)
         line.conclude(
-            f"{BRANCH}{quantity(revues, 'revue')} {inflect(revues, 'mise à jour', 'mises à jour')}"
+            f"{BRANCH}{quantity(journals, 'revue')} {inflect(journals, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
         with open_tx() as conn:
-            editeurs = publication_counts_queries.refresh_publisher_publication_counts(conn)
+            publishers = publication_counts_queries.refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
-        line.conclude(f"{LAST_BRANCH}{quantity(editeurs, 'éditeur')} mis à jour")
+        line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
 
 # ── Câblage ───────────────────────────────────────────────────
