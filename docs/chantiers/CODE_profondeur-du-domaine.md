@@ -19,7 +19,7 @@ Connaissances écrites à plusieurs endroits :
 - « enregistrement ScanR issu de HAL », à quatre endroits, dont un `LIKE 'hal%'` sans validation de l'identifiant ;
 - `meta ? 'conference'`, dans `metadata_correction_queries.py` et `type_proceedings_volumes.py` ;
 - la définition d'une revue diamant, seulement dans `infrastructure/sql_fragments.py` ;
-- « prénom réduit à des initiales », trois prédicats ; `cascade.py` recopie `attested_full_first_names` ;
+- « prénom plein qui prolonge les initiales », à quatre endroits ;
 - les seuils de comparaison des auteurs, dans `author_grouping.py` et `interfaces/cli/dev/estimate_residual_weights.py` ;
 - les clés des JSON `meta` et `biblio` : écrites par `pipeline/ingestion/hal/payload.py`, lues par chaîne dans `domain/publications/conference.py` et `relations.py` ;
 - le registre des dimensions de statistiques (`domain/stats.py`) et leur liaison SQL (`infrastructure/read_models/stats/pivot.py`), synchronisés par des `assert`.
@@ -48,7 +48,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] `allow_person_creation` décidé sur les rôles. 49c40081a
 - [x] Réattribution d'un identifiant seulement par l'agrégat : endpoint de réattribution retiré ; docstring de `AttributionStatus` alignée sur l'usage de l'admin.
 - [x] Identifiants personne normalisés à l'ingestion par `compact_identifiers`. c309a275e
-- [ ] Un prédicat « prénom réduit à des initiales », un prédicat « prénom plein qui prolonge les initiales ».
+- [x] Prédicat « prénom plein qui prolonge les initiales » unique ; `author_grouping` lit `is_initials`. f5e86dfe4
 
 ### Phase 2 — Correction des métadonnées
 
