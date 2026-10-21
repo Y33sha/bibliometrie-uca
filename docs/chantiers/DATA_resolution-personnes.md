@@ -13,7 +13,8 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 ## Décisions
 
 - `source_contribution_groups` remplace `contributions`. Une contribution est un groupe dont `person_id` est renseigné. `person_id` et `resolution_mode` quittent `source_contributions`.
-- Chaque contribution source non collective appartient à un groupe. Une contribution source sans jumelle forme un groupe à elle seule.
+- Une contribution source sans jumelle forme un groupe à elle seule. Les contributions sources collectives et celles des enregistrements sources écartés de l'alignement (enregistrement source scanR issu d'un dépôt HAL présent, enregistrement source DataCite au DOI convergé) restent hors groupe, donc sans personne.
+- Les changements irréversibles du schéma passent en dernier, après l'étude de leurs conséquences.
 - La cascade décide par groupe. Elle cherche les indices de périmètre du groupe, puis rattache le groupe à une personne existante.
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
 - Le rattachement d'un groupe à une personne est figé d'un run à l'autre.
@@ -64,11 +65,11 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
 ### Phase 2 — Audit des consommateurs
 
-- [ ] Lecteurs et écrivains de `contributions`, de `source_contributions.person_id` et de `source_contributions.resolution_mode` : pipeline, matviews, API, frontend, scripts, tests.
+- [x] Lecteurs et écrivains de `contributions`, de `source_contributions.person_id` et de `source_contributions.resolution_mode`, le 2026-10-21 : environ 100 fichiers hors documentation, dont 50 de tests. Environ 14 requêtes écrivent `source_contributions.person_id`, 4 écrivent `contributions`. Seule la fusion de personnes écrit `source_contribution_groups.person_id`. Aucune clé étrangère ne vise `contributions.id`.
 
-### Phase 3 — Groupes complets
+### Phase 3 — Enregistrements sources écartés de l'alignement
 
-- [ ] Contributions sources hors groupe : doublons d'auteur des enregistrements sources écartés de l'alignement (enregistrement source scanR issu d'un dépôt HAL présent, enregistrement source DataCite au DOI convergé). 358 enregistrements sources au 2026-10-18.
+- [ ] Mesure de ce que leurs contributions sources apportent seules : contributions (publication, personne) absentes des groupes, indices de périmètre absents des groupes de la publication. 358 enregistrements sources au 2026-10-18.
 
 ### Phase 4 — Essais d'une cascade par groupe
 
@@ -78,11 +79,40 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - [ ] Une personne par groupe au plus. Dans une publication, un groupe par personne au plus.
 - [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
-### Phase 5 — Intégration au pipeline
+### Phase 5 — Migration du schéma
 
-- [ ] `person_id` et `resolution_mode` passent de `source_contributions` à `source_contribution_groups`. `source_contribution_groups` remplace `contributions`, matviews reportées.
-- [ ] Épinglages et rejets propagés au groupe.
+Les étapes A à C sont réversibles : `contributions` et `source_contributions.person_id` restent tenus à jour. L'étape D est irréversible.
+
+#### Étape A — Personne sur le groupe, en double écriture
+
+- [ ] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`. `reference_position` tient lieu d'`author_position`.
+- [ ] Contrainte : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La suppression d'une personne vide `person_id` par la clé étrangère (`ON DELETE SET NULL`) sans vider `resolution_mode` : elle détache donc d'abord ses groupes.
+- [ ] La phase `persons` écrit la personne du groupe en plus de celle des contributions sources. Tant que la cascade décide par contribution source, la personne du groupe est celle de ses membres. Des membres rattachés à deux personnes laissent le groupe sans personne, et le conflit est compté.
+- [ ] Report de la personne quand `author_grouping` recalcule les groupes. Un groupe reprend l'identifiant de l'ancien groupe dont il partage le plus de membres (`plan_group_ids`). Cas où la personne se perd sans report :
+  - scission d'un groupe : le groupe sans l'identifiant repart sans personne ;
+  - réunion de deux groupes : l'identifiant abandonné emporte sa personne ;
+  - fusion de publications : les groupes de la publication absorbée sont supprimés en cascade ;
+  - enregistrement source déplacé vers une autre publication.
+- [ ] Écart entre les groupes et `contributions` : couples (publication, personne) présents d'un seul côté.
+
+#### Étape B — Bascule des lecteurs
+
+- [ ] Matviews `contribution_structures` et `publication_structures` calculées par les membres des groupes.
+- [ ] Read models, API, frontend, scripts `report_open_science` et `snapshot_perimeter`. `contribution_id` et `PATCH /api/contributions/{contribution_id}/exclude` désignent un groupe.
+- [ ] Compteurs `source_contribution_count` et `in_perimeter_source_contribution_count` de l'API personnes renommés : ils comptent des contributions.
+
+#### Étape C — Bascule des écrivains
+
+- [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
 - [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
+- [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` se réduit à la propagation des attributs des membres vers le groupe.
+- [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
+
+#### Étape D — Suppressions
+
+- [ ] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement.
+- [ ] Scripts ponctuels qui écrivent ces colonnes supprimés.
+- [ ] `source_contribution_groups` renommée `contributions`.
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
@@ -103,5 +133,6 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
 - Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
+- `resolution_mode` d'un groupe rattaché par une décision humaine : valeur dédiée, ou lecture de l'épinglage.
 - Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres groupes.
