@@ -60,7 +60,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] Règles des volumes Crossref sur la colonne `source_records.author_count` ; titre qui commence par un mot de volume sans condition d'auteurs. 70201133b
 - [x] Colonne `raw_metadata` renommée `corrections`. e102ffc2f
 - [x] Colonnes `meta` de `source_records` et `publications` renommées `source_extras` ; trace des corrections d'une publication dans `publications.corrections`. 3b584b73c
-- [ ] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ.
+- [x] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ. d882da50e
 - [ ] Module propriétaire du format des JSON `source_extras` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `source_extras` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
 - [ ] Projection SQL des faits des règles à côté des règles.
 - [ ] Registre des clés de `corrections` et de leur sous-étape ; `effective_external_ids`.
