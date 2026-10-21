@@ -25,7 +25,7 @@ Une personne est un chercheur unifié à travers les sources : plusieurs contrib
 
 1. **Appliquer les décisions humaines.** Les rattachements épinglés à la main sont reposés en premier ; les étapes suivantes ne les défont pas.
 2. **Arbitrer les identifiants disputés.** Un ORCID, un IdRef ou un identifiant de compte HAL peut être attribué à une personne alors que des contributions sources où il figure sont rattachées à une autre. Le nom d'auteur majoritaire, parmi toutes les contributions sources où figure cette valeur, tranche. Une attribution confirmée à la main prévaut. Après un transfert, les contributions sources qui tenaient leur rattachement de cet identifiant repassent à nul et sont résolues à nouveau.
-3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Les rôles non-auteurs des thèses — jury, rapporteurs — n'autorisent aucune création.
+3. **Rapprocher.** `decide_person_match` tranche par fiabilité décroissante : ORCID, identifiant de compte HAL, IdRef, nom unique, report depuis une autre source, et création en dernier recours. La cascade fait deux passes sur les mêmes index : la première ne fait que rapprocher, la création est repoussée à la seconde. Une contribution source à rôles de jury de thèse seuls (direction, rapport, jury, présidence), venue de theses.fr ou de ScanR, n'autorise aucune création.
 4. **Détacher ce qui a perdu son appui.** Un rattachement obtenu par report depuis une autre source, dont l'attache d'origine a disparu, repasse à nul.
 5. **Régénérer les formes de nom.** Les formes calculées depuis l'état civil de la personne rejoignent celles observées dans ses contributions sources ; seules les différences sont écrites. Une forme calculée naît confirmée, une forme observée naît en attente, et les décisions humaines déjà prises sont conservées.
 6. **Purger.** Les rattachements par nom dont la forme désigne maintenant deux personnes ou plus sont détachés, puis les personnes devenues vides sont supprimées — sauf celles qui ont une fiche annuaire.
@@ -40,7 +40,7 @@ Routeur `interfaces/api/routers/persons.py`, commandes dans `application/service
 
 **Fusionner deux personnes** (`POST /api/persons/{id}/merge`). `merge_into` transfère six tables — contributions sources, contributions, rejets, identifiants, fiche annuaire si la cible n'en a pas, et formes de nom en réunissant leurs provenances — puis supprime la personne absorbée. Sur une publication où la personne fusionnée est à la fois contributrice et rejetée, le rejet l'emporte : ses contributions sources y sont détachées et la contribution supprimée. La fusion est refusée si les deux ont chacune une fiche annuaire distincte.
 
-**Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation ou rejet ; réattribution, qui ramène l'identifiant en attente.
+**Gérer les identifiants.** Ajout manuel, limité aux types publics ; suppression ; confirmation, rejet ou retour en attente. Ajouter à une personne un identifiant rejeté chez une autre le lui réattribue, en attente ; un identifiant en attente ou confirmé chez une autre personne est refusé.
 
 **Agir sur la personne.** Rejet et retour en arrière, avec recalcul de l'appartenance des publications au périmètre ; renommage, qui régénère les formes calculées.
 

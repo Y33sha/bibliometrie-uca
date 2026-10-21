@@ -24,10 +24,6 @@ class UpdateIdentifierStatus(BaseModel):
     ]
 
 
-class ReassignIdentifier(BaseModel):
-    person_id: int
-
-
 class SetPersonExclusion(BaseModel):
     exclusion: PersonExclusion | None
 
@@ -84,14 +80,6 @@ class NameFormStatusResponse(BaseModel):
 
     person_id: int
     name_form: str
-    status: str
-
-
-class IdentifierReassignResponse(BaseModel):
-    """Identifiant après réattribution : la personne à laquelle il est rattaché et son statut."""
-
-    id: int
-    person_id: int
     status: str
 
 

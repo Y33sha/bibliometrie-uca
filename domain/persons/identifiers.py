@@ -32,10 +32,7 @@ class AttributionStatus(StrEnum):
 
     Mappe sur l'enum Postgres `identifier_status`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
 
-    Transitions valides :
-    - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
-    - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
-    - `REJECTED → PENDING` lors d'une réattribution à une autre personne (seule transition portée par une méthode du domaine, `IdentifierAttribution.reattribute_to` ; les autres passent par `update_identifier_status`, validées par l'enum Postgres).
+    L'admin pose librement `PENDING`, `CONFIRMED` ou `REJECTED` (`update_identifier_status`). Le pipeline passe par les méthodes de `IdentifierAttribution` : `reattribute_to` reprend un identifiant `REJECTED` chez une autre personne, `transfer_to` déplace un identifiant `PENDING`.
 
     `AUTHENTICATED` est un statut à part : il atteste que le chercheur a lui-même authentifié son ORCID en se connectant à son compte. Seul un ORCID peut le porter. C'est le statut le plus fort et le seul immuable : un trigger Postgres interdit d'en sortir (aucune dégradation, même par l'admin) et de le poser hors de l'import dédié des ORCID authentifiés. Il ne participe à aucune transition applicative.
     """

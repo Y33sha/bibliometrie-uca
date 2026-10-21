@@ -320,30 +320,6 @@ class TestUpdateIdentifierStatus:
         assert r.json()["status"] == "confirmed"
 
 
-class TestReassignIdentifier:
-    def test_requires_admin(self, client):
-        r = client.patch("/api/persons/identifiers/1/reassign", json={"person_id": 1})
-        assert r.status_code == 401
-
-    def test_target_not_found(self, auth_client):
-        pid = seed_person()
-        iid = seed_person_identifier(pid, id_type="idhal", id_value=uniq("ra"))
-        r = auth_client.patch(
-            f"/api/persons/identifiers/{iid}/reassign", json={"person_id": 999999999}
-        )
-        assert r.status_code == 404
-
-    def test_ok(self, auth_client):
-        src = seed_person()
-        dst = seed_person()
-        iid = seed_person_identifier(src, id_type="idhal", id_value=uniq("ra"), status="rejected")
-        r = auth_client.patch(f"/api/persons/identifiers/{iid}/reassign", json={"person_id": dst})
-        assert r.status_code == 200
-        body = r.json()
-        assert body["person_id"] == dst
-        assert body["status"] == "pending"
-
-
 # ── Reject / update name / merge ────────────────────────────────
 
 

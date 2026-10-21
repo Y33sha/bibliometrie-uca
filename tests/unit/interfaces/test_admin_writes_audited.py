@@ -38,7 +38,6 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/perimeters"): "perimeter.created",
     ("PUT", "/api/perimeters/{perimeter_id}"): "perimeter.updated",
     ("DELETE", "/api/perimeters/{perimeter_id}"): "perimeter.deleted",
-    ("PATCH", "/api/persons/identifiers/{ident_id}/reassign"): "person_identifier.reassigned",
     ("PATCH", "/api/persons/identifiers/{ident_id}/status"): "person_identifier.status_changed",
     ("POST", "/api/persons/mark-distinct"): "person.marked_distinct",
     ("POST", "/api/persons/{person_id}/detach-contributions"): "contribution.rejected",

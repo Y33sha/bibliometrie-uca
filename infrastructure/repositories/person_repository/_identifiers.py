@@ -152,16 +152,3 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
         ),
         {"st": status, "ids": list(peer_ids)},
     ).rowcount
-
-
-def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:
-    result = conn.execute(
-        text(
-            "UPDATE person_identifiers "
-            "SET person_id = :pid, status = CAST('pending' AS identifier_status) "
-            "WHERE id = :id"
-        ),
-        {"pid": target_person_id, "id": ident_id},
-    )
-    if result.rowcount == 0:
-        raise NotFoundError(f"Identifiant {ident_id} introuvable")

@@ -102,10 +102,6 @@ class PersonRepository(Protocol):
         """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
-    def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
-        """Réattribue un identifiant à une autre personne, statut repassé à `pending`. Lève `NotFoundError` s'il est absent."""
-        ...
-
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:

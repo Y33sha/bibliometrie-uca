@@ -15,7 +15,6 @@ from application.services.persons.core import (
     detach_contributions,
     mark_distinct,
     merge_person,
-    reassign_identifier,
     set_exclusion,
     update_identifier_status,
     update_name,
@@ -296,38 +295,6 @@ class TestIdentifierStatusPropagation:
         insert_person_identifier(sa_sync_conn, p, id_type="hal_person_id", id_value="11581")
 
         assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
-
-
-class TestReassignIdentifier:
-    def test_raises_on_unknown_target_person(self, sa_sync_conn, repo):
-        """Sans cette garde, la réattribution heurterait la clé étrangère."""
-        person_id = _person(sa_sync_conn)
-        ident_id = insert_person_identifier(
-            sa_sync_conn, person_id, id_type="orcid", id_value="0000-0001", status="rejected"
-        )
-        with pytest.raises(NotFoundError):
-            reassign_identifier(ident_id, 999999, repo=repo)
-
-    def test_reassigns(self, sa_sync_conn, repo):
-        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
-        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        ident_id = insert_person_identifier(
-            sa_sync_conn, p1, id_type="orcid", id_value="0000-0001", status="pending"
-        )
-
-        reassign_identifier(ident_id, p2, repo=repo)
-
-        row = sa_sync_conn.execute(
-            text("SELECT person_id, status::text AS status FROM person_identifiers WHERE id = :i"),
-            {"i": ident_id},
-        ).one()
-        assert row.person_id == p2
-        assert row.status == "pending"
-
-    def test_raises_not_found(self, sa_sync_conn, repo):
-        p = _person(sa_sync_conn)
-        with pytest.raises(NotFoundError):
-            reassign_identifier(999999, p, repo=repo)
 
 
 class TestSetExclusion:

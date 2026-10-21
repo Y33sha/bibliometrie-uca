@@ -1116,28 +1116,6 @@ export interface paths {
         patch: operations["update_identifier_status_api_persons_identifiers__ident_id__status_patch"];
         trace?: never;
     };
-    "/api/persons/identifiers/{ident_id}/reassign": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Reassign Identifier
-         * @description Réattribue un identifiant rejeté à une autre personne (status → pending).
-         *
-         *     Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
-         */
-        patch: operations["reassign_identifier_api_persons_identifiers__ident_id__reassign_patch"];
-        trace?: never;
-    };
     "/api/persons/{person_id}": {
         parameters: {
             query?: never;
@@ -2808,10 +2786,7 @@ export interface components {
          *
          *     Mappe sur l'enum Postgres `identifier_status`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
          *
-         *     Transitions valides :
-         *     - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
-         *     - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
-         *     - `REJECTED → PENDING` lors d'une réattribution à une autre personne (seule transition portée par une méthode du domaine, `IdentifierAttribution.reattribute_to` ; les autres passent par `update_identifier_status`, validées par l'enum Postgres).
+         *     L'admin pose librement `PENDING`, `CONFIRMED` ou `REJECTED` (`update_identifier_status`). Le pipeline passe par les méthodes de `IdentifierAttribution` : `reattribute_to` reprend un identifiant `REJECTED` chez une autre personne, `transfer_to` déplace un identifiant `PENDING`.
          *
          *     `AUTHENTICATED` est un statut à part : il atteste que le chercheur a lui-même authentifié son ORCID en se connectant à son compte. Seul un ORCID peut le porter. C'est le statut le plus fort et le seul immuable : un trigger Postgres interdit d'en sortir (aucune dégradation, même par l'admin) et de le poser hors de l'import dédié des ORCID authentifiés. Il ne participe à aucune transition applicative.
          * @enum {string}
@@ -3483,18 +3458,6 @@ export interface components {
             pairs: components["schemas"]["IdentifierConflictPairOut"][];
             /** Pages */
             readonly pages: number;
-        };
-        /**
-         * IdentifierReassignResponse
-         * @description Identifiant après réattribution : la personne à laquelle il est rattaché et son statut.
-         */
-        IdentifierReassignResponse: {
-            /** Id */
-            id: number;
-            /** Person Id */
-            person_id: number;
-            /** Status */
-            status: string;
         };
         /** IdentifierRef */
         IdentifierRef: {
@@ -4846,11 +4809,6 @@ export interface components {
             publisher_types: components["schemas"]["FacetOption"][];
             /** Countries */
             countries: components["schemas"]["FacetOption"][];
-        };
-        /** ReassignIdentifier */
-        ReassignIdentifier: {
-            /** Person Id */
-            person_id: number;
         };
         /**
          * RejectedPairItem
@@ -7531,41 +7489,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdentifierStatusResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reassign_identifier_api_persons_identifiers__ident_id__reassign_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                ident_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ReassignIdentifier"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IdentifierReassignResponse"];
                 };
             };
             /** @description Validation Error */

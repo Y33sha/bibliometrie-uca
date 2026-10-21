@@ -59,21 +59,6 @@ def update_identifier_status(
     return result
 
 
-def reassign_identifier(
-    conn: Connection,
-    ident_id: int,
-    target_person_id: int,
-    *,
-    repo: PersonRepository,
-    audit_repo: AuditRepository,
-) -> None:
-    """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
-    persons_service.reassign_identifier(
-        ident_id, target_person_id, repo=repo, audit_repo=audit_repo
-    )
-    conn.commit()
-
-
 # ── Exclusion / renommage / fusion ────────────────────────────────
 
 

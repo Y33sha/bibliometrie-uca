@@ -52,14 +52,12 @@ from interfaces.api.models import (
     AddIdentifierResponse,
     DetachContributions,
     DetachContributionsResponse,
-    IdentifierReassignResponse,
     IdentifierStatusResponse,
     MarkDistinctPersons,
     MergeRequest,
     MergeResponse,
     NameFormStatusResponse,
     OkResponse,
-    ReassignIdentifier,
     SetPersonExclusion,
     TotalCountResponse,
     UpdateIdentifierStatus,
@@ -259,22 +257,6 @@ def update_identifier_status(
     return IdentifierStatusResponse(
         id=result.id, status=result.status, propagated=result.propagated
     )
-
-
-@router.patch("/identifiers/{ident_id}/reassign", response_model=IdentifierReassignResponse)
-def reassign_identifier(
-    ident_id: int,
-    body: ReassignIdentifier,
-    conn: Connection = Depends(db_conn),
-    repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
-) -> IdentifierReassignResponse:
-    """Réattribue un identifiant rejeté à une autre personne (status → pending).
-
-    Renvoie 404 sur un identifiant ou une personne cible introuvable (`reassign_identifier`).
-    """
-    person_commands.reassign_identifier(conn, ident_id, body.person_id, repo=repo, audit_repo=audit)
-    return IdentifierReassignResponse(id=ident_id, person_id=body.person_id, status="pending")
 
 
 # ── Une personne : lectures ──────────────────────────────────────
