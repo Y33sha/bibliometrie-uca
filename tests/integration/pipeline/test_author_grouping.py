@@ -11,7 +11,7 @@ from infrastructure.read_models.publications.suspect_merges import (
 )
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
-from pipeline.transformation.publications.author_grouping.queries import AuthorGroupingQueries
+from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
 from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
@@ -59,7 +59,7 @@ def _groups(conn, publication_id):
 
 
 def _run(conn):
-    return build_groups(conn, AuthorGroupingQueries(), logger)
+    return build_groups(conn, SourceContributionGroupStore(conn), logger)
 
 
 def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
@@ -74,7 +74,7 @@ def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
         neutralized_identifiers={"orcid": "shared", "idref": "misplaced"},
     )
 
-    [row] = AuthorGroupingQueries().fetch_source_contributions(conn, [publication])
+    [row] = SourceContributionGroupStore(conn).fetch_source_contributions([publication])
 
     assert (row.id, row.orcid, row.idref) == (source_contribution, "", "")
 
