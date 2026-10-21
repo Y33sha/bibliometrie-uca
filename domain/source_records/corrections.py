@@ -7,7 +7,9 @@ Quand une correction écrit la valeur **effective** dans une colonne typée de `
 Ce module centralise **lecture** (reconstruction de la valeur d'avant correction) et **écriture** (stash) de ce format, de sorte que le contrat de réversibilité — `COALESCE(corrections->'<champ>'->>'raw', <colonne>)` côté SQL, `hydrate_raw_view` côté Python — soit défini en un seul endroit. Inverse des corrections (`domain/source_records/metadata_correction/`).
 """
 
+from collections.abc import Mapping
 from dataclasses import replace
+from enum import StrEnum
 from typing import TYPE_CHECKING, cast
 
 from domain.types import JsonValue
@@ -21,6 +23,39 @@ CORRECTED_BY = "corrected_by"
 
 REMOVED = "removed"
 BEFORE = "before"
+
+
+class CorrectionKey(StrEnum):
+    """Clé de `corrections`."""
+
+    DOC_TYPE = "doc_type"
+    OA_STATUS = "oa_status"
+    EXTERNAL_IDS = "external_ids"
+    DOI = "doi"
+    REMOVED_EXTERNAL_IDS = "removed_external_ids"
+    """Identifiants externes partagés avec une autre œuvre, retirés (`removal_entry`)."""
+    JOURNAL_ID = "journal_id"
+
+
+# Clés que pose chaque sous-étape de `metadata_correction`. Chaque sous-étape réécrit les siennes et garde les autres (`other_entries`).
+UNARY_KEYS = frozenset(
+    {CorrectionKey.DOC_TYPE, CorrectionKey.OA_STATUS, CorrectionKey.EXTERNAL_IDS}
+)
+CLUSTER_KEYS = frozenset({CorrectionKey.DOI, CorrectionKey.REMOVED_EXTERNAL_IDS})
+JOURNAL_BY_DOI_KEYS = frozenset({CorrectionKey.JOURNAL_ID})
+assert UNARY_KEYS | CLUSTER_KEYS | JOURNAL_BY_DOI_KEYS == set(CorrectionKey)
+assert not (
+    UNARY_KEYS & CLUSTER_KEYS
+    or UNARY_KEYS & JOURNAL_BY_DOI_KEYS
+    or CLUSTER_KEYS & JOURNAL_BY_DOI_KEYS
+)
+
+
+def other_entries(
+    corrections: Mapping[str, JsonValue], owned: frozenset[CorrectionKey]
+) -> dict[str, JsonValue]:
+    """Entrées de `corrections` hors des clés `owned` d'une sous-étape."""
+    return {k: v for k, v in corrections.items() if k not in owned}
 
 
 def stash_entry(raw: JsonValue, corrected_by: str) -> dict[str, JsonValue]:
@@ -63,7 +98,7 @@ def with_values_restored(mapping: dict[str, JsonValue], entry: JsonValue) -> dic
     return {**mapping, **entry[BEFORE]}
 
 
-def raw_value[T](corrections: dict[str, JsonValue] | None, field: str, current: T) -> T:
+def raw_value[T](corrections: Mapping[str, JsonValue] | None, field: str, current: T) -> T:
     """Valeur d'avant correction d'un champ : la valeur stashée si la `source_record` a été corrigée sur ce champ, sinon la valeur courante de la colonne."""
     entry = corrections.get(field) if corrections else None
     if isinstance(entry, dict) and RAW in entry:
@@ -73,7 +108,7 @@ def raw_value[T](corrections: dict[str, JsonValue] | None, field: str, current: 
 
 def hydrate_raw_view[ViewT: DataclassInstance](
     view: ViewT,
-    corrections: dict[str, JsonValue] | None,
+    corrections: Mapping[str, JsonValue] | None,
 ) -> ViewT:
     """Reconstruit la vue aux valeurs **source d'origine** (avant correction), en réinjectant chaque champ stashé dans `corrections`. Les champs jamais corrigés gardent leur valeur courante. Inverse de la persistance des corrections.
 

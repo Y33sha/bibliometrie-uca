@@ -13,7 +13,13 @@ from sqlalchemy import Connection
 
 from domain.journals.containers import is_book_or_chapter
 from domain.journals.doi_namespaces import DoiNamespace, resolve_journal
-from domain.source_records.corrections import raw_value, stash_entry
+from domain.source_records.corrections import (
+    JOURNAL_BY_DOI_KEYS,
+    CorrectionKey,
+    other_entries,
+    raw_value,
+    stash_entry,
+)
 from domain.source_records.metadata_correction.journal_by_doi import (
     JOURNAL_BY_DOI_NAMESPACE,
 )
@@ -30,15 +36,15 @@ def _compute_update(
     row: JournalCorrectionRow, namespaces: Mapping[str, DoiNamespace]
 ) -> JournalCorrectionUpdate | None:
     """État cible d'une `source_record`, ou `None` s'il est l'état courant. La clé `corrections.journal_id` appartient à cette sous-étape ; les autres clés sont préservées."""
-    raw_journal_id = raw_value(row.corrections, "journal_id", row.journal_id)
-    corrections = {k: v for k, v in row.corrections.items() if k != "journal_id"}
+    raw_journal_id = raw_value(row.corrections, CorrectionKey.JOURNAL_ID, row.journal_id)
+    corrections = other_entries(row.corrections, JOURNAL_BY_DOI_KEYS)
 
     new_journal_id = raw_journal_id
     if raw_journal_id is None and row.doi and not is_book_or_chapter(row.raw_doc_type, row.source):
         namespace = resolve_journal(row.doi, namespaces)
         if namespace is not None:
             new_journal_id = namespace.journal_id
-            corrections["journal_id"] = stash_entry(None, JOURNAL_BY_DOI_NAMESPACE)
+            corrections[CorrectionKey.JOURNAL_ID] = stash_entry(None, JOURNAL_BY_DOI_NAMESPACE)
 
     if new_journal_id == row.journal_id and corrections == row.corrections:
         return None

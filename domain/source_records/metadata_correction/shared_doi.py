@@ -132,9 +132,6 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
     }
 )
 
-# Clé de `corrections` où la correction par cluster note les identifiants externes qu'elle retire.
-REMOVED_EXTERNAL_IDS = "removed_external_ids"
-
 
 def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[str, ...]]:
     """Valeurs des clés de confirmation d'un `external_ids`, par type."""

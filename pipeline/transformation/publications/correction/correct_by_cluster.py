@@ -20,7 +20,10 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.source_records.corrections import (
+    CLUSTER_KEYS,
     CORRECTED_BY,
+    CorrectionKey,
+    other_entries,
     raw_value,
     removal_entry,
     stash_entry,
@@ -28,7 +31,6 @@ from domain.source_records.corrections import (
     without_values,
 )
 from domain.source_records.metadata_correction.shared_doi import (
-    REMOVED_EXTERNAL_IDS,
     ConfirmationIdRemoval,
     DoiClusterDecision,
     DoiClusterMember,
@@ -49,7 +51,9 @@ from pipeline.transformation.publications.correction.metadata_correction_queries
 
 def _base_external_ids(row: DoiClusterRow) -> dict[str, JsonValue]:
     """Identifiants externes de l'enregistrement source avant le retrait par cluster : ceux que l'étape unaire a écrits, valeurs retirées au run précédent restaurées."""
-    return with_values_restored(row.external_ids, row.corrections.get(REMOVED_EXTERNAL_IDS))
+    return with_values_restored(
+        row.external_ids, row.corrections.get(CorrectionKey.REMOVED_EXTERNAL_IDS)
+    )
 
 
 def _compute_update(
@@ -57,17 +61,15 @@ def _compute_update(
     decision: DoiClusterDecision | None,
     removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
-    raw_doi = raw_value(row.corrections, "doi", row.doi)
-    corrections = {
-        k: v for k, v in row.corrections.items() if k not in ("doi", REMOVED_EXTERNAL_IDS)
-    }
+    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `CorrectionKey.REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    raw_doi = raw_value(row.corrections, CorrectionKey.DOI, row.doi)
+    corrections = other_entries(row.corrections, CLUSTER_KEYS)
 
     if decision is None or decision.target_doi == raw_doi:
         new_doi = raw_doi
     else:
         new_doi = decision.target_doi
-        corrections["doi"] = stash_entry(raw_doi, decision.case.value)
+        corrections[CorrectionKey.DOI] = stash_entry(raw_doi, decision.case.value)
 
     base = _base_external_ids(row)
     new_external_ids = base
@@ -76,7 +78,7 @@ def _compute_update(
             {k: base[k] for k in removal.removed if k in base}, removal.removed, removal.case.value
         )
         new_external_ids = without_values(base, entry)
-        corrections[REMOVED_EXTERNAL_IDS] = entry
+        corrections[CorrectionKey.REMOVED_EXTERNAL_IDS] = entry
 
     if (
         new_doi == row.doi
@@ -154,7 +156,7 @@ def run(
 
     updates = compute_updates(rows)
     logger.info("%s%s à appliquer", BRANCHE, accord(len(updates), "correction"))
-    removals = sum(1 for u in updates if REMOVED_EXTERNAL_IDS in u.corrections)
+    removals = sum(1 for u in updates if CorrectionKey.REMOVED_EXTERNAL_IDS in u.corrections)
     logger.info(
         "%sidentifiants partagés avec une autre œuvre retirés de %s",
         BRANCHE,

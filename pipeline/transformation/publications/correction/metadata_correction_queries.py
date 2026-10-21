@@ -11,11 +11,11 @@ from sqlalchemy import Connection, Row, bindparam, text
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
+from domain.source_records.corrections import CorrectionKey
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
-    REMOVED_EXTERNAL_IDS,
     DoiClusterCase,
 )
 from domain.source_records.source_extras import SourceExtra
@@ -389,7 +389,7 @@ class PgMetadataCorrectionQueries:
                     UNION
                     SELECT eff_doi AS d FROM sr_eff
                     WHERE {corrected("doi", "sr_eff")}
-                       OR {corrected(REMOVED_EXTERNAL_IDS, "sr_eff")}
+                       OR {corrected(CorrectionKey.REMOVED_EXTERNAL_IDS, "sr_eff")}
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
