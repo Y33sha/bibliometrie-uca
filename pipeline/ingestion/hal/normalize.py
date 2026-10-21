@@ -40,10 +40,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.hal.payload import (
     derive_hal_oa_status,
     extract_hal_source_extras,
@@ -208,7 +208,7 @@ def build_hal_external_ids(
 
 def insert_hal_document(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
@@ -253,8 +253,7 @@ def insert_hal_document(
     uri = hal_text_field(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="hal",
             source_id=hal_id,
@@ -603,12 +602,12 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging HAL."""
@@ -634,14 +633,14 @@ def process_work(
 
     source_record_id = insert_hal_document(
         conn,
-        queries,
+        record_store,
         doc,
         staging_id,
         hal_id,
         publication_meta,
     )
     process_contributions(conn, contribution_store, doc, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
 
     return True
 
@@ -661,6 +660,6 @@ class HalNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

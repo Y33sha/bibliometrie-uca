@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from unittest.mock import ANY, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -27,7 +27,7 @@ def _row(label: str) -> StagingRow:
 
 
 class _FakeStaging:
-    """Stub minimal du port `StagingQueries`."""
+    """Stub minimal du port `StagingStore`."""
 
     def __init__(self) -> None:
         self.count_returns = 0
@@ -35,20 +35,20 @@ class _FakeStaging:
         self.batch_ids: list[int] = []
         self.batch_id_rows: dict[tuple[int, ...], list[StagingRow]] = {}
 
-    def count_pending_staging(self, conn, source: str) -> int:
+    def count_pending_staging(self, source: str) -> int:
         return self.count_returns
 
-    def fetch_pending_staging(self, conn, source: str, *, limit: int) -> list[StagingRow]:
+    def fetch_pending_staging(self, source: str, *, limit: int) -> list[StagingRow]:
         return self.pending_rows[:limit]
 
-    def fetch_pending_staging_ids(self, conn, source: str) -> list[int]:
+    def fetch_pending_staging_ids(self, source: str) -> list[int]:
         # Le test dédié à `FETCH_SUB_BATCH` peuple `batch_ids` directement.
         # Pour les autres tests qui peuplent `pending_rows`, on dérive les ids.
         if self.batch_ids:
             return self.batch_ids
         return [r.id for r in self.pending_rows]
 
-    def fetch_staging_by_ids(self, conn, ids: list[int]) -> list[StagingRow]:
+    def fetch_staging_by_ids(self, ids: list[int]) -> list[StagingRow]:
         if self.batch_id_rows:
             return self.batch_id_rows.get(tuple(ids), [])
         ids_set = set(ids)
@@ -71,7 +71,7 @@ class _Norm(SourceNormalizer):
         super().__init__(
             conn=MagicMock(invalidated=False),
             logger=logging.getLogger("test"),
-            staging_queries=staging,
+            staging_store=staging,
         )
         self.results = results or []
         self.raises_on = raises_on or set()
@@ -284,7 +284,7 @@ class _MinimalNorm(SourceNormalizer):
         super().__init__(
             conn=MagicMock(invalidated=False),
             logger=logging.getLogger("test"),
-            staging_queries=staging,
+            staging_store=staging,
         )
         self.normalized: list[StagingRow] = []
 
@@ -311,8 +311,8 @@ class TestProcessWorkMinimalMetadata:
         norm = _MinimalNorm(staging)
         row = StagingRow(id=7, source_id="W3131333980", doi=None, raw_data={"title": "T"})
         assert norm.process_work(MagicMock(), row) is False
-        staging.discard_source_record.assert_called_once_with(ANY, 7)
-        staging.mark_done.assert_called_once_with(ANY, 7)
+        staging.discard_source_record.assert_called_once_with(7)
+        staging.mark_done.assert_called_once_with(7)
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
@@ -322,8 +322,8 @@ class TestProcessWorkMinimalMetadata:
         norm.normalize_record = lambda conn, row: False  # type: ignore[method-assign]
         row = StagingRow(id=3, source_id="c", doi=None, raw_data={"title": "T", "year": 2020})
         assert norm.process_work(MagicMock(), row) is False
-        staging.discard_source_record.assert_called_once_with(ANY, 3)
-        staging.mark_done.assert_called_once_with(ANY, 3)
+        staging.discard_source_record.assert_called_once_with(3)
+        staging.mark_done.assert_called_once_with(3)
 
     def test_enregistrement_source_complet_normalise(self):
         staging = MagicMock()

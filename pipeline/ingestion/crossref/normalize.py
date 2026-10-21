@@ -33,10 +33,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.crossref.payload import (
     crossref_issns,
     crossref_raw_doc_type,
@@ -348,12 +348,12 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool | None:
     staging_id = staging_row.id
@@ -375,8 +375,7 @@ def process_work(
     biblio = get_biblio(msg)
     source_extras = extract_crossref_source_extras(msg)
 
-    source_record_id = queries.upsert_source_record(
-        conn,
+    source_record_id = record_store.upsert_source_record(
         SourceRecordUpsert(
             source="crossref",
             source_id=doi,
@@ -400,7 +399,7 @@ def process_work(
         ),
     )
     process_contributions(conn, contribution_store, msg, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -419,6 +418,6 @@ class CrossrefNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

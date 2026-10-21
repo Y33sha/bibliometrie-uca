@@ -28,10 +28,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.scanr.payload import (
     derive_scanr_oa_status,
     extract_nnt_from_scanr_id,
@@ -154,7 +154,7 @@ def extract_publication_metadata(
 
 def insert_scanr_document(  # noqa: C901
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
@@ -235,8 +235,7 @@ def insert_scanr_document(  # noqa: C901
         journal_eissn=jeissn,
     )
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="scanr",
             source_id=scanr_id,
@@ -386,12 +385,12 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool:
     staging_id = staging_row.id
@@ -406,10 +405,10 @@ def process_work(
     )
 
     source_record_id = insert_scanr_document(
-        conn, queries, doc, staging_id, scanr_id, publication_meta
+        conn, record_store, doc, staging_id, scanr_id, publication_meta
     )
     process_contributions(conn, contribution_store, doc, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
 
     return True
 
@@ -429,6 +428,6 @@ class ScanrNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

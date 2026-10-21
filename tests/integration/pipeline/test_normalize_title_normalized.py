@@ -4,20 +4,17 @@ from sqlalchemy import text
 
 from domain.publications.metadata import normalized_title
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
 from tests.integration.helpers.staging import insert_staging
-
-_Q = SourceRecordQueries()
 
 
 def test_upsert_writes_title_normalized(sa_sync_conn):
     conn = sa_sync_conn
     staging_id = insert_staging(conn, "openalex", source_id="W_title_norm")
     raw_title = "Les Cœurs <b>simples</b> &amp;amp; complexes"
-    source_record_id = _Q.upsert_source_record(
-        conn,
+    source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
         SourceRecordUpsert(
             source="openalex",
             source_id="W_title_norm",

@@ -39,10 +39,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
     extract_external_ids_from_urls,
@@ -263,7 +263,7 @@ def extract_publication_metadata(
 
 def insert_openalex_document(  # noqa: C901
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     work: Mapping[str, JsonValue],
     staging_id: int,
     publication_meta: PublicationMetadata,
@@ -328,8 +328,7 @@ def insert_openalex_document(  # noqa: C901
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
     publisher_license = None if should_skip_publisher_journal(primary) else raw_license
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="openalex",
             source_id=openalex_id,
@@ -494,12 +493,12 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
@@ -518,10 +517,10 @@ def process_work(
     )
 
     source_record_id = insert_openalex_document(
-        conn, queries, work, staging_id, publication_meta, primary
+        conn, record_store, work, staging_id, publication_meta, primary
     )
     process_contributions(conn, contribution_store, work, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -542,6 +541,6 @@ class OpenalexNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

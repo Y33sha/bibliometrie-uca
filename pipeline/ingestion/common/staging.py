@@ -1,7 +1,7 @@
 """Table `staging` : écriture des documents rendus par les sources, lecture et marquage par la normalisation.
 
 - `upsert_staging` écrit un document, pour toutes les voies d'entrée (phases `harvest`, `fetch_missing` et `fetch_stale`).
-- `StagingQueries` lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
+- `StagingStore` lit les lignes à normaliser et marque les lignes traitées, en archivant leur payload au raw store.
 
 Le commit est à la charge de l'appelant.
 """
@@ -151,17 +151,18 @@ _MARK_DONE_SQL = text(
 )
 
 
-class StagingQueries:
+class StagingStore:
     """Lectures et marquages de `staging` par la normalisation.
 
     `raw_store` (défaut : `get_raw_store()`) reçoit chaque payload `raw_data` juste avant sa vidange par `mark_done` (archivage hors base).
     """
 
-    def __init__(self, raw_store: RawStore | None = None) -> None:
+    def __init__(self, conn: Connection, raw_store: RawStore | None = None) -> None:
+        self._conn = conn
         self._raw_store = raw_store if raw_store is not None else get_raw_store()
 
-    def count_pending_staging(self, conn: Connection, source: str) -> int:
-        row = conn.execute(
+    def count_pending_staging(self, source: str) -> int:
+        row = self._conn.execute(
             text(
                 "SELECT COUNT(*) AS cnt FROM staging WHERE source = :source AND processed = FALSE"
             ),
@@ -169,10 +170,8 @@ class StagingQueries:
         ).one_or_none()
         return row.cnt if row else 0
 
-    def fetch_pending_staging(
-        self, conn: Connection, source: str, *, limit: int
-    ) -> list[StagingRow]:
-        rows = conn.execute(
+    def fetch_pending_staging(self, source: str, *, limit: int) -> list[StagingRow]:
+        rows = self._conn.execute(
             text(f"""
                 SELECT {_COLUMNS}
                 FROM staging
@@ -184,8 +183,8 @@ class StagingQueries:
         ).all()
         return [_row(r) for r in rows]
 
-    def fetch_pending_staging_ids(self, conn: Connection, source: str) -> list[int]:
-        rows = conn.execute(
+    def fetch_pending_staging_ids(self, source: str) -> list[int]:
+        rows = self._conn.execute(
             text("""
                 SELECT id FROM staging
                 WHERE source = :source AND processed = FALSE
@@ -195,8 +194,8 @@ class StagingQueries:
         ).all()
         return [r.id for r in rows]
 
-    def fetch_staging_by_ids(self, conn: Connection, staging_ids: list[int]) -> list[StagingRow]:
-        rows = conn.execute(
+    def fetch_staging_by_ids(self, staging_ids: list[int]) -> list[StagingRow]:
+        rows = self._conn.execute(
             text(f"""
                 SELECT {_COLUMNS}
                 FROM staging WHERE id = ANY(:ids)
@@ -206,12 +205,12 @@ class StagingQueries:
         ).all()
         return [_row(r) for r in rows]
 
-    def discard_source_record(self, conn: Connection, staging_id: int) -> None:
-        delete_source_record_of_staging(conn, staging_id)
+    def discard_source_record(self, staging_id: int) -> None:
+        delete_source_record_of_staging(self._conn, staging_id)
 
-    def mark_done(self, conn: Connection, staging_id: int) -> None:
+    def mark_done(self, staging_id: int) -> None:
         # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).
-        row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
+        row = self._conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
         if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
             return
         try:

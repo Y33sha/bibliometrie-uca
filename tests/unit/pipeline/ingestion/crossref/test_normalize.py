@@ -46,8 +46,8 @@ from pipeline.ingestion.crossref.normalize import (
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
-    FakeSourceRecordQueries,
-    FakeStagingQueries,
+    FakeSourceRecordStore,
+    FakeStagingStore,
     staging_row,
 )
 
@@ -613,30 +613,30 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_crossref, "process_contributions", lambda *a, **kw: None)
 
     @pytest.fixture
-    def queries(self) -> FakeSourceRecordQueries:
-        return FakeSourceRecordQueries()
+    def record_store(self) -> FakeSourceRecordStore:
+        return FakeSourceRecordStore()
 
     @pytest.fixture
-    def staging(self) -> FakeStagingQueries:
-        return FakeStagingQueries()
+    def staging(self) -> FakeStagingStore:
+        return FakeStagingStore()
 
-    def _run(self, raw, queries, staging, logger):
+    def _run(self, raw, record_store, staging, logger):
         return process_work(
             MagicMock(),
-            queries,
+            record_store,
             staging_row(staging_id=42, raw=raw),
             container_stores=MagicMock(),
             publisher_store=MagicMock(),
-            staging_queries=staging,
+            staging_store=staging,
             contribution_store=MagicMock(),
         )
 
-    def test_document_verse_et_ligne_marquee(self, queries, staging, logger):
-        rendu = self._run(_message(), queries, staging, logger)
+    def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
+        rendu = self._run(_message(), record_store, staging, logger)
 
         assert rendu is True
         assert staging.marked_done == [42]
-        (document,) = queries.upserted_documents
+        (document,) = record_store.upserted_documents
         assert document.source == "crossref"
         assert document.doi == "10.1000/abc"
         assert document.publication_year == 2024
@@ -649,13 +649,13 @@ class TestProcessWork:
             ({"title": ["T"], "issued": {"date-parts": [[2024]]}}, "sans DOI"),
         ],
     )
-    def test_document_refuse_sans_rien_ecrire(self, raw, motif, queries, staging, logger):
+    def test_document_refuse_sans_rien_ecrire(self, raw, motif, record_store, staging, logger):
         """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
-        rendu = self._run(raw, queries, staging, logger)
+        rendu = self._run(raw, record_store, staging, logger)
 
         assert rendu is False, motif
         assert staging.marked_done == []
-        assert queries.upserted_documents == []
+        assert record_store.upserted_documents == []
 
 
 def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
@@ -664,13 +664,13 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
     monkeypatch.setattr(
         normalize_crossref,
         "process_work",
-        lambda conn, queries, row, **kw: vus.update(row=row, **kw) or True,
+        lambda conn, record_store, row, **kw: vus.update(row=row, **kw) or True,
     )
     normalizer = CrossrefNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
-        staging_queries=MagicMock(),
-        queries=MagicMock(),
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),

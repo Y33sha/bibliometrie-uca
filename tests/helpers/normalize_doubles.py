@@ -18,24 +18,24 @@ def staging_row(
     return StagingRow(id=staging_id, source_id=source_id, doi=doi, raw_data=raw or {})
 
 
-class FakeSourceRecordQueries:
-    """`SourceRecordQueries` : retient les documents versés."""
+class FakeSourceRecordStore:
+    """`SourceRecordStore` : retient les documents versés."""
 
     def __init__(self) -> None:
         self.upserted_documents: list[SourceRecordUpsert] = []
 
-    def upsert_source_record(self, conn, row: SourceRecordUpsert) -> int:
+    def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         self.upserted_documents.append(row)
         return 999
 
 
-class FakeStagingQueries:
-    """`StagingQueries` : retient les lignes marquées traitées."""
+class FakeStagingStore:
+    """`StagingStore` : retient les lignes marquées traitées."""
 
     def __init__(self) -> None:
         self.marked_done: list[int] = []
 
-    def mark_done(self, conn, staging_id: int) -> None:
+    def mark_done(self, staging_id: int) -> None:
         self.marked_done.append(staging_id)
 
 

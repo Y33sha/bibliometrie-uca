@@ -67,31 +67,31 @@ def run_normalize_wos(conn):
 
     from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
-        SourceRecordQueries,
+        SourceRecordStore,
     )
-    from pipeline.ingestion.common.staging import StagingQueries
+    from pipeline.ingestion.common.staging import StagingStore
     from pipeline.ingestion.wos.normalize import process_record
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourceRecordQueries()
-    staging_queries = StagingQueries()
+    record_store = SourceRecordStore(conn)
+    staging_store = StagingStore(conn)
     contribution_store = SourceContributionStore(conn)
     logger = logging.getLogger("test")
     container_stores = ContainerStores.of(conn)
     publisher_store = PublisherStore(conn)
 
-    rows = staging_queries.fetch_pending_staging(conn, "wos", limit=10_000)
+    rows = staging_store.fetch_pending_staging("wos", limit=10_000)
     processed = 0
     for row in rows:
         if process_record(
             conn,
-            queries,
+            record_store,
             logger,
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=staging_queries,
+            staging_store=staging_store,
             contribution_store=contribution_store,
         ):
             processed += 1

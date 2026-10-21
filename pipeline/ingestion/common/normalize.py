@@ -33,10 +33,10 @@ from pipeline.ingestion.common.source_contribution_store import (
     mark_source_contributions_to_resync,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     delete_disappeared_source_records,
 )
-from pipeline.ingestion.common.staging import StagingQueries
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
 from pipeline.ingestion.datacite.normalize import DataciteNormalizer
 from pipeline.ingestion.hal.normalize import HalNormalizer
@@ -218,8 +218,8 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
         return lambda conn, logger: cls(
             conn,
             logger,
-            StagingQueries(raw_store),
-            SourceRecordQueries(),
+            StagingStore(conn, raw_store),
+            SourceRecordStore(conn),
             container_stores=ContainerStores.of(conn),
             publisher_store=PublisherStore(conn),
             contribution_store=SourceContributionStore(conn),
@@ -229,8 +229,8 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
         "theses": lambda conn, logger: ThesesNormalizer(
             conn,
             logger,
-            StagingQueries(raw_store),
-            SourceRecordQueries(),
+            StagingStore(conn, raw_store),
+            SourceRecordStore(conn),
             contribution_store=SourceContributionStore(conn),
         ),
         "crossref": _biblio(CrossrefNormalizer),

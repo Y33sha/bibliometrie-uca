@@ -2,7 +2,7 @@
 
 Couvre `extract_publication_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_contributions` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
-Pattern : `FakeSourceRecordQueries` + `MagicMock`, pas de DB.
+Pattern : `FakeSourceRecordStore` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pipeline.ingestion.theses.normalize import (
 )
 from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
-    FakeSourceRecordQueries,
-    FakeStagingQueries,
+    FakeSourceRecordStore,
+    FakeStagingStore,
     staging_row,
 )
 
@@ -158,74 +158,74 @@ class TestInsertSourceDocument:
 
     def _call(
         self,
-        queries: FakeSourceRecordQueries,
+        record_store: FakeSourceRecordStore,
         thesis: dict,
         *,
         publication_meta: PublicationMetadata | None = None,
     ) -> dict:
         insert_source_document(
             MagicMock(),
-            queries,
+            record_store,
             thesis,
             staging_id=1,
             theses_id="2024CLFAC001",
             publication_meta=publication_meta or self._publication_meta(),
         )
-        return queries.upserted_documents[-1]
+        return record_store.upserted_documents[-1]
 
     def test_nnt_goes_in_external_ids(self):
-        queries = FakeSourceRecordQueries()
+        record_store = FakeSourceRecordStore()
         captured = self._call(
-            queries, {}, publication_meta=self._publication_meta(nnt="2024CLFAC001")
+            record_store, {}, publication_meta=self._publication_meta(nnt="2024CLFAC001")
         )
         assert captured.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {})
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {})
         assert captured.external_ids is None
 
     def test_keywords_from_sujets(self):
-        queries = FakeSourceRecordQueries()
+        record_store = FakeSourceRecordStore()
         thesis = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
-        captured = self._call(queries, thesis)
+        captured = self._call(record_store, thesis)
         assert captured.keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {})
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {})
         assert captured.keywords is None
 
     def test_topics_discipline_only(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {"discipline": "Informatique"})
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {"discipline": "Informatique"})
         assert captured.topics == {"discipline": "Informatique"}
 
     def test_topics_with_rameau(self):
-        queries = FakeSourceRecordQueries()
+        record_store = FakeSourceRecordStore()
         thesis = {
             "discipline": "Informatique",
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
         }
-        captured = self._call(queries, thesis)
+        captured = self._call(record_store, thesis)
         assert captured.topics == {
             "discipline": "Informatique",
             "rameau": ["Apprentissage automatique"],
         }
 
     def test_no_topics(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {})
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {})
         assert captured.topics is None
 
     def test_source_meta_passed(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {"dateSoutenance": "15/03/2024"})
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {"dateSoutenance": "15/03/2024"})
         assert captured.source_extras == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
-        queries = FakeSourceRecordQueries()
-        captured = self._call(queries, {}, publication_meta=self._publication_meta(title=None))
+        record_store = FakeSourceRecordStore()
+        captured = self._call(record_store, {}, publication_meta=self._publication_meta(title=None))
         assert captured.title == ""
 
 
@@ -280,18 +280,18 @@ class TestProcessContributions:
 
 
 class TestProcessWork:
-    def _kwargs(self, queries=None, staging_queries=None):
+    def _kwargs(self, record_store=None, staging_store=None):
         return {
-            "queries": queries or FakeSourceRecordQueries(),
-            "staging_queries": staging_queries or FakeStagingQueries(),
+            "record_store": record_store or FakeSourceRecordStore(),
+            "staging_store": staging_store or FakeStagingStore(),
             "contribution_store": MagicMock(),
         }
 
     def test_happy_path(self, monkeypatch):
         monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda thesis: [])
-        sq = FakeStagingQueries()
+        sq = FakeStagingStore()
         row = staging_row(staging_id=42, raw={"titrePrincipal": "T"})
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_store=sq))
         assert result is True
         assert sq.marked_done == [42]
 
@@ -314,8 +314,8 @@ def _make_normalizer():
     return ThesesNormalizer(
         conn=MagicMock(),
         logger=logging.getLogger("test"),
-        staging_queries=FakeStagingQueries(),
-        queries=FakeSourceRecordQueries(),
+        staging_store=FakeStagingStore(),
+        record_store=FakeSourceRecordStore(),
         contribution_store=MagicMock(),
     )
 

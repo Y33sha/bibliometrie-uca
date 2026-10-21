@@ -38,10 +38,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
@@ -248,12 +248,12 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool | None:
     staging_id = staging_row.id
@@ -283,8 +283,7 @@ def process_work(
     if isbns := get_isbns(attributes):
         external_ids[ExternalIdType.ISBN] = isbns
 
-    source_record_id = queries.upsert_source_record(
-        conn,
+    source_record_id = record_store.upsert_source_record(
         SourceRecordUpsert(
             source="datacite",
             source_id=doi,
@@ -308,7 +307,7 @@ def process_work(
         ),
     )
     process_contributions(conn, contribution_store, attributes, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -332,6 +331,6 @@ class DataciteNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

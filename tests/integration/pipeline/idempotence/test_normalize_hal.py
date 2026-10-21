@@ -66,15 +66,15 @@ def run_normalize_hal(conn):
 
     from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
-        SourceRecordQueries,
+        SourceRecordStore,
     )
-    from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.common.staging import StagingRow, StagingStore
     from pipeline.ingestion.hal.normalize import process_work
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourceRecordQueries()
-    staging_queries = StagingQueries()
+    record_store = SourceRecordStore(conn)
+    staging_store = StagingStore(conn)
     contribution_store = SourceContributionStore(conn)
     container_stores = ContainerStores.of(conn)
     publisher_store = PublisherStore(conn)
@@ -95,11 +95,11 @@ def run_normalize_hal(conn):
         )
         if process_work(
             conn,
-            queries,
+            record_store,
             staging_row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=staging_queries,
+            staging_store=staging_store,
             contribution_store=contribution_store,
         ):
             processed += 1

@@ -118,23 +118,24 @@ _UPSERT_SQL = text(
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
 
-class SourceRecordQueries:
+class SourceRecordStore:
     """Écriture des `source_records`. Les formes de `language_forms` se chargent à la première écriture."""
 
-    def __init__(self) -> None:
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
         self._language_forms: dict[str, str] | None = None
 
-    def upsert_source_record(self, conn: Connection, row: SourceRecordUpsert) -> int:
+    def upsert_source_record(self, row: SourceRecordUpsert) -> int:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
-        params["language"] = language_code(row.raw_language, self._forms(conn))
+        params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
-        return scalar_int(conn.execute(_UPSERT_SQL, params))
+        return scalar_int(self._conn.execute(_UPSERT_SQL, params))
 
-    def _forms(self, conn: Connection) -> dict[str, str]:
+    def _forms(self) -> dict[str, str]:
         if self._language_forms is None:
-            self._language_forms = fetch_language_forms(conn)
+            self._language_forms = fetch_language_forms(self._conn)
         return self._language_forms
 
 

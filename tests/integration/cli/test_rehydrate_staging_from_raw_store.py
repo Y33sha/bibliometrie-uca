@@ -1,4 +1,4 @@
-"""Réhydratation `staging` depuis le raw store : inverse de `StagingQueries.mark_done`.
+"""Réhydratation `staging` depuis le raw store : inverse de `StagingStore.mark_done`.
 
 Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data, raw_hash, processed`) : un renommage casserait ces requêtes.
 """

@@ -27,10 +27,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
 
 # =============================================================
@@ -111,7 +111,7 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
 
 def insert_source_document(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     thesis: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
@@ -139,8 +139,7 @@ def insert_source_document(
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None
 
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="theses",
             source_id=theses_id,
@@ -211,10 +210,10 @@ def process_contributions(
 
 def process_work(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     staging_row: StagingRow,
     *,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool:
     """Traite une thèse du staging."""
@@ -225,10 +224,10 @@ def process_work(
     publication_meta = extract_publication_metadata(thesis)
 
     source_record_id = insert_source_document(
-        conn, queries, thesis, staging_id, theses_id, publication_meta
+        conn, record_store, thesis, staging_id, theses_id, publication_meta
     )
     process_contributions(conn, thesis, source_record_id, contribution_store=contribution_store)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
 
     return True
 
@@ -241,12 +240,12 @@ class ThesesNormalizer(SourceNormalizer):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging_queries: StagingQueries,
-        queries: SourceRecordQueries,
+        staging_store: StagingStore,
+        record_store: SourceRecordStore,
         contribution_store: SourceContributionStore,
     ) -> None:
-        super().__init__(conn, logger, staging_queries)
-        self._queries = queries
+        super().__init__(conn, logger, staging_store)
+        self._queries = record_store
         self._batch_queries = contribution_store
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
@@ -258,6 +257,6 @@ class ThesesNormalizer(SourceNormalizer):
             conn,
             self._queries,
             row,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._batch_queries,
         )

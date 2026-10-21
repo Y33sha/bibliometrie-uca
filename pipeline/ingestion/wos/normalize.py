@@ -28,10 +28,10 @@ from pipeline.ingestion.common.source_contributions import (
     sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordQueries,
+    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.ingestion.wos.payload import (
     derive_wos_api_oa_status,
     is_wos_author_usable,
@@ -500,7 +500,7 @@ def extract_publication_metadata(
 
 def insert_wos_document(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     rec: Mapping[str, JsonValue],
     staging_id: int,
     publication_meta: PublicationMetadata,
@@ -513,8 +513,7 @@ def insert_wos_document(
     que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
     keywords, topics, urls, external_ids non canoniques).
     """
-    return queries.upsert_source_record(
-        conn,
+    return record_store.upsert_source_record(
         SourceRecordUpsert(
             source="wos",
             source_id=as_str(rec.get("ut")) or "",
@@ -640,13 +639,13 @@ def process_contributions(
 
 def process_record(
     conn: Connection,
-    queries: SourceRecordQueries,
+    record_store: SourceRecordStore,
     logger: logging.Logger,
     staging_row: StagingRow,
     *,
     container_stores: ContainerStores,
     publisher_store: PublisherStore,
-    staging_queries: StagingQueries,
+    staging_store: StagingStore,
     contribution_store: SourceContributionStore,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
@@ -668,9 +667,9 @@ def process_record(
         rec, containers.journal_id, containers.monograph_id
     )
 
-    source_record_id = insert_wos_document(conn, queries, rec, staging_id, publication_meta)
+    source_record_id = insert_wos_document(conn, record_store, rec, staging_id, publication_meta)
     process_contributions(conn, contribution_store, logger, rec, source_record_id)
-    staging_queries.mark_done(conn, staging_id)
+    staging_store.mark_done(staging_id)
     return True
 
 
@@ -691,6 +690,6 @@ class WosNormalizer(BibliographicNormalizer):
             row,
             container_stores=container_stores,
             publisher_store=publisher_store,
-            staging_queries=self._staging,
+            staging_store=self._staging,
             contribution_store=self._contribution_queries,
         )

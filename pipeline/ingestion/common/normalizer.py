@@ -15,8 +15,8 @@ from sqlalchemy import Connection
 from domain.publications.metadata import has_minimal_publication_metadata
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-from pipeline.ingestion.common.source_records import SourceRecordQueries
-from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+from pipeline.ingestion.common.source_records import SourceRecordStore
+from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
     quantity,
@@ -55,11 +55,11 @@ class SourceNormalizer(ABC):
     FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
-        self, conn: Connection, logger: logging.Logger, staging_queries: StagingQueries
+        self, conn: Connection, logger: logging.Logger, staging_store: StagingStore
     ) -> None:
         self.conn = conn
         self.logger = logger
-        self._staging = staging_queries
+        self._staging = staging_store
 
     # ── Hooks métier ────────────────────────────────────────────
 
@@ -77,7 +77,7 @@ class SourceNormalizer(ABC):
         Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
-            self._staging.mark_done(conn, row.id)
+            self._staging.mark_done(row.id)
             return None
         title, publication_year = self.minimal_metadata(row)
         if not has_minimal_publication_metadata(title, publication_year):
@@ -89,8 +89,8 @@ class SourceNormalizer(ABC):
 
     def _reject(self, conn: Connection, row: StagingRow) -> bool:
         """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme enregistrement incomplet."""
-        self._staging.discard_source_record(conn, row.id)
-        self._staging.mark_done(conn, row.id)
+        self._staging.discard_source_record(row.id)
+        self._staging.mark_done(row.id)
         return False
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
@@ -102,14 +102,14 @@ class SourceNormalizer(ABC):
     # ── Template method ────────────────────────────────────────
 
     def _count_pending(self, conn: Connection) -> int:
-        return self._staging.count_pending_staging(conn, self.SOURCE)
+        return self._staging.count_pending_staging(self.SOURCE)
 
     def _iter_rows(self, conn: Connection) -> Iterator[StagingRow]:
         """Itère toutes les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
-        work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE)
+        work_ids = self._staging.fetch_pending_staging_ids(self.SOURCE)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            yield from self._staging.fetch_staging_by_ids(conn, batch_ids)
+            yield from self._staging.fetch_staging_by_ids(batch_ids)
 
     def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
         """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
@@ -200,14 +200,14 @@ class BibliographicNormalizer(SourceNormalizer):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging_queries: StagingQueries,
-        queries: SourceRecordQueries,
+        staging_store: StagingStore,
+        record_store: SourceRecordStore,
         container_stores: ContainerStores,
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
     ) -> None:
-        super().__init__(conn, logger, staging_queries)
-        self._queries = queries
+        super().__init__(conn, logger, staging_store)
+        self._queries = record_store
         self._container_stores = container_stores
         self._publisher_store = publisher_store
         self._contribution_queries = contribution_store

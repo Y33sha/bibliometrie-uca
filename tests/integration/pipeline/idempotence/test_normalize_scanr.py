@@ -163,23 +163,23 @@ def run_normalize_scanr(conn):
 
     from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
     from pipeline.ingestion.common.source_records import (
-        SourceRecordQueries,
+        SourceRecordStore,
     )
-    from pipeline.ingestion.common.staging import StagingQueries, StagingRow
+    from pipeline.ingestion.common.staging import StagingRow, StagingStore
     from pipeline.ingestion.scanr.normalize import ScanrNormalizer
     from pipeline.transformation.publishing.containers import ContainerStores
     from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-    queries = SourceRecordQueries()
-    staging_queries = StagingQueries()
+    record_store = SourceRecordStore(conn)
+    staging_store = StagingStore(conn)
     contribution_store = SourceContributionStore(conn)
     logger = logging.getLogger("test")
     # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
     normalizer = ScanrNormalizer(
         conn,
         logger,
-        staging_queries,
-        queries,
+        staging_store,
+        record_store,
         container_stores=ContainerStores.of(conn),
         publisher_store=PublisherStore(conn),
         contribution_store=contribution_store,
