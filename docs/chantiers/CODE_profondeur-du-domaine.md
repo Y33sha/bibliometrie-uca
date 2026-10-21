@@ -14,7 +14,7 @@ Connaissances écrites à plusieurs endroits :
 
 - un prédicat de correction : la dataclass `MetadataForCorrection`, `_AppliesTo`, `_check_predicate`, `_SOURCE_ONLY_PREDICATES`, `UnaryCorrectionRow` et `for_correction()`, la requête `_SELECT`, les valeurs factices de `consolidation.py` ;
 - les clés de configuration : `domain/config.py` (nature, validation), `infrastructure/db/tables.py` (CHECK), `pipeline/runtime/config.py` (littéraux, valeurs par défaut, recontrainte) ;
-- la propriété des clés de `raw_metadata` : chaque sous-étape de `metadata_correction` filtre ses clés à sa façon ;
+- la propriété des clés de `corrections` : chaque sous-étape de `metadata_correction` filtre ses clés à sa façon ;
 - `CONVERGENCE_CASES`, re-listé dans `author_grouping/queries.py` ;
 - « enregistrement ScanR issu de HAL », à quatre endroits, dont un `LIKE 'hal%'` sans validation de l'identifiant ;
 - `meta ? 'conference'`, dans `metadata_correction_queries.py` et `type_proceedings_volumes.py` ;
@@ -42,7 +42,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - Un fait inconnu vaut `None`. Une règle qui lit un fait inconnu ne s'applique pas.
 - `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
 - La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
-- `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `raw_metadata` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
+- `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `corrections` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
 
 ## Phasage
 
@@ -57,11 +57,12 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 - [x] Colonnes `raw_doc_type` et `raw_language` ; type et langue traduits par `normalize` ; lecteurs de la valeur de la source branchés sur ces colonnes ; marqueurs `DOC_TYPE_MAP` et `LANGUAGE_MAP` retirés ; oneshot `split_raw_doc_type_language`. a543d6495
 - [x] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées. d473dd1b8
+- [x] Règles des volumes Crossref sur la colonne `source_records.author_count` ; titre qui commence par un mot de volume sans condition d'auteurs. 70201133b
+- [x] Colonne `raw_metadata` renommée `corrections`. e102ffc2f
 - [ ] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ.
 - [ ] Module propriétaire du format des JSON `meta` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `meta` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
 - [ ] Projection SQL des faits des règles à côté des règles.
-- [ ] Règles des volumes Crossref sur la colonne `source_records.author_count` ; sous-requête de comptage retirée.
-- [ ] Registre des clés de `raw_metadata` et de leur sous-étape ; `effective_external_ids`.
+- [ ] Registre des clés de `corrections` et de leur sous-étape ; `effective_external_ids`.
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
 - [ ] Revue par espace de noms DOI en fonction de domaine.
 

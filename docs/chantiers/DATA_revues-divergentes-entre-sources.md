@@ -48,7 +48,7 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 ### 5. Revue erronée dans une source
 
 - [x] Audit préalable (`audit_journals_against_crossref`) : écarts à Crossref par source, divergences sans Crossref, préprints DataCite.
-- [ ] Correction dans `metadata_correction` : l'enregistrement dont la revue diffère de celle de l'enregistrement Crossref de même DOI prend la revue de Crossref, avec trace dans `raw_metadata`.
+- [ ] Correction dans `metadata_correction` : l'enregistrement dont la revue diffère de celle de l'enregistrement Crossref de même DOI prend la revue de Crossref, avec trace dans `corrections`.
 
 ### 6. Espaces de noms DOI des revues
 
@@ -60,7 +60,7 @@ Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.p
 - [x] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI, dans `metadata_correction` (The Conversation : 277 publications sans revue).
 - [ ] Doublons : deux revues qui se partagent un espace de noms forment une paire candidate à la fusion.
 - [x] Revue erronée, examen : onglet « Contredites par le DOI » de l'administration des revues. Il groupe par paire de revues les enregistrements dont la revue diffère de celle de l'espace de noms de leur DOI.
-- [ ] Revue erronée, correction automatique avec trace dans `raw_metadata`, si l'examen montre qu'elle est sans risque.
+- [ ] Revue erronée, correction automatique avec trace dans `corrections`, si l'examen montre qu'elle est sans risque.
 
 ## Questions ouvertes
 
