@@ -76,8 +76,8 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 4 — Configuration et identifiants
 
-- [ ] Registre unique des clés de configuration (nom, nature, défaut), lecteur générique côté pipeline.
-- [ ] Base commune des value objects d'identifiants ; fonctions de normalisation passe-plats retirées.
+- [x] Registre unique des clés de configuration (nom, nature, défaut), lecteur générique côté pipeline. 796a849bc
+- [x] Base commune des value objects d'identifiants ; fonctions de normalisation passe-plats retirées. 8e7dd80f3
 
 ### Phase 5 — Documentation
 
