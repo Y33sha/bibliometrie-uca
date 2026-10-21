@@ -2,7 +2,6 @@
 
 import pytest
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.exc import CompileError
 
 from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
 from infrastructure.db.tables import source_records
@@ -31,9 +30,10 @@ def test_champs_des_mises_a_jour_sont_des_colonnes():
         _compile(list(fields))
 
 
-def test_colonne_inconnue_refusee():
-    with pytest.raises(CompileError, match="colonne_inconnue"):
-        _compile(["doc_type", "colonne_inconnue"])
+def test_colonne_inconnue_refusee_avant_tout_acces_a_la_base():
+    # `conn` vaut None : le refus tombe avant qu'on s'en serve.
+    with pytest.raises(ValueError, match="colonne_inconnue"):
+        _persist_updates(None, [{"id": 1, "doc_type": "article", "colonne_inconnue": 1}])  # type: ignore[arg-type]
 
 
 def test_corrections_liee_en_jsonb():

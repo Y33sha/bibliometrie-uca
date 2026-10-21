@@ -174,9 +174,15 @@ _UPDATE = (
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
-    """UPDATE en lot sur `source_records` : chaque mise à jour pose ses colonnes sur l'enregistrement source de sa clé `id`, marque `keys_dirty` et met à jour `updated_at`. Retourne le nombre de lignes."""
+    """UPDATE en lot sur `source_records` : chaque mise à jour pose ses colonnes sur l'enregistrement source de sa clé `id`, marque `keys_dirty` et met à jour `updated_at`. Retourne le nombre de lignes.
+
+    Lève `ValueError` sur une clé qui ne nomme aucune colonne de `source_records`.
+    """
     if not updates:
         return 0
+    unknown = sorted({k for u in updates for k in u} - set(source_records.c.keys()))
+    if unknown:
+        raise ValueError(f"Colonnes inconnues de source_records : {', '.join(unknown)}")
     params = [
         {"source_record_id": u["id"], **{k: v for k, v in u.items() if k != "id"}} for u in updates
     ]
