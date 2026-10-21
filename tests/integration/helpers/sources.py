@@ -42,7 +42,7 @@ def insert_source_record(
     keys_dirty: bool | None = None,
     external_ids: dict[str, object] | None = None,
     biblio: dict[str, object] | None = None,
-    meta: dict[str, object] | None = None,
+    source_extras: dict[str, object] | None = None,
     topics: object = None,
     corrections: dict[str, object] | None = None,
 ) -> int:
@@ -77,11 +77,13 @@ def insert_source_record(
             "keys_dirty": keys_dirty,
             "external_ids": _jsonb(external_ids),
             "biblio": _jsonb(biblio),
-            "meta": _jsonb(meta),
+            "source_extras": _jsonb(source_extras),
             "topics": _jsonb(topics),
             "corrections": _jsonb(corrections),
         },
-        dict.fromkeys(("external_ids", "biblio", "meta", "topics", "corrections"), "jsonb"),
+        dict.fromkeys(
+            ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
+        ),
     )
 
 

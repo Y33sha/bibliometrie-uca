@@ -41,7 +41,11 @@ from pipeline.ingestion.common.source_records import (
     SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
-from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
+from pipeline.ingestion.hal.payload import (
+    derive_hal_oa_status,
+    extract_hal_source_extras,
+    hal_text_field,
+)
 from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -204,7 +208,7 @@ def insert_hal_document(
     journal_id, oa_status, language, container_title) viennent toutes de
     `publication_meta`, construit en amont par `extract_publication_metadata`. `doc`
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
-    keywords, domaines, biblio, meta, urls).
+    keywords, domaines, biblio, source_extras, urls).
     """
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
@@ -271,7 +275,7 @@ def insert_hal_document(
             container_title=publication_meta.container_title,
             raw_language=publication_meta.language,
             biblio=biblio_json,
-            meta=extract_hal_meta(doc),
+            source_extras=extract_hal_source_extras(doc),
             abstract=abstract,
             keywords=keywords,
             topics=topics,

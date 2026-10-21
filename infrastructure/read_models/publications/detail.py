@@ -217,9 +217,9 @@ def get_publication_detail(
 
     thesis_meta: ThesisMeta | None = None
     if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
-        meta_row = conn.execute(
+        extras_row = conn.execute(
             text(f"""
-                SELECT sr.meta AS source_record_meta, p.meta AS publication_meta
+                SELECT sr.source_extras AS source_record_extras, p.source_extras AS publication_extras
                 FROM publications p
                 LEFT JOIN source_records sr
                        ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
@@ -228,17 +228,17 @@ def get_publication_detail(
             """),
             {"pid": publication_id},
         ).one_or_none()
-        if meta_row:
-            source_record_meta = meta_row.source_record_meta or {}
-            publication_meta = meta_row.publication_meta or {}
+        if extras_row:
+            source_record_extras = extras_row.source_record_extras or {}
+            publication_extras = extras_row.publication_extras or {}
             thesis_meta = ThesisMeta(
-                discipline=source_record_meta.get("discipline"),
-                ecoles_doctorales=source_record_meta.get("ecoles_doctorales"),
-                partenaires=source_record_meta.get("partenaires"),
-                date_soutenance=source_record_meta.get("date_soutenance")
-                or publication_meta.get("date_soutenance"),
-                date_inscription=source_record_meta.get("date_inscription")
-                or publication_meta.get("date_inscription"),
+                discipline=source_record_extras.get("discipline"),
+                ecoles_doctorales=source_record_extras.get("ecoles_doctorales"),
+                partenaires=source_record_extras.get("partenaires"),
+                date_soutenance=source_record_extras.get("date_soutenance")
+                or publication_extras.get("date_soutenance"),
+                date_inscription=source_record_extras.get("date_inscription")
+                or publication_extras.get("date_inscription"),
             )
 
     subjects = get_publication_subjects(conn, publication_id)

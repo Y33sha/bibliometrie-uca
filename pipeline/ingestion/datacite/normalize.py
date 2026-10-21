@@ -4,7 +4,7 @@ Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
 - `raw_doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`).
-- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `meta.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
+- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `source_extras.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
 
@@ -44,8 +44,8 @@ from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
-    extract_datacite_meta,
     extract_datacite_publication_year,
+    extract_datacite_source_extras,
     extract_related_dois,
     get_abstract,
     get_cited_by_count,
@@ -316,7 +316,7 @@ def process_work(
             oa_status=None,
             license=datacite_license(attributes.get("rightsList")),
             impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
-            meta=extract_datacite_meta(attributes),
+            source_extras=extract_datacite_source_extras(attributes),
         ),
     )
     process_contributions(conn, contribution_queries, attributes, source_record_id)

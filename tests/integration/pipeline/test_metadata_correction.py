@@ -500,14 +500,14 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
 
 def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=None):
     """Enregistrement source DataCite dont les `related_identifiers` mentionnent `relations`, couples (type, DOI cible)."""
-    meta = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
+    source_extras = {"related_identifiers": [{"relation_type": t, "doi": d} for t, d in relations]}
     return _typed_source_record(
         conn,
         source="datacite",
         source_id=source_id,
         doi=doi,
         doc_type=doc_type,
-        meta=meta,
+        source_extras=source_extras,
         corrections=corrections,
     )
 
@@ -583,7 +583,7 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
-    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `meta`."""
+    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
     return insert_source_record(
         conn,
         source="datacite",
@@ -592,7 +592,7 @@ def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset"
         title_normalized="piece",
         doi=doi,
         doc_type=doc_type,
-        meta={"related_identifiers": [{"relation_type": "IsPartOf", "doi": parent_doi}]},
+        source_extras={"related_identifiers": [{"relation_type": "IsPartOf", "doi": parent_doi}]},
     )
 
 
@@ -647,7 +647,9 @@ def test_une_correction_de_doi_regroupe_les_contributions_sources_de_la_publicat
         title_normalized="piece",
         doi="10.9002/file1",
         doc_type="dataset",
-        meta={"related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]},
+        source_extras={
+            "related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]
+        },
     )
     insert_source_record(conn, other, source="openalex", source_id="W-other", title="Other")
     conn.execute(text("UPDATE publications SET contributions_dirty = false"))

@@ -4,7 +4,7 @@ Tourne après `publications` : les `source_records` sont rattachées à leur pub
 
 Trois signaux peuplent la table :
 
-- **Signal #1 — relations déclarées par les sources** : DataCite `meta.related_identifiers` et Crossref `meta.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
+- **Signal #1 — relations déclarées par les sources** : DataCite `source_extras.related_identifiers` et Crossref `source_extras.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes qui partagent une clé (hal_id, arXiv, PMID, NNT) sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
 - **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
@@ -47,9 +47,9 @@ def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[Relatio
     edges: list[RelationEdge] = []
     for source_record in sources:
         if source_record.source == "datacite":
-            relations = extract_datacite_relations(source_record.meta)
+            relations = extract_datacite_relations(source_record.source_extras)
         elif source_record.source == "crossref":
-            relations = extract_crossref_relations(source_record.meta)
+            relations = extract_crossref_relations(source_record.source_extras)
         else:
             continue
         edges.extend(
@@ -69,7 +69,7 @@ def _distinct_work_targets(sources: list[DeclaredRelationSource]) -> list[str]:
             for source_record in sources
             if source_record.source == "datacite"
             for doi in extract_datacite_distinct_works(
-                source_record.meta, source_record.doi, source_record.source_record_doc_type
+                source_record.source_extras, source_record.doi, source_record.source_record_doc_type
             )
         }
     )
@@ -87,7 +87,7 @@ def _build_distinct_work_edges(
         if source_record.source != "datacite":
             continue
         for target_doi in extract_datacite_distinct_works(
-            source_record.meta, source_record.doi, source_record.source_record_doc_type
+            source_record.source_extras, source_record.doi, source_record.source_record_doc_type
         ):
             target = publications_by_doi.get(target_doi)
             inferred = infer_shared_key_relation(

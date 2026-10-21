@@ -1,6 +1,10 @@
 from datetime import date
 
-from pipeline.ingestion.hal.payload import derive_hal_oa_status, extract_hal_meta, hal_text_field
+from pipeline.ingestion.hal.payload import (
+    derive_hal_oa_status,
+    extract_hal_source_extras,
+    hal_text_field,
+)
 
 
 class TestHalTextField:
@@ -15,21 +19,23 @@ class TestExtractHalMeta:
             "serie_s": ["Occidens (3)", " ", "Occidens (3)"],
             "source_s": "Actes des 8èmes journées scientifiques",
         }
-        assert extract_hal_meta(doc) == {
+        assert extract_hal_source_extras(doc) == {
             "proceedings": True,
             "series": ["Occidens (3)"],
             "source_title": "Actes des 8èmes journées scientifiques",
         }
 
     def test_sans_actes(self):
-        assert extract_hal_meta({"proceedings_s": "0"}) == {"proceedings": False}
+        assert extract_hal_source_extras({"proceedings_s": "0"}) == {"proceedings": False}
 
     def test_licence_du_fichier_depose(self):
         doc = {"licence_s": "https://creativecommons.org/licenses/by/4.0/"}
-        assert extract_hal_meta(doc) == {"licence": "https://creativecommons.org/licenses/by/4.0/"}
+        assert extract_hal_source_extras(doc) == {
+            "licence": "https://creativecommons.org/licenses/by/4.0/"
+        }
 
     def test_enregistrement_source_muet(self):
-        assert extract_hal_meta({"title_s": ["Titre"]}) is None
+        assert extract_hal_source_extras({"title_s": ["Titre"]}) is None
 
 
 class TestDeriveHalOaStatus:

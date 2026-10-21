@@ -65,13 +65,13 @@ class TestInsertScanrDocumentLicense:
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
         assert captured.license == "cc-by"
-        assert captured.meta == {"license": "cc-by"}
+        assert captured.source_extras == {"license": "cc-by"}
 
     def test_licence_d_archive_gardee_brute(self):
         authorisation = "https://about.hal.science/hal-authorisation-v1/"
         captured = self._call({"hostType": "repository", "license": authorisation})
         assert captured.license is None
-        assert captured.meta == {"license": authorisation}
+        assert captured.source_extras == {"license": authorisation}
 
 
 class TestInsertScanrDocumentBiblio:

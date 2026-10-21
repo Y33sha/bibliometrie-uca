@@ -48,7 +48,7 @@ class MetadataForCorrection:
     embargo_expired: bool
     # Calculé à la lecture : l'enregistrement déclare la relation Crossref `is-preprint-of`, soit
     # « je suis le preprint d'une autre œuvre ». Le sens inverse porte la clé `has-preprint`.
-    # Booléen pour garder `effective_metadata` pure (pas de lecture de `meta` dans le domaine).
+    # Booléen pour garder `effective_metadata` pure (pas de lecture de `source_extras` dans le domaine).
     self_declared_preprint: bool
     # Calculé à la lecture : l'enregistrement nomme le congrès dont il est issu (Crossref `event`,
     # ou `assertion` Springer).
@@ -57,7 +57,7 @@ class MetadataForCorrection:
     registrant_publisher_type: str | None
     # Joint à la lecture : la monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
     in_proceedings_volume: bool = False
-    # Lu dans `meta` : forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
+    # Lu dans `source_extras` : forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
     group_title: str | None = None
     # Joint à la lecture : la revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
     journal_diamond: bool = False
@@ -70,7 +70,7 @@ class MetadataForCorrection:
 class MetadataCorrectionRule(StrEnum):
     """Identifiants des règles de correction figées. Une règle = un membre.
 
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_records.corrections.<champ>.corrected_by` côté source_record, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
+    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`corrections.<champ>.corrected_by` de `source_records` comme de `publications`) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
     """
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
@@ -364,7 +364,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `meta.relation`) : il EST
+    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `source_extras.relation`) : il EST
     # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
     # des relations dérivées du type). Sans whitelist `doc_type` : la déclaration prime, y compris
     # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`

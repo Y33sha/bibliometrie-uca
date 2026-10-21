@@ -8,7 +8,7 @@ Règles d'agrégation par type de champ :
 - **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
-- **JSONB `biblio`, `meta`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
+- **JSONB `biblio`, `source_extras`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
 - **`doc_type`** : premier non-null, un sous-type d'article d'une source moins prioritaire l'emportant sur `article` (cf. `arbitrate_doc_type_with_article_subtype`), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`).
 
@@ -97,7 +97,7 @@ def refresh_from_sources(
     publication.countries = _textes(merge_lists_dedup_ci(sorted_sources, "countries"))
     publication.topics = topics_by_source(sorted_sources)
     publication.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
-    publication.meta = shallow_merge_jsonb(sorted_sources, "meta")
+    publication.source_extras = shallow_merge_jsonb(sorted_sources, "source_extras")
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
 
 
@@ -149,7 +149,7 @@ def merge_lists_dedup_ci(sources: list[SourceRecord], attr: str) -> list[JsonVal
 
 
 def shallow_merge_jsonb(sources: list[SourceRecord], attr: str) -> dict[str, JsonValue] | None:
-    """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
+    """Fusion shallow par clé pour `source_extras` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
     for s in sources:
         d = getattr(s, attr)

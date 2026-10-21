@@ -290,7 +290,7 @@ class TestFirstDocTypeArbitration:
             urls=(),
             topics=None,
             biblio=None,
-            meta=None,
+            source_extras=None,
         )
 
     def _arbitrate(self):
@@ -410,7 +410,7 @@ class TestNormalizeNnt:
 # ── theses.fr ────────────────────────────────────────────────────
 
 from pipeline.ingestion.theses.normalize import (
-    _build_source_meta,
+    _build_source_extras,
     extract_publication_metadata,
 )
 
@@ -472,7 +472,7 @@ class TestThesesBuildSourceMeta:
                 {"nom": "CNRS", "type": "org"},
             ],
         }
-        meta = _build_source_meta(these)
+        meta = _build_source_extras(these)
         assert meta == {
             "date_soutenance": "2023-03-15",
             "date_inscription": "2020-09-01",
@@ -486,10 +486,10 @@ class TestThesesBuildSourceMeta:
 
     def test_empty(self):
         """Sans aucun champ exploitable → None."""
-        assert _build_source_meta({}) is None
+        assert _build_source_extras({}) is None
 
     def test_partial(self):
-        meta = _build_source_meta({"discipline": "Physique"})
+        meta = _build_source_extras({"discipline": "Physique"})
         assert meta == {"discipline": "Physique"}
 
     def test_filters_entries_without_nom(self):
@@ -497,7 +497,7 @@ class TestThesesBuildSourceMeta:
             "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
             "partenairesDeRecherche": [{"type": "lab"}],
         }
-        assert _build_source_meta(these) is None
+        assert _build_source_extras(these) is None
 
 
 # ── contribution_roles ─────────────────────────────────────────────

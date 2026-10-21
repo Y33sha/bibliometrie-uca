@@ -94,7 +94,7 @@ def _source_record(doc_type, relation_type, cible, doi):
     return DeclaredRelationSource(
         publication_id=1,
         source="datacite",
-        meta={"related_identifiers": [{"relation_type": relation_type, "doi": cible}]},
+        source_extras={"related_identifiers": [{"relation_type": relation_type, "doi": cible}]},
         doi=doi,
         doc_type=doc_type,
         source_record_doc_type=doc_type,

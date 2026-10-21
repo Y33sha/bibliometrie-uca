@@ -1,6 +1,6 @@
 """Résolution des laboratoires partenaires de thèse : rattachement de leur PPN IdRef aux structures, par leur nom. Tâche `affiliations.resolve_thesis_partners`.
 
-Chaque PPN cité par un enregistrement source theses.fr (`meta.partenaires`) est résolu par les formes de noms de ses noms, comme les adresses. `idref_structures` garde la forme à l'origine de chaque détection. Comme pour les adresses, une détection qui disparaît est supprimée, et un lien confirmé ou infirmé par l'administration reste en place.
+Chaque PPN cité par un enregistrement source theses.fr (`source_extras.partenaires`) est résolu par les formes de noms de ses noms, comme les adresses. `idref_structures` garde la forme à l'origine de chaque détection. Comme pour les adresses, une détection qui disparaît est supprimée, et un lien confirmé ou infirmé par l'administration reste en place.
 """
 
 import logging
@@ -20,7 +20,7 @@ from pipeline.transformation.structures.name_recognition import StructureNameMat
 _PARTNERS = text("""
     SELECT DISTINCT partner ->> 'ppn' AS ppn, partner ->> 'nom' AS name
     FROM source_records sr
-    CROSS JOIN LATERAL jsonb_array_elements(sr.meta -> 'partenaires') partner
+    CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras -> 'partenaires') partner
     WHERE sr.source = 'theses' AND partner ->> 'ppn' IS NOT NULL AND partner ->> 'nom' IS NOT NULL
 """)
 

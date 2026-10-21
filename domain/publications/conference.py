@@ -27,9 +27,9 @@ _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 
 def _hal_titles(source: SourceRecord) -> list[str]:
     """Titre de la source et collections qu'un enregistrement source HAL associe à une communication."""
-    meta = source.meta or {}
-    titles = as_strs(meta.get("series"))
-    if source_title := as_str(meta.get("source_title")):
+    source_extras = source.source_extras or {}
+    titles = as_strs(source_extras.get("series"))
+    if source_title := as_str(source_extras.get("source_title")):
         titles.append(source_title)
     return titles
 
@@ -43,9 +43,9 @@ def names_abstracts(source: SourceRecord) -> bool:
 
 def _hal_editorial_fields(source: SourceRecord) -> bool:
     """L'enregistrement source HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
-    meta = source.meta or {}
+    source_extras = source.source_extras or {}
     biblio = source.biblio or {}
-    if meta.get("proceedings") is True:
+    if source_extras.get("proceedings") is True:
         return True
     if _PAGE_RANGE.search(as_str(biblio.get("pages")) or ""):
         return True
@@ -60,7 +60,7 @@ def attests_publication(source: SourceRecord) -> bool:
     """L'enregistrement source atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
     if source.doi or source.journal_id or source.monograph_id:
         return True
-    if (source.meta or {}).get("conference"):
+    if (source.source_extras or {}).get("conference"):
         return True
     return source.source == "hal" and _hal_editorial_fields(source)
 

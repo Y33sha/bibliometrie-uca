@@ -26,7 +26,7 @@ def _refresh_sql(scope: str) -> str:
                 FROM source_records sr
                 WHERE sr.publication_id {scope}
                   AND sr.source = 'theses'
-                  AND sr.meta ->> 'etablissement_ppn' = ANY(:thesis_ppns)
+                  AND sr.source_extras ->> 'etablissement_ppn' = ANY(:thesis_ppns)
             ) by_publication
             GROUP BY id
         ), target AS (

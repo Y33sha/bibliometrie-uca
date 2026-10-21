@@ -10,6 +10,7 @@ from domain.publications.aggregation import refresh_from_sources as _refresh_agg
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
+from domain.source_records.corrections import stash_entry
 from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
     effective_doc_type_for_publication,
@@ -45,7 +46,7 @@ class _SourceRecordRow(NamedTuple):
     keywords: list[str] | None
     topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
-    meta: dict[str, JsonValue] | None
+    source_extras: dict[str, JsonValue] | None
     license: str | None
 
 
@@ -71,7 +72,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         keywords=tuple(row.keywords or ()),
         topics=row.topics,
         biblio=row.biblio,
-        meta=row.meta,
+        source_extras=row.source_extras,
         license=row.license,
     )
 
@@ -90,7 +91,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.journal_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
-                   sr.topics, sr.biblio, sr.meta, sr.license::text AS license
+                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license
             FROM source_records sr
             WHERE sr.publication_id = :id
         """),
@@ -224,7 +225,7 @@ def _apply_canonical_doc_type_correction(
 
     `effective_doc_type_for_publication` écarte les règles lisant un fait propre à un enregistrement source ; les champs correspondants restent nuls ici. L'`oa_status` est hors du rejeu, en entrée comme en sortie — une source corrigée remonte d'elle-même par l'agrégation du statut le plus ouvert, et Unpaywall tranche après vérification.
 
-    `journal_type` est le type de la revue `publication.journal_id`. Mute `publication.doc_type` et trace la règle dans `publication.meta['corrections']['doc_type']`. Idempotent.
+    `journal_type` est le type de la revue `publication.journal_id`. Mute `publication.doc_type` et réécrit `publication.corrections` : le type arbitré et la règle, ou rien sans correction. Idempotent.
     """
     corrected = effective_doc_type_for_publication(
         MetadataForCorrection(
@@ -242,11 +243,9 @@ def _apply_canonical_doc_type_correction(
             registrant_publisher_type=None,
         )
     )
+    publication.corrections = {}
     if corrected is not None and corrected.value != publication.doc_type:
+        publication.corrections = {
+            "doc_type": stash_entry(publication.doc_type, corrected.rule.value)
+        }
         publication.doc_type = corrected.value
-        meta = dict(publication.meta or {})
-        existing_corrections = meta.get("corrections")
-        corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
-        corrections["doc_type"] = corrected.rule.value
-        meta["corrections"] = corrections
-        publication.meta = meta

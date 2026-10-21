@@ -154,7 +154,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue. Chaque
+# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `source_extras`, `journal_diamond` le caractère diamant de la revue. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source::text AS source, sr.source_id,
@@ -164,12 +164,12 @@ _SELECT = f"""
            j.journal_type::text AS journal_type, j.oa_model,
            sr.corrections,
            (sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date) AS embargo_expired,
-           COALESCE(jsonb_exists(sr.meta->'relation', 'is-preprint-of'), false)
+           COALESCE(jsonb_exists(sr.source_extras->'relation', 'is-preprint-of'), false)
                AS self_declared_preprint,
-           COALESCE(sr.meta ? 'conference', false) AS declares_conference,
+           COALESCE(sr.source_extras ? 'conference', false) AS declares_conference,
            rp.publisher_type::text AS registrant_publisher_type,
            COALESCE(m.proceedings, false) AS in_proceedings_volume,
-           sr.meta->>'group_title' AS group_title,
+           sr.source_extras->>'group_title' AS group_title,
            COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond,
            sr.author_count
     FROM source_records sr
@@ -311,7 +311,7 @@ class PgMetadataCorrectionQueries:
             text(f"""
                 WITH sr_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
-                           meta, external_ids,
+                           source_extras, external_ids,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
                     FROM source_records
                 ),
@@ -334,7 +334,7 @@ class PgMetadataCorrectionQueries:
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
                         FROM sr_eff sr
-                        CROSS JOIN LATERAL jsonb_array_elements(sr.meta->'related_identifiers') rel
+                        CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras->'related_identifiers') rel
                         WHERE sr.source = '{Source.DATACITE.value}'
                           AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
@@ -351,7 +351,7 @@ class PgMetadataCorrectionQueries:
                             lower(rel->>'doi') AS canonical_doi,
                             '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
-                        CROSS JOIN LATERAL jsonb_array_elements(sr.meta->'related_identifiers') rel
+                        CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras->'related_identifiers') rel
                         WHERE sr.source = '{Source.DATACITE.value}'
                           AND sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'

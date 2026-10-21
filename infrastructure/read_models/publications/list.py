@@ -160,10 +160,10 @@ _ORDER_MAP = {
     "title_desc": "p.title DESC",
     "apc_desc": f"{_APC_SORT} DESC, p.title",
     "apc_asc": f"{_APC_SORT} ASC, p.title",
-    "soutenance_desc": "p.meta->>'date_soutenance' DESC NULLS LAST, p.title",
-    "soutenance_asc": "p.meta->>'date_soutenance' ASC NULLS LAST, p.title",
-    "inscription_desc": "p.meta->>'date_inscription' DESC NULLS LAST, p.title",
-    "inscription_asc": "p.meta->>'date_inscription' ASC NULLS LAST, p.title",
+    "soutenance_desc": "p.source_extras->>'date_soutenance' DESC NULLS LAST, p.title",
+    "soutenance_asc": "p.source_extras->>'date_soutenance' ASC NULLS LAST, p.title",
+    "inscription_desc": "p.source_extras->>'date_inscription' DESC NULLS LAST, p.title",
+    "inscription_asc": "p.source_extras->>'date_inscription' ASC NULLS LAST, p.title",
 }
 
 
@@ -213,8 +213,8 @@ def list_publications(
                 pub.name AS publisher_name,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
                 src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
-                p.meta->>'date_soutenance' AS date_soutenance,
-                p.meta->>'date_inscription' AS date_inscription,
+                p.source_extras->>'date_soutenance' AS date_soutenance,
+                p.source_extras->>'date_inscription' AS date_inscription,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT pe.first_name || ' ' || pe.last_name
                      FROM contributions ath
@@ -600,15 +600,15 @@ def export_theses_csv(
     """
     conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)
-    order = _ORDER_MAP.get(sort, "p.meta->>'date_soutenance' DESC NULLS LAST, p.title")
+    order = _ORDER_MAP.get(sort, "p.source_extras->>'date_soutenance' DESC NULLS LAST, p.title")
 
     rows = conn.execute(
         text(f"""
             SELECT
                 p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
-                p.meta->>'date_soutenance' AS date_soutenance,
-                p.meta->>'date_inscription' AS date_inscription,
+                p.source_extras->>'date_soutenance' AS date_soutenance,
+                p.source_extras->>'date_inscription' AS date_inscription,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))

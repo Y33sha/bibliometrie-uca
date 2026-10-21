@@ -178,7 +178,7 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     return biblio or None
 
 
-def get_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
+def get_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     return extract_crossref_meta(msg)
 
 
@@ -380,7 +380,7 @@ def process_work(
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
-    meta = get_meta(msg)
+    source_extras = get_source_extras(msg)
 
     source_record_id = queries.upsert_source_record(
         conn,
@@ -403,7 +403,7 @@ def process_work(
             oa_status=None,
             license=crossref_license(msg.get("license")),
             impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
-            meta=meta,
+            source_extras=source_extras,
         ),
     )
     process_contributions(conn, contribution_queries, msg, source_record_id)

@@ -383,7 +383,7 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "structure_name_forms",
             "structures",
-            "source_records.meta",
+            "source_records.source_extras",
             "idref_structures",
         ),
         writes=("idref_structures",),
@@ -405,7 +405,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structure_aliases",
             "structures.ror_id",
             "structures.api_ids",
-            "source_records.meta",
+            "source_records.source_extras",
             "source_contributions.roles",
             "idref_structures",
             "source_contributions.source_record_id",
@@ -709,7 +709,7 @@ TASKS: tuple[Task, ...] = (
                     "external_ids",
                     "corrections",
                     "embargo_until",
-                    "meta",
+                    "source_extras",
                 )
             ),
             "journals.journal_type",
@@ -753,7 +753,7 @@ TASKS: tuple[Task, ...] = (
                 "doi",
                 "title_normalized",
                 "corrections",
-                "meta",
+                "source_extras",
                 "external_ids",
                 "source_id",
                 "publication_id",
@@ -1049,7 +1049,7 @@ TASKS: tuple[Task, ...] = (
             *(
                 f"source_records.{column}"
                 for column in (
-                    "meta",
+                    "source_extras",
                     "corrections",
                     "doi",
                     "external_ids",

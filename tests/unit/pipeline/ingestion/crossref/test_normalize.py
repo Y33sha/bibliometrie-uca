@@ -36,9 +36,9 @@ from pipeline.ingestion.crossref.normalize import (
     get_issns,
     get_keywords,
     get_language,
-    get_meta,
     get_publication_year,
     get_publisher_name,
+    get_source_extras,
     get_title,
     process_contributions,
     process_work,
@@ -317,7 +317,7 @@ class TestGetBiblio:
 class TestGetMeta:
     def test_delegates_to_domain(self):
         # Délégation à `extract_crossref_meta` ; on vérifie juste le wiring.
-        result = get_meta({"DOI": "10.1000/abc"})
+        result = get_source_extras({"DOI": "10.1000/abc"})
         # Le résultat exact dépend de la fonction domain ; ici on s'assure
         # juste qu'on retourne quelque chose (dict ou None), sans crasher.
         assert result is None or isinstance(result, dict)

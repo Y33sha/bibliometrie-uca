@@ -144,9 +144,11 @@ def test_structures_d_une_these(sa_sync_conn):
     insert_structure_name_form(sa_sync_conn, lab, form_text="laboratoire de test")
     record = insert_source_record(sa_sync_conn, source="theses", source_id="2021CLFAC001")
     sa_sync_conn.execute(
-        text("UPDATE source_records SET meta = CAST(:meta AS jsonb) WHERE id = :id"),
+        text(
+            "UPDATE source_records SET source_extras = CAST(:source_extras AS jsonb) WHERE id = :id"
+        ),
         {
-            "meta": json.dumps(
+            "source_extras": json.dumps(
                 {
                     "etablissement_ppn": "196200032",
                     "partenaires": [{"nom": "Laboratoire de test", "ppn": "123456789"}],

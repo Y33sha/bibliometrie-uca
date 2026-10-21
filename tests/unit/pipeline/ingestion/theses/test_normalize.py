@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `extract_publication_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_meta` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_contributions` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
+Couvre `extract_publication_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_contributions` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
 
 Pattern : `FakeSourceRecordQueries` + `MagicMock`, pas de DB.
 """
@@ -17,7 +17,7 @@ from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.theses import normalize as normalize_theses
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
-    _build_source_meta,
+    _build_source_extras,
     build_theses_author_records,
     extract_publication_metadata,
     extract_theses_author_block,
@@ -78,19 +78,19 @@ class TestExtractPublicationMetadata:
         assert meta.doi == "10.1/abc"
 
 
-# ── _build_source_meta ───────────────────────────────────────────
+# ── _build_source_extras ───────────────────────────────────────────
 
 
 class TestBuildSourceMeta:
     def test_empty(self):
-        assert _build_source_meta({}) is None
+        assert _build_source_extras({}) is None
 
     def test_only_soutenance(self):
-        meta = _build_source_meta({"dateSoutenance": "15/03/2024"})
+        meta = _build_source_extras({"dateSoutenance": "15/03/2024"})
         assert meta == {"date_soutenance": "2024-03-15"}
 
     def test_etablissement(self):
-        meta = _build_source_meta(
+        meta = _build_source_extras(
             {
                 "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
                 "etabSoutenancePpn": "252404955",
@@ -113,7 +113,7 @@ class TestBuildSourceMeta:
                 {"nom": "LRL"},
             ],
         }
-        meta = _build_source_meta(these)
+        meta = _build_source_extras(these)
         assert meta is not None
         assert meta["date_soutenance"] == "2024-03-15"
         assert meta["date_inscription"] == "2020-09-10"
@@ -129,11 +129,11 @@ class TestBuildSourceMeta:
         ]
 
     def test_filters_ecoles_without_nom(self):
-        meta = _build_source_meta({"ecolesDoctorale": [{"ppn": "123"}, {"nom": "EDSPI"}]})
+        meta = _build_source_extras({"ecolesDoctorale": [{"ppn": "123"}, {"nom": "EDSPI"}]})
         assert meta == {"ecoles_doctorales": [{"nom": "EDSPI", "ppn": None}]}
 
     def test_filters_partenaires_without_nom(self):
-        meta = _build_source_meta({"partenairesDeRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
+        meta = _build_source_extras({"partenairesDeRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
         assert meta == {"partenaires": [{"nom": "LIMOS", "type": None, "ppn": None}]}
 
 
@@ -221,7 +221,7 @@ class TestInsertSourceDocument:
     def test_source_meta_passed(self):
         queries = FakeSourceRecordQueries()
         captured = self._call(queries, {"dateSoutenance": "15/03/2024"})
-        assert captured.meta == {"date_soutenance": "2024-03-15"}
+        assert captured.source_extras == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
         queries = FakeSourceRecordQueries()

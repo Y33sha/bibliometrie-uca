@@ -40,4 +40,6 @@ class Publication:
     keywords: tuple[str, ...] = field(default=())
     topics: dict[str, JsonValue] | None = None
     biblio: dict[str, JsonValue] | None = None
-    meta: dict[str, JsonValue] | None = None
+    source_extras: dict[str, JsonValue] | None = None
+    corrections: dict[str, JsonValue] = field(default_factory=dict)
+    """Valeur d'avant correction et règle de chaque champ corrigé (`domain.source_records.corrections`)."""

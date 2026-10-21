@@ -54,8 +54,10 @@ def test_these_soutenue_dans_l_etablissement(sa_sync_conn):
         sa_sync_conn, these, source="theses", source_id="2021CLFAC001"
     )
     sa_sync_conn.execute(
-        text("UPDATE source_records SET meta = CAST(:meta AS jsonb) WHERE id = :id"),
-        {"meta": json.dumps({"etablissement_ppn": _PPN}), "id": source_record},
+        text(
+            "UPDATE source_records SET source_extras = CAST(:source_extras AS jsonb) WHERE id = :id"
+        ),
+        {"source_extras": json.dumps({"etablissement_ppn": _PPN}), "id": source_record},
     )
 
     refresh_publications_perimeter_evidence(sa_sync_conn)

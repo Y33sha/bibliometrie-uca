@@ -2,8 +2,8 @@
 
 Les relations modélisées ici lient des publications **distinctes** (pas des doublons). Deux sources déclarent des relations, avec des vocabulaires différents :
 
-- **DataCite** : `relatedIdentifiers[].relationType` (`IsSupplementTo`, `IsPartOf`…), stocké dans `source_records.meta.related_identifiers`.
-- **Crossref** : clés de `meta.relation` (`is-preprint-of`, `erratum`…), stocké dans `source_records.meta.relation`.
+- **DataCite** : `relatedIdentifiers[].relationType` (`IsSupplementTo`, `IsPartOf`…), stocké dans `source_records.source_extras.related_identifiers`.
+- **Crossref** : clés de `source_extras.relation` (`is-preprint-of`, `erratum`…), stocké dans `source_records.source_extras.relation`.
 
 Ce module fige un jeu de **types canoniques** (directionnels) et le mapping de chaque vocabulaire source vers ce jeu. Les types hors scope renvoient `None`.
 
@@ -100,7 +100,7 @@ _DATACITE_MAP: dict[str, RelationType] = {
     "IsDocumentedBy": RelationType.IS_DESCRIBED_BY,
 }
 
-# Mapping Crossref (clés de `meta.relation`) → type canonique.
+# Mapping Crossref (clés de `source_extras.relation`) → type canonique.
 _CROSSREF_MAP: dict[str, RelationType] = {
     "is-preprint-of": RelationType.IS_PREPRINT_OF,
     "has-preprint": RelationType.HAS_PREPRINT,
@@ -161,13 +161,15 @@ def map_datacite_relation(relation_type: str) -> RelationType | None:
 
 
 def map_crossref_relation(relation_key: str) -> RelationType | None:
-    """Type canonique d'une clé `meta.relation` Crossref, ou `None` si hors scope."""
+    """Type canonique d'une clé `source_extras.relation` Crossref, ou `None` si hors scope."""
     return _CROSSREF_MAP.get(relation_key)
 
 
-def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload DataCite, depuis `meta.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique, DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
-    related = (meta or {}).get("related_identifiers")
+def extract_datacite_relations(
+    source_extras: dict[str, JsonValue] | None,
+) -> list[tuple[RelationType, str]]:
+    """Relations en scope déclarées par un payload DataCite, depuis `source_extras.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique, DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
+    related = (source_extras or {}).get("related_identifiers")
     if not isinstance(related, list):
         return []
     out: list[tuple[RelationType, str]] = []
@@ -182,13 +184,13 @@ def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[
 
 
 def extract_datacite_distinct_works(
-    meta: dict[str, JsonValue] | None, own_doi: str | None, doc_type: str | None
+    source_extras: dict[str, JsonValue] | None, own_doi: str | None, doc_type: str | None
 ) -> list[str]:
     """DOI qu'un payload DataCite déclare comme autre forme de son œuvre, quand la relation relie deux œuvres.
 
     `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, que lit `meme_oeuvre_declaree`.
     """
-    related = (meta or {}).get("related_identifiers")
+    related = (source_extras or {}).get("related_identifiers")
     if not isinstance(related, list):
         return []
     out: list[str] = []
@@ -239,9 +241,11 @@ def infer_shared_key_relation(
     return RelationType.IS_RELATED_TO, "sym"
 
 
-def extract_crossref_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload Crossref, depuis `meta.relation` (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les cibles de type DOI et les clés en scope."""
-    relation = (meta or {}).get("relation")
+def extract_crossref_relations(
+    source_extras: dict[str, JsonValue] | None,
+) -> list[tuple[RelationType, str]]:
+    """Relations en scope déclarées par un payload Crossref, depuis `source_extras.relation` (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les cibles de type DOI et les clés en scope."""
+    relation = (source_extras or {}).get("relation")
     if not isinstance(relation, dict):
         return []
     out: list[tuple[RelationType, str]] = []

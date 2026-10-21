@@ -1130,7 +1130,13 @@ publications = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("countries", ARRAY(Text)),
     Column("sources", ARRAY(source_type_enum), nullable=False, server_default="{}"),
-    Column("meta", Jsonb),
+    Column("source_extras", Jsonb),
+    Column(
+        "corrections",
+        Jsonb,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
@@ -1170,6 +1176,10 @@ publications = Table(
     # l'unique publication ancre de la partition `(composante ∩ DOI)`). Partiel : les
     # publications sans DOI (NULL) ne sont pas contraintes.
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
+    CheckConstraint(
+        "jsonb_typeof(corrections) = 'object'",
+        name="publications_corrections_is_object",
+    ),
     schema="publications",
 )
 
@@ -1227,7 +1237,7 @@ source_records = Table(
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
     Column("oa_status", Text),
-    # Licence normalisée de l'enregistrement source ; la forme brute reste dans `meta`.
+    # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
     Column("embargo_until", Date),
     Column("language", Text),
@@ -1242,7 +1252,7 @@ source_records = Table(
     Column("keywords", ARRAY(Text)),
     Column("topics", Jsonb),
     Column("biblio", Jsonb),
-    Column("meta", Jsonb),
+    Column("source_extras", Jsonb),
     Column(
         "corrections",
         Jsonb,

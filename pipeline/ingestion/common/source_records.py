@@ -75,7 +75,7 @@ class SourceRecordUpsert:
     hal_collections: list[str] | None = None
 
     # Charge utile propre à la source
-    meta: JsonValue = None
+    source_extras: JsonValue = None
 
 
 _FIELDS = fields(SourceRecordUpsert)

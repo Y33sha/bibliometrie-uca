@@ -2,7 +2,7 @@
 
 Interprétation des champs propres au schéma CrossRef Works API — fonctions de lecture et nettoyeurs qui encapsulent les conventions CrossRef.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_records.meta` (JSONB).
+Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_records.source_extras` (JSONB).
 """
 
 from __future__ import annotations
@@ -112,26 +112,26 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
 def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
-    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_records.meta`.
+    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_records.source_extras`.
 
-    Le sous-objet `meta->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
+    Le sous-objet `source_extras->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
     """
-    meta: dict[str, JsonValue] = {}
+    source_extras: dict[str, JsonValue] = {}
     for key in ("license", "funder", "relation"):
         val = msg.get(key)
         if val:
-            meta[key] = val
+            source_extras[key] = val
     conference = extract_crossref_conference(msg)
     if conference:
-        meta["conference"] = conference
+        source_extras["conference"] = conference
     if msg.get("type") == "posted-content" and (group_title := as_str(msg.get("group-title"))):
-        meta["group_title"] = group_title
+        source_extras["group_title"] = group_title
     refs_count = msg.get("references-count")
     if isinstance(refs_count, int) and refs_count > 0:
-        meta["references_count"] = refs_count
+        source_extras["references_count"] = refs_count
     indexed = msg.get("indexed") or {}
     if isinstance(indexed, dict):
         ts = indexed.get("timestamp") or indexed.get("date-time")
         if ts:
-            meta["indexed"] = ts
-    return meta or None
+            source_extras["indexed"] = ts
+    return source_extras or None

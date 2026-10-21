@@ -37,7 +37,7 @@ _PROCEEDINGS_FACTS = text("""
                '{}'
            ) AS raw_doc_types,
            coalesce(
-               array_agg(coalesce(sr.meta ? 'conference', false) ORDER BY sr.id)
+               array_agg(coalesce(sr.source_extras ? 'conference', false) ORDER BY sr.id)
                    FILTER (WHERE sr.id IS NOT NULL),
                '{}'
            ) AS declares

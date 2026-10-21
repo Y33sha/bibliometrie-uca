@@ -68,31 +68,31 @@ def extract_publication_metadata(these: Mapping[str, JsonValue]) -> PublicationM
 # =============================================================
 
 
-def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Construit le meta jsonb pour source_records à partir des données brutes."""
-    meta: dict[str, JsonValue] = {}
+def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
+    """Champs propres à theses.fr, pour `source_records.source_extras`."""
+    source_extras: dict[str, JsonValue] = {}
     ds = french_date_to_iso(as_str(these.get("dateSoutenance")))
     di = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
     if ds:
-        meta["date_soutenance"] = ds
+        source_extras["date_soutenance"] = ds
     if di:
-        meta["date_inscription"] = di
+        source_extras["date_inscription"] = di
 
     discipline = these.get("discipline")
     if discipline:
-        meta["discipline"] = discipline
+        source_extras["discipline"] = discipline
 
     if etablissement := these.get("etabSoutenanceN"):
-        meta["etablissement"] = etablissement
+        source_extras["etablissement"] = etablissement
     if etablissement_ppn := as_str(these.get("etabSoutenancePpn")):
-        meta["etablissement_ppn"] = etablissement_ppn
+        source_extras["etablissement_ppn"] = etablissement_ppn
 
     ecoles = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
     ecoles_clean = [
         {"nom": nom, "ppn": as_str(e.get("ppn"))} for e in ecoles if (nom := as_str(e.get("nom")))
     ]
     if ecoles_clean:
-        meta["ecoles_doctorales"] = ecoles_clean
+        source_extras["ecoles_doctorales"] = ecoles_clean
 
     partenaires = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
     partenaires_clean = [
@@ -101,9 +101,9 @@ def _build_source_meta(these: Mapping[str, JsonValue]) -> dict[str, JsonValue] |
         if (nom := as_str(p.get("nom")))
     ]
     if partenaires_clean:
-        meta["partenaires"] = partenaires_clean
+        source_extras["partenaires"] = partenaires_clean
 
-    return meta or None
+    return source_extras or None
 
 
 def insert_source_document(
@@ -138,10 +138,6 @@ def insert_source_document(
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None
 
-    # Meta spécifique thèse (discipline, écoles doctorales, partenaires, dates)
-    source_meta = _build_source_meta(these)
-    source_meta_json = source_meta if source_meta else None
-
     return queries.upsert_source_record(
         conn,
         SourceRecordUpsert(
@@ -159,7 +155,7 @@ def insert_source_document(
             keywords=keywords,
             topics=topics_json,
             oa_status=publication_meta.oa_status,
-            meta=source_meta_json,
+            source_extras=_build_source_extras(these),
         ),
     )
 
@@ -177,7 +173,7 @@ def extract_theses_author_block(these: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
     """Une contribution source par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
-    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `meta` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
+    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `source_extras` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
     """
     return [
         AuthorRecord(
