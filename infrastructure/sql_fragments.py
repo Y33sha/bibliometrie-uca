@@ -9,10 +9,12 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
+from domain.publications.identifiers import HAL_DOC_PATTERN
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY, Source
+from domain.sources.scanr import SCANR_HAL_PREFIX
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -222,6 +224,14 @@ def raw_column(field: str, source_record: str = "sr") -> str:
     return (
         f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
         f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
+    )
+
+
+def scanr_from_hal_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` est un enregistrement ScanR issu d'un dépôt HAL (`extract_hal_id_from_scanr_id`)."""
+    return (
+        f"({alias}.source = '{Source.SCANR.value}'"
+        f" AND {alias}.source_id ~* '^{SCANR_HAL_PREFIX}.*{HAL_DOC_PATTERN}')"
     )
 
 

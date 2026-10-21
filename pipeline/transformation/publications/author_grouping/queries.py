@@ -6,15 +6,13 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
-from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
-
-# Enregistrement source dont le DOI a convergé sur celui d'une autre œuvre (pièce, version, copie d'un dépôt DataCite).
-_CONVERGED = [
-    DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-    DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-]
+from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
+from infrastructure.sql_fragments import (
+    corrected_by,
+    in_clause,
+    scanr_from_hal_sql,
+    usable_identifier,
+)
 
 # Statuts d'un rattachement d'identifiant posé par un humain.
 _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
@@ -40,7 +38,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
         SELECT n.* FROM records n
         WHERE NOT (n.converged AND EXISTS (
                 SELECT 1 FROM records o WHERE o.publication_id = n.publication_id AND NOT o.converged))
-          AND NOT (n.source = 'scanr' AND n.source_id LIKE 'hal%' AND EXISTS (
+          AND NOT ({scanr_from_hal_sql("n")} AND EXISTS (
                 SELECT 1 FROM records h WHERE h.publication_id = n.publication_id AND h.source = 'hal'))
     )
     SELECT k.publication_id, k.id AS source_record, k.source, sc.id, sc.author_position AS position,
@@ -189,7 +187,7 @@ class AuthorGroupingQueries:
         """Contributions sources à grouper de ces publications."""
         rows = conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
-            {"publications": list(publication_ids), "converged": [str(c) for c in _CONVERGED]},
+            {"publications": list(publication_ids), "converged": list(CONVERGENCE_CASES)},
         ).mappings()
         return [SourceContributionRow(**row) for row in rows]
 

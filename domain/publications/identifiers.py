@@ -184,7 +184,9 @@ class DoiPrefix:
 # base, tous portails confondus, ont exactement 8 chiffres). Ce plancher écarte les fragments
 # `mot-chiffres` glanés dans des URLs étrangères — un suffixe de DOI DataCite (`pubdb-2020`,
 # `rwth-2020`) ou un PURL (`gro-2`) ne ressemble plus à un hal_id.
-_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*[-_]\d{8,})", re.IGNORECASE)
+HAL_DOC_PATTERN = r"[a-z][a-z0-9]*[-_]\d{8,}"
+"""Motif d'un identifiant de dépôt HAL, insensible à la casse ; repris en SQL par `sql_fragments`."""
+_HAL_DOC_BASE = re.compile(f"({HAL_DOC_PATTERN})", re.IGNORECASE)
 
 # Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`. Les works OpenAlex
 # exposent la source structurée de leurs locations sous cette forme : `oai:HAL:hal-04123456v1` pour
