@@ -62,17 +62,17 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] Colonnes `meta` de `source_records` et `publications` renommées `source_extras` ; trace des corrections d'une publication dans `publications.corrections`. 3b584b73c
 - [x] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ. d882da50e
 - [x] Module propriétaire des clés de `source_extras` (`domain/source_records/source_extras.py`), fragments SQL dérivés ; les faits des règles lus dans `source_extras` en viennent. fddfe65f6
-- [ ] Clés et accesseurs de `biblio`.
+- [x] Clés de `biblio` et constructeur unique `compact_biblio`, appelé par les six normaliseurs. f3e31ae75
 - [x] Projection SQL des faits des règles construite depuis les champs de `MetadataForCorrection`. fddfe65f6
-- [ ] Registre des clés de `corrections` et de leur sous-étape ; `effective_external_ids`.
-- [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
-- [ ] Revue par espace de noms DOI en fonction de domaine.
+- [x] Registre des clés de `corrections` et de leur sous-étape (`CorrectionKey`, `other_entries`). a1f18a42a
+- [x] `correct_source_record` dans le domaine : valeurs corrigées et trace complète. a1f18a42a
+- [x] Revue par espace de noms DOI en fonction de domaine (`attach_journal_by_doi`). 4491ae27a
 
 ### Phase 3 — Doublons ponctuels
 
-- [ ] `CONVERGENCE_CASES` importé ; fragment SQL unique pour « ScanR issu de HAL ».
-- [ ] Seuils de comparaison des auteurs partagés avec `estimate_residual_weights.py`.
-- [ ] `_SourceRecordLinks.resolve` ; `_Claim` en `NamedTuple` ; critères de création de publication en prédicats de `ReconcileMember`.
+- [x] `CONVERGENCE_CASES` importé ; fragment SQL unique pour « ScanR issu de HAL », avec test de parité. e2fd36456
+- [x] Seuils de comparaison des auteurs partagés avec `estimate_residual_weights.py`. 0262e76a2
+- [x] `_SourceRecordLinks.resolve` ; `_Claim` en `NamedTuple` ; critères de création de publication en prédicats de `ReconcileMember`. b9526cc4f
 
 ### Phase 4 — Configuration et identifiants
 
