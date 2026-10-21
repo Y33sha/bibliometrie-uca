@@ -24,6 +24,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
@@ -37,7 +38,7 @@ from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
 from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
-from pipeline.runtime.config import get_doaj_refresh_after_days
+from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
@@ -372,6 +373,6 @@ def _run_enrich_journals_from_doaj(
         return run_enrich_journals_from_doaj(
             conn,
             ctx.logger,
-            refresh_after_days=get_doaj_refresh_after_days(conn),
+            refresh_after_days=delay(conn, ConfigKey.DOAJ_REFRESH_AFTER_DAYS),
             download_dump=lambda: downloaded_doaj_dump(user_agent=user_agent, logger=ctx.logger),
         )

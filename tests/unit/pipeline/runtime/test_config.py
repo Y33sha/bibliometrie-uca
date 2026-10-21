@@ -3,7 +3,8 @@
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from pipeline.runtime.config import get_fetch_stale_after_days
+from domain.config import ConfigKey
+from pipeline.runtime.config import delay
 
 
 class _ConnEnPanne:
@@ -18,4 +19,4 @@ class TestPanneDeLecture:
 
     def test_reglage_du_pipeline(self):
         with pytest.raises(SQLAlchemyError):
-            get_fetch_stale_after_days(_ConnEnPanne())
+            delay(_ConnEnPanne(), ConfigKey.FETCH_STALE_AFTER_DAYS)

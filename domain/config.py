@@ -5,6 +5,9 @@ La table `config` porte les réglages d'exploitation du pipeline : périmètres,
 Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, un délai un nombre entier de jours d'au moins un, une année doit tomber dans les bornes.
 """
 
+from enum import StrEnum
+from typing import NamedTuple
+
 from domain.errors import ValidationError
 from domain.types import JsonValue
 
@@ -16,32 +19,79 @@ PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset(
     }
 )
 
-CAP_KEYS: frozenset[str] = frozenset(
-    {
-        # Nombre de DOI vérifiés auprès d'Unpaywall par run.
-        "unpaywall_max_per_run",
-        # Nombre de DOI interrogés par source cible à l'import par DOI.
-        "fetch_missing_max_per_source",
-    }
-)
-"""Plafonds d'interrogation, exprimés en entiers positifs. Zéro retire la borne."""
 
-DELAY_KEYS: frozenset[str] = frozenset(
-    {
-        # Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source.
-        "fetch_stale_after_days",
-        # Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. L'échec est définitif pour un identifiant absent de son registre (`REGISTRY_LOOKUPS`).
-        "fetch_missing_retry_after_days",
-        # Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall.
-        "unpaywall_recheck_after_days",
-        # Délai avant de télécharger de nouveau le fichier du DOAJ.
-        "doaj_refresh_after_days",
-    }
-)
-"""Délais de réinterrogation des sources, exprimés en nombres entiers de jours, au moins un."""
+class ConfigKey(StrEnum):
+    """Clé d'un réglage numérique du pipeline."""
 
-YEAR_KEYS: frozenset[str] = frozenset({"pipeline_start_year_full"})
-"""Clés portant une année."""
+    UNPAYWALL_MAX_PER_RUN = "unpaywall_max_per_run"
+    """Nombre de DOI vérifiés auprès d'Unpaywall par run."""
+    FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
+    """Nombre de DOI interrogés par source cible à l'import par DOI."""
+    FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
+    """Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
+    FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
+    """Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. L'échec est définitif pour un identifiant absent de son registre (`REGISTRY_LOOKUPS`)."""
+    UNPAYWALL_RECHECK_AFTER_DAYS = "unpaywall_recheck_after_days"
+    """Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall."""
+    DOAJ_REFRESH_AFTER_DAYS = "doaj_refresh_after_days"
+    """Délai avant de télécharger de nouveau le fichier du DOAJ."""
+    PIPELINE_START_YEAR_FULL = "pipeline_start_year_full"
+    """Première année moissonnée."""
+
+
+class ConfigKind(StrEnum):
+    """Forme d'un réglage numérique."""
+
+    CAP = "cap"
+    """Plafond d'interrogations, entier positif ; zéro retire la borne."""
+    DELAY = "delay"
+    """Délai de réinterrogation, en nombre entier de jours, au moins un."""
+    YEAR = "year"
+    """Année, entre `MIN_YEAR` et `MAX_YEAR`."""
+
+
+class ConfigSetting(NamedTuple):
+    """Forme d'un réglage, et valeur retenue quand la clé est absente ou illisible ; pour un plafond, `None` vaut illimité."""
+
+    kind: ConfigKind
+    default: int | None = None
+
+
+SETTINGS: dict[ConfigKey, ConfigSetting] = {
+    ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
+    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP),
+    ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 90),
+    ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
+    ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 15),
+    ConfigKey.DOAJ_REFRESH_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
+    ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(ConfigKind.YEAR),
+}
+assert set(SETTINGS) == set(ConfigKey)
+assert all(s.default is not None for s in SETTINGS.values() if s.kind is ConfigKind.DELAY)
+
+
+def _keys_of(kind: ConfigKind) -> frozenset[str]:
+    return frozenset(key.value for key, setting in SETTINGS.items() if setting.kind is kind)
+
+
+CAP_KEYS = _keys_of(ConfigKind.CAP)
+DELAY_KEYS = _keys_of(ConfigKind.DELAY)
+YEAR_KEYS = _keys_of(ConfigKind.YEAR)
+
+
+def cap_value(key: ConfigKey, stored: int | None) -> int | None:
+    """Plafond effectif de `key`, `None` valant illimité : zéro ou une valeur négative retire la borne ; une valeur absente donne la valeur par défaut."""
+    if stored is None:
+        return SETTINGS[key].default
+    return stored if stored > 0 else None
+
+
+def delay_value(key: ConfigKey, stored: int | None) -> int:
+    """Délai effectif de `key`, en jours : la valeur par défaut pour une valeur absente ou inférieure à un jour."""
+    default = SETTINGS[key].default
+    assert default is not None
+    return stored if stored is not None and stored >= 1 else default
+
 
 PERIMETER_EXTRACTION_KEY = "perimeter_extraction"
 """Clé du code du périmètre dont les structures sont interrogées à l'extraction."""

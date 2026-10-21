@@ -13,6 +13,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
 )
@@ -27,10 +28,7 @@ from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
 from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
 from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
-from pipeline.runtime.config import (
-    get_fetch_missing_max_per_source,
-    get_fetch_missing_retry_after_days,
-)
+from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import rien_a_faire
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -172,7 +170,7 @@ def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_hal_by_id(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -183,7 +181,7 @@ def _run_fetch_missing_hal_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_nnt
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_hal_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -194,7 +192,7 @@ def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
     from pipeline.ingestion.theses.fetch_missing import fetch_missing_theses_by_nnt
 
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_theses_by_nnt(conn, ctx.logger, retry_after_days=retry_after_days)
         )
@@ -219,8 +217,8 @@ def _run_fetch_missing_doi(
 ) -> PhaseMetrics:
     search = _make_doi_search(target)
     with ctx.open_tx() as conn:
-        retry_after_days = get_fetch_missing_retry_after_days(conn)
-        limit = get_fetch_missing_max_per_source(conn)
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
+        limit = cap(conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE)
         return asyncio.run(
             fetch_missing_doi(
                 conn,

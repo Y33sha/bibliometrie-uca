@@ -7,18 +7,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
+from domain.config import SETTINGS, ConfigKey
 from domain.dates import today
-from pipeline.runtime.config import (
-    FETCH_STALE_AFTER_DAYS_DEFAULT,
-    UNPAYWALL_MAX_PER_RUN_DEFAULT,
-    get_doaj_refresh_after_days,
-    get_fetch_missing_max_per_source,
-    get_fetch_missing_retry_after_days,
-    get_fetch_stale_after_days,
-    get_unpaywall_max_per_run,
-    get_unpaywall_recheck_after_days,
-    get_years,
-)
+from pipeline.runtime.config import cap, delay, get_years
 from tests.integration.helpers.config import set_config
 
 
@@ -70,45 +61,51 @@ class TestPlafondsParRun:
 
     def test_le_plafond_unpaywall_configure_est_lu(self, sa_sync_conn):
         set_config(sa_sync_conn, "unpaywall_max_per_run", 250)
-        assert get_unpaywall_max_per_run(sa_sync_conn) == 250
+        assert cap(sa_sync_conn, ConfigKey.UNPAYWALL_MAX_PER_RUN) == 250
 
     def test_zero_vaut_illimite_pour_unpaywall(self, sa_sync_conn):
         set_config(sa_sync_conn, "unpaywall_max_per_run", 0)
-        assert get_unpaywall_max_per_run(sa_sync_conn) is None
+        assert cap(sa_sync_conn, ConfigKey.UNPAYWALL_MAX_PER_RUN) is None
 
     def test_la_cle_absente_laisse_le_plafond_par_defaut(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'unpaywall_max_per_run'"))
-        assert get_unpaywall_max_per_run(sa_sync_conn) == UNPAYWALL_MAX_PER_RUN_DEFAULT
+        assert (
+            cap(sa_sync_conn, ConfigKey.UNPAYWALL_MAX_PER_RUN)
+            == SETTINGS[ConfigKey.UNPAYWALL_MAX_PER_RUN].default
+        )
 
     def test_le_plafond_de_fetch_missing_configure_est_lu(self, sa_sync_conn):
         set_config(sa_sync_conn, "fetch_missing_max_per_source", 5000)
-        assert get_fetch_missing_max_per_source(sa_sync_conn) == 5000
+        assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) == 5000
 
     def test_zero_vaut_illimite_pour_fetch_missing(self, sa_sync_conn):
         set_config(sa_sync_conn, "fetch_missing_max_per_source", 0)
-        assert get_fetch_missing_max_per_source(sa_sync_conn) is None
+        assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) is None
 
     def test_fetch_missing_sans_cle_est_illimite(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_missing_max_per_source'"))
-        assert get_fetch_missing_max_per_source(sa_sync_conn) is None
+        assert cap(sa_sync_conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE) is None
 
 
 class TestDelais:
     """Délais de réinterrogation lus en configuration, en jours."""
 
     @pytest.mark.parametrize(
-        ("key", "lire"),
+        "key",
         [
-            ("fetch_stale_after_days", get_fetch_stale_after_days),
-            ("fetch_missing_retry_after_days", get_fetch_missing_retry_after_days),
-            ("unpaywall_recheck_after_days", get_unpaywall_recheck_after_days),
-            ("doaj_refresh_after_days", get_doaj_refresh_after_days),
+            ConfigKey.FETCH_STALE_AFTER_DAYS,
+            ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS,
+            ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS,
+            ConfigKey.DOAJ_REFRESH_AFTER_DAYS,
         ],
     )
-    def test_le_delai_configure_est_lu(self, sa_sync_conn, key, lire):
-        set_config(sa_sync_conn, key, 7)
-        assert lire(sa_sync_conn) == 7
+    def test_le_delai_configure_est_lu(self, sa_sync_conn, key):
+        set_config(sa_sync_conn, key.value, 7)
+        assert delay(sa_sync_conn, key) == 7
 
     def test_la_cle_absente_laisse_le_delai_par_defaut(self, sa_sync_conn):
         sa_sync_conn.execute(text("DELETE FROM config WHERE key = 'fetch_stale_after_days'"))
-        assert get_fetch_stale_after_days(sa_sync_conn) == FETCH_STALE_AFTER_DAYS_DEFAULT
+        assert (
+            delay(sa_sync_conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
+            == SETTINGS[ConfigKey.FETCH_STALE_AFTER_DAYS].default
+        )

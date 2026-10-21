@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sqlalchemy import Connection
 
+from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -45,7 +46,7 @@ from pipeline.ingestion.common import (
 )
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex import fetch_truncated
-from pipeline.runtime.config import get_fetch_stale_after_days
+from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, RunOptions
 from pipeline.runtime.execution import log, open_tx, phase_context
 from pipeline.runtime.lock import PipelineAlreadyRunningError, pipeline_lock
@@ -264,7 +265,7 @@ def _encadre(lignes: list[str]) -> list[str]:
 
 
 def _champs_fetch_stale(conn: "Connection") -> dict[str, str]:
-    return {"delai": accord(get_fetch_stale_after_days(conn), "jour")}
+    return {"delai": accord(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
 
 
 _CHAMPS_DE_LIBELLE: dict[str, Callable[["Connection"], dict[str, str]]] = {

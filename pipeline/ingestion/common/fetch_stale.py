@@ -17,6 +17,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES, source_label
 from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.stale_refetch import (
@@ -30,7 +31,7 @@ from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
 from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
 from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
 from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
-from pipeline.runtime.config import get_fetch_stale_after_days, get_years
+from pipeline.runtime.config import delay, get_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -151,7 +152,7 @@ def _run_fetch_stale(
     """
     refetch = _make_refetch(target)
     with ctx.open_tx() as conn:
-        after_days = get_fetch_stale_after_days(conn)
+        after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
         return asyncio.run(
             refresh(conn, refetch, ctx.logger, after_days=after_days, years=years, breaker=breaker)
         )

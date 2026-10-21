@@ -17,13 +17,14 @@ from dataclasses import dataclass
 import httpx2
 from sqlalchemy import Connection
 
+from domain.config import ConfigKey
 from domain.publications.metadata import publication_oa_status
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.http.tls import tls_context
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.complements.unpaywall import fetch_oa_status
-from pipeline.runtime.config import get_unpaywall_max_per_run, get_unpaywall_recheck_after_days
+from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.libelles import (
     BRANCHE,
@@ -236,7 +237,7 @@ def build() -> Phase:
         OaStatusPhase(
             OaStatusQueries(),
             fetcher,
-            staleness_days=get_unpaywall_recheck_after_days,
-            max_per_run=get_unpaywall_max_per_run,
+            staleness_days=lambda conn: delay(conn, ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS),
+            max_per_run=lambda conn: cap(conn, ConfigKey.UNPAYWALL_MAX_PER_RUN),
         ),
     )
