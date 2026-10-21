@@ -2,7 +2,7 @@
 
 Bulk, set-based : indexe les `journals` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
-Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_journals_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: value}`.
+Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_journals_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: valeur}`.
 """
 
 import logging

@@ -17,7 +17,7 @@ from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
 def load_country_forms(conn: Connection) -> dict[str, str]:
-    """Formes normalisées des noms de pays, chacune avec le code ISO du pays qu'elle désigne : `{inflect: code ISO}`."""
+    """Formes normalisées des noms de pays, chacune avec le code ISO du pays qu'elle désigne : `{forme: code ISO}`."""
     rows = conn.execute(
         text(
             "SELECT form_normalized, iso_code FROM place_name_forms "

@@ -24,7 +24,7 @@ _LABELS = {PlaceNameKind.INSTITUTION: "institutions", PlaceNameKind.CITY: "ville
 
 
 def load_place_forms(conn: Connection, kind: PlaceNameKind) -> dict[str, str]:
-    """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{inflect: code ISO}`."""
+    """Formes normalisées des noms de lieux de nature `kind` (institution ou ville), chacune avec le code ISO du pays où le lieu se situe : `{forme: code ISO}`."""
     rows = conn.execute(
         text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = :kind"),
         {"kind": kind.value},
