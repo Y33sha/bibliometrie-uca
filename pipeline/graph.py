@@ -1182,7 +1182,7 @@ PHASE_ORDER: tuple[str, ...] = tuple(
 )
 """Ordre d'exécution des phases : celui de leurs tâches dans `TASKS`."""
 
-PHASE_LIBELLES: dict[str, str] = {
+PHASE_LABELS: dict[str, str] = {
     "harvest": "Moissonnage par affiliation",
     "harvest_by_person": "Moissonnage par personne",
     "resolve_ra": "Résolution des agences d'enregistrement des DOI",
@@ -1216,5 +1216,5 @@ Aucune ne dépend d'une autre. Des phases placées avant elles lisent leurs sort
 if not EXTRA_PHASES <= set(PHASE_ORDER):
     raise ValueError("EXTRA_PHASES nomme une phase absente du graphe")
 
-if set(PHASE_LIBELLES) != set(PHASE_ORDER):
+if set(PHASE_LABELS) != set(PHASE_ORDER):
     raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")

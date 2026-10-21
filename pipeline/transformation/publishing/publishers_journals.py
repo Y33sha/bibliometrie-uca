@@ -169,11 +169,11 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
         "rows": [
             {
                 "key": key,
-                "traités": by_step[champ].total,
-                "identifiés": identifies(by_step[champ]),
-                "créés": by_step[champ].extras.get("publisher_created", 0),
+                "traités": by_step[field].total,
+                "identifiés": identifies(by_step[field]),
+                "créés": by_step[field].extras.get("publisher_created", 0),
             }
-            for champ, key, identifies in _TABLE
+            for field, key, identifies in _TABLE
         ]
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
@@ -193,56 +193,56 @@ def build() -> Phase:
                 "resolve_crossref_publishers": TaskStep(
                     _run_resolve_crossref_publishers,
                     "Éditeurs",
-                    resolve_publishers.LIBELLES["Crossref"],
+                    resolve_publishers.LABELS["Crossref"],
                 ),
                 "resolve_datacite_publishers": TaskStep(
                     _run_resolve_datacite_publishers,
                     "Éditeurs",
-                    resolve_publishers.LIBELLES["DataCite"],
+                    resolve_publishers.LABELS["DataCite"],
                 ),
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
                 "enrich_journals_from_openalex": TaskStep(
                     _run_enrich_journals_from_openalex,
                     "Revues",
-                    enrich_journals_from_openalex.LIBELLE,
+                    enrich_journals_from_openalex.LABEL,
                     threshold=3,
                 ),
                 "check_journals_in_sudoc": TaskStep(
                     _run_check_journals_in_sudoc,
                     "Revues",
-                    check_journals_in_sudoc.LIBELLE,
+                    check_journals_in_sudoc.LABEL,
                     threshold=3,
                 ),
                 "merge_duplicate_journals": TaskStep(
-                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LIBELLE
+                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LABEL
                 ),
                 "type_proceedings_journals": TaskStep(
-                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LIBELLE
+                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LABEL
                 ),
                 "learn_journal_doi_namespaces": TaskStep(
                     _run_learn_journal_doi_namespaces,
                     "Revues",
-                    learn_journal_doi_namespaces.LIBELLE,
+                    learn_journal_doi_namespaces.LABEL,
                 ),
                 "enrich_journals_from_doaj": TaskStep(
                     _run_enrich_journals_from_doaj,
                     "Revues",
-                    enrich_journals_from_doaj.LIBELLE,
+                    enrich_journals_from_doaj.LABEL,
                 ),
                 "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,
                     "Monographies",
-                    merge_duplicate_monographs.LIBELLE,
+                    merge_duplicate_monographs.LABEL,
                 ),
                 "link_monographs_to_collections": TaskStep(
                     _run_link_monographs_to_collections,
                     "Monographies",
-                    link_monographs_to_collections.LIBELLE,
+                    link_monographs_to_collections.LABEL,
                 ),
                 "type_proceedings_volumes": TaskStep(
                     _run_type_proceedings_volumes,
                     "Monographies",
-                    type_proceedings_volumes.LIBELLE,
+                    type_proceedings_volumes.LABEL,
                 ),
             }.items()
         }

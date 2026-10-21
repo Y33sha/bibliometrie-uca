@@ -2,7 +2,7 @@
 
 Bulk, set-based : indexe les `journals` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
-Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_journals_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: valeur}`.
+Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_journals_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: value}`.
 """
 
 import logging
@@ -27,7 +27,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.runtime.observability.signals import signal_source_unavailable
 
-LIBELLE = "Import du DOAJ"
+LABEL = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 # Colonnes ISSN du dump CSV DOAJ.
@@ -189,18 +189,18 @@ def run_enrich_journals_from_doaj(
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
     last = doaj_last_import_at(conn)
-    delai = timedelta(days=refresh_after_days)
-    if last is not None and last > datetime.now(UTC) - delai:
+    refresh_delay = timedelta(days=refresh_after_days)
+    if last is not None and last > datetime.now(UTC) - refresh_delay:
         metrics = PhaseMetrics(extras={"skipped": 1})
         metrics.report = (
             f"importé le {date_to_french(last.date())}, "
-            f"prochain import le {date_to_french((last + delai).date())}"
+            f"prochain import le {date_to_french((last + refresh_delay).date())}"
         )
         return metrics
 
     try:
-        with waiting(f"{BRANCH}{LIBELLE}", logger) as ligne:
-            ligne.erase()
+        with waiting(f"{BRANCH}{LABEL}", logger) as line:
+            line.erase()
             with download_dump() as rows:
                 stats = run_import_doaj_dump(conn, logger, rows=rows)
     except DumpUnavailableError as e:

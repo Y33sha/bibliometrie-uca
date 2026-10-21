@@ -36,7 +36,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.journals.store import JournalStore
 
-LIBELLE = "Vérification des ISSN dans le Sudoc"
+LABEL = "Vérification des ISSN dans le Sudoc"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 COMMIT_EVERY = 50  # revues par commit
@@ -291,9 +291,7 @@ async def run_check_journals_in_sudoc(
         return records
 
     # Le compteur de la barre compte les revues présentes dans le Sudoc.
-    with track_progress(
-        total, f"{BRANCH}{LIBELLE}", logger, count_kept=True, erase=True
-    ) as progress:
+    with track_progress(total, f"{BRANCH}{LABEL}", logger, count_kept=True, erase=True) as progress:
 
         def _write(
             conn: Connection, row: JournalSudocRow, records: dict[str, SudocSerialRecord] | None

@@ -13,7 +13,7 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.monographs.monograph_merge import merge_monograph_into
 
-LIBELLE = "Fusion des monographies en double"
+LABEL = "Fusion des monographies en double"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 

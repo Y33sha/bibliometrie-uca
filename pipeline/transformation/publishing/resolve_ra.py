@@ -106,9 +106,9 @@ def _resolve(
             for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
         ]
     }
-    resolus = metrics.extras.get("resolved", 0)
+    resolved = metrics.extras.get("resolved", 0)
     total = metrics.total
-    metrics.report = f"{resolus}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
+    metrics.report = f"{resolved}/{total} {inflect(total, 'préfixe')} {inflect(total, 'résolu')}"
     return metrics
 
 

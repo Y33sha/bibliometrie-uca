@@ -13,7 +13,7 @@ from infrastructure.sql_fragments import declares_conference_sql
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-LIBELLE = "Nature des monographies"
+LABEL = "Nature des monographies"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 

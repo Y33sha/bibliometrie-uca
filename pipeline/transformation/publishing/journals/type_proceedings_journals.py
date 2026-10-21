@@ -25,7 +25,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.journal_label import journal_label
 from pipeline.transformation.publishing.journals.store import TYPE_NOT_MANUAL, JournalStore
 
-LIBELLE = "Typage des recueils d'actes"
+LABEL = "Typage des recueils d'actes"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _BY_RECORDS = "articles de congrès"

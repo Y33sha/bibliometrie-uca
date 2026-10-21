@@ -16,7 +16,7 @@ from infrastructure.sql_fragments import corrected
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-LIBELLE = "Espaces de noms DOI"
+LABEL = "Espaces de noms DOI"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 

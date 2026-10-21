@@ -17,7 +17,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.find_or_create import find_or_create_journal
 from pipeline.transformation.publishing.journals.store import JournalStore
 
-LIBELLE = "Rattachement aux collections"
+LABEL = "Rattachement aux collections"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 

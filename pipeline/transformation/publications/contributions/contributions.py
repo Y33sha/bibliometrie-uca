@@ -218,25 +218,25 @@ def _refresh_publication_counts(
     """
     step(logger, "Recalcul des décomptes de publications")
 
-    with waiting(f"{BRANCH}par adresse", logger) as ligne:
+    with waiting(f"{BRANCH}par adresse", logger) as line:
         with open_tx() as conn:
             adresses = address_publication_count_queries.recompute_publication_count(conn)
-        ligne.conclude(
+        line.conclude(
             f"{BRANCH}{quantity(adresses, 'adresse')} {inflect(adresses, 'mise à jour', 'mises à jour')}"
         )
 
-    with waiting(f"{BRANCH}par revue", logger) as ligne:
+    with waiting(f"{BRANCH}par revue", logger) as line:
         with open_tx() as conn:
             revues = publication_counts_queries.refresh_journal_publication_counts(conn)
-        ligne.conclude(
+        line.conclude(
             f"{BRANCH}{quantity(revues, 'revue')} {inflect(revues, 'mise à jour', 'mises à jour')}"
         )
 
-    with waiting(f"{LAST_BRANCH}par éditeur", logger) as ligne:
+    with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
         with open_tx() as conn:
             editeurs = publication_counts_queries.refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
-        ligne.conclude(f"{LAST_BRANCH}{quantity(editeurs, 'éditeur')} mis à jour")
+        line.conclude(f"{LAST_BRANCH}{quantity(editeurs, 'éditeur')} mis à jour")
 
 
 # ── Câblage ───────────────────────────────────────────────────
@@ -248,9 +248,9 @@ def build() -> Phase:
         PgPublicationCountsQueries(),
         AddressPublicationCountQueries(),
         empty_containers=(
-            (delete_empty_monographs.LIBELLE, _run_delete_empty_monographs),
-            (delete_empty_journals.LIBELLE, _run_delete_empty_journals),
-            (delete_empty_publishers.LIBELLE, _run_delete_empty_publishers),
+            (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
+            (delete_empty_journals.LABEL, _run_delete_empty_journals),
+            (delete_empty_publishers.LABEL, _run_delete_empty_publishers),
         ),
     )
 

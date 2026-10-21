@@ -10,7 +10,7 @@ from sqlalchemy import Connection, text
 from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-LIBELLE = "Monographies vides"
+LABEL = "Monographies vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _DELETE_EMPTY = text("""

@@ -20,7 +20,7 @@ from pipeline.runtime.observability.log_format import inflect
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.store import JournalStore
 
-LIBELLE = "Type des revues sur OpenAlex"
+LABEL = "Type des revues sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50
@@ -113,7 +113,7 @@ def run_enrich_journals_from_openalex(
                 processed,
                 total,
             )
-            return _bilan(total, updated)
+            return _summary(total, updated)
 
         id_map = {row[1]: row[0] for row in pending[i : i + BATCH_SIZE]}
         sources = fetch_batch(list(id_map))
@@ -146,10 +146,10 @@ def run_enrich_journals_from_openalex(
             conn.commit()
 
     conn.commit()
-    return _bilan(total, updated)
+    return _summary(total, updated)
 
 
-def _bilan(total: int, updated: int) -> PhaseMetrics:
+def _summary(total: int, updated: int) -> PhaseMetrics:
     metrics = PhaseMetrics(seen=total, updated=updated)
     metrics.report = (
         f"{updated}/{total} {inflect(total, 'revue mise à jour', 'revues mises à jour')}"

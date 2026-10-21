@@ -30,7 +30,7 @@ from pipeline.transformation.publishing.doi_prefixes import (
 from pipeline.transformation.publishing.find_or_create import match_or_create_publisher
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
-LIBELLES: dict[Agency, str] = {
+LABELS: dict[Agency, str] = {
     "Crossref": "Éditeurs des préfixes DOI Crossref",
     "DataCite": "Éditeurs des préfixes DOI DataCite",
 }
@@ -134,7 +134,7 @@ def _resolve(
     rows = repo.get_prefixes_pending_publisher(agency)
     if not rows:
         return metrics
-    with track_progress(len(rows), f"{BRANCH}{LIBELLES[agency]}", log, erase=True) as progress:
+    with track_progress(len(rows), f"{BRANCH}{LABELS[agency]}", log, erase=True) as progress:
         # Nom déjà stocké : rattachement direct, sans requête.
         for row in rows:
             if row.publisher_name_normalized is not None:
