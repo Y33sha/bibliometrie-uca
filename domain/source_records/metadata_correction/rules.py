@@ -1,14 +1,12 @@
-"""Correction unaire des métadonnées d'un enregistrement, par table de règles.
+"""Correction des métadonnées par table de règles, pour un enregistrement source comme pour une publication.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction aux faits de `MetadataForCorrection`, pour un enregistrement source comme pour une publication.
+`effective_metadata` applique les règles aux faits de `MetadataForCorrection`. Elle corrige `doc_type` et `oa_status`.
 
-Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre de `MetadataCorrectionRule` à sa définition `{applies_to, applies_correction}` où :
-- `applies_to` est un dict de prédicats AND-és sur la `source_record` (clés typées par `_AppliesTo`).
-- `applies_correction` est un dict champ → valeur cible.
+Une règle est un membre de `MetadataCorrectionRule` et son entrée dans `_RULES`. `applies_to` liste ses prédicats, tous requis. `applies_correction` donne la valeur cible de chaque champ corrigé. Pour un champ, la première règle de `_RULES` qui s'applique l'emporte.
 
-Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(source_record, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
+Les prédicats sont les clés de `_AppliesTo`. Une clé qui nomme un champ de `MetadataForCorrection` teste l'égalité. Les autres clés ont leur branche dans `_check_predicate`.
 
-Champs corrigés : `doc_type` et `oa_status` (le rattachement du `journal_id` manquant et la correction du DOI de groupe vivent dans les modules frères `journal_by_doi` et `shared_doi`).
+Un fait inconnu vaut `None`, et les prédicats qui le testent sont faux. Une publication connaît seulement les faits de `MetadataForCorrection.for_publication`.
 """
 
 import re
