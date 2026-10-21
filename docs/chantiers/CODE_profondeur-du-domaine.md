@@ -18,7 +18,6 @@ Connaissances écrites à plusieurs endroits :
 - `CONVERGENCE_CASES`, re-listé dans `author_grouping/queries.py` ;
 - « enregistrement ScanR issu de HAL », à quatre endroits, dont un `LIKE 'hal%'` sans validation de l'identifiant ;
 - `meta ? 'conference'`, dans `metadata_correction_queries.py` et `type_proceedings_volumes.py` ;
-- la définition d'une revue diamant, seulement dans `infrastructure/sql_fragments.py` ;
 - « prénom plein qui prolonge les initiales », à quatre endroits ;
 - les seuils de comparaison des auteurs, dans `author_grouping.py` et `interfaces/cli/dev/estimate_residual_weights.py` ;
 - les clés des JSON `meta` et `biblio` : écrites par `pipeline/ingestion/hal/payload.py`, lues par chaîne dans `domain/publications/conference.py` et `relations.py` ;
@@ -36,8 +35,11 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 ## Décisions
 
 - Une règle du domaine a une seule entrée publique, qui rend une décision complète. L'appelant lit les faits et écrit le résultat.
-- Le SQL rend des faits bruts ; le verdict se calcule en Python. Une règle qui doit rester en SQL a un fragment unique dans `infrastructure/sql_fragments.py`.
-- Une règle répétée en SQL et en Python a un test de parité.
+- Le verdict d'une règle se calcule en Python.
+- Chaque fait a un seul propriétaire, qui le fournit au SQL comme au Python. Un fait que le SQL évalue sur des ensembles de lignes a un fragment unique dans `infrastructure/sql_fragments.py`.
+- Un fait évalué en SQL et en Python a un test de parité.
+- La projection SQL des faits que lisent les règles de correction se trouve à côté des règles. L'appelant demande la correction d'enregistrements sources, sans connaître les faits que lisent les règles.
+- Un fait inconnu vaut `None`. Une règle qui lit un fait inconnu ne s'applique pas.
 - `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
 - La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
 - `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `raw_metadata` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
@@ -55,16 +57,18 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 - [x] Colonnes `raw_doc_type` et `raw_language` ; type et langue traduits par `normalize` ; lecteurs de la valeur de la source branchés sur ces colonnes ; marqueurs `DOC_TYPE_MAP` et `LANGUAGE_MAP` retirés ; oneshot `split_raw_doc_type_language`. a543d6495
 - [x] `map_doc_type` sans repli sur les autres sources ; valeurs inconnues journalisées. d473dd1b8
+- [ ] Faits des règles de correction optionnels ; `_SOURCE_ONLY_PREDICATES` et les valeurs factices de `consolidation.py` retirés ; fabrique `MetadataForCorrection.for_publication` ; prédicats d'égalité lus par nom de champ.
+- [ ] Module propriétaire du format des JSON `meta` et `biblio` : clés, accesseurs Python, fragments SQL. Les faits des règles lus dans `meta` (`declares_conference`, `self_declared_preprint`, `group_title`) en viennent.
+- [ ] Projection SQL des faits des règles à côté des règles.
+- [ ] Règles des volumes Crossref sur la colonne `source_records.author_count` ; sous-requête de comptage retirée.
+- [ ] Registre des clés de `raw_metadata` et de leur sous-étape ; `effective_external_ids`.
 - [ ] `correct_source_record` dans le domaine : valeurs corrigées et provenances.
 - [ ] Revue par espace de noms DOI en fonction de domaine.
-- [ ] Registre des clés de `raw_metadata` et de leur sous-étape ; `effective_external_ids`.
-- [ ] Prédicats d'égalité lus par nom de champ ; champs propres aux enregistrements sources marqués ; fabrique `MetadataForCorrection.for_publication`.
 
 ### Phase 3 — Doublons ponctuels
 
-- [ ] `CONVERGENCE_CASES` importé ; fragments SQL uniques pour « ScanR issu de HAL » et `declares_conference` ; revue diamant définie dans le domaine.
+- [ ] `CONVERGENCE_CASES` importé ; fragment SQL unique pour « ScanR issu de HAL ».
 - [ ] Seuils de comparaison des auteurs partagés avec `estimate_residual_weights.py`.
-- [ ] Clés et accesseurs des JSON `meta` et `biblio` dans un module commun.
 - [ ] `_SourceRecordLinks.resolve` ; `_Claim` en `NamedTuple` ; critères de création de publication en prédicats de `ReconcileMember`.
 
 ### Phase 4 — Configuration et identifiants
