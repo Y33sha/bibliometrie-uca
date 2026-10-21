@@ -40,8 +40,8 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - Un fait évalué en SQL et en Python a un test de parité.
 - La projection SQL des faits que lisent les règles de correction se trouve à côté des règles. L'appelant demande la correction d'enregistrements sources, sans connaître les faits que lisent les règles.
 - Un fait inconnu vaut `None`. Une règle qui lit un fait inconnu ne s'applique pas.
-- `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](CODE_adaptateur-par-source.md).
-- La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](DATA_resolution-personnes.md).
+- `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](../CODE_adaptateur-par-source.md).
+- La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](../DATA_resolution-personnes.md).
 - `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `corrections` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
 - `application.ports` est la zone neutre de `infrastructure/` et du pipeline. `domain/config.py` reste dans le domaine : il définit les réglages et valide les valeurs saisies.
 
@@ -53,6 +53,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] Réattribution d'un identifiant seulement par l'agrégat : endpoint de réattribution retiré ; docstring de `AttributionStatus` alignée sur l'usage de l'admin.
 - [x] Identifiants personne normalisés à l'ingestion par `compact_identifiers`. c309a275e
 - [x] Prédicat « prénom plein qui prolonge les initiales » unique ; `author_grouping` lit `is_initials`. f5e86dfe4
+- [x] IdRef normalisé sans ses blancs internes. 9a36b3b65
 
 ### Phase 2 — Correction des métadonnées
 
@@ -68,12 +69,15 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - [x] Registre des clés de `corrections` et de leur sous-étape (`CorrectionKey`, `other_entries`). a1f18a42a
 - [x] `correct_source_record` dans le domaine : valeurs corrigées et trace complète. a1f18a42a
 - [x] Revue par espace de noms DOI en fonction de domaine (`attach_journal_by_doi`). 4491ae27a
+- [x] Colonnes des mises à jour des corrections dérivées de `CorrectedSourceRecord` ; `correct_source_record` rend `None` sur un enregistrement source à jour ; colonne inconnue refusée. cf0cf2ab9, 05bba70ba
+- [x] Pagination HAL et Crossref décomposée en `first_page` et `last_page` ; oneshot `split_biblio_pages` passé. 41c48358c
 
 ### Phase 3 — Doublons ponctuels
 
 - [x] `CONVERGENCE_CASES` importé ; fragment SQL unique pour « ScanR issu de HAL », avec test de parité. e2fd36456
 - [x] Seuils de comparaison des auteurs partagés avec `estimate_residual_weights.py`. 0262e76a2
 - [x] `_SourceRecordLinks.resolve` ; `_Claim` en `NamedTuple` ; critères de création de publication en prédicats de `ReconcileMember`. b9526cc4f
+- [x] Clés de confirmation : tokens dérivés des champs de `ConfirmationKeys`, identifiants normalisés par le registre de `external_ids`. 93b7c5964
 
 ### Phase 4 — Configuration et identifiants
 
@@ -82,7 +86,8 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ### Phase 5 — Documentation
 
-- [x] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) et `docs/playbooks/ajouter-une-regle-de-correction.md` ; noms `corrections` et `source_extras` dans les fiches des autres chantiers.
+- [x] Mise à jour de `docs/pipeline/` (`03-normalize.md`, `06-metadata-correction.md`, `08-persons.md`), `docs/agregats/`, `docs/donnees/02-sources.md`, `docs/sources/` (Crossref, DataCite, theses) ; noms `corrections` et `source_extras` dans les fiches des autres chantiers. cdf6f8314
+- [x] Playbooks des règles de correction et de déduplication retirés ; leur procédure dans les docstrings de `rules.py` et `keys.py`. ae9de7097, d9ce60a4d
 
 ### Phase 6 — Registres hors du domaine
 
