@@ -38,7 +38,7 @@ class PendingPublisherPrefix(NamedTuple):
     """DOI du préfixe porté par un enregistrement, lu juste avant d'interroger Crossref."""
 
 
-class DoiPrefixesQueries:
+class DoiPrefixStore:
     """Requêtes sur `doi_prefixes`, sur une connexion."""
 
     def __init__(self, conn: Connection) -> None:

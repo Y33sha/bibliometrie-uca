@@ -24,7 +24,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.doi_prefixes import (
     Agency,
-    DoiPrefixesQueries,
+    DoiPrefixStore,
     PendingPublisherPrefix,
 )
 from pipeline.transformation.publishing.find_or_create import match_or_create_publisher
@@ -69,7 +69,7 @@ def run_resolve_crossref_publishers(
     conn: Connection,
     log: logging.Logger,
     *,
-    repo: DoiPrefixesQueries,
+    prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchCrossrefPrefixFn,
     breaker: SourceCircuitBreaker | None = None,
@@ -87,16 +87,16 @@ def run_resolve_crossref_publishers(
         return _PrefixAnswer("Crossref", crossref=answer)
 
     def prepare(conn: Connection, row: PendingPublisherPrefix) -> PendingPublisherPrefix:  # noqa: ARG001
-        return row._replace(sample_doi=repo.find_doi_with_prefix(row.prefix))
+        return row._replace(sample_doi=prefix_store.find_doi_with_prefix(row.prefix))
 
-    return _resolve(conn, log, "Crossref", ask, prepare, repo, publisher_store, breaker)
+    return _resolve(conn, log, "Crossref", ask, prepare, prefix_store, publisher_store, breaker)
 
 
 def run_resolve_datacite_publishers(
     conn: Connection,
     log: logging.Logger,
     *,
-    repo: DoiPrefixesQueries,
+    prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchDataCitePrefixFn,
     breaker: SourceCircuitBreaker | None = None,
@@ -113,7 +113,7 @@ def run_resolve_datacite_publishers(
             return _PrefixAnswer(row.ra)
         return _PrefixAnswer("DataCite", datacite=answer)
 
-    return _resolve(conn, log, "DataCite", ask, None, repo, publisher_store, breaker)
+    return _resolve(conn, log, "DataCite", ask, None, prefix_store, publisher_store, breaker)
 
 
 def _resolve(
@@ -122,7 +122,7 @@ def _resolve(
     agency: Agency,
     ask: _Ask,
     prepare: Callable[[Connection, PendingPublisherPrefix], PendingPublisherPrefix] | None,
-    repo: DoiPrefixesQueries,
+    prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
     breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:
@@ -131,7 +131,7 @@ def _resolve(
     `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence). S'arrête si le `breaker` a coupé.
     """
     metrics = PhaseMetrics()
-    rows = repo.get_prefixes_pending_publisher(agency)
+    rows = prefix_store.get_prefixes_pending_publisher(agency)
     if not rows:
         return metrics
     with track_progress(len(rows), f"{BRANCH}{LABELS[agency]}", log, erase=True) as progress:
@@ -145,7 +145,7 @@ def _resolve(
                     row.publisher_name_normalized,
                     metrics,
                     log,
-                    repo,
+                    prefix_store,
                     publisher_store,
                 )
                 progress.advance()
@@ -164,8 +164,17 @@ def _resolve(
                     extra={"detail": True},
                 )
             else:
-                name_raw, name_normalized = _store_publisher_metadata(row, answer, repo)
-                _attach(row, agency, name_raw, name_normalized, metrics, log, repo, publisher_store)
+                name_raw, name_normalized = _store_publisher_metadata(row, answer, prefix_store)
+                _attach(
+                    row,
+                    agency,
+                    name_raw,
+                    name_normalized,
+                    metrics,
+                    log,
+                    prefix_store,
+                    publisher_store,
+                )
             progress.advance()
 
         asyncio.run(
@@ -194,7 +203,7 @@ def _resolve(
 
 
 def _store_publisher_metadata(
-    row: PendingPublisherPrefix, answer: _PrefixAnswer, repo: DoiPrefixesQueries
+    row: PendingPublisherPrefix, answer: _PrefixAnswer, prefix_store: DoiPrefixStore
 ) -> tuple[str | None, str | None]:
     """Persiste les métadonnées de la réponse `/prefixes` et la RA retenue. Retourne `(name_raw, name_normalized)`."""
     publisher_name_raw: str | None = None
@@ -218,7 +227,7 @@ def _store_publisher_metadata(
         client_name_normalized = normalize_text(client_name_raw) or None
 
     # Persiste même si le nom est vide : la row sera marquée vue par l'agence, donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
-    repo.set_prefix_publisher_metadata(
+    prefix_store.set_prefix_publisher_metadata(
         prefix=row.prefix,
         ra=answer.ra,
         publisher_name_raw=publisher_name_raw,
@@ -238,7 +247,7 @@ def _attach(
     name_normalized: str | None,
     metrics: PhaseMetrics,
     log: logging.Logger,
-    repo: DoiPrefixesQueries,
+    prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
 ) -> None:
     """Rattache l'éditeur nommé, le crée au besoin, et marque le préfixe vu par l'agence."""
@@ -250,7 +259,7 @@ def _attach(
     )
     if matched is not None:
         publisher_id, created = matched
-        repo.update_publisher_id(row.prefix, publisher_id)
+        prefix_store.update_publisher_id(row.prefix, publisher_id)
         metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
         # Ligne de détail : le terminal la masque, le journal la garde.
         log.info(
@@ -264,4 +273,4 @@ def _attach(
         metrics.add(no_publisher=1)
         log.info("%s → éditeur inconnu de %s", row.prefix, agency, extra={"detail": True})
 
-    repo.mark_checked(row.prefix, agency)
+    prefix_store.mark_checked(row.prefix, agency)

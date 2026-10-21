@@ -42,7 +42,7 @@ from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.publishing.doi_prefixes import DoiPrefixesQueries
+from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 from pipeline.transformation.publishing.journals import (
     check_journals_in_sudoc,
     enrich_journals_from_doaj,
@@ -256,7 +256,7 @@ def _run_resolve_crossref_publishers(
         return run_resolve_crossref_publishers(
             conn,
             ctx.logger,
-            repo=DoiPrefixesQueries(conn),
+            prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_crossref_prefix,
             breaker=breaker,
@@ -270,7 +270,7 @@ def _run_resolve_datacite_publishers(
         return run_resolve_datacite_publishers(
             conn,
             ctx.logger,
-            repo=DoiPrefixesQueries(conn),
+            prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
             breaker=breaker,
