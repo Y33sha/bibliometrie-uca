@@ -251,7 +251,7 @@ def _enrich(row: BareUnlinkedContribution) -> EnrichedContribution:
     """Découpe et normalise le nom, calcule le flag de création autorisée."""
     last_name, first_name = row.name.split()
     last_norm, first_norm = row.name.normalized()
-    allow_create = allow_person_creation(row.source, row.roles or [])
+    allow_create = allow_person_creation(row.roles or [])
 
     return EnrichedContribution(
         source_contribution_id=row.source_contribution_id,

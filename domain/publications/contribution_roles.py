@@ -163,6 +163,16 @@ THESES_FIELD_ROLES = {
     "president": [ContributionRole.JURY_PRESIDENT],
 }
 
+# Rôles de jury de thèse, donnés par theses.fr et ScanR.
+THESIS_JURY_ROLES: frozenset[str] = frozenset(
+    {
+        ContributionRole.THESIS_DIRECTOR,
+        ContributionRole.RAPPORTEUR,
+        ContributionRole.JURY_MEMBER,
+        ContributionRole.JURY_PRESIDENT,
+    }
+)
+
 # Rôles thèse qui impliquent l'appartenance au jury
 # → pas besoin d'ajouter jury_member si un de ceux-ci est déjà présent
 _THESIS_ROLES_IMPLYING_JURY = {

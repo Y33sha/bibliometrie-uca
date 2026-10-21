@@ -255,7 +255,7 @@ def decide_name_form_outcome(
     - Forme connue, 0 candidat (tous rejetés) → `skip` avec `reason="all_candidates_rejected"` : la contribution source reste orpheline, sans création.
     - Forme inconnue, personnes compatibles : mêmes règles sur elles, le `match` portant `reason="compatible_name"`.
     - Forme inconnue, aucune personne compatible, `allow_create` → `create`.
-    - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (typiquement les rôles non-auteur des thèses, cf. `domain.persons.creation.allow_person_creation`).
+    - Forme inconnue, aucune personne compatible, pas `allow_create` → `skip` avec `reason="creation_not_allowed"` (rôles de jury de thèse seuls, cf. `domain.persons.creation.allow_person_creation`).
     """
     match_reason: MatchReason | None = None
     if person_ids is None:
