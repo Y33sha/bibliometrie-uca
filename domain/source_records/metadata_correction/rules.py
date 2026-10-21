@@ -356,7 +356,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`. Whitelist étroite : les enregistrements sources Crossref ont `journal-article`, l'arbitrage canonique efface parfois le `preprint` brut OA. `dataset`/`software`/`poster` épargnés.
+    # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`.
     MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
             "journal_type": JournalType.PREPRINT_SERVER,
