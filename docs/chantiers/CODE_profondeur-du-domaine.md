@@ -78,5 +78,11 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 
 ## Questions ouvertes
 
+- Types de document absents de la table de leur source, traduits en `other` (base locale, 2026-10-21) :
+  - Crossref : `book-section` (3 enregistrements sources). Une section de livre peut réunir plusieurs chapitres : sa traduction en `book_chapter` reste à vérifier.
+  - HAL : `PRESCONF`, `REPORT_RESPROT` (1 chacun).
+  - OpenAlex : `reference-entry` (138).
+  - DataCite : `StudyRegistration` (197), `Presentation` (94), `Technical note` (68), `Project` (34), `Wissenschaftlicher Artikel` (19), `article validé par les pairs` (14), `Journal Issue` (14), `RegistrationComponent` (14), `oceanographic cruise` (12), `Paratext` (10), `OutputManagementPlan` (10), `Project milestone` (10), `InteractiveResource` (8), `Protein-ligand binding data` (5), `Paper` (5). S'y ajoutent 49 valeurs à moins de 5 enregistrements sources, souvent des variantes de valeurs de la table (`Article de colloque`, `Book section`, `Doctoral Thesis`, `PhDThesis`).
+
 - `domain/` contient des contrats entre couches qui ne sont pas des règles métier : `config`, `stats`, `pipeline_runs`. Import-linter interdit `pipeline → application`, donc `domain/` est le seul paquet commun. Un paquet neutre déclaré dans import-linter, ou le statu quo.
 - Registre des dimensions de statistiques : dans le read model, avec sa liaison SQL, ou dans le paquet neutre.

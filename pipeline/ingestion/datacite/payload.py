@@ -175,9 +175,9 @@ def get_cited_by_count(attributes: Mapping[str, JsonValue]) -> int | None:
 
 
 def extract_datacite_doc_type_token(attributes: Mapping[str, JsonValue]) -> str | None:
-    """Token brut de doc_type à stocker sur `source_records.doc_type`.
+    """Token brut de doc_type à stocker sur `source_records.raw_doc_type`.
 
-    DataCite porte deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, mappé ensuite par `domain.source_records.doc_types._SOURCE_MAPS["datacite"]` :
+    DataCite donne deux niveaux dans `types` : `resourceTypeGeneral` (vocabulaire contrôlé : JournalArticle, Preprint, Dataset, Text…) et `resourceType` (texte libre). On stocke un seul token, traduit par `domain.source_records.doc_types._SOURCE_MAPS["datacite"]` :
 
     - `resourceTypeGeneral` spécifique (≠ Text / Other) → ce token ;
     - sinon `resourceType` libre s'il est renseigné ;
