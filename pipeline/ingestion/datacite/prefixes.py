@@ -52,8 +52,8 @@ def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | No
     if not client_symbol or not provider_id:
         return None
     included_index: dict[tuple[str | None, str | None], Mapping[str, JsonValue]] = {}
-    for entree in as_sequence(data.get("included")):
-        item = as_mapping(entree)
+    for entry in as_sequence(data.get("included")):
+        item = as_mapping(entry)
         included_index[(as_str(item.get("type")), as_str(item.get("id")))] = item
     client_attrs = as_mapping(included_index.get(("clients", client_symbol), {}).get("attributes"))
     provider_attrs = as_mapping(

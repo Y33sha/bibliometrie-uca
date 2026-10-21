@@ -92,23 +92,23 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
         client = self._client
         years = self._years(window)
 
-        def compte(annee: int) -> int:
+        def count_year(year: int) -> int:
             try:
-                return client.count(build_query(annee, keywords), str(annee))
+                return client.count(build_query(year, keywords), str(year))
             except SourceUnavailableError:
                 raise
             except Exception:
                 # L'extraction de l'année rencontre la même erreur et la signale.
                 return 0
 
-        def extrait(annee: int, progress: Progress) -> PhaseMetrics:
+        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
             # Une erreur garde les métriques des pages déjà écrites.
             metrics = PhaseMetrics()
             try:
                 harvest_year(
                     client,
                     self.conn,
-                    annee,
+                    year,
                     keywords,
                     progress,
                     metrics,
@@ -117,9 +117,9 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
             except SourceUnavailableError:
                 raise
             except Exception as e:
-                scoped_logger(self.logger, self.SOURCE, str(annee)).error(
+                scoped_logger(self.logger, self.SOURCE, str(year)).error(
                     "erreur : %s — passage à la suivante", e
                 )
             return metrics
 
-        return self._extrait_par_annee(years, compte, extrait)
+        return self._harvest_by_year(years, count_year, harvest_step)

@@ -23,10 +23,10 @@ def extract_doi(rec: Mapping[str, JsonValue]) -> str | None:
     """
     if "UT" in rec:
         return clean_doi(as_str(rec.get("DI")))
-    brut = at_path(rec, "dynamic_data", "cluster_related", "identifiers").get("identifier")
-    identifiers = [brut] if isinstance(brut, Mapping) else as_sequence(brut)
-    for entree in identifiers:
-        ident = as_mapping(entree)
+    raw = at_path(rec, "dynamic_data", "cluster_related", "identifiers").get("identifier")
+    identifiers = [raw] if isinstance(raw, Mapping) else as_sequence(raw)
+    for entry in identifiers:
+        ident = as_mapping(entry)
         if as_str(ident.get("type")) == "doi":
             val = ident.get("value")
             return clean_doi(str(val)) if val is not None else None

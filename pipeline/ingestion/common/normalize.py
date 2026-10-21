@@ -58,7 +58,7 @@ NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
 """Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
 
 
-def _retenue(source: str) -> Callable[[PhaseContext], bool]:
+def _selected(source: str) -> Callable[[PhaseContext], bool]:
     """Condition d'exécution de la tâche de `source` : la source fait partie des sources du run."""
     return lambda ctx: source in ctx.options.sources
 
@@ -80,7 +80,7 @@ class NormalizePhase:
                 self._normalize_task(source),
                 label=source_label(source),
                 progress_bar=True,
-                when=_retenue(source),
+                when=_selected(source),
             )
             for source in sources
         }
@@ -104,8 +104,8 @@ class NormalizePhase:
             if "row" in (task := by_task[f"normalize.{source}"]).details
         ]
         metrics = PhaseMetrics()
-        normalises = sum(cast("int", row["processed"]) for row in rows)
-        metrics.add(seen=normalises)
+        normalized = sum(cast("int", row["processed"]) for row in rows)
+        metrics.add(seen=normalized)
         metrics.details["table"] = {"rows": rows}
         metrics.details["disappeared_pruned"] = by_task["normalize.prune_disappeared"].extras.get(
             "disappeared", 0
@@ -130,43 +130,43 @@ class NormalizePhase:
 
     def _prune(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
-        disparues = self.prune_disappeared(ctx)
-        if disparues:
+        disappeared = self.prune_disappeared(ctx)
+        if disappeared:
             ctx.logger.info(
                 "%s%s (disparus de leur source)",
                 LAST_BRANCH,
-                quantity(disparues, "document supprimé", "documents supprimés"),
+                quantity(disappeared, "document supprimé", "documents supprimés"),
             )
         else:
             ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
-        return PhaseMetrics(extras={"disappeared": disparues})
+        return PhaseMetrics(extras={"disappeared": disappeared})
 
     def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        supprimees = self.cleanup_orphan_contributor_information(ctx)
+        deleted = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
-        if supprimees:
-            metrics.report = f"{quantity(supprimees, 'ligne supprimée', 'lignes supprimées')}"
+        if deleted:
+            metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
         return metrics
 
     def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        supprimees = self.cleanup_orphan_addresses(ctx)
+        deleted = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
-        if supprimees:
-            metrics.report = f"{quantity(supprimees, 'adresse supprimée', 'adresses supprimées')}"
+        if deleted:
+            metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
         return metrics
 
 
 # ── Câblage ───────────────────────────────────────────────────
 
 
-type ConstructeurNormalizer = Callable[[Connection, logging.Logger], SourceNormalizer]
+type NormalizerFactory = Callable[[Connection, logging.Logger], SourceNormalizer]
 
 
 def build() -> Phase:
-    return _NormalizeSelonOptions()
+    return _NormalizeByOptions()
 
 
-class _NormalizeSelonOptions:
+class _NormalizeByOptions:
     """Construit les normaliseurs selon les options du run (`--raw-store`), puis exécute `NormalizePhase`.
 
     Avec `--normalize-full`, chaque source marque d'abord tous ses enregistrements sources à resynchroniser.
@@ -209,12 +209,12 @@ def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
         return delete_orphan_addresses(conn)
 
 
-def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormalizer]:
+def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
     """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
 
     raw_store = get_raw_store() if archive else NullRawStore()
 
-    def _biblio(cls: type[BibliographicNormalizer]) -> ConstructeurNormalizer:
+    def _biblio(cls: type[BibliographicNormalizer]) -> NormalizerFactory:
         return lambda conn, logger: cls(
             conn,
             logger,
@@ -242,6 +242,6 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, ConstructeurNormal
     }
 
 
-def _run_normalize(ctx: PhaseContext, build: ConstructeurNormalizer) -> NormalizeStats:
+def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStats:
     with ctx.open_tx() as conn:
         return build(conn, ctx.logger).run()

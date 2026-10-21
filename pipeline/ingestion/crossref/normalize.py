@@ -135,17 +135,17 @@ def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | Non
     `isbn-type` donne le support de chaque ISBN : celui de l'édition électronique va sous `eisbn`. Un ISBN sans support déclaré reste sous `isbn`.
     """
     ext: dict[str, JsonValue] = {}
-    electroniques = {
+    electronic = {
         value
         for entry in as_sequence(msg.get("isbn-type"))
         if (value := as_str(as_mapping(entry).get("value")))
         and as_str(as_mapping(entry).get("type")) == "electronic"
     }
     isbns = [s for s in as_sequence(msg.get("ISBN")) if isinstance(s, str)]
-    if papier := [s for s in isbns if s not in electroniques]:
-        ext[ExternalIdType.ISBN] = papier
-    if en_ligne := [s for s in isbns if s in electroniques]:
-        ext[ExternalIdType.EISBN] = en_ligne
+    if print_isbns := [s for s in isbns if s not in electronic]:
+        ext[ExternalIdType.ISBN] = print_isbns
+    if online := [s for s in isbns if s in electronic]:
+        ext[ExternalIdType.EISBN] = online
     return ext or None
 
 

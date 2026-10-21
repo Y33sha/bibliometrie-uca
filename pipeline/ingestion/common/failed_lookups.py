@@ -46,9 +46,9 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
 
     Les DOI passent par `clean_doi`, un document pouvant les exposer sous toute forme. Ne commit pas.
     """
-    propres = [propre for doi in dois if (propre := clean_doi(doi))]
-    if propres:
-        conn.execute(_FORGET_DOIS_SQL, {"source": source, "dois": propres})
+    cleaned = [clean for doi in dois if (clean := clean_doi(doi))]
+    if cleaned:
+        conn.execute(_FORGET_DOIS_SQL, {"source": source, "dois": cleaned})
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:

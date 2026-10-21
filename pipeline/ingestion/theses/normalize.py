@@ -41,11 +41,11 @@ from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_t
 def extract_publication_metadata(these: Mapping[str, JsonValue]) -> PublicationMetadata:
     """Extrait les métadonnées canoniques d'une thèse."""
     title = as_str(these.get("titrePrincipal"))
-    date_soutenance = french_date_to_iso(as_str(these.get("dateSoutenance")))
+    defense_date = french_date_to_iso(as_str(these.get("dateSoutenance")))
     date_inscription = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
 
     # publication_year = soutenance > première inscription (cascade theses.fr)
-    year_source = date_soutenance or date_inscription
+    year_source = defense_date or date_inscription
     publication_year = int(year_source[:4]) if year_source else None
 
     doi = clean_doi(as_str(these.get("doi")))
@@ -54,7 +54,7 @@ def extract_publication_metadata(these: Mapping[str, JsonValue]) -> PublicationM
     return PublicationMetadata(
         title=title,
         publication_year=publication_year,
-        doc_type=derive_theses_doc_type(date_soutenance),
+        doc_type=derive_theses_doc_type(defense_date),
         doi=doi,
         nnt=nnt_clean,
         oa_status="closed",
@@ -83,26 +83,28 @@ def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
     if discipline:
         source_extras[SourceExtra.DISCIPLINE] = discipline
 
-    if etablissement := these.get("etabSoutenanceN"):
-        source_extras[SourceExtra.ETABLISSEMENT] = etablissement
-    if etablissement_ppn := as_str(these.get("etabSoutenancePpn")):
-        source_extras[SourceExtra.ETABLISSEMENT_PPN] = etablissement_ppn
+    if institution := these.get("etabSoutenanceN"):
+        source_extras[SourceExtra.ETABLISSEMENT] = institution
+    if institution_ppn := as_str(these.get("etabSoutenancePpn")):
+        source_extras[SourceExtra.ETABLISSEMENT_PPN] = institution_ppn
 
-    ecoles = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
-    ecoles_clean = [
-        {"nom": nom, "ppn": as_str(e.get("ppn"))} for e in ecoles if (nom := as_str(e.get("nom")))
+    doctoral_schools = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
+    doctoral_schools_clean = [
+        {"nom": name, "ppn": as_str(e.get("ppn"))}
+        for e in doctoral_schools
+        if (name := as_str(e.get("nom")))
     ]
-    if ecoles_clean:
-        source_extras[SourceExtra.ECOLES_DOCTORALES] = ecoles_clean
+    if doctoral_schools_clean:
+        source_extras[SourceExtra.ECOLES_DOCTORALES] = doctoral_schools_clean
 
-    partenaires = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
-    partenaires_clean = [
-        {"nom": nom, "type": as_str(p.get("type")), "ppn": as_str(p.get("ppn")) or None}
-        for p in partenaires
-        if (nom := as_str(p.get("nom")))
+    partners = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
+    partners_clean = [
+        {"nom": name, "type": as_str(p.get("type")), "ppn": as_str(p.get("ppn")) or None}
+        for p in partners
+        if (name := as_str(p.get("nom")))
     ]
-    if partenaires_clean:
-        source_extras[SourceExtra.PARTENAIRES] = partenaires_clean
+    if partners_clean:
+        source_extras[SourceExtra.PARTENAIRES] = partners_clean
 
     return source_extras or None
 
@@ -123,8 +125,8 @@ def insert_source_document(
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
-    sujets = as_sequence(these.get("sujets"))
-    keywords = [label for s in sujets if (label := as_str(as_mapping(s).get("libelle")))] or None
+    subjects = as_sequence(these.get("sujets"))
+    keywords = [label for s in subjects if (label := as_str(as_mapping(s).get("libelle")))] or None
 
     # Topics : discipline + sujets Rameau
     topics: dict[str, JsonValue] = {}

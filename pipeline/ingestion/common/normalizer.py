@@ -116,20 +116,20 @@ class SourceNormalizer(ABC):
         with savepoint(conn, on_rollback_failure=self.conn.rollback):
             return self.process_work(conn, row)
 
-    def _recapitule_incomplets(self, identifiants: list[str]) -> None:
+    def _summarize_incomplete(self, identifiers: list[str]) -> None:
         """Récapitule sous la barre de la source les documents qu'elle a laissés de côté.
 
         Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source, et la liste des sources reste d'un seul tenant. Le logger nu porte ces lignes, celui de la source les préfixerait de son nom et romprait l'alignement.
         """
-        if not identifiants:
+        if not identifiers:
             return
         self.logger.info(
             "%s%s aux métadonnées incomplètes",
             BRANCH_CONTINUATION,
-            quantity(len(identifiants), "document"),
+            quantity(len(identifiers), "document"),
         )
-        for identifiant in identifiants:
-            self.logger.info("%s%s", BRANCH_CONTINUATION, identifiant)
+        for identifier in identifiers:
+            self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
         """Entry point : pilote la boucle de normalisation."""
@@ -150,7 +150,7 @@ class SourceNormalizer(ABC):
             errors = 0
             # Documents que `process_work` laisse de côté faute de métadonnées exploitables :
             # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
-            incomplets: list[str] = []
+            incomplete: list[str] = []
 
             with track_progress(total, source_branch(self.SOURCE), slog) as progress:
                 for row in self._iter_rows(self.conn):
@@ -168,7 +168,7 @@ class SourceNormalizer(ABC):
                         skipped += 1
                     else:
                         errors += 1
-                        incomplets.append(row.source_id)
+                        incomplete.append(row.source_id)
 
                     done = processed + skipped
                     if done > 0 and done % self.DEFAULT_BATCH_SIZE == 0:
@@ -177,7 +177,7 @@ class SourceNormalizer(ABC):
             self.conn.commit()
             self.cleanup()
 
-            self._recapitule_incomplets(incomplets)
+            self._summarize_incomplete(incomplete)
             return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:

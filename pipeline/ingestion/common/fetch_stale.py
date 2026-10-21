@@ -74,7 +74,7 @@ class FetchStalePhase:
 
             return run
 
-        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+        def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets
 
         by_task = run_tasks(
@@ -84,7 +84,7 @@ class FetchStalePhase:
                     task(source),
                     label=source_label(source),
                     progress_bar=True,
-                    when=retenue(source),
+                    when=selected(source),
                 )
                 for source in ALL_SOURCES
             },

@@ -55,15 +55,15 @@ def harvest_theses(
     query = build_query(ppns)
     metrics = PhaseMetrics()
     total: int | None = None
-    debut = 0
+    start = 0
 
-    while total is None or debut < total:
+    while total is None or start < total:
         if breaker_tripped():
             logger.warning(
                 "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
             )
             break
-        data = client.fetch_page(query, debut=debut)
+        data = client.fetch_page(query, start=start)
         if total is None:
             total = as_int(data.get("totalHits")) or 0
             progress.set_total(total)
@@ -89,7 +89,7 @@ def harvest_theses(
             progress.keep()
 
         conn.commit()
-        debut += len(theses)
+        start += len(theses)
         progress.advance(len(theses))
 
     return metrics
@@ -100,7 +100,7 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
 
     SOURCE = "theses"
     DOCUMENT = "thèse"
-    FEMININ = True
+    FEMININE = True
 
     def load_config(self, conn: Connection) -> ThesesHarvestConfig:
         ppns = get_extraction_api_ids(conn, "theses")
@@ -126,8 +126,8 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
                 breaker_tripped=self._breaker_tripped,
             )
         if window.year is None:
-            self._ecrit_bilan(metrics)
+            self._write_summary(metrics)
         else:
             # Le filtre par année retient une partie des thèses parcourues ; le bilan porte sur celles-là.
-            self._ecrit_bilan(metrics, trouves=metrics.new + metrics.updated + metrics.unchanged)
+            self._write_summary(metrics, found=metrics.new + metrics.updated + metrics.unchanged)
         return metrics

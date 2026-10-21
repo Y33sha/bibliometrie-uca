@@ -75,7 +75,7 @@ def _extraire(client: MagicMock, *, progress: Progress | None = None, **kwargs):
 def test_pagination_jusqu_au_total(ecritures):
     client = _client([[_these("2020AAA1"), _these("2020AAA2")], [_these("2020AAA3")]], total=3)
     assert _extraire(client).new == 3
-    assert [appel.kwargs["debut"] for appel in client.fetch_page.call_args_list] == [0, 2]
+    assert [appel.kwargs["start"] for appel in client.fetch_page.call_args_list] == [0, 2]
 
 
 def test_ventilation_par_issue_de_l_ecriture(ecritures):

@@ -149,12 +149,12 @@ def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
 def _creator_orcid(creator: Mapping[str, JsonValue]) -> str | None:
     """ORCID depuis `nameIdentifiers` (scheme ORCID ou schemeUri orcid.org)."""
     for identifier in as_sequence(creator.get("nameIdentifiers")):
-        champs = as_mapping(identifier)
-        if not champs:
+        fields = as_mapping(identifier)
+        if not fields:
             continue
-        scheme = (as_str(champs.get("nameIdentifierScheme")) or "").strip().lower()
-        if scheme == "orcid" or is_host(as_str(champs.get("schemeUri")), "orcid.org"):
-            orcid = normalize_orcid(as_str(champs.get("nameIdentifier")))
+        scheme = (as_str(fields.get("nameIdentifierScheme")) or "").strip().lower()
+        if scheme == "orcid" or is_host(as_str(fields.get("schemeUri")), "orcid.org"):
+            orcid = normalize_orcid(as_str(fields.get("nameIdentifier")))
             if orcid:
                 return orcid
     return None
@@ -167,8 +167,8 @@ def _creator_affiliations(
     addresses: list[AddressRecord] = []
     without_text: set[RorId] = set()
     for aff in as_sequence(creator.get("affiliation")):
-        if (texte := as_str(aff)) and texte.strip():
-            addresses.append(AddressRecord(text=texte.strip()))
+        if (text := as_str(aff)) and text.strip():
+            addresses.append(AddressRecord(text=text.strip()))
             continue
         obj = as_mapping(aff)
         rors = parse_ror_ids(

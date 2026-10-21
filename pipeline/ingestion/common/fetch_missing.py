@@ -77,15 +77,15 @@ class FetchMissingPhase:
         doi_targets = set(
             select_targets(DOI_SEARCHABLE_SOURCES, options.sources, include_wos=options.include_wos)
         )
-        retenus = {
+        selected_tasks = {
             _HAL_BY_ID: hal,
             _HAL_BY_NNT: hal and options.mode == "full",
             _THESES_BY_NNT: theses,
             **{_doi_task(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
         }
 
-        def quand(task: str) -> Callable[[PhaseContext], bool]:
-            return lambda _ctx: retenus[task]
+        def when_selected(task: str) -> Callable[[PhaseContext], bool]:
+            return lambda _ctx: selected_tasks[task]
 
         def channel(fetch: FetchChannel) -> TaskRun:
             return lambda ctx, _breaker: fetch(ctx)
@@ -103,23 +103,23 @@ class FetchMissingPhase:
                 _HAL_BY_ID: TaskStep(
                     channel(self.fetch_hal_by_id),
                     section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
-                    when=quand(_HAL_BY_ID),
+                    when=when_selected(_HAL_BY_ID),
                 ),
                 _HAL_BY_NNT: TaskStep(
                     channel(self.fetch_hal_by_nnt),
                     section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
-                    when=quand(_HAL_BY_NNT),
+                    when=when_selected(_HAL_BY_NNT),
                 ),
                 _THESES_BY_NNT: TaskStep(
                     channel(self.fetch_theses_by_nnt),
                     section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
-                    when=quand(_THESES_BY_NNT),
+                    when=when_selected(_THESES_BY_NNT),
                 ),
                 **{
                     _doi_task(target): TaskStep(
                         doi(target),
                         section="Recherche par DOI des documents manquants dans chaque source",
-                        when=quand(_doi_task(target)),
+                        when=when_selected(_doi_task(target)),
                     )
                     for target in DOI_SEARCHABLE_SOURCES
                 },
@@ -143,7 +143,7 @@ class FetchMissingPhase:
         }
         for task, key in channels.items():
             metrics.merge(by_task[task])
-            if retenus[task] and not skipped(by_task[task]):
+            if selected_tasks[task] and not skipped(by_task[task]):
                 by_channel[key] = _summary(by_task[task])
         if by_channel:
             metrics.details["table"] = {

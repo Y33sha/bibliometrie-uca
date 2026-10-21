@@ -80,8 +80,8 @@ def extract_locations_data(
     urls: list[str] = []
     seen: set[str] = set()
     location_ids: list[str] = []
-    for entree in as_sequence(work.get("locations")):
-        loc = as_mapping(entree)
+    for entry in as_sequence(work.get("locations")):
+        loc = as_mapping(entry)
         for key in ("landing_page_url", "pdf_url"):
             url = as_str(loc.get(key))
             if url and url not in seen:
@@ -117,9 +117,9 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
     if not inverted_index:
         return None
     positions: dict[int, str] = {}
-    for word, indices in inverted_index.items():
-        for brut in as_sequence(indices):
-            if (idx := as_int(brut)) is not None:
+    for word, word_positions in inverted_index.items():
+        for raw in as_sequence(word_positions):
+            if (idx := as_int(raw)) is not None:
                 positions[idx] = word
     if not positions:
         return None
@@ -129,13 +129,13 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
 def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
     """Extrait les topics OpenAlex sous forme de liste simplifiée."""
     topics: list[dict[str, JsonValue]] = []
-    for entree in as_sequence(work.get("topics")):
-        t = as_mapping(entree)
+    for entry in as_sequence(work.get("topics")):
+        t = as_mapping(entry)
         topic: dict[str, JsonValue] = {}
         for level in ("domain", "field", "subfield", "topic"):
             obj = as_mapping(t.get(level)) or (t if level == "topic" else {})
-            if nom := as_str(obj.get("display_name")):
-                topic[level] = nom
+            if name := as_str(obj.get("display_name")):
+                topic[level] = name
         if (score := t.get("score")) is not None:
             topic["score"] = score
         if topic:
@@ -317,10 +317,10 @@ def insert_openalex_document(  # noqa: C901
 
     # Abstract, keywords, topics
     abstract = reconstruct_abstract(as_mapping(work.get("abstract_inverted_index")))
-    mots = [
+    words = [
         as_str(as_mapping(k).get("keyword")) or as_str(k) for k in as_sequence(work.get("keywords"))
     ]
-    keywords = [m for m in mots if m] or None
+    keywords = [m for m in words if m] or None
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
@@ -386,9 +386,9 @@ def _countries(institutions: Iterable[Mapping[str, JsonValue]]) -> list[str] | N
     return (
         sorted(
             {
-                pays
+                country
                 for i in institutions
-                if (pays := normalize_country_code(as_str(i.get("country_code"))))
+                if (country := normalize_country_code(as_str(i.get("country_code"))))
             }
         )
         or None
@@ -429,18 +429,18 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
         institutions_by_text: dict[str, set[str]] = defaultdict(set)
         for affiliation in as_sequence(authorship.get("affiliations")):
             affiliation = as_mapping(affiliation)
-            if texte := as_str(affiliation.get("raw_affiliation_string")):
-                institutions_by_text[texte].update(
+            if text := as_str(affiliation.get("raw_affiliation_string")):
+                institutions_by_text[text].update(
                     institution_id
                     for e in as_sequence(affiliation.get("institution_ids"))
                     if (institution_id := as_str(e)) in institutions
                 )
         raw_strings = [
-            texte
+            text
             for e in as_sequence(authorship.get("raw_affiliation_strings"))
-            if (texte := as_str(e))
+            if (text := as_str(e))
         ]
-        with_text = {i for texte in raw_strings for i in institutions_by_text.get(texte, ())}
+        with_text = {i for text in raw_strings for i in institutions_by_text.get(text, ())}
 
         ids = ids_by_position[position]
         records.append(
@@ -452,13 +452,13 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
                 identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(
-                        text=texte,
+                        text=text,
                         countries=_countries(
-                            institutions[i] for i in institutions_by_text.get(texte, ())
+                            institutions[i] for i in institutions_by_text.get(text, ())
                         ),
-                        ror_ids=_rors(institutions[i] for i in institutions_by_text.get(texte, ())),
+                        ror_ids=_rors(institutions[i] for i in institutions_by_text.get(text, ())),
                     )
-                    for texte in raw_strings
+                    for text in raw_strings
                 ],
                 ror_ids=_rors(institutions[i] for i in institutions.keys() - with_text),
             )

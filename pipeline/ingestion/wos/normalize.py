@@ -34,7 +34,7 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingQueries, StagingRow
 from pipeline.ingestion.wos.payload import (
     derive_wos_api_oa_status,
-    is_wos_author_exploitable,
+    is_wos_author_usable,
     parse_export_addresses,
     parse_export_corresponding,
     parse_export_researcher_ids,
@@ -73,8 +73,8 @@ def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | No
     """Extrait un titre depuis la structure API."""
     titles = at_path(static, "summary", "titles")
     title_list = _safe_list(titles.get("title"))
-    for entree in title_list:
-        t = as_mapping(entree)
+    for entry in title_list:
+        t = as_mapping(entry)
         if as_str(t.get("type")) == title_type:
             return as_str(t.get("content"))
     return None
@@ -100,16 +100,16 @@ def _parse_api_authors(
             # Organizations structurées
             org_list = _safe_list(at_path(spec, "organizations").get("organization"))
             orgs: list[dict[str, JsonValue]] = []
-            for entree in org_list:
-                o = as_mapping(entree)
-                if nom := as_str(o.get("content")):
-                    orgs.append({"name": nom, "ror_id": o.get("ror_id"), "pref": o.get("pref")})
+            for entry in org_list:
+                o = as_mapping(entry)
+                if name := as_str(o.get("content")):
+                    orgs.append({"name": name, "ror_id": o.get("ror_id"), "pref": o.get("pref")})
             if orgs:
                 addr_orgs_map[str(addr_no)] = orgs
 
     authors: list[dict[str, JsonValue]] = []
-    for entree in name_list:
-        name_obj = as_mapping(entree)
+    for entry in name_list:
+        name_obj = as_mapping(entry)
         wos_role = as_str(name_obj.get("role"))
         if not wos_role:
             continue
@@ -198,8 +198,8 @@ def _get_api_isbns(dynamic: Mapping[str, JsonValue], isbn_type: str) -> list[str
     """ISBN d'un support (`isbn` papier, `eisbn` électronique), que WoS distingue par le type de l'identifiant."""
     identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
     isbns: list[str] = []
-    for entree in _safe_list(identifiers):
-        ident = as_mapping(entree)
+    for entry in _safe_list(identifiers):
+        ident = as_mapping(entry)
         if as_str(ident.get("type")) == isbn_type:
             isbns += find_isbns(as_str(ident.get("value")))
     return list(dict.fromkeys(isbns))
@@ -227,15 +227,15 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     doctype_list = _safe_list(doctypes.get("doctype"))
     raw_doc_type = None
     if doctype_list:
-        premier = doctype_list[0]
-        raw_doc_type = as_str(as_mapping(premier).get("content")) or as_str(premier)
+        first = doctype_list[0]
+        raw_doc_type = as_str(as_mapping(first).get("content")) or as_str(first)
 
     # Publisher
     publishers = at_path(summary, "publishers")
     publisher_data = at_path(publishers, "publisher")
     publisher_names = at_path(publisher_data, "names")
-    noms = _safe_list(publisher_names.get("name"))
-    publisher_name_obj = as_mapping(noms[0]) if noms else {}
+    names = _safe_list(publisher_names.get("name"))
+    publisher_name_obj = as_mapping(names[0]) if names else {}
     publisher_name = as_str(publisher_name_obj.get("unified_name")) or as_str(
         publisher_name_obj.get("full_name")
     )
@@ -282,16 +282,16 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     # Keywords
     # Web of Science rend un mot-clé unique en chaîne, plusieurs en liste.
     kw_raw = at_path(frm, "keywords").get("keyword", [])
-    mot_seul = as_str(kw_raw)
-    keywords = ([mot_seul] if mot_seul else as_strs(kw_raw)) or None
+    single_word = as_str(kw_raw)
+    keywords = ([single_word] if single_word else as_strs(kw_raw)) or None
 
     # Topics : categories
     cat = at_path(frm, "category_info")
     topics = {}
     subj_names = [
-        nom
+        name
         for s in _safe_list(at_path(cat, "subjects").get("subject"))
-        if (nom := as_str(as_mapping(s).get("content")))
+        if (name := as_str(as_mapping(s).get("content")))
     ]
     if subj_names:
         topics["subjects"] = subj_names
@@ -302,12 +302,12 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
 
     # Citations
     cited_by_count = None
-    for entree in _safe_list(at_path(dynamic, "citation_related", "tc_list").get("silo_tc")):
-        tc = as_mapping(entree)
+    for entry in _safe_list(at_path(dynamic, "citation_related", "tc_list").get("silo_tc")):
+        tc = as_mapping(entry)
         if as_str(tc.get("coll_id")) == "WOK":
             # Compte absent : zéro citation. Compte illisible : le décompte reste inconnu.
-            brut = tc.get("local_count")
-            cited_by_count = 0 if brut is None else as_int(brut)
+            local_count = tc.get("local_count")
+            cited_by_count = 0 if local_count is None else as_int(local_count)
 
     authors = _parse_api_authors(static, dynamic)
     return {
@@ -322,7 +322,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "issn": issn_val,
         "eissn": eissn_val,
         "publisher_name": publisher_name,
-        "authors": [a for a in authors if is_wos_author_exploitable(a)],
+        "authors": [a for a in authors if is_wos_author_usable(a)],
         "authors_found": len(authors),
         "abstract": abstract,
         "cited_by_count": cited_by_count,

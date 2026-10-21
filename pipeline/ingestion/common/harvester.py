@@ -39,10 +39,10 @@ __all__ = [
 ]
 
 
-type Formes = tuple[str, str]
+type Forms = tuple[str, str]
 """Singulier et pluriel d'un mot du bilan."""
 
-_FORMES_DU_BILAN: dict[bool, tuple[Formes, Formes, Formes, Formes]] = {
+_SUMMARY_FORMS: dict[bool, tuple[Forms, Forms, Forms, Forms]] = {
     False: (
         ("trouvé", "trouvés"),
         ("nouveau", "nouveaux"),
@@ -130,7 +130,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
     SOURCE: ClassVar[str] = ""
     DOCUMENT: ClassVar[str] = "document"
     """Nom des éléments que rapporte la source, au singulier."""
-    FEMININ: ClassVar[bool] = False
+    FEMININE: ClassVar[bool] = False
     """Genre de `DOCUMENT`, auquel s'accordent les mots du bilan."""
 
     def __init__(
@@ -171,78 +171,78 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
         return source_branch(self.SOURCE, scope)
 
-    def _extrait_par_annee(
+    def _harvest_by_year(
         self,
-        annees: list[int],
-        compte: Callable[[int], int],
-        extrait: Callable[[int, Progress], PhaseMetrics],
+        years: list[int],
+        count_year: Callable[[int], int],
+        harvest_step: Callable[[int, Progress], PhaseMetrics],
     ) -> PhaseMetrics:
         """Extrait les années dans l'ordre sous une seule barre, dont le libellé suit l'année en cours.
 
-        `compte` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
+        `count_year` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
         Une source indisponible (`SourceUnavailableError`) arrête la boucle : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
         """
         metrics = PhaseMetrics()
-        if not annees:
+        if not years:
             return metrics
-        total = sum(compte(annee) for annee in annees)
-        with track_progress(total, self._label(str(annees[0])), self.logger) as progress:
-            for i, annee in enumerate(annees):
-                restantes = annees[i:]
-                sautees = (
-                    f"{inflect(len(restantes), 'année')} {', '.join(map(str, restantes))} "
-                    f"{inflect(len(restantes), 'sautée')}"
+        total = sum(count_year(year) for year in years)
+        with track_progress(total, self._label(str(years[0])), self.logger) as progress:
+            for i, year in enumerate(years):
+                remaining = years[i:]
+                skipped = (
+                    f"{inflect(len(remaining), 'année')} {', '.join(map(str, remaining))} "
+                    f"{inflect(len(remaining), 'sautée')}"
                 )
-                if self._stop_on_tripped(sautees):
+                if self._stop_on_tripped(skipped):
                     break
-                progress.relabel(self._label(str(annee)))
+                progress.relabel(self._label(str(year)))
                 try:
-                    metrics.merge(extrait(annee, progress))
+                    metrics.merge(harvest_step(year, progress))
                 except SourceUnavailableError:
-                    self._warn_stopped(sautees)
+                    self._warn_stopped(skipped)
                     break
             else:
-                plage = f"{annees[0]}-{annees[-1]}" if len(annees) > 1 else str(annees[0])
-                progress.relabel(self._label(plage))
-        self._ecrit_bilan(metrics)
+                year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
+                progress.relabel(self._label(year_range))
+        self._write_summary(metrics)
         return metrics
 
-    def _extrait_d_un_tenant(
+    def _harvest_at_once(
         self,
         total: int,
-        extrait: Callable[[Progress], PhaseMetrics],
+        harvest_step: Callable[[Progress], PhaseMetrics],
         *,
         par: str | None = None,
     ) -> PhaseMetrics:
         """Extrait un périmètre d'un seul tenant sous la barre de la source, puis écrit le bilan."""
         with track_progress(total, self._label(), self.logger) as progress:
-            metrics = extrait(progress)
-        self._ecrit_bilan(metrics, par=par)
+            metrics = harvest_step(progress)
+        self._write_summary(metrics, par=par)
         return metrics
 
-    def _ecrit_bilan(
+    def _write_summary(
         self,
         metrics: PhaseMetrics,
         *,
-        trouves: int | None = None,
+        found: int | None = None,
         par: str | None = None,
     ) -> None:
         """Écrit sous la barre le nombre de documents trouvés, ventilé en nouveaux, mis à jour et inchangés.
 
-        `trouves` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `par` nomme le critère de recherche : « trouvés par ORCID ».
+        `found` donne le nombre du bilan quand un filtre retient une partie des documents parcourus. `par` nomme le critère de recherche : « trouvés par ORCID ».
         """
-        trouve, nouveau, mis_a_jour, inchange = _FORMES_DU_BILAN[self.FEMININ]
-        n = metrics.total if trouves is None else trouves
+        found_form, new_form, updated_form, unchanged_form = _SUMMARY_FORMS[self.FEMININE]
+        n = metrics.total if found is None else found
         self.logger.info(
             "%s%s %s%s : %s, %s, %s",
             BRANCH_CONTINUATION,
             quantity(n, self.DOCUMENT),
-            inflect(n, *trouve),
+            inflect(n, *found_form),
             f" par {par}" if par else "",
-            quantity(metrics.new, *nouveau),
-            quantity(metrics.updated, *mis_a_jour),
-            quantity(metrics.unchanged, *inchange),
+            quantity(metrics.new, *new_form),
+            quantity(metrics.updated, *updated_form),
+            quantity(metrics.unchanged, *unchanged_form),
         )
 
     # ── Hooks métier ────────────────────────────────────────────

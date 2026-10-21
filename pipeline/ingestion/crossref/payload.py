@@ -39,8 +39,8 @@ def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year:
         if not date_parts:
             continue
         # `date-parts` porte une liste de dates, chacune décomposée en [année, mois, jour].
-        premiere = as_sequence(date_parts[0])
-        year = as_int(premiere[0]) if premiere else None
+        first = as_sequence(date_parts[0])
+        year = as_int(first[0]) if first else None
         if year is not None and 1500 <= year <= max_year:
             return year
     return None
@@ -52,8 +52,8 @@ _ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRON
 def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[JournalIssn, ...]:
     """ISSN d'un enregistrement source Crossref. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
     typed = []
-    for entree in as_sequence(msg.get("issn-type")):
-        issn_obj = as_mapping(entree)
+    for entry in as_sequence(msg.get("issn-type")):
+        issn_obj = as_mapping(entry)
         support = _ISSN_SUPPORTS.get(as_str(issn_obj.get("type")) or "")
         value = as_str(issn_obj.get("value"))
         if support is not None and value:

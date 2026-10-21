@@ -52,8 +52,8 @@ from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
-    for entree in as_sequence(doc.get("externalIds")):
-        ext = as_mapping(entree)
+    for entry in as_sequence(doc.get("externalIds")):
+        ext = as_mapping(entry)
         if as_str(ext.get("type")) == "doi":
             return clean_doi(as_str(ext.get("id")))
     return None
@@ -130,7 +130,7 @@ def extract_publication_metadata(
     container_title = None
     if not journal_id:
         container_title = as_str(as_mapping(doc.get("source")).get("title"))
-    ouvert = doc.get("isOa")
+    is_open = doc.get("isOa")
     return PublicationMetadata(
         title=title,
         publication_year=as_int(doc.get("year")),
@@ -138,7 +138,7 @@ def extract_publication_metadata(
         doi=extract_doi(doc),
         nnt=extract_nnt_from_scanr_id(scanr_id),
         oa_status=derive_scanr_oa_status(
-            ouvert if isinstance(ouvert, bool) else None, as_mapping(doc.get("oaEvidence"))
+            is_open if isinstance(is_open, bool) else None, as_mapping(doc.get("oaEvidence"))
         ),
         journal_id=journal_id,
         monograph_id=monograph_id,
@@ -170,18 +170,18 @@ def insert_scanr_document(  # noqa: C901
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
     dois: list[str] = []
-    for entree in as_sequence(doc.get("externalIds")):
-        eid = as_mapping(entree)
+    for entry in as_sequence(doc.get("externalIds")):
+        eid = as_mapping(entry)
         etype = as_str(eid.get("type"))
-        valeur = as_str(eid.get("id"))
-        if not etype or not valeur:
+        value = as_str(eid.get("id"))
+        if not etype or not value:
             continue
         etype = etype.lower()
-        if etype == "hal" and valeur not in hal_ids:
-            hal_ids.append(valeur)
+        if etype == "hal" and value not in hal_ids:
+            hal_ids.append(value)
         elif etype == "pmid":
-            ext[ExternalIdType.PMID] = valeur
-        elif etype == "doi" and (doi := clean_doi(valeur)) and doi not in dois:
+            ext[ExternalIdType.PMID] = value
+        elif etype == "doi" and (doi := clean_doi(value)) and doi not in dois:
             dois.append(doi)
     if hal_ids:
         ext[ExternalIdType.HAL_ID] = hal_ids
@@ -196,8 +196,8 @@ def insert_scanr_document(  # noqa: C901
     kw_val = as_mapping(doc.get("keywords")).get("default")
     if isinstance(kw_val, str) and kw_val:
         keywords = [k.strip() for k in kw_val.split(",") if k.strip()] or None
-    elif liste := as_sequence(kw_val):
-        keywords = [str(k).strip() for k in liste if k] or None
+    elif items := as_sequence(kw_val):
+        keywords = [str(k).strip() for k in items if k] or None
     else:
         keywords = None
 
@@ -208,8 +208,8 @@ def insert_scanr_document(  # noqa: C901
     topics = subjects or None
 
     cbc = as_mapping(doc.get("cited_by_counts_by_year"))
-    annees = [n for v in cbc.values() if (n := as_int(v)) is not None]
-    cited_by_count = sum(annees) if annees else None
+    years = [n for v in cbc.values() if (n := as_int(v)) is not None]
+    cited_by_count = sum(years) if years else None
 
     urls: list[str] = []
     seen: set[str] = set()
@@ -217,10 +217,10 @@ def insert_scanr_document(  # noqa: C901
     raw_license = as_str(oa_ev.get("license"))
     # La licence d'une localisation d'archive (dépôt HAL…) garde sa forme brute dans `source_extras`, sans licence normalisée : HAL donne la licence de ses dépôts.
     publisher_license = raw_license if oa_ev.get("hostType") == "publisher" else None
-    adresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
-    adresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
-    for brut in adresses:
-        u = as_str(brut)
+    addresses = [doc.get(f) for f in ("landingPage", "doiUrl", "pdfUrl")]
+    addresses += [oa_ev.get(f) for f in ("landingPageUrl", "url", "pdfUrl")]
+    for raw in addresses:
+        u = as_str(raw)
         if u and u not in seen:
             seen.add(u)
             urls.append(u)
@@ -312,9 +312,9 @@ def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecor
                 source_contribution_rors |= rors
                 continue
             countries = {
-                pays
+                country
                 for p in as_sequence(aff.get("detected_countries"))
-                if (pays := normalize_country_code(as_str(p)))
+                if (country := normalize_country_code(as_str(p)))
             }
             addresses.append(
                 AddressRecord(text=name, countries=sorted(countries) or None, ror_ids=rors)

@@ -76,13 +76,13 @@ class _ParAnnee(SourceHarvester):
         return None
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        def extrait(annee, progress):
+        def harvest_step(year, progress):
             self.progress = progress
             self.log_format.append(progress._label)
             self.totaux.append(progress._total)
-            return PhaseMetrics(new=1, unchanged=self.volumes[annee] - 1)
+            return PhaseMetrics(new=1, unchanged=self.volumes[year] - 1)
 
-        return self._extrait_par_annee(list(self.volumes), self.volumes.__getitem__, extrait)
+        return self._harvest_by_year(list(self.volumes), self.volumes.__getitem__, harvest_step)
 
 
 def _args() -> argparse.Namespace:
@@ -130,9 +130,7 @@ class _DUnTenant(_ParAnnee):
     """Moissonneur d'un seul tenant, dont le bilan nomme le critère de recherche."""
 
     def harvest_all(self, args, config):  # type: ignore[no-untyped-def]
-        return self._extrait_d_un_tenant(
-            2, lambda progress: PhaseMetrics(new=2), par="ORCID, IdRef"
-        )
+        return self._harvest_at_once(2, lambda progress: PhaseMetrics(new=2), par="ORCID, IdRef")
 
 
 def test_le_bilan_nomme_le_critere_de_recherche(logger, caplog):

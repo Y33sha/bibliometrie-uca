@@ -126,8 +126,8 @@ class ScanrHarvester(SourceHarvester[ScanrHarvestConfig, ScanrClient]):
         ids = config.affiliation_ids
         client = self._client
         years = self._years(window)
-        return self._extrait_par_annee(
+        return self._harvest_by_year(
             years,
-            lambda annee: client.count(build_query(annee, ids)),
-            lambda annee, progress: harvest_year(client, self.conn, annee, ids, progress),
+            lambda year: client.count(build_query(year, ids)),
+            lambda year, progress: harvest_year(client, self.conn, year, ids, progress),
         )

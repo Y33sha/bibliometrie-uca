@@ -23,17 +23,17 @@ class ThesesClient:
         self._url = base_url
         self._throttle = Throttle(THESES_DELAY)
 
-    def fetch_page(self, query: str, *, debut: int) -> Mapping[str, JsonValue]:
-        """Une page de `THESES_PER_PAGE` thèses, à partir du rang `debut`."""
+    def fetch_page(self, query: str, *, start: int) -> Mapping[str, JsonValue]:
+        """Une page de `THESES_PER_PAGE` thèses, à partir du rang `start`."""
         params: dict[str, str | int | float | bool | None] = {
             "q": query,
-            "debut": debut,
+            "debut": start,
             "nombre": THESES_PER_PAGE,
         }
         with self._throttle.request():
             return as_mapping(
                 http_request_with_retry(
-                    "GET", self._url, params=params, timeout=30, label=f"theses debut={debut}"
+                    "GET", self._url, params=params, timeout=30, label=f"theses debut={start}"
                 )
             )
 
@@ -56,8 +56,8 @@ async def fetch_thesis(
     )
     if isinstance(outcome, NotFound | Unavailable):
         return outcome
-    for entree in as_sequence(as_mapping(outcome).get("theses")):
-        these = as_mapping(entree)
+    for entry in as_sequence(as_mapping(outcome).get("theses")):
+        these = as_mapping(entry)
         if as_str(these.get("id")) == thesis_id:
             return these
     return NOT_FOUND

@@ -66,7 +66,7 @@ class HarvestByPersonPhase:
 
             return run
 
-        def retenue(source: str) -> Callable[[PhaseContext], bool]:
+        def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in effective
 
         by_task = run_tasks(
@@ -77,7 +77,7 @@ class HarvestByPersonPhase:
                     label=source_label(source),
                     progress_bar=True,
                     threshold=5,
-                    when=retenue(source),
+                    when=selected(source),
                 )
                 for source in PERSON_SEARCHED_SOURCES
             },

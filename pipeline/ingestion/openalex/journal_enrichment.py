@@ -25,24 +25,24 @@ def extract_apc(source: Mapping[str, JsonValue]) -> tuple[float, str] | None:
     """
     prices = [
         (amount, as_str(entry.get("currency")) or "USD")
-        for entree in as_sequence(source.get("apc_prices"))
-        if (amount := _montant((entry := as_mapping(entree)).get("price"))) is not None
+        for price_item in as_sequence(source.get("apc_prices"))
+        if (amount := _amount((entry := as_mapping(price_item)).get("price"))) is not None
     ]
     for amount, currency in prices:
         if currency == "EUR":
             return amount, currency
     if prices:
         return prices[0]
-    if (apc_usd := _montant(source.get("apc_usd"))) is not None:
+    if (apc_usd := _amount(source.get("apc_usd"))) is not None:
         return apc_usd, "USD"
     return None
 
 
-def _montant(valeur: JsonValue) -> float | None:
-    """Montant porté par `valeur` : l'API rend un entier ou un décimal selon la devise."""
-    if isinstance(valeur, bool):
+def _amount(value: JsonValue) -> float | None:
+    """Montant de `value` : l'API rend un entier ou un décimal selon la devise."""
+    if isinstance(value, bool):
         return None
-    return float(valeur) if isinstance(valeur, int | float) else None
+    return float(value) if isinstance(value, int | float) else None
 
 
 def fetch_sources_batch(
@@ -73,9 +73,9 @@ def fetch_sources_batch(
         return {}
 
     result: dict[str, tuple[float | None, str | None, str | None]] = {}
-    for entree in as_sequence(data.get("results")):
-        source = as_mapping(entree)
+    for price_item in as_sequence(data.get("results")):
+        source = as_mapping(price_item)
         apc_amount, apc_currency = extract_apc(source) or (None, None)
-        identifiant = short_openalex_id(as_str(source.get("id")) or "")
-        result[identifiant] = (apc_amount, apc_currency, as_str(source.get("type")))
+        identifier = short_openalex_id(as_str(source.get("id")) or "")
+        result[identifier] = (apc_amount, apc_currency, as_str(source.get("type")))
     return result

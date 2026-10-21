@@ -68,10 +68,10 @@ def hal_text_field(value: JsonValue) -> str | None:
     if isinstance(value, str):
         return value
     if isinstance(value, Sequence):
-        premier = value[0] if value else None
-        if premier is None:
+        first = value[0] if value else None
+        if first is None:
             return None
-        return premier if isinstance(premier, str) else str(premier)
+        return first if isinstance(first, str) else str(first)
     return str(value)
 
 

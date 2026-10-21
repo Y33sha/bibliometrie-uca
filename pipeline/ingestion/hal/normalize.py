@@ -146,7 +146,7 @@ def extract_publication_metadata(
 
     embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
-    ouvert = doc.get("openAccess_bool")
+    is_open = doc.get("openAccess_bool")
     return PublicationMetadata(
         title=title,
         publication_year=as_int(doc.get("producedDateY_i")),
@@ -154,7 +154,7 @@ def extract_publication_metadata(
         doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
         nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
         oa_status=derive_hal_oa_status(
-            ouvert if isinstance(ouvert, bool) else None,
+            is_open if isinstance(is_open, bool) else None,
             hal_text_field(doc.get("fileMain_s")),
             hal_text_field(doc.get("linkExtId_s")),
             embargo_until,
@@ -195,10 +195,10 @@ def build_hal_external_ids(
         external_ids[ExternalIdType.ISBN] = isbns
     if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
         external_ids[ExternalIdType.PMID] = pmid
-    brut = doc.get("linkExtUrl_s")
-    link_urls = [brut] if isinstance(brut, str) else as_sequence(brut)
-    for entree in link_urls:
-        url = hal_text_field(entree)
+    raw = doc.get("linkExtUrl_s")
+    link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
+    for entry in link_urls:
+        url = hal_text_field(entry)
         if ExternalIdType.PMCID not in external_ids and (pmcid := normalize_pmcid(url)):
             external_ids[ExternalIdType.PMCID] = pmcid
         if ExternalIdType.ARXIV_ID not in external_ids and (arxiv_id := normalize_arxiv_id(url)):

@@ -126,7 +126,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         ]
         seen: set[str] = set()
 
-        def extrait(progress: Progress) -> PhaseMetrics:
+        def harvest_step(progress: Progress) -> PhaseMetrics:
             metrics = PhaseMetrics()
             for i, batch in enumerate(batches):
                 remaining = len(persons) - i * self.BATCH_SIZE
@@ -149,7 +149,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         labels = ", ".join(
             PERSON_IDENTIFIER_LABELS[t] for t in PersonIdentifierType if t in self.id_types
         )
-        return self._extrait_d_un_tenant(len(persons), extrait, par=labels)
+        return self._harvest_at_once(len(persons), harvest_step, par=labels)
 
     def _extract_batch(
         self,

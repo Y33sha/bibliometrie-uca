@@ -114,7 +114,7 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
         client = self._client
         years = self._years(window)
 
-        def extrait(
+        def harvest_step(
             progress: Progress, *, years: list[int], since: str | None = None
         ) -> PhaseMetrics:
             scope = f"depuis {since}" if since else str(years[0])
@@ -129,13 +129,13 @@ class OpenalexHarvester(SourceHarvester[OpenalexHarvestConfig, OpenalexClient]):
             )
 
         if window.since:
-            return self._extrait_d_un_tenant(
+            return self._harvest_at_once(
                 client.count(ids, years=years, since=window.since),
-                lambda progress: extrait(progress, years=years, since=window.since),
+                lambda progress: harvest_step(progress, years=years, since=window.since),
             )
 
-        return self._extrait_par_annee(
+        return self._harvest_by_year(
             years,
-            lambda annee: client.count(ids, years=[annee]),
-            lambda annee, progress: extrait(progress, years=[annee]),
+            lambda year: client.count(ids, years=[year]),
+            lambda year, progress: harvest_step(progress, years=[year]),
         )

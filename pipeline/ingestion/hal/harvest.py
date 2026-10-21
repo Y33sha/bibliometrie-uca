@@ -132,7 +132,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
         years = self._years(window)
 
         if window.since:
-            return self._extrait_d_un_tenant(
+            return self._harvest_at_once(
                 client.count(build_query(years=years, since=window.since), fq),
                 lambda progress: harvest_union(
                     client,
@@ -146,18 +146,18 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
                 ),
             )
 
-        def compte(annee: int) -> int:
-            return client.count(build_query(years=[annee]), fq)
+        def count_year(year: int) -> int:
+            return client.count(build_query(years=[year]), fq)
 
-        def extrait(annee: int, progress: Progress) -> PhaseMetrics:
+        def harvest_step(year: int, progress: Progress) -> PhaseMetrics:
             return harvest_union(
                 client,
                 config,
                 self.conn,
-                scoped_logger(self.logger, self.SOURCE, str(annee)),
+                scoped_logger(self.logger, self.SOURCE, str(year)),
                 progress,
-                years=[annee],
+                years=[year],
                 breaker_tripped=self._breaker_tripped,
             )
 
-        return self._extrait_par_annee(years, compte, extrait)
+        return self._harvest_by_year(years, count_year, harvest_step)
