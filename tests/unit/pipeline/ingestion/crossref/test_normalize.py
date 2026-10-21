@@ -6,7 +6,7 @@ Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
 `get_external_ids`, `get_biblio`, `_author_name`,
 `_author_affiliations`.
 
-Les délégations vers `domain.sources.crossref` (`extract_crossref_meta`,
+Les délégations vers `domain.sources.crossref` (`extract_crossref_source_extras`,
 `extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`)
 sont testées directement dans `tests/unit/domain/sources/test_crossref.py` ;
 ici on ne fait que vérifier le wiring (1-2 cas par délégation).
@@ -38,7 +38,6 @@ from pipeline.ingestion.crossref.normalize import (
     get_language,
     get_publication_year,
     get_publisher_name,
-    get_source_extras,
     get_title,
     process_contributions,
     process_work,
@@ -312,15 +311,6 @@ class TestGetBiblio:
         assert get_biblio({"container-title": ["J. Phys."]}) == {
             "journal": {"title": "J. Phys."},
         }
-
-
-class TestGetMeta:
-    def test_delegates_to_domain(self):
-        # Délégation à `extract_crossref_meta` ; on vérifie juste le wiring.
-        result = get_source_extras({"DOI": "10.1000/abc"})
-        # Le résultat exact dépend de la fonction domain ; ici on s'assure
-        # juste qu'on retourne quelque chose (dict ou None), sans crasher.
-        assert result is None or isinstance(result, dict)
 
 
 class TestAuthorName:

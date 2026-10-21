@@ -26,6 +26,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     meme_oeuvre_declaree,
 )
+from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.types import JsonValue, as_str
 
 
@@ -102,7 +103,7 @@ _DATACITE_MAP: dict[str, RelationType] = {
 
 # Mapping Crossref (clés de `source_extras.relation`) → type canonique.
 _CROSSREF_MAP: dict[str, RelationType] = {
-    "is-preprint-of": RelationType.IS_PREPRINT_OF,
+    CROSSREF_PREPRINT_OF: RelationType.IS_PREPRINT_OF,
     "has-preprint": RelationType.HAS_PREPRINT,
     "is-supplement-to": RelationType.IS_SUPPLEMENT_TO,
     "is-supplemented-by": RelationType.HAS_SUPPLEMENT,
@@ -169,7 +170,7 @@ def extract_datacite_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
     """Relations en scope déclarées par un payload DataCite, depuis `source_extras.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique, DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
-    related = (source_extras or {}).get("related_identifiers")
+    related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
         return []
     out: list[tuple[RelationType, str]] = []
@@ -190,7 +191,7 @@ def extract_datacite_distinct_works(
 
     `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, que lit `meme_oeuvre_declaree`.
     """
-    related = (source_extras or {}).get("related_identifiers")
+    related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
         return []
     out: list[str] = []
@@ -245,7 +246,7 @@ def extract_crossref_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
     """Relations en scope déclarées par un payload Crossref, depuis `source_extras.relation` (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les cibles de type DOI et les clés en scope."""
-    relation = (source_extras or {}).get("relation")
+    relation = (source_extras or {}).get(SourceExtra.RELATION)
     if not isinstance(relation, dict):
         return []
     out: list[tuple[RelationType, str]] = []

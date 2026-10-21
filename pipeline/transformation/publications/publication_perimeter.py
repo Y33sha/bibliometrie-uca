@@ -5,9 +5,10 @@ Une publication réunit les indices de ses contributions d'auteurs, de personnes
 
 from sqlalchemy import Connection, text
 
+from domain.source_records.source_extras import SourceExtra
 from domain.structures.perimeter_evidence import PerimeterEvidence
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
-from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role
+from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role, source_extra
 
 
 def _refresh_sql(scope: str) -> str:
@@ -26,7 +27,7 @@ def _refresh_sql(scope: str) -> str:
                 FROM source_records sr
                 WHERE sr.publication_id {scope}
                   AND sr.source = 'theses'
-                  AND sr.source_extras ->> 'etablissement_ppn' = ANY(:thesis_ppns)
+                  AND {source_extra(SourceExtra.ETABLISSEMENT_PPN)} = ANY(:thesis_ppns)
             ) by_publication
             GROUP BY id
         ), target AS (

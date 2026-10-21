@@ -94,7 +94,6 @@ TYPES_EXERCES = {
     "FacetOption",
     "DoiNamespace",
     "JournalCorrectionRow",
-    "UnaryCorrectionRow",
     "_JournalRow",
     "_PerimeterRow",
     "_PublisherRow",
@@ -135,7 +134,7 @@ def _types_apparies() -> set[str]:
 
 def test_le_parcours_trouve_les_appariements():
     """Filet du filet : un parcours qui n'en trouverait aucun rendrait l'assertion vide, donc verte."""
-    assert len(_types_apparies()) >= 10
+    assert len(_types_apparies()) >= 9
 
 
 def test_chaque_type_apparie_est_exerce_par_un_test():

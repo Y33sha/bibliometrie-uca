@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 from datetime import date
 
+from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_strs
 
 # Repositories ouverts reconnus par HAL via `linkExtId_s` qu'on traite
@@ -82,12 +83,12 @@ def extract_hal_source_extras(doc: Mapping[str, JsonValue]) -> dict[str, JsonVal
     source_extras: dict[str, JsonValue] = {}
     proceedings = hal_text_field(doc.get("proceedings_s"))
     if proceedings in ("0", "1"):
-        source_extras["proceedings"] = proceedings == "1"
+        source_extras[SourceExtra.PROCEEDINGS] = proceedings == "1"
     series = [s.strip() for s in as_strs(doc.get("serie_s")) if s.strip()]
     if series:
-        source_extras["series"] = list(dict.fromkeys(series))
+        source_extras[SourceExtra.SERIES] = list(dict.fromkeys(series))
     if source_title := (hal_text_field(doc.get("source_s")) or "").strip():
-        source_extras["source_title"] = source_title
+        source_extras[SourceExtra.SOURCE_TITLE] = source_title
     if licence := (hal_text_field(doc.get("licence_s")) or "").strip():
-        source_extras["licence"] = licence
+        source_extras[SourceExtra.LICENCE] = licence
     return source_extras or None

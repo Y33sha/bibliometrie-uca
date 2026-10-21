@@ -16,6 +16,7 @@ from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.normalizer import SourceNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
@@ -74,25 +75,25 @@ def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
     ds = french_date_to_iso(as_str(these.get("dateSoutenance")))
     di = french_date_to_iso(as_str(these.get("datePremiereInscriptionDoctorat")))
     if ds:
-        source_extras["date_soutenance"] = ds
+        source_extras[SourceExtra.DATE_SOUTENANCE] = ds
     if di:
-        source_extras["date_inscription"] = di
+        source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
     discipline = these.get("discipline")
     if discipline:
-        source_extras["discipline"] = discipline
+        source_extras[SourceExtra.DISCIPLINE] = discipline
 
     if etablissement := these.get("etabSoutenanceN"):
-        source_extras["etablissement"] = etablissement
+        source_extras[SourceExtra.ETABLISSEMENT] = etablissement
     if etablissement_ppn := as_str(these.get("etabSoutenancePpn")):
-        source_extras["etablissement_ppn"] = etablissement_ppn
+        source_extras[SourceExtra.ETABLISSEMENT_PPN] = etablissement_ppn
 
     ecoles = [as_mapping(e) for e in as_sequence(these.get("ecolesDoctorale"))]
     ecoles_clean = [
         {"nom": nom, "ppn": as_str(e.get("ppn"))} for e in ecoles if (nom := as_str(e.get("nom")))
     ]
     if ecoles_clean:
-        source_extras["ecoles_doctorales"] = ecoles_clean
+        source_extras[SourceExtra.ECOLES_DOCTORALES] = ecoles_clean
 
     partenaires = [as_mapping(p) for p in as_sequence(these.get("partenairesDeRecherche"))]
     partenaires_clean = [
@@ -101,7 +102,7 @@ def _build_source_extras(these: Mapping[str, JsonValue]) -> dict[str, JsonValue]
         if (nom := as_str(p.get("nom")))
     ]
     if partenaires_clean:
-        source_extras["partenaires"] = partenaires_clean
+        source_extras[SourceExtra.PARTENAIRES] = partenaires_clean
 
     return source_extras or None
 

@@ -3,9 +3,11 @@
 La phase persiste sur `source_records` les valeurs corrigées par les règles de `domain.source_records.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce module : la correction unaire, qui traite chaque `source_record` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_records` partageant un même DOI.
 """
 
+from collections.abc import Iterable
+from dataclasses import fields
 from typing import NamedTuple
 
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, Row, bindparam, text
 
 from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
@@ -16,65 +18,31 @@ from domain.source_records.metadata_correction.shared_doi import (
     REMOVED_EXTERNAL_IDS,
     DoiClusterCase,
 )
+from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.rows import rows_as
 from infrastructure.db.tables import source_records
-from infrastructure.sql_fragments import corrected, diamond_journal_sql, raw_column
+from infrastructure.sql_fragments import (
+    corrected,
+    declares_conference_sql,
+    diamond_journal_sql,
+    raw_column,
+    self_declared_preprint_sql,
+    source_extra,
+    source_extra_json,
+)
 
 
 class UnaryCorrectionRow(NamedTuple):
-    """Une `source_record` candidate à la correction unaire, jointe à son journal.
-
-    Contient les champs du contrat des règles (`for_correction`) et ceux dont la phase seule se sert : `id` pour persister, `source_id` pour retrouver le dépôt HAL d'un enregistrement source ScanR, `external_ids` et `corrections` pour le stash et la reconstruction du brut.
-
-    L'adapter construit les lignes par appariement de noms : chaque champ a le nom de la colonne qui l'alimente.
-    """
+    """Une `source_record` candidate à la correction unaire : les faits que lisent les règles (`facts`), et ce dont la phase se sert pour persister."""
 
     id: int
-    source: str
     source_id: str
-    title: str
-    doc_type: str | None
-    doi: str | None
-    journal_id: int | None
-    oa_status: str | None
-    urls: list[str] | None
     external_ids: dict[str, JsonValue]
-    journal_type: str | None
-    oa_model: str | None
     corrections: dict[str, JsonValue]
-    embargo_expired: bool
-    self_declared_preprint: bool
-    declares_conference: bool
-    registrant_publisher_type: str | None
-    in_proceedings_volume: bool
-    group_title: str | None
-    journal_diamond: bool
-    author_count: int
-
-    def for_correction(self) -> MetadataForCorrection:
-        """Projette la ligne vers le contrat d'entrée des règles."""
-        return MetadataForCorrection(
-            title=self.title,
-            doc_type=self.doc_type,
-            doi=self.doi,
-            journal_id=self.journal_id,
-            oa_status=self.oa_status,
-            urls=self.urls,
-            journal_type=self.journal_type,
-            oa_model=self.oa_model,
-            embargo_expired=self.embargo_expired,
-            self_declared_preprint=self.self_declared_preprint,
-            declares_conference=self.declares_conference,
-            registrant_publisher_type=self.registrant_publisher_type,
-            in_proceedings_volume=self.in_proceedings_volume,
-            group_title=self.group_title,
-            journal_diamond=self.journal_diamond,
-            source=self.source,
-            author_count=self.author_count,
-        )
+    facts: MetadataForCorrection
 
 
 class CorrectionUpdate(NamedTuple):
@@ -151,33 +119,53 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
     "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
 )
 
-# Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
-# alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
-# sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `source_extras`, `journal_diamond` le caractère diamant de la revue. Chaque
-# variante ajoute son `WHERE`.
+# Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`.
+_FACTS: dict[str, str] = {
+    "title": "sr.title",
+    "doc_type": "sr.doc_type",
+    "doi": "sr.doi",
+    "journal_id": "sr.journal_id",
+    "journal_type": "j.journal_type::text",
+    "oa_status": "sr.oa_status",
+    "oa_model": "j.oa_model",
+    "urls": "sr.urls",
+    "embargo_expired": "(sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date)",
+    "self_declared_preprint": self_declared_preprint_sql(),
+    "declares_conference": declares_conference_sql(),
+    "registrant_publisher_type": "rp.publisher_type::text",
+    "in_proceedings_volume": "COALESCE(m.proceedings, false)",
+    "group_title": source_extra(SourceExtra.GROUP_TITLE),
+    "journal_diamond": f"COALESCE({diamond_journal_sql('j')}, false)",
+    "source": "sr.source::text",
+    "author_count": "sr.author_count",
+}
+assert set(_FACTS) == {f.name for f in fields(MetadataForCorrection)}, (
+    "projection des faits désynchronisée de MetadataForCorrection"
+)
+
+# Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
-    SELECT sr.id, sr.source::text AS source, sr.source_id,
-           sr.title, sr.doc_type, sr.doi,
-           sr.journal_id, sr.oa_status,
-           sr.urls, sr.external_ids,
-           j.journal_type::text AS journal_type, j.oa_model,
-           sr.corrections,
-           (sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date) AS embargo_expired,
-           COALESCE(jsonb_exists(sr.source_extras->'relation', 'is-preprint-of'), false)
-               AS self_declared_preprint,
-           COALESCE(sr.source_extras ? 'conference', false) AS declares_conference,
-           rp.publisher_type::text AS registrant_publisher_type,
-           COALESCE(m.proceedings, false) AS in_proceedings_volume,
-           sr.source_extras->>'group_title' AS group_title,
-           COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond,
-           sr.author_count
+    SELECT sr.id, sr.source_id, sr.external_ids, sr.corrections,
+           {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
     LEFT JOIN journals j ON j.id = sr.journal_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
     LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sr.doi, '/', 1)
     LEFT JOIN publishers rp ON rp.id = dp.publisher_id
 """
+
+
+def _unary_rows(rows: Iterable[Row[tuple[object, ...]]]) -> list[UnaryCorrectionRow]:
+    return [
+        UnaryCorrectionRow(
+            id=r.id,
+            source_id=r.source_id,
+            external_ids=r.external_ids,
+            corrections=r.corrections,
+            facts=MetadataForCorrection(**{name: r._mapping[name] for name in _FACTS}),
+        )
+        for r in rows
+    ]
 
 
 # Colonnes que les corrections de métadonnées ont le droit de poser. Un nom de colonne
@@ -241,8 +229,7 @@ class PgMetadataCorrectionQueries:
 
         Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_record` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
         """
-        rows = conn.execute(text(_SELECT))
-        return rows_as(UnaryCorrectionRow, rows)
+        return _unary_rows(conn.execute(text(_SELECT)))
 
     def fetch_for_unary_correction_by_journal(
         self, conn: Connection, journal_id: int
@@ -250,8 +237,9 @@ class PgMetadataCorrectionQueries:
         """Les `source_records` rattachées à un journal (`journal_id = :jid`).
 
         Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
-        rows = conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
-        return rows_as(UnaryCorrectionRow, rows)
+        return _unary_rows(
+            conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
+        )
 
     def fetch_for_unary_correction_by_hal_ids(
         self, conn: Connection, hal_ids: list[str]
@@ -259,11 +247,12 @@ class PgMetadataCorrectionQueries:
         """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
-        rows = conn.execute(
-            text(_SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)"),
-            {"ids": hal_ids},
+        return _unary_rows(
+            conn.execute(
+                text(_SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)"),
+                {"ids": hal_ids},
+            )
         )
-        return rows_as(UnaryCorrectionRow, rows)
 
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes effectives + `corrections`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
@@ -334,7 +323,7 @@ class PgMetadataCorrectionQueries:
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
                         FROM sr_eff sr
-                        CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras->'related_identifiers') rel
+                        CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE sr.source = '{Source.DATACITE.value}'
                           AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
@@ -351,7 +340,7 @@ class PgMetadataCorrectionQueries:
                             lower(rel->>'doi') AS canonical_doi,
                             '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
-                        CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras->'related_identifiers') rel
+                        CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE sr.source = '{Source.DATACITE.value}'
                           AND sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'

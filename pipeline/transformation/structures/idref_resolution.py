@@ -9,6 +9,8 @@ from collections import defaultdict
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
+from domain.source_records.source_extras import SourceExtra
+from infrastructure.sql_fragments import source_extra_json
 from pipeline.runtime.observability.libelles import DERNIERE_BRANCHE, etape
 from pipeline.transformation.structures.detections import (
     IDREF_STRUCTURES,
@@ -17,10 +19,10 @@ from pipeline.transformation.structures.detections import (
 )
 from pipeline.transformation.structures.name_recognition import StructureNameMatcher
 
-_PARTNERS = text("""
+_PARTNERS = text(f"""
     SELECT DISTINCT partner ->> 'ppn' AS ppn, partner ->> 'nom' AS name
     FROM source_records sr
-    CROSS JOIN LATERAL jsonb_array_elements(sr.source_extras -> 'partenaires') partner
+    CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.PARTENAIRES)}) partner
     WHERE sr.source = 'theses' AND partner ->> 'ppn' IS NOT NULL AND partner ->> 'nom' IS NOT NULL
 """)
 

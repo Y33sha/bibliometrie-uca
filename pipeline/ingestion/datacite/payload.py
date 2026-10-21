@@ -11,6 +11,7 @@ import re
 from collections.abc import Iterable, Mapping
 
 from domain.publications.identifiers import clean_doi, find_isbns
+from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 
@@ -308,11 +309,11 @@ def extract_datacite_source_extras(
     source_extras: dict[str, JsonValue] = {}
     related = _doi_related_identifiers(attributes)
     if related:
-        source_extras["related_identifiers"] = related
+        source_extras[SourceExtra.RELATED_IDENTIFIERS] = related
     rights = attributes.get("rightsList")
     if isinstance(rights, list) and rights:
-        source_extras["rights"] = rights
+        source_extras[SourceExtra.RIGHTS] = rights
     funding = attributes.get("fundingReferences")
     if isinstance(funding, list) and funding:
-        source_extras["funding"] = funding
+        source_extras[SourceExtra.FUNDING] = funding
     return source_extras or None

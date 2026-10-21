@@ -4,6 +4,7 @@ import logging
 from unittest.mock import MagicMock
 
 from domain.source_records.corrections import stash_entry
+from domain.source_records.metadata_correction.rules import MetadataForCorrection
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_update,
     compute_updates,
@@ -53,32 +54,28 @@ def test_tally_corrections_compte_les_regles():
     }
 
 
+_ROW_FIELDS = ("id", "source_id", "external_ids", "corrections")
+
+
 def _source_record(**overrides: object) -> UnaryCorrectionRow:
-    base: dict[str, object] = {
-        "id": 1,
+    """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles."""
+    row: dict[str, object] = {"id": 1, "source_id": "W1", "external_ids": {}, "corrections": {}}
+    facts: dict[str, object] = {
         "source": "openalex",
-        "source_id": "W1",
         "title": "Un titre quelconque",
         "doc_type": "article",
         "doi": None,
         "journal_id": None,
-        "oa_status": None,
-        "urls": None,
-        "external_ids": {},
-        "journal_type": None,
-        "oa_model": None,
-        "corrections": {},
         "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
-        "registrant_publisher_type": None,
         "in_proceedings_volume": False,
-        "group_title": None,
         "journal_diamond": False,
         "author_count": 1,
     }
-    base.update(overrides)
-    return UnaryCorrectionRow(**base)  # type: ignore[arg-type]
+    for key, value in overrides.items():
+        (row if key in _ROW_FIELDS else facts)[key] = value
+    return UnaryCorrectionRow(**row, facts=MetadataForCorrection(**facts))  # type: ignore[arg-type]
 
 
 def test_no_rule_returns_none():

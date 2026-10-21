@@ -7,6 +7,7 @@ import re
 
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
+from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
 
@@ -28,8 +29,8 @@ _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 def _hal_titles(source: SourceRecord) -> list[str]:
     """Titre de la source et collections qu'un enregistrement source HAL associe à une communication."""
     source_extras = source.source_extras or {}
-    titles = as_strs(source_extras.get("series"))
-    if source_title := as_str(source_extras.get("source_title")):
+    titles = as_strs(source_extras.get(SourceExtra.SERIES))
+    if source_title := as_str(source_extras.get(SourceExtra.SOURCE_TITLE)):
         titles.append(source_title)
     return titles
 
@@ -45,7 +46,7 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
     """L'enregistrement source HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
     source_extras = source.source_extras or {}
     biblio = source.biblio or {}
-    if source_extras.get("proceedings") is True:
+    if source_extras.get(SourceExtra.PROCEEDINGS) is True:
         return True
     if _PAGE_RANGE.search(as_str(biblio.get("pages")) or ""):
         return True
@@ -60,7 +61,7 @@ def attests_publication(source: SourceRecord) -> bool:
     """L'enregistrement source atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
     if source.doi or source.journal_id or source.monograph_id:
         return True
-    if (source.source_extras or {}).get("conference"):
+    if declares_conference(source.source_extras):
         return True
     return source.source == "hal" and _hal_editorial_fields(source)
 

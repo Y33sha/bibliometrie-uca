@@ -15,6 +15,7 @@ from domain.publications.identifiers import clean_doi, extract_doi_from_url, ext
 from domain.publications.licenses import normalize_license
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
+from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import (
     JsonValue,
@@ -368,7 +369,7 @@ def insert_openalex_document(  # noqa: C901
             urls=urls or None,
             impact=extract_impact(work).to_json(),
             is_retracted=is_retracted,
-            source_extras={"license": raw_license} if raw_license else None,
+            source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
         ),
     )
 

@@ -10,11 +10,12 @@ from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     SCALAR_CONFIRMATION_ID_TYPES,
 )
+from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import raw_column
+from infrastructure.sql_fragments import has_source_extra, raw_column
 
 
 class DeclaredRelationSource(NamedTuple):
@@ -184,8 +185,8 @@ class PublicationRelationsQueries:
                        p.doc_type::text AS doc_type, sr.doc_type AS source_record_doc_type
                 FROM source_records sr
                 JOIN publications p ON p.id = sr.publication_id
-                WHERE (sr.source = '{Source.DATACITE.value}' AND sr.source_extras ? 'related_identifiers')
-                   OR (sr.source = '{Source.CROSSREF.value}' AND sr.source_extras ? 'relation')
+                WHERE (sr.source = '{Source.DATACITE.value}' AND {has_source_extra(SourceExtra.RELATED_IDENTIFIERS)})
+                   OR (sr.source = '{Source.CROSSREF.value}' AND {has_source_extra(SourceExtra.RELATION)})
             """)
         ).all()
         return [

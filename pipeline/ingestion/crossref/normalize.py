@@ -40,8 +40,8 @@ from pipeline.ingestion.crossref.payload import (
     crossref_issns,
     crossref_raw_doc_type,
     extract_crossref_conference,
-    extract_crossref_meta,
     extract_crossref_publication_year,
+    extract_crossref_source_extras,
     parse_crossref_issns,
     strip_jats_tags,
 )
@@ -176,10 +176,6 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     if journal_obj:
         biblio["journal"] = journal_obj
     return biblio or None
-
-
-def get_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    return extract_crossref_meta(msg)
 
 
 # =============================================================
@@ -380,7 +376,7 @@ def process_work(
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
-    source_extras = get_source_extras(msg)
+    source_extras = extract_crossref_source_extras(msg)
 
     source_record_id = queries.upsert_source_record(
         conn,

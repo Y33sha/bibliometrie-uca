@@ -11,6 +11,7 @@ import re
 from collections.abc import Mapping
 
 from domain.journals.issns import IssnSupport, JournalIssn, received_issns
+from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
 _JATS_TAG_RE = re.compile(r"</?jats:[A-Za-z][^<>]*>")
@@ -109,7 +110,7 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
     return conference
 
 
-def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
+def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
     Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_records.source_extras`.
@@ -117,21 +118,21 @@ def extract_crossref_meta(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValu
     Le sous-objet `source_extras->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
     """
     source_extras: dict[str, JsonValue] = {}
-    for key in ("license", "funder", "relation"):
+    for key in (SourceExtra.LICENSE, SourceExtra.FUNDER, SourceExtra.RELATION):
         val = msg.get(key)
         if val:
             source_extras[key] = val
     conference = extract_crossref_conference(msg)
     if conference:
-        source_extras["conference"] = conference
+        source_extras[SourceExtra.CONFERENCE] = conference
     if msg.get("type") == "posted-content" and (group_title := as_str(msg.get("group-title"))):
-        source_extras["group_title"] = group_title
+        source_extras[SourceExtra.GROUP_TITLE] = group_title
     refs_count = msg.get("references-count")
     if isinstance(refs_count, int) and refs_count > 0:
-        source_extras["references_count"] = refs_count
+        source_extras[SourceExtra.REFERENCES_COUNT] = refs_count
     indexed = msg.get("indexed") or {}
     if isinstance(indexed, dict):
         ts = indexed.get("timestamp") or indexed.get("date-time")
         if ts:
-            source_extras["indexed"] = ts
+            source_extras[SourceExtra.INDEXED] = ts
     return source_extras or None

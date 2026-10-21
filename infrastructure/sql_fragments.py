@@ -10,6 +10,7 @@ from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIE
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
 from domain.source_records.corrections import CORRECTED_BY, RAW
+from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
@@ -222,6 +223,31 @@ def raw_column(field: str, source_record: str = "sr") -> str:
         f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
         f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
     )
+
+
+def source_extra(key: SourceExtra, alias: str = "sr") -> str:
+    """Valeur texte de la clé `key` des champs propres à la source de la ligne aliasée `alias`, enregistrement source ou publication."""
+    return f"{alias}.source_extras ->> '{key}'"
+
+
+def source_extra_json(key: SourceExtra, alias: str = "sr") -> str:
+    """Valeur JSON de la clé `key` des champs propres à la source de la ligne aliasée `alias`."""
+    return f"{alias}.source_extras -> '{key}'"
+
+
+def has_source_extra(key: SourceExtra, alias: str = "sr") -> str:
+    """Condition vraie quand les champs propres à la source de la ligne aliasée `alias` contiennent la clé `key`."""
+    return f"{alias}.source_extras ? '{key}'"
+
+
+def declares_conference_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` nomme son congrès (`declares_conference`)."""
+    return f"COALESCE({has_source_extra(SourceExtra.CONFERENCE, alias)}, false)"
+
+
+def self_declared_preprint_sql(alias: str = "sr") -> str:
+    """Condition vraie quand l'enregistrement source aliasé `alias` déclare être le preprint d'une autre œuvre."""
+    return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
 # Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la contribution source `sc` et son enregistrement source `sr`.

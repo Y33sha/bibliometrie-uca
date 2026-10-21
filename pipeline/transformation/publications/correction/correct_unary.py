@@ -51,7 +51,8 @@ def compute_updates(
     for row in rows:
         origin = (
             hal_rows.get(hal_id)
-            if row.source == "scanr" and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
+            if row.facts.source == "scanr"
+            and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
             else None
         )
         origin_doc_type = corrected_doc_type(origin) if origin else None
@@ -66,14 +67,15 @@ def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
         {
             hal_id
             for row in rows
-            if row.source == "scanr" and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
+            if row.facts.source == "scanr"
+            and (hal_id := extract_hal_id_from_scanr_id(row.source_id))
         }
     )
 
 
 def corrected_doc_type(row: UnaryCorrectionRow) -> str | None:
     """Type corrigé d'une `source_record` par les règles de correction."""
-    raw = hydrate_raw_view(row.for_correction(), row.corrections)
+    raw = hydrate_raw_view(row.facts, row.corrections)
     corrected = effective_metadata(raw)
     return corrected.doc_type.value if corrected.doc_type is not None else raw.doc_type
 
@@ -89,7 +91,7 @@ def compute_update(
     `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu, qui prime sur le sien.
 
     Pure : ne fait pas d'I/O. Préserve les clés de `corrections` hors `_UNARY_FIELDS` (la sous-étape cluster gère `doi`, la sous-étape `journal_by_doi` gère `journal_id`)."""
-    raw = hydrate_raw_view(row.for_correction(), row.corrections)
+    raw = hydrate_raw_view(row.facts, row.corrections)
     corrected = effective_metadata(raw)
 
     new_doc_type = raw.doc_type
@@ -130,8 +132,8 @@ def compute_update(
     new_external_ids = without_values(new_external_ids, corrections.get(REMOVED_EXTERNAL_IDS))
 
     if (
-        new_doc_type == row.doc_type
-        and new_oa_status == row.oa_status
+        new_doc_type == row.facts.doc_type
+        and new_oa_status == row.facts.oa_status
         and new_external_ids == row.external_ids
         and corrections == row.corrections
     ):
@@ -176,7 +178,7 @@ def run(
     rows = queries.fetch_for_unary_correction(conn)
     logger.info("%s%s %s", BRANCHE, accord(len(rows), "document"), forme(len(rows), "examiné"))
 
-    hal_rows = {row.source_id: row for row in rows if row.source == "hal"}
+    hal_rows = {row.source_id: row for row in rows if row.facts.source == "hal"}
     updates = compute_updates(rows, hal_rows)
     corrected, rule_counts = tally_corrections(updates)
     logger.info("%s%s à corriger", BRANCHE, accord(corrected, "document"))

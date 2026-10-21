@@ -13,6 +13,7 @@ from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
+from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import BibliographicNormalizer
@@ -263,7 +264,7 @@ def insert_scanr_document(  # noqa: C901
             license=normalize_license(publisher_license),
             urls=urls or None,
             impact=Impact(cited_by_count=cited_by_count).to_json(),
-            source_extras={"license": raw_license} if raw_license else None,
+            source_extras={SourceExtra.LICENSE: raw_license} if raw_license else None,
         ),
     )
 
