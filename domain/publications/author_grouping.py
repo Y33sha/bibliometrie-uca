@@ -163,6 +163,14 @@ class ComparisonLevel(StrEnum):
     ELSE = "else"
 
 
+JARO_WINKLER_THRESHOLDS: dict[ComparisonLevel, float] = {
+    ComparisonLevel.JW_092: 0.92,
+    ComparisonLevel.JW_08: 0.8,
+    ComparisonLevel.JW_09: 0.9,
+}
+"""Similarité de Jaro-Winkler minimale de chaque niveau ; l'estimation des poids du modèle les reprend."""
+
+
 def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel | None]:
     """Niveau de chaque comparaison du modèle du résidu entre deux auteurs ; `None` quand une valeur manque."""
     levels: dict[Comparison, ComparisonLevel | None] = {}
@@ -175,9 +183,9 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
         levels[Comparison.LAST_NAME] = ComparisonLevel.REVERSED
     elif set(lx.split()) <= set(ly.split()) or set(ly.split()) <= set(lx.split()):
         levels[Comparison.LAST_NAME] = ComparisonLevel.WORDS_INCLUDED
-    elif jaro_winkler(lx, ly) >= 0.92:
+    elif jaro_winkler(lx, ly) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_092]:
         levels[Comparison.LAST_NAME] = ComparisonLevel.JW_092
-    elif jaro_winkler(lx, ly) >= 0.8:
+    elif jaro_winkler(lx, ly) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_08]:
         levels[Comparison.LAST_NAME] = ComparisonLevel.JW_08
     else:
         levels[Comparison.LAST_NAME] = ComparisonLevel.ELSE
@@ -190,7 +198,7 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
         _initials(fx).startswith(_initials(fy)) or _initials(fy).startswith(_initials(fx))
     ):
         levels[Comparison.FIRST_NAME] = ComparisonLevel.INITIALS_MATCH
-    elif jaro_winkler(fx, fy) >= 0.9:
+    elif jaro_winkler(fx, fy) >= JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_09]:
         levels[Comparison.FIRST_NAME] = ComparisonLevel.JW_09
     else:
         levels[Comparison.FIRST_NAME] = ComparisonLevel.ELSE

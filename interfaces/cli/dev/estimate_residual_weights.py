@@ -37,6 +37,7 @@ from sqlalchemy import Connection, text
 
 from domain.dates import today
 from domain.publications.author_grouping import (
+    JARO_WINKLER_THRESHOLDS,
     Author,
     Comparison,
     ComparisonLevel,
@@ -228,11 +229,12 @@ def _name_comparisons() -> list[cl.CustomComparison]:
                 label_for_charts=ComparisonLevel.WORDS_INCLUDED,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.92",
+                f"jaro_winkler_similarity(ln_l, ln_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_092]}",
                 label_for_charts=ComparisonLevel.JW_092,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(ln_l, ln_r) >= 0.8", label_for_charts=ComparisonLevel.JW_08
+                f"jaro_winkler_similarity(ln_l, ln_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_08]}",
+                label_for_charts=ComparisonLevel.JW_08,
             ),
             cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
@@ -251,7 +253,8 @@ def _name_comparisons() -> list[cl.CustomComparison]:
                 label_for_charts=ComparisonLevel.INITIALS_MATCH,
             ),
             cll.CustomLevel(
-                "jaro_winkler_similarity(fn_l, fn_r) >= 0.9", label_for_charts=ComparisonLevel.JW_09
+                f"jaro_winkler_similarity(fn_l, fn_r) >= {JARO_WINKLER_THRESHOLDS[ComparisonLevel.JW_09]}",
+                label_for_charts=ComparisonLevel.JW_09,
             ),
             cll.ElseLevel().configure(label_for_charts=ComparisonLevel.ELSE),
         ],
