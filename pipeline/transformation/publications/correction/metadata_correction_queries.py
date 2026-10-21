@@ -154,7 +154,7 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
 # Projection partagée : chaque colonne porte le nom du champ d'`UnaryCorrectionRow` qu'elle
 # alimente (appariement par nom). Les booléens `embargo_expired`, `self_declared_preprint` et `declares_conference`
 # sont calculés en SQL pour garder `effective_metadata` pure. `registrant_publisher_type` est le type de
-# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue, `author_count` le nombre de contributions sources. Chaque
+# l'éditeur qui a déposé le préfixe du DOI, `in_proceedings_volume` la nature de sa monographie, `group_title` la forme de présentation lue dans `meta`, `journal_diamond` le caractère diamant de la revue. Chaque
 # variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source::text AS source, sr.source_id,
@@ -171,8 +171,7 @@ _SELECT = f"""
            COALESCE(m.proceedings, false) AS in_proceedings_volume,
            sr.meta->>'group_title' AS group_title,
            COALESCE({diamond_journal_sql("j")}, false) AS journal_diamond,
-           (SELECT count(*) FROM source_contributions sc
-            WHERE sc.source_record_id = sr.id) AS author_count
+           sr.author_count
     FROM source_records sr
     LEFT JOIN journals j ON j.id = sr.journal_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id

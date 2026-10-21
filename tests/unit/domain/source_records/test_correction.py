@@ -400,12 +400,24 @@ class TestCrossrefVolumeRules:
             corrected.rule == MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS
         )
 
-    def test_volume_signe_par_son_editeur_devient_volume(self):
+    def test_volume_a_un_auteur_declare_devient_volume(self):
         view = _view(
             source="crossref",
             author_count=1,
             doc_type="conference_paper",
             title="Proceedings of the 23rd International Conference of IFORS",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS
+
+    def test_recueil_de_resumes_listant_leurs_auteurs_devient_volume(self):
+        """Cas réel : le recueil liste les 934 auteurs de ses résumés."""
+        view = _view(
+            source="crossref",
+            author_count=934,
+            doc_type="article",
+            title="Abstracts from the Food Allergy and Anaphylaxis Meeting 2016",
         )
         corrected = effective_metadata(view).doc_type
         assert corrected is not None

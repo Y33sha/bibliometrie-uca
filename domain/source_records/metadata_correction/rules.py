@@ -63,7 +63,7 @@ class MetadataForCorrection:
     journal_diamond: bool = False
     # Source de l'enregistrement.
     source: str | None = None
-    # Calculé à la lecture : nombre de contributions sources de l'enregistrement source.
+    # `source_records.author_count` : contributions sources d'auteur non collectives.
     author_count: int | None = None
 
 
@@ -303,7 +303,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"registrant_publisher_type": PublisherType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # Enregistrement source Crossref d'un volume d'actes ou d'un recueil de résumés, sans auteur ou avec son seul éditeur pour contributeur ⇒ `proceedings`.
+    # Enregistrement source Crossref sans auteur dont le titre nomme un volume d'actes ou un recueil de résumés ⇒ `proceedings`.
     MetadataCorrectionRule.CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS: {
         "applies_to": {
             "source": "crossref",
@@ -313,10 +313,10 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PROCEEDINGS},
     },
+    # Enregistrement source Crossref dont le titre commence par un mot de volume ⇒ `proceedings`, quel que soit son nombre d'auteurs.
     MetadataCorrectionRule.CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS: {
         "applies_to": {
             "source": "crossref",
-            "author_count_max": 1,
             "doc_type": frozenset({DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.OTHER}),
             "title_regex": _VOLUME_TITLE_PREFIX_PATTERN,
         },
