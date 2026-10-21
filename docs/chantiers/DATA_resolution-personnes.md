@@ -100,4 +100,5 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 - Les composantes connexes ne respectent pas les interdictions. La réconciliation des publications sépare toujours deux DOI différents, ce que la transitivité des paires ne garantit pas. L'étape 3 devient alors un regroupement sous contraintes, et l'étape 2 reçoit aussi les interdictions issues des règles.
 - Les décisions sur les personnes visent des entités (un rejet vise un couple publication-personne, un non-doublon deux personnes), non des paires de contributions sources. Comment les traduire en contraintes sur les contributions sources ?
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres contributions sources.
+- Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
 - `publications.reconcile`, aujourd'hui une seule tâche du graphe : le scinder selon les étapes de la forme par paires, si elle est retenue.
