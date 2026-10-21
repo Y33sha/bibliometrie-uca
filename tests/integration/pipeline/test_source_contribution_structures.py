@@ -6,7 +6,7 @@ import logging
 from sqlalchemy import text
 
 from domain.structures.hal_structures import parse_hal_structure
-from pipeline.transformation.structures.hal_structures import HalStructuresQueries
+from pipeline.transformation.structures.hal_structures import HalStructureStore
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import insert_address
@@ -49,7 +49,7 @@ def _perimeter(conn) -> tuple[int, int]:
         )
     set_config(conn, "perimeter_extraction", "uca")
     refresh_perimeter_structures(conn)
-    HalStructuresQueries(conn).save(
+    HalStructureStore(conn).save(
         [
             _hal(1, ror=_UNIV_ROR),
             _hal(2, parents=[1], aliases=[9], ror=_LAB_ROR),
@@ -57,7 +57,7 @@ def _perimeter(conn) -> tuple[int, int]:
         ],
         {9: 2},
     )
-    HalStructuresQueries(conn).rebuild_relations()
+    HalStructureStore(conn).rebuild_relations()
     return univ, lab
 
 
@@ -123,7 +123,7 @@ def test_ror_de_la_contribution_source_et_ror_d_une_adresse_hors_perimetre(sa_sy
 def test_structure_hal_rattachee_explicitement(sa_sync_conn):
     _, lab = _perimeter(sa_sync_conn)
     # Une fiche hors de la hiérarchie, sans ROR, rattachée au laboratoire par `structure_id`.
-    HalStructuresQueries(sa_sync_conn).save([_hal(5)], {})
+    HalStructureStore(sa_sync_conn).save([_hal(5)], {})
     sa_sync_conn.execute(
         text("UPDATE hal_structures SET structure_id = :lab WHERE hal_structure_id = 5"),
         {"lab": lab},

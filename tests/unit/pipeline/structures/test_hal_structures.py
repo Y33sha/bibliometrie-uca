@@ -57,7 +57,7 @@ class _Referential:
 
 def _fetch(ids, source, referential):
     return fetch_hal_structures(
-        ids, source=source, queries=referential, save_batch=referential.save_batch
+        ids, source=source, store=referential, save_batch=referential.save_batch
     )
 
 
@@ -101,16 +101,16 @@ def test_un_parent_cite_par_son_alias_est_lu_une_fois():
 
 
 def test_source_indisponible_garde_les_lots_enregistres():
-    queries = MagicMock()
-    queries.ids_to_fetch.return_value = {3}
+    store = MagicMock()
+    store.ids_to_fetch.return_value = {3}
     source = MagicMock()
     source.by_ids.side_effect = SourceUnavailableError("hal")
     conn = MagicMock()
 
     metrics = run_refresh_hal_structures(
-        conn, source=source, queries=queries, logger=_LOG, refresh_stale=False
+        conn, source=source, store=store, logger=_LOG, refresh_stale=False
     )
 
     conn.rollback.assert_called_once()
-    queries.rebuild_relations.assert_called_once()
+    store.rebuild_relations.assert_called_once()
     assert metrics.report

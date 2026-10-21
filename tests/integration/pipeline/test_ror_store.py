@@ -2,7 +2,7 @@ from sqlalchemy import text
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
-from pipeline.transformation.structures.ror import RorDumpQueries
+from pipeline.transformation.structures.ror import RorStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -22,9 +22,9 @@ def _org(ror_id, country_code="fr"):
 
 
 def test_replace_all_vide_puis_remplit_les_tables(sa_sync_conn):
-    repo = RorDumpQueries(sa_sync_conn)
-    repo.replace_all([_org(RorId("02feahw73"))], [], version="v2.13")
-    repo.replace_all([_org(UNIV), _org(LABO)], [(UNIV, LABO)], version="v2.14")
+    store = RorStore(sa_sync_conn)
+    store.replace_all([_org(RorId("02feahw73"))], [], version="v2.13")
+    store.replace_all([_org(UNIV), _org(LABO)], [(UNIV, LABO)], version="v2.14")
 
     rows = sa_sync_conn.execute(
         text("SELECT ror_id, country_code, types::text[] FROM ror_organizations ORDER BY ror_id")
@@ -37,21 +37,21 @@ def test_replace_all_vide_puis_remplit_les_tables(sa_sync_conn):
         text("SELECT parent_ror_id, child_ror_id FROM ror_relations")
     ).all()
     assert [tuple(r) for r in relations] == [("01a8ajp46", "03vgfxd91")]
-    assert repo.last_imported_version() == "v2.14"
+    assert store.last_imported_version() == "v2.14"
 
 
 def test_reimport_d_une_version_deja_importee(sa_sync_conn):
-    repo = RorDumpQueries(sa_sync_conn)
-    repo.replace_all([_org(UNIV)], [], version="v2.14")
-    repo.replace_all([_org(UNIV)], [], version="v2.14")
-    assert repo.last_imported_version() == "v2.14"
+    store = RorStore(sa_sync_conn)
+    store.replace_all([_org(UNIV)], [], version="v2.14")
+    store.replace_all([_org(UNIV)], [], version="v2.14")
+    assert store.last_imported_version() == "v2.14"
 
 
 def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_qui_citent_l_organisation(
     sa_sync_conn,
 ):
-    repo = RorDumpQueries(sa_sync_conn)
-    repo.replace_all([_org(UNIV), _org(LABO)], [], version="v2.13")
+    store = RorStore(sa_sync_conn)
+    store.replace_all([_org(UNIV), _org(LABO)], [], version="v2.13")
     record = insert_source_record(sa_sync_conn, source="openalex", source_id="W1")
     without_address = insert_source_contribution(sa_sync_conn, record, source="openalex")
     with_address = insert_source_contribution(
@@ -86,7 +86,7 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
     sa_sync_conn.execute(text("UPDATE source_contributions SET countries_dirty = false"))
     sa_sync_conn.execute(text("UPDATE addresses SET candidates_dirty = false"))
 
-    repo.replace_all([_org(UNIV, "it"), _org(LABO)], [], version="v2.14")
+    store.replace_all([_org(UNIV, "it"), _org(LABO)], [], version="v2.14")
 
     dirty = set(
         sa_sync_conn.execute(

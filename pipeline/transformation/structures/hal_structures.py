@@ -29,7 +29,7 @@ class HalStructuresSource(Protocol):
     def by_aliases(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]: ...
 
 
-class HalStructuresQueries:
+class HalStructureStore:
     """Accès PostgreSQL du pipeline au référentiel des structures HAL."""
 
     def __init__(self, conn: Connection) -> None:
@@ -203,7 +203,7 @@ def fetch_hal_structures(
     ids: Collection[int],
     *,
     source: HalStructuresSource,
-    queries: HalStructuresQueries,
+    store: HalStructureStore,
     save_batch: SaveBatch,
     progress: Progress | None = None,
 ) -> HalStructuresLoad:
@@ -235,7 +235,7 @@ def fetch_hal_structures(
             if progress is not None:
                 progress.advance(len(chunk))
         pending = parents - requested
-        pending -= queries.known_ids(pending)
+        pending -= store.known_ids(pending)
     load.requested = len(requested)
     return load
 
@@ -244,35 +244,35 @@ def run_refresh_hal_structures(
     conn: Connection,
     *,
     source: HalStructuresSource,
-    queries: HalStructuresQueries,
+    store: HalStructureStore,
     logger: logging.Logger,
     refresh_stale: bool,
 ) -> PhaseMetrics:
     """Charge les structures HAL citées et absentes du référentiel, relit les anciennes quand `refresh_stale` est vrai, puis reconstruit les relations. Chaque lot est validé dès son écriture."""
     metrics = PhaseMetrics()
     step(logger, "Référentiel des structures HAL")
-    ids = queries.ids_to_fetch(refresh_stale=refresh_stale)
+    ids = store.ids_to_fetch(refresh_stale=refresh_stale)
     if not ids:
         logger.info("%sAucune structure à charger", LAST_BRANCH)
         return metrics
 
     def save_batch(structures: list[HalStructure], aliases: dict[int, int]) -> None:
-        queries.save(structures, aliases)
+        store.save(structures, aliases)
         conn.commit()
 
     try:
         with track_progress(len(ids), f"{LAST_BRANCH}HAL", logger) as progress:
             load = fetch_hal_structures(
-                ids, source=source, queries=queries, save_batch=save_batch, progress=progress
+                ids, source=source, store=store, save_batch=save_batch, progress=progress
             )
     except SourceUnavailableError:
         conn.rollback()
-        queries.rebuild_relations()
+        store.rebuild_relations()
         conn.commit()
         signal_source_unavailable(metrics, "hal", logger=logger, phase="affiliations")
         metrics.report = "référentiel HAL inaccessible, chargement repris au prochain run"
         return metrics
-    queries.rebuild_relations()
+    store.rebuild_relations()
     conn.commit()
     metrics.add(seen=len(ids), updated=load.structures)
     metrics.details["hal_structures"] = {

@@ -29,7 +29,7 @@ from pipeline.runtime.observability.signals import signal_source_unavailable
 _BATCH_SIZE = 5000
 
 
-class RorDumpQueries:
+class RorStore:
     """Accès PostgreSQL du pipeline au référentiel ROR."""
 
     def __init__(self, conn: Connection) -> None:
@@ -133,12 +133,12 @@ def import_ror_dump(
     organizations: Iterable[RorOrganization],
     *,
     version: str,
-    repo: RorDumpQueries,
+    store: RorStore,
 ) -> RorImportStats:
     """Remplit le référentiel ROR avec les organisations du dump `version` et leurs relations parent/enfant, en une transaction."""
     orgs = list(organizations)
     relations = ror_relations(orgs)
-    repo.replace_all(orgs, relations, version=version)
+    store.replace_all(orgs, relations, version=version)
     conn.commit()
     return RorImportStats(organizations=len(orgs), relations=len(relations))
 
@@ -147,13 +147,13 @@ def run_refresh_ror(
     conn: Connection,
     *,
     source: ZenodoRorDumpSource,
-    repo: RorDumpQueries,
+    store: RorStore,
     logger: logging.Logger,
 ) -> PhaseMetrics:
     """Importe la dernière version du dump ROR si elle n'est pas déjà importée."""
     metrics = PhaseMetrics()
     step(logger, "Référentiel ROR")
-    last = repo.last_imported_version()
+    last = store.last_imported_version()
     published = source.published_version()
     if last and published and dump_version(last) == published:
         logger.info("%sVersion %s déjà importée", LAST_BRANCH, last)
@@ -165,7 +165,7 @@ def run_refresh_ror(
             logger.info("%sVersion %s déjà importée", LAST_BRANCH, latest)
             metrics.details["ror"] = {"version": latest, "imported": False}
             return metrics
-        stats = import_ror_dump(conn, source.organizations(latest), version=latest, repo=repo)
+        stats = import_ror_dump(conn, source.organizations(latest), version=latest, store=store)
     except DumpUnavailableError as e:
         conn.rollback()
         logger.warning("%sDump ROR inaccessible, référentiel inchangé : %s", LAST_BRANCH, e)

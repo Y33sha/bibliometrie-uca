@@ -34,7 +34,7 @@ from pipeline.transformation.structures.address_resolution import (
     run_resolution,
 )
 from pipeline.transformation.structures.hal_structures import (
-    HalStructuresQueries,
+    HalStructureStore,
     run_refresh_hal_structures,
 )
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
@@ -43,7 +43,7 @@ from pipeline.transformation.structures.perimeter_evidence import (
     refresh_source_contribution_structures,
     sync_perimeter_evidence,
 )
-from pipeline.transformation.structures.ror import RorDumpQueries, run_refresh_ror
+from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 
 
 @dataclass(frozen=True)
@@ -140,7 +140,7 @@ def _run_refresh_hal_structures(ctx: PhaseContext, refresh_stale: bool) -> Phase
         return run_refresh_hal_structures(
             conn,
             source=HalStructuresClient(),
-            queries=HalStructuresQueries(conn),
+            store=HalStructureStore(conn),
             logger=ctx.logger,
             refresh_stale=refresh_stale,
         )
@@ -152,4 +152,4 @@ def _run_refresh_ror(ctx: PhaseContext) -> PhaseMetrics:
     # Le dump est public : l'adresse du polite pool y est facultative.
     source = ZenodoRorDumpSource(user_agent=default_user_agent(), logger=ctx.logger)
     with ctx.open_tx() as conn:
-        return run_refresh_ror(conn, source=source, repo=RorDumpQueries(conn), logger=ctx.logger)
+        return run_refresh_ror(conn, source=source, store=RorStore(conn), logger=ctx.logger)
