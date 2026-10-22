@@ -93,10 +93,16 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
 ### Phase 4 — Essais d'une cascade par groupe
 
-- [ ] Périmètre du groupe, par l'union des indices de ses contributions sources.
-- [ ] Une décision par groupe, sur les signaux réunis de ses contributions sources : identifiants des sources fiables, nom au prénom le plus complet, structures et adresses.
+- [x] Périmètre du groupe, par l'union des indices de ses contributions sources. 02f69c43b
+- [x] Une décision par groupe, sur les signaux réunis de ses contributions sources (`domain/persons/group_matching.py`). 02f69c43b
+  - Exécution à blanc le 2026-10-22 (`shadow_group_cascade.py`), sur les 464 227 groupes qui ont un membre du périmètre ou rattaché : 456 915 identiques au rattachement actuel, 6 119 toujours sans personne (5 951 jurys de thèse), 849 rattachements perdus, 266 conflits actuels tranchés, 73 rattachements gagnés, 3 autres personnes, 2 créations. L'index des personnes vient en partie des rattachements actuels, donc l'accord est surestimé.
+  - Rattachements perdus : surtout des rattachements par un ORCID rejeté pour la personne, et des rattachements par le nom de groupes sortis du périmètre. Les 71 conflits de nom sont des doublons de personnes (« Zheng-Ze » et « Zhengze » Zhu), des fautes de source (« Buoef-Gibot » dans WoS) ou des erreurs de groupement.
+  - Conflits actuels tranchés : membres rattachés à deux personnes par l'ancrage entre sources ; la décision suit l'identifiant ou l'épinglage.
+  - Rattachements gagnés : nom complet d'un membre hors périmètre dans un groupe que l'adresse OpenAlex d'un autre membre met dans le périmètre.
+  - Essai écarté : refuser un identifiant quand un membre de même nom de famille, au prénom complet, contredit sa personne. Un refus juste sur deux : diminutifs (Bob et Robert), translittérations (Kuleshov), fautes de source.
 - [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
-- [ ] Une personne par groupe au plus. Dans une publication, un groupe par personne au plus.
+- [x] Une personne par groupe au plus, par construction.
+- [ ] Dans une publication, un groupe par personne au plus. 1 527 couples (publication, personne) portés par plusieurs groupes : 779 auteurs répétés dans une liste (Fauchon aux positions 0, 1, 14 et 15 chez OpenAlex), 748 personnes qui portent les identifiants de deux chercheurs (Manea et Manna).
 - [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
 ### Phase 5 — Migration du schéma
