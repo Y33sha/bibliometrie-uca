@@ -59,111 +59,105 @@
   {#if failure}
     <p class="failure">{failure}</p>
   {:else if data}
-    <section>
-      <h3>Sources</h3>
-      <div class="comparison-scroll">
-        <table class="comparison">
-          <thead>
-            <tr>
-              <th class="field" scope="col"></th>
-              {#each records as r (r.id)}
-                <th scope="col">
-                  <span class="record-head">
-                    <SourceTag
-                      source={r.source}
-                      href={sourceExternalUrl(r.source, r.source_id, r.oa_status)}
-                      id={r.source_id}
-                    />
-                    <span class="record-id">{r.source_id}</span>
-                  </span>
-                </th>
-              {/each}
-            </tr>
-          </thead>
-          <tbody>
-            {#each rows as row (row.key)}
-              <tr class:divergent={row.divergent}>
-                <th
-                  class="field"
-                  scope="row"
-                  title={row.divergent ? "Valeurs différentes selon les sources" : undefined}
-                >
-                  {row.label}
-                </th>
-                {#each row.cells as cell}
-                  <td>
-                    {#if cell.text === null}
-                      <span class="absent">—</span>
-                    {:else if cell.link?.kind === "doi"}
-                      <a href="https://doi.org/{cell.link.doi}" target="_blank" rel="noopener">{cell.text}</a>
-                    {:else if cell.link}
-                      <a href="{base}/{cell.link.kind}/{cell.link.id}" target="_blank" rel="noopener">{cell.text}</a>
+    <table class="comparison">
+      <thead>
+        <tr>
+          <th class="field" scope="col">Sources</th>
+          {#each records as r (r.id)}
+            <th scope="col">
+              <span class="record-head">
+                <SourceTag
+                  source={r.source}
+                  href={sourceExternalUrl(r.source, r.source_id, r.oa_status)}
+                  id={r.source_id}
+                />
+                <span class="record-id">{r.source_id}</span>
+              </span>
+            </th>
+          {/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each rows as row (row.key)}
+          <tr class:divergent={row.divergent}>
+            <th
+              class="field"
+              scope="row"
+              title={row.divergent ? "Valeurs différentes selon les sources" : undefined}
+            >
+              {row.label}
+            </th>
+            {#each row.cells as cell}
+              <td>
+                {#if cell.text === null}
+                  <span class="absent">—</span>
+                {:else if cell.link?.kind === "doi"}
+                  <a href="https://doi.org/{cell.link.doi}" target="_blank" rel="noopener">{cell.text}</a>
+                {:else if cell.link}
+                  <a href="{base}/{cell.link.kind}/{cell.link.id}" target="_blank" rel="noopener">{cell.text}</a>
+                {:else}
+                  {cell.text}
+                {/if}
+                {#if cell.note}
+                  <div class="note" title="Nom donné par la source">{cell.note}</div>
+                {/if}
+              </td>
+            {/each}
+          </tr>
+        {/each}
+        {#if authors.length}
+          <tr class="section-row">
+            <th class="field" scope="row">Auteurs</th>
+            <td colspan={records.length}></td>
+          </tr>
+        {/if}
+        {#each authors as row (row.key)}
+          <tr class:divergent={row.divergent}>
+            <th
+              class="field"
+              scope="row"
+              title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
+            ></th>
+            {#each row.cells as s}
+              <td class="author-cell">
+                {#if s}
+                  <span class="position">{s.position != null ? s.position + 1 : ""}</span>
+                  <span class="author">
+                    {#if s.person_id}
+                      <a
+                        href="{base}/persons/{s.person_id}"
+                        target="_blank"
+                        rel="noopener"
+                        class:in-perimeter={s.in_perimeter}>{s.full_name}</a
+                      >
                     {:else}
-                      {cell.text}
+                      <span class:in-perimeter={s.in_perimeter}>{s.full_name}</span>
                     {/if}
-                    {#if cell.note}
-                      <div class="note" title="Nom donné par la source">{cell.note}</div>
+                    {#if structsTooltip(s, data.structures)}
+                      <Tooltip text={structsTooltip(s, data.structures)}
+                        ><span class="info">&#9432;</span></Tooltip
+                      >
                     {/if}
-                  </td>
-                {/each}
-              </tr>
+                    {#if s.countries?.length}
+                      <span class="countries"
+                        >{s.countries.map((c) => c.toUpperCase()).join(" ")}</span
+                      >
+                    {/if}
+                    {#if otherRoles(s).length}
+                      <span class="roles"
+                        >{otherRoles(s)
+                          .map((r) => (contributionRoleLabels[r] ?? r).toLowerCase())
+                          .join(", ")}</span
+                      >
+                    {/if}
+                  </span>
+                {/if}
+              </td>
             {/each}
-            {#if authors.length}
-              <tr class="section-row">
-                <th class="field" scope="row">Auteurs</th>
-                <td colspan={records.length}></td>
-              </tr>
-            {/if}
-            {#each authors as row (row.key)}
-              <tr class:divergent={row.divergent}>
-                <th
-                  class="field"
-                  scope="row"
-                  title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
-                >
-</th>
-                {#each row.cells as s}
-                  <td class="author-cell">
-                    {#if s}
-                      <span class="position">{s.position != null ? s.position + 1 : ""}</span>
-                      <span class="author">
-                        {#if s.person_id}
-                          <a
-                            href="{base}/persons/{s.person_id}"
-                            target="_blank"
-                            rel="noopener"
-                            class:in-perimeter={s.in_perimeter}>{s.full_name}</a
-                          >
-                        {:else}
-                          <span class:in-perimeter={s.in_perimeter}>{s.full_name}</span>
-                        {/if}
-                        {#if structsTooltip(s, data.structures)}
-                          <Tooltip text={structsTooltip(s, data.structures)}
-                            ><span class="info">&#9432;</span></Tooltip
-                          >
-                        {/if}
-                        {#if s.countries?.length}
-                          <span class="countries"
-                            >{s.countries.map((c) => c.toUpperCase()).join(" ")}</span
-                          >
-                        {/if}
-                        {#if otherRoles(s).length}
-                          <span class="roles"
-                            >{otherRoles(s)
-                              .map((r) => (contributionRoleLabels[r] ?? r).toLowerCase())
-                              .join(", ")}</span
-                          >
-                        {/if}
-                      </span>
-                    {/if}
-                  </td>
-                {/each}
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-    </section>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
   {/if}
 </Drawer>
 
@@ -178,16 +172,6 @@
     color: #2563eb;
     text-decoration: underline;
   }
-  h3 {
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #888;
-    margin: 0 0 8px;
-  }
-  .comparison-scroll {
-    overflow-x: auto;
-  }
   .comparison {
     border-collapse: collapse;
     font-size: 0.85rem;
@@ -200,8 +184,17 @@
     text-align: left;
     vertical-align: top;
   }
+  /* En-têtes des sources figés au bord haut du volet, qui défile dans les deux sens. La marge négative compense la marge haute du corps du volet (16px) : l'en-tête touche ce bord dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
+  .comparison {
+    margin-top: -16px;
+  }
   .comparison thead th {
-    border-bottom: 2px solid var(--border, #e0e0e0);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+    border-bottom: none;
+    box-shadow: inset 0 -2px 0 var(--border, #e0e0e0);
     white-space: nowrap;
   }
   /* Colonnes des enregistrements sources : la marge gauche reçoit le numéro de position des auteurs. */
@@ -220,10 +213,14 @@
   .field {
     position: sticky;
     left: 0;
+    z-index: 1;
     background: #fff;
     color: #666;
     font-weight: 600;
     white-space: nowrap;
+  }
+  .comparison thead th.field {
+    z-index: 3;
   }
   tr.divergent td,
   tr.divergent .field {
