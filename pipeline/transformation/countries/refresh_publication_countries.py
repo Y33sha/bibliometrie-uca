@@ -130,7 +130,7 @@ def create_dirty_scope(conn: Connection) -> int:
     conn.execute(text("ALTER TABLE countries_recompute_scope ADD PRIMARY KEY (rank)"))
     conn.execute(text("ANALYZE countries_dirty_scope"))
     conn.execute(text("ANALYZE countries_recompute_scope"))
-    return conn.execute(text("SELECT count(*) FROM countries_recompute_scope")).scalar_one()
+    return int(conn.execute(text("SELECT count(*) FROM countries_recompute_scope")).scalar_one())
 
 
 def drop_dirty_scope(conn: Connection) -> None:
