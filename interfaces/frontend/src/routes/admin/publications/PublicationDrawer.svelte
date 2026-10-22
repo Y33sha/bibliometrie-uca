@@ -204,6 +204,14 @@
     border-bottom: 2px solid var(--border, #e0e0e0);
     white-space: nowrap;
   }
+  /* Colonnes des enregistrements sources : la marge gauche reçoit le numéro de position des auteurs. */
+  .comparison {
+    --position-gutter: 2.8em;
+  }
+  .comparison td,
+  .comparison thead th:not(.field) {
+    padding-left: var(--position-gutter);
+  }
   .comparison td {
     min-width: 160px;
     max-width: 320px;
@@ -252,18 +260,15 @@
     color: #444;
   }
   .author-cell {
-    white-space: nowrap;
+    position: relative;
   }
   .position {
-    display: inline-block;
-    min-width: 2.5em;
+    position: absolute;
+    left: 0;
+    width: calc(var(--position-gutter) - 6px);
     color: #999;
     font-variant-numeric: tabular-nums;
     text-align: right;
-    margin-right: 6px;
-  }
-  .author {
-    white-space: normal;
   }
   .in-perimeter {
     font-weight: 600;
