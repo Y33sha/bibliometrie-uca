@@ -113,11 +113,13 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape A — Personne sur le groupe, en double écriture
 
-- [ ] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`. `reference_position` tient lieu d'`author_position`.
+- [x] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`, recomposés depuis les membres par la tâche `contributions.propagate_groups`. `reference_position` tient lieu d'`author_position`. d21f109fc
 - [x] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La purge vide les groupes d'une personne avant de la supprimer. 4f7e62b73
 - [x] Tâche `persons.resolve_groups`, après la purge : la décision par groupe rattache les groupes sans personne à une personne existante, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id`. a6e809b3d
 - [x] Réévaluation des groupes recomposés : `author_grouping` vide la personne d'un groupe dont les membres changent. c352def57
-- [ ] Écart entre les groupes et `contributions` : couples (publication, personne) présents d'un seul côté.
+- [x] Écart entre les groupes et `contributions`, le 2026-10-22 après deux runs : 473 600 couples (publication, personne) des deux côtés, 860 seulement dans `contributions`, 79 seulement dans les groupes.
+  - 735 groupes sans personne : fausses personnes du périmètre ancrées par le seul nom d'un membre aujourd'hui hors périmètre, identifiants rejetés pour la personne, conflits de nom ou d'identifiant, formes de nom devenues ambiguës.
+  - 125 groupes rattachés à une autre personne : doublons de personnes nés de fautes de source (« Ren Lavigne », « Malys Clinchamps », accents perdus ou en notation LaTeX), que le groupe départage par identifiant. 406 épinglages en bloc de « Zhang, M. » et « Xu, Z. » à Maolin Zhang et Zehua Xu, qui imposaient leur personne à des groupes d'autres chercheurs, ont été supprimés.
 
 #### Étape B — Bascule des lecteurs
 
