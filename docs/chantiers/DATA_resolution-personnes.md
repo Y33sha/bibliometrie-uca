@@ -95,7 +95,7 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
 - [ ] Périmètre du groupe, par l'union des indices de ses contributions sources.
 - [ ] Une décision par groupe, sur les signaux réunis de ses contributions sources : identifiants des sources fiables, nom au prénom le plus complet, structures et adresses.
-- [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
+- [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
 - [ ] Une personne par groupe au plus. Dans une publication, un groupe par personne au plus.
 - [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
