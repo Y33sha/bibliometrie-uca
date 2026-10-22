@@ -6,6 +6,7 @@
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
@@ -201,7 +202,7 @@
 		<tbody>
 			{#each monographs.items as m (m.id)}
 				<tr>
-					<td><a href="{base}/monographs/{m.id}">{m.title}</a></td>
+					<td><a href="{base}/monographs/{m.id}"><PublicationTitle titre={m.title} /></a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
 					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>

@@ -7,6 +7,7 @@ import {
 	sanitizeAbstract,
 	sanitizeTitle,
 	titleCase,
+	titleText,
 	formatDate,
 	halDocUrl,
 	scanrPubUrl,
@@ -180,6 +181,27 @@ describe('deriveStructDetectionStatus', () => {
 });
 
 // ── sanitizeAbstract ───────────────────────────────────────────
+describe('titleText', () => {
+	it('rend le texte visible du MathML, sans balise', () => {
+		expect(
+			titleText('Measurement of <mml:math><mml:msup><mml:mi>W</mml:mi><mml:mo>+</mml:mo></mml:msup></mml:math> production')
+		).toBe('Measurement of W+ production');
+	});
+
+	it('rend le texte visible du LaTeX, sans la source TeX ni la copie MathML de KaTeX', () => {
+		const text = titleText('$\\Sigma^{\\pm}$ production in pp collisions');
+		expect(text).toBe('Σ± production in pp collisions');
+	});
+
+	it('décode les entités et retire le formatage HTML', () => {
+		expect(titleText('H&lt;sub&gt;2&lt;/sub&gt;O &amp; CO<sub>2</sub>')).toBe('H2O & CO2');
+	});
+
+	it('rend une chaîne vide pour un titre absent', () => {
+		expect(titleText(null)).toBe('');
+	});
+});
+
 describe('sanitizeAbstract', () => {
 	it('garde les paragraphes que les sources déposent dans un résumé', () => {
 		const result = sanitizeAbstract('<p>Premier.</p><p>Second.</p>');

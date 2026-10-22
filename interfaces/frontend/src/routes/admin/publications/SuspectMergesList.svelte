@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
+  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import SourceTag from "$lib/components/SourceTag.svelte";
   import { sourceExternalUrl } from "$lib/sources";
   import type { components } from "$lib/api/schema";
@@ -50,7 +51,7 @@
       <div class="row" class:active={item.publication_id === activePublicationId}>
         <div class="head">
           <button class="title" onclick={() => onopenPublication(item.publication_id)}>
-            {item.title}
+            <PublicationTitle titre={item.title} />
           </button>
           <span class="meta">
             {item.doc_type}{#if item.publication_year} · {item.publication_year}{/if} ·

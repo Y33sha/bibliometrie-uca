@@ -12,6 +12,7 @@
 	import TabNav from '$lib/components/TabNav.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import { confirmDialog } from '$lib/dialogs.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import type { components } from '$lib/api/schema';
@@ -275,7 +276,7 @@
 							{#each section.theses as t (t.id)}
 								<tr>
 									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
-									<td><a href="{base}/publications/{t.id}">{t.title}</a></td>
+									<td><a href="{base}/publications/{t.id}"><PublicationTitle titre={t.title} /></a></td>
 									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>

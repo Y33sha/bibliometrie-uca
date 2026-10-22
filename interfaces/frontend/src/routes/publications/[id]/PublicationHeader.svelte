@@ -39,7 +39,7 @@
     <div class="publication-journal-line">
       <!-- Le livre ou le volume d'actes, puis sa collection ; sans monographie, la revue ou le titre brut du conteneur. -->
       {#if pub.monograph_id}
-        <a href="{base}/monographs/{pub.monograph_id}" class="journal-name">{pub.monograph_title}</a>
+        <a href="{base}/monographs/{pub.monograph_id}" class="journal-name"><PublicationTitle titre={pub.monograph_title} /></a>
         {#if pub.journal_id}
           <a href="{base}/journals/{pub.journal_id}" class="collection-name">{pub.journal_title}</a>
         {/if}

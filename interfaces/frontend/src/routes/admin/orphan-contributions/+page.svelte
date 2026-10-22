@@ -10,6 +10,7 @@
 	import { autofocus } from '$lib/actions/focus';
 	import { anchored } from '$lib/actions/anchored';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
@@ -307,7 +308,7 @@
 					<td>{o.full_name}</td>
 					<td>
 						<a href="{base}/publications/{o.publication_id}" class="publication-link">
-							{o.publication_year ?? '?'} — {o.publication_title?.slice(0, 80)}{(o.publication_title?.length ?? 0) > 80 ? '…' : ''}
+							{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
 						</a>
 					</td>
 					<td>
@@ -414,6 +415,8 @@
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
 	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.publication-link:hover { text-decoration: underline; }
+	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */
+	.publication-title { display: inline-block; max-width: 50ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 200px; }

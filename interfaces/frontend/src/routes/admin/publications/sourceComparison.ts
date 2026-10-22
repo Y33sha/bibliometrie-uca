@@ -8,11 +8,12 @@ export type SourceContribution = components['schemas']['SourceContributionOut'];
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
 export type CellLink = { kind: 'doi'; doi: string } | { kind: 'journals' | 'publishers'; id: number };
 
-/** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note le nom donné par la source quand il diffère du référentiel. */
+/** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note le nom donné par la source quand il diffère du référentiel. `title` signale un titre de publication, rendu par `PublicationTitle`. */
 export interface ComparisonCell {
 	text: string | null;
 	link?: CellLink;
 	note?: string;
+	title?: boolean;
 }
 
 /** Ligne du tableau : un champ, une case par enregistrement. `divergent` signale au moins deux valeurs différentes. */
@@ -112,7 +113,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'title',
 			label: 'Titre',
-			cell: (r) => ({ text: r.title }),
+			cell: (r) => ({ text: r.title, title: true }),
 			// Forme normalisée sans espaces : un trait d'union présent, absent ou remplacé par une espace ne crée pas d'écart.
 			compared: (r) => (r.title_normalized ?? r.title).replace(/\s+/g, ''),
 		},

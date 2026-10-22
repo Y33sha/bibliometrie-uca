@@ -3,6 +3,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { apiDetail } from "$lib/api";
+  import { titleText } from "$lib/utils";
   import PublicationAbstract from "$lib/components/PublicationAbstract.svelte";
   import type { PubResponse } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
@@ -63,7 +64,7 @@
 </script>
 
 <svelte:head>
-  <title>{pageTitle(pub?.title ? pub.title.slice(0, 80) : "Publication")}</title>
+  <title>{pageTitle(titleText(pub?.title).slice(0, 80) || "Publication")}</title>
 </svelte:head>
 
 {#if canGoBack}

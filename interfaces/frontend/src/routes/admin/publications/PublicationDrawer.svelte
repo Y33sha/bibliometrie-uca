@@ -95,6 +95,8 @@
                   <a href="https://doi.org/{cell.link.doi}" target="_blank" rel="noopener">{cell.text}</a>
                 {:else if cell.link}
                   <a href="{base}/{cell.link.kind}/{cell.link.id}" target="_blank" rel="noopener">{cell.text}</a>
+                {:else if cell.title}
+                  <PublicationTitle titre={cell.text} />
                 {:else}
                   {cell.text}
                 {/if}
