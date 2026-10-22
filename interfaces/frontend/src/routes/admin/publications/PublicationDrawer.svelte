@@ -184,13 +184,13 @@
     text-align: left;
     vertical-align: top;
   }
-  /* En-têtes des sources figés au bord haut du volet, qui défile dans les deux sens. La marge négative compense la marge haute du corps du volet (16px) : l'en-tête touche ce bord dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
+  /* En-têtes des sources figés au bord haut du volet, qui défile dans les deux sens. Le décalage de -16px compense la marge haute du corps du volet, dans laquelle `top: 0` laisserait passer les lignes défilées ; la marge négative du tableau colle l'en-tête à ce bord dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
   .comparison {
     margin-top: -16px;
   }
   .comparison thead th {
     position: sticky;
-    top: 0;
+    top: -16px;
     z-index: 2;
     background: #fff;
     border-bottom: none;
