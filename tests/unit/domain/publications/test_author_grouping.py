@@ -11,6 +11,7 @@ from domain.publications.author_grouping import (
     SourceContribution,
     align_publication,
     comparison_levels,
+    conflicting_initials,
     full_first_name,
     gap,
     jaro_winkler,
@@ -299,6 +300,36 @@ class TestPositionOnly:
         assert not position_only(
             _author("martin", "anne", orcid="0000"), _author("durand", "claire", orcid="0000")
         )
+
+
+class TestConflictingInitials:
+    def test_patronyme_proche_et_initiales_differentes(self):
+        assert conflicting_initials(_author("balakrishnan", "v"), _author("balaji", "s"))
+
+    def test_patronyme_identique(self):
+        assert not conflicting_initials(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
+
+    def test_initiales_concordantes(self):
+        assert not conflicting_initials(_author("soh", "d a"), _author("su", "daxian"))
+
+    def test_prenom_absent(self):
+        assert not conflicting_initials(_author("balakrishnan", ""), _author("balaji", "s"))
+
+    def test_identifiant_commun(self):
+        assert not conflicting_initials(
+            _author("balakrishnan", "v", orcid="0000"), _author("balaji", "s", orcid="0000")
+        )
+
+    def test_le_residu_ne_lie_pas_des_initiales_contradictoires(self):
+        """« V. Balakrishnan » occupe la place de « S. Balaji » entre deux auteurs liés : le modèle ne les lie pas."""
+        reference = _source_record(1, [("martin", "a"), ("balaji", "s"), ("durand", "c")])
+        other = _source_record(2, [("martin", "a"), ("balakrishnan", "v"), ("durand", "c")])
+        groups = align_publication(
+            {1: reference, 2: other},
+            model=ResidualModel(RESIDUAL_WEIGHTS),
+            assign=_greedy,
+        )
+        assert all(len(g.members) == 1 for g in groups if g.reference.last_name.startswith("bala"))
 
 
 class TestFullFirstName:

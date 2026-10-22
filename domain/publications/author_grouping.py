@@ -241,9 +241,30 @@ def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
     return (
         levels[Comparison.LAST_NAME] == ComparisonLevel.ELSE
         and levels[Comparison.FIRST_NAME] in (ComparisonLevel.ELSE, None)
-        and ComparisonLevel.IDENTIFIER_EXACT
-        not in (levels[Comparison.ORCID], levels[Comparison.IDREF])
+        and not _shared_identifier(levels)
     )
+
+
+def conflicting_initials(x: Author, y: Author) -> bool:
+    """Patronymes seulement proches et premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji »."""
+    return _conflicting_initials(x, y, comparison_levels(x, y))
+
+
+def _conflicting_initials(
+    x: Author, y: Author, levels: Mapping[Comparison, ComparisonLevel | None]
+) -> bool:
+    return (
+        levels[Comparison.LAST_NAME]
+        in (ComparisonLevel.JW_092, ComparisonLevel.JW_08, ComparisonLevel.ELSE)
+        and bool(x.first_name)
+        and bool(y.first_name)
+        and x.first_name[0] != y.first_name[0]
+        and not _shared_identifier(levels)
+    )
+
+
+def _shared_identifier(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
+    return ComparisonLevel.IDENTIFIER_EXACT in (levels[Comparison.ORCID], levels[Comparison.IDREF])
 
 
 @dataclass(frozen=True)
@@ -588,7 +609,7 @@ def _residual_links(
 ) -> dict[int, tuple[int, float, float]]:
     """Liens du résidu : contribution source → (indice de groupe, score, marge).
 
-    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe que la position seule ne rapproche pas (`position_only`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe retenus : ceux que la position seule ne rapproche pas (`position_only`), et dont les initiales ne contredisent pas un patronyme seulement proche (`conflicting_initials`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
     """
     contribution_gaps, group_gaps = record_links.gaps()
     rest_contributions = [s for s in record_links.contributions if s.id in contribution_gaps]
@@ -632,8 +653,9 @@ def _residual_links(
                 (y, levels)
                 for y in members[index]
                 if not _position_only(levels := comparison_levels(x, y))
+                and not _conflicting_initials(x, y, levels)
             ]
-            # Le blocage ne retient que les membres que la position seule ne rapproche pas ; le trou est celui du groupe.
+            # Le blocage ne retient que les membres retenus ; le trou est celui du groupe.
             if not kept or not (
                 abs(x.gap - group_gaps[index]) <= 1
                 or any(
