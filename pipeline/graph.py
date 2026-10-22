@@ -847,13 +847,15 @@ TASKS: tuple[Task, ...] = (
             "publications.contributions_dirty",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants et neutralisations qu'écrit la phase `persons`.
+        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publications.contributions_dirty",
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
         ),
     ),
     _task(
@@ -927,10 +929,12 @@ TASKS: tuple[Task, ...] = (
             "rejected_contributions",
             "distinct_persons",
         ),
-        # La suppression d'une personne emporte ses formes de nom.
+        # La suppression d'une personne emporte ses formes de nom et vide ses groupes.
         writes=(
             "source_contributions.person_id",
             "source_contributions.resolution_mode",
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
             "person_identifiers.id",
             "persons.id",
             "person_name_forms.id",

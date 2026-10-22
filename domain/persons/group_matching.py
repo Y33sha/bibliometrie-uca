@@ -59,13 +59,13 @@ class GroupSkipReason(StrEnum):
 
 
 class GroupMatchReason(StrEnum):
-    """Signal qui rattache un groupe à une personne."""
+    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `group_resolution_mode`."""
 
-    PINNED = "pinned"
+    MANUAL = "manual"
     ORCID = "orcid"
     HAL_PERSON_ID = "hal_person_id"
     IDREF = "idref"
-    SINGLE_NAME = "single_name"
+    NAME = "name"
     COMPATIBLE_NAME = "compatible_name"
 
 
@@ -139,7 +139,7 @@ def decide_group(
     pinned = {m.pinned_person_id for m in members if m.pinned_person_id is not None}
     if pinned:
         if (person_id := _single(pinned)) is not None:
-            return GroupDecision(GroupOutcome.MATCH, person_id, GroupMatchReason.PINNED)
+            return GroupDecision(GroupOutcome.MATCH, person_id, GroupMatchReason.MANUAL)
         return GroupDecision(GroupOutcome.SKIP, reason=GroupSkipReason.PIN_CONFLICT)
 
     evidence: list[tuple[str, str, int]] = []
@@ -209,10 +209,10 @@ def _decide_by_name(
             reason = (
                 GroupMatchReason.COMPATIBLE_NAME
                 if outcome.reason == MatchReason.COMPATIBLE_NAME
-                else GroupMatchReason.SINGLE_NAME
+                else GroupMatchReason.NAME
             )
             # Une forme exacte prime sur des initiales compatibles pour la même personne.
-            if matched.get(outcome.person_id) != GroupMatchReason.SINGLE_NAME:
+            if matched.get(outcome.person_id) != GroupMatchReason.NAME:
                 matched[outcome.person_id] = reason
             evidence.append((reason, m.source, outcome.person_id))
         elif outcome.reason == MatchReason.AMBIGUOUS_NAME_FORM:
@@ -240,11 +240,11 @@ def _decide_by_name(
 
 
 _STRENGTH: dict[GroupMatchReason, int] = {
-    GroupMatchReason.PINNED: 0,
+    GroupMatchReason.MANUAL: 0,
     GroupMatchReason.ORCID: 1,
     GroupMatchReason.HAL_PERSON_ID: 1,
     GroupMatchReason.IDREF: 1,
-    GroupMatchReason.SINGLE_NAME: 2,
+    GroupMatchReason.NAME: 2,
     GroupMatchReason.COMPATIBLE_NAME: 2,
 }
 """Rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""

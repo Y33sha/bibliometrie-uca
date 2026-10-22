@@ -204,8 +204,8 @@ class TestMergePersons:
         ):
             groups[key] = conn.execute(
                 text(
-                    "INSERT INTO source_contribution_groups (publication_id, person_id)"
-                    " VALUES (:p, :person) RETURNING id"
+                    "INSERT INTO source_contribution_groups (publication_id, person_id, resolution_mode)"
+                    " VALUES (:p, :person, 'name') RETURNING id"
                 ),
                 {"p": publication, "person": person},
             ).scalar_one()

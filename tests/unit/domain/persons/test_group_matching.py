@@ -69,7 +69,7 @@ def test_un_epinglage_l_emporte():
     assert (decision.outcome, decision.person_id, decision.reason) == (
         GroupOutcome.MATCH,
         1,
-        GroupMatchReason.PINNED,
+        GroupMatchReason.MANUAL,
     )
 
 
@@ -139,7 +139,7 @@ def test_un_membre_du_perimetre_suffit_au_rattachement_par_le_nom():
 
     decision = decide_group(members, index)
 
-    assert (decision.person_id, decision.reason) == (1, GroupMatchReason.SINGLE_NAME)
+    assert (decision.person_id, decision.reason) == (1, GroupMatchReason.NAME)
 
 
 def test_un_prenom_plein_tranche_l_ambiguite_d_une_initiale():
@@ -176,9 +176,9 @@ def test_un_jury_de_these_ne_cree_pas_de_personne():
 
 
 def test_une_personne_revient_au_groupe_le_mieux_appuye_de_la_publication():
-    by_name = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.SINGLE_NAME)
+    by_name = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.NAME)
     by_orcid = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.ORCID)
-    other = GroupDecision(GroupOutcome.MATCH, 2, GroupMatchReason.SINGLE_NAME)
+    other = GroupDecision(GroupOutcome.MATCH, 2, GroupMatchReason.NAME)
 
     settled = settle_publication({10: (by_name, 6), 11: (by_orcid, 2), 12: (other, 1)})
 
@@ -188,7 +188,7 @@ def test_une_personne_revient_au_groupe_le_mieux_appuye_de_la_publication():
 
 
 def test_a_appui_egal_la_personne_revient_au_groupe_le_plus_fourni():
-    decision = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.SINGLE_NAME)
+    decision = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.NAME)
 
     settled = settle_publication({10: (decision, 1), 11: (decision, 6)})
 
