@@ -57,6 +57,7 @@
 * 206321: pourquoi UNH non reconnue?
 * 221243: pourquoi pas fusionné avec son hal-id?
 * 81408: openalex, source hal; mais pas de doc hal correpondant
+* 27059: Epidemiological impact ofNeisseria gonorrhoeaeandChlamydia trachomatisscreening in men having sex with men: a modelling study => normaliser toutes les balises en espaces puis supprimer les espaces doubles
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
