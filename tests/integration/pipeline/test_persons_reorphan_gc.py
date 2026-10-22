@@ -7,7 +7,11 @@ from sqlalchemy import text
 from pipeline.transformation.persons.identifier_arbitration import (
     null_identifier_source_contributions,
 )
-from pipeline.transformation.persons.purge import delete_empty_persons, reorphan_ambiguous_nominal
+from pipeline.transformation.persons.purge import (
+    delete_empty_persons,
+    detach_out_of_perimeter_persons,
+    reorphan_ambiguous_nominal,
+)
 from pipeline.transformation.persons.store import PersonsStore
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import (
@@ -21,7 +25,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def _source_contribution(conn, *, form, person_id, mode, identifiers=None):
+def _source_contribution(conn, *, form, person_id, mode, identifiers=None, in_perimeter=True):
     publication = insert_publication(conn, "t")
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -33,7 +37,7 @@ def _source_contribution(conn, *, form, person_id, mode, identifiers=None):
         author_name_normalized=form,
         identifiers=identifiers,
         person_id=person_id,
-        in_perimeter=True,
+        in_perimeter=in_perimeter,
         resolution_mode=mode,
     )
 
@@ -150,6 +154,44 @@ def test_null_identifier_source_contributions_targets_old_owner_only(sa_sync_con
     assert _row(conn, pinned).person_id == old  # épinglée admin
     assert _row(conn, other_owner).person_id == other  # autre propriétaire
     assert _row(conn, other_value).person_id == old  # autre valeur
+
+
+def test_une_personne_sans_contribution_source_du_perimetre_est_detachee_puis_supprimee(
+    sa_sync_conn,
+):
+    """Une personne rattachée par identifiant à des contributions sources hors périmètre seulement est vidée puis supprimée ; une contribution source du périmètre, une fiche RH ou une décision humaine la conservent."""
+    conn = sa_sync_conn
+    hors = insert_person(conn, "Demougeot", first_name="Celine")
+    hors_contributions = [
+        _source_contribution(
+            conn, form="celine demougeot", person_id=hors, mode=mode, in_perimeter=False
+        )
+        for mode in ("identifier", "cross_source")
+    ]
+    mixte = insert_person(conn, "Mixte", first_name="M")
+    _source_contribution(
+        conn, form="m mixte", person_id=mixte, mode="identifier", in_perimeter=False
+    )
+    _source_contribution(conn, form="m mixte", person_id=mixte, mode="identifier")
+    rh = insert_person(conn, "Prof", first_name="P")
+    insert_hr_record(conn, rh)
+    rh_contribution = _source_contribution(
+        conn, form="p prof", person_id=rh, mode="identifier", in_perimeter=False
+    )
+    exclue = insert_person(conn, "Exclue", first_name="E")
+    conn.execute(text("UPDATE persons SET exclusion = 'not_a_person' WHERE id = :p"), {"p": exclue})
+    _source_contribution(
+        conn, form="e exclue", person_id=exclue, mode="identifier", in_perimeter=False
+    )
+
+    assert detach_out_of_perimeter_persons(conn) == 2
+    delete_empty_persons(conn)
+
+    assert [_row(conn, sc) for sc in hors_contributions] == [(None, None), (None, None)]
+    assert _person_exists(conn, hors) is False
+    for kept in (mixte, rh, exclue):
+        assert _person_exists(conn, kept) is True
+    assert _row(conn, rh_contribution).person_id == rh
 
 
 def test_delete_empty_persons_spares_signed_and_rh(sa_sync_conn):

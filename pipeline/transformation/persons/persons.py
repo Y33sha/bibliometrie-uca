@@ -100,6 +100,7 @@ class PersonsPhase:
         summary = metrics.details["summary"]
         assert isinstance(summary, dict)
         summary["reorphaned_nominal"] = purge_counts.get("reorphaned", 0)
+        summary["detached_out_of_perimeter"] = purge_counts.get("detached_out_of_perimeter", 0)
         summary["deleted_empty_persons"] = purge_counts.get("deleted_persons", 0)
         for key, count in name_form_counts.items():
             summary[f"name_forms_{key}"] = count

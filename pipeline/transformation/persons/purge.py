@@ -1,4 +1,4 @@
-"""Purge de la phase personnes : re-orphelinage des formes de nom devenues ambiguës, suppression des attributions d'identifiant sans appui, puis suppression des personnes vidées.
+"""Purge de la phase personnes : re-orphelinage des formes de nom devenues ambiguës, détachement des personnes sans contribution source du périmètre, suppression des attributions d'identifiant sans appui, puis suppression des personnes vidées.
 
 Tourne **après `populate_person_name_forms`**, qui régénère les formes dérivées du nom des personnes : c'est seulement là qu'une forme réduite (« j martin »), partagée par une personne réduite et par la forme pleine dont elle est l'initiale, devient ambiguë. Le re-orphelinage détache alors les contributions sources nominales à forme ambiguë, non épinglées ; le GC supprime les personnes ainsi vidées (hors référentiel RH), ce qui retire les formes dérivées de leur nom et désambiguïse. La contribution source libérée rejoint la forme pleine au `match` du run suivant.
 
@@ -66,6 +66,24 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
     ).rowcount
 
 
+def detach_out_of_perimeter_persons(conn: Connection) -> int:
+    """Détache les contributions sources des personnes qui n'en ont aucune du périmètre, ni fiche RH, ni décision humaine (`person_without_decision_sql`). La cascade rattache par identifiant une contribution source hors périmètre à une personne existante : sans cette étape, une personne dont le dernier indice de périmètre disparaît garde ses contributions sources. `delete_empty_persons` supprime ensuite la personne vidée. Rend le nombre de contributions sources détachées."""
+    return conn.execute(
+        text(f"""
+            UPDATE source_contributions sc
+            SET {DETACHED_SOURCE_CONTRIBUTION}
+            FROM persons p
+            WHERE sc.person_id = p.id
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_contributions sc_in
+                  WHERE sc_in.person_id = p.id AND sc_in.in_perimeter
+              )
+              AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
+              AND {person_without_decision_sql("p")}
+        """)
+    ).rowcount
+
+
 def delete_empty_persons(conn: Connection) -> int:
     """Après le re-orphelinage, une personne purement nominale peut se retrouver sans aucune `source_contributions` — typiquement une forme réduite dont les contributions sources ont rejoint la forme pleine. La supprimer retire les formes dérivées de son nom (FK `CASCADE`), ce qui désambiguïse la forme réduite et laisse les orphelines se re-attacher au run suivant.
 
@@ -101,16 +119,18 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
 
 
 def purge(conn: Connection) -> dict[str, int]:
-    """Re-orpheline les contributions sources nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes vidées.
+    """Re-orpheline les contributions sources nominales à forme ambiguë, détache celles des personnes hors périmètre, supprime les attributions d'identifiant sans appui, puis les personnes vidées.
 
-    Retourne les compteurs `{reorphaned, deleted_attributions, deleted_persons}`. Le commit est laissé au caller.
+    Retourne les compteurs `{reorphaned, detached_out_of_perimeter, deleted_attributions, deleted_persons}`. Le commit est laissé au caller.
     """
     reorphaned = reorphan_ambiguous_nominal(conn)
+    detached_out_of_perimeter = detach_out_of_perimeter_persons(conn)
     deleted_attributions = delete_unsupported_identifier_attributions(conn)
     deleted_persons = delete_empty_persons(conn)
 
     return {
         "reorphaned": reorphaned,
+        "detached_out_of_perimeter": detached_out_of_perimeter,
         "deleted_attributions": deleted_attributions,
         "deleted_persons": deleted_persons,
     }
