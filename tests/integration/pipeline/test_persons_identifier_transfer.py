@@ -36,7 +36,7 @@ def _seed(conn, *, source_contribution_id, raw_name, name_norm, idref):
         title=f"publication {source_contribution_id}",
         row_id=source_contribution_id,
         publication_year=2024,
-        doc_type="ART",
+        doc_type="article",
     )
     insert_source_contribution(
         conn,

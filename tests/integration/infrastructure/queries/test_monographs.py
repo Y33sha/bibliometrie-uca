@@ -182,7 +182,8 @@ def test_nature_recalculee_dans_les_deux_sens(repo, sa_sync_conn):
             sa_sync_conn,
             source="crossref",
             source_id=source_id,
-            doc_type="book-chapter",
+            doc_type="book_chapter",
+            raw_doc_type="book-chapter",
             monograph_id=mid,
         )
 

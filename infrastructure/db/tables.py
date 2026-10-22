@@ -1209,7 +1209,7 @@ source_records = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),
-    Column("doc_type", Text),
+    Column("doc_type", doc_type_enum),
     Column(
         "raw_doc_type",
         Text,

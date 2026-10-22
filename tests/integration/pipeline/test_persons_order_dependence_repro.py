@@ -38,7 +38,7 @@ def _seed_source_contribution(conn, *, publication_id, raw_name, name_norm):
         title=f"publication {publication_id}",
         row_id=publication_id,
         publication_year=2024,
-        doc_type="ART",
+        doc_type="article",
     )
     insert_source_contribution(
         conn,
@@ -64,7 +64,7 @@ def _seed_two_source_records(
             title=f"publication {publication_id}",
             row_id=source_record_id,
             publication_year=2024,
-            doc_type="ART",
+            doc_type="article",
         )
     for source_contribution_id, source, raw, norm in (
         (sa1_id, "hal", raw1, norm1),

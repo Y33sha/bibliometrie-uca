@@ -96,7 +96,7 @@ _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id")
 _JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
 # Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
-_ENUM_CASTS = {"license": "license_type"}
+_ENUM_CASTS = {"doc_type": "doc_type", "license": "license_type"}
 
 
 def _value(column: str) -> str:
