@@ -181,7 +181,7 @@ def fetch_out_of_perimeter_candidates(conn: Connection) -> list[BareUnlinkedCont
 
 
 def fetch_linked_contributions(conn: Connection) -> list[LinkedContributionRow]:
-    """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une contribution source collective ou un doublon d'auteur n'ancre rien."""
+    """Sert d'index d'ancrage au matching cross-source. Les liens cross-source eux-mêmes en sont exclus (`resolution_mode <> 'cross_source'`) : un résultat cross-source n'en ancre aucun autre. Une contribution source hors groupe n'ancre rien."""
     rows = conn.execute(
         text(f"""
             SELECT sc_auth.person_id, gs.group_id,

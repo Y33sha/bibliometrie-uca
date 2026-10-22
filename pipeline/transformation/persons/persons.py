@@ -2,7 +2,7 @@
 
 Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'un enregistrement source (`duplicate_of`), non épinglés, perdent leur personne.
+1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les contributions sources hors groupe, non épinglées, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les contributions sources rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
@@ -32,6 +32,7 @@ from infrastructure.repositories.person_repository import (
 )
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
+    person_source_contribution,
     pinned,
 )
 from pipeline.runtime.context import Phase, PhaseContext
@@ -60,13 +61,14 @@ def enforce_confirmed_source_contributions(conn: Connection) -> int:
     ).rowcount
 
 
-def detach_copies(conn: Connection) -> int:
-    """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
+def detach_ungrouped(conn: Connection) -> int:
+    """Détache de leur personne les contributions sources hors groupe (`person_source_contribution`), sauf épinglage. Rend le nombre de contributions sources détachées."""
     return conn.execute(
         text(f"""
             UPDATE source_contributions sc
             SET {DETACHED_SOURCE_CONTRIBUTION}
-            WHERE sc.duplicate_of IS NOT NULL AND sc.person_id IS NOT NULL
+            WHERE sc.person_id IS NOT NULL
+              AND NOT {person_source_contribution("sc")}
               AND NOT {pinned("sc.id")}
         """)
     ).rowcount
@@ -107,7 +109,7 @@ class PersonsPhase:
         return metrics
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        """Épinglages, détachement des copies, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
+        """Épinglages, détachement des contributions sources hors groupe, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         logger = ctx.logger
         with ctx.open_tx() as conn:
             repo = self.repo_factory(conn)
@@ -123,13 +125,17 @@ class PersonsPhase:
                     ),
                 )
 
-            n_copies = detach_copies(conn)
-            if n_copies:
-                step(logger, "Auteurs en double dans la liste d'un enregistrement source")
+            n_ungrouped = detach_ungrouped(conn)
+            if n_ungrouped:
+                step(logger, "Contributions sources hors groupe")
                 logger.info(
                     "%s%s de leur personne",
                     LAST_BRANCH,
-                    quantity(n_copies, "doublon détaché", "doublons détachés"),
+                    quantity(
+                        n_ungrouped,
+                        "contribution source détachée",
+                        "contributions sources détachées",
+                    ),
                 )
 
             arbitration = arbitrate_identifier_conflicts(conn, logger, repo=repo)

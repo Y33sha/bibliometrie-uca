@@ -864,8 +864,6 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "source_contributions.contributor_information_id",
             "source_contributions.in_perimeter",
-            "source_contributions.collective",
-            "source_contributions.duplicate_of",
             "source_contributions.source_record_id",
             "source_records.publication_id",
             "source_contribution_group_members",

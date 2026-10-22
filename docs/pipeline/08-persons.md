@@ -1,6 +1,6 @@
 #  Résolution et création des personnes
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-22.*
 
 ```mermaid
 flowchart LR
@@ -44,9 +44,9 @@ Une contribution source hors périmètre ne peut pas donner lieu à une créatio
 
 Elle peut être rattachée à une personne existante, soit par identifiant, soit par sa présence dans une autre source. Le critère de similitude de nom ne vaut que pour les contributions sources du périmètre. 
 
-### Contributions sources collectives
+### Contributions sources hors groupe
 
-Une contribution source collective n'est rattachée à aucune personne, et ne compte pas dans l'arbitrage des identifiants.
+Seule une contribution source d'un groupe (phase `author_grouping`) est rattachée à une personne. Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement restent hors groupe. Elles n'ont pas de personne, sauf épinglage, et ne comptent pas dans l'arbitrage des identifiants.
 
 ## Indépendance de l'ordre d'ingestion
 

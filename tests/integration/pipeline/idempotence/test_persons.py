@@ -66,8 +66,10 @@ def run_create_persons(conn):
     from pipeline.transformation.persons.identifier_arbitration import (
         arbitrate_identifier_conflicts,
     )
+    from tests.integration.helpers.groups import group_ungrouped
 
     logger = logging.getLogger("test")
+    group_ungrouped(conn)
     arbitrate_identifier_conflicts(conn, logger, repo=PgPersonRepository(conn))
     run_cascade(conn, logger, repo=PgPersonRepository(conn))
 

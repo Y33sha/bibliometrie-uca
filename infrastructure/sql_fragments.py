@@ -28,8 +28,11 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle n'est ni collective, ni un doublon d'auteur (`duplicate_of`)."""
-    return f"NOT {source_contribution}.collective AND {source_contribution}.duplicate_of IS NULL"
+    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`source_contribution_group_members`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
+    return (
+        "EXISTS (SELECT 1 FROM source_contribution_group_members gm"
+        f" WHERE gm.source_contribution_id = {source_contribution}.id)"
+    )
 
 
 def pinned(source_contribution_id: str) -> str:

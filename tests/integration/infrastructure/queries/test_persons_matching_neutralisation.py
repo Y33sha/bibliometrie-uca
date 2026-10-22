@@ -10,6 +10,7 @@ from pipeline.transformation.persons.identifier_arbitration import (
 )
 from pipeline.transformation.persons.loading import fetch_unlinked_contributions
 from tests.integration.helpers.contributions import upsert_contributor_information
+from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -53,6 +54,7 @@ def _carte(conn, source_contribution_id):
 
 
 def _orcid_projete(conn):
+    group_ungrouped(conn)
     rows = fetch_unlinked_contributions(conn)
     [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
     return row.identifiers.get("orcid")
@@ -77,6 +79,7 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
     _source_contribution(
         sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3"
     )
+    group_ungrouped(sa_sync_conn)
     votes = fetch_identifier_votes(sa_sync_conn, "orcid")
     assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
 

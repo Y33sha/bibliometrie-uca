@@ -2,6 +2,7 @@
 
 from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
 from pipeline.transformation.persons.loading import fetch_unlinked_contributions
+from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -29,6 +30,7 @@ def test_contribution_source_collective_absente_des_candidates(sa_sync_conn):
     _source_contribution(sa_sync_conn, "Zeta Consortium", collective=True, source_id="c-coll-1")
     _source_contribution(sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-2")
 
+    group_ungrouped(sa_sync_conn)
     names = {r.name.display() for r in fetch_unlinked_contributions(sa_sync_conn)}
 
     assert "Jean Zetaindividu" in names
@@ -43,6 +45,7 @@ def test_contribution_source_collective_ne_vote_pas(sa_sync_conn):
         sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-7", orcid=_ORCID
     )
 
+    group_ungrouped(sa_sync_conn)
     votes = fetch_identifier_votes(sa_sync_conn, "orcid")
 
     assert votes[_ORCID] == {"jean zetaindividu": 1}
