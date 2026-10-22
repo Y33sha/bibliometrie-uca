@@ -172,6 +172,23 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
     add_source_contribution_structure(conn, source_contribution_id, structure_id)
 
 
+def add_source_contribution_ror(conn, source_contribution_id: int, structure_id: int) -> None:
+    """Lie la contribution source `source_contribution_id` à `structure_id` par un ROR propre à la contribution source (indice `ror`), en donnant un ROR à la structure qui n'en a pas, puis rafraîchit les matviews de structures. La structure doit appartenir au périmètre d'extraction : `add_source_contribution_structure` l'y rattache."""
+    ror = conn.execute(
+        text(
+            "UPDATE structures SET ror_id = COALESCE(ror_id, :ror) WHERE id = :id RETURNING ror_id"
+        ),
+        {"ror": f"0test{next(_seq):04d}", "id": structure_id},
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO source_contribution_rors (source_contribution_id, ror_id) VALUES (:sc, :ror)"
+        ),
+        {"sc": source_contribution_id, "ror": ror},
+    )
+    refresh_structure_matviews(conn)
+
+
 def add_source_contribution_structure(conn, source_contribution_id: int, structure_id: int) -> None:
     """Lie la contribution source `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
     raw_text = f"as-test-addr-{next(_seq)}"

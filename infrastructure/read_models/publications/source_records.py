@@ -11,7 +11,10 @@ from application.ports.read_models.publications_queries import (
 )
 from domain.source_records.biblio import BiblioKey, JournalKey
 from infrastructure.read_models.publications.detail import structures_by_id
-from infrastructure.read_models.sql_fragments import contributor_display_name
+from infrastructure.read_models.sql_fragments import (
+    contributor_display_name,
+    source_contribution_structure_ids,
+)
 
 
 def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
@@ -79,9 +82,8 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
                    {contributor_display_name()} AS full_name, sc.roles, sc.person_id,
                    sc.in_perimeter, sc.collective, sc.countries,
-                   (SELECT array_agg(scs.structure_id ORDER BY scs.structure_id)
-                    FROM source_contribution_structures scs
-                    WHERE scs.source_contribution_id = sc.id) AS structure_ids,
+                   (SELECT array_agg(structure_id ORDER BY structure_id)
+                    FROM ({source_contribution_structure_ids("sc")}) ids) AS structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
                     FROM source_contribution_addresses sca
                     JOIN addresses addr ON addr.id = sca.address_id

@@ -5,7 +5,11 @@ from infrastructure.read_models.contributions import PgContributionsQueries
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
-from tests.integration.helpers.structures import add_source_contribution_structure, insert_structure
+from tests.integration.helpers.structures import (
+    add_source_contribution_ror,
+    add_source_contribution_structure,
+    insert_structure,
+)
 
 
 class TestOrphanContributionsCount:
@@ -177,3 +181,16 @@ class TestListOrphanContributions:
 
         (row,) = _list(sa_sync_conn, search="Zzorph Avec").contributions
         assert [(lab_item.id, lab_item.label) for lab_item in row.labs] == [(ids["lab"], "LAB")]
+
+    def test_un_laboratoire_atteint_par_deux_indices_compte_une_fois(self, sa_sync_conn):
+        """« Zzorph Avec » atteint LAB par une adresse et par un ROR : une étiquette et un compte."""
+        ids = self._labs_setup(sa_sync_conn)
+        add_source_contribution_ror(sa_sync_conn, ids["sa"], ids["lab"])
+
+        (row,) = _list(sa_sync_conn, search="Zzorph Avec").contributions
+        facets = PgContributionsQueries(sa_sync_conn).orphan_contributions_facets(
+            filters=OrphanFilters(search="Zzorph")
+        )
+
+        assert [lab_item.id for lab_item in row.labs] == [ids["lab"]]
+        assert (str(ids["lab"]), "LAB", 1) in [(o.value, o.label, o.count) for o in facets.labs]
