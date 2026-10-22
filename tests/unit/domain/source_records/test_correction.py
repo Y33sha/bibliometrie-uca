@@ -76,7 +76,7 @@ class TestThesesFrRule:
     def test_theses_fr_wins_over_dumas(self):
         # Une vue portant les deux marqueurs : theses.fr fait autorité.
         view = _view(
-            doc_type="dissertation",
+            doc_type="thesis",
             urls=("https://theses.fr/s1", "https://dumas.ccsd.cnrs.fr/dumas-1"),
         )
         corrected = effective_metadata(view).doc_type
@@ -90,22 +90,21 @@ class TestThesesFrRule:
 
 class TestDumasRule:
     def test_dumas_url_corrects_to_memoir(self):
-        view = _view(doc_type="dissertation", urls=("https://dumas.ccsd.cnrs.fr/dumas-12345",))
+        view = _view(doc_type="thesis", urls=("https://dumas.ccsd.cnrs.fr/dumas-12345",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
         assert corrected.rule == MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR
 
     def test_dumas_url_corrects_regardless_of_doc_type(self):
-        # Règle dure URL-only : un `doc_type` brut OpenAlex « article » (mésclassement
-        # ou entité mêlant thèse + article) passe quand même en `memoir`.
+        # Règle sur la seule URL : un `doc_type` `article` (mauvais classement ou entité mêlant thèse et article) passe en `memoir`.
         view = _view(doc_type="article", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
 
     def test_no_dumas_url_no_correction(self):
-        view = _view(doc_type="dissertation", urls=("https://example.com/x",))
+        view = _view(doc_type="thesis", urls=("https://example.com/x",))
         assert effective_metadata(view).doc_type is None
 
 
