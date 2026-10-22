@@ -19,6 +19,8 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - La cascade décide par groupe. Elle cherche les indices de périmètre du groupe, puis rattache le groupe à une personne existante.
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
 - Le rattachement d'un groupe à une personne est figé tant que ses membres restent les mêmes. Un groupe dont les membres changent est réévalué.
+- `source_contribution_groups.resolution_mode` a sa propre enum, `group_resolution_mode` : `manual`, `orcid`, `hal_person_id`, `idref`, `name`, `compatible_name`.
+- Pendant la transition, la cascade des groupes écrit seulement la personne des groupes, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id` jusqu'à la bascule des lecteurs ; les écarts entre les deux signalent des conflits.
 - Les décisions humaines visent des entités stables et se propagent au groupe :
   - l'épinglage d'une contribution source rattache son groupe ;
   - le rejet d'un couple (enregistrement source, personne) interdit de lier la personne à la publication de l'enregistrement source, donc à tout groupe de cette publication.
@@ -126,7 +128,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 #### Étape C — Bascule des écrivains
 
 - [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
-- [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
+- [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` se réduit à la propagation des attributs des membres vers le groupe.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
 
@@ -155,6 +157,5 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
 - Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md). Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
-- `resolution_mode` d'un groupe rattaché par une décision humaine : valeur dédiée, ou lecture de l'épinglage.
 - Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres groupes.

@@ -839,6 +839,9 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_contribution_groups.id",
             "source_contribution_groups.reference_position",
+            # Un groupe dont les membres changent perd sa personne.
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
             "publications.contributions_dirty",

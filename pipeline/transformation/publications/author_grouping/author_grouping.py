@@ -206,6 +206,7 @@ def _plan_batch(
     existing, stored = store.fetch_groups(publication_ids)
     planned: list[tuple[int, GroupTuple, int | None]] = []
     unmatched: list[int] = []
+    recomposed: list[int] = []
     copies: dict[int, int] = {}
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
     for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
@@ -214,8 +215,14 @@ def _plan_batch(
             gid: frozenset(contributions)
             for gid, contributions in existing.get(publication_id, {}).items()
         }
-        ids = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
+        new = [frozenset(m[0] for m in members) for _, members in groups]
+        ids = plan_group_ids(old, new)
         planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
+        recomposed += [
+            gid
+            for gid, members in zip(ids, new, strict=True)
+            if gid is not None and old[gid] != members
+        ]
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
     fresh = iter(store.group_ids(sum(1 for *_, gid in planned if gid is None)))
@@ -231,7 +238,7 @@ def _plan_batch(
                 MembershipRow(source_contribution, group_id, source_record, method, score, margin)
             )
     removed, inserted = membership_changes(stored, memberships)
-    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, copies)
+    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, recomposed, copies)
 
 
 def regroup(
