@@ -114,9 +114,9 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 #### Étape A — Personne sur le groupe, en double écriture
 
 - [ ] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`. `reference_position` tient lieu d'`author_position`.
-- [ ] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La clé étrangère `ON DELETE SET NULL` vide seulement `person_id`, donc la suppression d'une personne viole la contrainte si ses groupes ne sont pas détachés avant.
-- [ ] La phase `persons` écrit la personne du groupe en plus de celle des contributions sources. Tant que la cascade décide par contribution source, la personne du groupe est celle de ses membres. Des membres rattachés à deux personnes laissent le groupe sans personne, et le conflit est compté.
-- [ ] Réévaluation des groupes recomposés par `author_grouping`. Un groupe recomposé reprend l'identifiant de l'ancien groupe dont il partage le plus de membres (`plan_group_ids`) : `author_grouping` vide sa personne quand ses membres changent.
+- [x] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La purge vide les groupes d'une personne avant de la supprimer. 4f7e62b73
+- [x] Tâche `persons.resolve_groups`, après la purge : la décision par groupe rattache les groupes sans personne à une personne existante, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id`. a6e809b3d
+- [x] Réévaluation des groupes recomposés : `author_grouping` vide la personne d'un groupe dont les membres changent. c352def57
 - [ ] Écart entre les groupes et `contributions` : couples (publication, personne) présents d'un seul côté.
 
 #### Étape B — Bascule des lecteurs
