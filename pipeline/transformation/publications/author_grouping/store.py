@@ -7,7 +7,12 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.publications.author_grouping import REPEATED_LIST_CASES
-from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
+from infrastructure.sql_fragments import (
+    corrected_by,
+    in_clause,
+    propagate_group_attributes_sql,
+    usable_identifier,
+)
 
 # Statuts d'un rattachement d'identifiant posé par un humain.
 _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
@@ -165,6 +170,10 @@ class SourceContributionGroupStore:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def propagate_attributes(self) -> int:
+        """Recompose les attributs de tous les groupes depuis leurs membres (`propagate_group_attributes_sql`). Rend le nombre de groupes réécrits."""
+        return self._conn.execute(text(propagate_group_attributes_sql())).rowcount
 
     def refresh_alignment(self) -> None:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""

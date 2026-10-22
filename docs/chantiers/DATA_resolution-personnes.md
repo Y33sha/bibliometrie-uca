@@ -113,7 +113,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape A — Personne sur le groupe, en double écriture
 
-- [x] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`, recomposés depuis les membres par la tâche `contributions.propagate_groups`. `reference_position` tient lieu d'`author_position`. d21f109fc
+- [x] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`, recomposés depuis les membres par la tâche `author_grouping.attributes`. `reference_position` tient lieu d'`author_position`. d21f109fc
 - [x] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La purge vide les groupes d'une personne avant de la supprimer. 4f7e62b73
 - [x] Tâche `persons.resolve_groups`, après la purge : la décision par groupe rattache les groupes sans personne à une personne existante, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id`. a6e809b3d
 - [x] Réévaluation des groupes recomposés : `author_grouping` vide la personne d'un groupe dont les membres changent. c352def57
@@ -131,7 +131,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 - [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
 - [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
-- [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` se réduit à la propagation des attributs des membres vers le groupe.
+- [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` cesse de construire la table `contributions`.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
 
 #### Étape D — Suppressions

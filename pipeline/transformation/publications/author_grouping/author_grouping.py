@@ -32,7 +32,7 @@ from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
-from pipeline.task_runner import SingleTaskPhase
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
@@ -314,14 +314,38 @@ def build_groups(
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            return build_groups(
-                conn,
-                SourceContributionGroupStore(conn),
-                ctx.logger,
-                rebuild=ctx.options.rebuild_author_grouping,
-            )
+        """Recalcule les groupes des publications marquées, puis les attributs de tous les groupes : l'affiliation d'un membre change sans que son groupe change."""
+
+        def build_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                return build_groups(
+                    conn,
+                    SourceContributionGroupStore(conn),
+                    ctx.logger,
+                    rebuild=ctx.options.rebuild_author_grouping,
+                )
+
+        def attributes_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                updated = SourceContributionGroupStore(conn).propagate_attributes()
+            metrics = PhaseMetrics(updated=updated)
+            metrics.report = quantity(updated, "groupe réécrit", "groupes réécrits")
+            return metrics
+
+        by_task = run_tasks(
+            "author_grouping",
+            {
+                "author_grouping.build": TaskStep(build_task, label="Bilan"),
+                "author_grouping.attributes": TaskStep(
+                    attributes_task, label="Attributs des groupes"
+                ),
+            },
+            ctx,
+        )
+        metrics = by_task["author_grouping.build"]
+        metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
+        return metrics
 
 
 def build() -> Phase:
-    return SingleTaskPhase("author_grouping.build", AuthorGroupingPhase(), label="Bilan")
+    return AuthorGroupingPhase()

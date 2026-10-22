@@ -101,14 +101,6 @@ class ContributionsPhase:
             metrics.details["in_perimeter"] = in_perimeter
             return metrics
 
-        def propagate_groups(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            t0 = time.perf_counter()
-            with ctx.open_tx() as conn:
-                updated = queries.propagate_group_attributes(conn)
-            metrics = _timed(t0)
-            metrics.details["updated"] = updated
-            return metrics
-
         def publications_in_perimeter(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
@@ -148,9 +140,6 @@ class ContributionsPhase:
                 "contributions.build": TaskStep(build),
                 "contributions.propagate": TaskStep(
                     propagate, section=sync_section, label="Attributs des liens"
-                ),
-                "contributions.propagate_groups": TaskStep(
-                    propagate_groups, section=sync_section, label="Attributs des groupes"
                 ),
                 "contributions.publications_in_perimeter": TaskStep(
                     publications_in_perimeter,
