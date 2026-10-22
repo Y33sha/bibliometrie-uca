@@ -9,6 +9,7 @@ from infrastructure.db.scalars import scalar_int
 from infrastructure.sql_fragments import (
     insert_missing_contributions_sql,
     propagate_contribution_attributes_sql,
+    propagate_group_attributes_sql,
 )
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
@@ -37,6 +38,9 @@ class ContributionsBuild:
 
     def propagate_contribution_attributes(self, conn: Connection) -> int:
         return conn.execute(text(propagate_contribution_attributes_sql())).rowcount
+
+    def propagate_group_attributes(self, conn: Connection) -> int:
+        return conn.execute(text(propagate_group_attributes_sql())).rowcount
 
     def refresh_contribution_structures(self, conn: Connection) -> None:
         conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY contribution_structures"))

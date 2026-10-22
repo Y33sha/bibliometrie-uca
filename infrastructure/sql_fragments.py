@@ -344,6 +344,38 @@ def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
     """
 
 
+def propagate_group_attributes_sql() -> str:
+    """Recompose les attributs de chaque groupe de contributions sources depuis ses membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
+    return f"""
+        WITH members AS (
+            SELECT gm.group_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
+            FROM source_contribution_group_members gm
+            JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+        ),
+        scal AS (
+            SELECT group_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY group_id
+        ),
+        ev AS (
+            SELECT m.group_id, array_agg(DISTINCT e ORDER BY e) AS evidence
+            FROM members m, LATERAL unnest(m.perimeter_evidence) AS e
+            GROUP BY m.group_id
+        ),
+        rol AS (
+            SELECT m.group_id, array_agg(DISTINCT r ORDER BY r) AS roles
+            FROM members m, LATERAL unnest(m.roles) AS r
+            GROUP BY m.group_id
+        )
+        UPDATE source_contribution_groups g
+        SET is_corresponding = scal.is_corr,
+            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
+            roles = rol.roles
+        FROM scal LEFT JOIN rol ON rol.group_id = scal.group_id LEFT JOIN ev ON ev.group_id = scal.group_id
+        WHERE g.id = scal.group_id
+          AND (g.is_corresponding, g.perimeter_evidence, g.roles)
+              IS DISTINCT FROM (scal.is_corr, coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
+    """
+
+
 def active_issns(journal: str) -> str:
     """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
     return f"""coalesce((

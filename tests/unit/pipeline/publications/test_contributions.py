@@ -11,13 +11,17 @@ from pipeline.transformation.publications.contributions import contributions as 
 
 
 class _FakeBuildQueries:
-    """Requêtes des trois tâches de synchronisation."""
+    """Requêtes des tâches de synchronisation."""
 
     def __init__(self) -> None:
         self.appels: list[str] = []
 
     def propagate_contribution_attributes(self, conn) -> int:
         self.appels.append("propagate")
+        return 0
+
+    def propagate_group_attributes(self, conn) -> int:
+        self.appels.append("propagate_groups")
         return 0
 
     def count_contributions_in_perimeter(self, conn) -> int:
@@ -121,8 +125,8 @@ def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # build, propagation, périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 8
+    # build, propagation, propagation aux groupes, périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 9
 
 
 def test_la_synchronisation_suit_le_build(contexte, caplog):
@@ -131,8 +135,9 @@ def test_la_synchronisation_suit_le_build(contexte, caplog):
     assert rendu.details["summary"]["total_in_perimeter"] == 9
     lignes = [m for m in caplog.messages if m]
     debut = lignes.index("▶ Synchronisation des tables")
-    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 1 : debut + 4]] == [
+    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 1 : debut + 5]] == [
         "  ├─ Attributs des liens",
+        "  ├─ Attributs des groupes",
         "  ├─ Périmètre des publications",
         "  └─ Structures des liens",
     ]

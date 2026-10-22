@@ -946,7 +946,9 @@ TASKS: tuple[Task, ...] = (
         "persons.resolve_groups",
         "persons",
         reads=(
-            "source_contribution_groups",
+            "source_contribution_groups.id",
+            "source_contribution_groups.publication_id",
+            "source_contribution_groups.person_id",
             "source_contribution_group_members",
             "source_contributions.in_perimeter",
             "source_contributions.contributor_information_id",
@@ -1001,6 +1003,22 @@ TASKS: tuple[Task, ...] = (
             "contributions.is_corresponding",
             "contributions.in_perimeter",
             "contributions.roles",
+        ),
+    ),
+    _task(
+        "contributions.propagate_groups",
+        "contributions",
+        reads=(
+            "source_contribution_group_members",
+            "source_contributions.is_corresponding",
+            "source_contributions.perimeter_evidence",
+            "source_contributions.roles",
+            "source_contribution_groups",
+        ),
+        writes=(
+            "source_contribution_groups.is_corresponding",
+            "source_contribution_groups.perimeter_evidence",
+            "source_contribution_groups.roles",
         ),
     ),
     _task(

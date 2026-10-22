@@ -775,6 +775,21 @@ source_contribution_groups = Table(
     Column("person_id", Integer),
     Column("resolution_mode", group_resolution_mode_enum),
     Column("reference_position", SmallInteger),
+    Column("is_corresponding", Boolean),
+    Column("roles", ARRAY(Text)),
+    # Indices de l'entrée dans le périmètre, union de ceux des membres ; `in_perimeter` en découle.
+    Column(
+        "perimeter_evidence",
+        ARRAY(perimeter_evidence_enum),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "in_perimeter",
+        Boolean,
+        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
+        nullable=False,
+    ),
     UniqueConstraint(
         "publication_id", "person_id", name="source_contribution_groups_publication_person_uq"
     ),
