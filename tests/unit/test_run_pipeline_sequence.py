@@ -9,6 +9,7 @@ import argparse
 import logging
 import sys
 from contextlib import nullcontext
+from dataclasses import fields
 from types import SimpleNamespace
 
 import pytest
@@ -16,26 +17,14 @@ from sqlalchemy.exc import OperationalError, PendingRollbackError
 
 from pipeline import run as run_pipeline
 from pipeline.graph import EXTRA_PHASES
+from pipeline.runtime.context import RunOptions
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _args(**surcharges) -> argparse.Namespace:
-    base = {
-        "only": None,
-        "from_phase": None,
-        "no_extras": False,
-        "mode": "full",
-        "sources": "hal,openalex,wos",
-        "year": None,
-        "start_year": None,
-        "include_wos": False,
-        "rebuild_publications": False,
-        "rebuild_author_grouping": False,
-        "rebuild_subjects": False,
-        "raw_store": False,
-        "normalize_full": False,
-    }
-    return argparse.Namespace(**{**base, **surcharges})
+    """Arguments par défaut de la CLI, sources réduites à HAL, OpenAlex et WoS, puis `surcharges`."""
+    base = vars(run_pipeline._build_arg_parser().parse_args([]))
+    return argparse.Namespace(**{**base, "sources": "hal,openalex,wos", **surcharges})
 
 
 def _phase(run):
@@ -108,6 +97,15 @@ class TestSelectPhasesToRun:
         args = run_pipeline._build_arg_parser().parse_args(["--sources", " hal , wos "])
 
         assert args.sources == "hal,wos"
+
+
+def test_chaque_option_booleenne_arrive_aux_phases():
+    """Chaque option booléenne de la CLI renseigne le champ homonyme de `RunOptions`, et chaque champ booléen a son option."""
+    flags = {flag.dest for flag in run_pipeline._RUN_FLAGS}
+    options = run_pipeline._run_options(_args(**dict.fromkeys(flags, True)), {"hal"})
+
+    assert {f.name for f in fields(RunOptions) if f.type == "bool"} == flags
+    assert all(getattr(options, flag) is True for flag in flags)
 
 
 def _masquant(origine: BaseException) -> PendingRollbackError:

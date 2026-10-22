@@ -17,6 +17,7 @@ import sys
 import textwrap
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from types import FrameType
 from typing import TYPE_CHECKING
 
@@ -144,6 +145,61 @@ def _source_list(value: str) -> str:
     return ",".join(sources)
 
 
+@dataclass(frozen=True)
+class _RunFlag:
+    """Option booléenne de la CLI, transmise aux phases par le champ homonyme de `RunOptions`."""
+
+    option: str
+    help: str
+    banner: str | None = None
+    """Libellé de l'option dans la bannière du run ; sans libellé, l'option n'y paraît pas."""
+
+    @property
+    def dest(self) -> str:
+        return self.option.removeprefix("--").replace("-", "_")
+
+
+_RUN_FLAGS = (
+    _RunFlag(
+        "--include-wos",
+        "Inclure WoS dans l'extraction et la phase fetch_missing (opt-in : source en fin de vie, "
+        "crédit API limité ; exclue par défaut).",
+    ),
+    _RunFlag(
+        "--raw-store",
+        "Archive les réponses brutes des sources sur disque, sous `BIBLIO_RAW_STORE_DIR`. Rejouer "
+        "une normalisation puise alors dans cette archive au lieu de réinterroger les sources.",
+        "archivage des données brutes",
+    ),
+    _RunFlag(
+        "--normalize-full",
+        "À la phase normalize, marque tous les enregistrements sources des sources normalisées : "
+        "chacun resynchronise ses contributions sources à sa prochaine normalisation, même si son "
+        "bloc auteurs est inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
+        "contributions sources resynchronisées",
+    ),
+    _RunFlag(
+        "--rebuild-publications",
+        "Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
+        "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
+        "publications reconstruites",
+    ),
+    _RunFlag(
+        "--rebuild-author-grouping",
+        "À la phase author_grouping, marque toutes les publications à regrouper, pour appliquer "
+        "une évolution des règles d'alignement des auteurs sur tout le stock.",
+        "alignement des auteurs reconstruit",
+    ),
+    _RunFlag(
+        "--rebuild-subjects",
+        "À la phase subjects, marque toutes les publications à ingérer, pour propager "
+        "une évolution des règles d'ingestion sur tout le stock.",
+        "sujets reconstruits",
+    ),
+)
+"""Options booléennes du run, dans l'ordre des phases qu'elles touchent."""
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     """Parseur des arguments de la CLI pipeline.
 
@@ -190,45 +246,20 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="Année de début du range d'extraction (mode full ; défaut: config "
         "pipeline_start_year_full)",
     )
-    parser.add_argument(
-        "--include-wos",
-        action="store_true",
-        help="Inclure WoS dans l'extraction et la phase fetch_missing (opt-in : source en fin de vie, "
-        "crédit API limité ; exclue par défaut).",
-    )
-    parser.add_argument(
-        "--rebuild-publications",
-        action="store_true",
-        help="Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
-        "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
-    )
-    parser.add_argument(
-        "--raw-store",
-        action="store_true",
-        help="Archive les réponses brutes des sources sur disque, sous "
-        "`BIBLIO_RAW_STORE_DIR`. Rejouer une normalisation puise alors dans cette archive "
-        "au lieu de réinterroger les sources.",
-    )
-    parser.add_argument(
-        "--normalize-full",
-        action="store_true",
-        help="À la phase normalize, marque tous les enregistrements sources des sources normalisées : chacun "
-        "resynchronise ses contributions sources à sa prochaine normalisation, même si son bloc auteurs est "
-        "inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
-    )
-    parser.add_argument(
-        "--rebuild-author-grouping",
-        action="store_true",
-        help="À la phase author_grouping, marque toutes les publications à regrouper, pour appliquer "
-        "une évolution des règles d'alignement des auteurs sur tout le stock.",
-    )
-    parser.add_argument(
-        "--rebuild-subjects",
-        action="store_true",
-        help="À la phase subjects, marque toutes les publications à ingérer, pour propager "
-        "une évolution des règles d'ingestion sur tout le stock.",
-    )
+    for flag in _RUN_FLAGS:
+        parser.add_argument(flag.option, action="store_true", help=flag.help)
     return parser
+
+
+def _run_options(args: argparse.Namespace, sources: set[str]) -> RunOptions:
+    """Options du run transmises aux phases."""
+    return RunOptions(
+        mode=args.mode,
+        sources=frozenset(sources),
+        year=args.year,
+        start_year=args.start_year,
+        **{flag.dest: getattr(args, flag.dest) for flag in _RUN_FLAGS},
+    )
 
 
 def _select_phases_to_run(
@@ -355,17 +386,7 @@ def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]])
     elif args.no_extras:
         settings += _setting("phases", "sans les enrichissements terminaux")
 
-    options = [
-        text
-        for flag, text in (
-            (args.rebuild_publications, "publications reconstruites"),
-            (args.rebuild_author_grouping, "alignement des auteurs reconstruit"),
-            (args.rebuild_subjects, "sujets reconstruits"),
-            (args.raw_store, "archivage des données brutes"),
-            (args.normalize_full, "contributions sources resynchronisées"),
-        )
-        if flag
-    ]
+    options = [flag.banner for flag in _RUN_FLAGS if flag.banner and getattr(args, flag.dest)]
     if options:
         settings += _setting("options", ", ".join(options))
 
@@ -396,19 +417,7 @@ def _run_one_phase(
         try:
             result = build().run(
                 phase_context(
-                    RunOptions(
-                        mode=args.mode,
-                        sources=frozenset(sources),
-                        year=args.year,
-                        start_year=args.start_year,
-                        include_wos=args.include_wos,
-                        rebuild_publications=args.rebuild_publications,
-                        rebuild_author_grouping=args.rebuild_author_grouping,
-                        rebuild_subjects=args.rebuild_subjects,
-                        raw_store=args.raw_store,
-                        normalize_full=args.normalize_full,
-                    ),
-                    credentials_missing=source_credentials_missing,
+                    _run_options(args, sources), credentials_missing=source_credentials_missing
                 )
             )
         except (KeyboardInterrupt, Exception) as e:
