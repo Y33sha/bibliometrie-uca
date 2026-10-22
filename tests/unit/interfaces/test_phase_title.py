@@ -102,6 +102,7 @@ def _args(**modifications) -> argparse.Namespace:
         "from_phase": None,
         "no_extras": False,
         "rebuild_publications": False,
+        "rebuild_author_grouping": False,
         "rebuild_subjects": False,
         "raw_store": False,
         "normalize_full": False,

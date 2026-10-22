@@ -30,6 +30,7 @@ def _args(**surcharges) -> argparse.Namespace:
         "start_year": None,
         "include_wos": False,
         "rebuild_publications": False,
+        "rebuild_author_grouping": False,
         "rebuild_subjects": False,
         "raw_store": False,
         "normalize_full": False,

@@ -217,6 +217,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         "inchangé. Sert à appliquer une règle de normalisation des auteurs modifiée.",
     )
     parser.add_argument(
+        "--rebuild-author-grouping",
+        action="store_true",
+        help="À la phase author_grouping, marque toutes les publications à regrouper, pour appliquer "
+        "une évolution des règles d'alignement des auteurs sur tout le stock.",
+    )
+    parser.add_argument(
         "--rebuild-subjects",
         action="store_true",
         help="À la phase subjects, marque toutes les publications à ingérer, pour propager "
@@ -353,6 +359,7 @@ def _run_title(args: argparse.Namespace, phases: list[tuple[str, PhaseBuilder]])
         text
         for flag, text in (
             (args.rebuild_publications, "publications reconstruites"),
+            (args.rebuild_author_grouping, "alignement des auteurs reconstruit"),
             (args.rebuild_subjects, "sujets reconstruits"),
             (args.raw_store, "archivage des données brutes"),
             (args.normalize_full, "contributions sources resynchronisées"),
@@ -396,6 +403,7 @@ def _run_one_phase(
                         start_year=args.start_year,
                         include_wos=args.include_wos,
                         rebuild_publications=args.rebuild_publications,
+                        rebuild_author_grouping=args.rebuild_author_grouping,
                         rebuild_subjects=args.rebuild_subjects,
                         raw_store=args.raw_store,
                         normalize_full=args.normalize_full,
