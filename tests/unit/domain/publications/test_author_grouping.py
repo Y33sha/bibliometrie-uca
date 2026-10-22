@@ -126,6 +126,15 @@ class TestAlignPublication:
             align_publication(source_records)
         )
 
+    def test_un_patronyme_rendu_unique_par_un_lien_se_lie_au_second_passage(self):
+        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le patronyme lie le Martin sans prénom au seul groupe « Martin » resté libre."""
+        reference = _source_record(1, [("martin", "anne"), ("martin", "bruno"), ("petit", "c")])
+        other = _source_record(2, [("martin", "anne"), ("martin", "")])
+        assert _grouped(align_publication({1: reference, 2: other})) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
+            [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
+        ]
+
     def test_une_contribution_source_sans_position_se_lie_par_le_nom_hors_de_l_ordre(self):
         """Jury d'une thèse chez theses.fr, sans position : il se lie par le nom au jury positionné d'un autre enregistrement source, quel que soit son rang."""
         reference = _source_record(1, [("martin", "a"), ("petit", "b"), ("durand", "c")])

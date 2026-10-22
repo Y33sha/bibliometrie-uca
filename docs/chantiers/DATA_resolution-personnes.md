@@ -87,7 +87,7 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
   - scanR issu de HAL : indice juste pour les 28 personnes RH. Dans 50 fiches sur 54, la contribution source HAL du groupe est sans personne. La copie scanR porte l'IdRef, souvent l'ORCID, absents du dépôt HAL.
 - [x] Copies d'un article dans un repository réintroduites dans l'alignement : 1 569 enregistrements sources, 2 951 000 contributions sources.
 - [x] Enregistrements sources scanR issus d'un dépôt HAL présent réintroduits dans l'alignement.
-- [ ] `shared_identifier` recalcule les groupes liés pour chaque contribution source : coût quadratique.
+- [x] Règle par nom de l'alignement : groupes liés et groupes par clé calculés une fois par enregistrement source, le 2026-10-22. Sur 3 000 publications, les groupes sont inchangés et le second passage tombe de 3,4 s à 0,3 s.
 - [ ] Contributions sources hors groupe exclues de la résolution des personnes. 156 600 ont une personne au 2026-10-21.
 
 ### Phase 4 — Essais d'une cascade par groupe
