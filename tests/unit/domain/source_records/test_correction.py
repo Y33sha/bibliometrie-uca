@@ -221,11 +221,10 @@ class TestJournalTypeMediaRule:
         assert corrected.value == "media"
         assert corrected.rule == MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA
 
-    def test_journal_type_media_applies_regardless_of_raw_doc_type(self):
-        # La règle est inconditionnelle sur `journal_type=media` : peu importe le
-        # `doc_type` brut, la publication d'un journal média est reclassée.
-        for raw in ("article", "review", "editorial", None):
-            view = _view(doc_type=raw, journal_type="media")
+    def test_journal_type_media_applies_regardless_of_doc_type(self):
+        # La règle dépend seulement de `journal_type=media` : la publication d'un journal média est reclassée quel que soit son `doc_type`.
+        for doc_type in ("article", "review", "editorial", None):
+            view = _view(doc_type=doc_type, journal_type="media")
             corrected = effective_metadata(view).doc_type
             assert corrected is not None and corrected.value == "media"
 

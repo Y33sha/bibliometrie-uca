@@ -41,7 +41,7 @@ def _setup_affiliations_test_data(conn):
     insert_publication(conn, "Pub Affiliation Test", row_id=80001)
 
     for row_id, source, source_id, doc_type in (
-        (80001, "hal", "hal-80000001", "ART"),
+        (80001, "hal", "hal-80000001", "article"),
         (80002, "openalex", "W80000001", "article"),
     ):
         insert_source_record(

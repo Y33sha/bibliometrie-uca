@@ -15,8 +15,8 @@ def setup_persons_test_data(conn):
 
     # HAL documents
     for row_id, source_id, title, doc_type in (
-        (90001, "hal-90000001", "Test Pub Alpha", "ART"),
-        (90002, "hal-90000002", "Test Pub Beta", "THESE"),
+        (90001, "hal-90000001", "Test Pub Alpha", "article"),
+        (90002, "hal-90000002", "Test Pub Beta", "thesis"),
     ):
         insert_source_record(
             conn,
