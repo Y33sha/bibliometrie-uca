@@ -234,12 +234,10 @@ def _refresh_source_contributions_in_batches(
 def refresh(conn: Connection, logger: logging.Logger) -> int:
     """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
     step(logger, "Rafraîchissement des pays associés aux publications")
-    t0 = time.perf_counter()
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
         line.conclude(
             f"{BRANCH}{quantity(total, 'contribution source à recalculer', 'contributions sources à recalculer')}"
-            f" en {time.perf_counter() - t0:.1f} s"
         )
     t0 = time.perf_counter()
     updated = _refresh_source_contributions_in_batches(conn, total, logger)
