@@ -36,6 +36,7 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](archiv
 - **Le premier détecteur porte le recouvrement des noms d'auteurs** entre les enregistrements sources d'un même groupe.
 - **La taille du groupe ne fait pas un signal par elle-même.** Un jeu de données de plusieurs centaines de pièces se regroupe correctement. Le signal reste à évaluer hors `dataset` et `software`.
 - **Les titres identiques ne font pas une file de triage** : 5 063 publications, sans discriminant.
+- **Veto sur le lien entre une contribution source et une structure.** Un auteur parti garde dans HAL une affiliation obsolète. Sa contribution source HAL fait entrer dans le périmètre une publication faite ailleurs. La personne est bien l'auteur, et du périmètre pour d'autres publications : le rejet du lien personne–publication et l'exclusion de la personne sont inadaptés. Le veto vise le lien entre la contribution source et la structure, stable dans le temps. Un groupe de contributions sources est recalculé à chaque passage.
 
 ## Phasage
 
@@ -64,6 +65,7 @@ Prérequis : phase 3 du chantier [alignement des auteurs](DATA_alignement-auteur
 ### 4. Verdicts durables
 
 - [ ] Modèle de persistance des verdicts de scission et de fusion forcée, relu par la réconciliation.
+- [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet, liste des cas dans le signal « Rien de local hors HAL » des rapports par laboratoire.
 
 ## Questions ouvertes
 
