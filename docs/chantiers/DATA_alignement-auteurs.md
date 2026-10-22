@@ -245,7 +245,6 @@ Les verdicts manuels sur les contributions sources ont deux ancrages :
 Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de la résolution des personnes.
 
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
-- [ ] Indices de périmètre par groupe : l'adresse OpenAlex prime, puis celle de WoS, puis les indices de scanR.
 - [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
 - [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation. Le diagnostic se calcule sur les contributions sources que la phase `author_grouping` charge déjà.
 - [x] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Les enregistrements sources s'alignent de la plus longue à la plus courte, donc elle ne fonde pas les groupes.
