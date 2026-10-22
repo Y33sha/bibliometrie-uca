@@ -193,3 +193,11 @@ def test_a_appui_egal_la_personne_revient_au_groupe_le_plus_fourni():
     settled = settle_publication({10: (decision, 1), 11: (decision, 6)})
 
     assert (settled[10].outcome, settled[11].outcome) == (GroupOutcome.SKIP, GroupOutcome.MATCH)
+
+
+def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise():
+    decision = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.ORCID)
+
+    settled = settle_publication({10: (decision, 3)}, taken=frozenset({1}))
+
+    assert settled[10].reason == GroupSkipReason.PERSON_IN_OTHER_GROUP
