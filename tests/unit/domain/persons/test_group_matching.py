@@ -3,12 +3,14 @@
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.group_matching import (
+    GroupDecision,
     GroupMatchReason,
     GroupMember,
     GroupOutcome,
     GroupSkipReason,
     PersonIndex,
     decide_group,
+    settle_publication,
 )
 from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import compute_person_name_forms
@@ -171,3 +173,23 @@ def test_un_jury_de_these_ne_cree_pas_de_personne():
     members = [_member("Jean Martin", "theses", roles=(ContributionRole.RAPPORTEUR,))]
 
     assert decide_group(members, _index()).reason == GroupSkipReason.CREATION_NOT_ALLOWED
+
+
+def test_une_personne_revient_au_groupe_le_mieux_appuye_de_la_publication():
+    by_name = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.SINGLE_NAME)
+    by_orcid = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.ORCID)
+    other = GroupDecision(GroupOutcome.MATCH, 2, GroupMatchReason.SINGLE_NAME)
+
+    settled = settle_publication({10: (by_name, 6), 11: (by_orcid, 2), 12: (other, 1)})
+
+    assert settled[11] == by_orcid
+    assert settled[12] == other
+    assert settled[10].reason == GroupSkipReason.PERSON_IN_OTHER_GROUP
+
+
+def test_a_appui_egal_la_personne_revient_au_groupe_le_plus_fourni():
+    decision = GroupDecision(GroupOutcome.MATCH, 1, GroupMatchReason.SINGLE_NAME)
+
+    settled = settle_publication({10: (decision, 1), 11: (decision, 6)})
+
+    assert (settled[10].outcome, settled[11].outcome) == (GroupOutcome.SKIP, GroupOutcome.MATCH)

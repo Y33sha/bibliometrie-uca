@@ -7,7 +7,7 @@ Un groupe réunit les contributions sources d'un même auteur dans une publicati
 3. forme de nom, seulement pour un groupe du périmètre ;
 4. création d'une personne, pour un groupe du périmètre au nom inconnu.
 
-Deux personnes désignées au même niveau laissent le groupe sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau.
+Deux personnes désignées au même niveau laissent le groupe sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à un seul groupe (`settle_publication`).
 """
 
 from collections.abc import Mapping, Sequence
@@ -54,6 +54,8 @@ class GroupSkipReason(StrEnum):
     ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
     CREATION_NOT_ALLOWED = "creation_not_allowed"
     OUT_OF_PERIMETER = "out_of_perimeter"
+    # La personne revient à un groupe mieux appuyé de la même publication (`settle_publication`).
+    PERSON_IN_OTHER_GROUP = "person_in_other_group"
 
 
 class GroupMatchReason(StrEnum):
@@ -235,3 +237,46 @@ def _decide_by_name(
     return GroupDecision(
         GroupOutcome.SKIP, reason=GroupSkipReason.CREATION_NOT_ALLOWED, refused=refused
     )
+
+
+_STRENGTH: dict[GroupMatchReason, int] = {
+    GroupMatchReason.PINNED: 0,
+    GroupMatchReason.ORCID: 1,
+    GroupMatchReason.HAL_PERSON_ID: 1,
+    GroupMatchReason.IDREF: 1,
+    GroupMatchReason.SINGLE_NAME: 2,
+    GroupMatchReason.COMPATIBLE_NAME: 2,
+}
+"""Rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""
+
+
+def settle_publication(
+    decisions: Mapping[int, tuple[GroupDecision, int]],
+) -> dict[int, GroupDecision]:
+    """Décisions des groupes d'une publication, une personne au plus par publication.
+
+    `decisions` : décision et nombre de membres de chaque groupe, par identifiant de groupe. Quand plusieurs groupes désignent la même personne, elle revient au groupe le mieux appuyé (épinglage, puis identifiant, puis nom), à égalité au groupe qui a le plus de membres, puis au plus petit identifiant. Les autres groupes restent sans personne.
+    """
+    by_person: dict[int, list[int]] = {}
+    for group_id, (decision, _) in decisions.items():
+        if decision.outcome == GroupOutcome.MATCH and decision.person_id is not None:
+            by_person.setdefault(decision.person_id, []).append(group_id)
+    settled = {group_id: decision for group_id, (decision, _) in decisions.items()}
+    for group_ids in by_person.values():
+        if len(group_ids) < 2:
+            continue
+
+        def rank(group_id: int) -> tuple[int, int, int]:
+            decision, member_count = decisions[group_id]
+            assert isinstance(decision.reason, GroupMatchReason)
+            return (_STRENGTH[decision.reason], -member_count, group_id)
+
+        for group_id in sorted(group_ids, key=rank)[1:]:
+            decision = settled[group_id]
+            settled[group_id] = GroupDecision(
+                GroupOutcome.SKIP,
+                reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
+                evidence=decision.evidence,
+                refused=decision.refused,
+            )
+    return settled
