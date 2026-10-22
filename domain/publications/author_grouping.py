@@ -692,13 +692,36 @@ def align_publication(
             if i
             else {}
         )
-        by_index = {g.index: g for g in groups}
-        for s in contributions:
-            if (link := links.get(s.id)) is not None:
-                member = Member(s.id, source_record_id, link.method, link.score, link.margin)
-                by_index[link.group].members.append(member)
-            else:
-                member = Member(s.id, source_record_id, GroupingMethod.REFERENCE)
-                groups.append(Group(len(groups), s, [member]))
-        groups.sort(key=lambda g: (*_list_order(g.reference)[:2], g.index))
+        groups = _with_new_groups(groups, contributions, links, source_record_id)
     return groups
+
+
+def _with_new_groups(
+    groups: Sequence[Group],
+    contributions: Sequence[SourceContribution],
+    links: Mapping[int, _Link],
+    source_record_id: int,
+) -> list[Group]:
+    """Groupes rangés après l'alignement d'un enregistrement source : ses contributions sources liées rejoignent leur groupe, les autres fondent un groupe.
+
+    Un groupe fondé se range juste après le groupe de la contribution source liée qui le précède dans la liste, ou en tête sans telle contribution source. Les groupes fondés sans position se rangent à la fin.
+    """
+    by_index = {g.index: g for g in groups}
+    following: dict[int | None, list[Group]] = defaultdict(list)
+    unpositioned: list[Group] = []
+    previous: int | None = None
+    next_index = len(groups)
+    for s in contributions:
+        if (link := links.get(s.id)) is not None:
+            member = Member(s.id, source_record_id, link.method, link.score, link.margin)
+            by_index[link.group].members.append(member)
+            previous = link.group
+        else:
+            group = Group(next_index, s, [Member(s.id, source_record_id, GroupingMethod.REFERENCE)])
+            next_index += 1
+            (unpositioned if s.position is None else following[previous]).append(group)
+    return [
+        *following[None],
+        *(placed for g in groups for placed in (g, *following[g.index])),
+        *unpositioned,
+    ]

@@ -135,6 +135,26 @@ class TestAlignPublication:
             [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
         ]
 
+    def test_un_groupe_fonde_par_une_liste_plus_courte_suit_son_voisin_precedent(self):
+        """« Giromini » manque à la liste la plus longue : son groupe se range après « Durand », son voisin précédent. Sa position brute le rangerait après « Roux »."""
+        longest = _source_record(
+            1, [("martin", "a"), ("petit", "b"), ("durand", "c"), ("leroy", "d"), ("roux", "e")]
+        )
+        shorter = _source_record(
+            2,
+            [("martin", "a"), ("petit", "b"), ("durand", "c"), ("giromini", "p"), ("leroy", "d")],
+            start=1,
+        )
+        groups = align_publication({1: longest, 2: shorter})
+        assert [g.reference.last_name for g in groups] == [
+            "martin",
+            "petit",
+            "durand",
+            "giromini",
+            "leroy",
+            "roux",
+        ]
+
     def test_une_contribution_source_sans_position_se_lie_par_le_nom_hors_de_l_ordre(self):
         """Jury d'une thèse chez theses.fr, sans position : il se lie par le nom au jury positionné d'un autre enregistrement source, quel que soit son rang."""
         reference = _source_record(1, [("martin", "a"), ("petit", "b"), ("durand", "c")])
