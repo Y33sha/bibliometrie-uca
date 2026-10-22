@@ -514,7 +514,7 @@ class _SourceRecordLinks:
                 by_group.setdefault(key, []).append(g)
         for k, ss in by_contribution.items():
             gs = by_group.get(k, [])
-            if len(ss) > 1 and len(ss) == len(gs):
+            if len(ss) == len(gs):
                 for s, g in zip(ss, gs, strict=True):
                     self.link(s, g, GroupingMethod.ORDER)
 

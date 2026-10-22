@@ -246,6 +246,7 @@ Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de 
 
 - [ ] Désaccords d'affiliation entre sources pour un même auteur.
 - [x] Rang d'un groupe fondé par une liste plus courte : juste après le groupe de son voisin précédent dans cette liste, le 2026-10-22. Sur 3 000 publications, 1 107 liens passent du modèle à la règle. 316 contributions sources changent de groupe dans 16 grandes collaborations. Les homonymes reprennent leur ordre, mais le modèle lie aussi des voisins aux initiales incompatibles.
+- [x] Une paire seule dans un trou, de même patronyme et même initiale, se lie par l'ordre, le 2026-10-22. Sur 3 000 publications, 2 258 liens passent du modèle à l'ordre. 124 contributions sources changent de groupe dans 8 publications : une quinzaine de groupes corrigés, trois groupes d'homonymes mélangés (Li H, Wang Z).
 - [ ] Poids du modèle du résidu réestimés après le changement de rang des groupes.
 - [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
 - [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation. Le diagnostic se calcule sur les contributions sources que la phase `author_grouping` charge déjà.

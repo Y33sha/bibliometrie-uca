@@ -78,6 +78,23 @@ class TestAlignPublication:
         assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(groups)
         assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _grouped(groups)
 
+    def test_une_paire_seule_dans_un_trou_se_lie_dans_l_ordre(self):
+        """« Ahmad T » n'est unique ni par le patronyme ni par l'initiale, à cause de « Ahmad Tahania » plus loin ; seul de sa clé dans son trou, il se lie par l'ordre."""
+        reference = _source_record(
+            1,
+            [
+                ("martin", "a"),
+                ("ahmad", "t"),
+                ("petit", "b"),
+                ("ahmad", "tahania"),
+                ("durand", "c"),
+            ],
+        )
+        other = _source_record(2, [("martin", "a"), ("ahmad", "t"), ("petit", "b")])
+        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(
+            align_publication({1: reference, 2: other})
+        )
+
     def test_l_identifiant_d_un_membre_lie_au_groupe(self):
         """La référence est sans ORCID ; un membre venu du deuxième enregistrement source a l'ORCID, et le troisième enregistrement source rejoint son groupe, même dans l'ordre inverse."""
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno")])
