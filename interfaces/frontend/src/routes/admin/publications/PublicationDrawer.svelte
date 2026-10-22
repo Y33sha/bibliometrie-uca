@@ -264,8 +264,10 @@
     left: 0;
     width: calc(var(--position-gutter) - 6px);
     color: #999;
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     text-align: right;
+    white-space: nowrap;
   }
   .in-perimeter {
     font-weight: 600;
