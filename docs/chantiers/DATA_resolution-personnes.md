@@ -14,7 +14,7 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
 - `source_contribution_groups` remplace `contributions`. Une contribution est un groupe dont `person_id` est renseigné. `person_id` et `resolution_mode` quittent `source_contributions`.
 - Une contribution source sans jumelle forme un groupe à elle seule. Les contributions sources collectives et celles des enregistrements sources écartés de l'alignement restent hors groupe. Elles sont exclues de la résolution des personnes et restent sans personne.
-- Seuls les enregistrements sources au DOI convergé sont écartés de l'alignement. Un enregistrement source scanR issu d'un dépôt HAL présent entre dans l'alignement : il porte des identifiants absents du dépôt HAL.
+- Seules les versions d'un concept (`DATACITE_VERSION_TO_CONCEPT`) et les pièces d'un jeu de données (`DATACITE_PACKAGE_PIECE`) sont écartées de l'alignement, quelle que soit la source de l'enregistrement source. La copie d'un article dans un repository (`DATACITE_VARIANT_TO_PRIMARY`) entre dans l'alignement : sur la publication la plus lourde du stock, le surcoût est de 0,8 s. Un enregistrement source scanR issu d'un dépôt HAL présent entre dans l'alignement : il porte des identifiants absents du dépôt HAL.
 - Les changements irréversibles du schéma passent en dernier, après l'étude de leurs conséquences.
 - La cascade décide par groupe. Elle cherche les indices de périmètre du groupe, puis rattache le groupe à une personne existante.
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
@@ -85,7 +85,9 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - [ ] Relecture des pertes du périmètre (`build_ungrouped_review.py`). Premiers verdicts du 2026-10-21 :
   - DOI convergé : indice de périmètre faux dans 33 couples sur 36 hors personnes RH, dont 20 des 21 personnes perdues d'OpenAlex. La perte est bénéfique.
   - scanR issu de HAL : indice juste pour les 28 personnes RH. Dans 50 fiches sur 54, la contribution source HAL du groupe est sans personne. La copie scanR porte l'IdRef, souvent l'ORCID, absents du dépôt HAL.
-- [ ] Enregistrements sources scanR issus d'un dépôt HAL présent réintroduits dans l'alignement.
+- [x] Copies d'un article dans un repository réintroduites dans l'alignement : 1 569 enregistrements sources, 2 951 000 contributions sources.
+- [x] Enregistrements sources scanR issus d'un dépôt HAL présent réintroduits dans l'alignement.
+- [ ] `shared_identifier` recalcule les groupes liés pour chaque contribution source : coût quadratique.
 - [ ] Contributions sources hors groupe exclues de la résolution des personnes. 156 600 ont une personne au 2026-10-21.
 
 ### Phase 4 — Essais d'une cascade par groupe
