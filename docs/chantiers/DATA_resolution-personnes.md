@@ -82,13 +82,14 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 
   - 1 400 de ces enregistrements sources sont dans des publications marquées `contributions_dirty`.
   - Pertes du périmètre, personnes exclues écartées : 1 203 couples (publication, personne) du périmètre, dont 286 de personnes RH (271 par scanR issu de HAL) ; 88 personnes du périmètre sans aucune contribution source groupée (51 par OpenAlex au DOI convergé, 37 par scanR issu de HAL).
-- [ ] Relecture des pertes du périmètre (`build_ungrouped_review.py`). Premiers verdicts du 2026-10-21 :
+- [x] Mesure après la réintroduction des copies et de scanR issu de HAL, le 2026-10-22 (`measure_ungrouped.py`). Hors collectifs, 82 600 contributions sources sont hors groupe : 27 800 doublons d'auteur, 54 800 des enregistrements sources écartés (DataCite et OpenAlex surtout). 14 300 ont une personne, dont 9 épinglées. 22 couples (publication, personne) reposent sur elles seules. Pertes du périmètre : 32 couples, dont 3 de personnes RH ; 4 personnes ; 17 publications.
+- [x] Relecture des pertes du périmètre (`build_ungrouped_review.py`). Premiers verdicts du 2026-10-21, avant la mesure du 2026-10-22 :
   - DOI convergé : indice de périmètre faux dans 33 couples sur 36 hors personnes RH, dont 20 des 21 personnes perdues d'OpenAlex. La perte est bénéfique.
   - scanR issu de HAL : indice juste pour les 28 personnes RH. Dans 50 fiches sur 54, la contribution source HAL du groupe est sans personne. La copie scanR porte l'IdRef, souvent l'ORCID, absents du dépôt HAL.
 - [x] Copies d'un article dans un repository réintroduites dans l'alignement : 1 569 enregistrements sources, 2 951 000 contributions sources.
 - [x] Enregistrements sources scanR issus d'un dépôt HAL présent réintroduits dans l'alignement.
-- [ ] `shared_identifier` recalcule les groupes liés pour chaque contribution source : coût quadratique.
-- [ ] Contributions sources hors groupe exclues de la résolution des personnes. 156 600 ont une personne au 2026-10-21.
+- [x] Règle par nom de l'alignement : groupes liés et groupes par clé calculés une fois par enregistrement source, le 2026-10-22. Sur 3 000 publications, les groupes sont inchangés et le second passage tombe de 3,4 s à 0,3 s.
+- [ ] Contributions sources hors groupe exclues de la résolution des personnes.
 
 ### Phase 4 — Essais d'une cascade par groupe
 

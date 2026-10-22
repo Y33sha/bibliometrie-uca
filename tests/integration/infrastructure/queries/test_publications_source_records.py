@@ -9,6 +9,11 @@ from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.structures import (
+    add_source_contribution_ror,
+    add_source_contribution_structure,
+    insert_structure,
+)
 
 # Enregistrement source de titre « Titre ».
 _source_record = partial(insert_source_record, title="Titre")
@@ -171,3 +176,19 @@ class TestSourceContributions:
         assert by_id[openalex_martin].source_record_id == openalex
         assert by_id[collective].group_id is None
         assert by_id[collective].collective is True
+
+    def test_une_structure_atteinte_par_deux_indices_figure_une_fois(self, sa_sync_conn):
+        """La contribution source atteint le laboratoire par une adresse et par un ROR."""
+        conn = sa_sync_conn
+        publication = insert_publication(conn)
+        record = _source_record(conn, publication, source="hal", source_id="hal-1")
+        source_contribution = insert_source_contribution(conn, record, source="hal")
+        lab = insert_structure(conn, "SR-LAB", acronym="IHRIM", structure_type="labo")
+        add_source_contribution_structure(conn, source_contribution, lab)
+        add_source_contribution_ror(conn, source_contribution, lab)
+
+        result = get_publication_sources(conn, publication)
+
+        assert result is not None
+        (contribution,) = result.source_contributions
+        assert contribution.structure_ids == [lab]

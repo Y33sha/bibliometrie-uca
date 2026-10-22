@@ -22,6 +22,16 @@
   function onkeydown(e: KeyboardEvent) {
     if (e.key === "Escape") (onescape ?? onclose)();
   }
+
+  // Tant que le volet est ouvert, la page dessous ne défile pas : seul le volet a un ascenseur.
+  $effect(() => {
+    const root = document.documentElement;
+    const overflow = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = overflow;
+    };
+  });
 </script>
 
 <svelte:window {onkeydown} />

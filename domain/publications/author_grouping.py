@@ -9,7 +9,7 @@ from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from typing import NamedTuple
 
 from domain.persons.name_matching import first_name_initials, full_first_name_extends, is_initials
@@ -241,9 +241,30 @@ def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
     return (
         levels[Comparison.LAST_NAME] == ComparisonLevel.ELSE
         and levels[Comparison.FIRST_NAME] in (ComparisonLevel.ELSE, None)
-        and ComparisonLevel.IDENTIFIER_EXACT
-        not in (levels[Comparison.ORCID], levels[Comparison.IDREF])
+        and not _shared_identifier(levels)
     )
+
+
+def conflicting_initials(x: Author, y: Author) -> bool:
+    """Patronymes seulement proches et premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji »."""
+    return _conflicting_initials(x, y, comparison_levels(x, y))
+
+
+def _conflicting_initials(
+    x: Author, y: Author, levels: Mapping[Comparison, ComparisonLevel | None]
+) -> bool:
+    return (
+        levels[Comparison.LAST_NAME]
+        in (ComparisonLevel.JW_092, ComparisonLevel.JW_08, ComparisonLevel.ELSE)
+        and bool(x.first_name)
+        and bool(y.first_name)
+        and x.first_name[0] != y.first_name[0]
+        and not _shared_identifier(levels)
+    )
+
+
+def _shared_identifier(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
+    return ComparisonLevel.IDENTIFIER_EXACT in (levels[Comparison.ORCID], levels[Comparison.IDREF])
 
 
 @dataclass(frozen=True)
@@ -376,41 +397,64 @@ class _SourceRecordLinks:
         self.ranked = {g.index for g in groups if g.reference.position is not None}
         self.links: dict[int, int] = {}
         self.methods: dict[int, GroupingMethod] = {}
+        # Groupes liés : un groupe reçoit au plus un lien.
+        self.taken: set[int] = set()
         self.forbidden: set[tuple[int, int]] = set()
+        self.by_index = {g.index: g for g in groups}
+        self._group_indexes: dict[
+            Callable[[SourceContribution], object], dict[object, list[Group]]
+        ] = {}
 
     def link(self, s: SourceContribution, g: Group, method: GroupingMethod) -> None:
         if (s.id, g.index) not in self.forbidden:
             self.links[s.id] = g.index
             self.methods[s.id] = method
+            self.taken.add(g.index)
 
-    def linked_groups(self) -> set[int]:
-        return set(self.links.values())
+    def unlink(self, source_contribution_id: int) -> None:
+        """Retire le lien de la contribution source et l'interdit."""
+        group = self.links.pop(source_contribution_id)
+        del self.methods[source_contribution_id]
+        self.taken.discard(group)
+        self.forbidden.add((source_contribution_id, group))
+
+    def _groups_by(self, key: Callable[[SourceContribution], object]) -> dict[object, list[Group]]:
+        """Groupes par clé de leur contribution source de référence."""
+        index = self._group_indexes.get(key)
+        if index is None:
+            index = {}
+            for g in self.groups:
+                if k := key(g.reference):
+                    index.setdefault(k, []).append(g)
+            self._group_indexes[key] = index
+        return index
 
     def unique_pairs(
-        self, key: Callable[[SourceContribution], object], method: GroupingMethod
+        self,
+        key: Callable[[SourceContribution], object],
+        contributions: Sequence[SourceContribution],
     ) -> None:
-        """Lie une contribution source et un groupe quand leur clé est unique des deux côtés, parmi les contributions sources et groupes sans lien."""
-        taken = self.linked_groups()
+        """Lie une contribution source et un groupe quand leur clé est unique des deux côtés, parmi les contributions sources données et les groupes restés sans lien."""
         by_contribution: dict[object, list[SourceContribution]] = {}
-        by_group: dict[object, list[Group]] = {}
-        for s in self.contributions:
+        for s in contributions:
             if s.id not in self.links and (k := key(s)):
                 by_contribution.setdefault(k, []).append(s)
-        for g in self.groups:
-            if g.index not in taken and (k := key(g.reference)):
-                by_group.setdefault(k, []).append(g)
+        by_group = self._groups_by(key)
         for k, ss in by_contribution.items():
-            gs = by_group.get(k, [])
-            if len(ss) == 1 and len(gs) == 1:
-                self.link(ss[0], gs[0], method)
+            if len(ss) != 1:
+                continue
+            gs = [g for g in by_group.get(k, []) if g.index not in self.taken]
+            if len(gs) == 1:
+                self.link(ss[0], gs[0], GroupingMethod.NAME)
 
     def _members(self, g: Group) -> list[SourceContribution]:
         return [
             self.source_contributions.get(m.source_contribution, g.reference) for m in g.members
         ]
 
-    def shared_identifier(self) -> None:
-        """Lie une contribution source au groupe dont un membre partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs groupes ne lie rien."""
+    @cached_property
+    def by_identifier(self) -> dict[tuple[str, str, str], set[int]]:
+        """Groupes par (type d'identifiant, patronyme, identifiant) de leurs membres."""
         by_identifier: dict[tuple[str, str, str], set[int]] = defaultdict(set)
         for g in self.groups:
             for m in self._members(g):
@@ -418,26 +462,27 @@ class _SourceRecordLinks:
                     by_identifier[("orcid", m.last_name, m.orcid)].add(g.index)
                 if m.last_name and m.idref:
                     by_identifier[("idref", m.last_name, m.idref)].add(g.index)
-        by_index = {g.index: g for g in self.groups}
-        for s in self.contributions:
-            if s.id in self.links or not s.last_name:
+        return by_identifier
+
+    def shared_identifier(self, contributions: Sequence[SourceContribution]) -> None:
+        """Lie une contribution source au groupe dont un membre partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs groupes ne lie rien."""
+        for s in contributions:
+            if s.id in self.links or not s.last_name or not (s.orcid or s.idref):
                 continue
             candidates = (
-                by_identifier.get(("orcid", s.last_name, s.orcid), set()) if s.orcid else set()
+                self.by_identifier.get(("orcid", s.last_name, s.orcid), set()) if s.orcid else set()
             )
             if not candidates and s.idref:
-                candidates = by_identifier.get(("idref", s.last_name, s.idref), set())
-            if (
-                len(candidates) == 1
-                and (index := next(iter(candidates))) not in self.linked_groups()
-            ):
-                self.link(s, by_index[index], GroupingMethod.IDENTIFIER)
+                candidates = self.by_identifier.get(("idref", s.last_name, s.idref), set())
+            if len(candidates) == 1 and (index := next(iter(candidates))) not in self.taken:
+                self.link(s, self.by_index[index], GroupingMethod.IDENTIFIER)
 
     def name_steps(self) -> None:
-        self.unique_pairs(_name_key, GroupingMethod.NAME)
-        self.unique_pairs(_full_name_key, GroupingMethod.NAME)
-        self.unique_pairs(_initial_key, GroupingMethod.NAME)
-        self.shared_identifier()
+        """Noms puis identifiants, sur les contributions sources et les groupes sans lien."""
+        contributions = [s for s in self.contributions if s.id not in self.links]
+        for key in (_name_key, _full_name_key, _initial_key):
+            self.unique_pairs(key, contributions)
+        self.shared_identifier(contributions)
 
     def _in_order(self, s: SourceContribution) -> bool:
         """Le lien de `s` entre dans le filtre d'ordre : le groupe a une position, et le lien ne vient pas d'un identifiant."""
@@ -453,16 +498,14 @@ class _SourceRecordLinks:
         kept = longest_ordered(ordered)
         for _, _, source_contribution_id in ordered:
             if source_contribution_id not in kept:
-                self.forbidden.add((source_contribution_id, self.links.pop(source_contribution_id)))
-                del self.methods[source_contribution_id]
+                self.unlink(source_contribution_id)
 
     def gaps(self) -> tuple[dict[int, int], dict[int, int]]:
         """Trou de chaque contribution source et de chaque groupe restés sans lien, parmi ceux qui ont une position."""
-        taken = self.linked_groups()
         anchor_positions = sorted(
             s.position for s in self.contributions if s.id in self.links and s.position is not None
         )
-        anchor_ranks = sorted(self.rank[g] for g in taken if g in self.ranked)
+        anchor_ranks = sorted(self.rank[g] for g in self.taken if g in self.ranked)
         contribution_gaps = {
             s.id: gap(anchor_positions, s.position)
             for s in self.contributions
@@ -471,7 +514,7 @@ class _SourceRecordLinks:
         group_gaps = {
             g.index: gap(anchor_ranks, self.rank[g.index])
             for g in self.groups
-            if g.index not in taken and g.index in self.ranked
+            if g.index not in self.taken and g.index in self.ranked
         }
         return contribution_gaps, group_gaps
 
@@ -492,7 +535,7 @@ class _SourceRecordLinks:
                 by_group.setdefault(key, []).append(g)
         for k, ss in by_contribution.items():
             gs = by_group.get(k, [])
-            if len(ss) > 1 and len(ss) == len(gs):
+            if len(ss) == len(gs):
                 for s, g in zip(ss, gs, strict=True):
                     self.link(s, g, GroupingMethod.ORDER)
 
@@ -566,7 +609,7 @@ def _residual_links(
 ) -> dict[int, tuple[int, float, float]]:
     """Liens du résidu : contribution source → (indice de groupe, score, marge).
 
-    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe que la position seule ne rapproche pas (`position_only`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux membres du groupe retenus : ceux que la position seule ne rapproche pas (`position_only`), et dont les initiales ne contredisent pas un patronyme seulement proche (`conflicting_initials`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de groupes restants.
     """
     contribution_gaps, group_gaps = record_links.gaps()
     rest_contributions = [s for s in record_links.contributions if s.id in contribution_gaps]
@@ -610,8 +653,9 @@ def _residual_links(
                 (y, levels)
                 for y in members[index]
                 if not _position_only(levels := comparison_levels(x, y))
+                and not _conflicting_initials(x, y, levels)
             ]
-            # Le blocage ne retient que les membres que la position seule ne rapproche pas ; le trou est celui du groupe.
+            # Le blocage ne retient que les membres retenus ; le trou est celui du groupe.
             if not kept or not (
                 abs(x.gap - group_gaps[index]) <= 1
                 or any(
@@ -670,13 +714,36 @@ def align_publication(
             if i
             else {}
         )
-        by_index = {g.index: g for g in groups}
-        for s in contributions:
-            if (link := links.get(s.id)) is not None:
-                member = Member(s.id, source_record_id, link.method, link.score, link.margin)
-                by_index[link.group].members.append(member)
-            else:
-                member = Member(s.id, source_record_id, GroupingMethod.REFERENCE)
-                groups.append(Group(len(groups), s, [member]))
-        groups.sort(key=lambda g: (*_list_order(g.reference)[:2], g.index))
+        groups = _with_new_groups(groups, contributions, links, source_record_id)
     return groups
+
+
+def _with_new_groups(
+    groups: Sequence[Group],
+    contributions: Sequence[SourceContribution],
+    links: Mapping[int, _Link],
+    source_record_id: int,
+) -> list[Group]:
+    """Groupes rangés après l'alignement d'un enregistrement source : ses contributions sources liées rejoignent leur groupe, les autres fondent un groupe.
+
+    Un groupe fondé se range juste après le groupe de la contribution source liée qui le précède dans la liste, ou en tête sans telle contribution source. Les groupes fondés sans position se rangent à la fin.
+    """
+    by_index = {g.index: g for g in groups}
+    following: dict[int | None, list[Group]] = defaultdict(list)
+    unpositioned: list[Group] = []
+    previous: int | None = None
+    next_index = len(groups)
+    for s in contributions:
+        if (link := links.get(s.id)) is not None:
+            member = Member(s.id, source_record_id, link.method, link.score, link.margin)
+            by_index[link.group].members.append(member)
+            previous = link.group
+        else:
+            group = Group(next_index, s, [Member(s.id, source_record_id, GroupingMethod.REFERENCE)])
+            next_index += 1
+            (unpositioned if s.position is None else following[previous]).append(group)
+    return [
+        *following[None],
+        *(placed for g in groups for placed in (g, *following[g.index])),
+        *unpositioned,
+    ]

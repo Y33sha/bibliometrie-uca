@@ -5,6 +5,8 @@
 	import { onMount } from 'svelte';
 	import { apiDetail } from '$lib/api';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
+	import { titleText } from '$lib/utils';
 	import type { components } from '$lib/api/schema';
 
 	type Monograph = components['schemas']['MonographListItem'];
@@ -28,7 +30,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle(monograph?.title ?? 'Monographie')}</title>
+	<title>{pageTitle(titleText(monograph?.title) || 'Monographie')}</title>
 </svelte:head>
 
 {#if canGoBack}
@@ -42,7 +44,7 @@
 	<div class="loading">Chargement…</div>
 {:else}
 	<div class="m-header">
-		<h1 class="m-title">{monograph.title}</h1>
+		<h1 class="m-title"><PublicationTitle titre={monograph.title} /></h1>
 		<div class="meta-row">
 			<span class="type-tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
 			{#if monograph.year}

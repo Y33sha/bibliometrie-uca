@@ -154,6 +154,13 @@ export function sanitizeTitle(s: string | null | undefined): string {
 	return render(s, TITLE_ALLOWED_TAGS);
 }
 
+/** Texte visible du rendu de `sanitizeTitle`, pour les emplacements qui n'acceptent pas de HTML (titre d'onglet, info-bulle). La copie MathML que KaTeX joint à son rendu est écartée. */
+export function titleText(s: string | null | undefined): string {
+	const doc = new DOMParser().parseFromString(sanitizeTitle(s), 'text/html');
+	doc.querySelectorAll('.katex-mathml').forEach((node) => node.remove());
+	return (doc.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
+
 /* Comme `sanitizeTitle`, en gardant les paragraphes : un résumé en porte, un titre non. */
 export function sanitizeAbstract(s: string | null | undefined): string {
 	return render(s, ABSTRACT_ALLOWED_TAGS);

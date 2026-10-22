@@ -11,6 +11,7 @@ from domain.publications.author_grouping import (
     SourceContribution,
     align_publication,
     comparison_levels,
+    conflicting_initials,
     full_first_name,
     gap,
     jaro_winkler,
@@ -78,6 +79,23 @@ class TestAlignPublication:
         assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(groups)
         assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _grouped(groups)
 
+    def test_une_paire_seule_dans_un_trou_se_lie_dans_l_ordre(self):
+        """« Ahmad T » n'est unique ni par le patronyme ni par l'initiale, à cause de « Ahmad Tahania » plus loin ; seul de sa clé dans son trou, il se lie par l'ordre."""
+        reference = _source_record(
+            1,
+            [
+                ("martin", "a"),
+                ("ahmad", "t"),
+                ("petit", "b"),
+                ("ahmad", "tahania"),
+                ("durand", "c"),
+            ],
+        )
+        other = _source_record(2, [("martin", "a"), ("ahmad", "t"), ("petit", "b")])
+        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(
+            align_publication({1: reference, 2: other})
+        )
+
     def test_l_identifiant_d_un_membre_lie_au_groupe(self):
         """La référence est sans ORCID ; un membre venu du deuxième enregistrement source a l'ORCID, et le troisième enregistrement source rejoint son groupe, même dans l'ordre inverse."""
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno")])
@@ -125,6 +143,35 @@ class TestAlignPublication:
         assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] not in _grouped(
             align_publication(source_records)
         )
+
+    def test_un_patronyme_rendu_unique_par_un_lien_se_lie_au_second_passage(self):
+        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le patronyme lie le Martin sans prénom au seul groupe « Martin » resté libre."""
+        reference = _source_record(1, [("martin", "anne"), ("martin", "bruno"), ("petit", "c")])
+        other = _source_record(2, [("martin", "anne"), ("martin", "")])
+        assert _grouped(align_publication({1: reference, 2: other})) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
+            [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
+        ]
+
+    def test_un_groupe_fonde_par_une_liste_plus_courte_suit_son_voisin_precedent(self):
+        """« Giromini » manque à la liste la plus longue : son groupe se range après « Durand », son voisin précédent. Sa position brute le rangerait après « Roux »."""
+        longest = _source_record(
+            1, [("martin", "a"), ("petit", "b"), ("durand", "c"), ("leroy", "d"), ("roux", "e")]
+        )
+        shorter = _source_record(
+            2,
+            [("martin", "a"), ("petit", "b"), ("durand", "c"), ("giromini", "p"), ("leroy", "d")],
+            start=1,
+        )
+        groups = align_publication({1: longest, 2: shorter})
+        assert [g.reference.last_name for g in groups] == [
+            "martin",
+            "petit",
+            "durand",
+            "giromini",
+            "leroy",
+            "roux",
+        ]
 
     def test_une_contribution_source_sans_position_se_lie_par_le_nom_hors_de_l_ordre(self):
         """Jury d'une thèse chez theses.fr, sans position : il se lie par le nom au jury positionné d'un autre enregistrement source, quel que soit son rang."""
@@ -253,6 +300,36 @@ class TestPositionOnly:
         assert not position_only(
             _author("martin", "anne", orcid="0000"), _author("durand", "claire", orcid="0000")
         )
+
+
+class TestConflictingInitials:
+    def test_patronyme_proche_et_initiales_differentes(self):
+        assert conflicting_initials(_author("balakrishnan", "v"), _author("balaji", "s"))
+
+    def test_patronyme_identique(self):
+        assert not conflicting_initials(_author("mcdonald", "millie"), _author("mcdonald", "e f"))
+
+    def test_initiales_concordantes(self):
+        assert not conflicting_initials(_author("soh", "d a"), _author("su", "daxian"))
+
+    def test_prenom_absent(self):
+        assert not conflicting_initials(_author("balakrishnan", ""), _author("balaji", "s"))
+
+    def test_identifiant_commun(self):
+        assert not conflicting_initials(
+            _author("balakrishnan", "v", orcid="0000"), _author("balaji", "s", orcid="0000")
+        )
+
+    def test_le_residu_ne_lie_pas_des_initiales_contradictoires(self):
+        """« V. Balakrishnan » occupe la place de « S. Balaji » entre deux auteurs liés : le modèle ne les lie pas."""
+        reference = _source_record(1, [("martin", "a"), ("balaji", "s"), ("durand", "c")])
+        other = _source_record(2, [("martin", "a"), ("balakrishnan", "v"), ("durand", "c")])
+        groups = align_publication(
+            {1: reference, 2: other},
+            model=ResidualModel(RESIDUAL_WEIGHTS),
+            assign=_greedy,
+        )
+        assert all(len(g.members) == 1 for g in groups if g.reference.last_name.startswith("bala"))
 
 
 class TestFullFirstName:

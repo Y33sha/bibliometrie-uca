@@ -165,6 +165,12 @@ class SourceContributionGroupStore:
             text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment")
         )
 
+    def mark_all_dirty(self) -> int:
+        """Pose `contributions_dirty` sur toutes les publications. Rend le nombre de publications marquées."""
+        return self._conn.execute(
+            text("UPDATE publications SET contributions_dirty = true WHERE NOT contributions_dirty")
+        ).rowcount
+
     def fetch_dirty_publications(self) -> list[tuple[int, int]]:
         """Publications marquées `contributions_dirty`, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         rows = self._conn.execute(

@@ -2,7 +2,8 @@ import svelte from 'eslint-plugin-svelte';
 import svelteParser from 'svelte-eslint-parser';
 import tsParser from '@typescript-eslint/parser';
 
-/* Analyse ciblée : une seule règle, `svelte/no-at-html-tags`.
+/* Analyse ciblée : deux règles, `svelte/no-at-html-tags` et l'interdiction d'afficher un titre
+ * de publication sans son rendu (`TITRE_AFFICHE_BRUT`).
  *
  * `{@html}` insère du HTML sans échappement — c'est le seul endroit du frontend où une valeur
  * reçue d'une source externe peut devenir du code exécutable. Les valeurs qui y passent sont
@@ -28,6 +29,29 @@ const RENDU_HTML_ASSAINI = [
 	'src/lib/components/PublicationAbstract.svelte'
 ];
 
+/* Champs de titre de publication. Un titre porte du formatage déposé par les sources (MathML,
+ * LaTeX, balises) : dans un gabarit, il passe par `PublicationTitle` (prop `titre`), ou par
+ * `titleText` là où seul du texte est admis (titre d'onglet, info-bulle). */
+const CHAMP_TITRE = '/^(title|monograph_title|publication_title)$/';
+
+const TITRE_AFFICHE_BRUT = {
+	selector:
+		`SvelteMustacheTag MemberExpression[property.name=${CHAMP_TITRE}]` +
+		`:not(SvelteAttribute[key.name='titre'] *)` +
+		`:not(CallExpression[callee.name='titleText'] *)`,
+	message:
+		'Titre affiché sans rendu : passer par <PublicationTitle titre={…} />, ou par titleText(…) là où seul du texte est admis.'
+};
+
+/* Fichiers où `title` désigne autre chose qu'un titre de publication : revues, aide, boîtes de dialogue. */
+const TITRES_HORS_PUBLICATIONS = [
+	'src/lib/components/DialogHost.svelte',
+	'src/lib/components/JournalsListView.svelte',
+	'src/routes/journals/[[]id]/+page.svelte',
+	'src/routes/admin/journals/**',
+	'src/routes/admin/feedback/+page.svelte'
+];
+
 export default [
 	{
 		ignores: ['build/', '.svelte-kit/', 'node_modules/', 'src/lib/api/schema.ts']
@@ -42,7 +66,14 @@ export default [
 		},
 		plugins: { svelte },
 		rules: {
-			'svelte/no-at-html-tags': 'error'
+			'svelte/no-at-html-tags': 'error',
+			'no-restricted-syntax': ['error', TITRE_AFFICHE_BRUT]
+		}
+	},
+	{
+		files: TITRES_HORS_PUBLICATIONS,
+		rules: {
+			'no-restricted-syntax': 'off'
 		}
 	},
 	{

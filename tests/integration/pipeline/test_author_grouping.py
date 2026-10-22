@@ -141,6 +141,21 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     assert dict(conn.execute(text(tuples)).all()) == before
 
 
+def test_la_reconstruction_regroupe_les_publications_non_marquees(conn):
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
+    _run(conn)
+    conn.execute(
+        text("DELETE FROM source_contribution_groups WHERE publication_id = :p"), {"p": publication}
+    )
+
+    metrics = build_groups(conn, SourceContributionGroupStore(conn), logger, rebuild=True)
+
+    assert metrics.details["summary"]["publications"] >= 1
+    assert len(_groups(conn, publication)) == 2
+
+
 def test_un_enregistrement_source_deplace_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
     """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la contribution source."""
     monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)

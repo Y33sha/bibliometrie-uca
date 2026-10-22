@@ -11,6 +11,7 @@ import pytest
 from pipeline.graph import PHASE_LABELS, PHASE_ORDER
 from pipeline.run import (
     PHASE_TITLE_WIDTH,
+    _build_arg_parser,
     _phase_label,
     _phase_title,
     _run_title,
@@ -92,21 +93,8 @@ def test_une_phase_sans_libelle_garde_son_cadre(terminal) -> None:
 
 
 def _args(**modifications) -> argparse.Namespace:
-    defauts = {
-        "mode": "full",
-        "sources": "hal,openalex,scanr,theses,crossref,datacite,wos",
-        "include_wos": False,
-        "year": None,
-        "start_year": None,
-        "only": None,
-        "from_phase": None,
-        "no_extras": False,
-        "rebuild_publications": False,
-        "rebuild_subjects": False,
-        "raw_store": False,
-        "normalize_full": False,
-    }
-    return argparse.Namespace(**{**defauts, **modifications})
+    """Arguments par défaut de la CLI, puis `modifications`."""
+    return argparse.Namespace(**{**vars(_build_arg_parser().parse_args([])), **modifications})
 
 
 def _texte(lines: list[str]) -> str:
