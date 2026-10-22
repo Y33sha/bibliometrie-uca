@@ -5,7 +5,12 @@ Trois caches dénormalisés, en cascade :
   2. `source_records.countries` — union des `source_contributions.countries` du document.
   3. `publications.countries` — union des `source_records.countries` de même publication_id.
 
-Deux portées partagent l'agrégation : les lignes `countries_dirty` (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
+Deux portées partagent l'agrégation : les contributions sources à recalculer (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
+
+Une contribution source est à recalculer quand elle est marquée `countries_dirty` ou liée à une adresse marquée `countries_dirty`. `create_dirty_scope` relève ces contributions sources une fois, dans deux tables temporaires que lisent les trois étapes :
+
+- `countries_dirty_scope` : toutes ces contributions sources, avec leur enregistrement source ;
+- `countries_recompute_scope` : parmi elles, celles dont les pays peuvent changer, numérotées pour le traitement par tranches. Une contribution source sans adresse, sans ROR sans adresse, sans structure HAL et sans pays garde des pays vides : elle en est absente.
 """
 
 import logging
@@ -14,19 +19,35 @@ import time
 from sqlalchemy import Connection, text
 
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
-from pipeline.runtime.observability.progress import waiting
+from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.countries.resolution import resolve_address_countries
 
-# CTE des contributions sources à recalculer : marquées `countries_dirty`, ou liées à une adresse marquée `countries_dirty`.
-_DIRTY_SOURCE_CONTRIBUTION = """
-    WITH dirty_source_contribution AS (
-        SELECT id FROM source_contributions WHERE countries_dirty
-        UNION
-        SELECT sca.source_contribution_id
-        FROM source_contribution_addresses sca
-        JOIN addresses a ON a.id = sca.address_id
-        WHERE a.countries_dirty
-    )
+BATCH_SIZE = 50_000
+"""Nombre de contributions sources recalculées par requête."""
+
+_CREATE_DIRTY_SCOPE = """
+    CREATE TEMP TABLE countries_dirty_scope AS
+    SELECT id, source_record_id, countries IS NOT NULL AS has_countries
+    FROM source_contributions WHERE countries_dirty
+    UNION
+    SELECT sc.id, sc.source_record_id, sc.countries IS NOT NULL
+    FROM source_contribution_addresses sca
+    JOIN addresses a ON a.id = sca.address_id
+    JOIN source_contributions sc ON sc.id = sca.source_contribution_id
+    WHERE a.countries_dirty
+"""
+
+_CREATE_RECOMPUTE_SCOPE = """
+    CREATE TEMP TABLE countries_recompute_scope AS
+    SELECT row_number() OVER (ORDER BY d.id) AS rank, d.id
+    FROM countries_dirty_scope d
+    WHERE d.has_countries
+       OR EXISTS (SELECT 1 FROM source_contribution_addresses x
+                  WHERE x.source_contribution_id = d.id)
+       OR EXISTS (SELECT 1 FROM source_contribution_rors x
+                  WHERE x.source_contribution_id = d.id AND x.address_id IS NULL)
+       OR EXISTS (SELECT 1 FROM source_contribution_hal_structures x
+                  WHERE x.source_contribution_id = d.id)
 """
 
 # Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)` ; marque `countries_dirty` les contributions sources modifiées.
@@ -102,45 +123,69 @@ _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
 """
 
 
-def refresh_source_contribution_countries(
-    conn: Connection, *, id_range: tuple[int, int] | None = None
-) -> int:
-    """Recalcule `source_contributions.countries` des contributions sources de `_DIRTY_SOURCE_CONTRIBUTION`. Retourne le nombre de contributions sources modifiées.
+def create_dirty_scope(conn: Connection) -> int:
+    """Crée `countries_dirty_scope` et `countries_recompute_scope`. Retourne le nombre de contributions sources à recalculer."""
+    conn.execute(text(_CREATE_DIRTY_SCOPE))
+    conn.execute(text(_CREATE_RECOMPUTE_SCOPE))
+    conn.execute(text("ALTER TABLE countries_recompute_scope ADD PRIMARY KEY (rank)"))
+    conn.execute(text("ANALYZE countries_dirty_scope"))
+    conn.execute(text("ANALYZE countries_recompute_scope"))
+    return conn.execute(text("SELECT count(*) FROM countries_recompute_scope")).scalar_one()
 
-    `id_range` (bornes incluses) recalcule toutes les contributions sources de l'intervalle qui ont une adresse, un ROR sans adresse ou une structure HAL.
+
+def drop_dirty_scope(conn: Connection) -> None:
+    """Supprime les tables de `create_dirty_scope`."""
+    conn.execute(text("DROP TABLE countries_dirty_scope, countries_recompute_scope"))
+
+
+def refresh_source_contribution_countries(
+    conn: Connection, *, ranks: tuple[int, int] | None = None
+) -> int:
+    """Recalcule `source_contributions.countries` des contributions sources de `countries_recompute_scope`. Retourne le nombre de contributions sources modifiées.
+
+    `ranks` (bornes incluses) limite le recalcul à une tranche de la numérotation.
     """
-    if id_range is None:
-        scope = (
-            _DIRTY_SOURCE_CONTRIBUTION + ", scoped_sa AS (SELECT id FROM dirty_source_contribution)"
-        )
+    if ranks is None:
+        scope = "WITH scoped_sa AS (SELECT id FROM countries_recompute_scope)"
         params = {}
     else:
         scope = """
             WITH scoped_sa AS (
-                SELECT source_contribution_id AS id FROM source_contribution_addresses
-                WHERE source_contribution_id BETWEEN :lo AND :hi
-                UNION
-                SELECT source_contribution_id FROM source_contribution_rors
-                WHERE source_contribution_id BETWEEN :lo AND :hi AND address_id IS NULL
-                UNION
-                SELECT source_contribution_id FROM source_contribution_hal_structures
-                WHERE source_contribution_id BETWEEN :lo AND :hi
+                SELECT id FROM countries_recompute_scope WHERE rank BETWEEN :lo AND :hi
             )"""
-        params = {"lo": id_range[0], "hi": id_range[1]}
+        params = {"lo": ranks[0], "hi": ranks[1]}
     return conn.execute(text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE), params).rowcount
 
 
+def refresh_source_contribution_countries_in_id_range(
+    conn: Connection, id_range: tuple[int, int]
+) -> int:
+    """Recalcule `source_contributions.countries` de toutes les contributions sources de l'intervalle d'identifiants `id_range` (bornes incluses) qui ont une adresse, un ROR sans adresse ou une structure HAL. Retourne le nombre de contributions sources modifiées."""
+    scope = """
+        WITH scoped_sa AS (
+            SELECT source_contribution_id AS id FROM source_contribution_addresses
+            WHERE source_contribution_id BETWEEN :lo AND :hi
+            UNION
+            SELECT source_contribution_id FROM source_contribution_rors
+            WHERE source_contribution_id BETWEEN :lo AND :hi AND address_id IS NULL
+            UNION
+            SELECT source_contribution_id FROM source_contribution_hal_structures
+            WHERE source_contribution_id BETWEEN :lo AND :hi
+        )"""
+    return conn.execute(
+        text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE),
+        {"lo": id_range[0], "hi": id_range[1]},
+    ).rowcount
+
+
 def refresh_source_record_countries(conn: Connection) -> int:
-    """Recalcule `source_records.countries` des documents de `_DIRTY_SOURCE_CONTRIBUTION`. Retourne le nombre de lignes modifiées."""
+    """Recalcule `source_records.countries` des documents de `countries_dirty_scope`. Retourne le nombre de lignes modifiées."""
     return conn.execute(
         text(
-            _DIRTY_SOURCE_CONTRIBUTION
-            + """,
-            scoped_sp AS (
-                SELECT DISTINCT sc.source_record_id AS source_record_id
-                FROM source_contributions sc
-                JOIN dirty_source_contribution d ON d.id = sc.id
-                WHERE sc.source_record_id IS NOT NULL
+            """
+            WITH scoped_sp AS (
+                SELECT DISTINCT source_record_id FROM countries_dirty_scope
+                WHERE source_record_id IS NOT NULL
             )
             """
             + _SOURCE_RECORD_COUNTRIES_FROM_SCOPE
@@ -149,16 +194,14 @@ def refresh_source_record_countries(conn: Connection) -> int:
 
 
 def refresh_publication_countries(conn: Connection) -> int:
-    """Recalcule `publications.countries` des publications de `_DIRTY_SOURCE_CONTRIBUTION`. Retourne le nombre de lignes modifiées."""
+    """Recalcule `publications.countries` des publications des documents de `countries_dirty_scope`. Retourne le nombre de lignes modifiées."""
     return conn.execute(
         text(
-            _DIRTY_SOURCE_CONTRIBUTION
-            + """,
-            scoped_publications AS (
+            """
+            WITH scoped_publications AS (
                 SELECT DISTINCT sr.publication_id AS publication_id
-                FROM source_records sr
-                JOIN source_contributions sc ON sc.source_record_id = sr.id
-                JOIN dirty_source_contribution d ON d.id = sc.id
+                FROM (SELECT DISTINCT source_record_id FROM countries_dirty_scope) d
+                JOIN source_records sr ON sr.id = d.source_record_id
                 WHERE sr.publication_id IS NOT NULL
             )
             """
@@ -175,16 +218,41 @@ def clear_countries_dirty(conn: Connection) -> None:
     conn.execute(text("UPDATE addresses SET countries_dirty = false WHERE countries_dirty"))
 
 
+def _refresh_source_contributions_in_batches(
+    conn: Connection, total: int, logger: logging.Logger
+) -> int:
+    """Recalcule les `total` contributions sources de `countries_recompute_scope` par tranches de `BATCH_SIZE`, avec une barre de progression. Retourne le nombre de contributions sources modifiées."""
+    updated = 0
+    with track_progress(total, f"{BRANCH}contributions sources", logger, erase=True) as progress:
+        for lo in range(1, total + 1, BATCH_SIZE):
+            hi = min(lo + BATCH_SIZE - 1, total)
+            updated += refresh_source_contribution_countries(conn, ranks=(lo, hi))
+            progress.advance(hi - lo + 1)
+    return updated
+
+
 def refresh(conn: Connection, logger: logging.Logger) -> int:
-    """Recalcule les caches pays (source_contributions → source_records → publications), scopé aux `countries_dirty`, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
     step(logger, "Rafraîchissement des pays associés aux publications")
-    steps = (
-        ("contribution source", "contributions sources", refresh_source_contribution_countries),
+    t0 = time.perf_counter()
+    with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
+        total = create_dirty_scope(conn)
+        line.conclude(
+            f"{BRANCH}{quantity(total, 'contribution source à recalculer', 'contributions sources à recalculer')}"
+            f" en {time.perf_counter() - t0:.1f} s"
+        )
+    t0 = time.perf_counter()
+    updated = _refresh_source_contributions_in_batches(conn, total, logger)
+    logger.info(
+        "%s%s en %.1f s",
+        BRANCH,
+        quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
+        time.perf_counter() - t0,
+    )
+    for singular, plural, refresh_step in (
         ("enregistrement source", "enregistrements sources", refresh_source_record_countries),
         ("publication", "publications", refresh_publication_countries),
-    )
-    updated = 0
-    for singular, plural, refresh_step in steps:
+    ):
         t0 = time.perf_counter()
         with waiting(f"{BRANCH}{plural} : en cours", logger) as line:
             updated = refresh_step(conn)
@@ -192,6 +260,7 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
                 f"{BRANCH}{quantity(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
                 f" en {time.perf_counter() - t0:.1f} s"
             )
+    drop_dirty_scope(conn)
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}effacement des marqueurs de recalcul : en cours", logger) as line:
         clear_countries_dirty(conn)
