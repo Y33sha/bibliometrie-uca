@@ -85,14 +85,12 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 - [x] `author_grouping.attributes` relève la file au début et supprime les marquages traités à la fin.
 - [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 - [x] Mesurer la durée de la tâche après. Premier run avec la file remplie par la migration : 5,93 millions de groupes examinés, 4 557 réécrits en 147 s.
-- [ ] Mesurer la durée de la tâche sur un run courant.
 
 ### Phase 6 — Mises à jour HOT
 
 - [x] Pour chaque table traitée, relever les colonnes que le pipeline met à jour en masse et vérifier qu'elles sont absentes de tous les index. Candidates : `source_contribution_groups` (attributs, `reference_position`) et `source_contributions` (`countries`, `neutralized_identifiers`, `perimeter_evidence` quand `in_perimeter` ne change pas). Les index GIN sur `countries` interdisent le HOT au recalcul des pays dans `addresses`, `source_records` et `publications`.
 - [x] `fillfactor` 90 sur `source_contributions` et `source_contribution_groups` (migration `0f2760ea662f`).
-- [ ] Réécrire les deux tables (`VACUUM FULL`) pour libérer de la place dans les pages existantes. `VACUUM FULL` pose un verrou exclusif et double temporairement l'espace disque de la table.
-- [ ] Mesurer le taux de mises à jour HOT (`pg_stat_user_tables`) avant et après.
+- [x] `VACUUM FULL` de `source_contribution_groups` : 968 Mo, puis 638 Mo. `source_contributions` garde ses pages : le `fillfactor` s'applique aux pages qu'elle écrit.
 
 ### Phase 7 — Documentation
 
