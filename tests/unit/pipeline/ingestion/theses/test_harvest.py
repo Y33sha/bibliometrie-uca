@@ -1,6 +1,6 @@
 """Moissonnage theses.fr (`pipeline.ingestion.theses.harvest`) et champs des thèses.
 
-Requête et champs : fonctions pures. Pilotage : une requête pour tous les établissements, pagination sur `totalHits`, filtre par année sur le préfixe du NNT, bilan, arrêt sur circuit-breaker. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
+Requête et champs : fonctions pures. Pilotage : une requête pour tous les établissements, pagination sur `totalHits`, filtre sur les années de la fenêtre par le préfixe du NNT, bilan. Pas de réseau ni de base : un faux client sert des pages scriptées, la configuration et l'écriture dans `staging` sont remplacées.
 """
 
 from __future__ import annotations
@@ -61,13 +61,13 @@ def _client(pages: list[list[dict]], *, total: int | None = None) -> MagicMock:
     return client
 
 
-def _extraire(client: MagicMock, *, progress: Progress | None = None, **kwargs):
+def _extraire(client: MagicMock, *, progress: Progress | None = None, years=(2020,)):
     return harvest_theses(
         client,
         MagicMock(),
         ["PPN1"],
         progress or Progress(None, "theses.fr", None),
-        **kwargs,
+        years=list(years),
     )
 
 
@@ -90,16 +90,22 @@ def test_ventilation_par_issue_de_l_ecriture(ecritures):
 def test_filtre_annee_sur_le_prefixe_du_nnt(ecritures):
     progress = Progress(None, "theses.fr", None, count_kept=True)
     metrics = _extraire(
-        _client([[_these("2020AAA1"), _these("2021AAA1")]]), progress=progress, year=2021
+        _client([[_these("2020AAA1"), _these("2021AAA1")]]), progress=progress, years=[2021]
     )
     assert (metrics.total, metrics.new) == (2, 1)
     assert progress._kept == 1
 
 
+def test_la_fenetre_retient_plusieurs_annees(ecritures):
+    client = _client([[_these("2019A"), _these("2020A"), _these("2021A")]])
+    _extraire(client, years=[2020, 2021])
+    assert [e.source_id for e in ecritures] == ["2020A", "2021A"]
+
+
 def test_une_annee_retient_aussi_les_theses_en_cours(ecritures):
-    """Une thèse en cours n'a pas d'année dans son identifiant : elle est retenue quelle que soit l'année demandée."""
+    """Une thèse en cours n'a pas d'année dans son identifiant : elle est retenue quelle que soit la fenêtre."""
     client = _client([[_these("2020A"), _these("2021A"), _these("s367812", status="enCours")]])
-    _extraire(client, year=2021)
+    _extraire(client, years=[2021])
     assert [e.source_id for e in ecritures] == ["2021A", "s367812"]
 
 
@@ -114,14 +120,14 @@ def test_page_vide_interrompt_la_boucle(ecritures):
 
 
 def test_run_interroge_tous_les_etablissements_d_un_coup(configuration, ecritures):
-    configuration(harvest, api_ids=["PPN1", "PPN2"])
+    configuration(harvest, api_ids=["PPN1", "PPN2"], annees=[2020])
     client = _client([[_these("2020A"), _these("2020B")]])
     assert moissonneur(ThesesHarvester, client).run(arguments_du_run()).new == 2
     assert client.fetch_page.call_args.args[0] == build_query(["PPN1", "PPN2"])
 
 
 def test_run_ecrit_le_bilan_au_feminin(configuration, ecritures, caplog):
-    configuration(harvest)
+    configuration(harvest, annees=[2020])
     client = _client([[_these("2020A"), _these("2020B", UpsertOutcome.UNCHANGED)]])
     with caplog.at_level(logging.INFO, logger=_LOGGER.name):
         moissonneur(ThesesHarvester, client).run(arguments_du_run())

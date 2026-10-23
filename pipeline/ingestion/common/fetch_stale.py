@@ -43,7 +43,7 @@ class FetchStalePhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Relit les documents anciens de chaque source, dans la fenêtre d'années du run.
 
-        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`.
+        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]`. Une thèse en cours est relue quelle que soit la fenêtre.
         """
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
@@ -53,12 +53,10 @@ class FetchStalePhase:
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
 
         year = options.year
-        years_default = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
-        years_theses = [int(year)] if year else None
+        years = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
 
         def task(source: str) -> TaskRun:
-            row_years = years_theses if source == "theses" else years_default
-            return lambda ctx: self.refresh_one(ctx, source, row_years)
+            return lambda ctx: self.refresh_one(ctx, source, years)
 
         def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets

@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Les enregistrements sources de theses.fr restent : ce moissonnage couvre tout l'historique des établissements.
+"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours reste : elle n'a pas d'année de soutenance.
 
 Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
@@ -14,14 +14,13 @@ import os
 
 from sqlalchemy import Connection, text
 
+from domain.publications.doc_types import DocType
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
 from infrastructure.observability.log import setup_logger
 from pipeline.ingestion.common.source_records import delete_source_records_before
 
 log = setup_logger("delete_source_records_out_of_window", os.path.dirname(__file__))
-
-EXEMPT_SOURCES = ("theses",)
 
 
 def fetch_cutoff(conn: Connection) -> int:
@@ -34,14 +33,14 @@ def fetch_cutoff(conn: Connection) -> int:
 
 
 def count_targets(conn: Connection, cutoff: int) -> dict[str, int]:
-    """Enregistrements sources parus avant `cutoff`, par source, hors `EXEMPT_SOURCES`."""
+    """Enregistrements sources parus avant `cutoff`, par source, hors thèses en cours."""
     rows = conn.execute(
         text("""
             SELECT source::text, count(*) FROM source_records
-            WHERE publication_year < :cutoff AND source::text <> ALL(:exempt)
+            WHERE publication_year < :cutoff AND doc_type IS DISTINCT FROM CAST(:ongoing AS doc_type)
             GROUP BY 1 ORDER BY 2 DESC
         """),
-        {"cutoff": cutoff, "exempt": list(EXEMPT_SOURCES)},
+        {"cutoff": cutoff, "ongoing": DocType.ONGOING_THESIS},
     ).all()
     return dict(rows)
 
@@ -66,7 +65,7 @@ def main() -> int:
         return 0
 
     with engine.begin() as conn:
-        deleted, staged = delete_source_records_before(conn, cutoff, exempt_sources=EXEMPT_SOURCES)
+        deleted, staged = delete_source_records_before(conn, cutoff)
     log.info("Supprimés : %d enregistrements sources, %d lignes de staging", deleted, staged)
     return 0
 

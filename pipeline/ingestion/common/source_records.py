@@ -12,6 +12,7 @@ from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
 from domain.source_records.doc_types import map_doc_type
@@ -246,10 +247,8 @@ def delete_disappeared_source_records(conn: Connection) -> int:
     return _delete_source_records(conn, "s.disappeared_at IS NOT NULL", {})
 
 
-def delete_source_records_before(
-    conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
-) -> tuple[int, int]:
-    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Les enregistrements sources des sources `exempt_sources` restent.
+def delete_source_records_before(conn: Connection, start_year: int) -> tuple[int, int]:
+    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Une thèse en cours reste : elle n'a pas d'année de soutenance.
 
     Rend le nombre de `source_records` et de lignes de `staging` supprimées.
     """
@@ -258,9 +257,9 @@ def delete_source_records_before(
             text("""
                 SELECT sr.staging_id FROM source_records sr
                 WHERE sr.publication_year < :start_year AND sr.staging_id IS NOT NULL
-                  AND sr.source::text <> ALL(:exempt)
+                  AND sr.doc_type IS DISTINCT FROM CAST(:ongoing AS doc_type)
             """),
-            {"start_year": start_year, "exempt": list(exempt_sources)},
+            {"start_year": start_year, "ongoing": DocType.ONGOING_THESIS},
         ).scalars()
     )
     if not staging_ids:

@@ -66,13 +66,12 @@ def test_fetch_stale_covers_theses():
     assert "theses" in [c.args[1] for c in run_one.call_args_list]
 
 
-def test_fetch_stale_couples_years_per_source():
-    # theses ramène tout l'historique (borne None) ; les autres suivent la fenêtre du run.
+def test_fetch_stale_toutes_les_sources_suivent_la_fenetre():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
     by_target = {c.args[1]: c.args[2] for c in run_one.call_args_list}
-    assert by_target["theses"] is None
+    assert by_target["theses"] == [2024]
     assert by_target["hal"] == [2024]
 
 

@@ -5,7 +5,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 - s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : les sources incrémentales (`SourceProfile.incremental`) depuis le dernier moissonnage quotidien réussi ;
-- sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
+- sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
 Les dépendances techniques sont injectées par le composition-root :
@@ -47,9 +47,6 @@ if TYPE_CHECKING:
 
 HarvestOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
 GetLastDailyHarvestDate = Callable[[], date | None]
-
-# `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
-_YEAR_BOUNDED_SOURCES = frozenset({"openalex", "hal", "wos", "scanr", "datacite"})
 
 
 def _source_summary(metrics: PhaseMetrics) -> dict[str, float | None]:
@@ -95,7 +92,7 @@ class HarvestPhase:
                         last_daily[1],
                     )
                 window = HarvestWindow(
-                    start_year=options.start_year if source in _YEAR_BOUNDED_SOURCES else None,
+                    start_year=options.start_year,
                     year=options.year,
                     since=since,
                 )

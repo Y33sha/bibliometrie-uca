@@ -6,7 +6,6 @@ from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
 from interfaces.cli.maintenance.delete_source_records_out_of_window import (
-    EXEMPT_SOURCES,
     count_targets,
     fetch_cutoff,
 )
@@ -32,7 +31,13 @@ def _publication(conn) -> int:
 
 
 def _source_record_staged(
-    conn, publication_id, *, source: str, source_id: str, publication_year: int
+    conn,
+    publication_id,
+    *,
+    source: str,
+    source_id: str,
+    publication_year: int,
+    doc_type: str | None = None,
 ) -> int:
     staging_id = insert_staging(conn, source, source_id=source_id, processed=True)
     return _source_record(
@@ -42,6 +47,7 @@ def _source_record_staged(
         source_id=source_id,
         publication_year=publication_year,
         staging_id=staging_id,
+        doc_type=doc_type,
     )
 
 
@@ -65,7 +71,7 @@ def test_l_enregistrement_source_ancien_part_avec_sa_ligne_de_staging(sa_sync_co
     ).scalar_one()
 
     assert count_targets(conn, 2017) == {"hal": 1}
-    assert delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (1, 1)
+    assert delete_source_records_before(conn, 2017) == (1, 1)
     assert not _existe(conn, "source_records", ancienne)
     assert not _existe(conn, "staging", staging_id)
 
@@ -80,18 +86,33 @@ def test_la_soeur_dans_la_plage_reste_et_se_reconcilie(sa_sync_conn_owner):
         conn, publication, source="hal", source_id="hal-2017", publication_year=2017
     )
 
-    delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES)
+    delete_source_records_before(conn, 2017)
 
     assert _existe(conn, "source_records", soeur)
     assert soeur in queued(conn, Queue.SOURCE_RECORD_KEYS)
 
 
-def test_la_these_ancienne_reste(sa_sync_conn_owner):
+def test_la_these_soutenue_ancienne_part_la_these_en_cours_reste(sa_sync_conn_owner):
+    """Une thèse en cours n'a pas d'année de soutenance : son année de première inscription ne la fait pas sortir de la fenêtre."""
     conn = sa_sync_conn_owner
-    these = _source_record_staged(
-        conn, _publication(conn), source="theses", source_id="2005CLF21600", publication_year=2005
+    soutenue = _source_record_staged(
+        conn,
+        _publication(conn),
+        source="theses",
+        source_id="2005CLF21600",
+        publication_year=2005,
+        doc_type="thesis",
+    )
+    en_cours = _source_record_staged(
+        conn,
+        _publication(conn),
+        source="theses",
+        source_id="s367812",
+        publication_year=2012,
+        doc_type="ongoing_thesis",
     )
 
-    assert count_targets(conn, 2017) == {}
-    assert delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES) == (0, 0)
-    assert _existe(conn, "source_records", these)
+    assert count_targets(conn, 2017) == {"theses": 1}
+    assert delete_source_records_before(conn, 2017) == (1, 1)
+    assert not _existe(conn, "source_records", soutenue)
+    assert _existe(conn, "source_records", en_cours)

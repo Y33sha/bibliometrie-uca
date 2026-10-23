@@ -61,7 +61,7 @@ def test_since_last_extracts_hal_from_last_date(contexte):
     assert metrics.details["table"]["rows"][0]["key"] == "hal"
 
 
-def test_theses_ignores_year_range_bound(contexte):
+def test_toutes_les_sources_suivent_la_fenetre_d_annees(contexte):
     seen: dict[str, tuple[int | None, int | None]] = {}
 
     def harvest_one(_ctx, source, args):
@@ -70,8 +70,8 @@ def test_theses_ignores_year_range_bound(contexte):
 
     _phase(harvest_one).run(contexte(mode="full", sources={"hal", "theses"}, start_year=2020))
 
-    assert seen["hal"] == (2020, None)  # borne large appliquée
-    assert seen["theses"] == (None, None)  # theses ramène tout l'historique des PPN
+    assert seen["hal"] == (2020, None)
+    assert seen["theses"] == (2020, None)
 
 
 def _indisponible(source: str) -> PhaseMetrics:

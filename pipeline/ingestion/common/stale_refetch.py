@@ -12,6 +12,7 @@ from collections.abc import Mapping
 import httpx2
 from sqlalchemy import Connection, text
 
+from domain.publications.doc_types import DocType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.http.lookup import LookupOutcome
@@ -64,14 +65,18 @@ def get_stale_source_ids(
 ) -> list[str]:
     """Identifiants natifs des documents de `source` dont `last_seen_at` date de plus de `after_days` jours, hors documents disparus.
 
-    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années. `None` = aucune borne.
+    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années, et les thèses en cours. `None` = aucune borne.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        year_clause = "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years))"
+        # Une thèse en cours n'a pas d'année de soutenance : elle est relue quelle que soit la fenêtre.
+        year_clause = (
+            "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years)"
+            f" OR sr.doc_type = '{DocType.ONGOING_THESIS}')"
+        )
         params["years"] = list(years)
     sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
     return list(conn.execute(sql, params).scalars())

@@ -7,7 +7,7 @@ Récupère les données brutes depuis les API et les stocke en JSONB dans le *st
 ## Moissonnage par affiliation (`harvest`)
 
 **Critères de requête**:
-- **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
+- **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#années) dans `admin/config` (par défaut 2017, année de la fusion UCA). Une thèse soutenue suit la fenêtre par son année de soutenance ; une thèse en cours est toujours retenue ;
 - **affiliation** des publications ([périmètre configurable](../guide-utilisateur/03-workflow-admin.md#périmètres) dans `admin/config`). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures. DataCite, dont les affiliations sont du texte libre, s'interroge par mots-clés saisis pour chaque structure.
 
 En mode `daily`, seul HAL est moissonné : les dépôts de la même plage d'années, modifiés depuis le dernier moissonnage quotidien terminé sans signal, ou depuis 30 jours à défaut.
@@ -55,7 +55,7 @@ Chaque ligne périmée est réinterrogée par son identifiant natif :
 - absence confirmée → `disappeared_at` posé ;
 - erreur transitoire → laissée, retentée plus tard.
 
-La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year` — `theses` faisant exception, tout son historique restant éligible. Le seuil étale la charge : une passe ramasse seulement ce qui vient de franchir le délai.
+La sélection se borne aux années de la fenêtre courante, lues sur `source_records.publication_year`. Une thèse en cours, qui n'a pas d'année de soutenance, est relue quelle que soit la fenêtre. Le seuil étale la charge : une passe ramasse seulement ce qui vient de franchir le délai.
 
 ## Listes d'auteurs tronquées (`fetch_truncated`)
 

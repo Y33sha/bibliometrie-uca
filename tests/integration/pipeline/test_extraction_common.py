@@ -363,6 +363,27 @@ class TestGetStaleSourceIds:
         rows = get_stale_source_ids(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(rows) == ["W2", "W3"]
 
+    def test_une_these_en_cours_est_relue_hors_fenetre(self, sa_sync_conn):
+        """Une thèse en cours n'a pas d'année de soutenance : son année de première inscription ne l'écarte pas."""
+        for sid in ("2005CLF21600", "s367812"):
+            insert_staging(sa_sync_conn, "theses", source_id=sid, seen_days_ago=100)
+        _source_record(
+            sa_sync_conn,
+            source="theses",
+            source_id="2005CLF21600",
+            publication_year=2005,
+            doc_type="thesis",
+        )
+        _source_record(
+            sa_sync_conn,
+            source="theses",
+            source_id="s367812",
+            publication_year=2012,
+            doc_type="ongoing_thesis",
+        )
+        rows = get_stale_source_ids(sa_sync_conn, "theses", [2023, 2024], after_days=90)
+        assert rows == ["s367812"]
+
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)
         _source_record(sa_sync_conn, source="openalex", source_id="W1", publication_year=2010)
