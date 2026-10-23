@@ -4,13 +4,13 @@
 
 ### En cours
 
+- [Une source, un adaptateur](CODE_adaptateur-par-source.md)
 - [Résolution des personnes par groupe](DATA_resolution-personnes.md)
 
 ### En pause
 
 - [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
-- [Normalisation par lots de documents](CODE_batch-normalize.md)
 
 ### Non commencé
 
@@ -19,7 +19,6 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Indicateurs d'impact dans les rapports par laboratoire](METIER_rapports-impact.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 - [Monographies](DATA_monographies.md)
 - [Pagination par curseur](CODE_pagination-par-curseur.md)
@@ -28,7 +27,6 @@
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
-- [Une source, un adaptateur](CODE_adaptateur-par-source.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés

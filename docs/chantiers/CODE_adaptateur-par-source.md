@@ -75,7 +75,6 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 - La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
 - Une fonction sans I/O classe chaque tentative. Deux enveloppes, synchrone et asynchrone, l'exécutent. L'épuisement des réessais lève `SourceUnavailableError`, quelle qu'en soit la cause.
 - La classe de base de la normalisation fait la séquence d'écriture. Une source fournit l'analyse d'une ligne de `staging`.
-- La phase 7 se coordonne avec le chantier [Normalisation par lots](CODE_batch-normalize.md), qui réécrit le writer des contributions sources.
 
 ## Phasage
 
@@ -112,7 +111,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 ### Phase 6 — Politiques de source
 
 - [x] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre, qui épargne les thèses en cours. d8fd9c470
-- [ ] Câblage commun de `harvest` et de `harvest_by_person`.
+- [x] Câblage commun de `harvest` et de `harvest_by_person`. a764e373b 490ad11b1
 
 ### Phase 7 — Normalisation
 
