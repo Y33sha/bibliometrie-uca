@@ -8,7 +8,7 @@ from enum import StrEnum
 from urllib.parse import quote
 
 from domain.errors import ValidationError
-from domain.persons.identifiers import PersonIdentifierType
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 
 
 class Source(StrEnum):
@@ -85,6 +85,11 @@ PROFILES: dict[Source, SourceProfile] = {
 }
 
 SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
+
+# Statuts d'un identifiant de personne RH qui la font interroger par la phase `harvest_by_person`.
+SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
+    {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
+)
 
 
 def source_label(source: str) -> str:

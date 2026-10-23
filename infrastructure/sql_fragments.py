@@ -11,8 +11,7 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES, SOURCE_PRIORITY
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 

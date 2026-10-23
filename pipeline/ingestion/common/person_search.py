@@ -13,8 +13,7 @@ from typing import ClassVar
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import PERSON_IDENTIFIER_LABELS, PersonIdentifierType
-from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import PROFILES, Source
+from domain.sources.registry import PROFILES, SEARCHED_IDENTIFIER_STATUSES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
