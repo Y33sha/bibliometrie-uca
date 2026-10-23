@@ -3,9 +3,9 @@
 #   - pre-commit : garde rapide et locale à chaque commit (lint, format sur
 #     l'index, tests unitaires).
 #   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
-#     format, types, contrats d'architecture, hygiène des dépendances, build
-#     frontend). La suite de tests reste à la charge de la CI, trop longue pour
-#     un pre-push.
+#     format, types, contrats d'architecture, hygiène des dépendances,
+#     contrôles du frontend). La suite de tests et le build du frontend
+#     restent à la charge de la CI.
 # Installation des deux étages, par machine (`.git/hooks/` n'est pas versionné) :
 # `pre-commit install`.
 # Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
@@ -172,7 +172,7 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Frontend : vulnérabilités, types, tests, puis build de production.
+      # Frontend : vulnérabilités, types, lint et tests.
       # `--omit=dev` : seul `dependencies` part dans le bundle servi au
       # navigateur ; les failles de l'outillage de développement ne concernent
       # pas l'application déployée. Seuil `moderate` : c'est là que CVSS range
@@ -220,14 +220,6 @@ repos:
       - id: ci-frontend-test
         name: vitest (tests frontend)
         entry: bash -c 'cd interfaces/frontend && npm test'
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-
-      - id: ci-frontend-build
-        name: vite build (construction du frontend)
-        entry: bash -c 'cd interfaces/frontend && npm run build'
         language: system
         pass_filenames: false
         always_run: true
