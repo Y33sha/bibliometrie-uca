@@ -115,7 +115,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 7 — Normalisation
 
-- [ ] Séquence d'écriture dans la classe de base.
+- [x] Séquence d'écriture dans la classe de base.
 
 ### Phase 8 — Documentation
 

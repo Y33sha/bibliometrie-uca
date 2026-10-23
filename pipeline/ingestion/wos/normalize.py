@@ -2,7 +2,6 @@
 
 import logging
 from collections.abc import Mapping, Sequence
-from functools import partial
 
 from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
@@ -15,21 +14,18 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
-from pipeline.ingestion.common.normalizer import BibliographicNormalizer
+from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
     contributor_identifiers,
-    sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.wos.payload import (
     derive_wos_api_oa_status,
     is_wos_author_usable,
@@ -38,13 +34,9 @@ from pipeline.ingestion.wos.payload import (
     parse_export_researcher_ids,
     split_export_list,
 )
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # UTILITAIRES
@@ -429,11 +421,6 @@ def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dic
 # =============================================================
 
 
-def upsert_publisher(publisher_name: str | None, *, publisher_store: PublisherStore) -> int | None:
-    """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(publisher_name, repo=publisher_store)
-
-
 def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
     title = as_str(rec.get("journal_title"))
@@ -450,18 +437,6 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
         year=as_int(rec.get("publication_year")),
-    )
-
-
-def upsert_containers(
-    rec: Mapping[str, JsonValue],
-    publisher_id: int | None,
-    *,
-    container_stores: ContainerStores,
-) -> Containers:
-    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
-    return find_or_create_containers(
-        get_container_facts(rec), publisher_id=publisher_id, stores=container_stores
     )
 
 
@@ -496,42 +471,35 @@ def extract_publication_metadata(
 # =============================================================
 
 
-def insert_wos_document(
-    record_store: SourceRecordStore,
+def wos_source_record(
     rec: Mapping[str, JsonValue],
     staging_id: int,
     publication_meta: PublicationMetadata,
-) -> int:
-    """Crée/retrouve l'entrée source_records pour WoS.
+) -> SourceRecordUpsert:
+    """Enregistrement source WoS d'un record.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, journal_id,
-    oa_status, language, container_title) viennent toutes de `publication_meta`,
-    construit en amont par `extract_publication_metadata`. `rec` ne sert ici
-    que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
-    keywords, topics, urls, external_ids non canoniques).
+    Les métadonnées canoniques (doi, title, publication_year, doc_type, journal_id, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `rec` donne les champs propres à WoS (abstract, cited_by_count, biblio, keywords, topics, urls, external_ids non canoniques).
     """
-    return record_store.upsert_source_record(
-        SourceRecordUpsert(
-            source="wos",
-            source_id=as_str(rec.get("ut")) or "",
-            staging_id=staging_id,
-            doi=publication_meta.doi,
-            external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
-            title=publication_meta.title or "",
-            publication_year=publication_meta.publication_year,
-            raw_doc_type=publication_meta.doc_type,
-            journal_id=publication_meta.journal_id,
-            monograph_id=publication_meta.monograph_id,
-            container_title=publication_meta.container_title,
-            raw_language=publication_meta.language,
-            biblio=dict(as_mapping(rec.get("biblio"))) or None,
-            abstract=as_str(rec.get("abstract")),
-            keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
-            topics=dict(as_mapping(rec.get("topics"))) or None,
-            oa_status=publication_meta.oa_status,
-            urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
-            impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
-        ),
+    return SourceRecordUpsert(
+        source="wos",
+        source_id=as_str(rec.get("ut")) or "",
+        staging_id=staging_id,
+        doi=publication_meta.doi,
+        external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
+        title=publication_meta.title or "",
+        publication_year=publication_meta.publication_year,
+        raw_doc_type=publication_meta.doc_type,
+        journal_id=publication_meta.journal_id,
+        monograph_id=publication_meta.monograph_id,
+        container_title=publication_meta.container_title,
+        raw_language=publication_meta.language,
+        biblio=dict(as_mapping(rec.get("biblio"))) or None,
+        abstract=as_str(rec.get("abstract")),
+        keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
+        topics=dict(as_mapping(rec.get("topics"))) or None,
+        oa_status=publication_meta.oa_status,
+        urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
+        impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
     )
 
 
@@ -612,63 +580,7 @@ def extract_wos_author_block(rec: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"ut": rec.get("ut"), "authors": rec.get("authors")}
 
 
-def process_contributions(
-    contribution_store: SourceContributionStore,
-    logger: logging.Logger,
-    rec: Mapping[str, JsonValue],
-    source_record_id: int,
-) -> None:
-    """Synchronise les contributions sources WoS de l'enregistrement source depuis son bloc auteurs."""
-    sync_source_contributions(
-        contribution_store,
-        "wos",
-        source_record_id,
-        extract_wos_author_block(rec),
-        partial(build_wos_author_records, logger=logger),
-    )
-
-
-# =============================================================
-# BOUCLE PRINCIPALE
-# =============================================================
-
-
-def process_record(
-    record_store: SourceRecordStore,
-    logger: logging.Logger,
-    staging_row: StagingRow,
-    *,
-    container_stores: ContainerStores,
-    publisher_store: PublisherStore,
-    staging_store: StagingStore,
-    contribution_store: SourceContributionStore,
-) -> bool:
-    """Traite un record du staging WoS. Retourne True si succès."""
-    staging_id = staging_row.id
-    ut = staging_row.source_id
-    staging_doi = staging_row.doi
-    raw_data = staging_row.raw_data
-
-    rec = extract_record(raw_data, staging_doi)
-
-    if not rec["ut"]:
-        rec["ut"] = ut
-
-    publisher_id = upsert_publisher(
-        as_str(rec.get("publisher_name")), publisher_store=publisher_store
-    )
-    containers = upsert_containers(rec, publisher_id, container_stores=container_stores)
-    publication_meta = extract_publication_metadata(
-        rec, containers.journal_id, containers.monograph_id
-    )
-
-    source_record_id = insert_wos_document(record_store, rec, staging_id, publication_meta)
-    process_contributions(contribution_store, logger, rec, source_record_id)
-    staging_store.mark_done(staging_id)
-    return True
-
-
-class WosNormalizer(BibliographicNormalizer):
+class WosNormalizer(SourceNormalizer):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
 
@@ -676,14 +588,30 @@ class WosNormalizer(BibliographicNormalizer):
         rec = extract_record(row.raw_data, row.doi)
         return as_str(rec.get("title")), as_int(rec.get("publication_year"))
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        container_stores, publisher_store = self._container_stores, self._publisher_store
-        return process_record(
-            self._record_store,
-            self.logger,
-            row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=self._staging,
-            contribution_store=self._contribution_store,
+    def parse(self, row: StagingRow) -> Document:
+        """Le record, lu dans la forme de l'API ou de l'export, identifié par son UT à défaut d'en porter un."""
+        rec = extract_record(row.raw_data, row.doi)
+        if not rec["ut"]:
+            rec["ut"] = row.source_id
+        return rec
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:
+        name = as_str(doc.get("publisher_name"))
+        return PublisherFacts(name) if name else None
+
+    def container_facts(self, doc: Document) -> ContainerDescription:
+        return get_container_facts(doc)
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        publication_meta = extract_publication_metadata(
+            doc, containers.journal_id, containers.monograph_id
         )
+        return wos_source_record(doc, row.id, publication_meta)
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return extract_wos_author_block(doc)
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return build_wos_author_records(block, self.logger)

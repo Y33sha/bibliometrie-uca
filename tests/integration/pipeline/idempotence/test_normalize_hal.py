@@ -1,6 +1,6 @@
 """Idempotence : normalisation HAL."""
 
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_staging, normalize_pending
 
 HAL_STAGING_DOCS = [
     {
@@ -60,49 +60,7 @@ def insert_hal_staging(conn, docs):
 
 
 def run_normalize_hal(conn):
-    """Exécute la normalisation HAL sur la Connection SA de test."""
-
-    from sqlalchemy import text
-
-    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-    from pipeline.ingestion.common.source_records import (
-        SourceRecordStore,
-    )
-    from pipeline.ingestion.common.staging import StagingRow, StagingStore
-    from pipeline.ingestion.hal.normalize import process_work
-    from pipeline.transformation.publishing.containers import ContainerStores
-    from pipeline.transformation.publishing.publishers.store import PublisherStore
-
-    record_store = SourceRecordStore(conn)
-    staging_store = StagingStore(conn)
-    contribution_store = SourceContributionStore(conn)
-    container_stores = ContainerStores.of(conn)
-    publisher_store = PublisherStore(conn)
-
-    rows = conn.execute(
-        text("""
-            SELECT id, source_id, doi, raw_data
-            FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
-        """)
-    ).all()
-    processed = 0
-    for row in rows:
-        staging_row = StagingRow(
-            id=row.id,
-            source_id=row.source_id,
-            doi=row.doi,
-            raw_data=row.raw_data,
-        )
-        if process_work(
-            record_store,
-            staging_row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=staging_store,
-            contribution_store=contribution_store,
-        ):
-            processed += 1
-    return processed
+    return normalize_pending(conn, "hal")
 
 
 def _count_hal_tables(conn) -> dict:

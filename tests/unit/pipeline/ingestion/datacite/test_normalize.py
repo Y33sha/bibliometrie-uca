@@ -1,33 +1,35 @@
-"""Normalizer DataCite : parsing des auteurs, données bibliographiques, et boucle de traitement.
+"""Normaliseur DataCite : parsing des auteurs, données bibliographiques, conteneurs et enregistrement source.
 
-Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators` — dont ceux qui sont des institutions, écartés. La boucle, elle, décide de ce qu'elle refuse : un payload vide, des métadonnées illisibles, un DOI absent, un titre ou une année manquants. Chaque refus marque la ligne de staging traitée, sans quoi elle reviendrait à chaque passe.
-
-Aucune entrée-sortie : les ports d'écriture sont doublés (cf. conftest), et les créations d'éditeur et de revue sont remplacées.
+Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Un nœud sans DOI est refusé. L'enregistrement source est construit sans entrée-sortie.
 """
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
-from pipeline.ingestion.datacite import normalize as normalize_datacite
+from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.datacite.normalize import (
     DataciteNormalizer,
     build_datacite_author_records,
+    datacite_doi,
+    datacite_source_record,
     get_biblio,
     get_container_facts,
-    process_contributions,
-    process_work,
-    upsert_containers,
-    upsert_publisher,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import (
-    FakeSourceRecordStore,
-    FakeStagingStore,
-    staging_row,
-)
+from tests.helpers.normalize_doubles import staging_row
+
+
+def _normalizer() -> DataciteNormalizer:
+    return DataciteNormalizer(
+        conn=MagicMock(),
+        logger=MagicMock(),
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
+        container_stores=MagicMock(),
+        publisher_store=MagicMock(),
+        contribution_store=MagicMock(),
+    )
 
 
 class TestAuthorRecords:
@@ -277,17 +279,10 @@ class TestChampsIgnores:
         assert [a.text for a in addresses] == ["Un labo"]
 
 
-class TestProcessContributions:
-    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
-        """Les creators deviennent les contributions sources du document versé."""
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_datacite,
-            "sync_source_contributions",
-            lambda store, source, spid, block, build: vus.update(
-                source=source, spid=spid, records=build(block)
-            ),
-        )
+class TestAuthorBlock:
+    def test_creators_deviennent_les_contributions_sources(self):
+        """Le bloc auteurs du normaliseur porte les `creators`, que `author_records` lit."""
+        normalizer = _normalizer()
         attrs = {
             "creators": [
                 {"name": "Doe, J.", "nameType": "Personal"},
@@ -295,32 +290,24 @@ class TestProcessContributions:
             ]
         }
 
-        process_contributions(MagicMock(), attrs, 555)
+        records = normalizer.author_records(normalizer.author_block(attrs))
 
-        assert (vus["source"], vus["spid"]) == ("datacite", 555)
-        assert [r.name.display() for r in vus["records"]] == ["Doe, J.", "Big Lab"]
+        assert [r.name.display() for r in records] == ["Doe, J.", "Big Lab"]
 
 
-class TestUpsertPublisher:
-    def test_sans_editeur_nomme_rien_n_est_cree(self):
-        assert upsert_publisher({}, publisher_store=MagicMock()) is None
+class TestPublisher:
+    def test_sans_editeur_nomme_aucun_editeur(self):
+        assert _normalizer().publisher({}) is None
 
-    def test_editeur_nomme_est_cree(self, monkeypatch):
-        vus: list[str] = []
-        monkeypatch.setattr(
-            normalize_datacite,
-            "find_or_create_publisher",
-            lambda name, *, repo: vus.append(name) or 7,
-        )
-
-        assert upsert_publisher({"publisher": "Zenodo"}, publisher_store=MagicMock()) == 7
-        assert vus == ["Zenodo"]
+    def test_editeur_nomme(self):
+        assert _normalizer().publisher({"publisher": "Zenodo"}) == PublisherFacts("Zenodo")
 
 
 class TestContainers:
     def test_sans_titre_de_contenant_aucun_conteneur(self):
         """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
-        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
+        facts = _normalizer().container_facts({})
+        assert (facts.journal_title, facts.collection_title, facts.book_title) == (None, None, None)
 
     def test_revue_identifiee_par_son_issn(self):
         attrs = {
@@ -343,16 +330,16 @@ class TestContainers:
         facts = get_container_facts(attrs)
         assert (facts.raw_doc_type, facts.book_title) == ("BookChapter", "Transmission and Gender")
 
-    def test_revue_au_type_libre_cree_la_revue(self, monkeypatch):
+    def test_revue_au_type_libre_nomme_la_revue(self):
         """Cas réel : ATeM dépose ses articles sous le type générique `Text`, « Journal article » en texte libre."""
-        fake = MagicMock(return_value=Containers(3, None))
-        monkeypatch.setattr(normalize_datacite, "find_or_create_containers", fake)
         attrs = {
             "types": {"resourceTypeGeneral": "Text", "resourceType": "Journal article"},
             "container": {"title": "ATeM Archiv für Textmusikforschung", "type": "Series"},
         }
 
-        assert upsert_containers(attrs, 7, container_stores=MagicMock()) == Containers(3, None)
+        facts = get_container_facts(attrs)
+
+        assert facts.journal_title == "ATeM Archiv für Textmusikforschung"
 
     def test_copie_d_entrepot_sans_revue(self):
         """Cas réel : l'entrepôt du GSI dépose une copie d'article ; DataCite découpe mal sa citation en conteneur."""
@@ -394,49 +381,23 @@ def _attributs(**surcharges) -> dict:
     }
 
 
-class TestProcessWork:
-    def _kwargs(self, record_store, staging_store):
-        return {
-            "container_stores": MagicMock(),
-            "publisher_store": MagicMock(),
-            "staging_store": staging_store,
-            "contribution_store": MagicMock(),
-        }
+class TestSourceRecord:
+    def test_champs_de_l_enregistrement_source(self):
+        attributs = _attributs()
 
-    @pytest.fixture(autouse=True)
-    def _sans_editeur_ni_revue(self, monkeypatch):
-        """Les créations d'éditeur et de revue ont leurs propres tests : la boucle s'en passe."""
-        monkeypatch.setattr(normalize_datacite, "upsert_publisher", lambda a, **kw: None)
-        monkeypatch.setattr(
-            normalize_datacite, "upsert_containers", lambda a, p, **kw: Containers(None, None)
+        document = datacite_source_record(
+            attributs, 42, datacite_doi(attributs, None), Containers(None, None)
         )
-        monkeypatch.setattr(normalize_datacite, "process_contributions", lambda *a, **kw: None)
 
-    @pytest.fixture
-    def record_store(self) -> FakeSourceRecordStore:
-        return FakeSourceRecordStore()
-
-    @pytest.fixture
-    def staging(self) -> FakeStagingStore:
-        return FakeStagingStore()
-
-    def _run(self, raw, record_store, staging, logger, doi=None):
-        row = staging_row(staging_id=42, raw=raw, doi=doi)
-        return process_work(record_store, row, **self._kwargs(record_store, staging))
-
-    def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
-        rendu = self._run({"attributes": _attributs()}, record_store, staging, logger)
-
-        assert rendu is True
-        assert staging.marked_done == [42]
-        (document,) = record_store.upserted_documents
         assert document.source == "datacite"
+        assert document.source_id == "10.5281/zenodo.1"
+        assert document.staging_id == 42
         assert document.doi == "10.5281/zenodo.1"
         assert document.title == "Un jeu de données"
         assert document.publication_year == 2024
         assert document.oa_status is None  # DataCite ne renseigne pas l'accès ouvert
 
-    def test_dois_apparentes_rassembles(self, record_store, staging, logger):
+    def test_dois_apparentes_rassembles(self):
         attributs = _attributs(
             relatedIdentifiers=[
                 {
@@ -447,70 +408,46 @@ class TestProcessWork:
             ]
         )
 
-        self._run({"attributes": attributs}, record_store, staging, logger)
+        document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, None))
 
-        (document,) = record_store.upserted_documents
         assert document.external_ids == {"related_dois": ["10.5281/zenodo.0"]}
 
-    @pytest.mark.parametrize(
-        ("raw", "motif"),
-        [
-            ({"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}, "sans DOI"),
-        ],
-    )
-    def test_document_refuse_sans_rien_ecrire(self, raw, motif, record_store, staging, logger):
-        """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
-        rendu = self._run(raw, record_store, staging, logger)
+    def test_titre_du_conteneur_garde_sans_revue_resolue(self):
+        attributs = _attributs(container={"title": "Une collection"})
 
-        assert rendu is False, motif
-        assert staging.marked_done == []
-        assert record_store.upserted_documents == []
+        sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, 8))
+        avec_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(3, None))
 
-    def test_doi_repris_du_staging_a_defaut_des_metadonnees(self, record_store, staging, logger):
+        assert (sans_revue.journal_id, sans_revue.monograph_id) == (None, 8)
+        assert sans_revue.container_title == "Une collection"
+        assert (avec_revue.journal_id, avec_revue.container_title) == (3, None)
+
+
+class TestDoi:
+    def test_doi_des_metadonnees_prioritaire(self):
+        assert datacite_doi(_attributs(), "10.5281/zenodo.9") == "10.5281/zenodo.1"
+
+    def test_doi_repris_du_staging_a_defaut_des_metadonnees(self):
         attributs = _attributs()
         del attributs["doi"]
+        row = staging_row(staging_id=42, raw={"attributes": attributs}, doi="10.5281/zenodo.9")
+        normalizer = _normalizer()
 
-        rendu = self._run(
-            {"attributes": attributs}, record_store, staging, logger, doi="10.5281/zenodo.9"
-        )
+        document = normalizer.source_record(row, normalizer.parse(row), Containers(None, None))
 
-        assert rendu is True
-        assert record_store.upserted_documents[0].doi == "10.5281/zenodo.9"
+        assert document.doi == "10.5281/zenodo.9"
 
+    def test_document_refuse_sans_doi(self):
+        raw = {"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}
+        assert _normalizer().parse(staging_row(raw=raw)) is None
 
-def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
-    """La classe ne fait que rassembler ses dépendances et passer la main."""
-    vus: dict[str, object] = {}
-    monkeypatch.setattr(
-        normalize_datacite,
-        "process_work",
-        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
-    )
-    normalizer = DataciteNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        container_stores=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-    )
-    row = staging_row()
-
-    assert normalizer.normalize_record(row) is True
-    assert vus["row"] is row
+    def test_parse_rend_les_attributs(self):
+        attributs = _attributs()
+        assert _normalizer().parse(staging_row(raw={"attributes": attributs})) is attributs
 
 
 def test_metadonnees_minimales_d_attributs_illisibles():
-    normalizer = DataciteNormalizer(
-        conn=MagicMock(),
-        logger=MagicMock(),
-        staging_store=MagicMock(),
-        record_store=MagicMock(),
-        container_stores=MagicMock(),
-        publisher_store=MagicMock(),
-        contribution_store=MagicMock(),
-    )
+    normalizer = _normalizer()
     assert normalizer.minimal_metadata(staging_row(raw={"attributes": "pas un objet"})) == (
         None,
         None,

@@ -1,43 +1,32 @@
 """Tests unitaires de `pipeline.ingestion.scanr.normalize`.
 
-Couvre la construction de `biblio` dans `insert_scanr_document` et le parsing
-auteurs pur `build_scanr_author_records` (orcid/idref, roles, affiliations →
-adresses + pays détectés).
-
-Pattern : `FakeSourceRecordStore` + `MagicMock`, pas de DB.
+Couvre l'entrée `source_records` construite par `scanr_source_record`, l'éditeur, le conteneur, les métadonnées de publication, et le parsing des auteurs par `build_scanr_author_records` (orcid/idref, rôles, affiliations → adresses et pays détectés). Fonctions pures et `MagicMock`, sans base de données.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace as _remplacer
-from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.scanr import normalize as normalize_scanr
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
     ScanrNormalizer,
     build_scanr_author_records,
     extract_doi,
     extract_publication_metadata,
     get_container_facts,
+    get_publisher,
     get_title,
-    insert_scanr_document,
-    process_contributions,
-    process_work,
-    upsert_containers,
-    upsert_publisher,
+    scanr_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import (
-    FakeSourceRecordStore,
-    FakeStagingStore,
-    staging_row,
-)
+from tests.helpers.normalize_doubles import staging_row
 
 _EMPTY_PUBLICATION_META = PublicationMetadata(
     doi=None,
@@ -52,15 +41,11 @@ _EMPTY_PUBLICATION_META = PublicationMetadata(
 )
 
 
-class TestInsertScanrDocumentLicense:
+class TestScanrSourceRecordLicense:
     """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
 
-    def _call(self, evidence: dict) -> Any:
-        record_store = FakeSourceRecordStore()
-        insert_scanr_document(
-            record_store, {"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META
-        )
-        return record_store.upserted_documents[-1]
+    def _call(self, evidence: dict) -> SourceRecordUpsert:
+        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META)
 
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
@@ -74,28 +59,22 @@ class TestInsertScanrDocumentLicense:
         assert captured.source_extras == {"license": authorisation}
 
 
-class TestInsertScanrDocumentBiblio:
-    def _call(self, record_store, doc) -> dict[str, Any]:
-        insert_scanr_document(
-            record_store,
-            doc,
-            staging_id=1,
-            scanr_id="sc-1",
-            publication_meta=_EMPTY_PUBLICATION_META,
+class TestScanrSourceRecordBiblio:
+    def _call(self, doc) -> SourceRecordUpsert:
+        return scanr_source_record(
+            doc, staging_id=1, scanr_id="sc-1", publication_meta=_EMPTY_PUBLICATION_META
         )
-        return record_store.upserted_documents[-1]
 
     def test_biblio_none_when_no_source_fields(self):
-        captured = self._call(FakeSourceRecordStore(), {})
+        captured = self._call({})
         assert captured.biblio is None
 
     def test_biblio_publisher_only(self):
-        captured = self._call(FakeSourceRecordStore(), {"source": {"publisher": "Elsevier"}})
+        captured = self._call({"source": {"publisher": "Elsevier"}})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_and_journal_issns(self):
         captured = self._call(
-            FakeSourceRecordStore(),
             {
                 "source": {
                     "title": "Journal of Physics",
@@ -113,7 +92,6 @@ class TestInsertScanrDocumentBiblio:
 
     def test_biblio_publisher_and_journal_together(self):
         captured = self._call(
-            FakeSourceRecordStore(),
             {
                 "source": {
                     "publisher": "Elsevier",
@@ -128,21 +106,15 @@ class TestInsertScanrDocumentBiblio:
         }
 
     def test_biblio_journal_title_only(self):
-        captured = self._call(FakeSourceRecordStore(), {"source": {"title": "J. Phys."}})
+        captured = self._call({"source": {"title": "J. Phys."}})
         assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
 
-class TestInsertScanrDocumentExternalIds:
-    def _call(self, doc, publication_meta) -> dict[str, Any]:
-        record_store = FakeSourceRecordStore()
-        insert_scanr_document(
-            record_store,
-            doc,
-            staging_id=1,
-            scanr_id="sc-1",
-            publication_meta=publication_meta,
+class TestScanrSourceRecordExternalIds:
+    def _call(self, doc, publication_meta) -> SourceRecordUpsert:
+        return scanr_source_record(
+            doc, staging_id=1, scanr_id="sc-1", publication_meta=publication_meta
         )
-        return record_store.upserted_documents[-1]
 
     def test_related_dois_excludes_primary(self):
         doc = {
@@ -308,24 +280,15 @@ class TestGetTitle:
         assert get_title({"title": "Un titre"}) == "Un titre"
 
 
-class TestUpsertPublisherEtJournal:
-    def test_sans_editeur_nomme_rien_n_est_cree(self):
-        assert upsert_publisher({}, publisher_store=MagicMock()) is None
+class TestEditeurEtConteneur:
+    def test_sans_editeur_nomme_aucun_editeur(self):
+        assert get_publisher({}) is None
 
-    def test_editeur_nomme_est_cree(self, monkeypatch):
-        vus: list[str] = []
-        monkeypatch.setattr(
-            normalize_scanr,
-            "find_or_create_publisher",
-            lambda name, *, repo: vus.append(name) or 7,
-        )
-        doc = {"source": {"publisher": "Elsevier"}}
-
-        assert upsert_publisher(doc, publisher_store=MagicMock()) == 7
-        assert vus == ["Elsevier"]
+    def test_editeur_de_la_source(self):
+        assert get_publisher({"source": {"publisher": "Elsevier"}}) == PublisherFacts("Elsevier")
 
     def test_sans_titre_de_revue_aucune_revue(self):
-        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
+        assert get_container_facts({}).journal_title is None
 
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
@@ -383,17 +346,14 @@ class TestExtractPublicationMetadata:
         assert meta.nnt == "2021CLFAC030"
 
 
-class TestInsertScanrDocumentIdentifiants:
-    def _call(self, doc, publication_meta=None) -> Any:
-        record_store = FakeSourceRecordStore()
-        insert_scanr_document(
-            record_store,
+class TestScanrSourceRecordIdentifiants:
+    def _call(self, doc, publication_meta=None) -> SourceRecordUpsert:
+        return scanr_source_record(
             doc,
             staging_id=1,
             scanr_id="sc-1",
             publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
         )
-        return record_store.upserted_documents[-1]
 
     def test_numero_de_these_repris_des_metadonnees(self):
         document = self._call({}, _remplacer(_EMPTY_PUBLICATION_META, nnt="2021CLFAC030"))
@@ -419,17 +379,14 @@ class TestInsertScanrDocumentIdentifiants:
         assert document.external_ids is None
 
 
-class TestInsertScanrDocumentChamps:
-    def _call(self, doc, publication_meta=None) -> Any:
-        record_store = FakeSourceRecordStore()
-        insert_scanr_document(
-            record_store,
+class TestScanrSourceRecordChamps:
+    def _call(self, doc, publication_meta=None) -> SourceRecordUpsert:
+        return scanr_source_record(
             doc,
             staging_id=1,
             scanr_id="sc-1",
             publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
         )
-        return record_store.upserted_documents[-1]
 
     def test_mots_cles_en_liste(self):
         document = self._call({"keywords": {"default": ["climat", " océan "]}})
@@ -502,82 +459,8 @@ class TestInsertScanrDocumentChamps:
         assert self._call({"summary": {"default": "Un résumé"}}).abstract == "Un résumé"
 
 
-class TestProcessContributions:
-    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_scanr,
-            "sync_source_contributions",
-            lambda store, source, spid, block, build: vus.update(
-                source=source, spid=spid, records=build(block)
-            ),
-        )
-
-        process_contributions(MagicMock(), {"authors": []}, 555)
-
-        assert (vus["source"], vus["spid"]) == ("scanr", 555)
-
-
-class TestProcessWork:
-    @pytest.fixture(autouse=True)
-    def _sans_editeur_ni_revue(self, monkeypatch):
-        monkeypatch.setattr(normalize_scanr, "upsert_publisher", lambda d, **kw: None)
-        monkeypatch.setattr(
-            normalize_scanr, "upsert_containers", lambda d, p, **kw: Containers(None, None)
-        )
-        monkeypatch.setattr(normalize_scanr, "process_contributions", lambda *a, **kw: None)
-
-    def _run(self, raw, logger):
-        record_store = FakeSourceRecordStore()
-        staging = FakeStagingStore()
-        rendu = process_work(
-            record_store,
-            staging_row(staging_id=42, source_id="sc-1", raw=raw),
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            staging_store=staging,
-            contribution_store=MagicMock(),
-        )
-        return rendu, record_store, staging
-
-    def test_document_verse_et_ligne_marquee(self, logger):
-        rendu, record_store, staging = self._run(
-            {"title": {"default": "Un titre"}, "year": 2024, "type": "journal-article"}, logger
-        )
-
-        assert rendu is True
-        assert staging.marked_done == [42]
-        (document,) = record_store.upserted_documents
-        assert document.source == "scanr"
-        assert document.source_id == "sc-1"
-        assert document.title == "Un titre"
-
-    @pytest.mark.parametrize(
-        ("raw", "attendu"),
-        [({"year": 2024}, (None, 2024)), ({"title": {"default": "T"}}, ("T", None))],
-    )
-    def test_metadonnees_minimales(self, raw, attendu):
-        normalizer = ScanrNormalizer(
-            conn=MagicMock(),
-            logger=MagicMock(),
-            staging_store=MagicMock(),
-            record_store=MagicMock(),
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            contribution_store=MagicMock(),
-        )
-        assert normalizer.minimal_metadata(staging_row(raw=raw)) == attendu
-
-
-def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
-    """La classe ne fait que rassembler ses dépendances et passer la main."""
-    vus: dict[str, object] = {}
-    monkeypatch.setattr(
-        normalize_scanr,
-        "process_work",
-        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
-    )
-    normalizer = ScanrNormalizer(
+def _normalizer() -> ScanrNormalizer:
+    return ScanrNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
         staging_store=MagicMock(),
@@ -586,7 +469,34 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
     )
-    row = staging_row()
 
-    assert normalizer.normalize_record(row) is True
-    assert vus["row"] is row
+
+class TestScanrNormalizer:
+    def test_entree_source_records_de_la_ligne_et_des_conteneurs(self):
+        """L'identifiant ScanR de la ligne donne le numéro de thèse ; la revue créée remplace le titre du contenant."""
+        row = staging_row(staging_id=42, source_id="these2021CLFAC030")
+        doc = {
+            "title": {"default": "Un titre"},
+            "year": 2021,
+            "type": "thesis",
+            "source": {"title": "Revue"},
+        }
+
+        document = _normalizer().source_record(row, doc, Containers(journal_id=3, monograph_id=5))
+
+        assert (document.source, document.source_id, document.staging_id) == (
+            "scanr",
+            "these2021CLFAC030",
+            42,
+        )
+        assert document.title == "Un titre"
+        assert (document.journal_id, document.monograph_id) == (3, 5)
+        assert document.container_title is None
+        assert document.external_ids == {"nnt": "2021CLFAC030"}
+
+    @pytest.mark.parametrize(
+        ("raw", "attendu"),
+        [({"year": 2024}, (None, 2024)), ({"title": {"default": "T"}}, ("T", None))],
+    )
+    def test_metadonnees_minimales(self, raw, attendu):
+        assert _normalizer().minimal_metadata(staging_row(raw=raw)) == attendu

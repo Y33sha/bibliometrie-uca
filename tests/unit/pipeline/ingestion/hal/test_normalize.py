@@ -1,23 +1,21 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, get_container_facts, extract_publication_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers (get_title, get_container_facts, extract_publication_metadata), `hal_source_record` (collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
 
-Pattern : `FakeSourceRecordStore` + `FakeSourceContributionStore` + `MagicMock`, pas de DB.
+Pattern : doublures de stores + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import date
-from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
 from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
+from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
 from pipeline.ingestion.hal.normalize import (
@@ -29,12 +27,9 @@ from pipeline.ingestion.hal.normalize import (
     extract_publication_metadata,
     get_container_facts,
     get_title,
-    insert_hal_document,
+    hal_source_record,
     page_range,
     parse_tei_isbns,
-    process_work,
-    upsert_containers,
-    upsert_publisher,
 )
 from pipeline.ingestion.hal.payload import hal_text_field
 from pipeline.transformation.publishing.find_or_create import Containers
@@ -145,23 +140,6 @@ class TestContainerDescription:
             }
         )
         assert facts.book_title == "IC 2024"
-
-    def test_sans_conteneur_aucun(self):
-        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
-
-
-class TestUpsertPublisher:
-    def test_delegates_to_service(self, monkeypatch):
-        captured: dict[str, Any] = {}
-
-        def fake_find(name, *, repo):
-            captured["name"] = name
-            return 5
-
-        monkeypatch.setattr(normalize_hal, "find_or_create_publisher", fake_find)
-        result = upsert_publisher("Elsevier", publisher_store=MagicMock())
-        assert result == 5
-        assert captured["name"] == "Elsevier"
 
 
 # ── extract_publication_metadata ─────────────────────────────────────────
@@ -292,80 +270,61 @@ class TestActiveEmbargoUntil:
         assert active_embargo_until("<not valid xml", self.TODAY) is None
 
 
-# ── insert_hal_document ──────────────────────────────────────────
+# ── hal_source_record ────────────────────────────────────────────
 
 
-class TestInsertHalDocument:
-    def _call(self, record_store, doc, *, publication_meta=None) -> dict:
-        # Par défaut, publication_meta est dérivé via extract_publication_metadata pour rester
-        # cohérent avec le flux réel (harvest → insert). Tests qui veulent
-        # forcer une valeur passent un publication_meta explicite.
+class TestHalSourceRecord:
+    def _call(self, doc, *, publication_meta=None):
+        # Par défaut, publication_meta est dérivé via extract_publication_metadata, comme dans le flux réel. Les tests qui forcent une valeur passent un publication_meta explicite.
         if publication_meta is None:
             publication_meta = extract_publication_metadata(doc, journal_id=None)
-        insert_hal_document(
-            record_store,
-            doc,
-            staging_id=1,
-            hal_id="h1",
-            publication_meta=publication_meta,
-        )
-        return record_store.upserted_documents[-1]
+        return hal_source_record(doc, staging_id=1, hal_id="h1", publication_meta=publication_meta)
 
     def test_collections_from_coll_codes(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"collCode_s": ["UCA", "LIMOS", "UCA"]})
+        captured = self._call({"collCode_s": ["UCA", "LIMOS", "UCA"]})
         # Dédupliquées, triées, depuis le seul `collCode_s` du raw_data.
         assert captured.hal_collections == ["LIMOS", "UCA"]
 
     def test_no_collections_returns_none(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
+        captured = self._call({})
         assert captured.hal_collections is None
 
     def test_doc_type_concatenated_with_subtype(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"docType_s": "ART", "docSubType_s": "review"})
+        captured = self._call({"docType_s": "ART", "docSubType_s": "review"})
         assert captured.raw_doc_type == "ART_review"
 
     def test_doc_type_no_subtype(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"docType_s": "BOOK"})
+        captured = self._call({"docType_s": "BOOK"})
         assert captured.raw_doc_type == "BOOK"
 
     def test_nnt_goes_in_external_ids(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"nntId_s": "2024CLFAC001"})
+        captured = self._call({"nntId_s": "2024CLFAC001"})
         assert captured.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
 
     def test_hal_id_always_in_external_ids(self):
         """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que `hal_id` soit un token de confirmation et que HAL soit clusterisé comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
+        captured = self._call({})
         assert captured.external_ids == {"hal_id": ["h1"]}
 
     def test_keywords_deduplicated(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"keyword_s": ["a", "b", "a", "c"]})
+        captured = self._call({"keyword_s": ["a", "b", "a", "c"]})
         assert captured.keywords == ["a", "b", "c"]
 
     def test_keywords_empty(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"keyword_s": []})
+        captured = self._call({"keyword_s": []})
         assert captured.keywords is None
 
     def test_topics_from_domain(self):
         """Les domaines sont stockés tels que la source les expose ; la découpe en libellés vit dans la phase `subjects`."""
-        record_store = FakeSourceRecordStore()
         entries = [
             "sdv.bibs_FacetSep_Sciences du Vivant [q-bio]/Biostatistiques",
             "info.algo_FacetSep_Informatique [cs]/Algorithme et structure de données",
         ]
-        captured = self._call(record_store, {"fr_domainAllCodeLabel_fs": entries})
+        captured = self._call({"fr_domainAllCodeLabel_fs": entries})
         assert captured.topics == {"hal_domains": entries}
 
     def test_biblio_built_from_volume_issue_pages(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
+        captured = self._call({"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
         assert captured.biblio == {
             "volume": "10",
             "issue": "2",
@@ -383,31 +342,23 @@ class TestInsertHalDocument:
         assert page_range("22045", "ART") == PageRange("22045")
 
     def test_biblio_empty(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
+        captured = self._call({})
         assert captured.biblio is None
 
     def test_biblio_publisher_from_journalPublisher_s(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"journalPublisher_s": "Elsevier"})
+        captured = self._call({"journalPublisher_s": "Elsevier"})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_publisher_fallback_to_publisher_s(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"publisher_s": "Springer"})
+        captured = self._call({"publisher_s": "Springer"})
         assert captured.biblio == {"publisher": "Springer"}
 
     def test_biblio_journalPublisher_s_wins_over_publisher_s(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(
-            record_store, {"journalPublisher_s": "Elsevier", "publisher_s": "Springer"}
-        )
+        captured = self._call({"journalPublisher_s": "Elsevier", "publisher_s": "Springer"})
         assert captured.biblio == {"publisher": "Elsevier"}
 
     def test_biblio_journal_built_from_title_issn_eissn(self):
-        record_store = FakeSourceRecordStore()
         captured = self._call(
-            record_store,
             {
                 "journalTitle_s": "J. Phys.",
                 "journalIssn_s": "0022-3727",
@@ -423,19 +374,15 @@ class TestInsertHalDocument:
         }
 
     def test_biblio_journal_partial(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"journalTitle_s": "J. Phys."})
+        captured = self._call({"journalTitle_s": "J. Phys."})
         assert captured.biblio == {"journal": {"title": "J. Phys."}}
 
     def test_url_from_uri(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"uri_s": "https://hal.science/hal-123"})
+        captured = self._call({"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]
 
     def test_publication_meta_propagates_journal_oa_lang(self):
-        record_store = FakeSourceRecordStore()
         captured = self._call(
-            record_store,
             {},
             publication_meta=PublicationMetadata(
                 doi=None,
@@ -594,110 +541,6 @@ class TestBuildHalAuthorRecords:
         assert len(record.roles) > 0
 
 
-class TestProcessAuthors:
-    def test_synchronises_even_when_empty(self):
-        """Sans auteur, le writer synchronise quand même : les contributions sources en base sont supprimées."""
-        contribution_store = FakeSourceContributionStore()
-        normalize_hal.process_contributions(contribution_store, {}, 10)
-        assert contribution_store.synced_for == [10]
-
-
-# ── process_work ─────────────────────────────────────────────────
-
-
-@pytest.fixture
-def stub_orchestration_deps(monkeypatch):
-    """Stub les helpers internes pour ne tester que la boucle process_work."""
-    monkeypatch.setattr(
-        normalize_hal, "extract_publication_metadata", lambda d, j, m=None: {"journal_id": j}
-    )
-    monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
-    monkeypatch.setattr(normalize_hal, "process_contributions", lambda *a, **kw: None)
-    monkeypatch.setattr(normalize_hal, "upsert_publisher", lambda name, **kw: 1)
-    monkeypatch.setattr(normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None))
-
-
-class TestProcessWork:
-    def _kwargs(self, record_store=None, staging_store=None):
-        return {
-            "record_store": record_store or FakeSourceRecordStore(),
-            "container_stores": MagicMock(),
-            "publisher_store": MagicMock(),
-            "staging_store": staging_store or FakeStagingStore(),
-            "contribution_store": FakeSourceContributionStore(),
-        }
-
-    def test_happy_path(self, stub_orchestration_deps):
-        sq = FakeStagingStore()
-        raw = {
-            "title_s": ["T"],
-            "producedDateY_i": 2024,
-            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
-        }
-        row = staging_row(staging_id=1, source_id="hal-1", raw=raw)
-        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
-        assert result is True
-        assert sq.marked_done == [1]
-
-    def test_missing_author_field_is_refused(self, stub_orchestration_deps):
-        """Métadonnées minimales présentes, champ auteurs absent : enregistrement source refusé, sans rien écrire (la boucle la marque)."""
-        sq = FakeStagingStore()
-        row = staging_row(
-            staging_id=2, source_id="hal-2", raw={"title_s": ["T"], "producedDateY_i": 2024}
-        )
-        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
-        assert result is False
-        assert sq.marked_done == []
-
-    def test_no_publisher_name_no_upsert(self, monkeypatch):
-        """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
-        captured = {"called": False}
-
-        def fake_upsert_publication(name, **kw):
-            captured.called = True
-            return 1
-
-        monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_publication)
-        monkeypatch.setattr(
-            normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None)
-        )
-        monkeypatch.setattr(
-            normalize_hal, "extract_publication_metadata", lambda d, j, m=None: {"journal_id": j}
-        )
-        monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
-        monkeypatch.setattr(normalize_hal, "process_contributions", lambda *a, **kw: None)
-
-        raw = {
-            "title_s": ["T"],
-            "producedDateY_i": 2024,
-            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
-        }
-        row = staging_row(raw=raw)
-        process_work(staging_row=row, **self._kwargs())
-        assert captured["called"] is False
-
-    def test_exception_propagated(self, monkeypatch):
-        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
-
-        def boom(*args, **kw):
-            raise RuntimeError("kaboom")
-
-        monkeypatch.setattr(normalize_hal, "upsert_publisher", boom)
-        monkeypatch.setattr(
-            normalize_hal, "upsert_containers", lambda d, p, **kw: Containers(2, None)
-        )
-
-        raw = {
-            "title_s": ["T"],
-            "producedDateY_i": 2024,
-            "journalPublisher_s": "Elsevier",
-            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
-        }
-        row = staging_row(source_id="hal-x", raw=raw)
-        with pytest.raises(RuntimeError, match="kaboom"):
-            process_work(staging_row=row, **self._kwargs())
-
-
 # ── HalNormalizer (classe) ───────────────────────────────────────
 
 
@@ -721,8 +564,27 @@ class TestHalNormalizerClass:
             staging_row(raw={"title_s": ["T"], "producedDateY_i": 2024})
         ) == ("T", 2024)
 
-    def test_process_work_delegates(self, monkeypatch):
+    def test_refuse_sans_champ_auteurs(self):
+        """Métadonnées minimales présentes, champ auteurs absent : enregistrement source refusé."""
+        row = staging_row(raw={"title_s": ["T"], "producedDateY_i": 2024})
+        assert _make_normalizer().parse(row) is None
+
+    def test_accepte_avec_champ_auteurs(self):
+        raw = {"title_s": ["T"], "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"]}
+        assert _make_normalizer().parse(staging_row(raw=raw)) == raw
+
+    def test_editeur_de_journalPublisher_s_puis_publisher_s(self):
         norm = _make_normalizer()
-        monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
-        result = norm.normalize_record(staging_row())
-        assert result is True
+        assert norm.publisher({"journalPublisher_s": "Elsevier", "publisher_s": "Springer"}) == (
+            PublisherFacts("Elsevier")
+        )
+        assert norm.publisher({"publisher_s": "Springer"}) == PublisherFacts("Springer")
+
+    def test_sans_editeur(self):
+        assert _make_normalizer().publisher({}) is None
+
+    def test_enregistrement_source_porte_ligne_et_conteneurs(self):
+        row = staging_row(staging_id=7, source_id="hal-7", raw={"title_s": ["T"]})
+        record = _make_normalizer().source_record(row, row.raw_data, Containers(3, 4))
+        assert (record.staging_id, record.source_id) == (7, "hal-7")
+        assert (record.journal_id, record.monograph_id) == (3, 4)

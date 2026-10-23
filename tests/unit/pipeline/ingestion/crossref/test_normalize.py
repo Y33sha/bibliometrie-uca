@@ -1,31 +1,23 @@
-"""Tests unitaires des fonctions de lecture pures de `normalize_crossref`.
+"""Tests unitaires des fonctions pures de `pipeline.ingestion.crossref.normalize`.
 
-Couvre les fonctions sans I/O qui parsent un payload CrossRef brut :
-`get_doi`, `get_title`, `get_container_title`, `get_publisher_name`,
-`get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`,
-`get_external_ids`, `get_biblio`, `_author_name`,
-`_author_affiliations`.
+Couvre les fonctions sans I/O qui parsent un payload CrossRef brut : `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`, `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`, `get_external_ids`, `get_biblio`, `get_container_facts`, `_author_name`, `_author_affiliations`, `build_crossref_author_records`, `crossref_source_record`, et les méthodes `parse` et `publisher` de `CrossrefNormalizer`.
 
-Les délégations vers `domain.sources.crossref` (`extract_crossref_source_extras`,
-`extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`)
-sont testées directement dans `tests/unit/domain/sources/test_crossref.py` ;
-ici on ne fait que vérifier le wiring (1-2 cas par délégation).
+Les délégations vers `pipeline.ingestion.crossref.payload` (`extract_crossref_source_extras`, `extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`) sont testées dans `test_payload.py`. Ici, seul le branchement est vérifié (1-2 cas par délégation).
 """
 
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
-from pipeline.ingestion.crossref import normalize as normalize_crossref
+from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.crossref.normalize import (
     CrossrefNormalizer,
     _author_affiliations,
     _author_name,
     build_crossref_author_records,
+    crossref_source_record,
     get_abstract,
     get_biblio,
     get_cited_by_count,
@@ -39,17 +31,9 @@ from pipeline.ingestion.crossref.normalize import (
     get_publication_year,
     get_publisher_name,
     get_title,
-    process_contributions,
-    process_work,
-    upsert_containers,
-    upsert_publisher,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import (
-    FakeSourceRecordStore,
-    FakeStagingStore,
-    staging_row,
-)
+from tests.helpers.normalize_doubles import staging_row
 
 
 class TestGetDoi:
@@ -431,25 +415,7 @@ class TestBuildCrossrefAuthorRecords:
         ]
 
 
-class TestUpsertPublisherEtJournal:
-    def test_sans_editeur_nomme_rien_n_est_cree(self):
-        assert upsert_publisher({}, publisher_store=MagicMock()) is None
-
-    def test_editeur_nomme_est_cree(self, monkeypatch):
-        vus: list[str] = []
-        monkeypatch.setattr(
-            normalize_crossref,
-            "find_or_create_publisher",
-            lambda name, *, repo: vus.append(name) or 7,
-        )
-
-        assert upsert_publisher({"publisher": "Elsevier"}, publisher_store=MagicMock()) == 7
-        assert vus == ["Elsevier"]
-
-    def test_sans_titre_de_contenant_aucune_revue(self):
-        """Un document sans revue ni série qui le porte ne crée pas d'entrée au référentiel."""
-        assert upsert_containers({}, None, container_stores=MagicMock()) == Containers(None, None)
-
+class TestGetContainerFacts:
     def test_article_revue_et_ses_deux_issn(self):
         facts = get_container_facts(
             {
@@ -568,27 +534,6 @@ class TestAuteursIllisibles:
         assert [r.name.display() for r in recs] == ["Roe"]
 
 
-class TestProcessContributions:
-    def test_confie_les_contributions_sources_au_writer_partage(self, monkeypatch):
-        vus: dict[str, object] = {}
-        monkeypatch.setattr(
-            normalize_crossref,
-            "sync_source_contributions",
-            lambda store, source, spid, block, build: vus.update(
-                source=source, spid=spid, records=build(block)
-            ),
-        )
-
-        process_contributions(
-            MagicMock(),
-            {"author": [{"family": "Dupont"}]},
-            555,
-        )
-
-        assert (vus["source"], vus["spid"]) == ("crossref", 555)
-        assert [r.name.display() for r in vus["records"]] == ["Dupont"]
-
-
 def _message(**surcharges) -> dict:
     """Enregistrement source Crossref minimale et acceptable, que chaque test dégrade à sa guise."""
     return {
@@ -601,70 +546,8 @@ def _message(**surcharges) -> dict:
     }
 
 
-class TestProcessWork:
-    @pytest.fixture(autouse=True)
-    def _sans_editeur_ni_revue(self, monkeypatch):
-        """Les créations d'éditeur et de revue ont leurs propres tests : la boucle s'en passe."""
-        monkeypatch.setattr(normalize_crossref, "upsert_publisher", lambda m, **kw: None)
-        monkeypatch.setattr(
-            normalize_crossref, "upsert_containers", lambda m, p, **kw: Containers(None, None)
-        )
-        monkeypatch.setattr(normalize_crossref, "process_contributions", lambda *a, **kw: None)
-
-    @pytest.fixture
-    def record_store(self) -> FakeSourceRecordStore:
-        return FakeSourceRecordStore()
-
-    @pytest.fixture
-    def staging(self) -> FakeStagingStore:
-        return FakeStagingStore()
-
-    def _run(self, raw, record_store, staging, logger):
-        return process_work(
-            record_store,
-            staging_row(staging_id=42, raw=raw),
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            staging_store=staging,
-            contribution_store=MagicMock(),
-        )
-
-    def test_document_verse_et_ligne_marquee(self, record_store, staging, logger):
-        rendu = self._run(_message(), record_store, staging, logger)
-
-        assert rendu is True
-        assert staging.marked_done == [42]
-        (document,) = record_store.upserted_documents
-        assert document.source == "crossref"
-        assert document.doi == "10.1000/abc"
-        assert document.publication_year == 2024
-        assert document.raw_doc_type == "journal-article"
-        assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
-
-    @pytest.mark.parametrize(
-        ("raw", "motif"),
-        [
-            ({"title": ["T"], "issued": {"date-parts": [[2024]]}}, "sans DOI"),
-        ],
-    )
-    def test_document_refuse_sans_rien_ecrire(self, raw, motif, record_store, staging, logger):
-        """Le refus remonte à la boucle, qui supprime l'enregistrement et marque la ligne (`SourceNormalizer._reject`)."""
-        rendu = self._run(raw, record_store, staging, logger)
-
-        assert rendu is False, motif
-        assert staging.marked_done == []
-        assert record_store.upserted_documents == []
-
-
-def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
-    """La classe ne fait que rassembler ses dépendances et passer la main."""
-    vus: dict[str, object] = {}
-    monkeypatch.setattr(
-        normalize_crossref,
-        "process_work",
-        lambda record_store, row, **kw: vus.update(row=row, **kw) or True,
-    )
-    normalizer = CrossrefNormalizer(
+def _normalizer() -> CrossrefNormalizer:
+    return CrossrefNormalizer(
         conn=MagicMock(),
         logger=MagicMock(),
         staging_store=MagicMock(),
@@ -673,7 +556,50 @@ def test_le_normalizer_delegue_a_la_boucle(monkeypatch):
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
     )
-    row = staging_row()
 
-    assert normalizer.normalize_record(row) is True
-    assert vus["row"] is row
+
+class TestCrossrefSourceRecord:
+    def test_champs_du_document(self):
+        document = crossref_source_record(_message(), 42, Containers(None, None))
+
+        assert document.source == "crossref"
+        assert document.source_id == "10.1000/abc"
+        assert document.staging_id == 42
+        assert document.doi == "10.1000/abc"
+        assert document.publication_year == 2024
+        assert document.raw_doc_type == "journal-article"
+        assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
+
+    def test_titre_de_conteneur_garde_sans_revue(self):
+        msg = _message(**{"container-title": ["J. Things"]})
+
+        document = crossref_source_record(msg, 42, Containers(None, 9))
+
+        assert (document.journal_id, document.monograph_id) == (None, 9)
+        assert document.container_title == "J. Things"
+
+    def test_titre_de_conteneur_porte_par_la_revue(self):
+        msg = _message(**{"container-title": ["J. Things"]})
+
+        document = crossref_source_record(msg, 42, Containers(7, None))
+
+        assert document.journal_id == 7
+        assert document.container_title is None
+
+
+class TestCrossrefNormalizer:
+    def test_parse_rend_le_message(self):
+        msg = _message()
+
+        assert _normalizer().parse(staging_row(raw=msg)) is msg
+
+    def test_parse_refuse_sans_doi(self):
+        msg = {"title": ["T"], "issued": {"date-parts": [[2024]]}}
+
+        assert _normalizer().parse(staging_row(raw=msg)) is None
+
+    def test_editeur_nomme(self):
+        assert _normalizer().publisher({"publisher": " Elsevier "}) == PublisherFacts("Elsevier")
+
+    def test_sans_editeur_nomme(self):
+        assert _normalizer().publisher({}) is None

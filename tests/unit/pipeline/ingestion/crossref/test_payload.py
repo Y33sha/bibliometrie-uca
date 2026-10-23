@@ -1,4 +1,4 @@
-"""Tests unitaires de domain.sources.crossref (helpers purs)."""
+"""Tests unitaires de pipeline.ingestion.crossref.payload (helpers purs)."""
 
 from domain.dates import today
 from pipeline.ingestion.crossref.payload import (
@@ -47,10 +47,7 @@ class TestExtractCrossrefPublicationYearOrder:
 
 
 class TestExtractCrossrefPublicationYearFutureBound:
-    """Garde-fou : les éditeurs déposent parfois des dates de "futur numéro"
-    (2030+, parfois 2080, 2200…). Au-dessus de max_year, on retourne None
-    — process_work skippe la normalisation et laisse les autres sources
-    arbitrer."""
+    """Garde-fou : les éditeurs déposent parfois des dates de "futur numéro" (2030+, parfois 2080, 2200…). Au-dessus de max_year, l'année est None. La normalisation refuse alors l'enregistrement et laisse les autres sources arbitrer."""
 
     def test_skips_far_future(self):
         msg = {"published": _date_field(2030), "issued": _date_field(2030)}

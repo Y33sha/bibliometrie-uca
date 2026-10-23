@@ -7,10 +7,7 @@ Particularités theses.fr :
 - Les thèses en cours n'ont ni NNT ni DOI
 """
 
-import logging
 from collections.abc import Mapping
-
-from sqlalchemy import Connection
 
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
@@ -18,20 +15,18 @@ from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
-from pipeline.ingestion.common.normalizer import SourceNormalizer
+from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
-    sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
+from pipeline.transformation.publishing.find_or_create import Containers
 
 # =============================================================
 # PUBLICATIONS
@@ -109,16 +104,15 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     return source_extras or None
 
 
-def insert_source_document(
-    record_store: SourceRecordStore,
+def theses_source_record(
     thesis: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
     publication_meta: PublicationMetadata,
-) -> int:
-    """Crée/retrouve l'entrée source_records pour theses.fr.
+) -> SourceRecordUpsert:
+    """Enregistrement source theses.fr d'une thèse.
 
-    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent toutes de `publication_meta`, construit en amont par `extract_publication_metadata`. `thesis` ne sert ici que pour les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
+    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `thesis` donne les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
     """
     nnt = publication_meta.nnt
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
@@ -138,24 +132,22 @@ def insert_source_document(
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None
 
-    return record_store.upsert_source_record(
-        SourceRecordUpsert(
-            source="theses",
-            source_id=theses_id,
-            staging_id=staging_id,
-            doi=publication_meta.doi,
-            external_ids=external_ids,
-            title=publication_meta.title or "",
-            publication_year=publication_meta.publication_year,
-            raw_doc_type=publication_meta.doc_type,
-            journal_id=publication_meta.journal_id,
-            container_title=publication_meta.container_title,
-            raw_language=publication_meta.language,
-            keywords=keywords,
-            topics=topics_json,
-            oa_status=publication_meta.oa_status,
-            source_extras=_build_source_extras(thesis),
-        ),
+    return SourceRecordUpsert(
+        source="theses",
+        source_id=theses_id,
+        staging_id=staging_id,
+        doi=publication_meta.doi,
+        external_ids=external_ids,
+        title=publication_meta.title or "",
+        publication_year=publication_meta.publication_year,
+        raw_doc_type=publication_meta.doc_type,
+        journal_id=publication_meta.journal_id,
+        container_title=publication_meta.container_title,
+        raw_language=publication_meta.language,
+        keywords=keywords,
+        topics=topics_json,
+        oa_status=publication_meta.oa_status,
+        source_extras=_build_source_extras(thesis),
     )
 
 
@@ -185,74 +177,22 @@ def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
     ]
 
 
-def process_contributions(
-    thesis: Mapping[str, JsonValue],
-    source_record_id: int,
-    *,
-    contribution_store: SourceContributionStore,
-) -> None:
-    """Synchronise les contributions sources de la thèse depuis son bloc auteurs."""
-    sync_source_contributions(
-        contribution_store,
-        "theses",
-        source_record_id,
-        extract_theses_author_block(thesis),
-        build_theses_author_records,
-    )
-
-
-# =============================================================
-# BOUCLE PRINCIPALE
-# =============================================================
-
-
-def process_work(
-    record_store: SourceRecordStore,
-    staging_row: StagingRow,
-    *,
-    staging_store: StagingStore,
-    contribution_store: SourceContributionStore,
-) -> bool:
-    """Traite une thèse du staging."""
-    staging_id = staging_row.id
-    theses_id = staging_row.source_id
-    thesis = staging_row.raw_data
-
-    publication_meta = extract_publication_metadata(thesis)
-
-    source_record_id = insert_source_document(
-        record_store, thesis, staging_id, theses_id, publication_meta
-    )
-    process_contributions(thesis, source_record_id, contribution_store=contribution_store)
-    staging_store.mark_done(staging_id)
-
-    return True
-
-
 class ThesesNormalizer(SourceNormalizer):
     SOURCE = "theses"
     DEFAULT_BATCH_SIZE = 100
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        staging_store: StagingStore,
-        record_store: SourceRecordStore,
-        contribution_store: SourceContributionStore,
-    ) -> None:
-        super().__init__(conn, logger, staging_store)
-        self._record_store = record_store
-        self._contribution_store = contribution_store
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         publication_meta = extract_publication_metadata(row.raw_data)
         return publication_meta.title, publication_meta.publication_year
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        return process_work(
-            self._record_store,
-            row,
-            staging_store=self._staging,
-            contribution_store=self._contribution_store,
-        )
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        """Une thèse n'a ni éditeur ni conteneur."""
+        return theses_source_record(doc, row.id, row.source_id, extract_publication_metadata(doc))
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return extract_theses_author_block(doc)
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return build_theses_author_records(block)

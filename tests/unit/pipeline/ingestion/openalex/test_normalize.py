@@ -1,21 +1,21 @@
 """Tests unitaires de `pipeline.ingestion.openalex.normalize`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), les branches de `get_container_facts` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (process_work wrapper / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), `get_publisher`, les branches de `get_container_facts` / `openalex_source_record`, le parsing auteurs `build_openalex_author_records` et les méthodes de `OpenalexNormalizer`.
 
-Pattern : `FakeSourceRecordStore` + `MagicMock` pour repos / contribution_queries. Pas de DB.
+Pas de DB : les stores du normaliseur sont des doublures.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import Any
 from unittest.mock import MagicMock
-
-import pytest
 
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.normalizer import PublisherFacts
+from pipeline.ingestion.common.publication_metadata import PublicationMetadata
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.openalex import normalize as normalize_openalex
 from pipeline.ingestion.openalex.normalize import (
     OpenalexNormalizer,
@@ -26,12 +26,10 @@ from pipeline.ingestion.openalex.normalize import (
     extract_publication_metadata,
     extract_topics,
     get_container_facts,
-    insert_openalex_document,
-    process_work,
+    get_publisher,
+    openalex_source_record,
     reconstruct_abstract,
-    upsert_containers,
 )
-from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
@@ -192,26 +190,14 @@ class TestExtractOpenalexOrcid:
         assert _extract_openalex_orcid({"raw_orcid": None}) is None
 
 
-# ── upsert_publisher ─────────────────────────────────────────────
+# ── get_publisher ────────────────────────────────────────────────
 
 
-class TestUpsertPublisher:
+class TestGetPublisher:
     def test_no_publisher_name(self):
-        from pipeline.ingestion.openalex.normalize import upsert_publisher
+        assert get_publisher({}) is None
 
-        assert upsert_publisher({}, publisher_store=MagicMock()) is None
-
-    def test_happy_path(self, monkeypatch):
-        from pipeline.ingestion.openalex.normalize import upsert_publisher
-
-        captured: dict[str, Any] = {}
-
-        def fake_find(name, *, openalex_id, repo):
-            captured["name"] = name
-            captured["openalex_id"] = openalex_id
-            return 7
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_publisher", fake_find)
+    def test_happy_path(self):
         work = {
             "primary_location": {
                 "source": {
@@ -220,36 +206,18 @@ class TestUpsertPublisher:
                 }
             }
         }
-        result = upsert_publisher(work, publisher_store=MagicMock())
-        assert result == 7
-        assert captured["name"] == "Elsevier"
-        assert captured["openalex_id"] == "P1"
+        assert get_publisher(work) == PublisherFacts("Elsevier", "P1")
 
-    def test_no_host_organization_id(self, monkeypatch):
-        """Si `host_organization` est absent, `openalex_id` passé est None."""
-        from pipeline.ingestion.openalex.normalize import upsert_publisher
-
-        captured: dict[str, Any] = {}
-
-        def fake_find(name, *, openalex_id, repo):
-            captured["openalex_id"] = openalex_id
-            return 7
-
-        monkeypatch.setattr(normalize_openalex, "find_or_create_publisher", fake_find)
+    def test_no_host_organization_id(self):
+        """Sans `host_organization`, l'éditeur est sans identifiant OpenAlex."""
         work = {"primary_location": {"source": {"host_organization_name": "X"}}}
-        upsert_publisher(work, publisher_store=MagicMock())
-        assert captured["openalex_id"] is None
+        assert get_publisher(work) == PublisherFacts("X", None)
 
 
 # ── conteneurs (branches issn/eissn/oa_model) ───────────────────
 
 
 class TestContainerDescription:
-    def test_sans_source_aucun_conteneur(self):
-        repo = MagicMock()
-        assert upsert_containers({}, None, container_stores=repo) == Containers(None, None)
-        repo.create_journal.assert_not_called()
-
     def test_repository_source_oa_model(self):
         work = {
             "primary_location": {
@@ -343,55 +311,45 @@ class TestExtractPublicationMetadata:
         assert meta.container_title is None
 
 
-# ── insert_openalex_document (edge cases) ────────────────────────
+# ── openalex_source_record (cas limites) ─────────────────────────
 
 
-class TestInsertOpenalexDocument:
+class TestOpenalexSourceRecord:
     def _call(
         self,
-        record_store: FakeSourceRecordStore,
         work: dict,
         *,
-        publication_meta: dict | None = None,
-    ) -> dict:
-        # Par défaut, publication_meta est dérivé via extract_publication_metadata pour rester
-        # cohérent avec le flux réel (harvest → insert). Tests qui veulent
-        # forcer une valeur passent un publication_meta explicite.
+        publication_meta: PublicationMetadata | None = None,
+    ) -> SourceRecordUpsert:
+        # Par défaut, publication_meta vient de extract_publication_metadata, comme dans le normaliseur.
         if publication_meta is None:
             publication_meta = extract_publication_metadata(work, journal_id=None)
-        insert_openalex_document(
-            record_store, work, staging_id=1, publication_meta=publication_meta
-        )
-        return record_store.upserted_documents[-1]
+        return openalex_source_record(work, staging_id=1, publication_meta=publication_meta)
 
     def test_keywords_list_of_strings(self):
-        record_store = FakeSourceRecordStore()
         work = {"id": "https://openalex.org/W1", "keywords": ["a", "b"]}
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.keywords == ["a", "b"]
 
     def test_keywords_list_of_dicts(self):
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "keywords": [{"keyword": "kw1"}, {"keyword": "kw2"}],
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.keywords == ["kw1", "kw2"]
 
     def test_keywords_not_a_list(self):
-        record_store = FakeSourceRecordStore()
         work = {"id": "https://openalex.org/W1", "keywords": "scalar"}
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.keywords is None
 
     def test_biblio_extracted(self):
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "biblio": {"volume": "10", "issue": "2", "first_page": "100", "last_page": "120"},
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.biblio == {
             "volume": "10",
             "issue": "2",
@@ -400,18 +358,15 @@ class TestInsertOpenalexDocument:
         }
 
     def test_biblio_partial_drops_empty_keys(self):
-        record_store = FakeSourceRecordStore()
         work = {"id": "https://openalex.org/W1", "biblio": {"volume": "10"}}
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.biblio == {"volume": "10"}
 
     def test_biblio_empty_is_none(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"id": "https://openalex.org/W1", "biblio": {}})
+        captured = self._call({"id": "https://openalex.org/W1", "biblio": {}})
         assert captured.biblio is None
 
     def test_related_dois_excludes_primary(self):
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
@@ -420,21 +375,19 @@ class TestInsertOpenalexDocument:
                 {"id": "doi:10.2/preprint"},
             ],
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.external_ids["related_dois"] == ["10.2/preprint"]
 
     def test_related_dois_absent_when_only_primary(self):
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
             "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert "related_dois" not in (captured.external_ids or {})
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {
@@ -447,7 +400,7 @@ class TestInsertOpenalexDocument:
                 }
             },
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         # `issn_l` est mis dans `issnl` ; le premier non-issn_l de la liste passe en
         # `issn` (pas de typage `electronic`/`print` côté OpenAlex sur ce chemin).
         assert captured.biblio == {
@@ -469,22 +422,20 @@ class TestInsertOpenalexDocument:
         monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
         monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
         monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
-        record_store = FakeSourceRecordStore()
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {"source": {"host_organization_name": "HAL"}},
         }
-        captured = self._call(record_store, work)
+        captured = self._call(work)
         assert captured.biblio is None
 
     def test_publication_meta_nnt_passed_through_to_external_ids(self):
-        """insert lit publication_meta["nnt"] et le pose dans external_ids."""
-        record_store = FakeSourceRecordStore()
+        """Le NNT de publication_meta va dans external_ids."""
         work = {"id": "https://openalex.org/W1"}
         publication_meta = replace(
             extract_publication_metadata(work, journal_id=None), nnt="2024CLFAC001"
         )
-        captured = self._call(record_store, work, publication_meta=publication_meta)
+        captured = self._call(work, publication_meta=publication_meta)
         assert captured.external_ids is not None
         assert captured.external_ids["nnt"] == "2024CLFAC001"
 
@@ -641,80 +592,6 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records(work)[0].addresses[0].countries is None
 
 
-# ── process_work (orchestrateur) ─────────────────────────────────
-
-
-@pytest.fixture
-def stub_orchestration_deps(monkeypatch):
-    """Stub les helpers internes pour ne tester que la boucle process_work."""
-    monkeypatch.setattr(
-        normalize_openalex,
-        "extract_publication_metadata",
-        lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
-    )
-    monkeypatch.setattr(
-        normalize_openalex,
-        "insert_openalex_document",
-        lambda *a, **kw: 555,
-    )
-    monkeypatch.setattr(normalize_openalex, "process_contributions", lambda *a, **kw: None)
-    monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: None)
-    monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
-
-
-class TestProcessWork:
-    def _kwargs(self, record_store=None, staging_store=None):
-        return {
-            "record_store": record_store or FakeSourceRecordStore(),
-            "container_stores": MagicMock(),
-            "publisher_store": MagicMock(),
-            "staging_store": staging_store or FakeStagingStore(),
-            "contribution_store": MagicMock(),
-        }
-
-    def test_happy_path(self, stub_orchestration_deps):
-        record_store = FakeSourceRecordStore()
-        sq = FakeStagingStore()
-        row = staging_row(
-            staging_id=1, source_id="W1", doi="10.1/a", raw={"id": "https://openalex.org/W1"}
-        )
-        kw = self._kwargs(record_store=record_store, staging_store=sq)
-        result = process_work(staging_row=row, **kw)
-        assert result is True
-        assert sq.marked_done == [1]
-
-    def test_should_skip_publisher_journal_false_calls_upserts(self, monkeypatch):
-        """Quand should_skip_publisher_journal renvoie False, upsert_publisher / upsert_containers sont appelés."""
-        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: object())
-        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: False)
-        monkeypatch.setattr(normalize_openalex, "upsert_publisher", lambda w, **kw: 1)
-        monkeypatch.setattr(
-            normalize_openalex, "upsert_containers", lambda w, p, **kw: Containers(2, None)
-        )
-        monkeypatch.setattr(
-            normalize_openalex,
-            "extract_publication_metadata",
-            lambda w, j, primary=None, monograph_id=None: {"journal_id": j},
-        )
-        monkeypatch.setattr(normalize_openalex, "insert_openalex_document", lambda *a, **kw: 555)
-        monkeypatch.setattr(normalize_openalex, "process_contributions", lambda *a, **kw: None)
-
-        row = staging_row()
-        result = process_work(staging_row=row, **self._kwargs())
-        assert result is True
-
-    def test_exception_propagated(self, monkeypatch):
-        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
-        monkeypatch.setattr(
-            normalize_openalex,
-            "parse_primary_location",
-            lambda w: (_ for _ in ()).throw(RuntimeError("boom")),
-        )
-        row = staging_row(staging_id=1, source_id="W1")
-        with pytest.raises(RuntimeError, match="boom"):
-            process_work(staging_row=row, **self._kwargs())
-
-
 # ── OpenalexNormalizer (classe) ──────────────────────────────────
 
 
@@ -736,21 +613,33 @@ class TestOpenalexNormalizerClass:
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
         assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
 
-    def test_process_work_delegates_to_module_function(self, monkeypatch):
-        norm = _make_normalizer()
-        captured = {}
-
-        def fake_process(*args, **kwargs):
-            captured.update(kwargs)
-            return True
-
-        monkeypatch.setattr(normalize_openalex, "process_work", fake_process)
-        result = norm.normalize_record(staging_row())
-        assert result is True
-        # Les dépendances injectées sont passées en kwargs.
-        assert set(captured.keys()) >= {
-            "container_stores",
-            "publisher_store",
-            "staging_store",
-            "contribution_store",
+    def test_editeur_et_conteneur_d_une_revue(self):
+        work = {
+            "primary_location": {
+                "source": {
+                    "display_name": "Journal of Physics",
+                    "type": "journal",
+                    "host_organization_name": "Elsevier",
+                }
+            }
         }
+        norm = _make_normalizer()
+        assert norm.publisher(work) == PublisherFacts("Elsevier", None)
+        container = norm.container_facts(work)
+        assert container is not None
+        assert container.journal_title == "Journal of Physics"
+
+    def test_plateforme_sans_editeur_ni_conteneur(self):
+        """Une localisation principale de type `repository` ne désigne ni éditeur ni conteneur."""
+        work = {
+            "primary_location": {
+                "source": {
+                    "display_name": "Zenodo",
+                    "type": "repository",
+                    "host_organization_name": "CERN",
+                }
+            }
+        }
+        norm = _make_normalizer()
+        assert norm.publisher(work) is None
+        assert norm.container_facts(work) is None

@@ -3,12 +3,11 @@
 Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `extract_publication_metadata`, `upsert_publisher`, `get_container_facts`, `insert_wos_document` : wiring + propagation des champs.
-- `build_wos_author_records` : filtre `is_wos_author_usable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
-- `process_record` : orchestration (cascade publisher → journal → document → contributions), staging mark_done.
-- `WosNormalizer.process_work` : wiring de la classe.
+- `extract_publication_metadata`, `get_container_facts`, `wos_source_record` : propagation des champs.
+- `build_wos_author_records` : filtre `is_wos_author_usable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté.
+- `WosNormalizer` : UT lu depuis la ligne de staging, éditeur, entrée `source_records` construite avec les conteneurs.
 
-Mocks : `WosNormalizeQueries`, `StagingStore`, `JournalRepository`, `PublisherRepository`. `find_or_create_journal` / `find_or_create_publisher` monkeypatchés pour isoler la logique de wiring.
+La séquence d'écriture commune à toutes les sources est testée avec la classe de base.
 """
 
 from __future__ import annotations
@@ -17,12 +16,10 @@ import logging
 from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
+from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.wos import normalize as normalize_wos
 from pipeline.ingestion.wos.normalize import (
     WosNormalizer,
     _get_api_doi,
@@ -37,10 +34,7 @@ from pipeline.ingestion.wos.normalize import (
     extract_publication_metadata,
     extract_record,
     get_container_facts,
-    insert_wos_document,
-    process_record,
-    upsert_containers,
-    upsert_publisher,
+    wos_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
@@ -827,30 +821,10 @@ class TestExtractPublicationMetadata:
         assert meta.container_title == "Container Title"
 
 
-# ── upsert_publisher / conteneurs ───────────────────────────
+# ── get_container_facts ─────────────────────────────────────
 
 
-class TestUpsertWrappers:
-    def test_upsert_publisher_delegates(self, monkeypatch):
-        calls: list[tuple] = []
-
-        def fake_find_or_create_publisher(name, *, repo):
-            calls.append((name, repo))
-            return 99
-
-        monkeypatch.setattr(
-            normalize_wos, "find_or_create_publisher", fake_find_or_create_publisher
-        )
-        repo = MagicMock()
-        assert upsert_publisher("Springer", publisher_store=repo) == 99
-        assert calls == [("Springer", repo)]
-
-    def test_sans_titre_de_source_aucun_conteneur(self):
-        rec = {"journal_title": None}
-        assert upsert_containers(rec, publisher_id=1, container_stores=MagicMock()) == Containers(
-            None, None
-        )
-
+class TestGetContainerFacts:
     def test_article_revue_et_ses_issn(self):
         facts = get_container_facts(
             {"journal_title": "Nature", "issn": "0028-0836", "eissn": "1476-4687"}
@@ -874,13 +848,11 @@ class TestUpsertWrappers:
         assert (facts.isbns, facts.eisbns) == (("9783030580803",), ("9783030580810",))
 
 
-# ── insert_wos_document ──────────────────────────────────────────
+# ── wos_source_record ────────────────────────────────────────────
 
 
-class TestInsertWosDocument:
-    def test_forwards_publication_meta_and_rec_extras_to_queries(self):
-        record_store = MagicMock()
-        record_store.upsert_source_record.return_value = 555
+class TestWosSourceRecord:
+    def test_forwards_publication_meta_and_rec_extras(self):
         rec = {
             "ut": "WOS:1",
             "abstract": "abs",
@@ -903,12 +875,8 @@ class TestInsertWosDocument:
             container_title=None,
         )
 
-        result = insert_wos_document(
-            record_store, rec, staging_id=10, publication_meta=publication_meta
-        )
+        row_arg = wos_source_record(rec, staging_id=10, publication_meta=publication_meta)
 
-        assert result == 555
-        row_arg = record_store.upsert_source_record.call_args.args[0]
         assert row_arg.source_id == "WOS:1"
         assert row_arg.doi == "10.1/x"
         assert row_arg.title == "T"
@@ -922,8 +890,6 @@ class TestInsertWosDocument:
         assert row_arg.staging_id == 10
 
     def test_none_publication_meta_values_propagate(self):
-        record_store = MagicMock()
-        record_store.upsert_source_record.return_value = 1
         rec = {"ut": "WOS:1"}
         publication_meta = PublicationMetadata(
             doi=None,
@@ -936,9 +902,8 @@ class TestInsertWosDocument:
             language=None,
             container_title=None,
         )
-        insert_wos_document(record_store, rec, staging_id=5, publication_meta=publication_meta)
+        row_arg = wos_source_record(rec, staging_id=5, publication_meta=publication_meta)
 
-        row_arg = record_store.upsert_source_record.call_args.args[0]
         assert row_arg.journal_id is None
         assert row_arg.oa_status is None
         assert row_arg.doi is None
@@ -1030,165 +995,43 @@ class TestBuildWosAuthorRecords:
         assert rec0.addresses == []
 
 
-# ── process_record ───────────────────────────────────────────────
-
-
-class TestProcessRecord:
-    def test_happy_path(self, logger, monkeypatch):
-        # Stub les helpers internes pour ne tester que l'orchestration.
-        monkeypatch.setattr(
-            normalize_wos,
-            "extract_from_api",
-            lambda raw, doi: {
-                "ut": "WOS:1",
-                "doi": doi,
-                "title": "T",
-                "publication_year": 2024,
-                "doc_type": "article",
-                "publisher_name": "X",
-                "journal_title": "J",
-                "oa_status": None,
-                "language": None,
-                "authors": [],
-                "abstract": None,
-                "cited_by_count": None,
-                "biblio": None,
-                "keywords": None,
-                "topics": None,
-                "urls": None,
-                "external_ids": None,
-                "issn": None,
-                "eissn": None,
-            },
-        )
-        monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: 11)
-        monkeypatch.setattr(
-            normalize_wos, "find_or_create_containers", lambda *a, **kw: Containers(22, None)
-        )
-
-        record_store = MagicMock()
-        record_store.upsert_source_record.return_value = 555
-        staging_store = MagicMock()
-        contribution_store = MagicMock()
-
-        row = staging_row(staging_id=1, source_id="WOS:1", doi="10.1/x")
-        result = process_record(
-            record_store,
-            logger,
-            row,
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            staging_store=staging_store,
-            contribution_store=contribution_store,
-        )
-
-        assert result is True
-        # Synchronisation des contributions sources (via le writer partagé).
-        contribution_store.fetch_stored_source_contributions.assert_called_once()
-        # `mark_done` appelée avec le bon staging_id.
-        staging_store.mark_done.assert_called_once_with(1)
-
-    def test_uses_staging_ut_when_record_has_empty_ut(self, logger, monkeypatch):
-        """Si `extract_from_api` ne pose pas d'UT, on retombe sur la valeur du staging."""
-        captured: dict[str, Any] = {}
-
-        def fake_extract(raw, doi):
-            return {
-                "ut": "",  # vide → fallback attendu
-                "doi": doi,
-                "title": "T",
-                "publication_year": 2024,
-                "doc_type": "article",
-                "publisher_name": None,
-                "journal_title": None,
-                "oa_status": None,
-                "language": None,
-                "authors": [],
-                "issn": None,
-                "eissn": None,
-            }
-
-        monkeypatch.setattr(normalize_wos, "extract_from_api", fake_extract)
-        monkeypatch.setattr(normalize_wos, "find_or_create_publisher", lambda *a, **kw: None)
-        monkeypatch.setattr(
-            normalize_wos, "find_or_create_containers", lambda *a, **kw: Containers(None, None)
-        )
-
-        record_store = MagicMock()
-
-        def capture_ut(row_arg):
-            captured["ut"] = row_arg.source_id
-            return 42
-
-        record_store.upsert_source_record.side_effect = capture_ut
-
-        row = staging_row(staging_id=1, source_id="WOS:fallback", doi=None)
-        process_record(
-            record_store,
-            logger,
-            row,
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            staging_store=MagicMock(),
-            contribution_store=MagicMock(),
-        )
-
-        assert captured["ut"] == "WOS:fallback"
-
-    def test_exception_reraises(self, logger, monkeypatch):
-        """process_record laisse remonter l'exception ; le log incombe à la boucle de base."""
-        monkeypatch.setattr(
-            normalize_wos,
-            "extract_from_api",
-            lambda raw, doi: (_ for _ in ()).throw(ValueError("boom")),
-        )
-
-        row = staging_row(staging_id=1, source_id="WOS:err", doi=None)
-        with pytest.raises(ValueError, match="boom"):
-            process_record(
-                MagicMock(),
-                logger,
-                row,
-                container_stores=MagicMock(),
-                publisher_store=MagicMock(),
-                staging_store=MagicMock(),
-                contribution_store=MagicMock(),
-            )
-
-
 # ── WosNormalizer ────────────────────────────────────────────────
 
 
+def _normalizer(logger) -> WosNormalizer:
+    return WosNormalizer(
+        MagicMock(),
+        logger,
+        staging_store=MagicMock(),
+        record_store=MagicMock(),
+        container_stores=MagicMock(),
+        publisher_store=MagicMock(),
+        contribution_store=MagicMock(),
+    )
+
+
 class TestWosNormalizer:
-    def test_process_work_delegates_to_process_record(self, logger, monkeypatch):
-        norm = WosNormalizer(
-            MagicMock(),
-            logger,
-            staging_store=MagicMock(),
-            record_store=MagicMock(),
-            container_stores=MagicMock(),
-            publisher_store=MagicMock(),
-            contribution_store=MagicMock(),
+    def test_parse_garde_l_ut_du_record(self, logger):
+        row = staging_row(staging_id=1, source_id="WOS:staging", raw=_export_row())
+        assert _normalizer(logger).parse(row)["ut"] == "WOS:001"
+
+    def test_parse_prend_l_ut_de_la_ligne_si_le_record_n_en_porte_pas(self, logger):
+        row = staging_row(staging_id=1, source_id="WOS:fallback", raw=_export_row(UT=""))
+        assert _normalizer(logger).parse(row)["ut"] == "WOS:fallback"
+
+    def test_publisher_nomme_par_le_record(self, logger):
+        assert _normalizer(logger).publisher({"publisher_name": "ELSEVIER"}) == PublisherFacts(
+            "ELSEVIER"
         )
 
-        captured: dict[str, Any] = {}
+    def test_publisher_absent(self, logger):
+        assert _normalizer(logger).publisher({"publisher_name": None}) is None
 
-        def fake_process(record_store, log, row, **kw):
-            captured["row"] = row
-            captured["kwargs"] = kw
-            return True
-
-        monkeypatch.setattr(normalize_wos, "process_record", fake_process)
-
-        row = staging_row(staging_id=7, source_id="WOS:7")
-        result = norm.normalize_record(row)
-
-        assert result is True
-        assert captured["row"] == row
-        # Les dépendances injectées sont propagées.
-        assert set(captured["kwargs"].keys()) == {
-            "container_stores",
-            "publisher_store",
-            "staging_store",
-            "contribution_store",
-        }
+    def test_source_record_porte_les_conteneurs_et_la_ligne(self, logger):
+        norm = _normalizer(logger)
+        row = staging_row(staging_id=7, source_id="WOS:001", raw=_export_row())
+        doc = norm.parse(row)
+        upsert = norm.source_record(row, doc, Containers(journal_id=22, monograph_id=33))
+        assert (upsert.source_id, upsert.staging_id) == ("WOS:001", 7)
+        assert (upsert.journal_id, upsert.monograph_id) == (22, 33)
+        assert upsert.container_title is None

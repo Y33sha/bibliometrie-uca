@@ -1,7 +1,7 @@
 """Idempotence : normalisation ScanR."""
 
 from tests.integration.helpers.publications_phase import create_all_publications
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_staging, normalize_pending
 
 SCANR_STAGING_DOCS = [
     {
@@ -156,51 +156,7 @@ def _count_tables(conn) -> dict:
 
 
 def run_normalize_scanr(conn):
-    """Exécute la normalisation ScanR sur la Connection SA de test."""
-    import logging
-
-    from sqlalchemy import text
-
-    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-    from pipeline.ingestion.common.source_records import (
-        SourceRecordStore,
-    )
-    from pipeline.ingestion.common.staging import StagingRow, StagingStore
-    from pipeline.ingestion.scanr.normalize import ScanrNormalizer
-    from pipeline.transformation.publishing.containers import ContainerStores
-    from pipeline.transformation.publishing.publishers.store import PublisherStore
-
-    record_store = SourceRecordStore(conn)
-    staging_store = StagingStore(conn)
-    contribution_store = SourceContributionStore(conn)
-    logger = logging.getLogger("test")
-    # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
-    normalizer = ScanrNormalizer(
-        conn,
-        logger,
-        staging_store,
-        record_store,
-        container_stores=ContainerStores.of(conn),
-        publisher_store=PublisherStore(conn),
-        contribution_store=contribution_store,
-    )
-
-    rows = conn.execute(
-        text("""
-            SELECT id, source_id, doi, raw_data
-            FROM staging
-            WHERE source = 'scanr' AND processed = FALSE
-            ORDER BY id
-        """)
-    ).all()
-    processed = 0
-    for row in rows:
-        staging_row = StagingRow(
-            id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
-        )
-        if normalizer.process_work(staging_row):
-            processed += 1
-    return processed
+    return normalize_pending(conn, "scanr")
 
 
 class TestNormalizeScanrIdempotence:

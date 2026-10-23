@@ -18,7 +18,7 @@ from __future__ import annotations
 from functools import partial
 
 from tests.integration.helpers.publications_phase import create_all_publications
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_staging, normalize_pending
 
 # Ligne de staging Crossref à traiter.
 _crossref_staging = partial(insert_staging, source="crossref", processed=False)
@@ -87,49 +87,7 @@ def _insert_crossref_staging(conn, docs):
 
 
 def _run_normalize_crossref(conn):
-    """Lance `process_work` sur tous les staging crossref non traités."""
-    import logging
-
-    from sqlalchemy import text
-
-    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-    from pipeline.ingestion.common.source_records import (
-        SourceRecordStore,
-    )
-    from pipeline.ingestion.common.staging import StagingRow, StagingStore
-    from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-    from pipeline.transformation.publishing.containers import ContainerStores
-    from pipeline.transformation.publishing.publishers.store import PublisherStore
-
-    record_store = SourceRecordStore(conn)
-    staging_store = StagingStore(conn)
-    contribution_store = SourceContributionStore(conn)
-    logger = logging.getLogger("test")
-    # La classe porte la boucle du pipeline, filtre des métadonnées minimales compris.
-    normalizer = CrossrefNormalizer(
-        conn,
-        logger,
-        staging_store,
-        record_store,
-        container_stores=ContainerStores.of(conn),
-        publisher_store=PublisherStore(conn),
-        contribution_store=contribution_store,
-    )
-
-    rows = conn.execute(
-        text("""
-            SELECT id, source_id, doi, raw_data
-            FROM staging WHERE source = 'crossref' AND processed = FALSE ORDER BY id
-        """)
-    ).all()
-    processed = 0
-    for row in rows:
-        staging_row = StagingRow(
-            id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
-        )
-        if normalizer.process_work(staging_row):
-            processed += 1
-    return processed
+    return normalize_pending(conn, "crossref")
 
 
 def _count_crossref(conn) -> dict[str, int]:
