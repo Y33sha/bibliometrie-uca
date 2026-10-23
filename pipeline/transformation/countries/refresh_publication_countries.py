@@ -157,27 +157,6 @@ def refresh_source_contribution_countries(
     return conn.execute(text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE), params).rowcount
 
 
-def refresh_source_contribution_countries_in_id_range(
-    conn: Connection, id_range: tuple[int, int]
-) -> int:
-    """Recalcule `source_contributions.countries` de toutes les contributions sources de l'intervalle d'identifiants `id_range` (bornes incluses) qui ont une adresse, un ROR sans adresse ou une structure HAL. Retourne le nombre de contributions sources modifiées."""
-    scope = """
-        WITH scoped_sa AS (
-            SELECT source_contribution_id AS id FROM source_contribution_addresses
-            WHERE source_contribution_id BETWEEN :lo AND :hi
-            UNION
-            SELECT source_contribution_id FROM source_contribution_rors
-            WHERE source_contribution_id BETWEEN :lo AND :hi AND address_id IS NULL
-            UNION
-            SELECT source_contribution_id FROM source_contribution_hal_structures
-            WHERE source_contribution_id BETWEEN :lo AND :hi
-        )"""
-    return conn.execute(
-        text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE),
-        {"lo": id_range[0], "hi": id_range[1]},
-    ).rowcount
-
-
 def refresh_source_record_countries(conn: Connection) -> int:
     """Recalcule `source_records.countries` des documents de `countries_dirty_scope`. Retourne le nombre de lignes modifiées."""
     return conn.execute(

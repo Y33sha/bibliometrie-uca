@@ -9,7 +9,6 @@ from pipeline.transformation.countries.refresh_publication_countries import (
     drop_dirty_scope,
     refresh_publication_countries,
     refresh_source_contribution_countries,
-    refresh_source_contribution_countries_in_id_range,
     refresh_source_record_countries,
 )
 from pipeline.transformation.countries.resolution import resolve_address_countries
@@ -385,37 +384,6 @@ class TestDirtyDrivenSourceCountries:
         assert sa_sync_conn.execute(
             text("SELECT countries FROM source_contributions WHERE id = :sa"), {"sa": sa}
         ).scalar_one() == ["fr"]
-
-    def test_un_intervalle_d_identifiants_borne_le_recalcul_des_contributions_sources(
-        self, sa_sync_conn
-    ):
-        publication = insert_publication(sa_sync_conn)
-        source_record = insert_source_record(
-            sa_sync_conn, publication, source="hal", source_id="hal-r"
-        )
-        first = insert_source_contribution(sa_sync_conn, source_record, source="hal")
-        second = insert_source_contribution(
-            sa_sync_conn, source_record, source="hal", author_position=1
-        )
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO hal_structures (hal_structure_id, name, structure_type, country_code, status)"
-                " VALUES (1, 'Laboratoire de Météorologie Physique', 'laboratory', 'fr', 'VALID')"
-            )
-        )
-        sa_sync_conn.execute(
-            text("INSERT INTO source_contribution_hal_structures VALUES (:a, 1), (:b, 1)"),
-            {"a": first, "b": second},
-        )
-
-        changed = refresh_source_contribution_countries_in_id_range(sa_sync_conn, (first, first))
-
-        assert changed == 1
-        countries = sa_sync_conn.execute(
-            text("SELECT id, countries FROM source_contributions WHERE id IN (:a, :b)"),
-            {"a": first, "b": second},
-        ).all()
-        assert dict(countries) == {first: ["fr"], second: None}
 
     def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
