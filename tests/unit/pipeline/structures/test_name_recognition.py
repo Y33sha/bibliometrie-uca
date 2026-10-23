@@ -180,6 +180,39 @@ class TestResolve:
         forms = [_form(170, "aubiere", form_id=20, structure_type=StructureType.SITE)]
         assert StructureNameMatcher(forms).resolve("2 rue des cezeaux aubiere") == []
 
+    def test_context_must_itself_be_recognized(self):
+        """Régression : une forme de la structure de contexte, présente mais invalide faute de son propre contexte, ne satisfait pas le contexte.
+
+        « territoires » (UMR Territoires) exige l'UCA ; « faculte » (UCA) exige le site de Clermont. Une faculté de Lyon ne fait pas reconnaître l'UMR Territoires.
+        """
+        forms = [
+            _form(196, "territoires", form_id=1405, requires_context_of=[169]),
+            _form(169, "faculte", form_id=1735, is_word_boundary=True, requires_context_of=[170]),
+            _form(170, "clermont", form_id=20, structure_type=StructureType.SITE),
+        ]
+        matcher = StructureNameMatcher(forms)
+        text = "dct droits contrats territoires universite lumiere lyon 2 faculte de droit"
+        assert matcher.resolve(text) == []
+
+    def test_chained_context(self):
+        """Contexte en chaîne : le site reconnaît l'UCA, qui reconnaît l'UMR Territoires."""
+        forms = [
+            _form(196, "territoires", form_id=1405, requires_context_of=[169]),
+            _form(169, "faculte", form_id=1735, is_word_boundary=True, requires_context_of=[170]),
+            _form(170, "clermont", form_id=20, structure_type=StructureType.SITE),
+        ]
+        result = StructureNameMatcher(forms).resolve("umr territoires faculte clermont ferrand")
+        assert {sid for sid, _ in result} == {169, 196}
+
+    def test_excluded_structure_is_not_context(self):
+        """Une structure écartée par une forme d'exclusion ne sert pas de contexte."""
+        forms = [
+            _form(1, "limos", form_id=10, requires_context_of=[99]),
+            _form(99, "uca", form_id=99),
+            _form(99, "uca cote d azur", form_id=98, is_excluding=True),
+        ]
+        assert StructureNameMatcher(forms).resolve("limos uca cote d azur") == []
+
     def test_context_tutelles(self):
         """requires_context_of = [99] (IDs directs)."""
         forms = [

@@ -1,6 +1,6 @@
 """Value object `StructureNameForm` — forme du nom d'une structure.
 
-Une forme de nom de structure porte des options de matching en plus de la string : `is_word_boundary` (exiger une frontière de mot), `is_excluding` (la forme provoque un *rejet* du match), `requires_context_of` (le match n'est valide que si certaines autres structures sont présentes dans la même adresse).
+Une forme de nom de structure comporte des options de matching en plus de la string : `is_word_boundary` (exiger une frontière de mot), `is_excluding` (la forme provoque un *rejet* du match), `requires_context_of` (le match est valide seulement si l'une des structures de contexte est reconnue dans la même adresse).
 
 Ces attributs étant tous des valeurs (booléens, tuple d'entiers), la classe reste un VO : égalité par contenu, immuable.
 """
@@ -19,7 +19,7 @@ class StructureNameForm:
     - `form_text` : la string à matcher (déjà normalisée).
     - `is_word_boundary` : exige une frontière de mot avant/après la forme pour valider un match (évite p. ex. de matcher « ica » dans « africa »).
     - `is_excluding` : si la forme matche, le match global est rejeté (forme négative).
-    - `requires_context_of` : tuple d'ids de structures qui doivent aussi être présentes pour valider ce match (désambiguïsation).
+    - `requires_context_of` : tuple d'ids de structures dont l'une doit aussi être reconnue, son propre contexte compris, pour valider ce match (désambiguïsation).
     """
 
     form_text: str
