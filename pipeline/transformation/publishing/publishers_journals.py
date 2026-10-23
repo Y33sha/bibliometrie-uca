@@ -29,7 +29,6 @@ from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
     SUDOC_MAX_CONCURRENT,
-    SUDOC_MAX_PER_SECOND,
 )
 from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
 from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
@@ -210,7 +209,6 @@ def build() -> Phase:
                     "Revues",
                     check_journals_in_sudoc.LABEL,
                     threshold=3,
-                    max_per_second=SUDOC_MAX_PER_SECOND,
                 ),
                 "merge_duplicate_journals": TaskStep(
                     _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LABEL

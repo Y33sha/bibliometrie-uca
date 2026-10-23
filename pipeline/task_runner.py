@@ -34,8 +34,6 @@ class TaskStep:
     progress_bar: bool = False
     # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
     threshold: int | None = None
-    # Débit de la source en requêtes par seconde. `None` : celui du profil de la source, s'il y en a un.
-    max_per_second: float | None = None
     # Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée rend des métriques vides et n'écrit rien.
     when: Callable[[PhaseContext], bool] | None = None
 
@@ -139,8 +137,8 @@ def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> Phase
             phase=phase,
             logger=ctx.logger,
             credentials_missing=ctx.credentials_missing,
+            request_budget=ctx.request_budget,
             threshold=step.threshold,
-            max_per_second=step.max_per_second,
         )
     metrics.duration_s = round(time.perf_counter() - t0, 1)
     return metrics

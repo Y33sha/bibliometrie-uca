@@ -38,6 +38,7 @@ from infrastructure.observability.log import (
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
 from pipeline.graph import EXTRA_PHASES, PHASE_LABELS, PHASE_ORDER
+from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.common import (
     fetch_missing,
     fetch_stale,
@@ -417,7 +418,9 @@ def _run_one_phase(
         try:
             result = build().run(
                 phase_context(
-                    _run_options(args, sources), credentials_missing=source_credentials_missing
+                    _run_options(args, sources),
+                    credentials_missing=source_credentials_missing,
+                    request_budget=request_budget,
                 )
             )
         except (KeyboardInterrupt, Exception) as e:

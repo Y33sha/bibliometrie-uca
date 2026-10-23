@@ -27,7 +27,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, request_budget
 from pipeline.ingestion.openalex.api import SELECT_FIELDS, auth_params, build_params
 from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
@@ -118,7 +118,7 @@ def audit(year: int) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--year", type=int, required=True, help="Année de publication parcourue.")
-    with source_circuit_breaker("openalex"):
+    with source_circuit_breaker("openalex", max_per_second=request_budget("openalex")):
         return audit(parser.parse_args().year)
 
 

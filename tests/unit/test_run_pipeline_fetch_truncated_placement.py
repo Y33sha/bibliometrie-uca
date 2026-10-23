@@ -28,7 +28,11 @@ def test_refetch_not_called_in_extract():
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
         harvest.build().run(
-            phase_context(RunOptions(mode="full"), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(mode="full"),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
     assert refetch.call_count == 0
 
@@ -46,6 +50,7 @@ def test_refetch_not_called_in_normalize():
             phase_context(
                 RunOptions(mode="full", sources={"openalex", "hal"}),
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
     assert refetch.call_count == 0
@@ -60,6 +65,7 @@ def test_refetch_called_in_own_phase_when_openalex_present():
             phase_context(
                 RunOptions(mode="full", sources={"openalex", "hal"}),
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
     assert refetch.call_count == 1
@@ -71,6 +77,7 @@ def test_refetch_skipped_in_own_phase_without_openalex():
             phase_context(
                 RunOptions(mode="full", sources={"hal", "scanr"}),
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
     assert refetch.call_count == 0

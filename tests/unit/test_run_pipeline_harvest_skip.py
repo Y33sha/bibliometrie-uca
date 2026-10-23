@@ -35,6 +35,7 @@ def test_phase_extract_full_skips_unconfigured_source():
             phase_context(
                 RunOptions(mode="full", sources={"openalex", "theses"}),
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
 
@@ -56,7 +57,11 @@ def test_phase_extract_daily_hal_unconfigured():
         patch.object(harvest, "run_harvest", side_effect=_extract),
     ):
         metrics = harvest.build().run(
-            phase_context(RunOptions(mode="daily"), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(mode="daily"),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
 
     assert _table_keys(metrics) == set()

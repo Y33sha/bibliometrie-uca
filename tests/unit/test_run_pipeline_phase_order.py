@@ -49,6 +49,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
                 options=RunOptions(),
                 maintain=lambda op: None,
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
     addresses.assert_called_once()

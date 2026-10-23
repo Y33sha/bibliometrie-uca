@@ -1,11 +1,11 @@
 """Garde-fous sur le débit de la recherche par DOI dans DataCite.
 
 DataCite limite à 1000 requêtes / 5 min pour un client identifié (User-Agent
-avec mailto), soit ~3,3 req/s. Ces tests vérifient que le budget du profil
+avec mailto), soit ~3,3 req/s. Ces tests vérifient que le budget de débit
 reste sous cette limite.
 """
 
-from domain.sources.registry import PROFILES, Source
+from pipeline.ingestion.api_params import MAX_PER_SECOND
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
 
 # Limite identifiée DataCite : 1000 req / 5 min = 300 s.
@@ -17,4 +17,4 @@ def test_concurrency_limit():
 
 
 def test_budget_under_the_identified_limit():
-    assert PROFILES[Source.DATACITE].max_per_second <= _DATACITE_MAX_REQ_PER_S
+    assert MAX_PER_SECOND["datacite"] <= _DATACITE_MAX_REQ_PER_S

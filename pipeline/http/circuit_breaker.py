@@ -15,7 +15,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from domain.sources.registry import ALL_SOURCES_SET, PROFILES, Source
 from pipeline.http.pace import Pace
 
 DEFAULT_THRESHOLD = 10
@@ -101,12 +100,7 @@ def source_tripped() -> bool:
 def source_circuit_breaker(
     source: str, *, threshold: int = DEFAULT_THRESHOLD, max_per_second: float | None = None
 ) -> Iterator[SourceCircuitBreaker]:
-    """Pose le breaker de `source` dans la ContextVar le temps du bloc.
-
-    Le rythme des requêtes suit `max_per_second`, à défaut le débit du profil de la source (`SourceProfile.max_per_second`).
-    """
-    if max_per_second is None and source in ALL_SOURCES_SET:
-        max_per_second = PROFILES[Source(source)].max_per_second
+    """Pose le breaker de `source` dans la ContextVar le temps du bloc. Les requêtes suivent le rythme de `max_per_second`, sans plafond à `None`."""
     pace = Pace(max_per_second) if max_per_second else None
     breaker = SourceCircuitBreaker(source, threshold=threshold, pace=pace)
     token = _current_breaker.set(breaker)

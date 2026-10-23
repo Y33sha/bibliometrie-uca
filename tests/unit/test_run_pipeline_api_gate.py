@@ -19,7 +19,12 @@ _LOG = logging.getLogger("test")
 
 def _access(execute, *, missing=None):
     return access_source(
-        "crossref", execute, phase="test", logger=_LOG, credentials_missing=lambda _source: missing
+        "crossref",
+        execute,
+        phase="test",
+        logger=_LOG,
+        credentials_missing=lambda _source: missing,
+        request_budget=lambda _source: None,
     )
 
 
@@ -45,6 +50,26 @@ def test_avec_identifiants_l_etape_tourne_sous_le_circuit_breaker_de_la_source()
     assert sources == ["crossref"]
     assert get_current_breaker() is None
     assert metrics.signals == []
+
+
+def test_le_rythme_suit_le_budget_de_la_source():
+    rythmes = []
+
+    def execute():
+        breaker = get_current_breaker()
+        rythmes.append(breaker and breaker.pace)
+        return PhaseMetrics()
+
+    access_source(
+        "crossref",
+        execute,
+        phase="test",
+        logger=_LOG,
+        credentials_missing=lambda _source: None,
+        request_budget=lambda source: 5 if source == "crossref" else None,
+    )
+
+    assert rythmes[0] is not None
 
 
 def test_source_indisponible_signalee():
@@ -75,7 +100,11 @@ def test_phase_oa_status_skips_without_email():
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
     ):
         metrics = oa_status.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: "adresse absente")
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: "adresse absente",
+                request_budget=lambda _source: None,
+            )
         )
 
     run_step.assert_not_called()
@@ -89,7 +118,11 @@ def test_phase_oa_status_runs_with_email():
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
         metrics = oa_status.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
 
     run_step.assert_called_once()

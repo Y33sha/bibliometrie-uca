@@ -41,8 +41,6 @@ class SourceProfile:
     opt_in: bool = False
     # Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi.
     incremental: bool = False
-    # Débit consenti à la source, en requêtes par seconde, toutes requêtes confondues. `None` : sans plafond.
-    max_per_second: float | None = None
 
 
 PROFILES: dict[Source, SourceProfile] = {
@@ -54,38 +52,28 @@ PROFILES: dict[Source, SourceProfile] = {
             {PersonIdentifierType.ORCID, PersonIdentifierType.IDHAL, PersonIdentifierType.IDREF}
         ),
         incremental=True,
-        # Aucun seuil publié.
-        max_per_second=5,
     ),
     Source.OPENALEX: SourceProfile(
         label="OpenAlex",
         harvested=True,
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
-        # Seuil publié : 10 req/s.
-        max_per_second=8,
     ),
-    Source.WOS: SourceProfile(
-        label="WoS", harvested=True, doi_searchable=True, opt_in=True, max_per_second=2
-    ),
+    Source.WOS: SourceProfile(label="WoS", harvested=True, doi_searchable=True, opt_in=True),
     Source.SCANR: SourceProfile(
         label="ScanR",
         harvested=True,
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
-        # Aucun seuil publié.
-        max_per_second=5,
     ),
-    # Son API se requête par NNT, pas par DOI. Aucun seuil publié.
-    Source.THESES: SourceProfile(label="theses.fr", harvested=True, max_per_second=3),
+    # Son API se requête par NNT, pas par DOI.
+    Source.THESES: SourceProfile(label="theses.fr", harvested=True),
     # Interrogé par DOI et par personne, sans moissonnage.
     Source.CROSSREF: SourceProfile(
         label="Crossref",
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         registration_agency="Crossref",
-        # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.
-        max_per_second=5,
     ),
     Source.DATACITE: SourceProfile(
         label="DataCite",
@@ -93,8 +81,6 @@ PROFILES: dict[Source, SourceProfile] = {
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
         registration_agency="DataCite",
-        # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
-        max_per_second=3,
     ),
 }
 

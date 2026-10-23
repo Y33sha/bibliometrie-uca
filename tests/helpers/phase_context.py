@@ -60,6 +60,7 @@ def contexte(open_tx: FakeOpenTransaction) -> Callable[..., PhaseContext]:
             options=RunOptions(**options),
             maintain=lambda operation: None,
             credentials_missing=credentials_missing,
+            request_budget=lambda _source: None,
         )
 
     return fabriquer

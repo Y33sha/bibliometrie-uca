@@ -1,4 +1,4 @@
-"""Paramètres d'API invariants, codés en dur : URLs de base et tailles de page, par source. Le débit des sources bibliographiques est dans leur profil (`domain.sources.registry`).
+"""Paramètres d'API invariants, codés en dur : URLs de base, débits et tailles de page, par source.
 
 Centralise ces réglages pour éviter la dérive entre scripts. Modifier une valeur ici s'applique à tous les scripts qui interrogent l'API concernée. Les comportements spécifiques (reprise après erreur, pauses longues après quota dépassé) restent codés en dur dans chaque script.
 """
@@ -52,7 +52,33 @@ THESES_PER_PAGE = 500  # max accepté par l'API
 # doi.org/ra — aucune limite documentée ; 200 préfixes par requête passent
 DOI_ORG_RA_BATCH = 100  # préfixes par requête
 
-# Sudoc — aucune limite documentée : 5 req/s au plus, toutes requêtes simultanées confondues
-SUDOC_MAX_PER_SECOND = 5
+# Sudoc — aucune limite documentée
 SUDOC_MAX_CONCURRENT = 4
+
+
+# Débit consenti à chaque accès, en requêtes par seconde, toutes requêtes confondues. Un accès absent de la table est sans plafond.
+MAX_PER_SECOND: dict[str, float] = {
+    # Aucun seuil publié.
+    "hal": 5,
+    # Seuil publié : 10 req/s.
+    "openalex": 8,
+    "wos": 2,
+    # Aucun seuil publié.
+    "scanr": 5,
+    # Aucun seuil publié.
+    "theses": 3,
+    # Seuil publié du polite pool : 10 req/s, 3 requêtes simultanées.
+    "crossref": 5,
+    # Seuil publié du tier identifié (User-Agent avec mailto) : 1 000 requêtes par 5 minutes.
+    "datacite": 3,
+    # Aucun seuil publié.
+    "sudoc": 5,
+}
+
+
+def request_budget(source: str) -> float | None:
+    """Débit consenti à `source`, en requêtes par seconde, ou `None` sans plafond."""
+    return MAX_PER_SECOND.get(source)
+
+
 SUDOC_ISSN2PPN_BATCH = 20  # ISSN par requête `issn2ppn`

@@ -34,7 +34,11 @@ def test_phase_aggregates_substep_counters():
         patch.object(publishers_journals, "_run_enrich_journals_from_doaj", return_value=doaj),
     ):
         metrics = publishers_journals.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
 
     # Les compteurs des sous-étapes sont remontés : le résumé n'est pas « no-op ».
@@ -71,7 +75,11 @@ def test_phase_propagates_substep_signals():
         ),
     ):
         metrics = publishers_journals.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]

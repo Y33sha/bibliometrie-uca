@@ -27,7 +27,7 @@ from infrastructure.db.savepoint import rollback_unless_invalidated
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex.api import credential_params
 from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
@@ -226,6 +226,7 @@ def main() -> int:
             phase="enrich_publishers",
             logger=log,
             credentials_missing=source_credentials_missing,
+            request_budget=request_budget,
             threshold=3,
         )
     finally:

@@ -71,7 +71,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 - L'API sert les libellés des sources au frontend, et calcule les liens vers les portails des sources (`source_record_url`).
 - theses.fr suit la fenêtre d'années du run, comme les autres sources, par l'année de soutenance. Les thèses en cours sont toujours retenues.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
-- Le débit de chaque source est un budget en requêtes par seconde, dans son profil. Le circuit-breaker posé par l'accès à la source porte son rythme (`Pace`), que chaque requête HTTP respecte.
+- Le débit de chaque source est un budget en requêtes par seconde, avec les autres réglages d'accès aux API (`api_params.py`). Le run l'injecte dans le contexte de phase, comme le contrôle des identifiants ; le circuit-breaker posé par l'accès à la source porte le rythme correspondant (`Pace`), que chaque requête HTTP respecte.
 - La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
 - Une fonction sans I/O classe chaque tentative. Deux enveloppes, synchrone et asynchrone, l'exécutent. L'épuisement des réessais lève `SourceUnavailableError`, quelle qu'en soit la cause.
 - La classe de base de la normalisation fait la séquence d'écriture. Une source fournit l'analyse d'une ligne de `staging`.
@@ -105,8 +105,8 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 5 — Débit
 
-- [x] Budget de débit de chaque source dans son profil.
-- [x] Rythme de la source (`Pace`), porté par son circuit-breaker, à la place des pauses par worker, du `Throttle` et de `RequestPace`.
+- [x] Budget de débit de chaque source, avec les réglages d'accès aux API, injecté dans le contexte de phase. 6532f97c8
+- [x] Rythme de la source (`Pace`), porté par son circuit-breaker, à la place des pauses par worker, du `Throttle` et de `RequestPace`. 6532f97c8
 - [ ] Débit réel de chaque source mesuré sur un run, comparé à la mesure de la phase 4.
 
 ### Phase 6 — Politiques de source

@@ -49,10 +49,8 @@ def test_default_threshold_is_10():
     assert b.tripped
 
 
-def test_le_rythme_suit_le_profil_de_la_source():
+def test_le_rythme_suit_le_debit_recu():
     with source_circuit_breaker("hal") as breaker:
-        assert breaker.pace is not None
-    with source_circuit_breaker("sudoc") as breaker:
         assert breaker.pace is None
-    with source_circuit_breaker("sudoc", max_per_second=5) as breaker:
+    with source_circuit_breaker("hal", max_per_second=5) as breaker:
         assert breaker.pace is not None

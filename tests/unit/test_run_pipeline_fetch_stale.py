@@ -18,7 +18,11 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
-    return fetch_stale.build().run(phase_context(options, credentials_missing=lambda _source: None))
+    return fetch_stale.build().run(
+        phase_context(
+            options, credentials_missing=lambda _source: None, request_budget=lambda _source: None
+        )
+    )
 
 
 def _called_targets(stack) -> MagicMock:

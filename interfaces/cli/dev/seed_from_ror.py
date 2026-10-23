@@ -29,7 +29,7 @@ from interfaces.cli.dev.generate_seed import (
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.polite_pool import get_polite_pool_email_optional
-from pipeline.ingestion.api_params import API_BASE_URLS
+from pipeline.ingestion.api_params import API_BASE_URLS, request_budget
 from pipeline.ingestion.credentials import get_openalex_api_key
 
 ROR_API = "https://api.ror.org/v2/organizations"
@@ -406,9 +406,9 @@ def main() -> None:
     with source_circuit_breaker("ror"):
         root = fetch_ror(ror_id)
         children = [fetch_ror(child_id) for child_id in root.child_ids]
-    with source_circuit_breaker("hal"):
+    with source_circuit_breaker("hal", max_per_second=request_budget("hal")):
         hal_collections = fetch_hal_collections(root, children)
-    with source_circuit_breaker("openalex"):
+    with source_circuit_breaker("openalex", max_per_second=request_budget("openalex")):
         openalex_ids = fetch_openalex_ids(ror_id)
     seed = build_institution_seed(root, children, openalex_ids, args.code, hal_collections)
 
