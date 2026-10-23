@@ -104,7 +104,7 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
   - Essai écarté : refuser un identifiant quand un membre de même nom de famille, au prénom complet, contredit sa personne. Un refus juste sur deux : diminutifs (Bob et Robert), translittérations (Kuleshov), fautes de source.
 - [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
 - [x] Une personne par groupe au plus, par construction.
-- [ ] Dans une publication, un groupe par personne au plus. 1 527 couples (publication, personne) portés par plusieurs groupes : 779 auteurs répétés dans une liste (Fauchon aux positions 0, 1, 14 et 15 chez OpenAlex), 748 personnes qui portent les identifiants de deux chercheurs (Manea et Manna).
+- [x] Dans une publication, un groupe par personne au plus (`settle_publication`), y compris face aux groupes déjà rattachés. 8bd161212 a6e809b3d 1 527 couples (publication, personne) portés par plusieurs groupes : 779 auteurs répétés dans une liste (Fauchon aux positions 0, 1, 14 et 15 chez OpenAlex), 748 personnes qui portent les identifiants de deux chercheurs (Manea et Manna).
 - [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
 ### Phase 5 — Migration du schéma
@@ -131,7 +131,8 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 - [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
 - [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
-- [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` cesse de construire la table `contributions`.
+- [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
+- [ ] La phase `contributions` cesse de construire la table `contributions`.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
 
 #### Étape D — Suppressions
@@ -142,8 +143,10 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
-- [ ] Une entrée de domaine rend la décision complète d'un groupe. Elle lit un index de personnes en mémoire, que le pipeline met à jour après chaque écriture : formes de nom, homonymes par nom de famille. Elle renvoie les refus de corroboration. `NameFormDecision` et `PersonMatchDecision` fusionnent.
-- [ ] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par cette entrée : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre.
+- [x] Une entrée de domaine rend la décision complète d'un groupe (`decide_group`). Elle lit un index de personnes en mémoire et renvoie les refus de corroboration. 02f69c43b
+- [ ] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes.
+- [ ] `NameFormDecision` et `PersonMatchDecision` fusionnent, avec la disparition de l'ancienne cascade.
+- [x] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par `decide_group` : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre. 02f69c43b
 - [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
 
 ### Phase 7 — Correction du stock
