@@ -16,7 +16,6 @@ from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -92,34 +91,10 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     )
 
 
-def extract_publication_metadata(
-    doc: Mapping[str, JsonValue],
-    journal_id: int | None,
-    scanr_id: str | None = None,
-    monograph_id: int | None = None,
-) -> PublicationMetadata:
-    """Extrait les métadonnées de publication d'un document ScanR.
-
-    Toutes les valeurs sont brutes — pas de fallback (le brut de `source_records.doc_type` est nullable text) ni de transformation de cohérence. `language` est posé à `None` : l'API ScanR ne l'expose pas.
-    """
-    title = get_title(doc)
-    container_title = None
-    if not journal_id:
-        container_title = as_str(as_mapping(doc.get("source")).get("title"))
+def get_oa_status(doc: Mapping[str, JsonValue]) -> str | None:
     is_open = doc.get("isOa")
-    return PublicationMetadata(
-        title=title,
-        publication_year=as_int(doc.get("year")),
-        doc_type=as_str(doc.get("type")),
-        doi=extract_doi(doc),
-        nnt=extract_nnt_from_scanr_id(scanr_id),
-        oa_status=derive_scanr_oa_status(
-            is_open if isinstance(is_open, bool) else None, as_mapping(doc.get("oaEvidence"))
-        ),
-        journal_id=journal_id,
-        monograph_id=monograph_id,
-        container_title=container_title,
-        language=None,
+    return derive_scanr_oa_status(
+        is_open if isinstance(is_open, bool) else None, as_mapping(doc.get("oaEvidence"))
     )
 
 
@@ -132,14 +107,15 @@ def scanr_source_record(  # noqa: C901
     doc: Mapping[str, JsonValue],
     staging_id: int,
     scanr_id: str,
-    publication_meta: PublicationMetadata,
+    containers: Containers,
 ) -> SourceRecordUpsert:
     """Enregistrement source ScanR d'un document.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `doc` donne les champs propres à ScanR (hal_id, pmid, abstract, biblio, keywords, topics, urls).
+    Le NNT vient de l'identifiant ScanR (`scanr_id`). Le titre du contenant (`source.title`) est gardé seulement en l'absence de revue. L'API ScanR n'expose pas la langue.
     """
+    doi = extract_doi(doc)
     ext: dict[str, JsonValue] = {}
-    if nnt := publication_meta.nnt:
+    if nnt := extract_nnt_from_scanr_id(scanr_id):
         ext[ExternalIdType.NNT] = nnt
     # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
@@ -155,13 +131,13 @@ def scanr_source_record(  # noqa: C901
             hal_ids.append(value)
         elif etype == "pmid":
             ext[ExternalIdType.PMID] = value
-        elif etype == "doi" and (doi := clean_doi(value)) and doi not in dois:
-            dois.append(doi)
+        elif etype == "doi" and (entry_doi := clean_doi(value)) and entry_doi not in dois:
+            dois.append(entry_doi)
     if hal_ids:
         ext[ExternalIdType.HAL_ID] = hal_ids
     # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
     # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
-    if related_dois := [d for d in dois if d != publication_meta.doi]:
+    if related_dois := [d for d in dois if d != doi]:
         ext[ExternalIdType.RELATED_DOIS] = related_dois
     external_ids = ext if ext else None
 
@@ -213,20 +189,20 @@ def scanr_source_record(  # noqa: C901
         source="scanr",
         source_id=scanr_id,
         staging_id=staging_id,
-        doi=publication_meta.doi,
+        doi=doi,
         external_ids=external_ids,
-        title=publication_meta.title or "",
-        publication_year=publication_meta.publication_year,
-        raw_doc_type=publication_meta.doc_type,
-        journal_id=publication_meta.journal_id,
-        monograph_id=publication_meta.monograph_id,
-        container_title=publication_meta.container_title,
-        raw_language=publication_meta.language,
+        title=get_title(doc) or "",
+        publication_year=as_int(doc.get("year")),
+        raw_doc_type=as_str(doc.get("type")),
+        journal_id=containers.journal_id,
+        monograph_id=containers.monograph_id,
+        container_title=as_str(source.get("title")) if not containers.journal_id else None,
+        raw_language=None,
         biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
         topics=topics,
-        oa_status=publication_meta.oa_status,
+        oa_status=get_oa_status(doc),
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=Impact(cited_by_count=cited_by_count).to_json(),
@@ -350,10 +326,7 @@ class ScanrNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        publication_meta = extract_publication_metadata(
-            doc, containers.journal_id, row.source_id, monograph_id=containers.monograph_id
-        )
-        return scanr_source_record(doc, row.id, row.source_id, publication_meta)
+        return scanr_source_record(doc, row.id, row.source_id, containers)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_scanr_author_block(doc)

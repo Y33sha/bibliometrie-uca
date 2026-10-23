@@ -3,7 +3,7 @@
 Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `extract_publication_metadata`, `get_container_facts`, `wos_source_record` : propagation des champs.
+- `get_container_facts`, `wos_source_record` : propagation des champs.
 - `build_wos_author_records` : filtre `is_wos_author_usable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté.
 - `WosNormalizer` : UT lu depuis la ligne de staging, éditeur, entrée `source_records` construite avec les conteneurs.
 
@@ -19,7 +19,6 @@ from unittest.mock import MagicMock
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.common.normalizer import PublisherFacts
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.wos.normalize import (
     WosNormalizer,
     _get_api_doi,
@@ -31,7 +30,6 @@ from pipeline.ingestion.wos.normalize import (
     build_wos_author_records,
     extract_from_api,
     extract_from_export,
-    extract_publication_metadata,
     extract_record,
     get_container_facts,
     wos_source_record,
@@ -714,7 +712,7 @@ class TestExtractFromApi:
         assert rec["cited_by_count"] == 7
 
 
-# ── extract_publication_metadata ─────────────────────────────────────────
+# ── extract_from_export ──────────────────────────────────────────────────
 
 
 def _export_row(**surcharges: str) -> dict[str, str]:
@@ -790,37 +788,6 @@ class TestExtractFromExport:
         assert extract_record(_make_api_record(), None)["ut"] == "WOS:000123"
 
 
-class TestExtractPublicationMetadata:
-    def test_basic_with_journal_id(self):
-        rec = {
-            "title": "T",
-            "publication_year": 2024,
-            "doc_type": "article",
-            "doi": "10.1/x",
-            "oa_status": "gold",
-            "language": "en",
-            "journal_title": "J Name",
-        }
-        meta = extract_publication_metadata(rec, journal_id=42)
-        assert meta.title == "T"
-        assert meta.journal_id == 42
-        assert meta.container_title is None  # journal_id résout, pas besoin du title
-
-    def test_container_title_falls_back_when_no_journal_id(self):
-        """Si pas de journal_id (titre non matché), on garde `journal_title` comme `container_title`."""
-        rec = {
-            "title": "T",
-            "publication_year": 2024,
-            "doc_type": "article",
-            "doi": None,
-            "oa_status": None,
-            "language": None,
-            "journal_title": "Container Title",
-        }
-        meta = extract_publication_metadata(rec, journal_id=None)
-        assert meta.container_title == "Container Title"
-
-
 # ── get_container_facts ─────────────────────────────────────
 
 
@@ -852,9 +819,15 @@ class TestGetContainerFacts:
 
 
 class TestWosSourceRecord:
-    def test_forwards_publication_meta_and_rec_extras(self):
+    def test_forwards_canonical_fields_and_rec_extras(self):
         rec = {
             "ut": "WOS:1",
+            "doi": "10.1/x",
+            "title": "T",
+            "publication_year": 2024,
+            "doc_type": "article",
+            "oa_status": "gold",
+            "language": "en",
             "abstract": "abs",
             "cited_by_count": 9,
             "biblio": {"volume": "1"},
@@ -863,19 +836,10 @@ class TestWosSourceRecord:
             "urls": ["https://x"],
             "external_ids": {"pmid": "12345"},
         }
-        publication_meta = PublicationMetadata(
-            doi="10.1/x",
-            title="T",
-            publication_year=2024,
-            doc_type="article",
-            nnt=None,
-            journal_id=42,
-            oa_status="gold",
-            language="en",
-            container_title=None,
-        )
 
-        row_arg = wos_source_record(rec, staging_id=10, publication_meta=publication_meta)
+        row_arg = wos_source_record(
+            rec, staging_id=10, containers=Containers(journal_id=42, monograph_id=None)
+        )
 
         assert row_arg.source_id == "WOS:1"
         assert row_arg.doi == "10.1/x"
@@ -889,24 +853,50 @@ class TestWosSourceRecord:
         assert row_arg.impact == {"cited_by_count": 9}
         assert row_arg.staging_id == 10
 
-    def test_none_publication_meta_values_propagate(self):
-        rec = {"ut": "WOS:1"}
-        publication_meta = PublicationMetadata(
-            doi=None,
-            title="T",
-            publication_year=None,
-            doc_type="other",
-            nnt=None,
-            journal_id=None,
-            oa_status=None,
-            language=None,
-            container_title=None,
+    def test_none_values_propagate(self):
+        rec = {"ut": "WOS:1", "title": "T", "doc_type": "other"}
+        row_arg = wos_source_record(
+            rec, staging_id=5, containers=Containers(journal_id=None, monograph_id=None)
         )
-        row_arg = wos_source_record(rec, staging_id=5, publication_meta=publication_meta)
 
         assert row_arg.journal_id is None
         assert row_arg.oa_status is None
         assert row_arg.doi is None
+
+    def test_container_title_absent_with_journal_id(self):
+        rec = {
+            "ut": "WOS:1",
+            "title": "T",
+            "publication_year": 2024,
+            "doc_type": "article",
+            "doi": "10.1/x",
+            "oa_status": "gold",
+            "language": "en",
+            "journal_title": "J Name",
+        }
+        row_arg = wos_source_record(
+            rec, staging_id=1, containers=Containers(journal_id=42, monograph_id=None)
+        )
+        assert row_arg.title == "T"
+        assert row_arg.journal_id == 42
+        assert row_arg.container_title is None
+
+    def test_container_title_falls_back_when_no_journal_id(self):
+        """Sans `journal_id` (titre non matché), `journal_title` devient le `container_title`."""
+        rec = {
+            "ut": "WOS:1",
+            "title": "T",
+            "publication_year": 2024,
+            "doc_type": "article",
+            "doi": None,
+            "oa_status": None,
+            "language": None,
+            "journal_title": "Container Title",
+        }
+        row_arg = wos_source_record(
+            rec, staging_id=1, containers=Containers(journal_id=None, monograph_id=None)
+        )
+        assert row_arg.container_title == "Container Title"
 
 
 # ── build_wos_author_records (parsing pur) ───────────────────────

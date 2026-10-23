@@ -16,7 +16,6 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
@@ -33,30 +32,25 @@ from pipeline.transformation.publishing.find_or_create import Containers
 # =============================================================
 
 
-def extract_publication_metadata(thesis: Mapping[str, JsonValue]) -> PublicationMetadata:
-    """Extrait les métadonnées canoniques d'une thèse."""
-    title = as_str(thesis.get("titrePrincipal"))
-    defense_date = french_date_to_iso(as_str(thesis.get("dateSoutenance")))
-    enrollment_date = french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
+def _defense_date(thesis: Mapping[str, JsonValue]) -> str | None:
+    """Date de soutenance ISO."""
+    return french_date_to_iso(as_str(thesis.get("dateSoutenance")))
 
-    # publication_year = soutenance > première inscription (cascade theses.fr)
-    year_source = defense_date or enrollment_date
-    publication_year = int(year_source[:4]) if year_source else None
 
-    doi = clean_doi(as_str(thesis.get("doi")))
-    nnt_clean = normalize_nnt(as_str(thesis.get("nnt")))
+def _enrollment_date(thesis: Mapping[str, JsonValue]) -> str | None:
+    """Date de première inscription en doctorat ISO."""
+    return french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
 
-    return PublicationMetadata(
-        title=title,
-        publication_year=publication_year,
-        doc_type=derive_theses_doc_type(defense_date),
-        doi=doi,
-        nnt=nnt_clean,
-        oa_status="closed",
-        journal_id=None,
-        container_title=None,
-        language=None,
-    )
+
+def get_title(thesis: Mapping[str, JsonValue]) -> str | None:
+    """Titre principal de la thèse."""
+    return as_str(thesis.get("titrePrincipal"))
+
+
+def get_publication_year(thesis: Mapping[str, JsonValue]) -> int | None:
+    """Année de soutenance, à défaut année de première inscription."""
+    year_source = _defense_date(thesis) or _enrollment_date(thesis)
+    return int(year_source[:4]) if year_source else None
 
 
 # =============================================================
@@ -67,8 +61,8 @@ def extract_publication_metadata(thesis: Mapping[str, JsonValue]) -> Publication
 def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Champs propres à theses.fr, pour `source_records.source_extras`."""
     source_extras: dict[str, JsonValue] = {}
-    ds = french_date_to_iso(as_str(thesis.get("dateSoutenance")))
-    di = french_date_to_iso(as_str(thesis.get("datePremiereInscriptionDoctorat")))
+    ds = _defense_date(thesis)
+    di = _enrollment_date(thesis)
     if ds:
         source_extras[SourceExtra.DATE_SOUTENANCE] = ds
     if di:
@@ -108,13 +102,12 @@ def theses_source_record(
     thesis: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
-    publication_meta: PublicationMetadata,
 ) -> SourceRecordUpsert:
     """Enregistrement source theses.fr d'une thèse.
 
-    Les métadonnées canoniques (titre, doc_type, publication_year, doi, nnt, journal, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `thesis` donne les champs propres aux thèses (sujets, sujetsRameau, discipline, écoles doctorales, partenaires, dates).
+    Statut open access `closed`, sans conteneur ni langue. Le doc_type dépend de la présence d'une date de soutenance.
     """
-    nnt = publication_meta.nnt
+    nnt = normalize_nnt(as_str(thesis.get("nnt")))
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
 
     # Keywords : sujets (mots-clés auteur)
@@ -136,17 +129,18 @@ def theses_source_record(
         source="theses",
         source_id=theses_id,
         staging_id=staging_id,
-        doi=publication_meta.doi,
+        doi=clean_doi(as_str(thesis.get("doi"))),
         external_ids=external_ids,
-        title=publication_meta.title or "",
-        publication_year=publication_meta.publication_year,
-        raw_doc_type=publication_meta.doc_type,
-        journal_id=publication_meta.journal_id,
-        container_title=publication_meta.container_title,
-        raw_language=publication_meta.language,
+        title=get_title(thesis) or "",
+        publication_year=get_publication_year(thesis),
+        raw_doc_type=derive_theses_doc_type(_defense_date(thesis)),
+        journal_id=None,
+        monograph_id=None,
+        container_title=None,
+        raw_language=None,
         keywords=keywords,
         topics=topics_json,
-        oa_status=publication_meta.oa_status,
+        oa_status="closed",
         source_extras=_build_source_extras(thesis),
     )
 
@@ -182,14 +176,13 @@ class ThesesNormalizer(SourceNormalizer):
     DEFAULT_BATCH_SIZE = 100
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        publication_meta = extract_publication_metadata(row.raw_data)
-        return publication_meta.title, publication_meta.publication_year
+        return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
         """Une thèse n'a ni éditeur ni conteneur."""
-        return theses_source_record(doc, row.id, row.source_id, extract_publication_metadata(doc))
+        return theses_source_record(doc, row.id, row.source_id)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_theses_author_block(doc)

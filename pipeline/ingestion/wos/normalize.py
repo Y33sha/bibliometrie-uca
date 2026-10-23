@@ -15,7 +15,6 @@ from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -441,63 +440,32 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 # =============================================================
-# PUBLICATIONS
-# =============================================================
-
-
-def extract_publication_metadata(
-    rec: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
-) -> PublicationMetadata:
-    """Extrait les métadonnées canoniques d'un record WoS.
-
-    Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses.
-    """
-    return PublicationMetadata(
-        title=as_str(rec.get("title")),
-        publication_year=as_int(rec.get("publication_year")),
-        doc_type=as_str(rec.get("doc_type")),
-        doi=as_str(rec.get("doi")),
-        nnt=None,
-        oa_status=as_str(rec.get("oa_status")),
-        journal_id=journal_id,
-        monograph_id=monograph_id,
-        container_title=as_str(rec.get("journal_title")) if not journal_id else None,
-        language=as_str(rec.get("language")),
-    )
-
-
-# =============================================================
 # SOURCE DOCUMENTS (WOS)
 # =============================================================
 
 
 def wos_source_record(
-    rec: Mapping[str, JsonValue],
-    staging_id: int,
-    publication_meta: PublicationMetadata,
+    rec: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source WoS d'un record.
-
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, journal_id, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `rec` donne les champs propres à WoS (abstract, cited_by_count, biblio, keywords, topics, urls, external_ids non canoniques).
-    """
+    """Enregistrement source WoS d'un record, identifié par son UT. Le titre de la source sert de `container_title` à défaut d'entrée de `journals`. Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses."""
     return SourceRecordUpsert(
         source="wos",
         source_id=as_str(rec.get("ut")) or "",
         staging_id=staging_id,
-        doi=publication_meta.doi,
+        doi=as_str(rec.get("doi")),
         external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
-        title=publication_meta.title or "",
-        publication_year=publication_meta.publication_year,
-        raw_doc_type=publication_meta.doc_type,
-        journal_id=publication_meta.journal_id,
-        monograph_id=publication_meta.monograph_id,
-        container_title=publication_meta.container_title,
-        raw_language=publication_meta.language,
+        title=as_str(rec.get("title")) or "",
+        publication_year=as_int(rec.get("publication_year")),
+        raw_doc_type=as_str(rec.get("doc_type")),
+        journal_id=containers.journal_id,
+        monograph_id=containers.monograph_id,
+        container_title=as_str(rec.get("journal_title")) if not containers.journal_id else None,
+        raw_language=as_str(rec.get("language")),
         biblio=dict(as_mapping(rec.get("biblio"))) or None,
         abstract=as_str(rec.get("abstract")),
         keywords=[k for e in as_sequence(rec.get("keywords")) if (k := as_str(e))] or None,
         topics=dict(as_mapping(rec.get("topics"))) or None,
-        oa_status=publication_meta.oa_status,
+        oa_status=as_str(rec.get("oa_status")),
         urls=[u for e in as_sequence(rec.get("urls")) if (u := as_str(e))] or None,
         impact=Impact(cited_by_count=as_int(rec.get("cited_by_count"))).to_json(),
     )
@@ -605,10 +573,7 @@ class WosNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        publication_meta = extract_publication_metadata(
-            doc, containers.journal_id, containers.monograph_id
-        )
-        return wos_source_record(doc, row.id, publication_meta)
+        return wos_source_record(doc, row.id, containers)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_wos_author_block(doc)

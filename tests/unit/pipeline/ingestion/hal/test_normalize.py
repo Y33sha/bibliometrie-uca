@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, get_container_facts, extract_publication_metadata), `hal_source_record` (collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
+Couvre les helpers (get_title, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
 
 Pattern : doublures de stores + `MagicMock`, pas de DB.
 """
@@ -16,7 +16,6 @@ from domain.persons.contributor_name import ContributorName
 from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.normalizer import PublisherFacts
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.hal import normalize as normalize_hal
 from pipeline.ingestion.hal.normalize import (
     HalNormalizer,
@@ -24,7 +23,6 @@ from pipeline.ingestion.hal.normalize import (
     build_hal_author_records,
     build_hal_external_ids,
     extract_hal_author_block,
-    extract_publication_metadata,
     get_container_facts,
     get_title,
     hal_source_record,
@@ -142,46 +140,42 @@ class TestContainerDescription:
         assert facts.book_title == "IC 2024"
 
 
-# ── extract_publication_metadata ─────────────────────────────────────────
+# ── métadonnées canoniques ───────────────────────────────────────────────
 
 
-class TestExtractPublicationMetadata:
+def _record(doc, containers=Containers(None, None)):
+    return hal_source_record(doc, staging_id=1, hal_id="h1", containers=containers)
+
+
+class TestCanonicalMetadata:
     def test_minimal(self):
-        meta = extract_publication_metadata(
-            {"title_s": ["T"], "producedDateY_i": 2024}, journal_id=42
-        )
-        assert meta.title == "T"
-        assert meta.publication_year == 2024
-        assert meta.journal_id == 42
+        record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(42, None))
+        assert record.title == "T"
+        assert record.publication_year == 2024
+        assert record.journal_id == 42
         # Pas de container_title si journal_id présent.
-        assert meta.container_title is None
+        assert record.container_title is None
 
     def test_book_title_fallback_when_no_journal(self):
-        meta = extract_publication_metadata({"bookTitle_s": "Book"}, journal_id=None)
-        assert meta.container_title == "Book"
+        assert _record({"bookTitle_s": "Book"}).container_title == "Book"
 
     def test_conference_title_fallback(self):
-        meta = extract_publication_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
-        assert meta.container_title == "Conf"
+        assert _record({"conferenceTitle_s": "Conf"}).container_title == "Conf"
 
     def test_journal_title_fallback_when_no_journal(self):
         """Un chapitre sans ISSN n'a pas de revue : son titre de revue reste en container_title."""
-        meta = extract_publication_metadata(
-            {"docType_s": "COUV", "journalTitle_s": "Handbook"}, journal_id=None
-        )
-        assert meta.container_title == "Handbook"
+        record = _record({"docType_s": "COUV", "journalTitle_s": "Handbook"})
+        assert record.container_title == "Handbook"
 
     def test_language_from_list(self):
-        meta = extract_publication_metadata({"language_s": ["fr", "en"]}, journal_id=None)
-        assert meta.language == "fr"
+        assert _record({"language_s": ["fr", "en"]}).raw_language == "fr"
 
     def test_no_language(self):
-        meta = extract_publication_metadata({}, journal_id=None)
-        assert meta.language is None
+        assert _record({}).raw_language is None
 
     def test_nnt_normalized(self):
-        meta = extract_publication_metadata({"nntId_s": "  2024CLFAC001  "}, journal_id=None)
-        assert meta.nnt == "2024CLFAC001"
+        record = _record({"nntId_s": "  2024CLFAC001  "})
+        assert record.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
 
 
 # ── active_embargo_until ─────────────────────────────────────────
@@ -203,7 +197,7 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
     }
     get_container_facts(doc)
     build_hal_external_ids(doc, "hal-1", None)
-    extract_publication_metadata(doc, None)
+    _record(doc)
     normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
     assert len(calls) == 1
 
@@ -274,11 +268,8 @@ class TestActiveEmbargoUntil:
 
 
 class TestHalSourceRecord:
-    def _call(self, doc, *, publication_meta=None):
-        # Par défaut, publication_meta est dérivé via extract_publication_metadata, comme dans le flux réel. Les tests qui forcent une valeur passent un publication_meta explicite.
-        if publication_meta is None:
-            publication_meta = extract_publication_metadata(doc, journal_id=None)
-        return hal_source_record(doc, staging_id=1, hal_id="h1", publication_meta=publication_meta)
+    def _call(self, doc, containers=Containers(None, None)):
+        return _record(doc, containers)
 
     def test_collections_from_coll_codes(self):
         captured = self._call({"collCode_s": ["UCA", "LIMOS", "UCA"]})
@@ -381,27 +372,27 @@ class TestHalSourceRecord:
         captured = self._call({"uri_s": "https://hal.science/hal-123"})
         assert captured.urls == ["https://hal.science/hal-123"]
 
-    def test_publication_meta_propagates_journal_oa_lang(self):
+    def test_propagates_containers_oa_embargo_lang(self):
         captured = self._call(
-            {},
-            publication_meta=PublicationMetadata(
-                doi=None,
-                title=None,
-                publication_year=None,
-                doc_type=None,
-                nnt=None,
-                journal_id=7,
-                oa_status="gold",
-                embargo_until=date(2027, 1, 1),
-                language="fr",
-                container_title="Book",
-            ),
+            {
+                "fileMain_s": "https://hal.science/hal-123/document",
+                "label_xml": _embargo_tei(
+                    '<ref type="file" target="x"><date notBefore="2999-01-01"/></ref>'
+                ),
+                "language_s": "fr",
+                "bookTitle_s": "Book",
+            },
+            Containers(None, 8),
         )
-        assert captured.journal_id == 7
-        assert captured.oa_status == "gold"
-        assert captured.embargo_until == date(2027, 1, 1)
+        assert captured.journal_id is None
+        assert captured.monograph_id == 8
+        assert captured.oa_status == "embargoed"
+        assert captured.embargo_until == date(2999, 1, 1)
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
+
+    def test_journal_id_from_containers(self):
+        assert self._call({}, Containers(7, None)).journal_id == 7
 
 
 # `parse_tei_author_identifiers` est testé dans

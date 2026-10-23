@@ -27,7 +27,6 @@ from domain.types import (
     as_strs,
 )
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
@@ -195,69 +194,50 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 # =============================================================
-# PUBLICATIONS
-# =============================================================
-
-
-def extract_publication_metadata(
-    work: Mapping[str, JsonValue],
-    journal_id: int | None,
-    primary: OpenalexLocation | None = None,
-    monograph_id: int | None = None,
-) -> PublicationMetadata:
-    """Extrait les métadonnées canoniques d'un work OpenAlex.
-
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le `work["type"]` brut OpenAlex.
-    """
-    title = as_str(work.get("title")) or as_str(work.get("display_name")) or ""
-    if primary is None:
-        primary = parse_primary_location(work)
-    theses_fr = primary is not None and is_theses_fr_location(primary)
-    nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
-    oa_info = as_mapping(work.get("open_access"))
-    container_title = primary.source_display_name if (primary and not journal_id) else None
-
-    return PublicationMetadata(
-        title=title,
-        publication_year=as_int(work.get("publication_year")),
-        doc_type=as_str(work.get("type")),
-        doi=clean_doi(as_str(work.get("doi"))),
-        nnt=nnt,
-        oa_status=map_openalex_oa_status(as_str(oa_info.get("oa_status"))),
-        journal_id=journal_id,
-        monograph_id=monograph_id,
-        container_title=container_title,
-        language=as_str(work.get("language")),
-    )
-
-
-# =============================================================
 # SOURCE DOCUMENTS (OPENALEX)
 # =============================================================
+
+
+def get_title(work: Mapping[str, JsonValue]) -> str | None:
+    """Titre du work, ou à défaut son `display_name`."""
+    return as_str(work.get("title")) or as_str(work.get("display_name"))
+
+
+def get_publication_year(work: Mapping[str, JsonValue]) -> int | None:
+    return as_int(work.get("publication_year"))
+
+
+def get_nnt(primary: OpenalexLocation | None) -> str | None:
+    """NNT d'une localisation principale theses.fr."""
+    if primary is None or not is_theses_fr_location(primary):
+        return None
+    return extract_nnt_from_location(primary)
 
 
 def openalex_source_record(  # noqa: C901
     work: Mapping[str, JsonValue],
     staging_id: int,
-    publication_meta: PublicationMetadata,
+    containers: Containers,
     primary: OpenalexLocation | None = None,
 ) -> SourceRecordUpsert:
     """Enregistrement source OpenAlex d'un work.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `work` donne les champs propres à OpenAlex (urls, impact, is_retracted, biblio, publisher/journal bruts, abstract, keywords, topics, location_ids).
+    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale.
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
         primary = parse_primary_location(work)
 
+    doi = clean_doi(as_str(work.get("doi")))
+
     # URLs et identifiants extraits des locations
     urls, external_ids = extract_locations_data(work)
-    if nnt := publication_meta.nnt:
+    if nnt := get_nnt(primary):
         external_ids[ExternalIdType.NNT] = nnt
     # related_dois (collecté depuis les locations) = DOI secondaires : on retire
     # le DOI primaire de la publication, qui vit sur la colonne `doi`.
     if related_dois := as_sequence(external_ids.get(ExternalIdType.RELATED_DOIS)):
-        if remaining := [d for d in related_dois if d != publication_meta.doi]:
+        if remaining := [d for d in related_dois if d != doi]:
             external_ids[ExternalIdType.RELATED_DOIS] = remaining
         else:
             del external_ids[ExternalIdType.RELATED_DOIS]
@@ -304,20 +284,24 @@ def openalex_source_record(  # noqa: C901
         source="openalex",
         source_id=openalex_id,
         staging_id=staging_id,
-        doi=publication_meta.doi,
+        doi=doi,
         external_ids=external_ids or None,
-        title=publication_meta.title or "",
-        publication_year=publication_meta.publication_year,
-        raw_doc_type=publication_meta.doc_type,
-        journal_id=publication_meta.journal_id,
-        monograph_id=publication_meta.monograph_id,
-        container_title=publication_meta.container_title,
-        raw_language=publication_meta.language,
+        title=get_title(work) or "",
+        publication_year=get_publication_year(work),
+        raw_doc_type=as_str(work.get("type")),
+        journal_id=containers.journal_id,
+        monograph_id=containers.monograph_id,
+        container_title=(
+            primary.source_display_name if primary and not containers.journal_id else None
+        ),
+        raw_language=as_str(work.get("language")),
         biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status=publication_meta.oa_status,
+        oa_status=map_openalex_oa_status(
+            as_str(as_mapping(work.get("open_access")).get("oa_status"))
+        ),
         license=normalize_license(publisher_license),
         urls=urls or None,
         impact=extract_impact(work).to_json(),
@@ -445,9 +429,7 @@ class OpenalexNormalizer(SourceNormalizer):
     DEFAULT_BATCH_SIZE = 500
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        work = row.raw_data
-        title = as_str(work.get("title")) or as_str(work.get("display_name"))
-        return title, as_int(work.get("publication_year"))
+        return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
         if should_skip_publisher_journal(parse_primary_location(doc)):
@@ -462,11 +444,7 @@ class OpenalexNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        primary = parse_primary_location(doc)
-        publication_meta = extract_publication_metadata(
-            doc, containers.journal_id, primary, monograph_id=containers.monograph_id
-        )
-        return openalex_source_record(doc, row.id, publication_meta, primary)
+        return openalex_source_record(doc, row.id, containers, parse_primary_location(doc))
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_openalex_author_block(doc)

@@ -1,11 +1,10 @@
 """Tests unitaires de `pipeline.ingestion.scanr.normalize`.
 
-Couvre l'entrée `source_records` construite par `scanr_source_record`, l'éditeur, le conteneur, les métadonnées de publication, et le parsing des auteurs par `build_scanr_author_records` (orcid/idref, rôles, affiliations → adresses et pays détectés). Fonctions pures et `MagicMock`, sans base de données.
+Couvre l'entrée `source_records` construite par `scanr_source_record` (métadonnées canoniques comprises), l'éditeur, le conteneur, et le parsing des auteurs par `build_scanr_author_records` (orcid/idref, rôles, affiliations → adresses et pays détectés). Fonctions pures et `MagicMock`, sans base de données.
 """
 
 from __future__ import annotations
 
-from dataclasses import replace as _remplacer
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,13 +12,11 @@ import pytest
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.common.normalizer import PublisherFacts
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
     ScanrNormalizer,
     build_scanr_author_records,
     extract_doi,
-    extract_publication_metadata,
     get_container_facts,
     get_publisher,
     get_title,
@@ -28,24 +25,14 @@ from pipeline.ingestion.scanr.normalize import (
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import staging_row
 
-_EMPTY_PUBLICATION_META = PublicationMetadata(
-    doi=None,
-    title=None,
-    publication_year=None,
-    doc_type=None,
-    nnt=None,
-    journal_id=None,
-    oa_status=None,
-    language=None,
-    container_title=None,
-)
+_NO_CONTAINERS = Containers(journal_id=None, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
     """Seule la licence d'une localisation d'éditeur est normalisée ; celle d'une archive reste brute dans `meta`."""
 
     def _call(self, evidence: dict) -> SourceRecordUpsert:
-        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", _EMPTY_PUBLICATION_META)
+        return scanr_source_record({"oaEvidence": evidence}, 1, "sc-1", _NO_CONTAINERS)
 
     def test_licence_de_l_editeur_normalisee(self):
         captured = self._call({"hostType": "publisher", "license": "cc-by"})
@@ -61,9 +48,7 @@ class TestScanrSourceRecordLicense:
 
 class TestScanrSourceRecordBiblio:
     def _call(self, doc) -> SourceRecordUpsert:
-        return scanr_source_record(
-            doc, staging_id=1, scanr_id="sc-1", publication_meta=_EMPTY_PUBLICATION_META
-        )
+        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
 
     def test_biblio_none_when_no_source_fields(self):
         captured = self._call({})
@@ -111,10 +96,8 @@ class TestScanrSourceRecordBiblio:
 
 
 class TestScanrSourceRecordExternalIds:
-    def _call(self, doc, publication_meta) -> SourceRecordUpsert:
-        return scanr_source_record(
-            doc, staging_id=1, scanr_id="sc-1", publication_meta=publication_meta
-        )
+    def _call(self, doc) -> SourceRecordUpsert:
+        return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
 
     def test_related_dois_excludes_primary(self):
         doc = {
@@ -124,12 +107,14 @@ class TestScanrSourceRecordExternalIds:
                 {"type": "hal", "id": "hal-1"},
             ]
         }
-        captured = self._call(doc, _remplacer(_EMPTY_PUBLICATION_META, doi="10.1/primary"))
+        captured = self._call(doc)
+        assert captured.doi == "10.1/primary"
         assert captured.external_ids["related_dois"] == ["10.2/anie"]
 
     def test_related_dois_absent_when_only_primary(self):
         doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
-        captured = self._call(doc, _remplacer(_EMPTY_PUBLICATION_META, doi="10.1/primary"))
+        captured = self._call(doc)
+        assert captured.doi == "10.1/primary"
         assert "related_dois" not in (captured.external_ids or {})
 
 
@@ -312,7 +297,7 @@ class TestEditeurEtConteneur:
         assert facts.book_title is None
 
 
-class TestExtractPublicationMetadata:
+class TestScanrSourceRecordMetadonnees:
     def test_metadonnees_d_un_article(self):
         doc = {
             "title": {"default": "Un titre"},
@@ -322,43 +307,36 @@ class TestExtractPublicationMetadata:
             "isOa": False,
         }
 
-        meta = extract_publication_metadata(doc, journal_id=3, scanr_id="doi10.1/a")
+        record = scanr_source_record(
+            doc, 1, "doi10.1/a", Containers(journal_id=3, monograph_id=None)
+        )
 
-        assert meta.title == "Un titre"
-        assert meta.publication_year == 2024
-        assert meta.doi == "10.1/a"
-        assert meta.oa_status == "closed"
-        assert meta.nnt is None
-        assert meta.container_title is None  # la revue est créée : son titre n'est pas recopié
-        assert meta.language is None  # la source ne l'expose pas
+        assert record.title == "Un titre"
+        assert record.publication_year == 2024
+        assert record.raw_doc_type == "journal-article"
+        assert record.doi == "10.1/a"
+        assert record.oa_status == "closed"
+        assert "nnt" not in (record.external_ids or {})
+        assert record.container_title is None  # la revue est créée : son titre n'est pas recopié
+        assert record.raw_language is None  # la source ne l'expose pas
 
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
 
-        meta = extract_publication_metadata(doc, journal_id=None)
+        record = scanr_source_record(doc, 1, "sc-1", _NO_CONTAINERS)
 
-        assert meta.container_title == "Actes du colloque"
+        assert record.container_title == "Actes du colloque"
 
     def test_these_reconnue_a_son_identifiant(self):
         """La source encode les thèses en préfixant leur numéro national."""
-        meta = extract_publication_metadata({}, journal_id=None, scanr_id="these2021CLFAC030")
+        record = scanr_source_record({}, 1, "these2021CLFAC030", _NO_CONTAINERS)
 
-        assert meta.nnt == "2021CLFAC030"
+        assert record.external_ids == {"nnt": "2021CLFAC030"}
 
 
 class TestScanrSourceRecordIdentifiants:
-    def _call(self, doc, publication_meta=None) -> SourceRecordUpsert:
-        return scanr_source_record(
-            doc,
-            staging_id=1,
-            scanr_id="sc-1",
-            publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
-        )
-
-    def test_numero_de_these_repris_des_metadonnees(self):
-        document = self._call({}, _remplacer(_EMPTY_PUBLICATION_META, nnt="2021CLFAC030"))
-
-        assert document.external_ids == {"nnt": "2021CLFAC030"}
+    def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
 
     def test_identifiant_pubmed(self):
         document = self._call({"externalIds": [{"type": "pmid", "id": "12345678"}]})
@@ -380,13 +358,8 @@ class TestScanrSourceRecordIdentifiants:
 
 
 class TestScanrSourceRecordChamps:
-    def _call(self, doc, publication_meta=None) -> SourceRecordUpsert:
-        return scanr_source_record(
-            doc,
-            staging_id=1,
-            scanr_id="sc-1",
-            publication_meta=publication_meta or _EMPTY_PUBLICATION_META,
-        )
+    def _call(self, doc, scanr_id: str = "sc-1") -> SourceRecordUpsert:
+        return scanr_source_record(doc, staging_id=1, scanr_id=scanr_id, containers=_NO_CONTAINERS)
 
     def test_mots_cles_en_liste(self):
         document = self._call({"keywords": {"default": ["climat", " océan "]}})

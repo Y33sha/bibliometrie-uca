@@ -30,7 +30,6 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
@@ -97,48 +96,30 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
 # =============================================================
 
 
-def extract_publication_metadata(
-    doc: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
-) -> PublicationMetadata:
-    """Extrait les métadonnées canoniques d'un document HAL.
-
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`).
-    """
-    title = get_title(doc)
+def get_doc_type(doc: Mapping[str, JsonValue]) -> str | None:
+    """Type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`)."""
     raw_type = hal_text_field(doc.get("docType_s")) or ""
     raw_sub = hal_text_field(doc.get("docSubType_s")) or ""
-    doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
+    return f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
-    language = hal_text_field(doc.get("language_s"))
 
-    container_title = None
-    if not journal_id:
-        container_title = (
-            hal_text_field(doc.get("bookTitle_s"))
-            or hal_text_field(doc.get("conferenceTitle_s"))
-            or hal_text_field(doc.get("journalTitle_s"))
-        )
+def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
+    """Titre du livre, du congrès ou de la revue, dans cet ordre."""
+    return (
+        hal_text_field(doc.get("bookTitle_s"))
+        or hal_text_field(doc.get("conferenceTitle_s"))
+        or hal_text_field(doc.get("journalTitle_s"))
+    )
 
-    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
+def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> str | None:
+    """Statut open access tiré de `openAccess_bool`, du fichier déposé, du lien externe et de l'embargo actif."""
     is_open = doc.get("openAccess_bool")
-    return PublicationMetadata(
-        title=title,
-        publication_year=as_int(doc.get("producedDateY_i")),
-        doc_type=doc_type,
-        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
-        nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
-        oa_status=derive_hal_oa_status(
-            is_open if isinstance(is_open, bool) else None,
-            hal_text_field(doc.get("fileMain_s")),
-            hal_text_field(doc.get("linkExtId_s")),
-            embargo_until,
-        ),
-        embargo_until=embargo_until,
-        journal_id=journal_id,
-        monograph_id=monograph_id,
-        container_title=container_title,
-        language=language,
+    return derive_hal_oa_status(
+        is_open if isinstance(is_open, bool) else None,
+        hal_text_field(doc.get("fileMain_s")),
+        hal_text_field(doc.get("linkExtId_s")),
+        embargo_until,
     )
 
 
@@ -185,16 +166,20 @@ def hal_source_record(
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
-    publication_meta: PublicationMetadata,
+    containers: Containers,
 ) -> SourceRecordUpsert:
-    """Enregistrement source HAL d'un dépôt.
+    """Enregistrement source HAL d'un dépôt, identifié par son `hal_id`.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt, journal_id, oa_status, language, container_title) viennent de `publication_meta` (`extract_publication_metadata`). `doc` donne les champs propres à HAL (collections, abstract, keywords, domaines, biblio, source_extras, urls).
+    `container_title` est posé seulement en l'absence de revue.
     """
+    doc_type = get_doc_type(doc)
+    nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
+    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
+
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
 
-    external_ids = build_hal_external_ids(doc, hal_id, publication_meta.nnt)
+    external_ids = build_hal_external_ids(doc, hal_id, nnt)
 
     # Abstract
     abstract = hal_text_field(doc.get("abstract_s"))
@@ -210,7 +195,7 @@ def hal_source_record(
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
-        **page_range(hal_text_field(doc.get("page_s")), publication_meta.doc_type)._asdict(),
+        **page_range(hal_text_field(doc.get("page_s")), doc_type)._asdict(),
         publisher=hal_text_field(doc.get("journalPublisher_s"))
         or hal_text_field(doc.get("publisher_s")),
         journal_title=hal_text_field(doc.get("journalTitle_s")),
@@ -226,24 +211,24 @@ def hal_source_record(
         source="hal",
         source_id=hal_id,
         staging_id=staging_id,
-        doi=publication_meta.doi,
+        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
         external_ids=external_ids,
-        title=publication_meta.title or "",
-        publication_year=publication_meta.publication_year,
-        raw_doc_type=publication_meta.doc_type,
-        journal_id=publication_meta.journal_id,
-        monograph_id=publication_meta.monograph_id,
-        container_title=publication_meta.container_title,
-        raw_language=publication_meta.language,
+        title=get_title(doc),
+        publication_year=as_int(doc.get("producedDateY_i")),
+        raw_doc_type=doc_type,
+        journal_id=containers.journal_id,
+        monograph_id=containers.monograph_id,
+        container_title=get_container_title(doc) if not containers.journal_id else None,
+        raw_language=hal_text_field(doc.get("language_s")),
         biblio=biblio_json,
         source_extras=extract_hal_source_extras(doc),
         abstract=abstract,
         keywords=keywords,
         topics=topics,
-        oa_status=publication_meta.oa_status,
+        oa_status=get_oa_status(doc, embargo_until),
         license=normalize_license(hal_text_field(doc.get("licence_s"))),
         urls=urls,
-        embargo_until=publication_meta.embargo_until,
+        embargo_until=embargo_until,
         hal_collections=collections_array,
     )
 
@@ -569,10 +554,7 @@ class HalNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        publication_meta = extract_publication_metadata(
-            doc, containers.journal_id, containers.monograph_id
-        )
-        return hal_source_record(doc, row.id, row.source_id, publication_meta)
+        return hal_source_record(doc, row.id, row.source_id, containers)
 
     def author_block(self, doc: Document) -> AuthorBlock:
         return extract_hal_author_block(doc)

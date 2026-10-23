@@ -8,13 +8,11 @@ Pas de DB : les stores du normaliseur sont des doublures.
 from __future__ import annotations
 
 import logging
-from dataclasses import replace
 from unittest.mock import MagicMock
 
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.common.normalizer import PublisherFacts
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.openalex import normalize as normalize_openalex
 from pipeline.ingestion.openalex.normalize import (
@@ -23,13 +21,13 @@ from pipeline.ingestion.openalex.normalize import (
     build_openalex_author_records,
     extract_impact,
     extract_locations_data,
-    extract_publication_metadata,
     extract_topics,
     get_container_facts,
     get_publisher,
     openalex_source_record,
     reconstruct_abstract,
 )
+from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
@@ -283,23 +281,27 @@ class TestContainerDescription:
         assert (facts.book_title, facts.collection_title) == ("2021 ICCAS", None)
 
 
-# ── extract_publication_metadata ─────────────────────────────────────────
+# ── openalex_source_record (métadonnées canoniques) ──────────────
+
+_NO_CONTAINERS = Containers(journal_id=None, monograph_id=None)
 
 
-class TestExtractPublicationMetadata:
+class TestOpenalexSourceRecordMetadata:
     def test_minimal_work(self):
-        meta = extract_publication_metadata(
-            {"title": "T", "publication_year": 2024}, journal_id=None
+        record = openalex_source_record(
+            {"title": "T", "publication_year": 2024}, staging_id=1, containers=_NO_CONTAINERS
         )
-        assert meta.title == "T"
-        assert meta.publication_year == 2024
-        assert meta.doi is None
-        assert meta.nnt is None
-        assert meta.journal_id is None
+        assert record.title == "T"
+        assert record.publication_year == 2024
+        assert record.doi is None
+        assert "nnt" not in (record.external_ids or {})
+        assert record.journal_id is None
 
     def test_display_name_fallback(self):
-        meta = extract_publication_metadata({"display_name": "DN"}, journal_id=None)
-        assert meta.title == "DN"
+        record = openalex_source_record(
+            {"display_name": "DN"}, staging_id=1, containers=_NO_CONTAINERS
+        )
+        assert record.title == "DN"
 
     def test_with_journal_id_no_container_title(self):
         """Si journal_id présent, container_title reste None (la revue identifie tout)."""
@@ -307,24 +309,18 @@ class TestExtractPublicationMetadata:
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
-        meta = extract_publication_metadata(work, journal_id=42)
-        assert meta.container_title is None
+        record = openalex_source_record(
+            work, staging_id=1, containers=Containers(journal_id=42, monograph_id=None)
+        )
+        assert record.container_title is None
 
 
 # ── openalex_source_record (cas limites) ─────────────────────────
 
 
 class TestOpenalexSourceRecord:
-    def _call(
-        self,
-        work: dict,
-        *,
-        publication_meta: PublicationMetadata | None = None,
-    ) -> SourceRecordUpsert:
-        # Par défaut, publication_meta vient de extract_publication_metadata, comme dans le normaliseur.
-        if publication_meta is None:
-            publication_meta = extract_publication_metadata(work, journal_id=None)
-        return openalex_source_record(work, staging_id=1, publication_meta=publication_meta)
+    def _call(self, work: dict) -> SourceRecordUpsert:
+        return openalex_source_record(work, staging_id=1, containers=_NO_CONTAINERS)
 
     def test_keywords_list_of_strings(self):
         work = {"id": "https://openalex.org/W1", "keywords": ["a", "b"]}
@@ -429,13 +425,13 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert captured.biblio is None
 
-    def test_publication_meta_nnt_passed_through_to_external_ids(self):
-        """Le NNT de publication_meta va dans external_ids."""
-        work = {"id": "https://openalex.org/W1"}
-        publication_meta = replace(
-            extract_publication_metadata(work, journal_id=None), nnt="2024CLFAC001"
-        )
-        captured = self._call(work, publication_meta=publication_meta)
+    def test_theses_fr_nnt_passed_through_to_external_ids(self):
+        """Le NNT d'une localisation principale theses.fr va dans external_ids."""
+        work = {
+            "id": "https://openalex.org/W1",
+            "primary_location": {"id": "pmh:2024CLFAC001", "source": {"display_name": "theses.fr"}},
+        }
+        captured = self._call(work)
         assert captured.external_ids is not None
         assert captured.external_ids["nnt"] == "2024CLFAC001"
 

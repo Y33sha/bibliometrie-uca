@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `extract_publication_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `theses_source_record` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
+Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
 
 Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de DB.
 """
@@ -8,17 +8,16 @@ Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de D
 from __future__ import annotations
 
 import logging
-from typing import Any
 from unittest.mock import MagicMock
 
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
     _build_source_extras,
     build_theses_author_records,
-    extract_publication_metadata,
     extract_theses_author_block,
+    get_publication_year,
+    get_title,
     theses_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
@@ -29,50 +28,34 @@ from tests.helpers.normalize_doubles import (
     staging_row,
 )
 
-# ── extract_publication_metadata ─────────────────────────────────────────
+# ── get_title, get_publication_year ──────────────────────────────────────
 
 
-class TestExtractPublicationMetadata:
-    def test_minimal(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T"})
-        assert meta.title == "T"
-        assert meta.publication_year is None
-        assert meta.nnt is None
-        assert meta.oa_status == "closed"
-        assert meta.journal_id is None
-
-    def test_publication_year_from_soutenance(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"})
-        assert meta.publication_year == 2024
-
-    def test_publication_year_fallback_to_inscription(self):
-        """Si pas de date_soutenance, on prend date_inscription."""
-        meta = extract_publication_metadata(
-            {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
-        )
-        assert meta.publication_year == 2020
-
-    def test_publication_year_soutenance_wins_over_inscription(self):
-        meta = extract_publication_metadata(
-            {
-                "titrePrincipal": "T",
-                "dateSoutenance": "15/03/2024",
-                "datePremiereInscriptionDoctorat": "10/09/2020",
-            }
-        )
-        assert meta.publication_year == 2024
+class TestExtractors:
+    def test_title(self):
+        assert get_title({"titrePrincipal": "T"}) == "T"
 
     def test_no_title(self):
-        meta = extract_publication_metadata({})
-        assert meta.title is None
+        assert get_title({}) is None
 
-    def test_nnt_normalized(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
-        assert meta.nnt == "2024CLFAC001"
+    def test_no_dates_no_publication_year(self):
+        assert get_publication_year({"titrePrincipal": "T"}) is None
 
-    def test_doi_passthrough(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "doi": "10.1/abc"})
-        assert meta.doi == "10.1/abc"
+    def test_publication_year_from_soutenance(self):
+        assert get_publication_year({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"}) == 2024
+
+    def test_publication_year_fallback_to_inscription(self):
+        """Sans date de soutenance, l'année vient de la première inscription."""
+        thesis = {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
+        assert get_publication_year(thesis) == 2020
+
+    def test_publication_year_soutenance_wins_over_inscription(self):
+        thesis = {
+            "titrePrincipal": "T",
+            "dateSoutenance": "15/03/2024",
+            "datePremiereInscriptionDoctorat": "10/09/2020",
+        }
+        assert get_publication_year(thesis) == 2024
 
 
 # ── _build_source_extras ───────────────────────────────────────────
@@ -138,36 +121,26 @@ class TestBuildSourceMeta:
 
 
 class TestThesesSourceRecord:
-    def _publication_meta(self, **overrides) -> PublicationMetadata:
-        base: dict[str, Any] = {
-            "title": "T",
-            "publication_year": 2024,
-            "doc_type": "thesis",
-            "doi": None,
-            "nnt": None,
-            "oa_status": "closed",
-            "journal_id": None,
-            "container_title": None,
-            "language": None,
-        }
-        base.update(overrides)
-        return PublicationMetadata(**base)
+    def _call(self, thesis: dict) -> SourceRecordUpsert:
+        return theses_source_record(thesis, staging_id=1, theses_id="2024CLFAC001")
 
-    def _call(
-        self,
-        thesis: dict,
-        *,
-        publication_meta: PublicationMetadata | None = None,
-    ) -> SourceRecordUpsert:
-        return theses_source_record(
-            thesis,
-            staging_id=1,
-            theses_id="2024CLFAC001",
-            publication_meta=publication_meta or self._publication_meta(),
-        )
+    def test_minimal(self):
+        record = self._call({"titrePrincipal": "T"})
+        assert record.title == "T"
+        assert record.publication_year is None
+        assert record.external_ids is None
+        assert record.oa_status == "closed"
+        assert record.journal_id is None
+
+    def test_nnt_normalized(self):
+        record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
+        assert record.external_ids == {"nnt": "2024CLFAC001"}
+
+    def test_doi_passthrough(self):
+        assert self._call({"titrePrincipal": "T", "doi": "10.1/abc"}).doi == "10.1/abc"
 
     def test_nnt_goes_in_external_ids(self):
-        record = self._call({}, publication_meta=self._publication_meta(nnt="2024CLFAC001"))
+        record = self._call({"nnt": "2024CLFAC001"})
         assert record.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
@@ -201,7 +174,7 @@ class TestThesesSourceRecord:
         assert record.source_extras == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
-        record = self._call({}, publication_meta=self._publication_meta(title=None))
+        record = self._call({})
         assert record.title == ""
 
 
