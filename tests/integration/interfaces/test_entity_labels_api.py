@@ -5,15 +5,13 @@ Seed via un pool dédié en autocommit, hors du pool partagé par l'API, avec un
 
 import uuid
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_journal,
     seed_person,
     seed_publisher,
     seed_subject,
 )
-
-_cleanup_after_module = truncate_after_module("journals", "publishers")
 
 
 class TestEntityLabels:

@@ -18,7 +18,7 @@ from functools import partial
 
 import pytest
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_in_perimeter_contributions,
     seed_journal,
@@ -37,11 +37,6 @@ _publication = partial(seed_publication, normalize_title=False)
 
 # Enregistrement source de titre « Doc », sans année.
 _seed_record = partial(seed_source_record, title="Doc", publication_year=None)
-
-
-_cleanup_after_module = truncate_after_module(
-    "journals", "publishers", "publications", "publication_subjects", "subjects", "audit_log"
-)
 
 
 class TestListJournals:

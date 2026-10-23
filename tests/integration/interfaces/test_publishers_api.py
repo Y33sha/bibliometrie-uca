@@ -13,7 +13,7 @@ Couvre :
 import uuid
 from functools import partial
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_doi_prefix,
     seed_in_perimeter_contributions,
@@ -35,11 +35,6 @@ def _seed_doi_prefix(publisher_id: int, *, crossref_member_id: int) -> str:
         prefix, ra="Crossref", publisher_id=publisher_id, crossref_member_id=crossref_member_id
     )
     return prefix
-
-
-_cleanup_after_module = truncate_after_module(
-    "publishers", "journals", "publications", "publication_subjects", "subjects", "audit_log"
-)
 
 
 # ── GET /api/publishers ─────────────────────────────────────────

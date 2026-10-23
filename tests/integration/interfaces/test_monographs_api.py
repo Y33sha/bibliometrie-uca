@@ -2,17 +2,13 @@
 
 from functools import partial
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_journal,
     seed_monograph,
     seed_publication,
     seed_publisher,
     uniq,
-)
-
-_cleanup_after_module = truncate_after_module(
-    "monographs", "journals", "publishers", "publications"
 )
 
 # Publication sans titre normalisé.

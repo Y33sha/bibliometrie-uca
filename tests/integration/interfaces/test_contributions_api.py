@@ -10,7 +10,7 @@ test pour éviter les collisions.
 
 import uuid
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_contribution,
     seed_group,
@@ -26,17 +26,6 @@ from tests.integration.helpers.seeds import (
 def _uniq_name(prefix: str) -> str:
     """Nom de personne unique, en lettres seules : le nettoyage des noms bruts retire les chiffres."""
     return prefix + uuid.uuid4().hex[:8].translate(str.maketrans("0123456789", "ghijklmnop"))
-
-
-_cleanup_after_module = truncate_after_module(
-    "contributions",
-    "source_contributions",
-    "contributor_information",
-    "source_records",
-    "publications",
-    "persons",
-    "audit_log",
-)
 
 
 def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[int, int]:

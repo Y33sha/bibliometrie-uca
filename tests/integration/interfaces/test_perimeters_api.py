@@ -9,7 +9,7 @@ Couvre :
 
 from __future__ import annotations
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_config,
     seed_perimeter,
@@ -22,9 +22,6 @@ from tests.integration.helpers.seeds import (
 def _clear_config(key: str) -> None:
     with owner_pool() as cur:
         cur.execute("DELETE FROM config WHERE key = %s", (key,))
-
-
-_cleanup_after_module = truncate_after_module("perimeters", "structures", "audit_log")
 
 
 class TestListPerimeters:

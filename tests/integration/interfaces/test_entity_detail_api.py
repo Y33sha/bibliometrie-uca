@@ -2,10 +2,8 @@
 
 import pytest
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import seed_journal
-
-_cleanup_after_module = truncate_after_module("journals", "merge_redirects")
 
 _ABSORBED_ID = 999999990
 

@@ -11,7 +11,7 @@ from functools import partial
 
 import pytest
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_contribution,
     seed_person,
@@ -23,18 +23,6 @@ from tests.integration.helpers.seeds import (
 
 # Forme de nom de source « persons ».
 _persons_name_form = partial(seed_person_name_form, sources=["persons"])
-
-_cleanup_after_module = truncate_after_module(
-    "contributions",
-    "source_contributions",
-    "contributor_information",
-    "source_records",
-    "publications",
-    "persons",
-    "person_identifiers",
-    "person_name_forms",
-    "audit_log",
-)
 
 
 class TestPersonsList:
