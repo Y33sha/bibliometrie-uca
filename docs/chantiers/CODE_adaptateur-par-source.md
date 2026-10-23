@@ -105,13 +105,13 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 5 — Débit
 
-- [x] Budget de débit de chaque source, avec les réglages d'accès aux API, injecté dans le contexte de phase. 6532f97c8
+- [x] Budget de débit de chaque source, avec les réglages d'accès aux API, injecté dans le contexte de phase. 6532f97c8 ae2b644c0
 - [x] Rythme de la source (`Pace`), porté par son circuit-breaker, à la place des pauses par worker, du `Throttle` et de `RequestPace`. 6532f97c8
 - [ ] Débit réel de chaque source mesuré sur un run, comparé à la mesure de la phase 4.
 
 ### Phase 6 — Politiques de source
 
-- [ ] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre, qui épargne les thèses en cours.
+- [x] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre, qui épargne les thèses en cours. d8fd9c470
 - [ ] Câblage commun de `harvest` et de `harvest_by_person`.
 
 ### Phase 7 — Normalisation

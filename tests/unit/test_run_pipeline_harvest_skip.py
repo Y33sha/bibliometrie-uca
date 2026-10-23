@@ -1,7 +1,7 @@
 """Skip propre des sources d'extraction non configurées (phase `harvest`).
 
-Une source dont la config d'extraction manque (`HarvestConfigError`) est
-sautée avec un signal `source_unconfigured` (warning), sans interrompre le run :
+Une source dont la config d'extraction manque est sautée avec un signal
+`source_unconfigured` (warning, posé par `run_harvest`), sans interrompre le run :
 les sources configurées aboutissent et sont seules listées dans la table par
 source. Vaut pour la branche parallèle (full/weekly) et la branche HAL
 incrémentale (daily).
@@ -10,10 +10,10 @@ incrémentale (daily).
 from unittest.mock import patch
 
 from pipeline.ingestion.common import harvest
-from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
+from pipeline.runtime.observability.signals import signal_source_unconfigured
 
 
 def _table_keys(metrics: PhaseMetrics) -> set[str]:
@@ -22,9 +22,13 @@ def _table_keys(metrics: PhaseMetrics) -> set[str]:
 
 
 def test_phase_extract_full_skips_unconfigured_source():
-    def _extract(_ctx, source, _make, _args):
+    def _extract(ctx, phase, source, _make, _args):
         if source == "openalex":
-            raise HarvestConfigError("ni clé ni email")
+            metrics = PhaseMetrics()
+            signal_source_unconfigured(
+                metrics, source, "ni clé ni email", logger=ctx.logger, phase=phase
+            )
+            return metrics
         return PhaseMetrics(new=7)
 
     with (
@@ -45,8 +49,12 @@ def test_phase_extract_full_skips_unconfigured_source():
 
 
 def test_phase_extract_daily_hal_unconfigured():
-    def _extract(_ctx, _source, _make, _args):
-        raise HarvestConfigError("aucune collection")
+    def _extract(ctx, phase, source, _make, _args):
+        metrics = PhaseMetrics()
+        signal_source_unconfigured(
+            metrics, source, "aucune collection", logger=ctx.logger, phase=phase
+        )
+        return metrics
 
     with (
         patch(

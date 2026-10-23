@@ -15,7 +15,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
-from pipeline.ingestion.common.harvester import SourceHarvester
+from pipeline.ingestion.common.harvester import (
+    HarvestConfigError,
+    HarvestWindow,
+    SourceHarvester,
+    run_harvest,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -161,3 +166,15 @@ class TestRun:
         assert call["args"] is args
         assert call["config"] == {"affiliations": ["UCA"]}
         assert metrics.new == 42
+
+
+def test_une_source_non_configuree_est_sautee_avec_un_signal(contexte):
+    class _SansConfiguration:
+        def run(self, window):
+            raise HarvestConfigError("aucun PPN")
+
+    metrics = run_harvest(
+        contexte(), "harvest", "theses", lambda conn, log: _SansConfiguration(), HarvestWindow()
+    )
+
+    assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]

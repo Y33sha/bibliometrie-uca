@@ -13,11 +13,10 @@ from typing import TYPE_CHECKING
 
 from domain.sources.registry import PERSON_SEARCHED_SOURCES, Source, source_label
 from pipeline.ingestion.adapters import ADAPTERS
-from pipeline.ingestion.common.harvester import HarvestConfigError, HarvestWindow, run_harvest
+from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import signal_source_unconfigured
 from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
@@ -44,14 +43,7 @@ class HarvestByPersonPhase:
         def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext) -> PhaseMetrics:
                 window = HarvestWindow(start_year=options.start_year, year=options.year)
-                try:
-                    return self.search_one(ctx, source, window)
-                except HarvestConfigError as exc:
-                    metrics = PhaseMetrics()
-                    signal_source_unconfigured(
-                        metrics, source, str(exc), logger=ctx.logger, phase="harvest_by_person"
-                    )
-                    return metrics
+                return self.search_one(ctx, source, window)
 
             return run
 
@@ -86,6 +78,6 @@ def build() -> Phase:
     def search_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
         harvester = ADAPTERS[Source(source)].person_harvester
         assert harvester is not None, f"{source} : source cherchée par personne sans moissonneur"
-        return run_harvest(ctx, source, harvester, window)
+        return run_harvest(ctx, "harvest_by_person", source, harvester, window)
 
     return HarvestByPersonPhase(search_one=search_one, run_parallel=run_parallel)

@@ -11,9 +11,11 @@ from datetime import date
 import pytest
 
 from pipeline.ingestion.common.harvest import HarvestOne, HarvestPhase
-from pipeline.ingestion.common.harvester import HarvestConfigError
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.runtime.observability.signals import (
+    signal_source_unavailable,
+    signal_source_unconfigured,
+)
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 
@@ -34,9 +36,13 @@ def _phase(
 
 
 def test_parallel_skips_unconfigured_source(contexte):
-    def harvest_one(_ctx, source, _args):
+    def harvest_one(ctx, source, _args):
         if source == "openalex":
-            raise HarvestConfigError("aucune clé")
+            metrics = PhaseMetrics()
+            signal_source_unconfigured(
+                metrics, source, "aucune clé", logger=ctx.logger, phase="harvest"
+            )
+            return metrics
         return PhaseMetrics(new=3)
 
     metrics = _phase(harvest_one).run(contexte(mode="full", sources={"openalex", "theses"}))

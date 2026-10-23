@@ -6,12 +6,12 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
 - mode `since_last` (quotidien) : les sources incrémentales (`SourceProfile.incremental`) depuis le dernier moissonnage quotidien réussi ;
 - sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ;
-- assemble les métriques par source et signale les sources non configurées.
+- assemble les métriques par source.
 
 Les dépendances techniques sont injectées par le composition-root :
 
 - `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
-- `harvest_one(ctx, source, window)` : ouvre la connexion, câble le moissonneur et l'exécute ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
+- `harvest_one(ctx, source, window)` : ouvre la connexion, câble le moissonneur et l'exécute ; une source dont le périmètre d'interrogation manque est sautée avec un signal (`run_harvest`) ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_harvest_date` : la date du dernier moissonnage quotidien réussi (branche incrémentale).
 """
@@ -28,13 +28,12 @@ from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
 from infrastructure.read_models.perimeters import get_extraction_structure_ids
 from pipeline.ingestion.adapters import ADAPTERS
-from pipeline.ingestion.common.harvester import HarvestConfigError, HarvestWindow, run_harvest
+from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import (
     select_targets,
-    signal_source_unconfigured,
     skipped,
 )
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -96,14 +95,7 @@ class HarvestPhase:
                     year=options.year,
                     since=since,
                 )
-                try:
-                    return self.harvest_one(ctx, source, window)
-                except HarvestConfigError as exc:
-                    metrics = PhaseMetrics()
-                    signal_source_unconfigured(
-                        metrics, source, str(exc), logger=ctx.logger, phase="harvest"
-                    )
-                    return metrics
+                return self.harvest_one(ctx, source, window)
 
             return run
 
@@ -156,7 +148,7 @@ def build() -> Phase:
     def harvest_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
         harvester = ADAPTERS[Source(source)].harvester
         assert harvester is not None, f"{source} : source moissonnée sans moissonneur"
-        return run_harvest(ctx, source, harvester, window)
+        return run_harvest(ctx, "harvest", source, harvester, window)
 
     return HarvestPhase(
         count_extraction_structures=_extraction_structure_count,

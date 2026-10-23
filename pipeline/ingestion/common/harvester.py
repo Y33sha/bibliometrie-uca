@@ -31,6 +31,7 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
+from pipeline.runtime.observability.signals import signal_source_unconfigured
 
 __all__ = [
     "HarvestConfigError",
@@ -256,9 +257,21 @@ type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]
 
 
 def run_harvest(
-    ctx: PhaseContext, source: str, make_harvester: HarvesterFactory, window: HarvestWindow
+    ctx: PhaseContext,
+    phase: str,
+    source: str,
+    make_harvester: HarvesterFactory,
+    window: HarvestWindow,
 ) -> PhaseMetrics:
-    """Exécute le moissonneur de `make_harvester` sur une connexion de la phase, avec le journal de la source."""
+    """Exécute le moissonneur de `make_harvester` sur une connexion de la phase, avec le journal de la source.
+
+    Une source dont la configuration manque (`HarvestConfigError`) est sautée avec un signal `source_unconfigured` : la phase continue avec les autres sources.
+    """
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
-    with ctx.open_tx() as conn:
-        return make_harvester(conn, source_log).run(window)
+    try:
+        with ctx.open_tx() as conn:
+            return make_harvester(conn, source_log).run(window)
+    except HarvestConfigError as exc:
+        metrics = PhaseMetrics()
+        signal_source_unconfigured(metrics, source, str(exc), logger=ctx.logger, phase=phase)
+        return metrics
