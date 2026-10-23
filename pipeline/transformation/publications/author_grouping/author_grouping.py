@@ -329,8 +329,17 @@ class AuthorGroupingPhase:
                 )
 
         def attributes_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
+            step(ctx.logger, "Attributs des groupes")
+            t0 = time.perf_counter()
+            with (
+                waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
+                ctx.open_tx() as conn,
+            ):
                 updated = SourceContributionGroupStore(conn).propagate_attributes()
+                line.conclude(
+                    f"{LAST_BRANCH}{quantity(updated, 'groupe réécrit', 'groupes réécrits')}"
+                    f" en {time.perf_counter() - t0:.1f} s"
+                )
             metrics = PhaseMetrics(updated=updated)
             metrics.report = quantity(updated, "groupe réécrit", "groupes réécrits")
             return metrics

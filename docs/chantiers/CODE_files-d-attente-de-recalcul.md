@@ -21,6 +21,8 @@ Mesure du 22 octobre 2026 sur la phase `countries`, avec 5,9 millions de contrib
 
 L'effacement final de la phase `countries` porte sur toutes les lignes marquées, y compris celles marquées après la lecture du périmètre. Une saisie manuelle faite par l'API pendant la phase perd donc son marqueur sans avoir été traitée.
 
+La tâche `author_grouping.attributes` recompose à chaque run les attributs de tous les groupes de contributions sources (`is_corresponding`, `roles`, `perimeter_evidence`) depuis leurs membres. Elle réécrit seulement les groupes qui changent, mais lit les 5,9 millions de groupes et les contributions sources de leurs membres, même quand aucun membre n'a changé.
+
 ## Décisions
 
 - **Une file d'attente par marqueur.** Une table étroite du schéma `queues`, nommée avec le suffixe `_queue`, car le graphe des tâches identifie les tables par leur nom sans schéma. Colonnes : `id`, clé primaire et clé étrangère `ON DELETE CASCADE` vers la table traitée ; `seq`, numéro de marquage tiré d'une séquence.
@@ -65,13 +67,21 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 - [x] La réconciliation relève la file au début et supprime les marquages traités à la fin. L'invariant du voisinage à un saut s'exprime avec le marquage.
 - [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
-### Phase 5 — Mises à jour HOT
+### Phase 5 — Attributs des groupes
 
-- [ ] Pour chaque table traitée, relever les colonnes que le pipeline met à jour en masse et vérifier qu'elles sont absentes de tous les index.
+- [x] Journal de la tâche `author_grouping.attributes` : ligne « en cours », puis nombre de groupes réécrits et durée.
+- [ ] Mesurer la durée de la tâche sur un run complet.
+- [ ] File des groupes dont les attributs sont à recomposer.
+- [ ] Marquage là où un attribut d'un membre change : `perimeter_evidence` (`affiliations`, recalcul ciblé de l'API), `roles` et `is_corresponding` (`normalize`). Marquage des groupes dont le groupement change les membres.
+- [ ] `author_grouping.attributes` lit la file. Mesurer la durée de la tâche après.
+
+### Phase 6 — Mises à jour HOT
+
+- [x] Pour chaque table traitée, relever les colonnes que le pipeline met à jour en masse et vérifier qu'elles sont absentes de tous les index. Candidates : `source_contribution_groups` (attributs, `reference_position`) et `source_contributions` (`countries`, `neutralized_identifiers`, `perimeter_evidence` quand `in_perimeter` ne change pas). Les index GIN sur `countries` interdisent le HOT au recalcul des pays dans `addresses`, `source_records` et `publications`.
 - [ ] Fixer un `fillfactor` inférieur à 100 sur les tables où ces mises à jour peuvent devenir HOT, puis réécrire la table (`VACUUM FULL`) pour libérer de la place dans les pages existantes. `VACUUM FULL` pose un verrou exclusif et double temporairement l'espace disque de la table.
 - [ ] Mesurer le taux de mises à jour HOT (`pg_stat_user_tables`) avant et après.
 
-### Phase 6 — Documentation
+### Phase 7 — Documentation
 
 - [ ] `docs/donnees/08-donnees-derivees.md`, `docs/agregats/addresses.md`, `docs/agregats/source_contributions.md` et les docstrings qui nomment les marqueurs.
 
