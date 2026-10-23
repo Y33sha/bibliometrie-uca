@@ -16,7 +16,7 @@ from pipeline.ingestion.theses import harvest
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
 from pipeline.ingestion.theses.harvest import ThesesHarvester, build_query, harvest_theses
 from pipeline.runtime.observability.progress import Progress
-from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 _LOGGER = logging.getLogger("test")
 
@@ -66,7 +66,6 @@ def _extraire(client: MagicMock, *, progress: Progress | None = None, **kwargs):
         client,
         MagicMock(),
         ["PPN1"],
-        _LOGGER,
         progress or Progress(None, "theses.fr", None),
         **kwargs,
     )
@@ -141,12 +140,3 @@ def test_run_sans_ppn_configure_refuse(configuration):
     configuration(harvest, api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun PPN"):
         moissonneur(ThesesHarvester, _client([])).run(arguments_du_run())
-
-
-def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
-    """Le circuit-breaker déclenché laisse les thèses au run suivant."""
-    configuration(harvest)
-    client = _client([[_these("2020A")]])
-    metrics = moissonneur(ThesesHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
-    assert metrics.total == 0
-    client.fetch_page.assert_not_called()

@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable, Sequence
 import httpx2
 from sqlalchemy import Connection
 
-from pipeline.http.circuit_breaker import get_current_breaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.tls import tls_context
 
 
@@ -54,7 +54,6 @@ async def run_fetch_pool[Item, Fetched](
     prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
     """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent puis `write` sync sérialisé, commit tous les `commit_every` items. S'arrête quand le circuit-breaker courant coupe."""
-    breaker = get_current_breaker()
     db_lock = asyncio.Lock()
     item_iter = iter(items)
     done = 0
@@ -64,7 +63,7 @@ async def run_fetch_pool[Item, Fetched](
         async def worker() -> None:
             nonlocal done
             for item in item_iter:
-                if breaker is not None and breaker.tripped:
+                if source_tripped():
                     return
                 if prepare is not None:
                     async with db_lock:

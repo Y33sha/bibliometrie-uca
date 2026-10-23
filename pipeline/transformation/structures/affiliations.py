@@ -60,9 +60,9 @@ class AffiliationsPhase:
         by_task = run_tasks(
             "affiliations",
             {
-                "affiliations.refresh_ror": TaskStep(lambda ctx, _breaker: self.refresh_ror(ctx)),
+                "affiliations.refresh_ror": TaskStep(lambda ctx: self.refresh_ror(ctx)),
                 "affiliations.refresh_hal_structures": TaskStep(
-                    lambda ctx, _breaker: self.refresh_hal_structures(
+                    lambda ctx: self.refresh_hal_structures(
                         ctx, ctx.options.policy.refresh_hal_structures
                     )
                 ),
@@ -82,7 +82,7 @@ class AffiliationsPhase:
         metrics.details.update(by_task["affiliations.refresh_hal_structures"].details)
         return metrics
 
-    def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _resolve_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             perimeter_ids = set(get_persons_structure_ids_list(conn))
             stats = run_resolution(conn, perimeter_ids, ctx.logger)
@@ -94,13 +94,13 @@ class AffiliationsPhase:
         }
         return metrics
 
-    def _resolve_thesis_partners(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _resolve_thesis_partners(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             self.resolve_thesis_partners(conn, ctx.logger)
             conn.commit()
         return PhaseMetrics()
 
-    def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _populate(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             perimeter_ids = set(get_persons_structure_ids_list(conn))
             populate(conn, ctx.logger, perimeter_ids)

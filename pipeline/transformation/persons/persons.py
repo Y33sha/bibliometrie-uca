@@ -112,7 +112,7 @@ class PersonsPhase:
             summary[f"name_forms_{key}"] = count
         return metrics
 
-    def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _resolve(self, ctx: PhaseContext) -> PhaseMetrics:
         """Épinglages, détachement des contributions sources hors groupe, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         logger = ctx.logger
         with ctx.open_tx() as conn:
@@ -162,7 +162,7 @@ class PersonsPhase:
             cross_source_detached=cross_source_detached,
         )
 
-    def _populate(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _populate(self, ctx: PhaseContext) -> PhaseMetrics:
         t0 = time.perf_counter()
         with (
             ctx.open_tx() as conn,
@@ -172,12 +172,12 @@ class PersonsPhase:
             line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
         return PhaseMetrics(extras=counts._asdict())
 
-    def _purge(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _purge(self, ctx: PhaseContext) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             counts = purge(conn)
         return PhaseMetrics(extras=dict(counts))
 
-    def _resolve_groups(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _resolve_groups(self, ctx: PhaseContext) -> PhaseMetrics:
         with (
             ctx.open_tx() as conn,
             waiting(f"{LAST_BRANCH}décision des groupes sans personne", ctx.logger) as line,

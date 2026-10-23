@@ -1,6 +1,5 @@
 """Vérification des ISSN des revues dans le Sudoc : orchestration concurrente, lecture des notices, échecs de requête et arrêt sur coupe-circuit."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import httpx2
@@ -9,7 +8,7 @@ import pytest
 from domain.journals.issns import IssnStatus, IssnSupport, JournalIssn
 from domain.journals.journal import JournalType
 from domain.sources.sudoc import SudocSerialRecord
-from pipeline.http.circuit_breaker import reset_current_breaker, set_current_breaker
+from pipeline.http.circuit_breaker import SourceCircuitBreaker, source_circuit_breaker
 from pipeline.transformation.publishing.journals import check_journals_in_sudoc as mod
 from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
     JournalSudocRow,
@@ -62,7 +61,8 @@ _RECORDS = {
 }
 
 
-async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1, titles=()):
+async def _run(rows, *, on_fetch_ppns=None, max_concurrent=1, titles=()):
+    """Vérifie `rows` sous le circuit-breaker du Sudoc. `on_fetch_ppns` reçoit le breaker à chaque recherche de PPN."""
     repo = MagicMock()
     repo.find_journals_to_check_in_sudoc.return_value = rows
     repo.find_titles_of_journals_with_issn.return_value = list(titles)
@@ -72,44 +72,37 @@ async def _run(rows, *, breaker=None, on_fetch_ppns=None, max_concurrent=1, titl
     async def fetch_ppns(_client, issns):
         calls["ppns"].append(list(issns))
         if on_fetch_ppns:
-            on_fetch_ppns()
+            on_fetch_ppns(breaker)
         return {i: _PPNS[i] for i in issns if i in _PPNS}
 
     async def fetch_record(_client, ppn):
         calls["records"].append(ppn)
         return _RECORDS.get(ppn)
 
-    breaker = breaker or SimpleNamespace(tripped=False)
-    # L'accès à la source pose le breaker dans la ContextVar, que lit la boucle de téléchargement.
-    token = set_current_breaker(breaker)
-    try:
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(
-                mod,
-                "find_titles_of_journals_with_issn",
-                lambda conn: repo.find_titles_of_journals_with_issn(),
-            )
-            mp.setattr(
-                mod,
-                "find_journals_to_check_in_sudoc",
-                lambda conn, also=(): repo.find_journals_to_check_in_sudoc(also=also),
-            )
-            mp.setattr(
-                mod,
-                "record_sudoc_check",
-                lambda conn, journal_id, **kw: repo.record_sudoc_check(journal_id, **kw),
-            )
-            metrics = await mod.run_check_journals_in_sudoc(
-                conn,
-                MagicMock(),
-                fetch_ppns=fetch_ppns,
-                fetch_record=fetch_record,
-                breaker=breaker,
-                max_concurrent=max_concurrent,
-                max_per_second=1000,
-            )
-    finally:
-        reset_current_breaker(token)
+    with source_circuit_breaker("sudoc") as breaker, pytest.MonkeyPatch.context() as mp:
+        mp.setattr(
+            mod,
+            "find_titles_of_journals_with_issn",
+            lambda conn: repo.find_titles_of_journals_with_issn(),
+        )
+        mp.setattr(
+            mod,
+            "find_journals_to_check_in_sudoc",
+            lambda conn, also=(): repo.find_journals_to_check_in_sudoc(also=also),
+        )
+        mp.setattr(
+            mod,
+            "record_sudoc_check",
+            lambda conn, journal_id, **kw: repo.record_sudoc_check(journal_id, **kw),
+        )
+        metrics = await mod.run_check_journals_in_sudoc(
+            conn,
+            MagicMock(),
+            fetch_ppns=fetch_ppns,
+            fetch_record=fetch_record,
+            max_concurrent=max_concurrent,
+            max_per_second=1000,
+        )
     return repo, conn, metrics, calls
 
 
@@ -153,7 +146,7 @@ async def test_each_record_is_fetched_once():
 
 @pytest.mark.asyncio
 async def test_failed_request_leaves_the_journal_to_check():
-    def fail():
+    def fail(_breaker: SourceCircuitBreaker):
         raise httpx2.ConnectError("refused")
 
     repo, _, metrics, _ = await _run([_NATURE], on_fetch_ppns=fail)
@@ -163,13 +156,12 @@ async def test_failed_request_leaves_the_journal_to_check():
 
 @pytest.mark.asyncio
 async def test_stops_when_breaker_trips():
-    breaker = SimpleNamespace(tripped=False)
     rows = [_NATURE._replace(id=i) for i in range(10)]
 
-    def trip():
+    def trip(breaker: SourceCircuitBreaker):
         breaker.tripped = True
 
-    repo, conn, _, calls = await _run(rows, breaker=breaker, on_fetch_ppns=trip)
+    repo, conn, _, calls = await _run(rows, on_fetch_ppns=trip)
     assert len(calls["ppns"]) == 1  # plus aucune revue tirée après la coupure
     assert repo.record_sudoc_check.call_count == 1
     conn.commit.assert_called()

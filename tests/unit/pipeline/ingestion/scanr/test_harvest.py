@@ -16,7 +16,7 @@ from pipeline.ingestion.scanr import harvest
 from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.ingestion.scanr.harvest import ScanrHarvester, build_query, harvest_year
 from pipeline.runtime.observability.progress import Progress
-from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 
 class TestBuildQuery:
@@ -128,11 +128,3 @@ def test_run_sans_affiliation_refuse(configuration):
     configuration(harvest, api_ids=[])
     with pytest.raises(HarvestConfigError, match="aucun affiliation_id"):
         moissonneur(ScanrHarvester, _client([])).run(arguments_du_run())
-
-
-def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
-    configuration(harvest, annees=[2023, 2024])
-    client = _client([])
-    metrics = moissonneur(ScanrHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
-    assert metrics.total == 0
-    client.fetch_page.assert_not_called()

@@ -4,7 +4,7 @@ Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
 - `journal_type` (via le mapping local du `type` OpenAlex), uniquement quand le mapping renvoie une valeur exploitable
 
-Le fetch OpenAlex et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/openalex`). L'orchestrateur ne consulte que l'état du breaker pour s'arrêter quand la source est à bout de budget. Appelé par `run_pipeline`.
+Le fetch OpenAlex est injecté (le HTTP vit dans `pipeline/ingestion/openalex`). L'orchestrateur s'arrête quand le circuit-breaker de la source coupe. Appelé par `run_pipeline`.
 """
 
 import logging
@@ -15,7 +15,7 @@ from sqlalchemy import Connection, any_, func, literal, select, update
 
 from domain.journals.journal import JournalType, ManualField
 from infrastructure.db.tables import journals
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.runtime.observability.log_format import inflect
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.journals.store import JournalStore
@@ -91,7 +91,6 @@ def run_enrich_journals_from_openalex(
     logger: logging.Logger,
     *,
     fetch_batch: FetchSourcesBatch,
-    breaker: SourceCircuitBreaker,
     rate_delay: float = 0.1,
 ) -> PhaseMetrics:
     store = JournalStore(conn)
@@ -106,7 +105,7 @@ def run_enrich_journals_from_openalex(
     type_written = 0
 
     for i in range(0, total, BATCH_SIZE):
-        if breaker.tripped:
+        if source_tripped():
             conn.commit()
             logger.warning(
                 "⚡ Coupe-circuit OpenAlex : enrichissement revues interrompu à %d/%d, reste retenté au prochain run.",

@@ -19,7 +19,6 @@ from dataclasses import dataclass
 
 from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES, source_label
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.stale_refetch import (
     StaleRefetch,
     refresh,
@@ -39,8 +38,8 @@ from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 # Dépendances techniques du phasage, injectées par le composition-root.
-RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
-"""Nouvelle lecture des documents d'une source, bornée à `years`, sous le circuit-breaker de la source."""
+RefreshOne = Callable[[PhaseContext, str, "list[int] | None"], PhaseMetrics]
+"""Nouvelle lecture des documents d'une source, bornée à `years`."""
 GetYearsForWindow = Callable[[PhaseContext, "int | None"], "list[int] | None"]
 """`(ctx, start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
@@ -67,12 +66,8 @@ class FetchStalePhase:
         years_theses = [int(year)] if year else None
 
         def task(source: str) -> TaskRun:
-            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
-                row_years = years_theses if source == "theses" else years_default
-                return self.refresh_one(ctx, source, row_years, breaker)
-
-            return run
+            row_years = years_theses if source == "theses" else years_default
+            return lambda ctx: self.refresh_one(ctx, source, row_years)
 
         def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets
@@ -143,9 +138,7 @@ def _make_refetch(source: str) -> StaleRefetch:
     return refetches[source]()
 
 
-def _run_fetch_stale(
-    ctx: PhaseContext, target: str, years: list[int] | None, breaker: SourceCircuitBreaker
-) -> PhaseMetrics:
+def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
@@ -153,6 +146,4 @@ def _run_fetch_stale(
     refetch = _make_refetch(target)
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
-        return asyncio.run(
-            refresh(conn, refetch, ctx.logger, after_days=after_days, years=years, breaker=breaker)
-        )
+        return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))

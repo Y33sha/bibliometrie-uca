@@ -1,11 +1,11 @@
 """Enrichissement des revues par OpenAlex Sources : écriture de l'APC et du type."""
 
 import contextlib
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.http.circuit_breaker import get_current_breaker, source_circuit_breaker
 from pipeline.transformation.publishing.journals import (
     enrich_journals_from_openalex as journals_mod,
 )
@@ -43,7 +43,6 @@ class TestJournalsApc:
                 MagicMock(),
                 MagicMock(),
                 fetch_batch=lambda _oa_ids: {"S1": answer},
-                breaker=SimpleNamespace(tripped=False),
             )
         return journal_repo
 
@@ -59,44 +58,39 @@ class TestJournalsApc:
 
 
 class TestJournalsWorkerStopsOnTrippedBreaker:
-    def _run(self, fetch_batch, breaker, n_batches):
+    def _run(self, fetch_batch, n_batches):
         conn = MagicMock()
         journal_repo = MagicMock()
         # row = (journal_id, oa_id) ; BATCH_SIZE journaux par batch.
         rows = [(i, f"S{i}") for i in range(n_batches * journals_mod.BATCH_SIZE)]
         journal_repo.find_journals_of_unknown_type.return_value = rows
-        with _bound(journal_repo):
+        with _bound(journal_repo), source_circuit_breaker("openalex"):
             journals_mod.run_enrich_journals_from_openalex(
-                conn,
-                MagicMock(),
-                fetch_batch=fetch_batch,
-                breaker=breaker,
+                conn, MagicMock(), fetch_batch=fetch_batch
             )
         return conn
 
     def test_stops_when_breaker_trips(self):
         """Le worker s'arrête au tour où le breaker est tripé, sans parcourir tout le stock."""
-        breaker = SimpleNamespace(tripped=False)
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
             calls["n"] += 1
-            if calls["n"] >= 3:
+            if calls["n"] >= 3 and (breaker := get_current_breaker()) is not None:
                 breaker.tripped = True  # le 3e batch épuise le budget
             return {}
 
-        conn = self._run(fetch_batch, breaker, n_batches=20)
+        conn = self._run(fetch_batch, n_batches=20)
         assert calls["n"] == 3  # arrêt au tour suivant (breaker.tripped), pas les 20 batches
         conn.commit.assert_called()  # le déjà-fait est committé avant de couper
 
     def test_runs_all_batches_when_breaker_stays_up(self):
         """Sans trip, tous les batches sont parcourus."""
-        breaker = SimpleNamespace(tripped=False)
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
             calls["n"] += 1
             return {}
 
-        self._run(fetch_batch, breaker, n_batches=4)
+        self._run(fetch_batch, n_batches=4)
         assert calls["n"] == 4

@@ -156,8 +156,7 @@ class WosHarvester(SourceHarvester[WosHarvestConfig, WosClient]):
             except Exception as e:
                 slog.error("erreur : %s — passage à la suivante", e)
                 metrics = PhaseMetrics()
-            # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
-            if year != years[-1] and not self._breaker_tripped():
+            if year != years[-1]:
                 time.sleep(_BETWEEN_YEARS_SECS)
             return metrics
 

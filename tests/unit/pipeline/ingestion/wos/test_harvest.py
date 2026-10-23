@@ -18,7 +18,7 @@ from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.wos import harvest
 from pipeline.ingestion.wos.harvest import WosHarvester, harvest_year
 from pipeline.runtime.observability.progress import Progress
-from tests.helpers.harvesters import arguments_du_run, moissonneur, source_a_bout
+from tests.helpers.harvesters import arguments_du_run, moissonneur
 
 _LOGGER = logging.getLogger("test")
 
@@ -148,12 +148,4 @@ def test_run_s_arrete_quand_le_comptage_trouve_la_source_indisponible(configurat
     with pytest.raises(SourceUnavailableError):
         moissonneur(WosHarvester, client).run(arguments_du_run())
     assert client.count.call_count == 1
-    client.fetch_page.assert_not_called()
-
-
-def test_run_s_arrete_quand_la_source_est_a_bout(configuration):
-    configuration(harvest, annees=[2023, 2024])
-    client = _client([])
-    metrics = moissonneur(WosHarvester, client).run(arguments_du_run(), breaker=source_a_bout())
-    assert metrics.total == 0
     client.fetch_page.assert_not_called()

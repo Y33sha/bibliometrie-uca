@@ -1,6 +1,5 @@
 """Requêtes du script d'enrichissement du pays des éditeurs, sur la base de test."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from sqlalchemy import text
@@ -37,7 +36,6 @@ def test_le_pays_est_ecrit_seulement_la_ou_il_manque(sa_sync_conn, monkeypatch):
         sa_sync_conn,
         MagicMock(),
         fetch_batch=lambda _ids: {"P1": "fr"},
-        breaker=SimpleNamespace(tripped=False),
     )
     assert _country(sa_sync_conn, candidat) == "fr"
 
@@ -45,6 +43,5 @@ def test_le_pays_est_ecrit_seulement_la_ou_il_manque(sa_sync_conn, monkeypatch):
         sa_sync_conn,
         MagicMock(),
         fetch_batch=lambda _ids: {"P1": "nl"},
-        breaker=SimpleNamespace(tripped=False),
     )
     assert _country(sa_sync_conn, candidat) == "fr"

@@ -11,7 +11,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 Les dépendances techniques sont injectées par le composition-root :
 
 - `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
-- `harvest_one(ctx, source, window, breaker)` : ouvre la connexion, câble le moissonneur et l'exécute sous le circuit-breaker de la source ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
+- `harvest_one(ctx, source, window)` : ouvre la connexion, câble le moissonneur et l'exécute ; lève `HarvestConfigError` si le périmètre d'interrogation de la source manque ;
 - `run_parallel` : le primitif de parallélisme (thread pool) ;
 - `get_last_daily_harvest_date` : la date du dernier moissonnage quotidien réussi (branche incrémentale).
 """
@@ -30,7 +30,6 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
 from infrastructure.read_models.perimeters import get_extraction_structure_ids
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
@@ -51,7 +50,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-HarvestOne = Callable[[PhaseContext, str, HarvestWindow, SourceCircuitBreaker | None], PhaseMetrics]
+HarvestOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
 GetLastDailyHarvestDate = Callable[[], date | None]
 
 # `theses` ne suit pas la borne d'années large : elle ramène tout l'historique des PPN (sauf --year).
@@ -92,7 +91,7 @@ class HarvestPhase:
             effective &= {"hal"}
 
         def task(source: str) -> TaskRun:
-            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+            def run(ctx: PhaseContext) -> PhaseMetrics:
                 if last_daily is not None and source == "hal":
                     ctx.logger.info(
                         "%sMode incrémental : enregistrements HAL modifiés depuis le %s (%s)",
@@ -106,7 +105,7 @@ class HarvestPhase:
                     since=since,
                 )
                 try:
-                    return self.harvest_one(ctx, source, window, breaker)
+                    return self.harvest_one(ctx, source, window)
                 except HarvestConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
@@ -164,13 +163,8 @@ class HarvestPhase:
 def build() -> Phase:
     registry = _harvesters()
 
-    def harvest_one(
-        ctx: PhaseContext,
-        source: str,
-        window: HarvestWindow,
-        breaker: SourceCircuitBreaker | None,
-    ) -> PhaseMetrics:
-        return _run_harvest(ctx, source, registry[source], window, breaker)
+    def harvest_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
+        return _run_harvest(ctx, source, registry[source], window)
 
     return HarvestPhase(
         count_extraction_structures=_extraction_structure_count,
@@ -246,9 +240,8 @@ def _run_harvest(
     source: str,
     make_harvester: HarvesterFactory,
     window: HarvestWindow,
-    breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:
-    """Déroulé commun d'une extraction : ouverture de la connexion, exécution sous le circuit-breaker de la source, fermeture. `make_harvester` contient le câblage propre à la source."""
+    """Déroulé commun d'une extraction : ouverture de la connexion, exécution, fermeture. `make_harvester` contient le câblage propre à la source."""
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     with ctx.open_tx() as conn:
-        return make_harvester(conn, source_log).run(window, breaker=breaker)
+        return make_harvester(conn, source_log).run(window)

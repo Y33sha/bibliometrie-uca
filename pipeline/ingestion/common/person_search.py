@@ -131,8 +131,6 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
             for i, batch in enumerate(batches):
                 remaining = len(persons) - i * self.BATCH_SIZE
                 skipped = f"{quantity(remaining, 'personne')} {inflect(remaining, 'sautée')}"
-                if self._stop_on_tripped(skipped):
-                    break
                 label = f"lot {i + 1}"
                 try:
                     self._extract_batch(merge_identifiers(batch), years, label, seen, metrics)
@@ -180,5 +178,5 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
                     )
             self.conn.commit()
             next_token = page.next_token
-            if next_token is None or self._breaker_tripped():
+            if next_token is None:
                 return

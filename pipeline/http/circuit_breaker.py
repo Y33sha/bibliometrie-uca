@@ -2,7 +2,7 @@
 
 Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
 
-Le client HTTP le manipule (check / record) ; les boucles du pipeline consultent seulement l'état `tripped`. Le câblage des phases le crée et le pose dans la ContextVar.
+L'accès à la source le pose dans la ContextVar par `source_circuit_breaker`. Le client HTTP le manipule (check / record). Les boucles qui rangent un échec en résultat consultent `source_tripped()` pour s'arrêter.
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
@@ -11,7 +11,9 @@ Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coro
 
 from __future__ import annotations
 
-from contextvars import ContextVar, Token
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 DEFAULT_THRESHOLD = 10
 
@@ -20,8 +22,8 @@ __all__ = [
     "SourceCircuitBreaker",
     "SourceUnavailableError",
     "get_current_breaker",
-    "reset_current_breaker",
-    "set_current_breaker",
+    "source_circuit_breaker",
+    "source_tripped",
 ]
 
 
@@ -71,10 +73,20 @@ def get_current_breaker() -> SourceCircuitBreaker | None:
     return _current_breaker.get()
 
 
-def set_current_breaker(breaker: SourceCircuitBreaker | None) -> Token[SourceCircuitBreaker | None]:
-    """Pose le breaker courant ; retourne le token à passer à `reset_current_breaker`."""
-    return _current_breaker.set(breaker)
+def source_tripped() -> bool:
+    """`True` si le breaker de la phase courante a coupé."""
+    breaker = _current_breaker.get()
+    return breaker is not None and breaker.tripped
 
 
-def reset_current_breaker(token: Token[SourceCircuitBreaker | None]) -> None:
-    _current_breaker.reset(token)
+@contextmanager
+def source_circuit_breaker(
+    source: str, *, threshold: int = DEFAULT_THRESHOLD
+) -> Iterator[SourceCircuitBreaker]:
+    """Pose le breaker de `source` dans la ContextVar le temps du bloc."""
+    breaker = SourceCircuitBreaker(source, threshold=threshold)
+    token = _current_breaker.set(breaker)
+    try:
+        yield breaker
+    finally:
+        _current_breaker.reset(token)

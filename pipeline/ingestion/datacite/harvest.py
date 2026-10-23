@@ -7,7 +7,6 @@ Les paramètres de requête comprennent `RECORD_PARAMS` (`api.py`), comme ceux d
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -51,8 +50,6 @@ def harvest_year(
     keywords: list[str],
     progress: Progress,
     metrics: PhaseMetrics,
-    *,
-    breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> None:
     """Moissonne les DOI d'une année, page après page, et les compte dans `metrics`. Un nœud sans DOI est ignoré."""
     next_url: str | None = None
@@ -67,7 +64,7 @@ def harvest_year(
         conn.commit()
         progress.advance(len(page.records))
         next_url = page.next_url
-        if next_url is None or breaker_tripped():
+        if next_url is None:
             return
 
 
@@ -105,15 +102,7 @@ class DataciteHarvester(SourceHarvester[DataciteHarvestConfig, DataciteClient]):
             # Une erreur garde les métriques des pages déjà écrites.
             metrics = PhaseMetrics()
             try:
-                harvest_year(
-                    client,
-                    self.conn,
-                    year,
-                    keywords,
-                    progress,
-                    metrics,
-                    breaker_tripped=self._breaker_tripped,
-                )
+                harvest_year(client, self.conn, year, keywords, progress, metrics)
             except SourceUnavailableError:
                 raise
             except Exception as e:

@@ -24,7 +24,7 @@ def _run(
     appels = [] if appels is None else appels
 
     def runner(champ: str):
-        def run(_ctx, _breaker) -> PhaseMetrics:
+        def run(_ctx) -> PhaseMetrics:
             appels.append(champ)
             return metrics.get(champ, PhaseMetrics())
 

@@ -74,16 +74,9 @@ def test_5xx_is_retried():
 
 def test_5xx_with_breaker_raises_source_unavailable():
     """Sous circuit-breaker, un 5xx qui épuise ses retries lève `SourceUnavailableError` et compte un échec au breaker."""
-    from pipeline.http.circuit_breaker import (
-        SourceCircuitBreaker,
-        SourceUnavailableError,
-        reset_current_breaker,
-        set_current_breaker,
-    )
+    from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 
-    breaker = SourceCircuitBreaker("hal", threshold=1)
-    token = set_current_breaker(breaker)
-    try:
+    with source_circuit_breaker("hal", threshold=1) as breaker:
         resp = _resp(503)
         with (
             patch.object(http_retry.httpx2, "request", return_value=resp) as req,
@@ -93,8 +86,6 @@ def test_5xx_with_breaker_raises_source_unavailable():
                 http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
         assert req.call_count == 3  # 3 tentatives, puis coupure
         assert breaker.tripped  # l'échec est compté au breaker
-    finally:
-        reset_current_breaker(token)
 
 
 def test_success_returns_json():
@@ -398,20 +389,12 @@ class TestLookupJsonAsync:
 
     @pytest.mark.asyncio
     async def test_tripped_breaker_is_unavailable_without_request(self, http_mock):
-        from pipeline.http.circuit_breaker import (
-            SourceCircuitBreaker,
-            reset_current_breaker,
-            set_current_breaker,
-        )
+        from pipeline.http.circuit_breaker import source_circuit_breaker
 
         route = http_mock.get("https://api.example/a").mock(return_value=httpx2.Response(200))
-        breaker = SourceCircuitBreaker("test", threshold=1)
-        breaker.record_failure()
-        token = set_current_breaker(breaker)
-        try:
+        with source_circuit_breaker("test", threshold=1) as breaker:
+            breaker.record_failure()
             async with httpx2.AsyncClient() as client:
                 outcome = await lookup_json_async(client, "GET", "https://api.example/a", label="t")
-        finally:
-            reset_current_breaker(token)
         assert outcome is UNAVAILABLE
         assert route.call_count == 0

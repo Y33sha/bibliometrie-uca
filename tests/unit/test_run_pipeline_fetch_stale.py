@@ -8,12 +8,9 @@
 """
 
 from contextlib import ExitStack
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from pipeline.http.circuit_breaker import (
-    SourceCircuitBreaker,
-    get_current_breaker,
-)
+from pipeline.http.circuit_breaker import get_current_breaker
 from pipeline.ingestion.common import fetch_stale
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
@@ -93,14 +90,16 @@ def test_fetch_stale_respects_sources_filter():
 
 
 def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
-    """L'exécuteur pose le circuit-breaker de la source, le transmet à la relecture, puis le retire."""
+    """L'exécuteur pose le circuit-breaker de la source pendant la relecture, puis le retire."""
+    sources = []
+
+    async def refresh(*_args, **_kwargs):
+        breaker = get_current_breaker()
+        sources.append(breaker and breaker.source)
+        return PhaseMetrics()
+
     with ExitStack() as stack:
-        refresh = stack.enter_context(
-            patch(
-                "pipeline.ingestion.common.fetch_stale.refresh",
-                new=AsyncMock(return_value=PhaseMetrics()),
-            )
-        )
+        stack.enter_context(patch("pipeline.ingestion.common.fetch_stale.refresh", new=refresh))
         stack.enter_context(
             patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
         )
@@ -110,8 +109,6 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
         stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))
         _run_phase(RunOptions(sources={"hal"}))
 
-    breaker = refresh.call_args.kwargs["breaker"]
-    assert isinstance(breaker, SourceCircuitBreaker)
-    assert breaker.source == "hal"
+    assert sources == ["hal"]
     # La ContextVar est restaurée en sortie (pas de fuite de breaker).
     assert get_current_breaker() is None

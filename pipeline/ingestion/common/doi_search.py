@@ -21,7 +21,7 @@ from domain.sources.registry import (
     DOI_ORG,
 )
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
@@ -141,7 +141,6 @@ async def fetch_missing_doi(
     *,
     retry_after_days: int,
     limit: int | None = None,
-    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les enregistrements sources trouvés dans `staging`.
 
@@ -231,7 +230,7 @@ async def fetch_missing_doi(
             write=_write,
         )
 
-    if breaker is not None and breaker.tripped:
+    if source_tripped():
         slog.warning(
             "indisponible (429/5xx répétés) — abandon, %d/%d DOI traités, reste au prochain run",
             progress["processed"],

@@ -25,7 +25,7 @@ from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.savepoint import rollback_unless_invalidated
 from infrastructure.observability.log import setup_logger
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.credentials import source_credentials_missing
@@ -138,7 +138,6 @@ def run_enrich_publishers_from_openalex(
     logger: logging.Logger,
     *,
     fetch_batch: FetchPublishersBatch,
-    breaker: SourceCircuitBreaker,
     limit: int = 0,
     dry_run: bool = False,
     rate_delay: float = 0.1,
@@ -154,7 +153,7 @@ def run_enrich_publishers_from_openalex(
         updated = no_response = processed = 0
         country_counter: Counter[str] = Counter()
         for i in range(0, total, BATCH_SIZE):
-            if breaker.tripped:
+            if source_tripped():
                 if not dry_run:
                     conn.commit()
                 logger.warning(
@@ -208,14 +207,13 @@ def main() -> int:
     conn = get_sync_engine().connect()
     publishers_api = API_BASE_URLS["openalex_publishers"]
 
-    def enrich(breaker: SourceCircuitBreaker) -> PhaseMetrics:
+    def enrich() -> PhaseMetrics:
         run_enrich_publishers_from_openalex(
             conn,
             log,
             fetch_batch=lambda oa_ids: fetch_publishers_batch(
                 oa_ids, openalex_publishers_api=publishers_api
             ),
-            breaker=breaker,
             limit=args.limit,
             dry_run=args.dry_run,
             rate_delay=OPENALEX_DELAY,

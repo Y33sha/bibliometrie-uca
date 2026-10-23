@@ -7,7 +7,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run(contexte, mode: str, searched: list[str]) -> PhaseMetrics:
-    def search_one(_ctx, source: str, args, breaker) -> PhaseMetrics:
+    def search_one(_ctx, source: str, args) -> PhaseMetrics:
         searched.append(source)
         return PhaseMetrics()
 

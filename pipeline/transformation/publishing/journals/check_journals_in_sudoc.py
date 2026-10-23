@@ -2,7 +2,7 @@
 
 Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
-Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc et le circuit-breaker de source sont injectés (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc est injecté (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
 """
 
 import logging
@@ -29,7 +29,7 @@ from domain.source_records.biblio import BiblioKey, JournalKey
 from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import journal_issns, journals
 from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
-from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
 from pipeline.http.fetch_pool import RequestPace, run_fetch_pool
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -231,7 +231,6 @@ async def run_check_journals_in_sudoc(
     *,
     fetch_ppns: FetchPpns,
     fetch_record: FetchRecord,
-    breaker: SourceCircuitBreaker,
     max_concurrent: int,
     max_per_second: float,
 ) -> PhaseMetrics:
@@ -334,7 +333,7 @@ async def run_check_journals_in_sudoc(
         )
 
     checked = metrics.updated + metrics.unchanged
-    if breaker.tripped:
+    if source_tripped():
         logger.warning(
             "⚡ Coupe-circuit Sudoc : vérification interrompue à %d/%d, reste repris au prochain run.",
             checked,

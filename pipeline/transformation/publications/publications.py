@@ -36,10 +36,10 @@ class PublicationsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Réconciliation, puis suppression des publications restées sans source."""
 
-        def reconcile_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def reconcile_task(ctx: PhaseContext) -> PhaseMetrics:
             return _reconcile(ctx.open_tx, ctx.logger, rebuild=ctx.options.rebuild_publications)
 
-        def delete_without_sources(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def delete_without_sources(ctx: PhaseContext) -> PhaseMetrics:
             _delete_publications_without_sources(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 

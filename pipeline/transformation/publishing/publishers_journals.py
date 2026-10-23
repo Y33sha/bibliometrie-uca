@@ -25,7 +25,6 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -250,7 +249,7 @@ def build() -> Phase:
 
 
 def _run_resolve_crossref_publishers(
-    ctx: PhaseContext, breaker: SourceCircuitBreaker | None
+    ctx: PhaseContext,
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_resolve_crossref_publishers(
@@ -259,12 +258,11 @@ def _run_resolve_crossref_publishers(
             prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_crossref_prefix,
-            breaker=breaker,
         )
 
 
 def _run_resolve_datacite_publishers(
-    ctx: PhaseContext, breaker: SourceCircuitBreaker | None
+    ctx: PhaseContext,
 ) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_resolve_datacite_publishers(
@@ -273,15 +271,12 @@ def _run_resolve_datacite_publishers(
             prefix_store=DoiPrefixStore(conn),
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
-            breaker=breaker,
         )
 
 
 def _run_enrich_journals_from_openalex(
-    ctx: PhaseContext, breaker: SourceCircuitBreaker | None
+    ctx: PhaseContext,
 ) -> PhaseMetrics:
-    assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
-
     sources_api = API_BASE_URLS["openalex_sources"]
     with ctx.open_tx() as conn:
         return run_enrich_journals_from_openalex(
@@ -290,16 +285,13 @@ def _run_enrich_journals_from_openalex(
             fetch_batch=lambda oa_ids: fetch_sources_batch(
                 oa_ids, openalex_sources_api=sources_api
             ),
-            breaker=breaker,
             rate_delay=OPENALEX_DELAY,
         )
 
 
 def _run_check_journals_in_sudoc(
-    ctx: PhaseContext, breaker: SourceCircuitBreaker | None
+    ctx: PhaseContext,
 ) -> PhaseMetrics:
-    assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
-
     base_url = API_BASE_URLS["sudoc"]
     with ctx.open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
@@ -311,16 +303,13 @@ def _run_check_journals_in_sudoc(
                 fetch_record=lambda client, ppn: fetch_serial_record(
                     client, ppn, base_url=base_url
                 ),
-                breaker=breaker,
                 max_concurrent=SUDOC_MAX_CONCURRENT,
                 max_per_second=SUDOC_MAX_PER_SECOND,
             )
         )
 
 
-def _run_merge_duplicate_journals(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_merge_duplicate_journals(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
 
         def merge(target_id: int, source_id: int) -> None:
@@ -330,44 +319,32 @@ def _run_merge_duplicate_journals(
         return run_merge_duplicate_journals(conn, ctx.logger, merge=merge)
 
 
-def _run_merge_duplicate_monographs(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_merge_duplicate_monographs(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_merge_duplicate_monographs(conn, ctx.logger)
 
 
-def _run_link_monographs_to_collections(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_link_monographs_to_collections(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_link_monographs_to_collections(conn, ctx.logger)
 
 
-def _run_type_proceedings_volumes(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_type_proceedings_volumes(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_type_proceedings_volumes(conn, ctx.logger)
 
 
-def _run_type_proceedings_journals(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_type_proceedings_journals(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_type_proceedings_journals(conn, ctx.logger)
 
 
-def _run_learn_journal_doi_namespaces(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_learn_journal_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_learn_journal_doi_namespaces(conn, ctx.logger)
 
 
-def _run_enrich_journals_from_doaj(
-    ctx: PhaseContext, _breaker: SourceCircuitBreaker | None
-) -> PhaseMetrics:
+def _run_enrich_journals_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
     user_agent = default_user_agent()
     with ctx.open_tx() as conn:
         return run_enrich_journals_from_doaj(

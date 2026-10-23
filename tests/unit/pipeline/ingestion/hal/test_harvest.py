@@ -127,13 +127,3 @@ def test_sans_collection_refuse(configuration):
     configuration({}, [2024])
     with pytest.raises(HarvestConfigError, match="aucune collection HAL"):
         HalHarvester(MagicMock(), _LOGGER, _client()).run(arguments_du_run())
-
-
-def test_s_arrete_quand_la_source_est_a_bout(configuration):
-    configuration({"C": "Coll"}, [2023, 2024])
-    client = _client()
-    breaker = MagicMock()
-    breaker.tripped = True
-    metrics = HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(), breaker=breaker)
-    assert metrics.total == 0
-    client.fetch_page_cursor.assert_not_called()

@@ -53,19 +53,19 @@ class MetadataCorrectionPhase:
     def _steps(self) -> dict[str, TaskStep]:
         """Étape de chaque tâche. Chacune écrit sa section du journal et rend examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
 
-        def journal_by_doi(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def journal_by_doi(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 stats = run_journal_by_doi(conn, SourceRecordCorrectionStore(conn), ctx.logger)
             return PhaseMetrics(seen=stats.examined, updated=stats.attached)
 
-        def unary(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def unary(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 stats = run_unary(conn, SourceRecordCorrectionStore(conn), ctx.logger)
             return PhaseMetrics(
                 seen=stats.examined, updated=stats.corrected, extras=dict(stats.rule_counts)
             )
 
-        def cluster(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def cluster(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 stats = run_cluster(conn, SourceRecordCorrectionStore(conn), ctx.logger)
             return PhaseMetrics(

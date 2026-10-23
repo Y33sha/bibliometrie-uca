@@ -63,14 +63,14 @@ class CountriesPhase:
         """Exécute les tâches, borne l'entonnoir par les deux relevés et assemble les métriques."""
         initial = _address_status(ctx.open_tx)
 
-        def ror(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def ror(ctx: PhaseContext) -> PhaseMetrics:
             step(ctx.logger, "Pays des adresses d'après leurs organisations ROR")
             with ctx.open_tx() as conn:
                 added = CountryCandidatesStore(conn).add_ror()
             ctx.logger.info("%spays trouvé pour %s", LAST_BRANCH, quantity(added, "adresse"))
             return PhaseMetrics(new=added)
 
-        def detect(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def detect(ctx: PhaseContext) -> PhaseMetrics:
             metrics = PhaseMetrics()
             with ctx.open_tx() as conn:
                 metrics.merge(detect_by_country_name.run(conn, ctx.logger))
@@ -78,7 +78,7 @@ class CountriesPhase:
                 metrics.merge(detect_by_place_name.run(conn, ctx.logger))
             return metrics
 
-        def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def resolve(ctx: PhaseContext) -> PhaseMetrics:
             step(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
             with ctx.open_tx() as conn:
                 changed = resolve_queued_addresses(conn)
@@ -89,7 +89,7 @@ class CountriesPhase:
             )
             return PhaseMetrics(updated=changed)
 
-        def refresh(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def refresh(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 refresh_publication_countries.refresh(conn, ctx.logger)
             return PhaseMetrics()

@@ -1,6 +1,6 @@
 """Socle des moissonneurs : patron commun, écriture d'un document dans `staging`.
 
-Le patron porte l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur circuit-breaker. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()` ; la pagination (curseur, `search_after`, `firstRecord`, `cursorMark`) reste propre à chaque source.
+Le patron porte l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()` ; la pagination (curseur, `search_after`, `firstRecord`, `cursorMark`) reste propre à chaque source.
 
 Point d'entrée unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
 """
@@ -17,7 +17,7 @@ from sqlalchemy import Connection
 
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceCircuitBreaker, SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.runtime.config import get_years
 from pipeline.runtime.observability.log_format import (
@@ -142,25 +142,13 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self.conn = conn
         self.logger = logger
         self._client = client
-        # Circuit-breaker de la source (posé par `run`) : les boucles `harvest_all` consultent `_breaker_tripped()` pour s'arrêter quand la source est à bout de budget / en panne.
-        self._breaker: SourceCircuitBreaker | None = None
 
     def _years(self, window: HarvestWindow) -> list[int]:
         """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
         return [window.year] if window.year else get_years(self.conn, start_year=window.start_year)
 
-    def _breaker_tripped(self) -> bool:
-        """`True` si le circuit-breaker de la source a tripé (à consulter dans les boucles d'`harvest_all` pour stopper la source)."""
-        return self._breaker is not None and self._breaker.tripped
-
-    def _stop_on_tripped(self, remaining: str) -> bool:
-        """`True`, avec avertissement, si le circuit-breaker a tripé : à tester en tête de boucle d'items pour stopper la source. `remaining` nomme les items non traités (accordé par l'appelant), qui repartent au prochain run."""
-        if self._breaker_tripped():
-            self._warn_stopped(remaining)
-            return True
-        return False
-
     def _warn_stopped(self, remaining: str) -> None:
+        """Avertit de l'arrêt de la source. `remaining` nomme les items non traités, qui repartent au prochain run."""
         self.logger.warning(
             "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
         )
@@ -194,8 +182,6 @@ class SourceHarvester[ConfigT, ClientT](ABC):
                     f"{inflect(len(remaining), 'année')} {', '.join(map(str, remaining))} "
                     f"{inflect(len(remaining), 'sautée')}"
                 )
-                if self._stop_on_tripped(skipped):
-                    break
                 progress.relabel(self._label(str(year)))
                 try:
                     metrics.merge(harvest_step(year, progress))
@@ -262,19 +248,11 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
     # ── Entry point ─────────────────────────────────────────────
 
-    def run(
-        self,
-        window: HarvestWindow,
-        *,
-        breaker: SourceCircuitBreaker | None = None,
-    ) -> PhaseMetrics:
+    def run(self, window: HarvestWindow) -> PhaseMetrics:
         """Exécute l'extraction : `load_config` → `setup_logging` → `harvest_all`.
 
         Invoqué par `run_pipeline`. Les exceptions (`HarvestConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
-
-        `breaker` : circuit-breaker de la source (posé via la ContextVar par le composition root) ; les boucles `harvest_all` le consultent pour stopper une source à bout de budget.
         """
-        self._breaker = breaker
         config = self.load_config(self.conn)
         self.setup_logging(window, config)
         return self.harvest_all(window, config)
@@ -286,12 +264,7 @@ class Harvester(Protocol):
     Le protocole efface les paramètres de type de `SourceHarvester`, la configuration et le client propres à chaque source.
     """
 
-    def run(
-        self,
-        window: HarvestWindow,
-        *,
-        breaker: SourceCircuitBreaker | None = None,
-    ) -> PhaseMetrics: ...
+    def run(self, window: HarvestWindow) -> PhaseMetrics: ...
 
 
 type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]

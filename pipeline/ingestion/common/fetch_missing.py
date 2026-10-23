@@ -17,7 +17,6 @@ from domain.config import ConfigKey
 from domain.sources.registry import (
     DOI_SEARCHABLE_SOURCES,
 )
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.common.doi_search import (
     DoiSearch,
     fetch_missing_doi,
@@ -38,8 +37,8 @@ from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
 """Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
-FetchDoiOne = Callable[[PhaseContext, str, SourceCircuitBreaker], PhaseMetrics]
-"""Recherche par DOI dans une source cible, sous le circuit-breaker de la source."""
+FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
+"""Recherche par DOI dans une source cible."""
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
@@ -87,31 +86,24 @@ class FetchMissingPhase:
         def when_selected(task: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: selected_tasks[task]
 
-        def channel(fetch: FetchChannel) -> TaskRun:
-            return lambda ctx, _breaker: fetch(ctx)
-
         def doi(target: str) -> TaskRun:
-            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
-                return self.fetch_doi_one(ctx, target, breaker)
-
-            return run
+            return lambda ctx: self.fetch_doi_one(ctx, target)
 
         by_task = run_tasks(
             "fetch_missing",
             {
                 _HAL_BY_ID: TaskStep(
-                    channel(self.fetch_hal_by_id),
+                    self.fetch_hal_by_id,
                     section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
                     when=when_selected(_HAL_BY_ID),
                 ),
                 _HAL_BY_NNT: TaskStep(
-                    channel(self.fetch_hal_by_nnt),
+                    self.fetch_hal_by_nnt,
                     section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
                     when=when_selected(_HAL_BY_NNT),
                 ),
                 _THESES_BY_NNT: TaskStep(
-                    channel(self.fetch_theses_by_nnt),
+                    self.fetch_theses_by_nnt,
                     section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
                     when=when_selected(_THESES_BY_NNT),
                 ),
@@ -212,9 +204,7 @@ def _make_doi_search(target: str) -> DoiSearch:
     return searches[target]()
 
 
-def _run_fetch_missing_doi(
-    ctx: PhaseContext, target: str, breaker: SourceCircuitBreaker
-) -> PhaseMetrics:
+def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
     search = _make_doi_search(target)
     with ctx.open_tx() as conn:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
@@ -226,6 +216,5 @@ def _run_fetch_missing_doi(
                 ctx.logger,
                 retry_after_days=retry_after_days,
                 limit=limit,
-                breaker=breaker,
             )
         )

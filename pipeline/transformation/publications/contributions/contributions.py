@@ -108,11 +108,11 @@ class ContributionsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les tâches de la phase et retourne les métriques du build."""
 
-        def build(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def build(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 return build_contributions(conn, ctx.logger)
 
-        def propagate(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def propagate(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 propagate_contribution_attributes(conn)
@@ -121,30 +121,30 @@ class ContributionsPhase:
             metrics.details["in_perimeter"] = in_perimeter
             return metrics
 
-        def publications_in_perimeter(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 refresh_publications_perimeter_evidence(conn)
             return _timed(t0)
 
-        def structures(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def structures(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 refresh_contribution_structures(conn)
                 refresh_publication_structures(conn)
             return _timed(t0)
 
-        def purge(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def purge(ctx: PhaseContext) -> PhaseMetrics:
             metrics = PhaseMetrics()
             metrics.details["purged"] = _purge_orphan_publications(ctx.open_tx)
             return metrics
 
-        def empty_containers(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def empty_containers(ctx: PhaseContext) -> PhaseMetrics:
             metrics = PhaseMetrics()
             _delete_empty_containers(self.empty_containers, metrics, ctx)
             return metrics
 
-        def publication_counts(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def publication_counts(ctx: PhaseContext) -> PhaseMetrics:
             _refresh_publication_counts(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 

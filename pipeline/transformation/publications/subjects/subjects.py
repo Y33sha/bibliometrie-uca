@@ -29,13 +29,13 @@ class SubjectsPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Ingestion des sujets puis recalcul des co-occurrences ; retourne les métriques d'ingestion. L'option `rebuild_subjects` force la ré-ingestion de toutes les publications."""
 
-        def ingest(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def ingest(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 return run_ingest(
                     SubjectStore(conn), ctx.logger, rebuild=ctx.options.rebuild_subjects
                 )
 
-        def usage(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def usage(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 run_cooccurrences(SubjectStore(conn), ctx.logger)
             return PhaseMetrics()

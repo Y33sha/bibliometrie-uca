@@ -11,15 +11,14 @@ from dataclasses import dataclass
 from functools import partial
 
 from pipeline.graph import TASKS, Task
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
 
-type TaskRun = Callable[[PhaseContext, SourceCircuitBreaker | None], PhaseMetrics]
-"""Exécute une tâche. Reçoit le contexte de la phase, et le circuit-breaker de sa source (`None` pour une tâche sans source)."""
+type TaskRun = Callable[[PhaseContext], PhaseMetrics]
+"""Exécute une tâche dans le contexte de sa phase."""
 
 
 @dataclass(frozen=True)
@@ -130,11 +129,11 @@ def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> Phase
     """Exécute la tâche et range sa durée dans `duration_s`."""
     t0 = time.perf_counter()
     if task.network is None:
-        metrics = step.run(ctx, None)
+        metrics = step.run(ctx)
     else:
         metrics = access_source(
             task.network,
-            lambda breaker: step.run(ctx, breaker),
+            partial(step.run, ctx),
             phase=phase,
             logger=ctx.logger,
             credentials_missing=ctx.credentials_missing,
@@ -164,5 +163,5 @@ class SingleTaskPhase:
     label: str | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        step = TaskStep(lambda ctx, _breaker: self.phase.run(ctx), label=self.label)
+        step = TaskStep(self.phase.run, label=self.label)
         return run_tasks(self.task.partition(".")[0], {self.task: step}, ctx)[self.task]

@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.harvester import SourceHarvester
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -61,13 +62,16 @@ def conn():
 
 
 class _ParAnnee(SourceHarvester):
-    """Moissonneur dont chaque année rapporte un nouveau document et des inchangés, selon `volumes`."""
+    """Moissonneur dont chaque année rapporte un nouveau document et des inchangés, selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
 
     SOURCE = "hal"
 
-    def __init__(self, logger, volumes: dict[int, int]) -> None:
+    def __init__(
+        self, logger, volumes: dict[int, int], *, unavailable_from: int | None = None
+    ) -> None:
         super().__init__(MagicMock(), logger, MagicMock())
         self.volumes = volumes
+        self.unavailable_from = unavailable_from
         self.log_format: list[str] = []
         self.totaux: list[int | None] = []
         self.progress = None
@@ -80,6 +84,8 @@ class _ParAnnee(SourceHarvester):
             self.progress = progress
             self.log_format.append(progress._label)
             self.totaux.append(progress._total)
+            if self.unavailable_from is not None and year >= self.unavailable_from:
+                raise SourceUnavailableError(self.SOURCE)
             return PhaseMetrics(new=1, unchanged=self.volumes[year] - 1)
 
         return self._harvest_by_year(list(self.volumes), self.volumes.__getitem__, harvest_step)
@@ -118,12 +124,13 @@ class TestExtractionParAnnee:
             _ParAnnee(logger, {2024: 1}).run(_args())
         assert "1 document trouvé : 1 nouveau, 0 mis à jour, 0 inchangé" in caplog.text
 
-    def test_une_source_a_bout_nomme_les_annees_sautees(self, logger, caplog):
-        breaker = MagicMock()
-        breaker.tripped = True
+    def test_une_source_indisponible_garde_les_annees_extraites(self, logger, caplog):
         with caplog.at_level(logging.WARNING, logger=logger.name):
-            _ParAnnee(logger, {2023: 2, 2024: 3}).run(_args(), breaker=breaker)
-        assert "années 2023, 2024 sautées" in caplog.text
+            metrics = _ParAnnee(logger, {2023: 2, 2024: 3, 2025: 1}, unavailable_from=2024).run(
+                _args()
+            )
+        assert metrics.total == 2
+        assert "années 2024, 2025 sautées" in caplog.text
 
 
 class _DUnTenant(_ParAnnee):

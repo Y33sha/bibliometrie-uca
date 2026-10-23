@@ -34,7 +34,7 @@ def _phase(
 
 
 def test_parallel_skips_unconfigured_source(contexte):
-    def harvest_one(_ctx, source, _args, _breaker):
+    def harvest_one(_ctx, source, _args):
         if source == "openalex":
             raise HarvestConfigError("aucune clé")
         return PhaseMetrics(new=3)
@@ -49,7 +49,7 @@ def test_parallel_skips_unconfigured_source(contexte):
 def test_since_last_extracts_hal_from_last_date(contexte):
     calls: list[tuple[str, str | None]] = []
 
-    def harvest_one(_ctx, source, args, _breaker):
+    def harvest_one(_ctx, source, args):
         calls.append((source, args.since))
         return PhaseMetrics(new=5)
 
@@ -64,7 +64,7 @@ def test_since_last_extracts_hal_from_last_date(contexte):
 def test_theses_ignores_year_range_bound(contexte):
     seen: dict[str, tuple[int | None, int | None]] = {}
 
-    def harvest_one(_ctx, source, args, _breaker):
+    def harvest_one(_ctx, source, args):
         seen[source] = (args.start_year, args.year)
         return PhaseMetrics()
 
@@ -84,7 +84,7 @@ def _indisponible(source: str) -> PhaseMetrics:
 def test_parallel_skips_unavailable_source(contexte):
     """Une source indisponible (500 répétés sous circuit-breaker) est sautée : la phase se termine en ambre et les autres sources aboutissent."""
 
-    def harvest_one(_ctx, source, _args, _breaker):
+    def harvest_one(_ctx, source, _args):
         if source == "hal":
             return _indisponible("hal")
         return PhaseMetrics(new=3)
@@ -99,7 +99,7 @@ def test_parallel_skips_unavailable_source(contexte):
 def test_since_last_marks_hal_unavailable(contexte):
     """En quotidien, une source HAL indisponible termine la phase en ambre."""
 
-    def harvest_one(_ctx, _source, _args, _breaker):
+    def harvest_one(_ctx, _source, _args):
         return _indisponible("hal")
 
     metrics = _phase(harvest_one).run(contexte(mode="daily"))
@@ -112,7 +112,7 @@ def test_empty_extraction_perimeter_stops_the_phase(contexte):
     """Un périmètre d'extraction sans structure arrête la phase avant toute extraction."""
     calls: list[str] = []
 
-    def harvest_one(_ctx, source, _args, _breaker):
+    def harvest_one(_ctx, source, _args):
         calls.append(source)
         return PhaseMetrics()
 

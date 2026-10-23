@@ -6,15 +6,13 @@ L'accès contrôle les identifiants de la source et saute l'étape, avec un aver
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 
 from pipeline.http.circuit_breaker import (
     DEFAULT_THRESHOLD,
     SourceCircuitBreaker,
     SourceUnavailableError,
-    reset_current_breaker,
-    set_current_breaker,
+    source_circuit_breaker,
 )
 from pipeline.runtime.context import CredentialsMissing
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -26,7 +24,7 @@ from pipeline.runtime.observability.signals import (
 
 def access_source(
     source: str,
-    execute: Callable[[SourceCircuitBreaker], PhaseMetrics],
+    execute: Callable[[], PhaseMetrics],
     *,
     phase: str,
     logger: logging.Logger,
@@ -35,33 +33,20 @@ def access_source(
 ) -> PhaseMetrics:
     """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée.
 
-    `execute` reçoit le circuit-breaker, que ses boucles consultent pour s'arrêter quand il coupe. `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source.
+    `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source.
     """
     if reason := credentials_missing(source):
         metrics = PhaseMetrics()
         signal_source_unconfigured(metrics, source, reason, logger=logger, phase=phase)
         return metrics
-    with _circuit_breaker(source, threshold=threshold) as breaker:
+    with source_circuit_breaker(source, threshold=threshold or DEFAULT_THRESHOLD) as breaker:
         try:
-            metrics = execute(breaker)
+            metrics = execute()
         except SourceUnavailableError:
             metrics = PhaseMetrics()
             signal_source_unavailable(metrics, source, logger=logger, phase=phase)
     _signal_if_tripped(metrics, breaker)
     return metrics
-
-
-@contextmanager
-def _circuit_breaker(
-    source: str, *, threshold: int | None = None
-) -> Iterator[SourceCircuitBreaker]:
-    """Pose le circuit-breaker de `source` dans la ContextVar que lisent les clients HTTP, le temps du bloc."""
-    breaker = SourceCircuitBreaker(source, threshold=threshold or DEFAULT_THRESHOLD)
-    token = set_current_breaker(breaker)
-    try:
-        yield breaker
-    finally:
-        reset_current_breaker(token)
 
 
 def _signal_if_tripped(metrics: PhaseMetrics, breaker: SourceCircuitBreaker) -> None:

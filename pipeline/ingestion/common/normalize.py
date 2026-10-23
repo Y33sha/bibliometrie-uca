@@ -115,7 +115,7 @@ class NormalizePhase:
     def _normalize_task(self, source: str) -> TaskRun:
         """Tâche `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
 
-        def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def run(ctx: PhaseContext) -> PhaseMetrics:
             stats = self.normalize_one(ctx, source)
             metrics = PhaseMetrics()
             metrics.details["row"] = {
@@ -128,7 +128,7 @@ class NormalizePhase:
 
         return run
 
-    def _prune(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _prune(self, ctx: PhaseContext) -> PhaseMetrics:
         """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
         disappeared = self.prune_disappeared(ctx)
         if disappeared:
@@ -141,14 +141,14 @@ class NormalizePhase:
             ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
         return PhaseMetrics(extras={"disappeared": disappeared})
 
-    def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _cleanup(self, ctx: PhaseContext) -> PhaseMetrics:
         deleted = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
         if deleted:
             metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
         return metrics
 
-    def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _cleanup_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
         deleted = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
         if deleted:

@@ -322,7 +322,7 @@ class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Recalcule les groupes des publications en file, puis les attributs des groupes en file : l'affiliation d'un membre change sans que son groupe change."""
 
-        def build_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def build_task(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
                 return build_groups(
                     conn,
@@ -331,7 +331,7 @@ class AuthorGroupingPhase:
                     rebuild=ctx.options.rebuild_author_grouping,
                 )
 
-        def attributes_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def attributes_task(ctx: PhaseContext) -> PhaseMetrics:
             step(ctx.logger, "Attributs des groupes")
             t0 = time.perf_counter()
             with (

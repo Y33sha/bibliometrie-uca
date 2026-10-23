@@ -16,7 +16,7 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
 from pipeline.ingestion.common.staging import upsert_staging
@@ -107,7 +107,6 @@ async def refresh(
     *,
     after_days: int,
     years: list[int] | None = None,
-    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
 
@@ -131,7 +130,7 @@ async def refresh(
             outcome = await refetch.fetch_by_native_id(client, source_id)
         except Exception as e:
             # Breaker déclenché pendant la requête : abandon silencieux, le journal le signale une fois après le pool.
-            if not (breaker is not None and breaker.tripped):
+            if not source_tripped():
                 slog.error("erreur sur %s : %s", source_id, e)
             outcome = UNAVAILABLE
         if refetch.request_delay_s:
@@ -170,7 +169,7 @@ async def refresh(
             write=_write,
         )
 
-    if breaker is not None and breaker.tripped:
+    if source_tripped():
         slog.warning(
             "indisponible (429/5xx répétés) — abandon, %d/%d documents traités, reste au prochain run",
             processed,

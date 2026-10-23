@@ -5,7 +5,6 @@ Interroge en une seule requête l'ensemble des PPN d'établissement du périmèt
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -20,7 +19,6 @@ from pipeline.ingestion.common.harvester import (
 )
 from pipeline.ingestion.theses.api import ThesesClient
 from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
-from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -42,11 +40,9 @@ def harvest_theses(
     client: ThesesClient,
     conn: Connection,
     ppns: list[str],
-    logger: ScopedOrPlainLogger,
     progress: Progress,
     *,
     year: int | None = None,
-    breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> PhaseMetrics:
     """Moissonne les thèses des établissements, page après page.
 
@@ -58,11 +54,6 @@ def harvest_theses(
     start = 0
 
     while total is None or start < total:
-        if breaker_tripped():
-            logger.warning(
-                "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
-            )
-            break
         data = client.fetch_page(query, start=start)
         if total is None:
             total = as_int(data.get("totalHits")) or 0
@@ -120,10 +111,8 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
                 self._client,
                 self.conn,
                 config.ppns,
-                scoped_logger(self.logger, self.SOURCE),
                 progress,
                 year=window.year,
-                breaker_tripped=self._breaker_tripped,
             )
         if window.year is None:
             self._write_summary(metrics)

@@ -501,7 +501,7 @@ class RelationsPhase:
             "relations.rebuild"
         ]
 
-    def _rebuild(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _rebuild(self, ctx: PhaseContext) -> PhaseMetrics:
         """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
         with ctx.open_tx() as conn:
             sources = fetch_declared_relation_sources(conn)

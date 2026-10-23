@@ -16,7 +16,6 @@ from domain.sources.registry import source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.graph import PERSON_SEARCHED_SOURCES
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
@@ -36,7 +35,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 
-SearchOne = Callable[[PhaseContext, str, HarvestWindow, SourceCircuitBreaker | None], PhaseMetrics]
+SearchOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
 
 
 @dataclass(frozen=True)
@@ -53,10 +52,10 @@ class HarvestByPersonPhase:
         effective = set(PERSON_SEARCHED_SOURCES) & options.sources
 
         def task(source: str) -> TaskRun:
-            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
+            def run(ctx: PhaseContext) -> PhaseMetrics:
                 window = HarvestWindow(start_year=options.start_year, year=options.year)
                 try:
-                    return self.search_one(ctx, source, window, breaker)
+                    return self.search_one(ctx, source, window)
                 except HarvestConfigError as exc:
                     metrics = PhaseMetrics()
                     signal_source_unconfigured(
@@ -96,15 +95,10 @@ class HarvestByPersonPhase:
 def build() -> Phase:
     registry = _harvesters()
 
-    def search_one(
-        ctx: PhaseContext,
-        source: str,
-        window: HarvestWindow,
-        breaker: SourceCircuitBreaker | None,
-    ) -> PhaseMetrics:
+    def search_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
         source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
         with ctx.open_tx() as conn:
-            return registry[source](conn, source_log).run(window, breaker=breaker)
+            return registry[source](conn, source_log).run(window)
 
     return HarvestByPersonPhase(search_one=search_one, run_parallel=run_parallel)
 
