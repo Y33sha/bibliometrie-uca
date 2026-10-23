@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 807U0maVkaD4J7LfucqkZvWsQkTK7scI5rZybSu0NAsfQ305nwJIBfuKJfmqAaR
+\restrict WjSbEn3gItBDClfFTYjVtX6YDJ4H3yCgKDXlNlb24fDIgwdJwm6MnjEfbLrzg5Y
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -498,14 +498,16 @@ CREATE FUNCTION public.protect_authenticated_identifier() RETURNS trigger
 CREATE FUNCTION public.regroup_identifier_publications(id_type text, id_value text) RETURNS void
     LANGUAGE sql
     AS $$
-        UPDATE publications.publications p SET contributions_dirty = true
-        FROM sources.source_records sr
-        JOIN sources.source_contributions sc ON sc.source_record_id = sr.id
-        JOIN sources.contributor_information ci ON ci.id = sc.contributor_information_id
-        WHERE p.id = sr.publication_id AND NOT p.contributions_dirty
-          AND ci.identifiers ? id_type
-          AND ci.identifiers ->> id_type = id_value
-    $$;
+                INSERT INTO queues.publication_contributions_queue (id)
+                SELECT DISTINCT sr.publication_id
+                FROM sources.source_records sr
+                JOIN sources.source_contributions sc ON sc.source_record_id = sr.id
+                JOIN sources.contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE sr.publication_id IS NOT NULL
+                  AND ci.identifiers ? id_type
+                  AND ci.identifiers ->> id_type = id_value
+                ON CONFLICT (id) DO UPDATE SET seq = DEFAULT
+            $$;
 
 
 --
@@ -1113,7 +1115,6 @@ CREATE TABLE sources.source_records (
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     corrections jsonb DEFAULT '{}'::jsonb CONSTRAINT source_records_raw_metadata_not_null NOT NULL,
     title_normalized text,
-    keys_dirty boolean DEFAULT true NOT NULL,
     embargo_until date,
     monograph_id integer,
     authors_hash text,
@@ -1552,17 +1553,9 @@ CREATE TABLE publications.publications (
     deposit_license public.license_type,
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
-    contributions_dirty boolean DEFAULT true NOT NULL,
     corrections jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
-
-
---
--- Name: COLUMN publications.contributions_dirty; Type: COMMENT; Schema: publications; Owner: -
---
-
-COMMENT ON COLUMN publications.publications.contributions_dirty IS 'Groupes de contributions sources à recalculer : un enregistrement source a rejoint ou quitté la publication, ou ses contributions sources ont changé.';
 
 
 --
@@ -2053,6 +2046,30 @@ ALTER SEQUENCE publishing.publishers_id_seq OWNED BY publishing.publishers.id;
 
 
 --
+-- Name: address_candidates_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.address_candidates_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: address_candidates_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.address_candidates_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.address_candidates_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: address_countries_queue; Type: TABLE; Schema: queues; Owner: -
 --
 
@@ -2077,6 +2094,30 @@ ALTER TABLE queues.address_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS
 
 
 --
+-- Name: publication_contributions_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.publication_contributions_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: publication_contributions_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.publication_contributions_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.publication_contributions_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: source_contribution_countries_queue; Type: TABLE; Schema: queues; Owner: -
 --
 
@@ -2092,6 +2133,30 @@ CREATE TABLE queues.source_contribution_countries_queue (
 
 ALTER TABLE queues.source_contribution_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME queues.source_contribution_countries_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: source_record_keys_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.source_record_keys_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: source_record_keys_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.source_record_keys_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.source_record_keys_queue_seq_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -2532,16 +2597,8 @@ CREATE TABLE structures.addresses (
     created_at timestamp with time zone DEFAULT now(),
     publication_count integer DEFAULT 0,
     countries character(2)[],
-    candidates_dirty boolean DEFAULT true NOT NULL,
     CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
 );
-
-
---
--- Name: COLUMN addresses.candidates_dirty; Type: COMMENT; Schema: structures; Owner: -
---
-
-COMMENT ON COLUMN structures.addresses.candidates_dirty IS 'Adresse à traiter : détection du pays par le texte, puis résolution des candidats.';
 
 
 --
@@ -3222,6 +3279,14 @@ ALTER TABLE ONLY publishing.journal_issns
 
 
 --
+-- Name: address_candidates_queue address_candidates_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.address_candidates_queue
+    ADD CONSTRAINT address_candidates_queue_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: address_countries_queue address_countries_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
 --
 
@@ -3230,11 +3295,27 @@ ALTER TABLE ONLY queues.address_countries_queue
 
 
 --
+-- Name: publication_contributions_queue publication_contributions_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.publication_contributions_queue
+    ADD CONSTRAINT publication_contributions_queue_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: source_contribution_countries_queue source_contribution_countries_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
 --
 
 ALTER TABLE ONLY queues.source_contribution_countries_queue
     ADD CONSTRAINT source_contribution_countries_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_record_keys_queue source_record_keys_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_record_keys_queue
+    ADD CONSTRAINT source_record_keys_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -3838,13 +3919,6 @@ CREATE INDEX publication_subjects_subject_idx ON publications.publication_subjec
 
 
 --
--- Name: publications_contributions_dirty_idx; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX publications_contributions_dirty_idx ON publications.publications USING btree (id) WHERE contributions_dirty;
-
-
---
 -- Name: publications_doi_lower_key; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -4209,13 +4283,6 @@ CREATE INDEX idx_source_records_journal ON sources.source_records USING btree (j
 
 
 --
--- Name: idx_source_records_keys_dirty; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_keys_dirty ON sources.source_records USING btree (keys_dirty) WHERE keys_dirty;
-
-
---
 -- Name: idx_source_records_metadata_block; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4346,13 +4413,6 @@ CREATE INDEX idx_addr_struct_filter ON structures.address_structures USING btree
 --
 
 CREATE INDEX idx_addr_struct_structure ON structures.address_structures USING btree (structure_id);
-
-
---
--- Name: idx_addresses_candidates_dirty; Type: INDEX; Schema: structures; Owner: -
---
-
-CREATE INDEX idx_addresses_candidates_dirty ON structures.addresses USING btree (id) WHERE candidates_dirty;
 
 
 --
@@ -4758,6 +4818,14 @@ ALTER TABLE ONLY publishing.publisher_name_forms
 
 
 --
+-- Name: address_candidates_queue address_candidates_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.address_candidates_queue
+    ADD CONSTRAINT address_candidates_queue_id_fkey FOREIGN KEY (id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
+
+
+--
 -- Name: address_countries_queue address_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
 --
 
@@ -4766,11 +4834,27 @@ ALTER TABLE ONLY queues.address_countries_queue
 
 
 --
+-- Name: publication_contributions_queue publication_contributions_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.publication_contributions_queue
+    ADD CONSTRAINT publication_contributions_queue_id_fkey FOREIGN KEY (id) REFERENCES publications.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_contribution_countries_queue source_contribution_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
 --
 
 ALTER TABLE ONLY queues.source_contribution_countries_queue
     ADD CONSTRAINT source_contribution_countries_queue_id_fkey FOREIGN KEY (id) REFERENCES sources.source_contributions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_record_keys_queue source_record_keys_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_record_keys_queue
+    ADD CONSTRAINT source_record_keys_queue_id_fkey FOREIGN KEY (id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
 
 
 --
@@ -5033,5 +5117,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 807U0maVkaD4J7LfucqkZvWsQkTK7scI5rZybSu0NAsfQ305nwJIBfuKJfmqAaR
+\unrestrict WjSbEn3gItBDClfFTYjVtX6YDJ4H3yCgKDXlNlb24fDIgwdJwm6MnjEfbLrzg5Y
 

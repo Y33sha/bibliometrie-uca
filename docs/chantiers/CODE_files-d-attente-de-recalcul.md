@@ -49,21 +49,21 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 - [x] File `address_candidates_queue`, remplie depuis `candidates_dirty`.
 - [x] Marquage dans `normalize`, l'import ROR, le dépôt d'adresses de l'API et `redetect_address_countries`. La détection par le texte traite les adresses en file sans les marquer.
 - [x] Détection et résolution lisent la file. La résolution immédiate de l'API laisse l'adresse en file : le run suivant refait sa détection.
-- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
+- [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 3 — Groupement des auteurs
 
 - [x] File `publication_contributions_queue`, remplie depuis `contributions_dirty`.
 - [x] Marquage dans `normalize`, `metadata_correction`, la création et la réconciliation des publications, l'arbitrage des identifiants et la fonction `regroup_identifier_publications` des déclencheurs de l'API. Le `--rebuild` de `author_grouping` remplit la file avec toutes les publications.
 - [x] `author_grouping` relève la file au début, et supprime les marquages de chaque lot avant son commit.
-- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
+- [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 4 — Réconciliation des publications
 
 - [x] File `source_record_keys_queue`, remplie depuis `keys_dirty`.
 - [x] Marquage dans `normalize`, `metadata_correction`, `perimeter_evidence`, la propagation aux enregistrements sources d'une même publication et l'outil de re-matérialisation des clés.
 - [x] La réconciliation relève la file au début et supprime les marquages traités à la fin. L'invariant du voisinage à un saut s'exprime avec le marquage.
-- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
+- [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 5 — Mises à jour HOT
 
