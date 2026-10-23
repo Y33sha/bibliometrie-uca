@@ -19,6 +19,8 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.sources.registry import (
     ALL_SOURCES_SET as VALID_SOURCES,
     DOI_ORG,
+    PROFILES,
+    Source,
 )
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
@@ -69,13 +71,6 @@ class DoiSearch(Protocol):
         """Écrit l'enregistrement source dans `staging` et efface les échecs que ses DOI démentent. Rend `True` sur une insertion. Ne commite pas."""
 
 
-# Pour crossref et datacite, les DOI candidats sont filtrés sur l'agence d'enregistrement (RA) de leur préfixe.
-_TARGET_RA: dict[str, str] = {
-    "crossref": "Crossref",
-    "datacite": "DataCite",
-}
-
-
 def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) -> list[str]:
     """DOI présents dans les autres sources et absents de la cible.
 
@@ -87,12 +82,12 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
 
     Exclut les DOI dont la recherche dans la cible a échoué il y a moins de `retry_after_days` jours (`failed_lookups`), et les DOI que doi.org ne connaît pas. Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance du délai, un DOI inexistant en sort définitivement.
 
-    Pour les cibles présentes dans `_TARGET_RA`, retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
+    Pour une cible agence d'enregistrement (`SourceProfile.registration_agency`), retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
     """
     if target not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {target}. Valides : {', '.join(VALID_SOURCES)}")
 
-    target_ra = _TARGET_RA.get(target)
+    target_ra = PROFILES[Source(target)].registration_agency
     join_clause = (
         "JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
@@ -148,7 +143,7 @@ async def fetch_missing_doi(
 
     Un DOI confirmé absent est inscrit dans `failed_lookups`. Un DOI ni trouvé ni absent attend le run suivant. `limit` plafonne le nombre de DOI d'une exécution.
 
-    Quand la source est l'agence d'enregistrement des DOI cherchés (`_TARGET_RA`), un DOI absent est soumis à doi.org. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG` ; un DOI qu'il connaît en est effacé.
+    Quand la source est l'agence d'enregistrement des DOI cherchés, un DOI absent est soumis à doi.org. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG` ; un DOI qu'il connaît en est effacé.
 
     `total` = DOI traités, `new` = enregistrements sources insérés, `extras["fetched"]` = enregistrements sources reçus, `extras["not_found"]` = DOI confirmés absents, `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
     """
@@ -173,7 +168,8 @@ async def fetch_missing_doi(
         "not_found": 0,
         "unknown_to_doi_org": 0,
     }
-    user_agent = polite_user_agent() if search.source_key in _TARGET_RA else None
+    is_agency = PROFILES[Source(search.source_key)].registration_agency is not None
+    user_agent = polite_user_agent() if is_agency else None
 
     async def _fetch(client: httpx2.AsyncClient, item: tuple[int, list[str]]) -> DoiBatchResult:
         batch_idx, batch = item

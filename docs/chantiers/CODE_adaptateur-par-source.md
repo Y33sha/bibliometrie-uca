@@ -48,8 +48,10 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ## Décisions
 
-- Chaque source expose un adaptateur dans `<source>/__init__.py` : client, extracteurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, budget de débit, politiques.
-- Les tables des phases et les nœuds du graphe se construisent depuis la liste des adaptateurs.
+- Le profil de chaque source (`SourceProfile`, dans `domain/sources/registry.py`) déclare ce que le pipeline en fait : libellé, capacités, agence d'enregistrement, politiques. Le graphe, les modes et le domaine le lisent : leurs contrats d'import leur interdisent `pipeline.ingestion`.
+- Chaque source expose un adaptateur dans `<source>/__init__.py`, par des fabriques paresseuses : client, moissonneurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, budget de débit. Les tables des phases se construisent depuis la liste des adaptateurs. Un test vérifie que chaque adaptateur a exactement les capacités de son profil.
+- L'API sert les libellés des sources au frontend.
+- theses.fr suit la fenêtre d'années du run, comme les autres sources.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
 - Le débit de chaque source est un budget en requêtes par seconde, appliqué par `RequestPace` dans la boucle commune.
 - La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
@@ -65,15 +67,16 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 2 — Réessais
 
-- [ ] Classement des tentatives et ses deux enveloppes, avec une seule issue à l'épuisement.
-- [ ] Scripts hors pipeline sous le breaker de leur source.
+- [x] Classement des tentatives et ses deux enveloppes, avec une seule issue à l'épuisement. a347cc389
+- [x] Scripts hors pipeline sous le breaker de leur source. a347cc389
 
 ### Phase 3 — Adaptateur et registre
 
+- [ ] Profil des sources, d'où se tirent les listes de sources, les identifiants de personne cherchés, les agences d'enregistrement, les sources sur option et le mode quotidien.
 - [ ] Protocole de l'adaptateur, implémenté pour les sept sources.
-- [ ] Tables des phases et réglages construits depuis les adaptateurs.
-- [ ] `PERSON_SEARCHED_SOURCES` et les agences d'enregistrement tirés des adaptateurs.
-- [ ] Test : chaque source du registre a un adaptateur complet.
+- [ ] Tables des phases construites depuis les adaptateurs.
+- [ ] Test : chaque adaptateur a exactement les capacités de son profil.
+- [ ] Libellés des sources servis par l'API au frontend.
 
 ### Phase 4 — Boucle de recherche commune et écriture dans `staging`
 
@@ -90,7 +93,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 6 — Politiques de source
 
-- [ ] Attributs de l'adaptateur à la place des littéraux des orchestrateurs.
+- [ ] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre.
 - [ ] Câblage commun de `harvest` et de `harvest_by_person`.
 
 ### Phase 7 — Normalisation
@@ -103,5 +106,5 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ## Questions ouvertes
 
-- Libellés des sources dans le frontend : servis par l'API, ou copiés sous un test de concordance.
+- Thèses en cours dans la fenêtre d'années : retenues selon leur année de première inscription, ou toujours.
 - Budget de débit des sources sans seuil publié : HAL, theses.fr, ScanR.

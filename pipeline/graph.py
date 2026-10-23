@@ -14,6 +14,8 @@ from domain.sources.registry import (
     ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     HARVESTED_SOURCES,
+    PERSON_SEARCHED_SOURCES,
+    PROFILES,
     SOURCE_PRIORITY,
     Source,
 )
@@ -150,16 +152,6 @@ _CONTAINERS = (
 )
 
 
-# Sources que la phase `harvest_by_person` interroge.
-PERSON_SEARCHED_SOURCES: tuple[Source, ...] = (
-    Source.DATACITE,
-    Source.CROSSREF,
-    Source.OPENALEX,
-    Source.HAL,
-    Source.SCANR,
-)
-
-
 def _containers(source: Source) -> tuple[str, ...]:
     """Référentiels de publication que lit et écrit la normalisation de `source` : aucun pour theses.fr."""
     return () if source == Source.THESES else _CONTAINERS
@@ -222,7 +214,7 @@ TASKS: tuple[Task, ...] = (
             reads=(
                 "source_records.doi",
                 "publication_relations",
-                *(("doi_prefixes.ra",) if source in (Source.CROSSREF, Source.DATACITE) else ()),
+                *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
             ),
             previous_run=("doi_prefixes", "publication_relations"),
             network=source,

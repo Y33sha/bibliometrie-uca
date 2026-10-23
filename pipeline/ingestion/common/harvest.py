@@ -4,7 +4,7 @@ Workflow (sans I/O ni threads : ceux-ci sont injectés) :
 
 - s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
 - lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
-- mode `since_last` (quotidien) : HAL en incrémental depuis le dernier moissonnage quotidien réussi ;
+- mode `since_last` (quotidien) : les sources incrémentales (`SourceProfile.incremental`) depuis le dernier moissonnage quotidien réussi ;
 - sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ; `theses` ignore la borne large (tout l'historique des PPN, sauf `--year`) ;
 - assemble les métriques par source et signale les sources non configurées.
 
@@ -41,7 +41,11 @@ from pipeline.ingestion.credentials import get_scanr_credentials, get_wos_api_ke
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.signals import signal_source_unconfigured, skipped
+from pipeline.runtime.observability.signals import (
+    select_targets,
+    signal_source_unconfigured,
+    skipped,
+)
 from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
@@ -82,20 +86,20 @@ class HarvestPhase:
         if self.count_extraction_structures(ctx) == 0:
             raise EmptyExtractionPerimeterError()
         policy = options.policy
-        effective = set(policy.harvest_sources) | ({"wos"} if options.include_wos else set())
-        effective &= options.sources
+        effective = set(
+            select_targets(HARVESTED_SOURCES, options.sources, include_wos=options.include_wos)
+        )
+        effective &= policy.harvest_sources
         last_daily = self._since_last_daily() if policy.year_selection == "since_last" else None
         since = last_daily[0].isoformat() if last_daily else None
-        if last_daily is not None:
-            # Le mode quotidien moissonne HAL seul.
-            effective &= {"hal"}
 
         def task(source: str) -> TaskRun:
             def run(ctx: PhaseContext) -> PhaseMetrics:
-                if last_daily is not None and source == "hal":
+                if last_daily is not None:
                     ctx.logger.info(
-                        "%sMode incrémental : enregistrements HAL modifiés depuis le %s (%s)",
+                        "%sMode incrémental : enregistrements %s modifiés depuis le %s (%s)",
                         BRANCH,
+                        source_label(source),
                         date_to_french(last_daily[0]),
                         last_daily[1],
                     )

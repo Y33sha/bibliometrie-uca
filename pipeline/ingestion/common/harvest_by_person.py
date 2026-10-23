@@ -12,10 +12,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from domain.sources.registry import source_label
+from domain.sources.registry import PERSON_SEARCHED_SOURCES, source_label
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from pipeline.graph import PERSON_SEARCHED_SOURCES
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,

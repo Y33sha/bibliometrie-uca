@@ -6,6 +6,7 @@ Utilisés par les phases à interrogation externe (`harvest`, `fetch_missing`, `
 import logging
 from collections.abc import Sequence, Set
 
+from domain.sources.registry import PROFILES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
@@ -46,11 +47,12 @@ def signal_source_unavailable(
 
 
 def select_targets(base: Sequence[str], sources: Set[str], *, include_wos: bool) -> list[str]:
-    """Sources à interroger : celles de `base` qui font partie de `sources`, moins WoS (opt-in via `include_wos`), dans l'ordre de `base`.
+    """Sources à interroger : celles de `base` qui font partie de `sources`, moins les sources sur option (`SourceProfile.opt_in`) sans `include_wos`, dans l'ordre de `base`.
 
     Prologue commun aux phases à interrogation externe. L'ordre stable garantit des logs et un dispatch déterministes.
     """
-    eligible = (set(base) & sources) - (set() if include_wos else {"wos"})
+    opt_in = set() if include_wos else {s for s, p in PROFILES.items() if p.opt_in}
+    eligible = (set(base) & sources) - opt_in
     return [t for t in base if t in eligible]
 
 
