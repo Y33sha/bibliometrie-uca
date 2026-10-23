@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `contributions` : build, synchronisation, purge des orphelines, référentiels vides, refresh des compteurs.
+"""Orchestrateur de la phase `contributions` : build, synchronisation, purge des publications, référentiels vides, refresh des compteurs.
 
 Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
 """
@@ -18,7 +18,7 @@ class _FakePurgeQueries:
         self._lots = [*lots, 0]
         self.limites: list[int | None] = []
 
-    def purge_orphan_publications(self, conn, *, limit=None) -> int:
+    def purge_publications(self, conn, *, limit=None) -> int:
         self.limites.append(limit)
         return self._lots.pop(0)
 
@@ -61,9 +61,7 @@ def _run(contexte, lots, *, build_metrics=None):
     metrics.details.setdefault("summary", {})
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
-        patch.object(
-            phase, "purge_orphan_publications", side_effect=purge.purge_orphan_publications
-        ),
+        patch.object(phase, "purge_publications", side_effect=purge.purge_publications),
         ExitStack() as stack,
     ):
         for patcher in _patch_sql(counts):
@@ -144,7 +142,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     metrics.details["summary"] = {}
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
-        patch.object(phase, "purge_orphan_publications", return_value=0),
+        patch.object(phase, "purge_publications", return_value=0),
         caplog.at_level(logging.INFO, logger="test"),
         ExitStack() as stack,
     ):

@@ -50,4 +50,4 @@ Une `source_record` modifiée (insérée, re-normalisée, corrigée) est marqué
 
 ## Rafraîchissement des métadonnées
 
-Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_records`. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. Les publications vidées de toutes leurs `source_records` sont supprimées. Enfin, le décompte de publications par adresse (`addresses.publication_count`) est recalculé pour refléter les créations, fusions et scissions.
+Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_records`. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. Les publications vidées de toutes leurs `source_records` sont supprimées.

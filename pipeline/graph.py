@@ -800,7 +800,7 @@ TASKS: tuple[Task, ...] = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Verdicts d'Unpaywall ; publications que `contributions.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `contributions.delete_empty_containers`.
+        # Verdicts d'Unpaywall ; publications que `contributions.purge_publications` supprime ; revues et monographies vides supprimées par `contributions.delete_empty_containers`.
         previous_run=(
             "source_records.countries",
             "publications.id",
@@ -809,14 +809,6 @@ TASKS: tuple[Task, ...] = (
             "journals",
             "monographs",
         ),
-    ),
-    _task(
-        "publications.delete_without_sources",
-        "publications",
-        reads=("publications.id", "source_records.publication_id"),
-        writes=("publications.id",),
-        # Lignes que `contributions.purge_orphan_publications` supprime plus loin dans le même run.
-        previous_run=("publications.id",),
     ),
     _task(
         "author_grouping.build",
@@ -852,7 +844,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_group_attributes_queue",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
+        # Publications que `contributions.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publication_contributions_queue",
@@ -1006,7 +998,7 @@ TASKS: tuple[Task, ...] = (
             "contributions.id",
         ),
         writes=("contributions.id",),
-        # Lignes que `contributions.purge_orphan_publications` supprime plus loin dans le même run.
+        # Lignes que `contributions.purge_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
         # Le planificateur estime la propagation des attributs sur les liens qui viennent d'être créés.
         maintenance=("ANALYZE contributions",),
@@ -1036,7 +1028,7 @@ TASKS: tuple[Task, ...] = (
         "contributions",
         reads=("contributions", "persons.exclusion", "publications.id"),
         writes=("publications.in_perimeter",),
-        # Lignes que `contributions.purge_orphan_publications` supprime plus loin dans le même run.
+        # Lignes que `contributions.purge_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
     _task(
@@ -1052,9 +1044,9 @@ TASKS: tuple[Task, ...] = (
         writes=("contribution_structures", "publication_structures"),
     ),
     _task(
-        "contributions.purge_orphan_publications",
+        "contributions.purge_publications",
         "contributions",
-        reads=("publications.id", "contributions"),
+        reads=("publications.id", "source_records.publication_id", "contributions"),
         writes=("publications.id",),
     ),
     _task(

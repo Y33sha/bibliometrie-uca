@@ -4,7 +4,7 @@ Tâches (`pipeline.graph`), chacune dans sa transaction :
 
 1. **build** — consolide les `source_contributions` en contributions (une entrée par couple publication × personne). Sa maintenance `ANALYZE contributions` précède la propagation.
 2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des contributions (indices de l'entrée dans le périmètre compris), le périmètre des publications et les matviews `contribution_structures`, `publication_structures`.
-3. **purge des orphelines** — supprime les publications rétrogradées à zéro contribution (défense en profondeur).
+3. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 5. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
@@ -29,12 +29,10 @@ from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, infle
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.publications.contributions.address_publication_count import (
-    recompute_address_publication_count,
-)
 from pipeline.transformation.publications.contributions.build_contributions import (
     build as build_contributions,
 )
+from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
@@ -54,31 +52,11 @@ from pipeline.transformation.publishing.publishers import delete_empty_publisher
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
 )
+from pipeline.transformation.structures.address_publication_count import (
+    recompute_address_publication_count,
+)
 
 _PURGE_BATCH_SIZE = 5000
-
-
-def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> int:
-    """Supprime les publications sans aucune contribution, un lot de `limit` au plus. Retourne le nombre supprimé.
-
-    La réconciliation crée une publication pour une partition d'orphelins du périmètre seulement : une publication naît avec au moins une contribution attendu. Elle tombe à zéro contribution quand sa dernière contribution source du périmètre disparaît (personne détachée, structure sortie du périmètre, forme de nom rejetée). `publication_subjects` suit par `ON DELETE CASCADE`.
-    """
-    limit_clause = "LIMIT :lim" if limit is not None else ""
-    return conn.execute(
-        text(
-            f"""
-            DELETE FROM publications
-            WHERE id IN (
-                SELECT p.id FROM publications p
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM contributions a WHERE a.publication_id = p.id
-                )
-                {limit_clause}
-            )
-            """
-        ),
-        {"lim": limit} if limit is not None else {},
-    ).rowcount
 
 
 def propagate_contribution_attributes(conn: Connection) -> int:
@@ -136,7 +114,7 @@ class ContributionsPhase:
 
         def purge(ctx: PhaseContext) -> PhaseMetrics:
             metrics = PhaseMetrics()
-            metrics.details["purged"] = _purge_orphan_publications(ctx.open_tx)
+            metrics.details["purged"] = _purge_publications(ctx.open_tx)
             return metrics
 
         def empty_containers(ctx: PhaseContext) -> PhaseMetrics:
@@ -164,7 +142,7 @@ class ContributionsPhase:
                 "contributions.structures": TaskStep(
                     structures, section=sync_section, label="Structures des liens"
                 ),
-                "contributions.purge_orphan_publications": TaskStep(purge),
+                "contributions.purge_publications": TaskStep(purge),
                 "contributions.delete_empty_containers": TaskStep(empty_containers),
                 "contributions.publication_counts": TaskStep(publication_counts),
             },
@@ -177,9 +155,9 @@ class ContributionsPhase:
             summary["total_in_perimeter"] = by_task["contributions.propagate"].details[
                 "in_perimeter"
             ]
-            summary["publications_purged"] = by_task[
-                "contributions.purge_orphan_publications"
-            ].details["purged"]
+            summary["publications_purged"] = by_task["contributions.purge_publications"].details[
+                "purged"
+            ]
         return metrics
 
 
@@ -190,12 +168,12 @@ def _timed(t0: float) -> PhaseMetrics:
     return metrics
 
 
-def _purge_orphan_publications(open_tx: OpenTransaction) -> int:
-    """Purge par lots (commit par chunk). Retourne le nombre de publications supprimées."""
+def _purge_publications(open_tx: OpenTransaction) -> int:
+    """Purge par lots, un commit par lot. Rend le nombre de publications supprimées."""
     n = 0
     with open_tx() as conn:
         while True:
-            deleted = purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
+            deleted = purge_publications(conn, limit=_PURGE_BATCH_SIZE)
             if deleted == 0:
                 break
             conn.commit()

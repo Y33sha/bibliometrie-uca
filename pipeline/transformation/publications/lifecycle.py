@@ -1,6 +1,6 @@
-"""Cycle de vie d'une publication : création, suppression après recalcul, dissolution, suppression des publications sans source.
+"""Cycle de vie d'une publication : création, suppression après recalcul, dissolution, purge.
 
-Une publication existe si elle a au moins une `source_record`, un type admissible et au moins une contribution. `refresh` vérifie la `source_record` et le type après le recalcul d'une publication. `delete_publications_without_sources` vérifie la `source_record` sur toute la table. La phase `contributions` supprime les publications sans contribution (`purge_orphan_publications`).
+Une publication existe si elle a au moins une `source_record`, un type admissible et au moins une contribution. `refresh` vérifie la `source_record` et le type après le recalcul d'une publication. `purge_publications` vérifie la `source_record` et la contribution sur toute la table, une fois les contributions construites.
 """
 
 from sqlalchemy import Connection, text
@@ -56,13 +56,21 @@ def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
     store.delete(publication_id)
 
 
-def delete_publications_without_sources(conn: Connection) -> int:
-    """Supprime les publications auxquelles plus aucune `source_record` n'est rattachée. Rend le nombre de publications supprimées."""
+def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
+    """Supprime les publications sans `source_record` ou sans contribution, un lot de `limit` au plus. Rend le nombre de publications supprimées.
+
+    Une publication perd sa dernière `source_record` quand la phase `normalize` retire un document disparu de sa source. Elle perd sa dernière contribution quand sa dernière contribution source du périmètre disparaît : personne détachée, structure sortie du périmètre, forme de nom rejetée. `publication_subjects` suit par `ON DELETE CASCADE`.
+    """
+    limit_clause = "LIMIT :lim" if limit is not None else ""
     return conn.execute(
-        text("""
-            DELETE FROM publications p
-            WHERE NOT EXISTS (
-                SELECT 1 FROM source_records sr WHERE sr.publication_id = p.id
+        text(f"""
+            DELETE FROM publications
+            WHERE id IN (
+                SELECT p.id FROM publications p
+                WHERE NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publication_id = p.id)
+                   OR NOT EXISTS (SELECT 1 FROM contributions c WHERE c.publication_id = p.id)
+                {limit_clause}
             )
-        """)
+        """),
+        {"lim": limit} if limit is not None else {},
     ).rowcount
