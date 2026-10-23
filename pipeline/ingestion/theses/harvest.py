@@ -1,6 +1,6 @@
 """Moissonnage theses.fr : tâche `harvest.theses`.
 
-Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. Sans année demandée, ramène tout l'historique theses.fr de ces établissements : la plage d'années de la configuration ne s'applique pas.
+Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. La requête ramène tout l'historique theses.fr de ces établissements. Le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours.
 """
 
 from __future__ import annotations

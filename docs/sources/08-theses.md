@@ -14,7 +14,8 @@ theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses fr
 
 - Pas d'authentification
 - Requête : `q=etabSoutenancePpn:(<PPN>)`, pagination par `debut` / `nombre`
-- 500 résultats par page (max accepté par l'API), 0.3 s de délai entre requêtes
+- 500 résultats par page (max accepté par l'API), à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- L'API ne filtre pas par année : le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours
 
 ## Données récupérées
 
@@ -100,7 +101,7 @@ Les thèses en cours n'ont ni NNT ni DOI ; leur identifiant theses.fr (`sXXXXXX`
 
 ### 5 rôles dans une thèse, tous matérialisés comme contributions
 
-`auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `supervisor`, `reviewer`, `committee_member`, `committee_president`). Seuls les auteurs ont un `author_position` ; les autres rôles ont `author_position = NULL`.
+`auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont un `author_position` ; les autres rôles ont `author_position = NULL`.
 
 Une personne qui apparaît dans plusieurs champs est dédupliquée et a plusieurs rôles. Clé de déduplication : PPN si présent, sinon `(nom, prenom)`.
 

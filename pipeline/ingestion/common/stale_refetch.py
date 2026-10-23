@@ -26,7 +26,7 @@ type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
 class StaleRefetch(ABC):
     """Nouvelle lecture d'un document d'une source par son identifiant natif.
 
-    Les sous-classes fixent `source_key` et `max_concurrent`, et implémentent `fetch_by_native_id`. Le débit suit le profil de la source.
+    Les sous-classes fixent `source_key` et `max_concurrent`, et implémentent `fetch_by_native_id`. Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
     """
 
     source_key: str

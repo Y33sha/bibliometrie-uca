@@ -120,7 +120,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 8 — Documentation
 
-- [ ] Mise à jour de `docs/sources` et de `docs/pipeline`.
+- [x] Mise à jour de `docs/sources` et de `docs/pipeline`.
 
 ## Questions ouvertes
 

@@ -27,7 +27,7 @@ Ce que le projet interroge dans chaque source, indépendamment de ce que l'API o
 | OpenAlex | institution (filtre `lineage`) + année | ORCID | DOI |
 | Web of Science | champ OG (Organization) + année | — | DOI |
 | ScanR | identifiant SIREN + année | ORCID, IdRef | DOI |
-| theses.fr | PPN d'établissement | — | NNT |
+| theses.fr | PPN d'établissement + année de soutenance | — | NNT |
 | Crossref | — | ORCID | DOI |
 | DataCite | mot-clé d'affiliation + année | ORCID | DOI |
 

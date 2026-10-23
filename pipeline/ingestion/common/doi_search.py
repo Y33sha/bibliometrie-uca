@@ -36,7 +36,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 class DoiSearch(Protocol):
     """Recherche par DOI dans une source : requête d'un lot de DOI.
 
-    Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées. Le débit suit le profil de la source.
+    Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées. Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
     """
 
     source_key: str
