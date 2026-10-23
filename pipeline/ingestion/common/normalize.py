@@ -21,6 +21,8 @@ from sqlalchemy import Connection
 
 from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.adapter import SourceAdapter
 from pipeline.ingestion.common.normalizer import (
     BibliographicNormalizer,
     NormalizeStats,
@@ -37,13 +39,7 @@ from pipeline.ingestion.common.source_records import (
     delete_disappeared_source_records,
 )
 from pipeline.ingestion.common.staging import StagingStore
-from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-from pipeline.ingestion.datacite.normalize import DataciteNormalizer
-from pipeline.ingestion.hal.normalize import HalNormalizer
-from pipeline.ingestion.openalex.normalize import OpenalexNormalizer
-from pipeline.ingestion.scanr.normalize import ScanrNormalizer
 from pipeline.ingestion.theses.normalize import ThesesNormalizer
-from pipeline.ingestion.wos.normalize import WosNormalizer
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -210,36 +206,38 @@ def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
 
 
 def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
-    """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
+    """Constructeur du normaliseur de chaque source, sur les stores de la phase. Les sources bibliographiques partagent un câblage ; `theses` a le sien, sans store de revue ni d'éditeur."""
 
     raw_store = get_raw_store() if archive else NullRawStore()
 
-    def _biblio(cls: type[BibliographicNormalizer]) -> NormalizerFactory:
-        return lambda conn, logger: cls(
-            conn,
-            logger,
-            StagingStore(conn, raw_store),
-            SourceRecordStore(conn),
-            container_stores=ContainerStores.of(conn),
-            publisher_store=PublisherStore(conn),
-            contribution_store=SourceContributionStore(conn),
-        )
+    def builder(adapter: SourceAdapter) -> NormalizerFactory:
+        def build(conn: Connection, logger: logging.Logger) -> SourceNormalizer:
+            cls = adapter.normalizer()
+            staging_store = StagingStore(conn, raw_store)
+            contribution_store = SourceContributionStore(conn)
+            if issubclass(cls, BibliographicNormalizer):
+                return cls(
+                    conn,
+                    logger,
+                    staging_store,
+                    SourceRecordStore(conn),
+                    container_stores=ContainerStores.of(conn),
+                    publisher_store=PublisherStore(conn),
+                    contribution_store=contribution_store,
+                )
+            if issubclass(cls, ThesesNormalizer):
+                return cls(
+                    conn,
+                    logger,
+                    staging_store,
+                    SourceRecordStore(conn),
+                    contribution_store=contribution_store,
+                )
+            raise TypeError(f"{adapter.source} : normaliseur sans câblage ({cls.__name__})")
 
-    return {
-        "theses": lambda conn, logger: ThesesNormalizer(
-            conn,
-            logger,
-            StagingStore(conn, raw_store),
-            SourceRecordStore(conn),
-            contribution_store=SourceContributionStore(conn),
-        ),
-        "crossref": _biblio(CrossrefNormalizer),
-        "datacite": _biblio(DataciteNormalizer),
-        "scanr": _biblio(ScanrNormalizer),
-        "hal": _biblio(HalNormalizer),
-        "openalex": _biblio(OpenalexNormalizer),
-        "wos": _biblio(WosNormalizer),
-    }
+        return build
+
+    return {source.value: builder(adapter) for source, adapter in ADAPTERS.items()}
 
 
 def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStats:

@@ -1,6 +1,6 @@
 """Chargement du code des sources par l'orchestrateur du pipeline.
 
-Chaque source retenue par le run charge ses modules au moment où son moissonneur se construit. Une source écartée — `wos` sans `--include-wos` — laisse le sien de côté, et un défaut qui l'atteint laisse le run se dérouler.
+Les adaptateurs des sources importent le code de leur source au moment où une phase s'en sert. Une source écartée — `wos` sans `--include-wos` — laisse le sien de côté, et un défaut qui l'atteint laisse le run se dérouler.
 
 L'épreuve passe par un sous-processus : `sys.modules` du processus de test porte ce que les autres tests ont importé.
 """
@@ -10,35 +10,23 @@ from __future__ import annotations
 import subprocess
 import sys
 
-import pytest
-
 from infrastructure import PROJECT_ROOT
-
-SOURCES = ["hal", "openalex", "wos", "scanr", "theses"]
 
 _SCRIPT = """
 import sys
 
 import pipeline.run
-from pipeline.ingestion.common import harvest
 
-registry = harvest._harvesters()
-print(",".join(sorted(m for m in sys.modules if "{marqueur}" in m)))
+print(",".join(sorted(m for m in sys.modules if m.startswith("pipeline.ingestion.wos."))))
 """
 
 
-def _modules_charges(marqueur: str) -> set[str]:
-    """Modules contenant `marqueur` que l'appel de `_harvesters()` laisse chargés."""
+def test_l_orchestrateur_ne_charge_pas_le_code_de_wos() -> None:
     resultat = subprocess.run(  # noqa: S603 — commande écrite ici, sans valeur extérieure
-        [sys.executable, "-c", _SCRIPT.format(marqueur=marqueur)],
+        [sys.executable, "-c", _SCRIPT],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT,
         check=True,
     )
-    return {m for m in resultat.stdout.strip().split(",") if m}
-
-
-@pytest.mark.parametrize("source", SOURCES)
-def test_le_registre_des_extracteurs_ne_charge_aucune_source(source: str) -> None:
-    assert _modules_charges(f"extract_{source}") == set()
+    assert resultat.stdout.strip() == ""

@@ -7,7 +7,6 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
 )
 from pipeline.graph import PHASE_ORDER, TASKS, Task, dependencies, order_violations
-from pipeline.ingestion.common import harvest
 from pipeline.ingestion.common.normalize import _normalize_builders
 
 
@@ -27,7 +26,6 @@ def test_les_taches_d_une_phase_se_suivent():
 def test_une_tache_d_extraction_par_source_moissonnee():
     extract_tasks = [n.name for n in TASKS if n.phase == "harvest"]
     assert extract_tasks == [f"harvest.{s}" for s in HARVESTED_SOURCES]
-    assert set(harvest._harvesters()) == {s.value for s in HARVESTED_SOURCES}
 
 
 def test_une_tache_de_relecture_par_source():

@@ -18,18 +18,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
-from domain.sources.registry import ALL_SOURCES, source_label
-from pipeline.ingestion.common.stale_refetch import (
-    StaleRefetch,
-    refresh,
-)
-from pipeline.ingestion.crossref.fetch_stale import CrossrefStaleRefetch
-from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
-from pipeline.ingestion.hal.fetch_stale import HalStaleRefetch
-from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
-from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
-from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
-from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
+from domain.sources.registry import ALL_SOURCES, Source, source_label
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.stale_refetch import refresh
 from pipeline.runtime.config import delay, get_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
@@ -123,27 +114,12 @@ def _get_years_for_window(ctx: PhaseContext, start_year: int | None) -> list[int
         return get_years(conn, start_year)
 
 
-def _make_refetch(source: str) -> StaleRefetch:
-    """Construit la nouvelle lecture par identifiant natif d'une source."""
-
-    refetches: dict[str, type[StaleRefetch]] = {
-        "hal": HalStaleRefetch,
-        "openalex": OpenalexStaleRefetch,
-        "wos": WosStaleRefetch,
-        "scanr": ScanrStaleRefetch,
-        "theses": ThesesStaleRefetch,
-        "crossref": CrossrefStaleRefetch,
-        "datacite": DataciteStaleRefetch,
-    }
-    return refetches[source]()
-
-
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    refetch = _make_refetch(target)
+    refetch = ADAPTERS[Source(target)].stale_refetch()
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
         return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))

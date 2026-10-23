@@ -2,27 +2,18 @@
 
 Une tâche par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
 
-Les identifiants de personne que chaque source accepte sont dans `domain/sources/person_search.py`.
+Les identifiants de personne que chaque source accepte sont dans son profil (`domain/sources/registry.py`).
 """
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from domain.sources.registry import PERSON_SEARCHED_SOURCES, source_label
-from infrastructure import PROJECT_ROOT
-from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
-    Harvester,
-    HarvesterFactory,
-    HarvestWindow,
-)
-from pipeline.ingestion.credentials import get_scanr_credentials
+from domain.sources.registry import PERSON_SEARCHED_SOURCES, Source, source_label
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.harvester import HarvestConfigError, HarvestWindow, run_harvest
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -31,7 +22,7 @@ from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 if TYPE_CHECKING:
-    from sqlalchemy import Connection
+    pass
 
 
 SearchOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
@@ -92,54 +83,9 @@ class HarvestByPersonPhase:
 
 
 def build() -> Phase:
-    registry = _harvesters()
-
     def search_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
-        source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
-        with ctx.open_tx() as conn:
-            return registry[source](conn, source_log).run(window)
+        harvester = ADAPTERS[Source(source)].person_harvester
+        assert harvester is not None, f"{source} : source cherchée par personne sans moissonneur"
+        return run_harvest(ctx, source, harvester, window)
 
     return HarvestByPersonPhase(search_one=search_one, run_parallel=run_parallel)
-
-
-def _harvesters() -> dict[str, HarvesterFactory]:
-    """Constructeur du moissonneur par personne de chaque source. Chaque constructeur importe les modules de sa source au moment où il s'exécute."""
-
-    def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.datacite.api import DataciteClient
-        from pipeline.ingestion.datacite.person_search import DatacitePersonHarvester
-
-        return DatacitePersonHarvester(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
-
-    def crossref(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.crossref.api import CrossrefClient
-        from pipeline.ingestion.crossref.person_search import CrossrefPersonHarvester
-
-        return CrossrefPersonHarvester(conn, source_log, CrossrefClient(API_BASE_URLS["crossref"]))
-
-    def openalex(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.openalex.api import OpenalexClient
-        from pipeline.ingestion.openalex.person_search import OpenalexPersonHarvester
-
-        return OpenalexPersonHarvester(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
-
-    def hal(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.hal.api import HalClient
-        from pipeline.ingestion.hal.person_search import HalPersonHarvester
-
-        return HalPersonHarvester(conn, source_log, HalClient(API_BASE_URLS["hal"]))
-
-    def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.scanr.api import ScanrClient
-        from pipeline.ingestion.scanr.person_search import ScanrPersonHarvester
-
-        client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
-        return ScanrPersonHarvester(conn, source_log, client)
-
-    return {
-        "datacite": datacite,
-        "crossref": crossref,
-        "openalex": openalex,
-        "hal": hal,
-        "scanr": scanr,
-    }

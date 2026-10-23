@@ -17,9 +17,12 @@ from sqlalchemy import Connection
 
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
+from infrastructure import PROJECT_ROOT
+from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
 from pipeline.runtime.config import get_years
+from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
     inflect,
@@ -35,6 +38,7 @@ __all__ = [
     "HarvestWindow",
     "HarvesterFactory",
     "SourceHarvester",
+    "run_harvest",
     "stage_document",
 ]
 
@@ -269,3 +273,12 @@ class Harvester(Protocol):
 
 type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]
 """Construit le moissonneur d'une source sur la connexion de sa phase et le journal scopé à la source."""
+
+
+def run_harvest(
+    ctx: PhaseContext, source: str, make_harvester: HarvesterFactory, window: HarvestWindow
+) -> PhaseMetrics:
+    """Exécute le moissonneur de `make_harvester` sur une connexion de la phase, avec le journal de la source."""
+    source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
+    with ctx.open_tx() as conn:
+        return make_harvester(conn, source_log).run(window)

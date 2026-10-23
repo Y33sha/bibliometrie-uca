@@ -29,7 +29,7 @@ def test_phase_extract_full_skips_unconfigured_source():
 
     with (
         patch.object(harvest, "_extraction_structure_count", return_value=1),
-        patch.object(harvest, "_run_harvest", side_effect=_extract),
+        patch.object(harvest, "run_harvest", side_effect=_extract),
     ):
         metrics = harvest.build().run(
             phase_context(
@@ -53,7 +53,7 @@ def test_phase_extract_daily_hal_unconfigured():
             return_value=None,
         ),
         patch.object(harvest, "_extraction_structure_count", return_value=1),
-        patch.object(harvest, "_run_harvest", side_effect=_extract),
+        patch.object(harvest, "run_harvest", side_effect=_extract),
     ):
         metrics = harvest.build().run(
             phase_context(RunOptions(mode="daily"), credentials_missing=lambda _source: None)

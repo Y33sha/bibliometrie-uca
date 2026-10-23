@@ -40,7 +40,7 @@ def _sans_config[S](cls: type[S], **attributs: object) -> S:
 class _FakeAdapter:
     """Recherche de test : rend un enregistrement source par DOI, sauf les DOI de `absents` ; insert qui compte."""
 
-    source_key = "fake"
+    source_key = "openalex"
     batch_size = 1
     max_concurrent = 3
     request_delay_s = 0.0
@@ -108,7 +108,7 @@ class TestRunAsyncOrchestrator:
         recorded: list = []
         adapter = _FakeAdapter(absents=frozenset({"10.1/b"}))
         result = await _run(adapter, ["10.1/a", "10.1/b"], recorded=recorded)
-        assert recorded == [("fake", "10.1/b")]
+        assert recorded == [("openalex", "10.1/b")]
         assert result.extras == {"fetched": 1, "not_found": 1, "unknown_to_doi_org": 0}
         assert adapter.inserted_records == [{"doi": "10.1/a"}]
 

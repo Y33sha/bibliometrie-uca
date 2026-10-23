@@ -14,19 +14,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
-from domain.sources.registry import (
-    DOI_SEARCHABLE_SOURCES,
-)
-from pipeline.ingestion.common.doi_search import (
-    DoiSearch,
-    fetch_missing_doi,
-)
-from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
-from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
-from pipeline.ingestion.hal.fetch_missing import HalDoiSearch
-from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
-from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
-from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES, Source
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import nothing_to_do
@@ -190,22 +180,10 @@ def _run_fetch_missing_theses_by_nnt(ctx: PhaseContext) -> PhaseMetrics:
         )
 
 
-def _make_doi_search(target: str) -> DoiSearch:
-    """Construit la recherche par DOI d'une source cible."""
-
-    searches: dict[str, type[DoiSearch]] = {
-        "hal": HalDoiSearch,
-        "openalex": OpenalexDoiSearch,
-        "wos": WosDoiSearch,
-        "scanr": ScanrDoiSearch,
-        "crossref": CrossrefDoiSearch,
-        "datacite": DataciteDoiSearch,
-    }
-    return searches[target]()
-
-
 def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
-    search = _make_doi_search(target)
+    doi_search = ADAPTERS[Source(target)].doi_search
+    assert doi_search is not None, f"{target} : source interrogeable par DOI sans recherche"
+    search = doi_search()
     with ctx.open_tx() as conn:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         limit = cap(conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE)

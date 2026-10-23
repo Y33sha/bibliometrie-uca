@@ -51,7 +51,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 - Le profil de chaque source (`SourceProfile`, dans `domain/sources/registry.py`) déclare ce que le pipeline en fait : libellé, capacités, agence d'enregistrement, politiques. Le graphe, les modes et le domaine le lisent : leurs contrats d'import leur interdisent `pipeline.ingestion`.
 - Chaque source expose un adaptateur dans `<source>/__init__.py`, par des fabriques paresseuses : client, moissonneurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, budget de débit. Les tables des phases se construisent depuis la liste des adaptateurs. Un test vérifie que chaque adaptateur a exactement les capacités de son profil.
 - L'API sert les libellés des sources au frontend.
-- theses.fr suit la fenêtre d'années du run, comme les autres sources.
+- theses.fr suit la fenêtre d'années du run, comme les autres sources, par l'année de soutenance. Les thèses en cours sont toujours retenues.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
 - Le débit de chaque source est un budget en requêtes par seconde, appliqué par `RequestPace` dans la boucle commune.
 - La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
@@ -72,7 +72,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 3 — Adaptateur et registre
 
-- [ ] Profil des sources, d'où se tirent les listes de sources, les identifiants de personne cherchés, les agences d'enregistrement, les sources sur option et le mode quotidien.
+- [x] Profil des sources, d'où se tirent les listes de sources, les identifiants de personne cherchés, les agences d'enregistrement, les sources sur option et le mode quotidien. ad79d4099
 - [ ] Protocole de l'adaptateur, implémenté pour les sept sources.
 - [ ] Tables des phases construites depuis les adaptateurs.
 - [ ] Test : chaque adaptateur a exactement les capacités de son profil.
@@ -93,7 +93,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 6 — Politiques de source
 
-- [ ] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre.
+- [ ] theses.fr dans la fenêtre d'années : moissonnage, relecture, suppression hors fenêtre, qui épargne les thèses en cours.
 - [ ] Câblage commun de `harvest` et de `harvest_by_person`.
 
 ### Phase 7 — Normalisation
@@ -106,5 +106,4 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ## Questions ouvertes
 
-- Thèses en cours dans la fenêtre d'années : retenues selon leur année de première inscription, ou toujours.
 - Budget de débit des sources sans seuil publié : HAL, theses.fr, ScanR.

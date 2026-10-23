@@ -24,7 +24,7 @@ _REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"
 def test_refetch_not_called_in_extract():
     with (
         patch.object(harvest, "_extraction_structure_count", return_value=1),
-        patch.object(harvest, "_run_harvest", return_value=PhaseMetrics()),
+        patch.object(harvest, "run_harvest", return_value=PhaseMetrics()),
         patch(_REFETCH, new_callable=AsyncMock) as refetch,
     ):
         harvest.build().run(

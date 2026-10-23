@@ -18,26 +18,17 @@ Les dépendances techniques sont injectées par le composition-root :
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from typing import TYPE_CHECKING
 
 from domain.dates import date_to_french, today
-from domain.sources.registry import HARVESTED_SOURCES, source_label
-from infrastructure import PROJECT_ROOT
-from infrastructure.observability.log import setup_logger
+from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
 from infrastructure.read_models.perimeters import get_extraction_structure_ids
-from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common.harvester import (
-    HarvestConfigError,
-    Harvester,
-    HarvesterFactory,
-    HarvestWindow,
-)
-from pipeline.ingestion.credentials import get_scanr_credentials, get_wos_api_key
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.harvester import HarvestConfigError, HarvestWindow, run_harvest
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -51,7 +42,7 @@ from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
 
 if TYPE_CHECKING:
-    from sqlalchemy import Connection
+    pass
 
 
 HarvestOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
@@ -165,10 +156,10 @@ class HarvestPhase:
 
 
 def build() -> Phase:
-    registry = _harvesters()
-
     def harvest_one(ctx: PhaseContext, source: str, window: HarvestWindow) -> PhaseMetrics:
-        return _run_harvest(ctx, source, registry[source], window)
+        harvester = ADAPTERS[Source(source)].harvester
+        assert harvester is not None, f"{source} : source moissonnée sans moissonneur"
+        return run_harvest(ctx, source, harvester, window)
 
     return HarvestPhase(
         count_extraction_structures=_extraction_structure_count,
@@ -182,70 +173,3 @@ def _extraction_structure_count(ctx: PhaseContext) -> int:
     """Nombre de structures du périmètre d'extraction, lu dans `perimeter_structures`."""
     with ctx.open_tx() as conn:
         return len(get_extraction_structure_ids(conn))
-
-
-def _harvesters() -> dict[str, HarvesterFactory]:
-    """Constructeur du moissonneur de chaque source : `(conn, source_log)` → moissonneur câblé.
-
-    `wos` et `scanr` lisent leurs identifiants d'API en configuration.
-
-    Chaque constructeur importe les modules de sa source au moment où il s'exécute. Une source écartée du run ne charge donc pas son code, et un défaut qui l'atteint laisse les autres tourner."""
-
-    def hal(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.hal.api import HalClient
-        from pipeline.ingestion.hal.harvest import HalHarvester
-
-        return HalHarvester(conn, source_log, HalClient(API_BASE_URLS["hal"]))
-
-    def openalex(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.openalex.api import OpenalexClient
-        from pipeline.ingestion.openalex.harvest import OpenalexHarvester
-
-        return OpenalexHarvester(conn, source_log, OpenalexClient(API_BASE_URLS["openalex"]))
-
-    def wos(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.wos.api import WosClient
-        from pipeline.ingestion.wos.harvest import WosHarvester
-
-        client = WosClient(API_BASE_URLS["wos"], api_key=get_wos_api_key())
-        return WosHarvester(conn, source_log, client)
-
-    def scanr(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.scanr.api import ScanrClient
-        from pipeline.ingestion.scanr.harvest import ScanrHarvester
-
-        client = ScanrClient(API_BASE_URLS["scanr"], credentials=get_scanr_credentials())
-        return ScanrHarvester(conn, source_log, client)
-
-    def theses(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.theses.api import ThesesClient
-        from pipeline.ingestion.theses.harvest import ThesesHarvester
-
-        return ThesesHarvester(conn, source_log, ThesesClient(API_BASE_URLS["theses"]))
-
-    def datacite(conn: Connection, source_log: logging.Logger) -> Harvester:
-        from pipeline.ingestion.datacite.api import DataciteClient
-        from pipeline.ingestion.datacite.harvest import DataciteHarvester
-
-        return DataciteHarvester(conn, source_log, DataciteClient(API_BASE_URLS["datacite"]))
-
-    return {
-        "hal": hal,
-        "openalex": openalex,
-        "wos": wos,
-        "scanr": scanr,
-        "theses": theses,
-        "datacite": datacite,
-    }
-
-
-def _run_harvest(
-    ctx: PhaseContext,
-    source: str,
-    make_harvester: HarvesterFactory,
-    window: HarvestWindow,
-) -> PhaseMetrics:
-    """Déroulé commun d'une extraction : ouverture de la connexion, exécution, fermeture. `make_harvester` contient le câblage propre à la source."""
-    source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
-    with ctx.open_tx() as conn:
-        return make_harvester(conn, source_log).run(window)
