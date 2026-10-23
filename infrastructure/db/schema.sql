@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jHFaunjjjv4pKoPqlfyEU8jLnQ3KD0GcQ1GB0XO9Wnh1aSdM9o8CueGxw0Kvnbn
+\restrict 33BuihB9OPczMIEY6dguVoaE0AfTfZOYur4QLk9q4jm2ySgCQkOfzHevglJDZa2
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -4850,54 +4850,6 @@ ALTER TABLE ONLY publishing.publisher_name_forms
 
 
 --
--- Name: address_candidates_queue address_candidates_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.address_candidates_queue
-    ADD CONSTRAINT address_candidates_queue_id_fkey FOREIGN KEY (id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
-
-
---
--- Name: address_countries_queue address_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.address_countries_queue
-    ADD CONSTRAINT address_countries_queue_id_fkey FOREIGN KEY (id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
-
-
---
--- Name: publication_contributions_queue publication_contributions_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.publication_contributions_queue
-    ADD CONSTRAINT publication_contributions_queue_id_fkey FOREIGN KEY (id) REFERENCES publications.publications(id) ON DELETE CASCADE;
-
-
---
--- Name: source_contribution_countries_queue source_contribution_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.source_contribution_countries_queue
-    ADD CONSTRAINT source_contribution_countries_queue_id_fkey FOREIGN KEY (id) REFERENCES sources.source_contributions(id) ON DELETE CASCADE;
-
-
---
--- Name: source_contribution_group_attributes_queue source_contribution_group_attributes_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.source_contribution_group_attributes_queue
-    ADD CONSTRAINT source_contribution_group_attributes_queue_id_fkey FOREIGN KEY (id) REFERENCES publications.source_contribution_groups(id) ON DELETE CASCADE;
-
-
---
--- Name: source_record_keys_queue source_record_keys_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.source_record_keys_queue
-    ADD CONSTRAINT source_record_keys_queue_id_fkey FOREIGN KEY (id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
-
-
---
 -- Name: hal_structure_aliases hal_structure_aliases_hal_structure_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -5157,5 +5109,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jHFaunjjjv4pKoPqlfyEU8jLnQ3KD0GcQ1GB0XO9Wnh1aSdM9o8CueGxw0Kvnbn
+\unrestrict 33BuihB9OPczMIEY6dguVoaE0AfTfZOYur4QLk9q4jm2ySgCQkOfzHevglJDZa2
 
