@@ -370,14 +370,21 @@ class SourceContributionStore:
             )
 
     def upsert_addresses_batch(self, values: list[AddressBatchItem]) -> None:
+        """Crée les adresses absentes de la base, et les marque pour la détection de leur pays."""
         if not values:
             return
-        stmt = text("""
-            INSERT INTO addresses (raw_text, normalized_text)
-            SELECT t.raw, t.norm
-            FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
-            ON CONFLICT (md5(normalized_text)) DO NOTHING
-        """).bindparams(bindparam("payload", type_=Jsonb))
+        stmt = text(
+            """
+            WITH inserted AS (
+                INSERT INTO addresses (raw_text, normalized_text)
+                SELECT t.raw, t.norm
+                FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
+                ON CONFLICT (md5(normalized_text)) DO NOTHING
+                RETURNING id
+            )
+            """
+            + enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM inserted")
+        ).bindparams(bindparam("payload", type_=Jsonb))
         self._conn.execute(stmt, {"payload": list(values)})
 
     def fetch_address_ids_by_normalized_text(self, normalized_texts: list[str]) -> dict[str, int]:

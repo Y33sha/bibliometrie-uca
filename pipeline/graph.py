@@ -278,7 +278,7 @@ TASKS: tuple[Task, ...] = (
                 "source_contribution_hal_structures",
                 "contributor_information",
                 "addresses.id",
-                "addresses.candidates_dirty",
+                "address_candidates_queue",
                 "address_country_candidates",
                 "publications.contributions_dirty",
                 "source_contribution_countries_queue",
@@ -332,7 +332,12 @@ TASKS: tuple[Task, ...] = (
         "normalize",
         reads=("source_contribution_addresses", "addresses.id"),
         # La suppression d'une adresse emporte ses liens aux structures et son marquage.
-        writes=("addresses.id", "address_structures", "address_countries_queue"),
+        writes=(
+            "addresses.id",
+            "address_structures",
+            "address_countries_queue",
+            "address_candidates_queue",
+        ),
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
     ),
@@ -347,7 +352,7 @@ TASKS: tuple[Task, ...] = (
             # Dépendants d'une organisation qui change de pays.
             "source_contribution_countries_queue",
             "address_country_candidates",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
         previous_run=("ror_dump_imports",),
         network="zenodo",
@@ -1146,7 +1151,7 @@ TASKS: tuple[Task, ...] = (
         "countries.ror",
         "countries",
         reads=("source_contribution_rors", "ror_organizations", "countries", "addresses.id"),
-        writes=("address_country_candidates", "addresses.candidates_dirty"),
+        writes=("address_country_candidates", "address_candidates_queue"),
     ),
     _task(
         "countries.detect",
@@ -1156,11 +1161,11 @@ TASKS: tuple[Task, ...] = (
             "countries",
             "addresses.id",
             "addresses.normalized_text",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
-        writes=("address_country_candidates", "addresses.candidates_dirty"),
-        # Adresses marquées depuis la dernière résolution, que `countries.resolve` efface.
-        previous_run=("addresses.candidates_dirty",),
+        writes=("address_country_candidates",),
+        # Adresses marquées depuis la dernière résolution, que `countries.resolve` retire de la file.
+        previous_run=("address_candidates_queue",),
     ),
     _task(
         "countries.resolve",
@@ -1169,12 +1174,12 @@ TASKS: tuple[Task, ...] = (
             "address_country_candidates",
             "addresses.id",
             "addresses.countries",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
         writes=(
             "addresses.countries",
             "address_countries_queue",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
     ),
     _task(

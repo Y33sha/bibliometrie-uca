@@ -30,9 +30,7 @@ def main() -> int:
 
     with get_sync_engine().begin() as conn:
         if args.dry_run:
-            count = conn.execute(
-                text("SELECT count(*) FROM addresses WHERE NOT candidates_dirty")
-            ).scalar_one()
+            count = conn.execute(text("SELECT count(*) FROM addresses")).scalar_one()
             log.info("adresses à marquer : %d", count)
             return 0
         marked = CountryCandidatesStore(conn).mark_all_for_detection()

@@ -1,6 +1,6 @@
 """Détection du pays d'une adresse par **nom de lieu** : candidats `institution` et `city`.
 
-Cherche dans tout le texte normalisé des adresses à traiter (`candidates_dirty`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée.
+Cherche dans tout le texte normalisé des adresses en file (`address_candidates_queue`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée.
 
 Le commit est laissé au caller.
 """
@@ -39,7 +39,7 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     """
     step(logger, "Pays des adresses d'après les noms de villes et d'institutions")
     store = CountryCandidatesStore(conn)
-    rows = store.dirty_addresses()
+    rows = store.queued_addresses()
     added = 0
     for kind, method in _METHODS.items():
         detector = PlaceNameDetector(load_place_forms(conn, kind))
@@ -48,7 +48,7 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
             for addr_id, normalized_text in rows
             if (isos := detector.detect(normalized_text))
         ]
-        n = store.replace_for_dirty_addresses(method, proposals)
+        n = store.replace_for_queued_addresses(method, proposals)
         logger.info(
             "%s%s : pays trouvé pour %s",
             BRANCH if method is CountryDetectionMethod.INSTITUTION else LAST_BRANCH,

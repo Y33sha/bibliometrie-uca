@@ -86,7 +86,7 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
         {"addr": address},
     )
     clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
-    sa_sync_conn.execute(text("UPDATE addresses SET candidates_dirty = false"))
+    clear(sa_sync_conn, Queue.ADDRESS_CANDIDATES)
 
     store.replace_all([_org(UNIV, "it"), _org(LABO)], [], version="v2.14")
 
@@ -100,6 +100,4 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
         .all()
     )
     assert methods == ["city"]
-    assert sa_sync_conn.execute(
-        text("SELECT candidates_dirty FROM addresses WHERE id = :a"), {"a": address}
-    ).scalar_one()
+    assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == {address}

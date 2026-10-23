@@ -46,9 +46,10 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ### Phase 2 — Candidats pays des adresses
 
-- [ ] File `address_candidates_queue`, remplie depuis `candidates_dirty`.
-- [ ] Marquage dans `normalize`, l'import ROR, le dépôt d'adresses de l'API et `redetect_address_countries`.
-- [ ] Détection et résolution lisent la file.
+- [x] File `address_candidates_queue`, remplie depuis `candidates_dirty`.
+- [x] Marquage dans `normalize`, l'import ROR, le dépôt d'adresses de l'API et `redetect_address_countries`. La détection par le texte traite les adresses en file sans les marquer.
+- [x] Détection et résolution lisent la file. La résolution immédiate de l'API laisse l'adresse en file : le run suivant refait sa détection.
+- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 3 — Groupement des auteurs
 

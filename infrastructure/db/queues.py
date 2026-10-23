@@ -15,6 +15,8 @@ class Queue(StrEnum):
     """Contributions sources dont les pays sont à recalculer."""
     ADDRESS_COUNTRIES = "address_countries_queue"
     """Adresses dont les pays changent : les pays de leurs contributions sources sont à recalculer."""
+    ADDRESS_CANDIDATES = "address_candidates_queue"
+    """Adresses dont les pays candidats sont à détecter par le texte, puis à résoudre."""
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:
@@ -30,9 +32,9 @@ def enqueue_sql(queue: Queue, ids_sql: str) -> str:
     """  # noqa: S608
 
 
-def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> None:
-    """Marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne."""
-    conn.execute(text(enqueue_sql(queue, ids_sql)), params)
+def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> int:
+    """Marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne. Retourne le nombre d'identifiants marqués."""
+    return conn.execute(text(enqueue_sql(queue, ids_sql)), params).rowcount
 
 
 def snapshot(conn: Connection, queue: Queue, table: str) -> None:

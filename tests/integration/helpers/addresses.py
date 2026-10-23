@@ -2,6 +2,7 @@
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.queues import Queue, enqueue
 from tests.integration.helpers.rows import insert_row
 
 
@@ -15,14 +16,14 @@ def insert_address(
     publication_count: int | None = None,
     reuse: bool = False,
 ) -> int:
-    """Insère une adresse et renvoie son `id`. `row_id` fixe l'`id`. Le texte normalisé vaut par défaut le texte brut en minuscules. `reuse` renvoie l'adresse de même texte brut si elle existe."""
+    """Insère une adresse, la marque pour la détection de son pays comme la normalisation, et renvoie son `id`. `row_id` fixe l'`id`. Le texte normalisé vaut par défaut le texte brut en minuscules. `reuse` renvoie l'adresse de même texte brut si elle existe."""
     if reuse:
         existing = conn.execute(
             text("SELECT id FROM addresses WHERE md5(raw_text) = md5(:raw)"), {"raw": raw_text}
         ).scalar_one_or_none()
         if existing is not None:
             return existing
-    return insert_row(
+    address_id = insert_row(
         conn,
         "addresses",
         {
@@ -33,6 +34,8 @@ def insert_address(
             "publication_count": publication_count,
         },
     )
+    enqueue(conn, Queue.ADDRESS_CANDIDATES, "SELECT CAST(:id AS integer)", {"id": address_id})
+    return address_id
 
 
 def insert_address_structure(

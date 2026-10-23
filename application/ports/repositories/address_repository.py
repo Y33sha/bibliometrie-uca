@@ -76,11 +76,11 @@ class AddressRepository(Protocol):
         ...
 
     def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
-        """Fait de `countries` les pays saisis à la main (candidats `manual`) de l'adresse, et la marque `candidates_dirty`. Liste vide ou `None` : l'adresse est rendue aux moyens automatiques. Lève `NotFoundError` si l'adresse est introuvable."""
+        """Fait de `countries` les pays saisis à la main (candidats `manual`) de l'adresse, et la met dans la file `address_candidates_queue`. Liste vide ou `None` : l'adresse est rendue aux moyens automatiques. Lève `NotFoundError` si l'adresse est introuvable."""
         ...
 
     def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la marque `candidates_dirty`. Retourne les ids atteints."""
+        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Retourne les ids atteints."""
         ...
 
     def add_manual_country_by_filter(

@@ -90,12 +90,16 @@ class RorStore:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le tâche `countries.ror` recrée leurs candidats."""
+        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses pour la détection : la tâche `countries.ror` recrée leurs candidats."""
         if not ror_ids:
             return
         marked_contributions = enqueue_sql(
             Queue.SOURCE_CONTRIBUTION_COUNTRIES,
             "SELECT source_contribution_id FROM linked WHERE address_id IS NULL",
+        )
+        marked_addresses = enqueue_sql(
+            Queue.ADDRESS_CANDIDATES,
+            "SELECT address_id FROM linked WHERE address_id IS NOT NULL",
         )
         self._conn.execute(
             text(f"""
@@ -108,8 +112,7 @@ class RorStore:
                     DELETE FROM address_country_candidates
                     WHERE method = 'ror' AND address_id IN (SELECT address_id FROM linked)
                 )
-                UPDATE addresses SET candidates_dirty = true
-                WHERE id IN (SELECT address_id FROM linked) AND NOT candidates_dirty
+                {marked_addresses}
             """),
             {"ids": ror_ids},
         )

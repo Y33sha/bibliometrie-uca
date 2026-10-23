@@ -12,7 +12,10 @@ from pipeline.transformation.countries.refresh_publication_countries import (
     refresh_source_contribution_countries,
     refresh_source_record_countries,
 )
-from pipeline.transformation.countries.resolution import resolve_address_countries
+from pipeline.transformation.countries.resolution import (
+    resolve_address_countries,
+    resolve_queued_addresses,
+)
 from pipeline.transformation.countries.store import CountryCandidatesStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
@@ -64,9 +67,7 @@ class TestCandidatesAndResolution:
     def test_un_candidat_marque_l_adresse_et_ignore_un_code_inconnu(self, sa_sync_conn):
         ensure_country(sa_sync_conn, "fr")
         addr = insert_address(sa_sync_conn, "Lab, France", normalized_text="lab france")
-        sa_sync_conn.execute(
-            text("UPDATE addresses SET candidates_dirty = false WHERE id = :a"), {"a": addr}
-        )
+        unmark(sa_sync_conn, Queue.ADDRESS_CANDIDATES, addr)
 
         added = CountryCandidatesStore(sa_sync_conn).add(
             CountryDetectionMethod.COUNTRY_NAME, [(addr, ["fr", "zz"])]
@@ -74,7 +75,7 @@ class TestCandidatesAndResolution:
 
         assert added == 1
         assert _candidates(sa_sync_conn, addr) == {("fr", "country_name")}
-        assert _field(sa_sync_conn, addr, "candidates_dirty") is True
+        assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == {addr}
 
     def test_la_detection_efface_les_pays_que_le_moyen_ne_trouve_pas(self, sa_sync_conn):
         """Régression : un candidat issu d'une forme retirée de `place_name_forms` restait en place."""
@@ -89,11 +90,9 @@ class TestCandidatesAndResolution:
             ),
             {"d": dirty, "c": clean},
         )
-        sa_sync_conn.execute(
-            text("UPDATE addresses SET candidates_dirty = (id = :d)"), {"d": dirty}
-        )
+        unmark(sa_sync_conn, Queue.ADDRESS_CANDIDATES, clean)
 
-        CountryCandidatesStore(sa_sync_conn).replace_for_dirty_addresses(
+        CountryCandidatesStore(sa_sync_conn).replace_for_queued_addresses(
             CountryDetectionMethod.INSTITUTION, []
         )
 
@@ -112,11 +111,29 @@ class TestCandidatesAndResolution:
         )
         CountryCandidatesStore(sa_sync_conn).add(CountryDetectionMethod.CITY, [(addr, ["ma"])])
 
-        assert resolve_address_countries(sa_sync_conn) >= 1
+        assert resolve_queued_addresses(sa_sync_conn) >= 1
 
         assert _field(sa_sync_conn, addr, "countries") == ["ma"]
         assert addr in queued(sa_sync_conn, Queue.ADDRESS_COUNTRIES)
-        assert _field(sa_sync_conn, addr, "candidates_dirty") is False
+        assert addr not in queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES)
+
+    def test_la_detection_ne_remarque_pas_les_adresses_en_file(self, sa_sync_conn):
+        ensure_country(sa_sync_conn, "fr")
+        addr = insert_address(sa_sync_conn, "Lab, France", normalized_text="lab france")
+        (seq_before,) = sa_sync_conn.execute(
+            text(f"SELECT seq FROM {Queue.ADDRESS_CANDIDATES} WHERE id = :a"), {"a": addr}
+        ).one()
+
+        CountryCandidatesStore(sa_sync_conn).replace_for_queued_addresses(
+            CountryDetectionMethod.COUNTRY_NAME, [(addr, ["fr"])]
+        )
+
+        assert (
+            sa_sync_conn.execute(
+                text(f"SELECT seq FROM {Queue.ADDRESS_CANDIDATES} WHERE id = :a"), {"a": addr}
+            ).scalar_one()
+            == seq_before
+        )
 
     def test_une_adresse_sans_candidat_perd_son_pays(self, sa_sync_conn):
         addr = insert_address(sa_sync_conn, "Centre hospitalier universitaire", countries=["fr"])

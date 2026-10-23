@@ -258,9 +258,7 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
 class CountryRecompute:
     """Résolution des pays d'un lot d'adresses et recalcul ciblé de leurs caches (port injecté par l'API)."""
 
-    def resolve_address_countries(
-        self, conn: Connection, address_ids: list[int] | None = None
-    ) -> int:
+    def resolve_address_countries(self, conn: Connection, address_ids: list[int]) -> int:
         return resolve_address_countries(conn, address_ids)
 
     def refresh_source_records_countries_for_addresses(

@@ -1,6 +1,6 @@
 """Détection du pays d'une adresse par **nom de pays** en fin d'adresse : candidat `country_name`.
 
-Confronte les derniers tokens du `normalized_text` de chaque adresse à traiter (`candidates_dirty`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Un nom de pays clôt typiquement l'adresse, avec ou sans virgule ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu. Le candidat `country_name` est recalculé en entier pour chaque adresse traitée.
+Confronte les derniers tokens du `normalized_text` de chaque adresse en file (`address_candidates_queue`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Un nom de pays clôt typiquement l'adresse, avec ou sans virgule ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu. Le candidat `country_name` est recalculé en entier pour chaque adresse traitée.
 
 Le commit est laissé au caller.
 """
@@ -51,7 +51,7 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
     country_forms = load_country_forms(conn)
     max_tokens = max((form.count(" ") + 1 for form in country_forms), default=1)
 
-    rows = store.dirty_addresses()
+    rows = store.queued_addresses()
     logger.info("%s%s à traiter", BRANCH, quantity(len(rows), "adresse"))
 
     matched: list[tuple[int, list[str]]] = []
@@ -59,6 +59,6 @@ def run(conn: Connection, logger: logging.Logger) -> PhaseMetrics:
         if iso := _match_trailing_country(normalized_text, country_forms, max_tokens):
             matched.append((addr_id, [iso]))
 
-    added = store.replace_for_dirty_addresses(CountryDetectionMethod.COUNTRY_NAME, matched)
+    added = store.replace_for_queued_addresses(CountryDetectionMethod.COUNTRY_NAME, matched)
     logger.info("%spays trouvé pour %s", LAST_BRANCH, quantity(added, "adresse"))
     return PhaseMetrics(seen=len(rows), new=added, extras={"unmatched": len(rows) - len(matched)})

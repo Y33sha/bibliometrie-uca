@@ -618,13 +618,6 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
-    Column(
-        "candidates_dirty",
-        Boolean,
-        nullable=False,
-        server_default="true",
-        comment="Adresse à traiter : détection du pays par le texte, puis résolution des candidats.",
-    ),
     # Index UNIQUE sur expression md5(normalized_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
     schema="structures",
@@ -1613,6 +1606,7 @@ def _queue(name: str) -> Table:
 
 source_contribution_countries_queue = _queue("source_contribution_countries_queue")
 address_countries_queue = _queue("address_countries_queue")
+address_candidates_queue = _queue("address_candidates_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),
