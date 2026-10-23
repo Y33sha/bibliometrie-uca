@@ -86,7 +86,7 @@ class PhaseMetrics:
 
     `details` porte les indicateurs sur-mesure d'observabilité (conventions
     `summary`, `table`, lues par l'interface) et `signals` le motif d'un statut
-    dégradé (source coupée après une série de 429/5xx…), qui fait passer le point de
+    dégradé (source coupée après une série de requêtes en échec…), qui fait passer le point de
     la phase en ambre et s'affiche au drill-down : tous deux remontés à
     l'orchestrateur pour la capture par phase, sans rôle dans les compteurs.
     """

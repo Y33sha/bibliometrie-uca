@@ -69,7 +69,7 @@ def test_quota_de_la_source_epuise(lancer, caplog):
         resultat = lancer(issue=SourceUnavailableError("openalex"))
 
     assert resultat.code == 0
-    assert "openalex indisponible" in caplog.text
+    assert "source openalex coupée" in caplog.text
     assert resultat.fermetures == [True]
 
 

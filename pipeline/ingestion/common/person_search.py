@@ -16,7 +16,7 @@ from domain.persons.identifiers import PERSON_IDENTIFIER_LABELS, PersonIdentifie
 from domain.sources.registry import PROFILES, SEARCHED_IDENTIFIER_STATUSES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
@@ -24,7 +24,6 @@ from pipeline.ingestion.common.harvester import (
     SourceHarvester,
     stage_document,
 )
-from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -121,13 +120,11 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         def harvest_step(progress: Progress) -> PhaseMetrics:
             metrics = PhaseMetrics()
             for i, batch in enumerate(batches):
-                remaining = len(persons) - i * self.BATCH_SIZE
-                skipped = f"{quantity(remaining, 'personne')} {inflect(remaining, 'sautée')}"
                 label = f"lot {i + 1}"
                 try:
                     self._extract_batch(merge_identifiers(batch), years, label, seen, metrics)
                 except SourceUnavailableError:
-                    self._warn_stopped(skipped)
+                    trip_source()
                     break
                 except Exception as e:
                     scoped_logger(self.logger, self.SOURCE, label).error(

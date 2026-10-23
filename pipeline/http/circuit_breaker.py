@@ -2,7 +2,7 @@
 
 Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
 
-L'accès à la source le pose dans la ContextVar par `source_circuit_breaker`. Le client HTTP le manipule (check / record). Les boucles qui rangent un échec en résultat consultent `source_tripped()` pour s'arrêter.
+L'accès à la source le pose dans la ContextVar par `source_circuit_breaker`, et signale sa coupure. Le client HTTP le manipule (check / record). Les boucles qui rangent un échec en résultat consultent `source_tripped()` pour s'arrêter. Une boucle qui renonce à la source sur `SourceUnavailableError` la coupe (`trip_source`).
 
 Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
 
@@ -24,6 +24,7 @@ __all__ = [
     "get_current_breaker",
     "source_circuit_breaker",
     "source_tripped",
+    "trip_source",
 ]
 
 
@@ -57,6 +58,10 @@ class SourceCircuitBreaker:
         if self._consecutive >= self.threshold:
             self.tripped = True
 
+    def trip(self) -> None:
+        """Coupe la source : une boucle y renonce après une requête en échec."""
+        self.tripped = True
+
     def check(self) -> None:
         """Lève `SourceUnavailableError` si le breaker est déclenché."""
         if self.tripped:
@@ -71,6 +76,13 @@ _current_breaker: ContextVar[SourceCircuitBreaker | None] = ContextVar(
 def get_current_breaker() -> SourceCircuitBreaker | None:
     """Breaker de la phase courante (None si aucun n'est posé)."""
     return _current_breaker.get()
+
+
+def trip_source() -> None:
+    """Coupe la source de la phase courante. Sans breaker posé, ne fait rien."""
+    breaker = _current_breaker.get()
+    if breaker is not None:
+        breaker.trip()
 
 
 def source_tripped() -> bool:

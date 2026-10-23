@@ -30,18 +30,20 @@ def signal_source_unconfigured(
 def signal_source_unavailable(
     metrics: PhaseMetrics, source: str, *, logger: logging.Logger, phase: str
 ) -> None:
-    """Marque une source indisponible (retries épuisés sur 429/5xx/réseau, ou circuit-breaker déclenché) comme sautée.
+    """Marque une source coupée en cours de tâche comme indisponible.
 
     La phase se termine avec les sources qui ont abouti, son point passe en ambre, et les items non traités sont repris au run suivant (phases de rattrapage idempotentes). Même canal de signaux que `signal_source_unconfigured` et le circuit-breaker.
     """
     logger.warning(
-        "%s : source %s indisponible — sautée, items reportés au prochain run", phase, source
+        "%s : source %s coupée après une série de requêtes en échec, items reportés au prochain run",
+        phase,
+        source,
     )
     metrics.signals.append(
         {
             "level": "warning",
             "code": "source_unavailable",
-            "message": f"{source} indisponible — sautée, items reportés au prochain run",
+            "message": f"{source} coupée après une série de requêtes en échec, items reportés au prochain run",
         }
     )
 

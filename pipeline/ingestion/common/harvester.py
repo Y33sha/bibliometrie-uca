@@ -19,7 +19,7 @@ from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.config import get_years
 from pipeline.runtime.context import PhaseContext
@@ -142,12 +142,6 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
         return [window.year] if window.year else get_years(self.conn, start_year=window.start_year)
 
-    def _warn_stopped(self, remaining: str) -> None:
-        """Avertit de l'arrêt de la source. `remaining` nomme les items non traités, qui repartent au prochain run."""
-        self.logger.warning(
-            "%s à bout (429/5xx répétés) — %s (retry au prochain run)", self.SOURCE, remaining
-        )
-
     # ── Barre et bilan de la source ─────────────────────────────
 
     def _label(self, scope: str | None = None) -> str:
@@ -164,24 +158,19 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
         `count_year` donne le volume d'une année : la barre connaît son total dès le départ. Une coupure laisse sur la barre l'année interrompue, et les précédentes sont terminées.
 
-        Une source indisponible (`SourceUnavailableError`) arrête la boucle : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
+        Une source indisponible (`SourceUnavailableError`) arrête la boucle et coupe la source : les années restantes repartent au prochain run, les métriques des années extraites sont gardées.
         """
         metrics = PhaseMetrics()
         if not years:
             return metrics
         total = sum(count_year(year) for year in years)
         with track_progress(total, self._label(str(years[0])), self.logger) as progress:
-            for i, year in enumerate(years):
-                remaining = years[i:]
-                skipped = (
-                    f"{inflect(len(remaining), 'année')} {', '.join(map(str, remaining))} "
-                    f"{inflect(len(remaining), 'sautée')}"
-                )
+            for year in years:
                 progress.relabel(self._label(str(year)))
                 try:
                     metrics.merge(harvest_step(year, progress))
                 except SourceUnavailableError:
-                    self._warn_stopped(skipped)
+                    trip_source()
                     break
             else:
                 year_range = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])

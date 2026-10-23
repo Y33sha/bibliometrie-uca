@@ -1,6 +1,6 @@
 """Accès à une source : tout appel à une API tierce passe par `access_source`.
 
-L'accès contrôle les identifiants de la source et saute l'étape, avec un avertissement, s'ils manquent. Il pose le circuit-breaker de la source, que lisent les clients HTTP. Il signale une source indisponible ou un circuit coupé : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
+L'accès contrôle les identifiants de la source et saute l'étape, avec un avertissement, s'ils manquent. Il pose le circuit-breaker de la source, que lisent les clients HTTP. Il signale une source coupée, par une exception ou par la boucle qui y renonce : la phase passe en avertissement, et le run suivant reprend les éléments non traités.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from collections.abc import Callable
 
 from pipeline.http.circuit_breaker import (
     DEFAULT_THRESHOLD,
-    SourceCircuitBreaker,
     SourceUnavailableError,
     source_circuit_breaker,
 )
@@ -44,21 +43,7 @@ def access_source(
             metrics = execute()
         except SourceUnavailableError:
             metrics = PhaseMetrics()
-            signal_source_unavailable(metrics, source, logger=logger, phase=phase)
-    _signal_if_tripped(metrics, breaker)
-    return metrics
-
-
-def _signal_if_tripped(metrics: PhaseMetrics, breaker: SourceCircuitBreaker) -> None:
-    """Marque la phase en avertissement quand le circuit-breaker a coupé, après une série de 429 ou de 5xx."""
+            breaker.trip()
     if breaker.tripped:
-        metrics.signals.append(
-            {
-                "level": "warning",
-                "code": "source_unavailable",
-                "message": (
-                    f"{breaker.source} : arrêt après une série d'échecs (429/5xx), "
-                    "items reportés au prochain run"
-                ),
-            }
-        )
+        signal_source_unavailable(metrics, source, logger=logger, phase=phase)
+    return metrics

@@ -158,10 +158,4 @@ async def refresh(
             write=_write,
         )
 
-    if source_tripped():
-        slog.warning(
-            "indisponible (429/5xx répétés) — abandon, %d/%d documents traités, reste au prochain run",
-            processed,
-            total,
-        )
     return metrics

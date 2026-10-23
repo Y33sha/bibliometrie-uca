@@ -24,7 +24,6 @@ from domain.sources.registry import (
 )
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
@@ -227,13 +226,6 @@ async def fetch_missing_doi(
             commit_every=1,
             fetch=_fetch,
             write=_write,
-        )
-
-    if source_tripped():
-        slog.warning(
-            "indisponible (429/5xx répétés) — abandon, %d/%d DOI traités, reste au prochain run",
-            progress["processed"],
-            total,
         )
 
     return PhaseMetrics(

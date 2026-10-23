@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.ingestion.common.harvester import SourceHarvester
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -124,13 +124,13 @@ class TestExtractionParAnnee:
             _ParAnnee(logger, {2024: 1}).run(_args())
         assert "1 document trouvé : 1 nouveau, 0 mis à jour, 0 inchangé" in caplog.text
 
-    def test_une_source_indisponible_garde_les_annees_extraites(self, logger, caplog):
-        with caplog.at_level(logging.WARNING, logger=logger.name):
+    def test_une_source_indisponible_coupe_la_source_et_garde_les_annees_extraites(self, logger):
+        with source_circuit_breaker("hal") as breaker:
             metrics = _ParAnnee(logger, {2023: 2, 2024: 3, 2025: 1}, unavailable_from=2024).run(
                 _args()
             )
         assert metrics.total == 2
-        assert "années 2024, 2025 sautées" in caplog.text
+        assert breaker.tripped
 
 
 class _DUnTenant(_ParAnnee):
