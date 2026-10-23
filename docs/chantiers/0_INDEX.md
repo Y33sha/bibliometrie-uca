@@ -20,7 +20,6 @@
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 - [Monographies](DATA_monographies.md)
-- [Pagination par curseur](CODE_pagination-par-curseur.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
