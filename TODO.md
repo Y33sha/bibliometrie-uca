@@ -1,7 +1,3 @@
-# onehosts à lancer
-python -m interfaces.cli.oneshot.mark_collective_source_contributions
-supprimer les épinglages manuels sur M. Zhang et Z. Xu
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * [ ] plafond d'interrogations sudoc
