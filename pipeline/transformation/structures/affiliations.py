@@ -30,7 +30,6 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.structures.address_resolution import (
-    AddressResolutionQueries,
     run_resolution,
 )
 from pipeline.transformation.structures.hal_structures import (
@@ -48,7 +47,6 @@ from pipeline.transformation.structures.ror import RorStore, run_refresh_ror
 
 @dataclass(frozen=True)
 class AffiliationsPhase:
-    address_queries: AddressResolutionQueries
     refresh_ror: Callable[[PhaseContext], PhaseMetrics]
     refresh_hal_structures: Callable[[PhaseContext, bool], PhaseMetrics]
     resolve_thesis_partners: Callable[[Connection, logging.Logger], int]
@@ -87,7 +85,7 @@ class AffiliationsPhase:
     def _resolve_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
         with ctx.open_tx() as conn:
             perimeter_ids = set(get_persons_structure_ids_list(conn))
-            stats = run_resolution(conn, self.address_queries, perimeter_ids, ctx.logger)
+            stats = run_resolution(conn, perimeter_ids, ctx.logger)
         metrics = PhaseMetrics()
         metrics.add(seen=stats.processed)
         metrics.details["summary"] = {
@@ -126,7 +124,6 @@ def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) 
 
 def build() -> Phase:
     return AffiliationsPhase(
-        AddressResolutionQueries(),
         refresh_ror=_run_refresh_ror,
         refresh_hal_structures=_run_refresh_hal_structures,
         resolve_thesis_partners=resolve_thesis_partners,

@@ -22,26 +22,20 @@ from pipeline.transformation.structures.name_recognition import StructureNameMat
 CHUNK_SIZE = 10000
 
 
-class AddressResolutionQueries:
-    """Requêtes de la résolution des adresses.
+def count_addresses(conn: Connection) -> int:
+    return scalar_int(conn.execute(text("SELECT count(*) FROM addresses")))
 
-    Chaque run est un recalcul complet idempotent : toutes les adresses sont traitées par tranches (keyset par `id`).
-    """
 
-    def count_addresses(self, conn: Connection) -> int:
-        return scalar_int(conn.execute(text("SELECT count(*) FROM addresses")))
-
-    def fetch_addresses_chunk(
-        self, conn: Connection, *, after_id: int, limit: int
-    ) -> list[tuple[int, str]]:
-        rows = conn.execute(
-            text(
-                "SELECT a.id, a.normalized_text FROM addresses a "
-                "WHERE a.id > :after ORDER BY a.id LIMIT :limit"
-            ),
-            {"after": after_id, "limit": limit},
-        ).all()
-        return [(r.id, r.normalized_text) for r in rows]
+def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> list[tuple[int, str]]:
+    """Tranche des adresses d'identifiant supérieur à `after_id`, triées par identifiant (pagination keyset)."""
+    rows = conn.execute(
+        text(
+            "SELECT a.id, a.normalized_text FROM addresses a "
+            "WHERE a.id > :after ORDER BY a.id LIMIT :limit"
+        ),
+        {"after": after_id, "limit": limit},
+    ).all()
+    return [(r.id, r.normalized_text) for r in rows]
 
 
 # ─── Run ─────────────────────────────────────────────────────────
@@ -56,19 +50,15 @@ class ResolutionStats(NamedTuple):
 
 
 def run_resolution(
-    conn: Connection,
-    queries: AddressResolutionQueries,
-    perimeter_ids: set[int],
-    logger: logging.Logger,
+    conn: Connection, perimeter_ids: set[int], logger: logging.Logger
 ) -> ResolutionStats:
-    """Recalcul complet idempotent des affiliations (commit par lot, d'où le `conn`)."""
+    """Recalcul complet idempotent des affiliations : toutes les adresses, par tranches, un commit par tranche."""
     matcher = StructureNameMatcher.load(conn)
-    return process_addresses(conn, queries, matcher, perimeter_ids, logger)
+    return process_addresses(conn, matcher, perimeter_ids, logger)
 
 
 def process_addresses(
     conn: Connection,
-    queries: AddressResolutionQueries,
     matcher: StructureNameMatcher,
     perimeter: set[int],
     logger: logging.Logger,
@@ -85,9 +75,9 @@ def process_addresses(
     affil_count = 0
     after_id = 0
 
-    with track_progress(queries.count_addresses(conn), BRANCH.rstrip(), logger) as progress:
+    with track_progress(count_addresses(conn), BRANCH.rstrip(), logger) as progress:
         while True:
-            rows = queries.fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
+            rows = fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
             if not rows:
                 break
             after_id = rows[-1][0]  # tranche triée par id
