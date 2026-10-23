@@ -5,6 +5,7 @@
   import { replaceState } from "$app/navigation";
   import { api, nameForms } from "$lib/api";
   import { deriveStructDetectionStatus } from "$lib/utils";
+  import { compareStructureLabels } from "$lib/structureLabels";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
@@ -115,7 +116,9 @@
 
   async function loadStructures(): Promise<void> {
     // Un site porte les formes de nom d'un lieu pour servir de contexte au matching : une adresse qui le mentionne n'atteste d'aucun rattachement, il n'a pas de détection à juger.
-    allStructures = (await api<Structure[]>("/api/structures")).filter((s) => s.type !== "site");
+    allStructures = (await api<Structure[]>("/api/structures"))
+      .filter((s) => s.type !== "site")
+      .sort(compareStructureLabels);
 
     const grouped: GroupedStructures = {};
     for (const s of allStructures) (grouped[s.type] ??= []).push(s);

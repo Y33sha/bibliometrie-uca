@@ -10,6 +10,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { autofocus } from '$lib/actions/focus';
+	import { compareStructureLabels } from '$lib/structureLabels';
 
 	// ---- Type definitions ----
 
@@ -199,7 +200,7 @@
 	// ---- Data loading ----
 
 	async function loadStructures(): Promise<void> {
-		const all = await api<Structure[]>('/api/structures');
+		const all = (await api<Structure[]>('/api/structures')).sort(compareStructureLabels);
 		allStructures = all.filter((s) => s.type !== 'site');
 		const grouped: GroupedStructures = {};
 		for (const s of all) {

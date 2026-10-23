@@ -14,6 +14,14 @@ export function structLabel(structures: Record<string, StructInfo>, id: number):
 	return s ? s.acronym || s.name : `#${id}`;
 }
 
+/** Comparateur alphabétique de structures sur leur libellé affiché (acronyme, sinon nom), insensible à la casse et aux accents. */
+export function compareStructureLabels(
+	a: { acronym?: string | null; name?: string | null },
+	b: { acronym?: string | null; name?: string | null },
+): number {
+	return (a.acronym || a.name || '').localeCompare(b.acronym || b.name || '', 'fr', { sensitivity: 'base' });
+}
+
 export function structIsLabo(structures: Record<string, StructInfo>, id: number): boolean {
 	return structures[String(id)]?.type === 'labo';
 }
