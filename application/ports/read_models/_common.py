@@ -24,7 +24,7 @@ class PaginatedResponse(BaseModel):
     page: int
     per_page: int = Field(gt=0)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field
     @property
     def pages(self) -> int:
         return page_count(self.total, self.per_page)

@@ -39,7 +39,7 @@ dev = [
     "pytest-asyncio==1.4.0",   # tests des extractions HTTP async du pipeline
     "pytest-cov==7.1.0",
     "ruff==0.17.0",
-    "mypy==2.4.0",
+    "pyrefly==1.4.0",
     "deptry==0.25.1",
     "pip-audit==2.10.1",
     "pre-commit==4.7.0",
@@ -465,109 +465,54 @@ exclude_lines = [
 ]
 
 # ----------------------------------------------------------------------
-# Mypy : type checker
-# ----------------------------------------------------------------------
-[tool.mypy]
-# Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
-# vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
-python_version = "3.14"
-# Système des images de production, pour la même raison. Sans cette ligne, mypy analyse pour la
-# plateforme qui le lance : depuis un poste Windows, il rejette les appels POSIX que le code
-# exécute en production (`signal.SIGKILL`).
-platform = "linux"
-plugins = ["pydantic.mypy"]
-# Imports : ignorer les libs tierces non typées plutôt que de polluer
-ignore_missing_imports = true
-# Mode strict : toutes les fonctions doivent être annotées, et leur corps
-# est vérifié.
-check_untyped_defs = true
-disallow_untyped_defs = true
-# `Any` explicite interdit. Les exceptions se lisent dans les overrides plus bas, où chacune
-# porte son motif en regard du module.
-disallow_any_explicit = true
-disallow_any_generics = true
-# Une fonction ne rend pas un `Any` sous une déclaration qui promet autre chose : le contrôle
-# se fait à l'endroit où la valeur entre, non chez l'appelant qui la croira acquise.
-warn_return_any = true
-# Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
-show_error_codes = true
-# Un paramètre qui accepte `None` le déclare : `x: str | None = None`, jamais `x: str = None`.
-implicit_optional = false
-# Ignorer les erreurs dans les tests (focus sur le code de prod)
-exclude = [
-    "^tests/",
-    "^frontend/",
-    "^bibliometrie_uca\\.egg-info/",
-    "^\\.venv/",
-    "^build/",
-    # Code Alembic : `op` et `context` sont ajoutés dynamiquement au
-    # module `alembic` à l'import, mypy ne les détecte pas. Cohérent
-    # avec l'exclusion `tests/` : code framework, pas du métier.
-    "^alembic/",
-    # Copie de travail de mutmut : double les paquets du projet.
-    "^mutants/",
-    # Répertoire de travail local : données brutes et scripts jetables, hors du dépôt.
-    "^data/",
-    # Scripts jetables (audits, rattrapages), exécutés une fois.
-    "^interfaces/cli/oneshot/",
-]
-
-# Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
-# erreur est retirée, et le motif se lit en regard du module.
-#
-# Un JSON de forme libre ne se décrit pas par l'alias récursif `JsonValue` : le schéma OpenAPI
-# qui en découlerait produit un type TypeScript circulaire, que le compilateur refuse, et
-# `schema.ts` dérive du contrat.
-[[tool.mypy.overrides]]
-module = [
-    "application.ports.read_models.config_queries",        # `value` : JSON de forme libre
-    "application.ports.read_models.pipeline_runs_queries", # `details` : JSON de forme libre
-    "interfaces.api.models.config",                        # `value` : JSON de forme libre
-    "infrastructure.read_models.publications.facets",      # facette appelée par son nom (`getattr`)
-]
-disallow_any_explicit = false
-
-# Les deux réglages tiennent ensemble : `init_typed` type le constructeur synthétisé,
-# `init_forbid_extra` lui retire son `**kwargs: Any`. Sans l'un des deux, ce `Any` est écrit
-# dans chaque classe de modèle et génère des erreurs `explicit-any`.
-[tool.pydantic-mypy]
-init_forbid_extra = true
-init_typed = true
-
-# ----------------------------------------------------------------------
-# Pyrefly : second vérificateur de types, lancé à la demande.
-# Lancement : `uv run --with pyrefly pyrefly check`
-#
-# Mypy reste la référence, seul branché au pre-commit et à l'intégration.
-# Celui-ci sert à comparer les deux lectures du même code : il voit des
-# choses que l'autre laisse passer, et l'inverse.
+# Pyrefly : vérificateur de types.
+# Lancement : `uv run pyrefly check`
 # ----------------------------------------------------------------------
 [tool.pyrefly]
+# Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
+# vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
 python-version = "3.14.0"
-# Système des images de production, comme pour mypy : depuis un autre système, les appels POSIX
-# que le code exécute en production seraient rejetés.
+# Système des images de production, pour la même raison. Sans cette ligne, pyrefly analyse pour
+# la plateforme qui le lance : depuis un poste Windows, il rejette les appels POSIX que le code
+# exécute en production (`signal.SIGKILL`).
 python-platform = "linux"
-# Le code des tests, du frontend, d'Alembic et du répertoire de travail local reste hors du champ,
-# comme pour mypy.
 project-excludes = [
     "**/tests/",
     "**/frontend/",
     "**/bibliometrie_uca.egg-info/",
     "**/.venv/",
     "**/build/",
+    # Code Alembic : `op` et `context` sont ajoutés dynamiquement au module `alembic` à l'import.
     "**/alembic/",
+    # Répertoire de travail local : données brutes et scripts jetables, hors du dépôt.
     "**/data/",
+    # Copie de travail de mutmut : double les paquets du projet.
+    "**/mutants/",
+    # Scripts jetables (audits, rattrapages), exécutés une fois.
+    "**/interfaces/cli/oneshot/",
 ]
 # Libs tierces non typées : ignorées plutôt que déclarées une à une.
 ignore-missing-imports = ["*"]
 
 [tool.pyrefly.errors]
-# Les deux règles qui portent la discipline déclarée à mypy : `Any` explicite interdit,
-# et pas de valeur `Any` rendue sous une déclaration qui promet autre chose.
+# `Any` explicite interdit, comme les génériques sans paramètre (`dict`, `list`). Les exceptions
+# se lisent dans les sous-configurations plus bas, où chacune porte son motif.
 explicit-any = "error"
+implicit-any-type-argument = "error"
+# Une fonction ne rend pas un `Any` sous une déclaration qui promet autre chose : le contrôle
+# se fait à l'endroit où la valeur entre, non chez l'appelant qui la croira acquise.
 no-any-return = "error"
+# Toutes les fonctions sont annotées.
+unannotated-parameter = "error"
+unannotated-return = "error"
 
-# Modules exemptés d'`explicit-any`, les mêmes qu'à mypy et pour les mêmes motifs.
+# Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
+# erreur est retirée, et le motif se lit en regard du module.
+#
+# Un JSON de forme libre ne se décrit pas par l'alias récursif `JsonValue` : le schéma OpenAPI
+# qui en découlerait produit un type TypeScript circulaire, que le compilateur refuse, et
+# `schema.ts` dérive du contrat. Les trois premiers modules en relèvent ; `facets` appelle une
+# facette par son nom (`getattr`).
 [[tool.pyrefly.sub-config]]
 matches = "application/ports/read_models/config_queries.py"
 [tool.pyrefly.sub-config.errors]
@@ -583,7 +528,6 @@ matches = "interfaces/api/models/config.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
-
 [[tool.pyrefly.sub-config]]
 matches = "infrastructure/read_models/publications/facets.py"
 [tool.pyrefly.sub-config.errors]
@@ -596,19 +540,6 @@ explicit-any = false
 matches = "infrastructure/db/rows.py"
 [tool.pyrefly.sub-config.errors]
 bad-unpacking = false
-
-# `Scope`, le type que Starlette donne au contexte d'une requête ASGI, est un alias de
-# `MutableMapping[str, Any]`. Pyrefly compte l'alias importé comme un `Any` écrit ; le nommer
-# autrement reviendrait à renoncer au type de l'interface qu'on implémente.
-[[tool.pyrefly.sub-config]]
-matches = "interfaces/api/route_path.py"
-[tool.pyrefly.sub-config.errors]
-explicit-any = false
-
-[[tool.pyrefly.sub-config]]
-matches = "interfaces/api/spa.py"
-[tool.pyrefly.sub-config.errors]
-explicit-any = false
 
 # ----------------------------------------------------------------------
 # mutmut : tests de mutation du domaine.

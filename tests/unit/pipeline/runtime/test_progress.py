@@ -92,7 +92,8 @@ class TestSansLaBibliotheque:
     """L'absence de `tqdm` conduit au même repli que l'absence de terminal."""
 
     def test_les_jalons_prennent_le_relais(self, avec_terminal, caplog, monkeypatch):
-        monkeypatch.setattr(module, "tqdm", None)
+        for name in ("tqdm", "_Bar", "_KeptBar"):
+            monkeypatch.setattr(module, name, None)
         with (
             caplog.at_level(logging.INFO),
             module.track_progress(100, "hal", logging.getLogger(__name__), interval_s=0) as p,

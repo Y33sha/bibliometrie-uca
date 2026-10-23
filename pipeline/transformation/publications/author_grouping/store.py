@@ -7,6 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.publications.author_grouping import REPEATED_LIST_CASES
+from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
     corrected_by,
     in_clause,
@@ -208,8 +209,8 @@ class SourceContributionGroupStore:
         rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
             {"publications": list(publication_ids), "repeated": list(REPEATED_LIST_CASES)},
-        ).mappings()
-        return [SourceContributionRow(**row) for row in rows]
+        )
+        return rows_as(SourceContributionRow, rows)
 
     def fetch_groups(
         self, publication_ids: Sequence[int]

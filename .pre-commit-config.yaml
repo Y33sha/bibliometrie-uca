@@ -1,7 +1,7 @@
 # ============================================================
 # Vérifications git : deux étages.
 #   - pre-commit : garde rapide et locale à chaque commit (lint, format sur
-#     l'index, hygiène des fichiers, concordance du contrat OpenAPI).
+#     l'index, types, hygiène des fichiers, concordance du contrat OpenAPI).
 #   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
 #     format, types, contrats d'architecture, hygiène des dépendances,
 #     contrôles du frontend). La suite de tests et le build du frontend
@@ -36,9 +36,10 @@ repos:
         args: [--check]
 
   # Hooks locaux : outils installés dans l'env Python du projet.
-  # mypy et lint-imports résolvent les imports sur tout le projet : ils exigent
-  # un arbre cohérent, que le commit d'un sous-ensemble de fichiers ne garantit
-  # pas. Ils vivent donc à l'étage pre-push (arbre entièrement commité), pas ici.
+  # pyrefly et lint-imports résolvent les imports sur tout le projet. Au commit,
+  # pre-commit met de côté les modifications non indexées, mais les fichiers non
+  # suivis restent visibles. pyrefly tourne au commit et se rejoue au push, sur
+  # l'arbre entièrement commité ; lint-imports tourne seulement au push.
   #
   # Les outils sont lancés par l'interpréteur, pas par leur exécutable : le contrôle
   # d'application de Windows bloque les shims .exe non signés que uv pose dans le venv
@@ -100,6 +101,16 @@ repos:
         pass_filenames: false
         files: (\.py|^interfaces/frontend/src/lib/api/schema\.ts)$
 
+      # Types, sur tout le projet. Rejoué au push, comme ruff : un commit passé en
+      # --no-verify ou un fichier non suivi au moment du commit y sont rattrapés.
+      - id: pyrefly
+        name: pyrefly (types)
+        entry: uv run python -m pyrefly check --summary=none
+        language: system
+        pass_filenames: false
+        files: (\.py|^pyproject\.toml)$
+        stages: [pre-commit, pre-push]
+
       # --------------------------------------------------------
       # Étage pre-push : les contrôles de la CI (.github/workflows/ci.yml) qui
       # tiennent en quelques secondes et se passent d'une base. Tourne avant
@@ -128,7 +139,7 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Lint + format + contrats d'architecture + types sur tout le projet.
+      # Lint + format + contrats d'architecture sur tout le projet.
       # Rejoués ici même s'ils tournent au commit : garantit un push propre
       # y compris après un commit passé en --no-verify.
       - id: ci-ruff-check
@@ -161,14 +172,6 @@ repos:
       - id: ci-pytest-unit
         name: pytest (tests unitaires)
         entry: uv run python -m pytest tests/unit/ -q
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages: [pre-push]
-
-      - id: ci-mypy
-        name: mypy (type check)
-        entry: uv run python -m mypy .
         language: system
         pass_filenames: false
         always_run: true

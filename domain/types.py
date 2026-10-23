@@ -76,7 +76,7 @@ def as_sequence(value: JsonValue) -> Sequence[JsonValue]:
 
     Une chaîne en est écartée : Python la tient pour une suite de caractères, ce qu'un champ JSON n'entend jamais dire.
     """
-    if isinstance(value, str | Mapping):
+    if isinstance(value, (str, Mapping)):
         return []
     return value if isinstance(value, Sequence) else []
 

@@ -94,8 +94,8 @@ jobs:
       - name: Architecture contracts (import-linter)
         run: uv run lint-imports
 
-      - name: Type check (mypy)
-        run: uv run mypy .
+      - name: Type check (pyrefly)
+        run: uv run pyrefly check
 
       - name: Unit tests
         run: uv run python -m pytest tests/unit/ -v
