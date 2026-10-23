@@ -99,9 +99,9 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 ### Phase 4 — Boucle de recherche commune et écriture dans `staging`
 
 - [x] Débit réel de chaque source mesuré sur un run, avant la boucle commune (run 328).
-- [ ] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée.
+- [x] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée. c379eeb1c
 - [ ] Boucle commune et écriture des trois issues, pour les cinq canaux, effacement des échecs compris.
-- [ ] `upsert_staging` dans `StagingStore`, qui reçoit sa connexion à la construction.
+- [x] `upsert_staging` dans `StagingStore`, qui reçoit sa connexion à la construction. c379eeb1c
 
 ### Phase 5 — Débit
 
@@ -125,3 +125,4 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 ## Questions ouvertes
 
 - Budget de débit des sources sans seuil publié : HAL, theses.fr, ScanR.
+- Optimisation de `harvest_by_person` : plusieurs lots en vol par source, et `select` Crossref pour écarter les champs inutiles. Le temps d'une requête vient du volume des enregistrements de grandes collaborations (5 Mio pour 25 documents DataCite, 13 Mio pour 100 documents Crossref), pas de la recherche (0,3 s).

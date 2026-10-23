@@ -114,6 +114,20 @@ _MARK_DONE_SQL = text(
 )
 
 
+# Réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué, que le moissonnage suivant retrouve. Lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
+_COMPLETE_AUTHORS_SQL = text(
+    """
+    UPDATE staging
+    SET raw_data = :raw_data, processed = FALSE, authors_truncated = FALSE, last_seen_at = now()
+    WHERE source = :source AND source_id = :source_id
+    """
+).bindparams(bindparam("raw_data", type_=Jsonb))
+
+_CLEAR_TRUNCATED_SQL = text(
+    "UPDATE staging SET authors_truncated = FALSE WHERE source = :source AND source_id = :source_id"
+)
+
+
 class StagingStore:
     """Écritures des documents rendus par les sources, lectures et marquages de `staging` par la normalisation.
 
@@ -155,6 +169,26 @@ class StagingStore:
         if PROFILES[Source(source)].registration_agency is not None:
             forget_failed_doi_lookups(self._conn, DOI_ORG, identity.dois)
         return UpsertOutcome.of(inserted=inserted, changed=changed)
+
+    def complete_authors(
+        self, source: str, record: Mapping[str, JsonValue]
+    ) -> UpsertOutcome | None:
+        """Réécrit un document marqué tronqué par sa version complète, sans recalculer son empreinte.
+
+        Tant que le moissonnage rend le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Rend `UPDATED`, ou `None` pour un document sans identifiant.
+        """
+        identity = ADAPTERS[Source(source)].identify(record)
+        if identity is None:
+            return None
+        self._conn.execute(
+            _COMPLETE_AUTHORS_SQL,
+            {"raw_data": record, "source": source, "source_id": identity.source_id},
+        )
+        return UpsertOutcome.UPDATED
+
+    def clear_truncated(self, source: str, source_id: str) -> None:
+        """Lève le marqueur de troncature d'un document, sans toucher son contenu."""
+        self._conn.execute(_CLEAR_TRUNCATED_SQL, {"source": source, "source_id": source_id})
 
     def upsert(
         self,

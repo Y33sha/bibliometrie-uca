@@ -15,7 +15,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.ingestion.common import stale_refetch
+from pipeline.ingestion.common import lookup, stale_refetch
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.common.stale_refetch import StaleRefetch, refresh
 
@@ -121,7 +121,7 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lanc
         options.update(kwargs)
         yield spy
 
-    monkeypatch.setattr(stale_refetch, "track_progress", _track_progress)
+    monkeypatch.setattr(lookup, "track_progress", _track_progress)
     lancer(_QUATRE_ISSUES)
 
     assert options.get("count_kept") is True

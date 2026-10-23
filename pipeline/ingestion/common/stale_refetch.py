@@ -1,11 +1,10 @@
 """Nouvelle lecture des documents d'une source par leur identifiant natif (`staging.source_id`).
 
-Chaque source implémente `StaleRefetch` (`pipeline/ingestion/<source>/fetch_stale.py`) : seule la requête par identifiant natif lui est propre. `refresh` fait la boucle commune.
+Chaque source implémente `StaleRefetch` (`pipeline/ingestion/<source>/fetch_stale.py`) : seule la requête par identifiant natif lui est propre. `refresh` sélectionne les documents et les relit par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
@@ -15,17 +14,9 @@ from sqlalchemy import Connection, text
 
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import source_tripped
-from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
-from pipeline.runtime.observability.log_format import source_branch
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.http.lookup import LookupOutcome
+from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import track_progress
-
-COMMIT_EVERY = 50
-
 
 type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
 """Document relu dans la source, ou son absence, ou l'indisponibilité de la source."""
@@ -102,60 +93,23 @@ async def refresh(
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
 
-    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source.
+    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source. Un document confirmé absent est marqué `disappeared_at`.
 
-    `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
+    Compteurs de `look_up` : `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées.
     """
     source = refetch.source_key
-    slog = scoped_logger(log, source)
-    stale = get_stale_source_ids(conn, source, years, after_days=after_days)
-    total = len(stale)
-
-    metrics = PhaseMetrics(seen=total)
-    if total == 0:
-        return metrics
-
-    processed = 0
-
-    async def _fetch(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            outcome = await refetch.fetch_by_native_id(client, source_id)
-        except Exception as e:
-            # Breaker déclenché pendant la requête : abandon silencieux, le journal le signale une fois après le pool.
-            if not source_tripped():
-                slog.error("erreur sur %s : %s", source_id, e)
-            outcome = UNAVAILABLE
-        if refetch.request_delay_s:
-            await asyncio.sleep(refetch.request_delay_s)
-        return outcome
-
-    with track_progress(total, source_branch(source), slog, count_kept=True) as progress:
-
-        def _write(conn: Connection, source_id: str, outcome: FetchOutcome) -> None:
-            nonlocal processed
-            if isinstance(outcome, Unavailable):
-                metrics.add(errors=1)
-            elif isinstance(outcome, NotFound):
-                set_disappeared(conn, source, source_id)
-                metrics.add(disappeared=1)
-            else:
-                # La lecture par identifiant natif rend le document entier : aucun plafond d'auteurs.
-                staged = StagingStore(conn).stage(source, outcome, listed=False)
-                if staged is UpsertOutcome.UNCHANGED:
-                    metrics.add(unchanged=1)
-                elif staged is not None:
-                    metrics.add(updated=1)
-                progress.keep()
-            processed += 1
-            progress.advance()
-
-        await run_fetch_pool(
-            stale,
-            conn,
+    return await look_up(
+        conn,
+        log,
+        LookupChannel(
+            source=source,
+            fetch=one_at_a_time(refetch.fetch_by_native_id),
+            on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
+            # La lecture par identifiant natif rend le document entier : aucun plafond d'auteurs.
+            stage=lambda staging, record: staging.stage(source, record, listed=False),
+            absent_metric="disappeared",
             max_concurrent=refetch.max_concurrent,
-            commit_every=COMMIT_EVERY,
-            fetch=_fetch,
-            write=_write,
-        )
-
-    return metrics
+            request_delay_s=refetch.request_delay_s,
+        ),
+        get_stale_source_ids(conn, source, years, after_days=after_days),
+    )

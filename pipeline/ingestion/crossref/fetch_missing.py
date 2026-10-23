@@ -13,8 +13,8 @@ import httpx2
 
 from domain.publications.identifiers import clean_doi
 from domain.types import as_str
-from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.doi_search import DoiBatchResult
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.crossref.api import fetch_work
 
 
@@ -27,15 +27,17 @@ class CrossrefDoiSearch:
     max_concurrent = 3
     request_delay_s = 0.1
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         doi = dois[0]
         message = await fetch_work(client, doi)
         if isinstance(message, NotFound):
             # 404 = DOI confirmé absent de Crossref.
-            return DoiBatchResult(not_found=[doi])
+            return LookupBatch(absent=[doi])
         if isinstance(message, Unavailable):
-            return DoiBatchResult()
+            return UNAVAILABLE
         if clean_doi(as_str(message.get("DOI"))) != doi:
             # DOI alias, que Crossref redirige vers son DOI principal : le document reçu a ce dernier pour DOI. L'alias est inscrit comme introuvable.
-            return DoiBatchResult(records=[message], not_found=[doi])
-        return DoiBatchResult(records=[message])
+            return LookupBatch(records=[message], absent=[doi])
+        return LookupBatch(records=[message])

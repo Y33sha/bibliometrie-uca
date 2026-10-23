@@ -1,14 +1,12 @@
 """Recherche par DOI dans une source cible : les DOI vus dans les autres sources et absents de la cible, interrogés par lots.
 
-Chaque source implémente `DoiSearch` (`pipeline/ingestion/<source>/fetch_missing.py`) : requête d'un lot, écriture d'un enregistrement source. `fetch_missing_doi` fait la boucle commune.
+Chaque source implémente `DoiSearch` (`pipeline/ingestion/<source>/fetch_missing.py`) : la requête d'un lot. `fetch_missing_doi` sélectionne les DOI et les cherche par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from collections.abc import Awaitable, Mapping
-from dataclasses import dataclass, field, replace
+from collections.abc import Awaitable
 from typing import Protocol
 
 import httpx2
@@ -23,35 +21,16 @@ from domain.sources.registry import (
     Source,
 )
 from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue
-from pipeline.http.fetch_pool import run_fetch_pool
+from pipeline.http.lookup import UNAVAILABLE, Unavailable
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
-    forget_failed_doi_lookups,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
+from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up
 from pipeline.ingestion.complements.doi_org import doi_existence
-from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import track_progress
-
-
-@dataclass(frozen=True, slots=True)
-class DoiBatchResult:
-    """Réponse d'une source à un lot de DOI : enregistrements sources trouvés, et DOI dont la source a confirmé l'absence.
-
-    Un DOI du lot présent dans aucune des deux listes attend le run suivant : la source était indisponible, ou sa réponse ne permet pas de conclure.
-
-    Pour une agence d'enregistrement, les DOI absents sont soumis à doi.org : `known_to_doi_org` et `unknown_to_doi_org` rangent ceux qu'il connaît et ceux qu'il ne connaît pas.
-    """
-
-    records: list[Mapping[str, JsonValue]] = field(default_factory=list)
-    not_found: list[str] = field(default_factory=list)
-    known_to_doi_org: list[str] = field(default_factory=list)
-    unknown_to_doi_org: list[str] = field(default_factory=list)
 
 
 class DoiSearch(Protocol):
@@ -65,7 +44,9 @@ class DoiSearch(Protocol):
     max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
     request_delay_s: float  # pause par worker après chaque requête (0 = pas de pause)
 
-    def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> Awaitable[DoiBatchResult]:
+    def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> Awaitable[LookupBatch | Unavailable]:
         """Interroge l'API pour un lot de 1 à `batch_size` DOI."""
 
 
@@ -137,103 +118,58 @@ async def fetch_missing_doi(
 ) -> PhaseMetrics:
     """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les enregistrements sources trouvés dans `staging`.
 
-    Les requêtes tournent en parallèle via `run_fetch_pool` (pool de `search.max_concurrent` workers), ce qui borne le débit au rate-limit de l'API. Les écritures restent séquentielles. Chaque lot est committé en une transaction.
+    Un DOI confirmé absent est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution. Quand la source est l'agence d'enregistrement des DOI cherchés, ses DOI absents sont soumis à doi.org : un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`.
 
-    Un DOI confirmé absent est inscrit dans `failed_lookups`. Un DOI ni trouvé ni absent attend le run suivant. `limit` plafonne le nombre de DOI d'une exécution.
-
-    Quand la source est l'agence d'enregistrement des DOI cherchés, un DOI absent est soumis à doi.org. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG` ; un DOI qu'il connaît en est effacé.
-
-    `total` = DOI traités, `new` = enregistrements sources insérés, `extras["fetched"]` = enregistrements sources reçus, `extras["not_found"]` = DOI confirmés absents, `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
+    Compteurs de `look_up`, et `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
     """
-    slog = scoped_logger(log, search.source_key)
-    dois = get_missing_dois(conn, search.source_key, retry_after_days=retry_after_days)
-
+    source = search.source_key
+    dois = get_missing_dois(conn, source, retry_after_days=retry_after_days)
     if limit and len(dois) > limit:
-        slog.info(
+        scoped_logger(log, source).info(
             "plafond de %d DOI par exécution, %d reportés aux suivantes", limit, len(dois) - limit
         )
         dois = dois[:limit]
 
-    total = len(dois)
-    if total == 0:
-        return PhaseMetrics()
+    absent: list[str] = []
 
-    batches = [dois[i : i + search.batch_size] for i in range(0, total, search.batch_size)]
-    progress = {
-        "processed": 0,
-        "fetched": 0,
-        "inserted": 0,
-        "not_found": 0,
-        "unknown_to_doi_org": 0,
-    }
-    is_agency = PROFILES[Source(search.source_key)].registration_agency is not None
-    user_agent = polite_user_agent() if is_agency else None
+    def _absent(conn: Connection, doi: str) -> None:
+        record_failed_lookup(conn, source, "doi", doi)
+        absent.append(doi)
 
-    async def _fetch(client: httpx2.AsyncClient, item: tuple[int, list[str]]) -> DoiBatchResult:
-        batch_idx, batch = item
-        try:
-            result = await search.fetch_async(client, batch)
-            if user_agent is not None and result.not_found:
-                known, unknown = await doi_existence(
-                    client, result.not_found, user_agent=user_agent
-                )
-                result = replace(result, known_to_doi_org=known, unknown_to_doi_org=unknown)
-        except Exception as e:
-            slog.error("erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
-            result = DoiBatchResult()
-        if search.request_delay_s:
-            await asyncio.sleep(search.request_delay_s)
-        return result
-
-    with track_progress(total, source_branch(search.source_key), slog, count_kept=True) as bar:
-
-        def _write(conn: Connection, item: tuple[int, list[str]], result: DoiBatchResult) -> None:
-            batch_idx, batch = item
-            progress["fetched"] += len(result.records)
-            progress["not_found"] += len(result.not_found)
-
-            # Un lot = une transaction (le pool commite après ce write). Sur erreur, rollback : le lot repart au prochain run.
-            batch_inserted = 0
-            try:
-                staging = StagingStore(conn)
-                for record in result.records:
-                    outcome = staging.stage(
-                        search.source_key, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
-                    )
-                    if outcome is UpsertOutcome.NEW:
-                        batch_inserted += 1
-                for doi in result.not_found:
-                    record_failed_lookup(conn, search.source_key, "doi", doi)
-                for doi in result.unknown_to_doi_org:
-                    record_failed_lookup(conn, DOI_ORG, "doi", doi)
-                forget_failed_doi_lookups(conn, DOI_ORG, result.known_to_doi_org)
-                progress["inserted"] += batch_inserted
-                progress["unknown_to_doi_org"] += len(result.unknown_to_doi_org)
-            except Exception as e:
-                conn.rollback()
-                slog.warning(
-                    "lot %d (%d DOI) : insertion échouée, rollback — %s", batch_idx, len(batch), e
-                )
-
-            progress["processed"] += len(batch)
-            bar.advance(len(batch))
-            bar.keep(batch_inserted)
-
-        await run_fetch_pool(
-            list(enumerate(batches)),
-            conn,
+    metrics = await look_up(
+        conn,
+        log,
+        LookupChannel(
+            source=source,
+            fetch=search.fetch_async,
+            on_absent=_absent,
+            stage=lambda staging, record: staging.stage(
+                source, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
+            ),
+            batch_size=search.batch_size,
             max_concurrent=search.max_concurrent,
-            commit_every=1,
-            fetch=_fetch,
-            write=_write,
-        )
+            request_delay_s=search.request_delay_s,
+        ),
+        dois,
+    )
+    if absent and PROFILES[Source(source)].registration_agency is not None:
+        checked = await look_up(conn, log, _doi_org_channel(), absent)
+        metrics.add(unknown_to_doi_org=checked.extras.get("unknown_to_doi_org", 0))
+    return metrics
 
-    return PhaseMetrics(
-        seen=total,
-        new=progress["inserted"],
-        extras={
-            "fetched": progress["fetched"],
-            "not_found": progress["not_found"],
-            "unknown_to_doi_org": progress["unknown_to_doi_org"],
-        },
+
+def _doi_org_channel() -> LookupChannel:
+    """Vérification auprès de doi.org de DOI qu'une agence d'enregistrement ignore. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`."""
+    user_agent = polite_user_agent()
+
+    async def _fetch(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:
+        known, unknown = await doi_existence(client, dois, user_agent=user_agent)
+        return LookupBatch(absent=unknown) if known or unknown else UNAVAILABLE
+
+    return LookupChannel(
+        source=DOI_ORG,
+        fetch=_fetch,
+        on_absent=lambda conn, doi: record_failed_lookup(conn, DOI_ORG, "doi", doi),
+        absent_metric="unknown_to_doi_org",
+        max_concurrent=3,
     )

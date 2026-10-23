@@ -17,8 +17,8 @@ import httpx2
 
 from domain.publications.identifiers import clean_doi
 from domain.types import JsonValue
-from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.doi_search import DoiBatchResult
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.datacite.api import search_dois
 from pipeline.ingestion.datacite.fields import record_doi
 
@@ -33,16 +33,18 @@ class DataciteDoiSearch:
     max_concurrent = 3
     request_delay_s = 0.9
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         records = await search_dois(client, dois)
         if isinstance(records, NotFound | Unavailable):
-            return DoiBatchResult()
+            return UNAVAILABLE
         # Les nœuds reçus se rapportent aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume. DOI demandés non retournés = confirmés absents de DataCite.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for record in records:
             if doi := record_doi(record):
                 found[doi] = record
-        return DoiBatchResult(
+        return LookupBatch(
             records=list(found.values()),
-            not_found=[d for d in dois if clean_doi(d) not in found],
+            absent=[d for d in dois if clean_doi(d) not in found],
         )

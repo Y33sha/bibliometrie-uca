@@ -14,9 +14,9 @@ from collections.abc import Mapping
 import httpx2
 
 from domain.types import JsonValue
-from pipeline.http.lookup import NotFound, Unavailable
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
 from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
-from pipeline.ingestion.common.doi_search import DoiBatchResult
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.wos.api import filter_doi_for_wos, get_records, get_records_found, search
 from pipeline.ingestion.wos.fields import extract_doi
 
@@ -33,7 +33,9 @@ class WosDoiSearch:
     max_concurrent = 2
     request_delay_s = 0.5
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
@@ -67,9 +69,10 @@ class WosDoiSearch:
             await asyncio.sleep(WOS_DELAY)
 
         if not complete:
-            return DoiBatchResult(records=records)
+            # Lot interrompu : les records reçus sont écrits, sans conclure sur les absents.
+            return LookupBatch(records=records) if records else UNAVAILABLE
         # Lot complet : tout DOI interrogé sans record correspondant est confirmé absent de WoS. `extract_doi` et les candidats sont tous deux normalisés par `clean_doi`, donc comparables directement.
         found = {d for r in records if (d := extract_doi(r))}
-        return DoiBatchResult(
-            records=records, not_found=[orig for orig, c in queried if c and c not in found]
+        return LookupBatch(
+            records=records, absent=[orig for orig, c in queried if c and c not in found]
         )

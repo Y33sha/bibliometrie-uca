@@ -2,7 +2,7 @@
 
 Une réponse de liste d'OpenAlex plafonne les auteurs d'un work à `BULK_AUTHORSHIPS_CAP`. Le moissonnage marque `staging.authors_truncated` les works qui atteignent ce plafond ; cette phase les relit un par un par `/works/{id}`, qui rend tous les auteurs.
 
-**Préservation des auteurs complets.** La nouvelle lecture ne recalcule **pas** `raw_hash` : la ligne garde l'empreinte du work moissonné. Tant que le moissonnage rend le même work tronqué, son empreinte égale celle en base et l'écriture laisse `raw_data` en place. Un work modifié dans OpenAlex écrase `raw_data` par sa version tronquée, de nouveau marquée : cette phase la relit au même run.
+**Préservation des auteurs complets.** La nouvelle lecture ne recalcule **pas** `raw_hash` (`StagingStore.complete_authors`) : la ligne garde l'empreinte du work moissonné. Tant que le moissonnage rend le même work tronqué, son empreinte égale celle en base et l'écriture laisse `raw_data` en place. Un work modifié dans OpenAlex écrase `raw_data` par sa version tronquée, de nouveau marquée : cette phase la relit au même run.
 """
 
 from __future__ import annotations
@@ -12,53 +12,31 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-import httpx2
-from sqlalchemy import Connection, bindparam, text
+from sqlalchemy import Connection, text
 
 from domain.types import JsonValue, as_sequence
-from infrastructure.db.jsonb import Jsonb
-from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.openalex.api import fetch_work
+from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import track_progress
 from pipeline.task_runner import SingleTaskPhase
 
-COMMIT_EVERY = 50
 # Plafond OpenAlex 10 req/s.
 MAX_CONCURRENT = 3
 
 # Le marqueur posé au moissonnage survit à la normalisation, qui vide `raw_data` : la sélection ne dépend ni de l'ordre des phases ni du comptage des auteurs.
 _SELECT_TRUNCATED_SQL = text(
     """
-    SELECT id, source_id
+    SELECT source_id
     FROM staging
     WHERE source = 'openalex' AND authors_truncated
     ORDER BY id
     """
 )
-
-# Réécrit `raw_data` sans recalculer `raw_hash` (cf. docstring du module), lève le marqueur et repasse `processed = FALSE` : la normalisation réécrit les contributions sources complètes.
-_UPDATE_SQL = text(
-    """
-    UPDATE staging
-    SET raw_data = :raw_data, processed = FALSE, authors_truncated = FALSE, last_seen_at = now()
-    WHERE id = :id
-    """
-).bindparams(bindparam("raw_data", type_=Jsonb))
-
-_CLEAR_TRUNCATED_SQL = text("UPDATE staging SET authors_truncated = FALSE WHERE id = :id")
-
-
-@dataclass(frozen=True, slots=True)
-class TruncatedWork:
-    """Work de `staging` soupçonné d'être tronqué."""
-
-    staging_id: int
-    openalex_id: str
 
 
 @dataclass(frozen=True)
@@ -71,63 +49,43 @@ class FetchTruncatedPhase:
             return asyncio.run(refetch_openalex(conn, ctx.logger))
 
 
+def _complete(staging: StagingStore, work: Mapping[str, JsonValue]) -> UpsertOutcome | None:
+    """Écrit le work complet. Un work qui compte au plus le plafond d'auteurs était complet : son marqueur est levé, sans réécrire `raw_data` ni relancer la normalisation."""
+    if len(as_sequence(work.get("authorships"))) > BULK_AUTHORSHIPS_CAP:
+        return staging.complete_authors("openalex", work)
+    staging.clear_truncated("openalex", extract_openalex_id(work))
+    return UpsertOutcome.UNCHANGED
+
+
 async def refetch_openalex(conn: Connection, log: logging.Logger) -> PhaseMetrics:
     """Relit les works OpenAlex marqués `staging.authors_truncated`.
 
-    `updated` = works réécrits ; `extras["already_complete"]` = works qui avaient exactement le plafond d'auteurs (marqueur levé) ; `extras["not_found"]` = works qu'OpenAlex ne connaît plus (marqueur levé) ; `errors` = OpenAlex indisponible (marqueur conservé).
+    Compteurs de `look_up` : `updated` = works réécrits ; `unchanged` = works qui avaient exactement le plafond d'auteurs (marqueur levé) ; `extras["not_found"]` = works qu'OpenAlex ne connaît plus (marqueur levé) ; `errors` = OpenAlex indisponible (marqueur conservé).
     """
-    truncated = [
-        TruncatedWork(staging_id=row.id, openalex_id=row.source_id)
-        for row in conn.execute(_SELECT_TRUNCATED_SQL)
-    ]
-    total = len(truncated)
-
-    metrics = PhaseMetrics(seen=total)
+    truncated = list(conn.execute(_SELECT_TRUNCATED_SQL).scalars())
     if not truncated:
-        return metrics
-
+        return PhaseMetrics()
     step(
         log,
         "%s de %d auteurs, potentiellement %s",
-        quantity(total, "document"),
+        quantity(len(truncated), "document"),
         BULK_AUTHORSHIPS_CAP,
-        inflect(total, "tronqué"),
+        inflect(len(truncated), "tronqué"),
     )
-
-    async def _fetch(
-        client: httpx2.AsyncClient, ref: TruncatedWork
-    ) -> LookupOutcome[Mapping[str, JsonValue]]:
-        return await fetch_work(client, ref.openalex_id)
-
-    with track_progress(total, LAST_BRANCH.rstrip(), log) as progress:
-
-        def _write(
-            conn: Connection, ref: TruncatedWork, work: LookupOutcome[Mapping[str, JsonValue]]
-        ) -> None:
-            if isinstance(work, Unavailable):
-                metrics.add(errors=1)
-            elif isinstance(work, NotFound):
-                conn.execute(_CLEAR_TRUNCATED_SQL, {"id": ref.staging_id})
-                metrics.add(not_found=1)
-            elif len(as_sequence(work.get("authorships"))) <= BULK_AUTHORSHIPS_CAP:
-                # Work complet au plafond près : le marqueur est levé, sans réécrire `raw_data` ni relancer la normalisation.
-                conn.execute(_CLEAR_TRUNCATED_SQL, {"id": ref.staging_id})
-                metrics.add(already_complete=1)
-            else:
-                conn.execute(_UPDATE_SQL, {"raw_data": work, "id": ref.staging_id})
-                metrics.add(updated=1)
-            progress.advance()
-
-        await run_fetch_pool(
-            truncated,
-            conn,
+    return await look_up(
+        conn,
+        log,
+        LookupChannel(
+            source="openalex",
+            fetch=one_at_a_time(fetch_work),
+            on_absent=lambda conn, openalex_id: StagingStore(conn).clear_truncated(
+                "openalex", openalex_id
+            ),
+            stage=_complete,
             max_concurrent=MAX_CONCURRENT,
-            commit_every=COMMIT_EVERY,
-            fetch=_fetch,
-            write=_write,
-        )
-
-    return metrics
+        ),
+        truncated,
+    )
 
 
 # ── Câblage ───────────────────────────────────────────────────

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import httpx2
 
-from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.doi_search import DoiBatchResult
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.openalex.api import search_doi
 
 
@@ -22,12 +22,14 @@ class OpenalexDoiSearch:
     max_concurrent = 3
     request_delay_s = 0.1
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         doi = dois[0]
         work = await search_doi(client, doi)
         if isinstance(work, NotFound):
             # Réponse OpenAlex valide, zéro résultat : DOI confirmé absent.
-            return DoiBatchResult(not_found=[doi])
+            return LookupBatch(absent=[doi])
         if isinstance(work, Unavailable):
-            return DoiBatchResult()
-        return DoiBatchResult(records=[work])
+            return UNAVAILABLE
+        return LookupBatch(records=[work])
