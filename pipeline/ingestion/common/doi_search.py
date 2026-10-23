@@ -170,4 +170,5 @@ def _doi_org_channel() -> LookupChannel:
         on_absent=lambda conn, doi: record_failed_lookup(conn, DOI_ORG, "doi", doi),
         absent_metric="unknown_to_doi_org",
         max_concurrent=3,
+        shown=False,
     )

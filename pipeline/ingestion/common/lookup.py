@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 
 import httpx2
@@ -74,6 +75,8 @@ class LookupChannel:
     """Compteur des identifiants absents."""
     batch_size: int = 1
     max_concurrent: int = 1
+    shown: bool = True
+    """La recherche a sa barre de progression. `False` : une vérification qui prolonge une autre recherche, sous la barre de celle-ci."""
 
 
 async def look_up(
@@ -100,7 +103,12 @@ async def look_up(
             result = UNAVAILABLE
         return result
 
-    with track_progress(len(keys), source_branch(channel.source), slog, count_kept=True) as bar:
+    progress = (
+        track_progress(len(keys), source_branch(channel.source), slog, count_kept=True)
+        if channel.shown
+        else nullcontext(_Unshown())
+    )
+    with progress as bar:
 
         def _write(conn: Connection, batch: list[str], result: LookupBatch | Unavailable) -> None:
             bar.advance(len(batch))
@@ -123,6 +131,16 @@ async def look_up(
         )
 
     return metrics
+
+
+class _Unshown:
+    """Avancement d'une recherche sans barre."""
+
+    def advance(self, n: int = 1) -> None:
+        pass
+
+    def keep(self, n: int = 1) -> None:
+        pass
 
 
 def _stage(

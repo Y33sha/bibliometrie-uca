@@ -16,7 +16,7 @@ import pytest
 
 from pipeline.http.lookup import UNAVAILABLE
 from pipeline.ingestion.api_params import API_BASE_URLS
-from pipeline.ingestion.common import doi_search
+from pipeline.ingestion.common import doi_search, lookup
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
@@ -115,8 +115,15 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_l_agence_d_enregistrement_soumet_ses_absents_a_doi_org(self):
-        """Un DOI absent de son agence d'enregistrement est soumis à doi.org ; seul celui que doi.org ne connaît pas est inscrit sous `doi_org`."""
+        """Un DOI absent de son agence d'enregistrement est soumis à doi.org, sous la barre de l'agence ; seul celui que doi.org ne connaît pas est inscrit sous `doi_org`."""
         recorded: list = []
+        barres: list[str] = []
+        track_progress = lookup.track_progress
+
+        def _track_progress(total, label, logger, **kwargs):
+            barres.append(label)
+            return track_progress(total, label, logger, **kwargs)
+
         adapter = _FakeAdapter(absents=frozenset({"10.1/connu", "10.1/inconnu"}))
         adapter.source_key = "crossref"
 
@@ -126,6 +133,7 @@ class TestRunAsyncOrchestrator:
         with (
             patch.object(doi_search, "doi_existence", _existence),
             patch.object(doi_search, "polite_user_agent", lambda: "test"),
+            patch.object(lookup, "track_progress", _track_progress),
         ):
             result = await _run(adapter, ["10.1/connu", "10.1/inconnu"], recorded=recorded)
 
@@ -135,6 +143,7 @@ class TestRunAsyncOrchestrator:
             ("doi_org", "10.1/inconnu"),
         ]
         assert result.extras["unknown_to_doi_org"] == 1
+        assert len(barres) == 1
 
     @pytest.mark.asyncio
     async def test_worker_pool_caps_concurrent_fetches(self):
