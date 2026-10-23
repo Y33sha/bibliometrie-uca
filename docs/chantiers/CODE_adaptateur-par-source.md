@@ -38,23 +38,24 @@ Trois mécanismes règlent le débit d'une source :
 
 Avec une pause par worker, le débit dépend du temps de réponse. Les réglages de WoS sont répétés dans `wos/fetch_missing.py` et `wos/fetch_stale.py`.
 
-Débit mesuré sur le run 328 (2026-10-23, poste personnel, hors réseau universitaire) :
+Débit mesuré sur le run 328, avant le budget de débit par source, et sur le run 331, avec ce budget (2026-10-23, poste personnel, hors réseau universitaire) :
 
-| Tâche | Documents | Durée | Débit |
-|---|---|---|---|
-| `harvest.hal` | 5 567 | 326 s | 17 doc/s, ~5,8 s par page de 100 |
-| `harvest.openalex` | 6 989 | 93 s | 75 doc/s |
-| `harvest.scanr` | 4 414 | 75 s | 59 doc/s |
-| `harvest.theses` | 2 612 parcourues | 9 s | 290 doc/s |
-| `harvest.datacite` | 649 | 8 s | 81 doc/s |
-| `harvest_by_person.scanr` | 2 526 | 81 s | 31 doc/s |
-| `harvest_by_person.hal` | 1 943 | 150 s | 13 doc/s |
-| `harvest_by_person.openalex` | 4 103 | 167 s | 25 doc/s |
-| `harvest_by_person.crossref` | 901 | 320 s | ~1,7 s par lot de 10 ORCID |
-| `harvest_by_person.datacite` | 390 | 381 s | ~2 s par lot de 10 ORCID |
-| `fetch_truncated` | 643 | 177 s | 3,6 req/s (3 workers) |
+| Tâche | Run 328 | Run 331 |
+|---|---|---|
+| `harvest.hal` | 5 567 doc en 326 s : 17 doc/s | 6 385 doc en 360 s : 18 doc/s |
+| `harvest.openalex` | 6 989 doc en 93 s : 75 doc/s | 7 489 doc en 98 s : 77 doc/s |
+| `harvest.scanr` | 4 414 doc en 75 s : 59 doc/s | 6 095 doc en 194 s : 31 doc/s |
+| `harvest.theses` | 2 612 parcourues en 9 s | 2 612 parcourues en 7 s |
+| `harvest.datacite` | 649 doc en 8 s : 81 doc/s | 577 doc en 8 s : 69 doc/s |
+| `harvest_by_person.scanr` | 2 526 doc en 81 s : 31 doc/s | 3 023 doc en 102 s : 30 doc/s |
+| `harvest_by_person.hal` | 1 943 doc en 150 s : 13 doc/s | 2 413 doc en 157 s : 15 doc/s |
+| `harvest_by_person.openalex` | 4 103 doc en 167 s : 25 doc/s | 4 810 doc en 181 s : 27 doc/s |
+| `harvest_by_person.crossref` | 901 doc en 320 s | 800 doc en 261 s |
+| `harvest_by_person.datacite` | 390 doc en 381 s | 417 doc en 210 s |
+| `fetch_truncated` | 643 req en 177 s : 3,6 req/s | 780 req en 219 s : 3,6 req/s |
+| `fetch_missing.openalex` | 4 req | 298 req en 41 s : 7,3 req/s |
 
-Les moissonnages interrogent leur source une requête à la fois : leur débit suit le temps de réponse, et la pause par worker n'y pèse pas. `fetch_missing` (121 recherches) et `fetch_stale` (aucune) n'ont pas eu de volume mesurable.
+Aucun 429 ni réessai sur le run 331. Seul `fetch_missing.openalex` approche son budget (8 req/s). Les moissonnages restent sous leur budget : leur débit suit le temps de réponse. ScanR rend des pages de 1 000 documents, soit sept requêtes pour 6 095 documents : son ralentissement vient du temps de réponse, pas du budget.
 
 Le circuit-breaker circule par deux canaux. `access_source` le pose dans une ContextVar, que lisent les clients HTTP et `run_fetch_pool`. L'exécuteur des nœuds le passe aussi en argument, jusqu'aux callbacks `breaker_tripped=` des moissonneurs.
 
@@ -106,7 +107,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 - [x] Budget de débit de chaque source, avec les réglages d'accès aux API, injecté dans le contexte de phase. 6532f97c8 ae2b644c0
 - [x] Rythme de la source (`Pace`), porté par son circuit-breaker, à la place des pauses par worker, du `Throttle` et de `RequestPace`. 6532f97c8
-- [ ] Débit réel de chaque source mesuré sur un run, comparé à la mesure de la phase 4.
+- [x] Débit réel de chaque source mesuré sur un run, comparé à la mesure de la phase 4 (run 331).
 
 ### Phase 6 — Politiques de source
 
