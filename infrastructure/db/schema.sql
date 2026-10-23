@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict WjSbEn3gItBDClfFTYjVtX6YDJ4H3yCgKDXlNlb24fDIgwdJwm6MnjEfbLrzg5Y
+\restrict jHFaunjjjv4pKoPqlfyEU8jLnQ3KD0GcQ1GB0XO9Wnh1aSdM9o8CueGxw0Kvnbn
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2142,6 +2142,30 @@ ALTER TABLE queues.source_contribution_countries_queue ALTER COLUMN seq ADD GENE
 
 
 --
+-- Name: source_contribution_group_attributes_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.source_contribution_group_attributes_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: source_contribution_group_attributes_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.source_contribution_group_attributes_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.source_contribution_group_attributes_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: source_record_keys_queue; Type: TABLE; Schema: queues; Owner: -
 --
 
@@ -3308,6 +3332,14 @@ ALTER TABLE ONLY queues.publication_contributions_queue
 
 ALTER TABLE ONLY queues.source_contribution_countries_queue
     ADD CONSTRAINT source_contribution_countries_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_contribution_group_attributes_queue source_contribution_group_attributes_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_contribution_group_attributes_queue
+    ADD CONSTRAINT source_contribution_group_attributes_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -4850,6 +4882,14 @@ ALTER TABLE ONLY queues.source_contribution_countries_queue
 
 
 --
+-- Name: source_contribution_group_attributes_queue source_contribution_group_attributes_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_contribution_group_attributes_queue
+    ADD CONSTRAINT source_contribution_group_attributes_queue_id_fkey FOREIGN KEY (id) REFERENCES publications.source_contribution_groups(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_record_keys_queue source_record_keys_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
 --
 
@@ -5117,5 +5157,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict WjSbEn3gItBDClfFTYjVtX6YDJ4H3yCgKDXlNlb24fDIgwdJwm6MnjEfbLrzg5Y
+\unrestrict jHFaunjjjv4pKoPqlfyEU8jLnQ3KD0GcQ1GB0XO9Wnh1aSdM9o8CueGxw0Kvnbn
 
