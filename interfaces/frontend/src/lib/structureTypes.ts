@@ -20,6 +20,10 @@ export const STRUCTURE_GROUP_LABELS: Readonly<Record<string, string>> = {
   chu: "CHU",
   ecole: "Écoles",
   labo: "Laboratoires",
+  equipe: "Équipes",
+  admin: "Administrations",
+  autre: "Autres",
+  site: "Sites",
 };
 
 /** Libellé du groupe d'un type de structure, ou son code si le type est absent de `STRUCTURE_GROUP_LABELS`. */

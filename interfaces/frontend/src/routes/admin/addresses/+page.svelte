@@ -11,7 +11,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { autofocus } from '$lib/actions/focus';
 	import { structureLabel } from '$lib/structureLabels';
-	import { groupStructuresByType, STRUCTURE_GROUP_LABELS, structureGroupLabel } from '$lib/structureTypes';
+	import { groupStructuresByType, structureGroupLabel } from '$lib/structureTypes';
 
 	// ---- Type definitions ----
 
@@ -109,9 +109,10 @@
 	let currentStructureId = $state<number | null>(null);
 
 	let allStructures = $state<Structure[]>([]);
-	// Le choix de la structure étudiée se limite aux types de `STRUCTURE_GROUP_LABELS`. Le picker des prédicats Structure propose tous les types.
+	// Le choix de la structure étudiée se limite à ces types. Le picker des prédicats Structure propose tous les types.
+	const SCOPE_TYPES = ['universite', 'onr', 'chu', 'ecole', 'labo'];
 	const scopeGroups = $derived(
-		groupStructuresByType(allStructures).filter(([type]) => type in STRUCTURE_GROUP_LABELS)
+		groupStructuresByType(allStructures).filter(([type]) => SCOPE_TYPES.includes(type))
 	);
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	const list = usePaginatedFetch<Address, AddressesResponse>({
