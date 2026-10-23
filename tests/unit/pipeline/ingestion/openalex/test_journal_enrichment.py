@@ -1,5 +1,6 @@
 """Adapter OpenAlex Sources → enrichissement des revues : parsing APC et fetch batch."""
 
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.openalex import journal_enrichment as mod
 
 
@@ -41,7 +42,7 @@ class TestFetchSourcesBatch:
 
     def test_returns_empty_on_failure(self, monkeypatch):
         def boom(*_a, **_k):
-            raise RuntimeError("network down")
+            raise SourceUnavailableError("openalex")
 
         monkeypatch.setattr(mod, "http_request_with_retry", boom)
         out = mod.fetch_sources_batch(["S1"], openalex_sources_api="x")

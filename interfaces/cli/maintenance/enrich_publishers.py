@@ -19,13 +19,14 @@ from collections import Counter
 from collections.abc import Callable
 from typing import NamedTuple, NotRequired, TypedDict, cast
 
+import httpx2
 from sqlalchemy import Connection, text
 
 from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.savepoint import rollback_unless_invalidated
 from infrastructure.observability.log import setup_logger
-from pipeline.http.circuit_breaker import source_tripped
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.credentials import source_credentials_missing
@@ -77,7 +78,7 @@ def fetch_publishers_batch(
 ) -> dict[str, str | None]:
     """Interroge OpenAlex Publishers pour un lot d'identifiants (filtre à `|`, 50 au plus).
 
-    Rend `{}` en cas d'échec : `http_request_with_retry` a déjà compté l'échec au circuit-breaker, que la boucle consulte.
+    Rend `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les retries ; la boucle consulte l'état du circuit-breaker.
     """
     params: dict[str, str] = {
         "filter": f"ids.openalex:{'|'.join(full_openalex_id(oid) for oid in openalex_ids)}",
@@ -91,7 +92,7 @@ def fetch_publishers_batch(
                 "GET", openalex_publishers_api, params=params, timeout=30, label="publishers batch"
             )
         )
-    except Exception as exc:
+    except (httpx2.HTTPStatusError, SourceUnavailableError) as exc:
         log.warning("OpenAlex publishers batch : %r", exc)
         return {}
     results = cast("list[_OpenAlexPublisher]", data.get("results", []))

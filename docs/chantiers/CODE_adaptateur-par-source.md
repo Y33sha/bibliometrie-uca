@@ -52,8 +52,8 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 - Les tables des phases et les nœuds du graphe se construisent depuis la liste des adaptateurs.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
 - Le débit de chaque source est un budget en requêtes par seconde, appliqué par `RequestPace` dans la boucle commune.
-- La ContextVar est le seul canal du circuit-breaker.
-- Une machine à états sans I/O décide des réessais. Deux enveloppes, synchrone et asynchrone, l'exécutent.
+- La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
+- Une fonction sans I/O classe chaque tentative. Deux enveloppes, synchrone et asynchrone, l'exécutent. L'épuisement des réessais lève `SourceUnavailableError`, quelle qu'en soit la cause.
 - La classe de base de la normalisation fait la séquence d'écriture. Une source fournit l'analyse d'une ligne de `staging`.
 - La phase 7 se coordonne avec le chantier [Normalisation par lots](CODE_batch-normalize.md), qui réécrit le writer des contributions sources.
 
@@ -61,11 +61,12 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ### Phase 1 — Circuit-breaker
 
-- [ ] Paramètre `breaker` retiré des nœuds et des callbacks des moissonneurs.
+- [x] Paramètre `breaker` retiré des nœuds et des callbacks des moissonneurs. b9b9aa2cc
 
 ### Phase 2 — Réessais
 
-- [ ] Machine à états des réessais et ses deux enveloppes, avec une seule issue à l'épuisement.
+- [ ] Classement des tentatives et ses deux enveloppes, avec une seule issue à l'épuisement.
+- [ ] Scripts hors pipeline sous le breaker de leur source.
 
 ### Phase 3 — Adaptateur et registre
 

@@ -1,14 +1,16 @@
 """Tests du helper HTTP `http_retry`, versions synchrone et asynchrone.
 
-Vérifie la politique de retry commune aux deux variantes : 429 et 5xx retentés jusqu'à `max_retries`, autres 4xx (404…) en échec immédiat sans retry, corps vide et erreurs réseau retentés.
+Vérifie la politique de retry commune aux deux variantes : 429, 5xx, erreurs réseau et corps vide retentés jusqu'à `max_retries`, puis `SourceUnavailableError` ; autres 4xx (404…) en échec immédiat sans retry. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
 """
 
+import contextvars
 from unittest.mock import MagicMock, patch
 
 import httpx2
 import pytest
 
 from pipeline.http import http_retry
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
 from pipeline.http.http_retry import (
     http_get_text_with_retry_async,
     http_request_with_retry_async,
@@ -17,6 +19,8 @@ from pipeline.http.http_retry import (
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 
 _API_KEY = "cle-secrete-de-test"
+
+pytestmark = pytest.mark.usefixtures("breaker")
 
 # ── variante synchrone (httpx2) ────────────────────────────────
 
@@ -61,21 +65,8 @@ def test_une_erreur_reseau_sans_message_est_journalisee_par_son_type(caplog):
     assert "ReadTimeout" in caplog.text
 
 
-def test_5xx_is_retried():
-    resp = _resp(503)
-    with (
-        patch.object(http_retry.httpx2, "request", return_value=resp) as req,
-        patch.object(http_retry.time, "sleep"),
-    ):
-        with pytest.raises(httpx2.HTTPStatusError):
-            http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
-    assert req.call_count == 3  # 5xx retenté jusqu'au dernier essai
-
-
-def test_5xx_with_breaker_raises_source_unavailable():
-    """Sous circuit-breaker, un 5xx qui épuise ses retries lève `SourceUnavailableError` et compte un échec au breaker."""
-    from pipeline.http.circuit_breaker import SourceUnavailableError, source_circuit_breaker
-
+def test_5xx_exhausted_raises_source_unavailable():
+    """Un 5xx qui épuise ses retries lève `SourceUnavailableError` et compte un échec au breaker."""
     with source_circuit_breaker("hal", threshold=1) as breaker:
         resp = _resp(503)
         with (
@@ -86,6 +77,14 @@ def test_5xx_with_breaker_raises_source_unavailable():
                 http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
         assert req.call_count == 3  # 3 tentatives, puis coupure
         assert breaker.tripped  # l'échec est compté au breaker
+
+
+def test_une_requete_hors_de_l_acces_a_une_source_est_refusee():
+    """Hors de l'accès à une source, aucun breaker n'est posé : la requête n'est pas émise."""
+    with patch.object(http_retry.httpx2, "request") as req, pytest.raises(RuntimeError):
+        # Un contexte vide : la ContextVar y a sa valeur par défaut, sans breaker.
+        contextvars.Context().run(http_retry.http_request_with_retry, "GET", "http://x")
+    req.assert_not_called()
 
 
 def test_success_returns_json():
@@ -163,7 +162,7 @@ class TestAsync:
     async def test_5xx_is_retried(self, http_mock):
         route = http_mock.get("https://api.example/foo").mock(return_value=httpx2.Response(503))
         async with httpx2.AsyncClient() as client:
-            with pytest.raises(httpx2.HTTPStatusError):
+            with pytest.raises(SourceUnavailableError):
                 await http_request_with_retry_async(
                     client,
                     "GET",
@@ -190,10 +189,10 @@ class TestAsync:
         assert route.call_count == 1  # aucun retry sur 4xx
 
     @pytest.mark.asyncio
-    async def test_raises_on_persistent_network_error(self, http_mock):
+    async def test_persistent_network_error_raises_source_unavailable(self, http_mock):
         http_mock.get("https://api.example/foo").mock(side_effect=httpx2.ConnectError("refused"))
         async with httpx2.AsyncClient() as client:
-            with pytest.raises(httpx2.ConnectError):
+            with pytest.raises(SourceUnavailableError):
                 await http_request_with_retry_async(
                     client,
                     "GET",
@@ -222,6 +221,26 @@ class TestAsync:
             )
         assert data == {"ok": True}
         assert route.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_persistent_empty_body_raises_source_unavailable(self, http_mock):
+        """Un corps vide qui épuise ses retries compte un échec au breaker, comme un 429 : WoS signale ainsi un dépassement de débit."""
+        http_mock.get("https://api.example/foo").mock(return_value=httpx2.Response(200, text=""))
+        async with httpx2.AsyncClient() as client:
+            with (
+                source_circuit_breaker("test", threshold=1) as breaker,
+                pytest.raises(SourceUnavailableError),
+            ):
+                await http_request_with_retry_async(
+                    client,
+                    "GET",
+                    "https://api.example/foo",
+                    retry_on_empty_body=True,
+                    max_retries=2,
+                    initial_backoff=0.01,
+                    label="test",
+                )
+        assert breaker.tripped
 
     @pytest.mark.asyncio
     async def test_le_parametre_secret_ne_sort_pas_dans_l_erreur(self, http_mock):

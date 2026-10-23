@@ -146,7 +146,7 @@ class TestFetchPublishersBatch:
         """L'échec est déjà compté au circuit-breaker par le helper HTTP : le lot rendu est vide."""
 
         def boom(*_a, **_k):
-            raise RuntimeError("network down")
+            raise SourceUnavailableError("openalex")
 
         monkeypatch.setattr(module, "http_request_with_retry", boom)
         assert module.fetch_publishers_batch(["P1"], openalex_publishers_api="x") == {}

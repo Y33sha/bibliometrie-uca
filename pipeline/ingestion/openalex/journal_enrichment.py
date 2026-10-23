@@ -8,7 +8,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
+import httpx2
+
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.openalex.api import credential_params
 from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
@@ -52,7 +55,7 @@ def fetch_sources_batch(
 ) -> dict[str, tuple[float | None, str | None, str | None]]:
     """Interroge OpenAlex Sources pour un lot d'IDs.
 
-    Retourne `short_id → (apc_amount, apc_currency, raw_type)`, montant et devise à `None` quand OpenAlex ne donne pas d'APC. En cas d'échec (le circuit-breaker de source a enregistré l'échec via `http_request_with_retry`), retourne `{}` — l'appelant consulte l'état du breaker pour décider d'arrêter.
+    Retourne `short_id → (apc_amount, apc_currency, raw_type)`, montant et devise à `None` quand OpenAlex ne donne pas d'APC. Retourne `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les retries ; l'appelant consulte l'état du circuit-breaker pour décider d'arrêter.
     """
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     params: dict[str, str] = {
@@ -68,7 +71,7 @@ def fetch_sources_batch(
                 "GET", openalex_sources_api, params=params, timeout=30, label="sources batch"
             )
         )
-    except Exception as exc:
+    except (httpx2.HTTPStatusError, SourceUnavailableError) as exc:
         logger.warning("OpenAlex sources batch : %r", exc)
         return {}
 

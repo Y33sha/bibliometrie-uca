@@ -1,6 +1,6 @@
 """Tests du client `doi.org/ra` (`fetch_registration_agencies`).
 
-Mockent `httpx2.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau.
+Mockent `httpx2.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
 """
 
 from __future__ import annotations
@@ -8,9 +8,12 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import httpx2
+import pytest
 
 from pipeline.ingestion.complements import doi_org as registration_agency
 from pipeline.ingestion.complements.doi_org import fetch_registration_agencies
+
+pytestmark = pytest.mark.usefixtures("breaker")
 
 
 def _mock_response(status_code: int = 200, json_data=None):

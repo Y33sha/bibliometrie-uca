@@ -5,6 +5,7 @@
 - Fixture `_clear_caches` (autouse) qui vide les caches module-level
   entre chaque test.
 - Fixture `_adresse_polite_pool` (autouse) qui pose une adresse de test au polite pool, quel que soit l'environnement du poste.
+- Fixture `breaker` qui pose le circuit-breaker d'une source de test, sous lequel toute requête HTTP doit s'exécuter.
 - Fixture `http_mock` qui sert les requêtes HTTP sortantes depuis des
   routes déclarées, sans laisser un appel réel partir.
 - Sur Windows, impose la WindowsSelectorEventLoopPolicy : psycopg3
@@ -23,6 +24,7 @@ from unittest.mock import patch
 import httpx2
 import pytest
 
+from pipeline.http.circuit_breaker import SourceCircuitBreaker, source_circuit_breaker
 from tests.helpers.http_mock import HttpMock
 
 if sys.platform == "win32":
@@ -72,8 +74,15 @@ def _adresse_polite_pool(monkeypatch):
 
 
 @pytest.fixture
-def http_mock() -> Iterator[HttpMock]:
-    """Sert les requêtes HTTP sortantes du test depuis les routes qu'il déclare.
+def breaker() -> Iterator[SourceCircuitBreaker]:
+    """Circuit-breaker d'une source de test, posé comme le pose l'accès à une source."""
+    with source_circuit_breaker("test") as source_breaker:
+        yield source_breaker
+
+
+@pytest.fixture
+def http_mock(breaker: SourceCircuitBreaker) -> Iterator[HttpMock]:  # noqa: ARG001
+    """Sert les requêtes HTTP sortantes du test depuis les routes qu'il déclare, sous le circuit-breaker `breaker`.
 
     Le transport simulé est posé par défaut sur les clients httpx2 construits pendant le test : celui que le test crée pour appeler un adaptateur comme celui que le code appelé ouvre pour son compte. Un client qui reçoit un transport explicite garde le sien. Les fonctions de module (`httpx2.request`, `httpx2.get`, `httpx2.stream`…) construisent leur client dans `httpx2._api`, qui garde sa propre référence à `Client` : elle est remplacée aussi.
     """

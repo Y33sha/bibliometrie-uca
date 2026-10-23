@@ -25,6 +25,7 @@ from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters import get_extraction_api_ids
+from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
 from pipeline.ingestion.openalex.api import SELECT_FIELDS, auth_params, build_params
@@ -118,7 +119,8 @@ def audit(year: int) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--year", type=int, required=True, help="Année de publication parcourue.")
-    return audit(parser.parse_args().year)
+    with source_circuit_breaker("openalex"):
+        return audit(parser.parse_args().year)
 
 
 if __name__ == "__main__":

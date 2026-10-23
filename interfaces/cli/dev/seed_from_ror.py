@@ -27,6 +27,7 @@ from interfaces.cli.dev.generate_seed import (
     exported_columns,
     write_seed,
 )
+from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.polite_pool import get_polite_pool_email_optional
 from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
@@ -404,12 +405,14 @@ def main() -> None:
     ror_id = normalize_ror_id(args.ror_id)
     if ror_id is None:
         raise SystemExit(f"Identifiant ROR invalide : {args.ror_id}")
-    root = fetch_ror(ror_id)
-    children = [fetch_ror(child_id) for child_id in root.child_ids]
-    hal_collections = fetch_hal_collections(root, children)
-    seed = build_institution_seed(
-        root, children, fetch_openalex_ids(ror_id), args.code, hal_collections
-    )
+    with source_circuit_breaker("ror"):
+        root = fetch_ror(ror_id)
+        children = [fetch_ror(child_id) for child_id in root.child_ids]
+    with source_circuit_breaker("hal"):
+        hal_collections = fetch_hal_collections(root, children)
+    with source_circuit_breaker("openalex"):
+        openalex_ids = fetch_openalex_ids(ror_id)
+    seed = build_institution_seed(root, children, openalex_ids, args.code, hal_collections)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     write_seed(INSTITUTION_SEED.description, args.output, seed.sections)
