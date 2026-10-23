@@ -14,7 +14,6 @@
 
 ### Non commencé
 
-- [Accès réseau des sources](CODE_acces-reseau-des-sources.md)
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
