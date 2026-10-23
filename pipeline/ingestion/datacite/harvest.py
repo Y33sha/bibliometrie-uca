@@ -20,7 +20,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
-from pipeline.ingestion.datacite.fields import record_doi
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -57,10 +56,7 @@ def harvest_year(
     while True:
         page = client.fetch_page(query, next_url, str(year))
         for record in page.records:
-            if doi := record_doi(record):
-                stage_document(
-                    conn, metrics, source="datacite", source_id=doi, doi=doi, raw_data=record
-                )
+            stage_document(conn, metrics, source="datacite", record=record)
         conn.commit()
         progress.advance(len(page.records))
         next_url = page.next_url

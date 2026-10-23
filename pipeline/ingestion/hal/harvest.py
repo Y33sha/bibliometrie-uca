@@ -21,7 +21,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.hal.api import HalClient
-from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -81,12 +80,7 @@ def harvest_union(
         docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
 
         for doc in docs:
-            hal_id = extract_id(doc)
-            if not hal_id:
-                continue
-            stage_document(
-                conn, metrics, source="hal", source_id=hal_id, doi=extract_doi(doc), raw_data=doc
-            )
+            stage_document(conn, metrics, source="hal", record=doc)
         conn.commit()
 
         progress.advance(len(docs))

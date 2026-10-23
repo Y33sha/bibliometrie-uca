@@ -8,9 +8,8 @@ from __future__ import annotations
 import httpx2
 
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.datacite.api import fetch_doi
-from pipeline.ingestion.datacite.fields import record_doi
 
 
 class DataciteStaleRefetch(StaleRefetch):
@@ -23,4 +22,4 @@ class DataciteStaleRefetch(StaleRefetch):
         node = await fetch_doi(client, source_id)
         if isinstance(node, NotFound | Unavailable):
             return node
-        return FetchedRecord(doi=record_doi(node), raw_data=node)
+        return node

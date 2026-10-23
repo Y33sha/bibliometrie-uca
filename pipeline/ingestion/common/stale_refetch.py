@@ -9,7 +9,6 @@ import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 import httpx2
 from sqlalchemy import Connection, text
@@ -18,8 +17,8 @@ from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -28,15 +27,8 @@ from pipeline.runtime.observability.progress import track_progress
 COMMIT_EVERY = 50
 
 
-@dataclass(frozen=True, slots=True)
-class FetchedRecord:
-    """Document relu dans la source : payload brut et DOI."""
-
-    doi: str | None
-    raw_data: Mapping[str, JsonValue]
-
-
-type FetchOutcome = LookupOutcome[FetchedRecord]
+type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
+"""Document relu dans la source, ou son absence, ou l'indisponibilité de la source."""
 
 
 class StaleRefetch(ABC):
@@ -141,21 +133,18 @@ async def refresh(
 
         def _write(conn: Connection, source_id: str, outcome: FetchOutcome) -> None:
             nonlocal processed
-            if outcome is UNAVAILABLE:
+            if isinstance(outcome, Unavailable):
                 metrics.add(errors=1)
-            elif outcome is NOT_FOUND:
+            elif isinstance(outcome, NotFound):
                 set_disappeared(conn, source, source_id)
                 metrics.add(disappeared=1)
             else:
-                assert isinstance(outcome, FetchedRecord)
-                _, changed = upsert_staging(
-                    conn,
-                    source=source,
-                    source_id=source_id,
-                    doi=outcome.doi,
-                    raw_data=outcome.raw_data,
-                )
-                metrics.add(updated=1) if changed else metrics.add(unchanged=1)
+                # La lecture par identifiant natif rend le document entier : aucun plafond d'auteurs.
+                staged = StagingStore(conn).stage(source, outcome, listed=False)
+                if staged is UpsertOutcome.UNCHANGED:
+                    metrics.add(unchanged=1)
+                elif staged is not None:
+                    metrics.add(updated=1)
                 progress.keep()
             processed += 1
             progress.advance()

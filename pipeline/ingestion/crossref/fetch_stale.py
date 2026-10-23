@@ -7,10 +7,8 @@ from __future__ import annotations
 
 import httpx2
 
-from domain.publications.identifiers import clean_doi
-from domain.types import as_str
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.crossref.api import fetch_work
 
 
@@ -24,4 +22,4 @@ class CrossrefStaleRefetch(StaleRefetch):
         message = await fetch_work(client, source_id)
         if isinstance(message, NotFound | Unavailable):
             return message
-        return FetchedRecord(doi=clean_doi(as_str(message.get("DOI"))), raw_data=message)
+        return message

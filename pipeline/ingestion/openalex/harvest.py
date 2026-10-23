@@ -5,12 +5,11 @@ Interroge `/works` sur la lignée des institutions du périmètre (`authorships.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
+from domain.types import as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
@@ -19,8 +18,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
-from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
-from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -32,22 +29,6 @@ class OpenalexHarvestConfig:
 
     # Identifiants OpenAlex des institutions du périmètre d'extraction.
     institution_ids: list[str]
-
-
-def stage_work(conn: Connection, metrics: PhaseMetrics, work: Mapping[str, JsonValue]) -> None:
-    """Écrit un work dans `staging` et le compte dans `metrics`.
-
-    Un work dont la liste d'auteurs atteint le plafond de l'API est marqué tronqué : la phase `fetch_truncated` le complète. Le work complété garde l'empreinte (`raw_hash`) du work moissonné. Tant que l'API rend le même work, l'écriture laisse donc le contenu complété en place.
-    """
-    stage_document(
-        conn,
-        metrics,
-        source="openalex",
-        source_id=extract_openalex_id(work),
-        doi=extract_doi(work),
-        raw_data=work,
-        authors_truncated=authors_may_be_truncated(work),
-    )
 
 
 def harvest_period(
@@ -76,7 +57,7 @@ def harvest_period(
             break
 
         for work in works:
-            stage_work(conn, metrics, work)
+            stage_document(conn, metrics, source="openalex", record=work)
         conn.commit()
         fetched += len(works)
         progress.advance(len(works))

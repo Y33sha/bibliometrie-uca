@@ -9,19 +9,12 @@ Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 import httpx2
-from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import DOI_ORG
-from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_str
+from domain.types import as_str
 from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.common.doi_search import DoiBatchResult
-from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
-from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.crossref.api import fetch_work
 
 
@@ -46,20 +39,3 @@ class CrossrefDoiSearch:
             # DOI alias, que Crossref redirige vers son DOI principal : le document reçu a ce dernier pour DOI. L'alias est inscrit comme introuvable.
             return DoiBatchResult(records=[message], not_found=[doi])
         return DoiBatchResult(records=[message])
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour rester cohérent avec les autres sources et la colonne `doi`.
-        doi = clean_doi(as_str(record.get("DOI")))
-        if not doi:
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="crossref",
-            source_id=doi,
-            doi=doi,
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "crossref", [doi])
-        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
-        return inserted

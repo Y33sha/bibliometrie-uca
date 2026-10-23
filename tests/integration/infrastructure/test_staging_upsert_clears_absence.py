@@ -1,14 +1,13 @@
-"""`upsert_staging` efface le marqueur de disparition : un document retrouvé dans un harvest bulk est présent dans sa source."""
+"""`StagingStore.upsert` efface le marqueur de disparition : un document retrouvé dans un harvest bulk est présent dans sa source."""
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.staging import StagingStore
 
 
 def test_bulk_upsert_clears_disappeared_marker(sa_sync_conn):
     # Document présent puis confirmé absent par fetch_stale (disappeared_at posé).
-    upsert_staging(
-        sa_sync_conn,
+    StagingStore(sa_sync_conn).upsert(
         source="hal",
         source_id="hal-04000001",
         doi=None,
@@ -23,8 +22,7 @@ def test_bulk_upsert_clears_disappeared_marker(sa_sync_conn):
     )
 
     # Réapparition en bulk avec un contenu différent : le marqueur de disparition tombe.
-    upsert_staging(
-        sa_sync_conn,
+    StagingStore(sa_sync_conn).upsert(
         source="hal",
         source_id="hal-04000001",
         doi=None,

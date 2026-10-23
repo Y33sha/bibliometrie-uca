@@ -35,14 +35,18 @@ class TestParseSources:
 
 
 class TestDoiFor:
-    @pytest.mark.parametrize("source", ["crossref", "datacite"])
-    def test_sources_dont_l_identifiant_est_le_doi(self, source):
-        """Ces sources n'ont pas d'identifiant propre : leur clé d'archive est le DOI."""
-        assert _doi_for(source, "10.1/a", {}) == "10.1/a"
+    """Le DOI se relit dans le payload, par l'adaptateur de la source."""
 
-    def test_doi_re_extrait_du_payload(self):
-        """Ailleurs, le DOI se relit dans le payload, par la logique propre à la source."""
-        assert _doi_for("hal", "hal-1", {"doiId_s": "10.1/a"}) == "10.1/a"
+    @pytest.mark.parametrize(
+        ("source", "payload"),
+        [
+            ("crossref", {"DOI": "10.1/A"}),
+            ("datacite", {"id": "10.1/a"}),
+            ("hal", {"halId_s": "hal-1", "doiId_s": "10.1/a"}),
+        ],
+    )
+    def test_doi_relu_dans_le_payload(self, source, payload):
+        assert _doi_for(source, payload) == "10.1/a"
 
 
 _ILLISIBLE = object()
@@ -109,7 +113,7 @@ def lancer(monkeypatch):
 
 def test_lignes_presentes_mises_a_jour(lancer):
     resultat = lancer(
-        {"hal": {"hal-1": {"doiId_s": "10.1/a"}}},
+        {"hal": {"hal-1": {"halId_s": "hal-1", "doiId_s": "10.1/a"}}},
         "--sources",
         "hal",
         lignes_presentes={"hal-1"},
@@ -133,7 +137,7 @@ def test_cle_sans_ligne_signalee_et_ignoree(lancer, caplog):
 def test_mode_complet_recree_les_orphelines(lancer):
     """Après une table vidée, tout est orphelin : le document est reconstruit depuis le payload."""
     resultat = lancer(
-        {"hal": {"hal-1": {"doiId_s": "10.1/a"}}},
+        {"hal": {"hal-1": {"halId_s": "hal-1", "doiId_s": "10.1/a"}}},
         "--sources",
         "hal",
         "--full",

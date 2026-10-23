@@ -14,16 +14,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import httpx2
-from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import DOI_ORG
-from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.common.doi_search import DoiBatchResult
-from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
-from pipeline.ingestion.common.staging import upsert_staging
 from pipeline.ingestion.datacite.api import search_dois
 from pipeline.ingestion.datacite.fields import record_doi
 
@@ -51,20 +46,3 @@ class DataciteDoiSearch:
             records=list(found.values()),
             not_found=[d for d in dois if clean_doi(d) not in found],
         )
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.
-        doi = record_doi(record)
-        if not doi:
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="datacite",
-            source_id=doi,
-            doi=doi,
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "datacite", [doi])
-        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
-        return inserted

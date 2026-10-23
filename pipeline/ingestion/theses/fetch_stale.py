@@ -9,9 +9,8 @@ import httpx2
 
 from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.api_params import THESES_DELAY
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.theses.api import fetch_thesis
-from pipeline.ingestion.theses.fields import extract_doi
 
 
 class ThesesStaleRefetch(StaleRefetch):
@@ -24,4 +23,4 @@ class ThesesStaleRefetch(StaleRefetch):
         thesis = await fetch_thesis(client, source_id)
         if isinstance(thesis, NotFound | Unavailable):
             return thesis
-        return FetchedRecord(doi=extract_doi(thesis), raw_data=thesis)
+        return thesis

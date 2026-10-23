@@ -19,7 +19,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.wos.api import WosClient, get_records, get_records_found
-from pipeline.ingestion.wos.fields import extract_doi, extract_ut
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -82,14 +81,7 @@ def harvest_year(
         page_num += 1
 
         for record in records:
-            stage_document(
-                conn,
-                metrics,
-                source="wos",
-                source_id=extract_ut(record),
-                doi=extract_doi(record),
-                raw_data=record,
-            )
+            stage_document(conn, metrics, source="wos", record=record)
         conn.commit()
         progress.advance(len(records))
         first_record += len(records)

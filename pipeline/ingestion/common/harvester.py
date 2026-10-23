@@ -20,7 +20,7 @@ from domain.types import JsonValue
 from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError
-from pipeline.ingestion.common.staging import UpsertOutcome, upsert_staging
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.runtime.config import get_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
@@ -68,29 +68,20 @@ def stage_document(
     metrics: PhaseMetrics,
     *,
     source: str,
-    source_id: str,
-    doi: str | None,
-    raw_data: Mapping[str, JsonValue],
-    authors_truncated: bool = False,
+    record: Mapping[str, JsonValue],
     entry_mode: StagingEntryMode = StagingEntryMode.BULK,
-) -> None:
-    """Écrit un document dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé."""
-    inserted, changed = upsert_staging(
-        conn,
-        source=source,
-        source_id=source_id,
-        doi=doi,
-        raw_data=raw_data,
-        authors_truncated=authors_truncated,
-        entry_mode=entry_mode,
-    )
-    match UpsertOutcome.of(inserted=inserted, changed=changed):
+) -> bool:
+    """Écrit un document reçu d'une réponse de liste dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé. Rend `False` pour un document sans identifiant, ni écrit ni compté."""
+    match StagingStore(conn).stage(source, record, entry_mode=entry_mode):
+        case None:
+            return False
         case UpsertOutcome.NEW:
             metrics.add(new=1)
         case UpsertOutcome.UPDATED:
             metrics.add(updated=1)
         case UpsertOutcome.UNCHANGED:
             metrics.add(unchanged=1)
+    return True
 
 
 class HarvestConfigError(Exception):

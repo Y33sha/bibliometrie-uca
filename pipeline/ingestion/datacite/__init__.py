@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
 from domain.types import JsonValue
-from pipeline.ingestion.common.adapter import SourceAdapter
+from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -63,8 +63,17 @@ def _strip_volatile(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue
     return strip_volatile_for_hash(raw_data)
 
 
+def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
+    """Le DOI d'un nœud DataCite est son identifiant."""
+    from pipeline.ingestion.datacite.fields import record_doi
+
+    doi = record_doi(record)
+    return RecordIdentity.of(doi, doi) if doi else None
+
+
 ADAPTER = SourceAdapter(
     source=Source.DATACITE,
+    identify=_identify,
     stale_refetch=_stale_refetch,
     normalizer=_normalizer,
     harvester=_harvester,

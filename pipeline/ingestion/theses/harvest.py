@@ -18,7 +18,7 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.theses.api import ThesesClient
-from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
+from pipeline.ingestion.theses.fields import extract_id, is_ongoing
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -69,14 +69,7 @@ def harvest_theses(
                 continue
             if year is not None and not is_ongoing(thesis) and not theses_id.startswith(str(year)):
                 continue
-            stage_document(
-                conn,
-                metrics,
-                source="theses",
-                source_id=theses_id,
-                doi=extract_doi(thesis),
-                raw_data=thesis,
-            )
+            stage_document(conn, metrics, source="theses", record=thesis)
             progress.keep()
 
         conn.commit()

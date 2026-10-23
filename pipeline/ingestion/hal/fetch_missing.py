@@ -25,13 +25,11 @@ from pipeline.ingestion.api_params import HAL_DELAY
 from pipeline.ingestion.common.doi_search import DoiBatchResult
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
-    forget_failed_doi_lookups,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.hal.api import search_one
-from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
@@ -109,15 +107,8 @@ def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
 
 def _stage(conn: Connection, doc: Mapping[str, JsonValue]) -> bool:
     """Écrit un document HAL dans `staging`. Rend `True` sur une insertion."""
-    inserted, _ = upsert_staging(
-        conn,
-        source="hal",
-        source_id=extract_id(doc),
-        doi=extract_doi(doc),
-        raw_data=doc,
-        entry_mode=StagingEntryMode.FETCH_MISSING_HAL,
-    )
-    return inserted
+    staged = StagingStore(conn).stage("hal", doc, entry_mode=StagingEntryMode.FETCH_MISSING_HAL)
+    return staged is UpsertOutcome.NEW
 
 
 async def _fetch_ids(
@@ -156,7 +147,7 @@ async def _fetch_ids(
             if isinstance(result, NotFound):
                 record_failed_lookup(conn, "hal", id_type, identifier)
                 metrics.add(not_found=1)
-            elif not isinstance(result, Unavailable) and extract_id(result):
+            elif not isinstance(result, Unavailable):
                 if _stage(conn, result):
                     metrics.add(new=1)
                     progress.keep()
@@ -218,17 +209,3 @@ class HalDoiSearch:
         if isinstance(outcome, Unavailable):
             return DoiBatchResult()
         return DoiBatchResult(records=[outcome])
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        if not extract_id(record):
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="hal",
-            source_id=extract_id(record),
-            doi=extract_doi(record),
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "hal", [extract_doi(record)])
-        return inserted

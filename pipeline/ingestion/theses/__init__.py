@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
-from pipeline.ingestion.common.adapter import SourceAdapter
+from domain.types import JsonValue
+from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -42,8 +44,16 @@ def _normalizer() -> type[SourceNormalizer]:
     return ThesesNormalizer
 
 
+def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
+    from pipeline.ingestion.theses.fields import extract_doi, extract_id
+
+    theses_id = extract_id(record)
+    return RecordIdentity.of(theses_id, extract_doi(record)) if theses_id else None
+
+
 ADAPTER = SourceAdapter(
     source=Source.THESES,
+    identify=_identify,
     stale_refetch=_stale_refetch,
     normalizer=_normalizer,
     harvester=_harvester,

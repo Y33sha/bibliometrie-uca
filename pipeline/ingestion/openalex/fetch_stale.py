@@ -8,9 +8,8 @@ from __future__ import annotations
 import httpx2
 
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.openalex.api import fetch_work
-from pipeline.ingestion.openalex.fields import extract_doi
 
 
 class OpenalexStaleRefetch(StaleRefetch):
@@ -23,4 +22,4 @@ class OpenalexStaleRefetch(StaleRefetch):
         work = await fetch_work(client, source_id)
         if isinstance(work, NotFound | Unavailable):
             return work
-        return FetchedRecord(doi=extract_doi(work), raw_data=work)
+        return work

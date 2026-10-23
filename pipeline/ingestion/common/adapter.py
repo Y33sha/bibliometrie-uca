@@ -25,8 +25,28 @@ type StripVolatile = Callable[[Mapping[str, JsonValue]], Mapping[str, JsonValue]
 
 
 @dataclass(frozen=True, slots=True)
+class RecordIdentity:
+    """Identifiant natif d'un document dans sa source, et ses DOI nettoyés."""
+
+    source_id: str
+    dois: tuple[str, ...] = ()
+
+    @classmethod
+    def of(cls, source_id: str, *dois: str | None) -> RecordIdentity:
+        """Identité de `source_id`, avec les DOI non vides de `dois`, sans doublon."""
+        return cls(source_id, tuple(dict.fromkeys(d for d in dois if d)))
+
+    @property
+    def doi(self) -> str | None:
+        """DOI principal du document : le premier de ses DOI."""
+        return self.dois[0] if self.dois else None
+
+
+@dataclass(frozen=True, slots=True)
 class SourceAdapter:
     source: Source
+    # Identité d'un document reçu de la source, ou `None` pour un document sans identifiant.
+    identify: Callable[[Mapping[str, JsonValue]], RecordIdentity | None]
     # Nouvelle lecture des documents par identifiant natif (phase `fetch_stale`).
     stale_refetch: Callable[[], StaleRefetch]
     # Classe du normaliseur, que la phase `normalize` construit sur ses stores.
@@ -39,3 +59,5 @@ class SourceAdapter:
     doi_search: Callable[[], DoiSearch] | None = None
     # Neutralisation du bruit volatil avant l'empreinte. `None` : l'empreinte porte sur le payload fidèle.
     strip_volatile: StripVolatile | None = None
+    # Vrai quand un document reçu d'une réponse de liste atteint le plafond d'auteurs de la source : sa liste est peut-être tronquée. `None` : la source ne plafonne pas.
+    authors_truncated: Callable[[Mapping[str, JsonValue]], bool] | None = None

@@ -17,6 +17,7 @@ from domain.sources.registry import PROFILES, SEARCHED_IDENTIFIER_STATUSES, Sour
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
@@ -102,14 +103,6 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
     ) -> PersonSearchPage:
         """Une page des documents d'un des `identifiers`, parus entre les deux années de `years` : la première quand `next_token` est `None`."""
 
-    @abstractmethod
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        """Identifiant de la ligne de `staging` et DOI normalisé d'un document, ou `None` pour un document sans identifiant."""
-
-    def authors_truncated(self, record: Mapping[str, JsonValue]) -> bool:  # noqa: ARG002
-        """Vrai si la source a tronqué la liste d'auteurs du document."""
-        return False
-
     def load_config(self, conn: Connection) -> PersonSearchConfig:
         persons = searched_persons(conn, self.id_types)
         if not persons:
@@ -161,18 +154,14 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         while True:
             page = self.fetch_page(identifiers, years, next_token, label)
             for record in page.records:
-                key = self.record_key(record)
-                if key and key[0] not in seen:
-                    source_id, doi = key
-                    seen.add(source_id)
+                identity = ADAPTERS[Source(self.SOURCE)].identify(record)
+                if identity and identity.source_id not in seen:
+                    seen.add(identity.source_id)
                     stage_document(
                         self.conn,
                         metrics,
                         source=self.SOURCE,
-                        source_id=source_id,
-                        doi=doi,
-                        raw_data=record,
-                        authors_truncated=self.authors_truncated(record),
+                        record=record,
                         entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
             self.conn.commit()

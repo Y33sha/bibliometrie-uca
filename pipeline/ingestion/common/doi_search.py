@@ -22,6 +22,7 @@ from domain.sources.registry import (
     PROFILES,
     Source,
 )
+from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
@@ -31,6 +32,7 @@ from pipeline.ingestion.common.failed_lookups import (
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.runtime.observability.log_format import source_branch
 from pipeline.runtime.observability.logging_scope import scoped_logger
@@ -54,7 +56,7 @@ class DoiBatchResult:
 
 
 class DoiSearch(Protocol):
-    """Recherche par DOI dans une source : requête d'un lot de DOI, écriture d'un enregistrement source reçu.
+    """Recherche par DOI dans une source : requête d'un lot de DOI.
 
     Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées, pause de chaque worker après sa requête.
     """
@@ -66,9 +68,6 @@ class DoiSearch(Protocol):
 
     def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> Awaitable[DoiBatchResult]:
         """Interroge l'API pour un lot de 1 à `batch_size` DOI."""
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        """Écrit l'enregistrement source dans `staging` et efface les échecs que ses DOI démentent. Rend `True` sur une insertion. Ne commite pas."""
 
 
 def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) -> list[str]:
@@ -197,8 +196,12 @@ async def fetch_missing_doi(
             # Un lot = une transaction (le pool commite après ce write). Sur erreur, rollback : le lot repart au prochain run.
             batch_inserted = 0
             try:
+                staging = StagingStore(conn)
                 for record in result.records:
-                    if search.insert(conn, record):
+                    outcome = staging.stage(
+                        search.source_key, record, entry_mode=StagingEntryMode.FETCH_MISSING_DOI
+                    )
+                    if outcome is UpsertOutcome.NEW:
                         batch_inserted += 1
                 for doi in result.not_found:
                     record_failed_lookup(conn, search.source_key, "doi", doi)

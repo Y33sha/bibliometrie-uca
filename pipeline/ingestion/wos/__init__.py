@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
 from domain.types import JsonValue
-from pipeline.ingestion.common.adapter import SourceAdapter
+from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -58,8 +58,16 @@ def _strip_volatile(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue
     return strip_volatile_for_hash(raw_data)
 
 
+def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
+    from pipeline.ingestion.wos.fields import extract_doi, extract_ut
+
+    ut = extract_ut(record)
+    return RecordIdentity.of(ut, extract_doi(record)) if ut else None
+
+
 ADAPTER = SourceAdapter(
     source=Source.WOS,
+    identify=_identify,
     stale_refetch=_stale_refetch,
     normalizer=_normalizer,
     harvester=_harvester,

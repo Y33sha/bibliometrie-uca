@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
-from pipeline.ingestion.common.adapter import SourceAdapter
+from domain.types import JsonValue
+from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -49,8 +51,18 @@ def _normalizer() -> type[SourceNormalizer]:
     return CrossrefNormalizer
 
 
+def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
+    """Le DOI d'une œuvre Crossref est son identifiant."""
+    from domain.publications.identifiers import clean_doi
+    from domain.types import as_str
+
+    doi = clean_doi(as_str(record.get("DOI")))
+    return RecordIdentity.of(doi, doi) if doi else None
+
+
 ADAPTER = SourceAdapter(
     source=Source.CROSSREF,
+    identify=_identify,
     stale_refetch=_stale_refetch,
     normalizer=_normalizer,
     person_harvester=_person_harvester,

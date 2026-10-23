@@ -19,9 +19,8 @@ from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.api_params import THESES_DELAY
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.theses.api import fetch_thesis
-from pipeline.ingestion.theses.fields import extract_doi
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
@@ -83,15 +82,10 @@ async def fetch_missing_theses_by_nnt(
                 record_failed_lookup(conn, "theses", "nnt", nnt)
                 metrics.add(not_found=1)
             elif not isinstance(result, Unavailable):
-                inserted, _ = upsert_staging(
-                    conn,
-                    source="theses",
-                    source_id=nnt,
-                    doi=extract_doi(result),
-                    raw_data=result,
-                    entry_mode=StagingEntryMode.FETCH_MISSING_THESES,
+                staged = StagingStore(conn).stage(
+                    "theses", result, entry_mode=StagingEntryMode.FETCH_MISSING_THESES
                 )
-                if inserted:
+                if staged is UpsertOutcome.NEW:
                     metrics.add(new=1)
                     progress.keep()
             progress.advance()

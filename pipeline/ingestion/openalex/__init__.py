@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from domain.sources.registry import Source
-from pipeline.ingestion.common.adapter import SourceAdapter
+from domain.types import JsonValue
+from pipeline.ingestion.common.adapter import RecordIdentity, SourceAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -55,11 +57,27 @@ def _normalizer() -> type[SourceNormalizer]:
     return OpenalexNormalizer
 
 
+def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
+    from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
+
+    if not record.get("id"):
+        return None
+    return RecordIdentity.of(extract_openalex_id(record), extract_doi(record))
+
+
+def _authors_truncated(record: Mapping[str, JsonValue]) -> bool:
+    from pipeline.ingestion.openalex.payload import authors_may_be_truncated
+
+    return authors_may_be_truncated(record)
+
+
 ADAPTER = SourceAdapter(
     source=Source.OPENALEX,
+    identify=_identify,
     stale_refetch=_stale_refetch,
     normalizer=_normalizer,
     harvester=_harvester,
     person_harvester=_person_harvester,
     doi_search=_doi_search,
+    authors_truncated=_authors_truncated,
 )

@@ -5,19 +5,16 @@ Interroge `/works` avec le filtre `authorships.author.orcid`, qui réunit par OU
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
+from domain.types import as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.openalex.api import OpenalexClient
-from pipeline.ingestion.openalex.fields import extract_doi, extract_openalex_id
-from pipeline.ingestion.openalex.payload import authors_may_be_truncated
 
 
 def build_orcid_filter(orcids: list[str], first_year: int, last_year: int) -> str:
@@ -46,10 +43,3 @@ class OpenalexPersonHarvester(PersonSearchHarvester[OpenalexClient]):
         records = [as_mapping(w) for w in as_sequence(data.get("results"))]
         following = as_str(at_path(data, "meta").get("next_cursor"))
         return PersonSearchPage(records=records, next_token=following if records else None)
-
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        openalex_id = extract_openalex_id(record) if record.get("id") else None
-        return (openalex_id, extract_doi(record)) if openalex_id else None
-
-    def authors_truncated(self, record: Mapping[str, JsonValue]) -> bool:
-        return authors_may_be_truncated(record)

@@ -20,7 +20,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.scanr.api import ScanrClient
-from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -88,18 +87,9 @@ def harvest_year(
         for hit in hits:
             progress.advance()
             doc = as_mapping(hit.get("_source"))
-            scanr_id = extract_id(doc)
-            if not scanr_id:
+            if not stage_document(conn, metrics, source="scanr", record=doc):
                 continue
             seen += 1
-            stage_document(
-                conn,
-                metrics,
-                source="scanr",
-                source_id=scanr_id,
-                doi=extract_doi(doc),
-                raw_data=doc,
-            )
             if seen % _COMMIT_EVERY == 0:
                 conn.commit()
 

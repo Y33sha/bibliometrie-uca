@@ -14,9 +14,10 @@ refetch suivant (dans le même run pipeline) ré-amorce le cycle.
 
 from sqlalchemy import text
 
+from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common.fingerprint import fingerprint
-from pipeline.ingestion.openalex.fetch_missing import OpenalexDoiSearch
-from pipeline.ingestion.openalex.harvest import stage_work
+from pipeline.ingestion.common.harvester import stage_document
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from tests.integration.helpers.staging import insert_staging
 
@@ -24,7 +25,7 @@ from tests.integration.helpers.staging import insert_staging
 def insert_batch(conn, works):
     metrics = PhaseMetrics()
     for work in works:
-        stage_work(conn, metrics, work)
+        stage_document(conn, metrics, source="openalex", record=work)
     return metrics
 
 
@@ -197,7 +198,9 @@ class TestAuthorsTruncatedFlag:
 
     def test_fetch_missing_100_authors_flags_truncated(self, sa_sync_conn):
         """La recherche par DOI passe par l'endpoint de liste : un work à 100 auteurs est marqué comme au moissonnage."""
-        OpenalexDoiSearch().insert(sa_sync_conn, _make_work("W210", 100))
+        StagingStore(sa_sync_conn).stage(
+            "openalex", _make_work("W210", 100), entry_mode=StagingEntryMode.FETCH_MISSING_DOI
+        )
         assert _get_staging(sa_sync_conn, "W210").authors_truncated is True
 
     def test_bulk_under_100_not_flagged(self, sa_sync_conn):

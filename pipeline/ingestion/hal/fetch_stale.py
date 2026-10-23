@@ -8,9 +8,8 @@ from __future__ import annotations
 import httpx2
 
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.hal.api import search_one
-from pipeline.ingestion.hal.fields import extract_doi
 
 
 class HalStaleRefetch(StaleRefetch):
@@ -21,4 +20,4 @@ class HalStaleRefetch(StaleRefetch):
         doc = await search_one(client, f"halId_s:{source_id}", label=f"halId {source_id}")
         if isinstance(doc, NotFound | Unavailable):
             return doc
-        return FetchedRecord(doi=extract_doi(doc), raw_data=doc)
+        return doc

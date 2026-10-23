@@ -18,7 +18,6 @@ from pipeline.ingestion.common.person_search import (
     PersonSearchPage,
 )
 from pipeline.ingestion.scanr.api import ScanrClient
-from pipeline.ingestion.scanr.fields import extract_doi, extract_id
 
 
 def build_identifiers_query(
@@ -68,7 +67,3 @@ class ScanrPersonHarvester(PersonSearchHarvester[ScanrClient]):
         # Le jeton de la page suivante est la clé de tri du dernier document, sérialisée.
         following = json.dumps(hits[-1].get("sort")) if hits else None
         return PersonSearchPage(records=records, next_token=following)
-
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        scanr_id = extract_id(record)
-        return (scanr_id, extract_doi(record)) if scanr_id else None

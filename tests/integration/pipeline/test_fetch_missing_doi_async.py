@@ -17,6 +17,7 @@ import pytest
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.common import doi_search
 from pipeline.ingestion.common.doi_search import DoiBatchResult, fetch_missing_doi
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 from pipeline.ingestion.complements.doi_org import doi_existence
 from pipeline.ingestion.crossref.fetch_missing import CrossrefDoiSearch
 from pipeline.ingestion.datacite.fetch_missing import DataciteDoiSearch
@@ -38,7 +39,7 @@ def _sans_config[S](cls: type[S], **attributs: object) -> S:
 
 
 class _FakeAdapter:
-    """Recherche de test : rend un enregistrement source par DOI, sauf les DOI de `absents` ; insert qui compte."""
+    """Recherche de test : rend un enregistrement source par DOI, sauf les DOI de `absents` ; `inserted_records` retient les écritures."""
 
     source_key = "openalex"
     batch_size = 1
@@ -66,10 +67,6 @@ class _FakeAdapter:
             return DoiBatchResult(not_found=[dois[0]])
         return DoiBatchResult(records=[{"doi": dois[0]}])
 
-    def insert(self, conn, record):  # noqa: ARG002
-        self.inserted_records.append(record)
-        return True
-
 
 async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) -> PhaseMetrics:
     """`fetch_missing_doi` sur une connexion simulée et la sélection `dois` ; les DOI inscrits absents s'ajoutent à `recorded`."""
@@ -78,11 +75,16 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
         if recorded is not None:
             recorded.append((source, doi))
 
+    def _stage(_store, source, record, *, entry_mode, listed=True):  # noqa: ARG001
+        adapter.inserted_records.append(record)
+        return UpsertOutcome.NEW
+
     with (
         patch.object(
             doi_search, "get_missing_dois", lambda conn, target, *, retry_after_days: dois
         ),
         patch.object(doi_search, "record_failed_lookup", _record),
+        patch.object(StagingStore, "stage", _stage),
     ):
         return await fetch_missing_doi(
             MagicMock(), adapter, logging.getLogger("test"), retry_after_days=30, **kw

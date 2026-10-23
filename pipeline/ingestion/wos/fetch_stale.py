@@ -8,9 +8,8 @@ from __future__ import annotations
 import httpx2
 
 from pipeline.http.lookup import NOT_FOUND, NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.wos.api import get_records, search
-from pipeline.ingestion.wos.fields import extract_doi
 
 
 class WosStaleRefetch(StaleRefetch):
@@ -26,4 +25,4 @@ class WosStaleRefetch(StaleRefetch):
         records = get_records(data)
         if not records:
             return NOT_FOUND
-        return FetchedRecord(doi=extract_doi(records[0]), raw_data=records[0])
+        return records[0]
