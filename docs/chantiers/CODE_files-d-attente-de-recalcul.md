@@ -41,7 +41,7 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 - [x] Files `source_contribution_countries_queue` et `address_countries_queue`, remplies depuis `countries_dirty`.
 - [x] Marquage dans `normalize`, `ror.py`, `hal_structures.py` et `resolution.py`, qui sert aussi à l'API. Le recalcul des pays marque seulement les adresses dont le pays change.
 - [x] `create_dirty_scope` lit les files. L'effacement supprime les marquages du périmètre.
-- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
+- [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 - [ ] Mesurer la phase `countries` sur le même volume qu'au 22 octobre 2026.
 
 ### Phase 2 — Candidats pays des adresses

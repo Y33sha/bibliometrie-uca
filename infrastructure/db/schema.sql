@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1zUsi9891gy282C0xQJyWcV2F8sUuWM36a1PrYKsTIpskA7GslVYON1qd9WZZ5Y
+\restrict 807U0maVkaD4J7LfucqkZvWsQkTK7scI5rZybSu0NAsfQ305nwJIBfuKJfmqAaR
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -45,6 +45,13 @@ CREATE SCHEMA publications;
 --
 
 CREATE SCHEMA publishing;
+
+
+--
+-- Name: queues; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA queues;
 
 
 --
@@ -142,6 +149,20 @@ CREATE TYPE public.doc_type AS ENUM (
     'data_paper',
     'proceedings',
     'media'
+);
+
+
+--
+-- Name: group_resolution_mode; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.group_resolution_mode AS ENUM (
+    'manual',
+    'orcid',
+    'hal_person_id',
+    'idref',
+    'name',
+    'compatible_name'
 );
 
 
@@ -1009,7 +1030,6 @@ CREATE TABLE sources.source_contributions (
     roles text[] DEFAULT ARRAY['author'::text],
     raw_author_name text,
     created_at timestamp with time zone DEFAULT now(),
-    countries_dirty boolean DEFAULT true NOT NULL,
     contributor_information_id integer NOT NULL,
     resolution_mode public.resolution_mode,
     neutralized_identifiers jsonb,
@@ -1072,7 +1092,7 @@ CREATE TABLE sources.source_records (
     doi text,
     title text NOT NULL,
     publication_year smallint,
-    doc_type text,
+    doc_type public.doc_type,
     publication_id integer,
     staging_id integer,
     created_at timestamp with time zone DEFAULT now(),
@@ -1401,8 +1421,13 @@ CREATE TABLE publications.source_contribution_groups (
     id integer NOT NULL,
     publication_id integer NOT NULL,
     person_id integer,
-    resolution_mode public.resolution_mode,
-    reference_position smallint
+    resolution_mode public.group_resolution_mode,
+    reference_position smallint,
+    is_corresponding boolean,
+    roles text[],
+    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    CONSTRAINT source_contribution_groups_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
 );
 
 
@@ -2028,6 +2053,54 @@ ALTER SEQUENCE publishing.publishers_id_seq OWNED BY publishing.publishers.id;
 
 
 --
+-- Name: address_countries_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.address_countries_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: address_countries_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.address_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.address_countries_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: source_contribution_countries_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.source_contribution_countries_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: source_contribution_countries_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.source_contribution_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.source_contribution_countries_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: countries; Type: TABLE; Schema: ref; Owner: -
 --
 
@@ -2459,7 +2532,6 @@ CREATE TABLE structures.addresses (
     created_at timestamp with time zone DEFAULT now(),
     publication_count integer DEFAULT 0,
     countries character(2)[],
-    countries_dirty boolean DEFAULT false NOT NULL,
     candidates_dirty boolean DEFAULT true NOT NULL,
     CONSTRAINT ck_addresses_normalized_text_not_empty CHECK ((normalized_text <> ''::text))
 );
@@ -3147,6 +3219,22 @@ ALTER TABLE ONLY publishing.journal_name_forms
 
 ALTER TABLE ONLY publishing.journal_issns
     ADD CONSTRAINT uq_journal_issns_issn_journal UNIQUE NULLS NOT DISTINCT (issn, journal_id);
+
+
+--
+-- Name: address_countries_queue address_countries_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.address_countries_queue
+    ADD CONSTRAINT address_countries_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: source_contribution_countries_queue source_contribution_countries_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_contribution_countries_queue
+    ADD CONSTRAINT source_contribution_countries_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -4051,13 +4139,6 @@ CREATE INDEX idx_source_contributions_contributor_information ON sources.source_
 
 
 --
--- Name: idx_source_contributions_countries_dirty; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_contributions_countries_dirty ON sources.source_contributions USING btree (source_record_id) WHERE countries_dirty;
-
-
---
 -- Name: idx_source_contributions_in_perimeter; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4279,13 +4360,6 @@ CREATE INDEX idx_addresses_candidates_dirty ON structures.addresses USING btree 
 --
 
 CREATE INDEX idx_addresses_countries ON structures.addresses USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_addresses_countries_dirty; Type: INDEX; Schema: structures; Owner: -
---
-
-CREATE INDEX idx_addresses_countries_dirty ON structures.addresses USING btree (id) WHERE countries_dirty;
 
 
 --
@@ -4684,6 +4758,22 @@ ALTER TABLE ONLY publishing.publisher_name_forms
 
 
 --
+-- Name: address_countries_queue address_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.address_countries_queue
+    ADD CONSTRAINT address_countries_queue_id_fkey FOREIGN KEY (id) REFERENCES structures.addresses(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_contribution_countries_queue source_contribution_countries_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.source_contribution_countries_queue
+    ADD CONSTRAINT source_contribution_countries_queue_id_fkey FOREIGN KEY (id) REFERENCES sources.source_contributions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: hal_structure_aliases hal_structure_aliases_hal_structure_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -4943,5 +5033,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1zUsi9891gy282C0xQJyWcV2F8sUuWM36a1PrYKsTIpskA7GslVYON1qd9WZZ5Y
+\unrestrict 807U0maVkaD4J7LfucqkZvWsQkTK7scI5rZybSu0NAsfQ305nwJIBfuKJfmqAaR
 
