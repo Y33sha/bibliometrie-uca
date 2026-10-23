@@ -17,6 +17,8 @@ from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
+from pipeline.ingestion.common.staging import StagingStore
+from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
 from pipeline.transformation.publications.consolidation import source_records_of
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
@@ -52,6 +54,15 @@ class TestRelevesRendantUneListe:
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
         assert source_records_of(sa_sync_conn_owner, 1) == []
+
+    def test_les_lignes_de_staging_s_accordent(self, sa_sync_conn_owner):
+        store = StagingStore(sa_sync_conn_owner)
+        assert store.fetch_pending_staging("hal", limit=1) == []
+        assert store.fetch_staging_by_ids([1]) == []
+
+    def test_les_contributions_sources_a_grouper_s_accordent(self, sa_sync_conn_owner):
+        store = SourceContributionGroupStore(sa_sync_conn_owner)
+        assert store.fetch_source_contributions([1]) == []
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
         """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""
@@ -94,7 +105,9 @@ TYPES_EXERCES = {
     "_JournalRow",
     "_PerimeterRow",
     "_PublisherRow",
+    "SourceContributionRow",
     "_SourceRecordRow",
+    "StagingRow",
     "_StructureNameFormRow",
     "_StructureRow",
 }
