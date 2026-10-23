@@ -1,0 +1,74 @@
+"""Attributs des groupes de contributions sources recomposés depuis leurs membres (`propagate_group_attributes_sql`)."""
+
+from sqlalchemy import text
+
+from infrastructure.sql_fragments import propagate_group_attributes_sql
+from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+
+
+def _member(conn, publication, source, *, corresponding, roles, evidence):
+    source_record = insert_source_record(
+        conn, publication, source=source, source_id=f"{source}-{publication}"
+    )
+    source_contribution = insert_source_contribution(
+        conn,
+        source_record,
+        source=source,
+        raw_author_name="Jean Martin",
+        author_name_normalized="jean martin",
+        roles=roles,
+    )
+    conn.execute(
+        text(
+            "UPDATE source_contributions SET is_corresponding = :c,"
+            " perimeter_evidence = CAST(:e AS perimeter_evidence[]) WHERE id = :s"
+        ),
+        {"c": corresponding, "e": evidence, "s": source_contribution},
+    )
+    return source_contribution, source_record
+
+
+def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    group = insert_group(
+        conn,
+        publication,
+        [
+            _member(
+                conn,
+                publication,
+                "hal",
+                corresponding=False,
+                roles=["author"],
+                evidence="{hal_structure}",
+            ),
+            _member(
+                conn,
+                publication,
+                "openalex",
+                corresponding=True,
+                roles=["editor"],
+                evidence="{address,ror}",
+            ),
+        ],
+    )
+
+    assert conn.execute(text(propagate_group_attributes_sql())).rowcount == 1
+    row = conn.execute(
+        text(
+            "SELECT is_corresponding, roles, perimeter_evidence::text[] AS evidence, in_perimeter"
+            " FROM source_contribution_groups WHERE id = :g"
+        ),
+        {"g": group},
+    ).one()
+
+    assert (row.is_corresponding, row.roles, row.evidence, row.in_perimeter) == (
+        True,
+        ["author", "editor"],
+        ["address", "hal_structure", "ror"],
+        True,
+    )
+    assert conn.execute(text(propagate_group_attributes_sql())).rowcount == 0

@@ -18,7 +18,7 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.purge import purge
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.groups import group_ungrouped, insert_group
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -38,7 +38,7 @@ def _seed_source_contribution(conn, *, publication_id, raw_name, name_norm):
         title=f"publication {publication_id}",
         row_id=publication_id,
         publication_year=2024,
-        doc_type="ART",
+        doc_type="article",
     )
     insert_source_contribution(
         conn,
@@ -64,7 +64,7 @@ def _seed_two_source_records(
             title=f"publication {publication_id}",
             row_id=source_record_id,
             publication_year=2024,
-            doc_type="ART",
+            doc_type="article",
         )
     for source_contribution_id, source, raw, norm in (
         (sa1_id, "hal", raw1, norm1),
@@ -85,6 +85,7 @@ def _seed_two_source_records(
 
 def _run_create(conn):
     """Arbitrage des conflits d'identifiant (no-op ici, pas d'identifiant) puis la cascade."""
+    group_ungrouped(conn)
     arbitrate_identifier_conflicts(conn, _LOG, repo=PgPersonRepository(conn))
     run_cascade(conn, _LOG, repo=PgPersonRepository(conn))
 

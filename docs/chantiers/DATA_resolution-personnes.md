@@ -19,6 +19,8 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - La cascade décide par groupe. Elle cherche les indices de périmètre du groupe, puis rattache le groupe à une personne existante.
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
 - Le rattachement d'un groupe à une personne est figé tant que ses membres restent les mêmes. Un groupe dont les membres changent est réévalué.
+- `source_contribution_groups.resolution_mode` a sa propre enum, `group_resolution_mode` : `manual`, `orcid`, `hal_person_id`, `idref`, `name`, `compatible_name`.
+- Pendant la transition, la cascade des groupes écrit seulement la personne des groupes, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id` jusqu'à la bascule des lecteurs ; les écarts entre les deux signalent des conflits.
 - Les décisions humaines visent des entités stables et se propagent au groupe :
   - l'épinglage d'une contribution source rattache son groupe ;
   - le rejet d'un couple (enregistrement source, personne) interdit de lier la personne à la publication de l'enregistrement source, donc à tout groupe de cette publication.
@@ -89,14 +91,20 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - [x] Copies d'un article dans un repository réintroduites dans l'alignement : 1 569 enregistrements sources, 2 951 000 contributions sources.
 - [x] Enregistrements sources scanR issus d'un dépôt HAL présent réintroduits dans l'alignement.
 - [x] Règle par nom de l'alignement : groupes liés et groupes par clé calculés une fois par enregistrement source, le 2026-10-22. Sur 3 000 publications, les groupes sont inchangés et le second passage tombe de 3,4 s à 0,3 s.
-- [ ] Contributions sources hors groupe exclues de la résolution des personnes.
+- [x] Contributions sources hors groupe exclues de la résolution des personnes.
 
 ### Phase 4 — Essais d'une cascade par groupe
 
-- [ ] Périmètre du groupe, par l'union des indices de ses contributions sources.
-- [ ] Une décision par groupe, sur les signaux réunis de ses contributions sources : identifiants des sources fiables, nom au prénom le plus complet, structures et adresses.
-- [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires. Une adresse au CHU de Clermont laisse l'auteur hors périmètre, mais appuie son rattachement à une personne RH.
-- [ ] Une personne par groupe au plus. Dans une publication, un groupe par personne au plus.
+- [x] Périmètre du groupe, par l'union des indices de ses contributions sources. 02f69c43b
+- [x] Une décision par groupe, sur les signaux réunis de ses contributions sources (`domain/persons/group_matching.py`). 02f69c43b
+  - Exécution à blanc le 2026-10-22 (`shadow_group_cascade.py`), sur les 464 227 groupes qui ont un membre du périmètre ou rattaché : 456 915 identiques au rattachement actuel, 6 119 toujours sans personne (5 951 jurys de thèse), 849 rattachements perdus, 266 conflits actuels tranchés, 73 rattachements gagnés, 3 autres personnes, 2 créations. L'index des personnes vient en partie des rattachements actuels, donc l'accord est surestimé.
+  - Rattachements perdus : surtout des rattachements par un ORCID rejeté pour la personne, et des rattachements par le nom de groupes sortis du périmètre. Les 71 conflits de nom sont des doublons de personnes (« Zheng-Ze » et « Zhengze » Zhu), des fautes de source (« Buoef-Gibot » dans WoS) ou des erreurs de groupement.
+  - Conflits actuels tranchés : membres rattachés à deux personnes par l'ancrage entre sources ; la décision suit l'identifiant ou l'épinglage.
+  - Rattachements gagnés : nom complet d'un membre hors périmètre dans un groupe que l'adresse OpenAlex d'un autre membre met dans le périmètre.
+  - Essai écarté : refuser un identifiant quand un membre de même nom de famille, au prénom complet, contredit sa personne. Un refus juste sur deux : diminutifs (Bob et Robert), translittérations (Kuleshov), fautes de source.
+- [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
+- [x] Une personne par groupe au plus, par construction.
+- [x] Dans une publication, un groupe par personne au plus (`settle_publication`), y compris face aux groupes déjà rattachés. 8bd161212 a6e809b3d 1 527 couples (publication, personne) portés par plusieurs groupes : 779 auteurs répétés dans une liste (Fauchon aux positions 0, 1, 14 et 15 chez OpenAlex), 748 personnes qui portent les identifiants de deux chercheurs (Manea et Manna).
 - [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
 ### Phase 5 — Migration du schéma
@@ -105,11 +113,13 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape A — Personne sur le groupe, en double écriture
 
-- [ ] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`. `reference_position` tient lieu d'`author_position`.
-- [ ] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La clé étrangère `ON DELETE SET NULL` vide seulement `person_id`, donc la suppression d'une personne viole la contrainte si ses groupes ne sont pas détachés avant.
-- [ ] La phase `persons` écrit la personne du groupe en plus de celle des contributions sources. Tant que la cascade décide par contribution source, la personne du groupe est celle de ses membres. Des membres rattachés à deux personnes laissent le groupe sans personne, et le conflit est compté.
-- [ ] Réévaluation des groupes recomposés par `author_grouping`. Un groupe recomposé reprend l'identifiant de l'ancien groupe dont il partage le plus de membres (`plan_group_ids`) : `author_grouping` vide sa personne quand ses membres changent.
-- [ ] Écart entre les groupes et `contributions` : couples (publication, personne) présents d'un seul côté.
+- [x] Colonnes de `contributions` ajoutées aux groupes : `is_corresponding`, `roles`, `perimeter_evidence`, `in_perimeter`, recomposés depuis les membres par la tâche `author_grouping.attributes`. `reference_position` tient lieu d'`author_position`. d21f109fc
+- [x] Contrainte CHECK : `resolution_mode` est renseigné si et seulement si `person_id` l'est. La purge vide les groupes d'une personne avant de la supprimer. 4f7e62b73
+- [x] Tâche `persons.resolve_groups`, après la purge : la décision par groupe rattache les groupes sans personne à une personne existante, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id`. a6e809b3d
+- [x] Réévaluation des groupes recomposés : `author_grouping` vide la personne d'un groupe dont les membres changent. c352def57
+- [x] Écart entre les groupes et `contributions`, le 2026-10-22 après deux runs : 473 600 couples (publication, personne) des deux côtés, 860 seulement dans `contributions`, 79 seulement dans les groupes.
+  - 735 groupes sans personne : fausses personnes du périmètre ancrées par le seul nom d'un membre aujourd'hui hors périmètre, identifiants rejetés pour la personne, conflits de nom ou d'identifiant, formes de nom devenues ambiguës.
+  - 125 groupes rattachés à une autre personne : doublons de personnes nés de fautes de source (« Ren Lavigne », « Malys Clinchamps », accents perdus ou en notation LaTeX), que le groupe départage par identifiant. 406 épinglages en bloc de « Zhang, M. » et « Xu, Z. » à Maolin Zhang et Zehua Xu, qui imposaient leur personne à des groupes d'autres chercheurs, ont été supprimés.
 
 #### Étape B — Bascule des lecteurs
 
@@ -120,8 +130,9 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 #### Étape C — Bascule des écrivains
 
 - [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
-- [ ] Invalidation des rattachements au rejet d'un identifiant. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
-- [ ] La cascade par groupe (phase 4) écrit seulement le groupe. La phase `contributions` se réduit à la propagation des attributs des membres vers le groupe.
+- [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
+- [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
+- [ ] La phase `contributions` cesse de construire la table `contributions`.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
 
 #### Étape D — Suppressions
@@ -132,8 +143,10 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
-- [ ] Une entrée de domaine rend la décision complète d'un groupe. Elle lit un index de personnes en mémoire, que le pipeline met à jour après chaque écriture : formes de nom, homonymes par nom de famille. Elle renvoie les refus de corroboration. `NameFormDecision` et `PersonMatchDecision` fusionnent.
-- [ ] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par cette entrée : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre.
+- [x] Une entrée de domaine rend la décision complète d'un groupe (`decide_group`). Elle lit un index de personnes en mémoire et renvoie les refus de corroboration. 02f69c43b
+- [ ] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes.
+- [ ] `NameFormDecision` et `PersonMatchDecision` fusionnent, avec la disparition de l'ancienne cascade.
+- [x] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par `decide_group` : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre. 02f69c43b
 - [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
 
 ### Phase 7 — Correction du stock
@@ -149,6 +162,5 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
 - Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md). Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
-- `resolution_mode` d'un groupe rattaché par une décision humaine : valeur dédiée, ou lecture de l'épinglage.
 - Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres groupes.

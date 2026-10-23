@@ -39,6 +39,7 @@ from domain.country_detection import CountryDetectionMethod
 from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.merge import MergedEntity
+from domain.persons.group_matching import GroupMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
@@ -762,16 +763,39 @@ rejected_contributions = Table(
 
 grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
 
+group_resolution_mode_enum = PgEnum(
+    *GroupMatchReason, name="group_resolution_mode", create_type=False
+)
+
 source_contribution_groups = Table(
     "source_contribution_groups",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
     Column("person_id", Integer),
-    Column("resolution_mode", resolution_mode_enum),
+    Column("resolution_mode", group_resolution_mode_enum),
     Column("reference_position", SmallInteger),
+    Column("is_corresponding", Boolean),
+    Column("roles", ARRAY(Text)),
+    # Indices de l'entrée dans le périmètre, union de ceux des membres ; `in_perimeter` en découle.
+    Column(
+        "perimeter_evidence",
+        ARRAY(perimeter_evidence_enum),
+        nullable=False,
+        server_default="{}",
+    ),
+    Column(
+        "in_perimeter",
+        Boolean,
+        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
+        nullable=False,
+    ),
     UniqueConstraint(
         "publication_id", "person_id", name="source_contribution_groups_publication_person_uq"
+    ),
+    CheckConstraint(
+        "(person_id IS NULL) = (resolution_mode IS NULL)",
+        name="source_contribution_groups_resolution_mode_with_person",
     ),
     comment=(
         "Contributions sources d'un même auteur dans une publication, avec au maximum une "
@@ -1209,7 +1233,7 @@ source_records = Table(
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),
-    Column("doc_type", Text),
+    Column("doc_type", doc_type_enum),
     Column(
         "raw_doc_type",
         Text,

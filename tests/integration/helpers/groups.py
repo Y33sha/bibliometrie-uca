@@ -30,3 +30,27 @@ def insert_group(
             },
         )
     return group_id
+
+
+def group_ungrouped(conn: Connection) -> None:
+    """Donne un groupe à elle seule à chaque contribution source sans groupe d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : le groupe que la phase `author_grouping` forme pour un auteur sans jumelle."""
+    conn.execute(
+        text("""
+            WITH ungrouped AS (
+                SELECT sc.id, sc.source_record_id, sr.publication_id,
+                       nextval(pg_get_serial_sequence('publications.source_contribution_groups', 'id')) AS group_id
+                FROM source_contributions sc
+                JOIN source_records sr ON sr.id = sc.source_record_id
+                WHERE sr.publication_id IS NOT NULL AND NOT sc.collective AND sc.duplicate_of IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM source_contribution_group_members gm
+                      WHERE gm.source_contribution_id = sc.id)
+            ), groups AS (
+                INSERT INTO source_contribution_groups (id, publication_id)
+                SELECT group_id, publication_id FROM ungrouped
+            )
+            INSERT INTO source_contribution_group_members
+                (source_contribution_id, group_id, source_record_id, method)
+            SELECT id, group_id, source_record_id, 'reference' FROM ungrouped
+        """)
+    )

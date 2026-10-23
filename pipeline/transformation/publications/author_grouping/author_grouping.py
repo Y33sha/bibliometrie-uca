@@ -32,7 +32,7 @@ from pipeline.runtime.cpu import available_cpus
 from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress, waiting
-from pipeline.task_runner import SingleTaskPhase
+from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.author_grouping.residual_weights import (
     RESIDUAL_WEIGHTS,
 )
@@ -206,6 +206,7 @@ def _plan_batch(
     existing, stored = store.fetch_groups(publication_ids)
     planned: list[tuple[int, GroupTuple, int | None]] = []
     unmatched: list[int] = []
+    recomposed: list[int] = []
     copies: dict[int, int] = {}
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
     for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
@@ -214,8 +215,14 @@ def _plan_batch(
             gid: frozenset(contributions)
             for gid, contributions in existing.get(publication_id, {}).items()
         }
-        ids = plan_group_ids(old, [frozenset(m[0] for m in members) for _, members in groups])
+        new = [frozenset(m[0] for m in members) for _, members in groups]
+        ids = plan_group_ids(old, new)
         planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
+        recomposed += [
+            gid
+            for gid, members in zip(ids, new, strict=True)
+            if gid is not None and old[gid] != members
+        ]
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
     fresh = iter(store.group_ids(sum(1 for *_, gid in planned if gid is None)))
@@ -231,7 +238,7 @@ def _plan_batch(
                 MembershipRow(source_contribution, group_id, source_record, method, score, margin)
             )
     removed, inserted = membership_changes(stored, memberships)
-    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, copies)
+    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, recomposed, copies)
 
 
 def regroup(
@@ -307,14 +314,38 @@ def build_groups(
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        with ctx.open_tx() as conn:
-            return build_groups(
-                conn,
-                SourceContributionGroupStore(conn),
-                ctx.logger,
-                rebuild=ctx.options.rebuild_author_grouping,
-            )
+        """Recalcule les groupes des publications marquées, puis les attributs de tous les groupes : l'affiliation d'un membre change sans que son groupe change."""
+
+        def build_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                return build_groups(
+                    conn,
+                    SourceContributionGroupStore(conn),
+                    ctx.logger,
+                    rebuild=ctx.options.rebuild_author_grouping,
+                )
+
+        def attributes_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                updated = SourceContributionGroupStore(conn).propagate_attributes()
+            metrics = PhaseMetrics(updated=updated)
+            metrics.report = quantity(updated, "groupe réécrit", "groupes réécrits")
+            return metrics
+
+        by_task = run_tasks(
+            "author_grouping",
+            {
+                "author_grouping.build": TaskStep(build_task, label="Bilan"),
+                "author_grouping.attributes": TaskStep(
+                    attributes_task, label="Attributs des groupes"
+                ),
+            },
+            ctx,
+        )
+        metrics = by_task["author_grouping.build"]
+        metrics.details["attributes_updated"] = by_task["author_grouping.attributes"].updated
+        return metrics
 
 
 def build() -> Phase:
-    return SingleTaskPhase("author_grouping.build", AuthorGroupingPhase(), label="Bilan")
+    return AuthorGroupingPhase()

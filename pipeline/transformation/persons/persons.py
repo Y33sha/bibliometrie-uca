@@ -1,15 +1,14 @@
 """Orchestrateur unique de la phase personnes.
 
-Trois tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
+Quatre tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`), `purge` (tâche `persons.purge`) et `resolve_groups` (tâche `persons.resolve_groups`) ont chacun leur transaction.
 
-1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les doublons d'auteur d'un enregistrement source (`duplicate_of`), non épinglés, perdent leur personne.
+1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les contributions sources hors groupe, non épinglées, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les contributions sources rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
-
-Le rattachement est ordre-indépendant : le résultat ne dépend pas de la séquence d'ingestion des sources — propriété de l'algorithme (recompute complet, arbitrage par consensus, lectures d'agrégat sur le snapshot), non de la transaction.
+7. **resolve_groups** — rattache à une personne existante les groupes de contributions sources sans personne (`pipeline.transformation.persons.groups`).
 
 Les publications hors scope sont écartées (`domain/publications/scope`).
 
@@ -32,6 +31,7 @@ from infrastructure.repositories.person_repository import (
 )
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
+    person_source_contribution,
     pinned,
 )
 from pipeline.runtime.context import Phase, PhaseContext
@@ -40,6 +40,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.groups import resolve_groups
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.metrics import build_metrics
 from pipeline.transformation.persons.populate_person_name_forms import populate
@@ -60,13 +61,14 @@ def enforce_confirmed_source_contributions(conn: Connection) -> int:
     ).rowcount
 
 
-def detach_copies(conn: Connection) -> int:
-    """Détache de leur personne les doublons d'auteur (`duplicate_of`), sauf épinglage. Rend le nombre de doublons détachés."""
+def detach_ungrouped(conn: Connection) -> int:
+    """Détache de leur personne les contributions sources hors groupe (`person_source_contribution`), sauf épinglage. Rend le nombre de contributions sources détachées."""
     return conn.execute(
         text(f"""
             UPDATE source_contributions sc
             SET {DETACHED_SOURCE_CONTRIBUTION}
-            WHERE sc.duplicate_of IS NOT NULL AND sc.person_id IS NOT NULL
+            WHERE sc.person_id IS NOT NULL
+              AND NOT {person_source_contribution("sc")}
               AND NOT {pinned("sc.id")}
         """)
     ).rowcount
@@ -78,7 +80,7 @@ class PersonsPhase:
     orphans_log: logging.Logger | None = None
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les trois tâches de la phase personnes et rend ses métriques.
+        """Exécute les quatre tâches de la phase personnes et rend ses métriques.
 
         `orphans_log` reçoit le motif de chaque contribution source du périmètre restée sans personne (`run_cascade`).
         """
@@ -91,6 +93,10 @@ class PersonsPhase:
                     section="Rafraîchissement des formes de nom associées aux personnes",
                 ),
                 "persons.purge": TaskStep(self._purge),
+                "persons.resolve_groups": TaskStep(
+                    self._resolve_groups,
+                    section="Rattachement des groupes de contributions sources",
+                ),
             },
             ctx,
         )
@@ -107,7 +113,7 @@ class PersonsPhase:
         return metrics
 
     def _resolve(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-        """Épinglages, détachement des copies, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
+        """Épinglages, détachement des contributions sources hors groupe, arbitrage des identifiants, cascade et détachement cross-source, sur une transaction."""
         logger = ctx.logger
         with ctx.open_tx() as conn:
             repo = self.repo_factory(conn)
@@ -123,13 +129,17 @@ class PersonsPhase:
                     ),
                 )
 
-            n_copies = detach_copies(conn)
-            if n_copies:
-                step(logger, "Auteurs en double dans la liste d'un enregistrement source")
+            n_ungrouped = detach_ungrouped(conn)
+            if n_ungrouped:
+                step(logger, "Contributions sources hors groupe")
                 logger.info(
                     "%s%s de leur personne",
                     LAST_BRANCH,
-                    quantity(n_copies, "doublon détaché", "doublons détachés"),
+                    quantity(
+                        n_ungrouped,
+                        "contribution source détachée",
+                        "contributions sources détachées",
+                    ),
                 )
 
             arbitration = arbitrate_identifier_conflicts(conn, logger, repo=repo)
@@ -166,6 +176,18 @@ class PersonsPhase:
         with ctx.open_tx() as conn:
             counts = purge(conn)
         return PhaseMetrics(extras=dict(counts))
+
+    def _resolve_groups(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        with (
+            ctx.open_tx() as conn,
+            waiting(f"{LAST_BRANCH}décision des groupes sans personne", ctx.logger) as line,
+        ):
+            counts = resolve_groups(conn)
+            line.conclude(
+                f"{LAST_BRANCH}{quantity(counts['written'], 'groupe rattaché', 'groupes rattachés')}"
+                f" sur {quantity(counts['groups'], 'groupe décidé', 'groupes décidés')}"
+            )
+        return PhaseMetrics(extras=counts)
 
 
 # ── Câblage ───────────────────────────────────────────────────

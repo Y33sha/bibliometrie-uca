@@ -80,7 +80,7 @@ _MISPLACED = IdentifierNeutralization.MISPLACED.value
 def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
     """Pour chaque valeur du type, le nombre de **contributions sources** qui la contiennent sous chaque `author_name_normalized` (poids en contributions sources, et non en lignes de `contributor_information` — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des informations du contributeur qui contiennent le type (`contributor_information`), jointes aux `source_contributions` (index `contributor_information_id`) pour le comptage.
 
-    Une contribution source collective ou un doublon d'auteur ne vote pas. Une contribution source qui neutralise la valeur pour cause de partage ne vote pas. Une contribution source qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
+    Une contribution source hors groupe ne vote pas. Une contribution source qui neutralise la valeur pour cause de partage ne vote pas. Une contribution source qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
     rows = conn.execute(
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value,

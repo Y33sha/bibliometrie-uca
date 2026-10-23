@@ -97,32 +97,59 @@ def test_les_contributions_sources_d_un_meme_auteur_sont_groupees(conn):
     assert dirty.scalar_one() is False
 
 
-def test_un_recalcul_garde_l_identifiant_et_la_personne_des_groupes(conn):
+def _attached_group(conn, publication, source_contribution):
+    """Rattache à une personne le groupe de `source_contribution` et rend son identifiant."""
+    group = next(
+        gid
+        for gid, contributions in _groups(conn, publication).items()
+        if source_contribution in contributions
+    )
+    person = insert_person(conn, "Martin", first_name="Anne")
+    conn.execute(
+        text(
+            "UPDATE source_contribution_groups SET person_id = :person, resolution_mode = 'name'"
+            " WHERE id = :g"
+        ),
+        {"person": person, "g": group},
+    )
+    conn.execute(
+        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
+    )
+    return group, person
+
+
+def _group_person(conn, group):
+    return conn.execute(
+        text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+        {"g": group},
+    ).one()
+
+
+def test_un_groupe_aux_membres_inchanges_garde_sa_personne(conn):
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    martin = next(
-        gid for gid, contributions in _groups(conn, publication).items() if hal[0] in contributions
-    )
-    person = insert_person(conn, "Martin", first_name="Anne")
-    conn.execute(
-        text("UPDATE source_contribution_groups SET person_id = :person WHERE id = :g"),
-        {"person": person, "g": martin},
-    )
+    martin, person = _attached_group(conn, publication, hal[0])
+
+    _run(conn)
+
+    assert tuple(_group_person(conn, martin)) == (person, "name")
+
+
+def test_un_groupe_recompose_garde_son_identifiant_et_perd_sa_personne(conn):
+    publication = insert_publication(conn)
+    hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+    _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
+    _run(conn)
+    martin, _ = _attached_group(conn, publication, hal[0])
     _source_record(conn, publication, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
-    conn.execute(
-        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
-    )
 
     _run(conn)
 
     groups = _groups(conn, publication)
     assert hal[0] in groups[martin] and len(groups[martin]) == 3
-    kept = conn.execute(
-        text("SELECT person_id FROM source_contribution_groups WHERE id = :g"), {"g": martin}
-    )
-    assert kept.scalar_one() == person
+    assert tuple(_group_person(conn, martin)) == (None, None)
 
 
 def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):

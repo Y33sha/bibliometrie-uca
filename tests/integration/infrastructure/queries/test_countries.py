@@ -5,8 +5,11 @@ from sqlalchemy import text
 from domain.country_detection import CountryDetectionMethod
 from pipeline.transformation.countries.refresh_publication_countries import (
     clear_countries_dirty,
+    create_dirty_scope,
+    drop_dirty_scope,
     refresh_publication_countries,
     refresh_source_contribution_countries,
+    refresh_source_contribution_countries_in_id_range,
     refresh_source_record_countries,
 )
 from pipeline.transformation.countries.resolution import resolve_address_countries
@@ -18,6 +21,15 @@ from tests.integration.helpers.sources import (
     insert_source_contribution_address,
     insert_source_record,
 )
+
+
+def _refresh(conn, *steps) -> list[int]:
+    """Exécute les étapes de recalcul dans le périmètre des contributions sources à recalculer, et rend leurs nombres de lignes modifiées."""
+    create_dirty_scope(conn)
+    try:
+        return [refresh_step(conn) for refresh_step in steps]
+    finally:
+        drop_dirty_scope(conn)
 
 
 def _resolve(conn, address_id: int, codes: list[str]) -> None:
@@ -147,8 +159,9 @@ class TestRefreshAddressSourceCountries:
         )
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        refresh_source_contribution_countries(sa_sync_conn)
-        updated = refresh_source_record_countries(sa_sync_conn)
+        _, updated = _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -166,7 +179,7 @@ class TestRefreshAddressSourceCountries:
         addr = insert_address(sa_sync_conn, "X", countries=None, normalized_text="X")
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        updated = refresh_source_record_countries(sa_sync_conn)
+        (updated,) = _refresh(sa_sync_conn, refresh_source_record_countries)
         assert updated == 0
 
 
@@ -187,7 +200,7 @@ class TestRefreshPublicationCountries:
         insert_source_contribution(sa_sync_conn, sd1, source="hal")
         insert_source_contribution(sa_sync_conn, sd2, source="openalex")
 
-        updated = refresh_publication_countries(sa_sync_conn)
+        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
         assert updated == 1
 
         result = sa_sync_conn.execute(
@@ -200,7 +213,7 @@ class TestRefreshPublicationCountries:
         insert_source_record(
             sa_sync_conn, None, source="hal", source_id="hal-orphan", countries=["FR"]
         )
-        updated = refresh_publication_countries(sa_sync_conn)
+        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
         assert updated == 0
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
@@ -216,7 +229,7 @@ class TestRefreshPublicationCountries:
             {"pid": publication_id},
         )
 
-        updated = refresh_publication_countries(sa_sync_conn)
+        (updated,) = _refresh(sa_sync_conn, refresh_publication_countries)
         assert updated == 0
 
 
@@ -277,8 +290,9 @@ class TestDirtyDrivenSourceCountries:
             ),
         )
 
-        refresh_source_contribution_countries(sa_sync_conn)
-        refresh_source_record_countries(sa_sync_conn)
+        _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
         assert _source_record_countries(sa_sync_conn, dirty_source_record) == ["FR"]
         assert (
             _source_record_countries(sa_sync_conn, clean_source_record) is None
@@ -298,7 +312,7 @@ class TestDirtyDrivenSourceCountries:
             address_id=insert_address(sa_sync_conn, "X", countries=None, normalized_text="X"),
         )
 
-        refresh_source_record_countries(sa_sync_conn)
+        _refresh(sa_sync_conn, refresh_source_record_countries)
         assert _source_record_countries(sa_sync_conn, source_record) is None  # orphelin → NULL
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
@@ -317,8 +331,9 @@ class TestDirtyDrivenSourceCountries:
         # La résolution pose addresses.countries_dirty sur la ligne changée.
         _resolve(sa_sync_conn, addr, ["FR"])
         assert _addr_dirty(sa_sync_conn, addr) is True
-        refresh_source_contribution_countries(sa_sync_conn)
-        refresh_source_record_countries(sa_sync_conn)
+        _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
         assert _source_record_countries(sa_sync_conn, source_record) == [
             "FR"
         ]  # recalculé via l'adresse dirty
@@ -342,8 +357,9 @@ class TestDirtyDrivenSourceCountries:
             text("INSERT INTO source_contribution_hal_structures VALUES (:sa, 1)"), {"sa": sa}
         )
 
-        refresh_source_contribution_countries(sa_sync_conn)
-        refresh_source_record_countries(sa_sync_conn)
+        _refresh(
+            sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
+        )
 
         assert _source_record_countries(sa_sync_conn, source_record) == ["fr"]
 
@@ -364,7 +380,7 @@ class TestDirtyDrivenSourceCountries:
             text("INSERT INTO source_contribution_hal_structures VALUES (:sa, 7)"), {"sa": sa}
         )
 
-        refresh_source_contribution_countries(sa_sync_conn)
+        _refresh(sa_sync_conn, refresh_source_contribution_countries)
 
         assert sa_sync_conn.execute(
             text("SELECT countries FROM source_contributions WHERE id = :sa"), {"sa": sa}
@@ -392,7 +408,7 @@ class TestDirtyDrivenSourceCountries:
             {"a": first, "b": second},
         )
 
-        changed = refresh_source_contribution_countries(sa_sync_conn, id_range=(first, first))
+        changed = refresh_source_contribution_countries_in_id_range(sa_sync_conn, (first, first))
 
         assert changed == 1
         countries = sa_sync_conn.execute(

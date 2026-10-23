@@ -1,6 +1,6 @@
 #  Résolution et création des personnes
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-22.*
 
 ```mermaid
 flowchart LR
@@ -44,13 +44,17 @@ Une contribution source hors périmètre ne peut pas donner lieu à une créatio
 
 Elle peut être rattachée à une personne existante, soit par identifiant, soit par sa présence dans une autre source. Le critère de similitude de nom ne vaut que pour les contributions sources du périmètre. 
 
-### Contributions sources collectives
+### Contributions sources hors groupe
 
-Une contribution source collective n'est rattachée à aucune personne, et ne compte pas dans l'arbitrage des identifiants.
+Seule une contribution source d'un groupe (phase `author_grouping`) est rattachée à une personne. Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement restent hors groupe. Elles n'ont pas de personne, sauf épinglage, et ne comptent pas dans l'arbitrage des identifiants.
 
-## Indépendance de l'ordre d'ingestion
+## Rattachements conservés d'un run à l'autre
 
-Le résultat ne dépend pas de l'ordre dans lequel les sources ont été moissonnées. La phase ne fige aucun rattachement dérivé : à chaque exécution, elle les rejuge tous contre l'état ferme de tout le corpus.
+La cascade examine les contributions sources sans personne, et rejuge les rattachements par une autre source. Un rattachement par identifiant ou par forme de nom reste en place d'un run à l'autre. Il tombe seulement dans trois cas :
+
+- l'arbitrage des identifiants détache une contribution source rattachée par un identifiant mal placé ou transféré à une autre personne ;
+- la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge) ;
+- la personne est supprimée.
 
 ## Données préservées
 

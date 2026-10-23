@@ -152,7 +152,8 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
         source="crossref",
         source_id="10.64628/aak.x",
         doi="10.64628/aak.x",
-        doc_type="posted-content",
+        doc_type="preprint",
+        raw_doc_type="posted-content",
     )
 
     _apply(conn)
@@ -168,10 +169,10 @@ def test_reversibility_invariant(sa_sync_conn):
     _source_record(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
     _apply(conn)
 
-    # COALESCE(corrections->'doc_type'->>'raw', doc_type) reconstruit le brut d'origine.
+    # COALESCE(corrections->'doc_type'->>'raw', doc_type::text) reconstruit le brut d'origine.
     reconstructed = conn.execute(
         text(
-            "SELECT COALESCE(corrections->'doc_type'->>'raw', doc_type) "
+            "SELECT COALESCE(corrections->'doc_type'->>'raw', doc_type::text) "
             "FROM source_records WHERE source_id = 'W_media'"
         )
     ).scalar_one()

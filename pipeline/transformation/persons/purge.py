@@ -89,14 +89,19 @@ def delete_empty_persons(conn: Connection) -> int:
 
     Une personne vide est conservée si elle a une fiche RH, ou une décision humaine (`person_without_decision_sql`). Une personne rejetée reste ainsi un candidat connu, écarté par son rejet, au lieu d'être recréée à l'identique par la cascade.
     """
-    return conn.execute(
+    empty = f"""
+        NOT EXISTS (SELECT 1 FROM source_contributions sc WHERE sc.person_id = p.id)
+        AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
+        AND {person_without_decision_sql("p")}
+    """
+    # Les groupes de la personne perdent personne et mode avant sa suppression : la clé étrangère vide seulement `person_id`.
+    conn.execute(
         text(f"""
-            DELETE FROM persons p
-            WHERE NOT EXISTS (SELECT 1 FROM source_contributions sc WHERE sc.person_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
-              AND {person_without_decision_sql("p")}
+            UPDATE source_contribution_groups g SET person_id = NULL, resolution_mode = NULL
+            FROM persons p WHERE g.person_id = p.id AND {empty}
         """)
-    ).rowcount
+    )
+    return conn.execute(text(f"DELETE FROM persons p WHERE {empty}")).rowcount
 
 
 def delete_unsupported_identifier_attributions(conn: Connection) -> int:

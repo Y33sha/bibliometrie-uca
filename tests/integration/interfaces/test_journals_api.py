@@ -256,7 +256,7 @@ def _seed_typed_journal_with_records(raw_types: list[tuple[str, str]]) -> int:
     """Revue typée `journal` portant un enregistrement par couple `(source, type brut)`."""
     jid = seed_journal(journal_type="journal")
     for source, raw_type in raw_types:
-        _seed_record(source, journal_id=jid, doc_type=raw_type)
+        _seed_record(source, journal_id=jid, raw_doc_type=raw_type)
     return jid
 
 

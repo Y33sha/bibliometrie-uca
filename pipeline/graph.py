@@ -839,18 +839,42 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_contribution_groups.id",
             "source_contribution_groups.reference_position",
+            # Un groupe dont les membres changent perd sa personne.
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
             "publications.contributions_dirty",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants et neutralisations qu'écrit la phase `persons`.
+        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publications.contributions_dirty",
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
+        ),
+    ),
+    _task(
+        "author_grouping.attributes",
+        "author_grouping",
+        reads=(
+            "source_contribution_group_members",
+            "source_contributions.is_corresponding",
+            "source_contributions.perimeter_evidence",
+            "source_contributions.roles",
+            "source_contribution_groups.id",
+            "source_contribution_groups.is_corresponding",
+            "source_contribution_groups.perimeter_evidence",
+            "source_contribution_groups.roles",
+        ),
+        writes=(
+            "source_contribution_groups.is_corresponding",
+            "source_contribution_groups.perimeter_evidence",
+            "source_contribution_groups.roles",
         ),
     ),
     _task(
@@ -864,8 +888,6 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "source_contributions.contributor_information_id",
             "source_contributions.in_perimeter",
-            "source_contributions.collective",
-            "source_contributions.duplicate_of",
             "source_contributions.source_record_id",
             "source_records.publication_id",
             "source_contribution_group_members",
@@ -926,16 +948,43 @@ TASKS: tuple[Task, ...] = (
             "rejected_contributions",
             "distinct_persons",
         ),
-        # La suppression d'une personne emporte ses formes de nom.
+        # La suppression d'une personne emporte ses formes de nom et vide ses groupes.
         writes=(
             "source_contributions.person_id",
             "source_contributions.resolution_mode",
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
             "person_identifiers.id",
             "persons.id",
             "person_name_forms.id",
         ),
         # `normalize` et `persons` réécrivent en masse `source_contributions.person_id`.
         maintenance=("ANALYZE source_contributions",),
+    ),
+    _task(
+        "persons.resolve_groups",
+        "persons",
+        reads=(
+            "source_contribution_groups.id",
+            "source_contribution_groups.publication_id",
+            "source_contribution_groups.person_id",
+            "source_contribution_group_members",
+            "source_contributions.in_perimeter",
+            "source_contributions.contributor_information_id",
+            "source_contributions.neutralized_identifiers",
+            "source_contributions.roles",
+            "source_records.publication_id",
+            "contributor_information",
+            "confirmed_source_contributions",
+            "rejected_contributions",
+            "person_identifiers",
+            "person_name_forms",
+            "persons",
+        ),
+        writes=(
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
+        ),
     ),
     _task(
         "contributions.build",

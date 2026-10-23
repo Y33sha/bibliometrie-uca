@@ -7,7 +7,12 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.publications.author_grouping import REPEATED_LIST_CASES
-from infrastructure.sql_fragments import corrected_by, in_clause, usable_identifier
+from infrastructure.sql_fragments import (
+    corrected_by,
+    in_clause,
+    propagate_group_attributes_sql,
+    usable_identifier,
+)
 
 # Statuts d'un rattachement d'identifiant posé par un humain.
 _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
@@ -59,6 +64,11 @@ _DELETE_MEMBERSHIPS_SQL = text(
 )
 
 _DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
+
+_DETACH_GROUPS_SQL = text(
+    "UPDATE source_contribution_groups SET person_id = NULL, resolution_mode = NULL"
+    " WHERE id = ANY(:ids) AND person_id IS NOT NULL"
+)
 
 _CLEAR_COPIES_SQL = text("""
     UPDATE source_contributions sc SET duplicate_of = NULL
@@ -149,6 +159,8 @@ class BatchPlan:
     """Appartenances à insérer."""
     unmatched: list[int]
     """Groupes en base sans correspondant, supprimés."""
+    recomposed: list[int]
+    """Groupes en base dont les membres changent : ils perdent leur personne, que la phase `persons` redécide."""
     copies: dict[int, int]
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
@@ -158,6 +170,10 @@ class SourceContributionGroupStore:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def propagate_attributes(self) -> int:
+        """Recompose les attributs de tous les groupes depuis leurs membres (`propagate_group_attributes_sql`). Rend le nombre de groupes réécrits."""
+        return self._conn.execute(text(propagate_group_attributes_sql())).rowcount
 
     def refresh_alignment(self) -> None:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
@@ -224,7 +240,7 @@ class SourceContributionGroupStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `contributions_dirty`.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant. Il garde sa personne et son mode de résolution tant que ses membres restent les mêmes. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
@@ -239,6 +255,8 @@ class SourceContributionGroupStore:
             self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
         if unmatched_ids:
             self._conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
+        if plan.recomposed:
+            self._conn.execute(_DETACH_GROUPS_SQL, {"ids": list(plan.recomposed)})
         kept = [g for g in groups if g.existing]
         if kept:
             self._conn.execute(

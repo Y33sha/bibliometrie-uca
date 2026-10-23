@@ -28,6 +28,7 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from tests.integration.helpers.contributions import upsert_split_contributor_information
+from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.persons import (
     insert_person_identifier,
     insert_person_name_form,
@@ -102,6 +103,7 @@ def _get_person_identifiers(conn, person_id):
 
 
 def _run_cascade(conn):
+    group_ungrouped(conn)
     arbitrate_identifier_conflicts(conn, _logger, repo=PgPersonRepository(conn))
     run_cascade(conn, _logger, repo=PgPersonRepository(conn))
 
@@ -542,6 +544,7 @@ class TestCascadeRun:
             sa_sync_conn, publication, source="openalex", source_id="W778"
         )
         orphan = _insert_contribution(sa_sync_conn, "openalex", source_record, "J Dupont")
+        group_ungrouped(sa_sync_conn)
 
         with caplog.at_level(logging.INFO, logger="test_orphelines"):
             run_cascade(

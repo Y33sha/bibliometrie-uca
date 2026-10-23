@@ -20,6 +20,7 @@
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Conception du pipeline](CODE_conception-du-pipeline.md)
 - [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
+- [Files d'attente de recalcul](CODE_files-d-attente-de-recalcul.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Indicateurs d'impact dans les rapports par laboratoire](METIER_rapports-impact.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)

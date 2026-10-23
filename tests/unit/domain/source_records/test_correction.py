@@ -76,7 +76,7 @@ class TestThesesFrRule:
     def test_theses_fr_wins_over_dumas(self):
         # Une vue portant les deux marqueurs : theses.fr fait autorité.
         view = _view(
-            doc_type="dissertation",
+            doc_type="thesis",
             urls=("https://theses.fr/s1", "https://dumas.ccsd.cnrs.fr/dumas-1"),
         )
         corrected = effective_metadata(view).doc_type
@@ -90,22 +90,21 @@ class TestThesesFrRule:
 
 class TestDumasRule:
     def test_dumas_url_corrects_to_memoir(self):
-        view = _view(doc_type="dissertation", urls=("https://dumas.ccsd.cnrs.fr/dumas-12345",))
+        view = _view(doc_type="thesis", urls=("https://dumas.ccsd.cnrs.fr/dumas-12345",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
         assert corrected.rule == MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR
 
     def test_dumas_url_corrects_regardless_of_doc_type(self):
-        # Règle dure URL-only : un `doc_type` brut OpenAlex « article » (mésclassement
-        # ou entité mêlant thèse + article) passe quand même en `memoir`.
+        # Règle sur la seule URL : un `doc_type` `article` (mauvais classement ou entité mêlant thèse et article) passe en `memoir`.
         view = _view(doc_type="article", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
 
     def test_no_dumas_url_no_correction(self):
-        view = _view(doc_type="dissertation", urls=("https://example.com/x",))
+        view = _view(doc_type="thesis", urls=("https://example.com/x",))
         assert effective_metadata(view).doc_type is None
 
 
@@ -222,11 +221,10 @@ class TestJournalTypeMediaRule:
         assert corrected.value == "media"
         assert corrected.rule == MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA
 
-    def test_journal_type_media_applies_regardless_of_raw_doc_type(self):
-        # La règle est inconditionnelle sur `journal_type=media` : peu importe le
-        # `doc_type` brut, la publication d'un journal média est reclassée.
-        for raw in ("article", "review", "editorial", None):
-            view = _view(doc_type=raw, journal_type="media")
+    def test_journal_type_media_applies_regardless_of_doc_type(self):
+        # La règle dépend seulement de `journal_type=media` : la publication d'un journal média est reclassée quel que soit son `doc_type`.
+        for doc_type in ("article", "review", "editorial", None):
+            view = _view(doc_type=doc_type, journal_type="media")
             corrected = effective_metadata(view).doc_type
             assert corrected is not None and corrected.value == "media"
 

@@ -234,3 +234,24 @@ def test_delete_empty_persons_spares_persons_with_a_decision(sa_sync_conn):
     for kept in (rejected, distinct_a, distinct_b, excluded):
         assert _person_exists(conn, kept) is True
     assert _person_exists(conn, confirmed_orcid) is False
+
+
+def test_delete_empty_persons_detaches_their_groups(sa_sync_conn):
+    conn = sa_sync_conn
+    empty = insert_person(conn, "Ghost", first_name="G")
+    group = conn.execute(
+        text(
+            "INSERT INTO source_contribution_groups (publication_id, person_id, resolution_mode)"
+            " VALUES (:p, :person, 'name') RETURNING id"
+        ),
+        {"p": insert_publication(conn, "t"), "person": empty},
+    ).scalar_one()
+
+    delete_empty_persons(conn)
+
+    assert _person_exists(conn, empty) is False
+    row = conn.execute(
+        text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+        {"g": group},
+    ).one()
+    assert tuple(row) == (None, None)

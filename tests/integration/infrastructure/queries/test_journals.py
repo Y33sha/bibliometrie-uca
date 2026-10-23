@@ -461,7 +461,12 @@ class TestRecordTypesOfUnknownJournals:
             corrections={"doc_type": {"raw": "book_chapter", "corrected_by": "X"}},
         )
         insert_source_record(
-            sa_sync_conn, source_id="hal-1", title="B", doc_type="COMM", journal_id=jid
+            sa_sync_conn,
+            source_id="hal-1",
+            title="B",
+            doc_type="conference_paper",
+            raw_doc_type="COMM",
+            journal_id=jid,
         )
 
         rows = [

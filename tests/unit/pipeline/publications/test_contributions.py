@@ -11,7 +11,7 @@ from pipeline.transformation.publications.contributions import contributions as 
 
 
 class _FakeBuildQueries:
-    """Requêtes des trois tâches de synchronisation."""
+    """Requêtes des tâches de synchronisation."""
 
     def __init__(self) -> None:
         self.appels: list[str] = []
