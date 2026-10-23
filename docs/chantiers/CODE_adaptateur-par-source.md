@@ -38,6 +38,24 @@ Trois mécanismes règlent le débit d'une source :
 
 Avec une pause par worker, le débit dépend du temps de réponse. Les réglages de WoS sont répétés dans `wos/fetch_missing.py` et `wos/fetch_stale.py`.
 
+Débit mesuré sur le run 328 (2026-10-23, poste personnel, hors réseau universitaire) :
+
+| Tâche | Documents | Durée | Débit |
+|---|---|---|---|
+| `harvest.hal` | 5 567 | 326 s | 17 doc/s, ~5,8 s par page de 100 |
+| `harvest.openalex` | 6 989 | 93 s | 75 doc/s |
+| `harvest.scanr` | 4 414 | 75 s | 59 doc/s |
+| `harvest.theses` | 2 612 parcourues | 9 s | 290 doc/s |
+| `harvest.datacite` | 649 | 8 s | 81 doc/s |
+| `harvest_by_person.scanr` | 2 526 | 81 s | 31 doc/s |
+| `harvest_by_person.hal` | 1 943 | 150 s | 13 doc/s |
+| `harvest_by_person.openalex` | 4 103 | 167 s | 25 doc/s |
+| `harvest_by_person.crossref` | 901 | 320 s | ~1,7 s par lot de 10 ORCID |
+| `harvest_by_person.datacite` | 390 | 381 s | ~2 s par lot de 10 ORCID |
+| `fetch_truncated` | 643 | 177 s | 3,6 req/s (3 workers) |
+
+Les moissonnages interrogent leur source une requête à la fois : leur débit suit le temps de réponse, et la pause par worker n'y pèse pas. `fetch_missing` (121 recherches) et `fetch_stale` (aucune) n'ont pas eu de volume mesurable.
+
 Le circuit-breaker circule par deux canaux. `access_source` le pose dans une ContextVar, que lisent les clients HTTP et `run_fetch_pool`. L'exécuteur des nœuds le passe aussi en argument, jusqu'aux callbacks `breaker_tripped=` des moissonneurs.
 
 `http_retry.py` contient deux copies de la boucle de réessai, synchrone et asynchrone. À l'épuisement des réessais, la synchrone lève `SourceUnavailableError`, l'asynchrone l'erreur d'origine.
@@ -76,11 +94,11 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 - [x] Protocole de l'adaptateur, implémenté pour les sept sources. a764e373b
 - [x] Tables des phases construites depuis les adaptateurs. a764e373b
 - [x] Test : chaque adaptateur a exactement les capacités de son profil. a764e373b
-- [ ] Libellés des sources servis par l'API au frontend, et liens vers les portails des sources calculés par l'API.
+- [x] Libellés des sources servis par l'API au frontend, et liens vers les portails des sources calculés par l'API. b95cee119
 
 ### Phase 4 — Boucle de recherche commune et écriture dans `staging`
 
-- [ ] Débit réel de chaque source mesuré sur un run, avant la boucle commune.
+- [x] Débit réel de chaque source mesuré sur un run, avant la boucle commune (run 328).
 - [ ] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée.
 - [ ] Boucle commune et écriture des trois issues, pour les cinq canaux, effacement des échecs compris.
 - [ ] `upsert_staging` dans `StagingStore`, qui reçoit sa connexion à la construction.
