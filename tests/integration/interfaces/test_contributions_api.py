@@ -13,6 +13,7 @@ import uuid
 from tests.integration.helpers.db import owner_pool, truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_contribution,
+    seed_group,
     seed_person,
     seed_publication,
     seed_rejected_contribution,
@@ -39,7 +40,7 @@ _cleanup_after_module = truncate_after_module(
 
 
 def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[int, int]:
-    """source_contribution orpheline (person_id NULL, in_perimeter TRUE) rattachée à une publication.
+    """source_contribution orpheline (person_id NULL, in_perimeter TRUE, groupe à elle seule) rattachée à une publication.
 
     Renvoie (source_contribution_id, publication_id) pour pouvoir rejeter la paire."""
     publication_id = seed_publication(title=uniq("Pub"))
@@ -47,6 +48,7 @@ def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[i
     source_contribution_id = seed_source_contribution(
         source="hal", source_record_id=source_record_id, raw_author_name=raw_author_name
     )
+    seed_group(publication_id, [(source_contribution_id, source_record_id)])
     return source_contribution_id, publication_id
 
 

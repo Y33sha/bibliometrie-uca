@@ -21,10 +21,11 @@ from infrastructure.read_models.sql_fragments import (
 )
 from infrastructure.sql_fragments import has_author_role
 
-# Une contribution source est orpheline quand elle est rattachée à aucune personne, dans le périmètre et sous un rôle d'auteur : c'est la matière que la file de rattachement présente.
+# Contribution source orpheline, matière de la file de rattachement : sans personne, du périmètre, sous un rôle d'auteur, membre d'un groupe.
 _ORPHAN_BASE = f"""
     sc.person_id IS NULL AND sc.in_perimeter = TRUE
     AND {has_author_role("sc")}
+    AND EXISTS (SELECT 1 FROM source_contribution_group_members gm WHERE gm.source_contribution_id = sc.id)
 """
 
 _ORPHANS_FROM = """

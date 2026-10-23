@@ -2,6 +2,7 @@
 
 from application.ports.read_models.contributions_queries import OrphanFilters
 from infrastructure.read_models.contributions import PgContributionsQueries
+from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -23,6 +24,7 @@ class TestOrphanContributionsCount:
         insert_source_contribution(
             sa_sync_conn, source_record, author_position=1, person_id=pid, in_perimeter=True
         )  # attribuée
+        group_ungrouped(sa_sync_conn)
 
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total >= 1
 
@@ -30,6 +32,13 @@ class TestOrphanContributionsCount:
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(sa_sync_conn, publication)
         insert_source_contribution(sa_sync_conn, source_record, person_id=None, in_perimeter=False)
+        group_ungrouped(sa_sync_conn)
+        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+
+    def test_excludes_source_contributions_outside_groups(self, sa_sync_conn):
+        """Une contribution source hors groupe (enregistrement source écarté de l'alignement, doublon d'auteur) reste sans personne : elle n'est pas à rattacher."""
+        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
+        insert_source_contribution(sa_sync_conn, source_record, person_id=None, in_perimeter=True)
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
     def test_excludes_non_author_roles(self, sa_sync_conn):
@@ -54,10 +63,13 @@ class TestOrphanContributionsCount:
             roles=["jury_member"],
             in_perimeter=True,
         )
+        group_ungrouped(sa_sync_conn)
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
 
 def _list(conn, **filters):
+    """File des orphelines, après avoir groupé les contributions sources sans groupe."""
+    group_ungrouped(conn)
     return PgContributionsQueries(conn).list_orphan_contributions(
         filters=OrphanFilters(**filters), page=1, per_page=50
     )
@@ -148,6 +160,7 @@ class TestListOrphanContributions:
         add_source_contribution_structure(conn, sa, lab)
         add_source_contribution_structure(conn, sa, team)
         add_source_contribution_structure(conn, other, other_lab)
+        group_ungrouped(conn)
         return {"lab": lab, "other_lab": other_lab, "sa": sa, "other": other, "none": none}
 
     def test_filters_by_lab(self, sa_sync_conn):
