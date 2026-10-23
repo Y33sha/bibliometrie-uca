@@ -4,33 +4,11 @@ Le propos testé ici est l'enchaînement des tâches et la boucle de purge : cel
 """
 
 import logging
+from contextlib import ExitStack
 from unittest.mock import patch
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.contributions import contributions as phase
-
-
-class _FakeBuildQueries:
-    """Requêtes des tâches de synchronisation."""
-
-    def __init__(self) -> None:
-        self.appels: list[str] = []
-
-    def propagate_contribution_attributes(self, conn) -> int:
-        self.appels.append("propagate")
-        return 0
-
-    def count_contributions_in_perimeter(self, conn) -> int:
-        return 9
-
-    def refresh_publications_perimeter_evidence(self, conn) -> None:
-        self.appels.append("publications_in_perimeter")
-
-    def refresh_contribution_structures(self, conn) -> None:
-        self.appels.append("contribution_structures")
-
-    def refresh_publication_structures(self, conn) -> None:
-        self.appels.append("publication_structures")
 
 
 class _FakePurgeQueries:
@@ -46,25 +24,34 @@ class _FakePurgeQueries:
 
 
 class _Counts:
-    """Décomptes appelés, dans l'ordre."""
+    """Requêtes SQL de la phase appelées, dans l'ordre."""
 
     def __init__(self) -> None:
         self.appels: list[str] = []
 
-    def counter(self, name: str, n: int):
-        def count(_conn) -> int:
+    def counter(self, name: str, n: int | None):
+        def count(_conn) -> int | None:
             self.appels.append(name)
             return n
 
         return count
 
 
-def _patch_counts(counts: _Counts):
-    return (
-        patch.object(phase, "recompute_address_publication_count", counts.counter("adresses", 7)),
-        patch.object(phase, "refresh_journal_publication_counts", counts.counter("revues", 3)),
-        patch.object(phase, "refresh_publisher_publication_counts", counts.counter("éditeurs", 2)),
-    )
+def _patch_sql(counts: _Counts) -> list:
+    """Remplace les requêtes de synchronisation et les décomptes de la phase."""
+    return [
+        patch.object(phase, name, counts.counter(label, n))
+        for name, label, n in (
+            ("propagate_contribution_attributes", "propagation", 0),
+            ("count_contributions_in_perimeter", "périmètre des contributions", 9),
+            ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
+            ("refresh_contribution_structures", "structures des contributions", None),
+            ("refresh_publication_structures", "structures des publications", None),
+            ("recompute_address_publication_count", "adresses", 7),
+            ("refresh_journal_publication_counts", "revues", 3),
+            ("refresh_publisher_publication_counts", "éditeurs", 2),
+        )
+    ]
 
 
 def _run(contexte, lots, *, build_metrics=None):
@@ -72,17 +59,16 @@ def _run(contexte, lots, *, build_metrics=None):
     counts = _Counts()
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
-    addresses, journals, publishers = _patch_counts(counts)
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(
             phase, "purge_orphan_publications", side_effect=purge.purge_orphan_publications
         ),
-        addresses,
-        journals,
-        publishers,
+        ExitStack() as stack,
     ):
-        rendu = phase.ContributionsPhase(_FakeBuildQueries()).run(contexte())
+        for patcher in _patch_sql(counts):
+            stack.enter_context(patcher)
+        rendu = phase.ContributionsPhase().run(contexte())
     return rendu, purge, counts
 
 
@@ -92,7 +78,7 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
     assert open_tx.conn.commits == 3  # un commit par lot supprimé, aucun pour le lot vide
-    assert publication_counts.appels == ["adresses", "revues", "éditeurs"]
+    assert publication_counts.appels[-3:] == ["adresses", "revues", "éditeurs"]
 
 
 def test_rien_a_purger(open_tx, contexte):
@@ -156,17 +142,15 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
 
     metrics = PhaseMetrics(new=1)
     metrics.details["summary"] = {}
-    addresses, journals, publishers = _patch_counts(_Counts())
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(phase, "purge_orphan_publications", return_value=0),
-        addresses,
-        journals,
-        publishers,
         caplog.at_level(logging.INFO, logger="test"),
+        ExitStack() as stack,
     ):
+        for patcher in _patch_sql(_Counts()):
+            stack.enter_context(patcher)
         rendu = phase.ContributionsPhase(
-            _FakeBuildQueries(),
             empty_containers=(
                 ("Monographies vides", suppression("monographies", 0)),
                 ("Revues vides", suppression("revues", 2)),

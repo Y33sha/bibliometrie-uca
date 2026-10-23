@@ -27,6 +27,11 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
             return_value=PhaseMetrics(details={"summary": {}}),
         ),
         patch.object(contributions_phase, "purge_orphan_publications", return_value=0),
+        patch.object(contributions_phase, "propagate_contribution_attributes"),
+        patch.object(contributions_phase, "count_contributions_in_perimeter"),
+        patch.object(contributions_phase, "refresh_publications_perimeter_evidence"),
+        patch.object(contributions_phase, "refresh_contribution_structures"),
+        patch.object(contributions_phase, "refresh_publication_structures"),
         patch.object(
             contributions_phase, "recompute_address_publication_count", return_value=0
         ) as addresses,
@@ -37,7 +42,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
             contributions_phase, "refresh_publisher_publication_counts", return_value=0
         ) as publishers,
     ):
-        contributions_phase.ContributionsPhase(MagicMock()).run(
+        contributions_phase.ContributionsPhase().run(
             PhaseContext(
                 open_tx=_fake_tx,
                 logger=logging.getLogger("test"),
