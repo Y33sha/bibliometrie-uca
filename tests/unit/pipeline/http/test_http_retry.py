@@ -4,6 +4,7 @@ Vérifie la politique de retry commune aux deux variantes : 429, 5xx, erreurs r�
 """
 
 import contextvars
+import time
 from unittest.mock import MagicMock, patch
 
 import httpx2
@@ -85,6 +86,18 @@ def test_une_requete_hors_de_l_acces_a_une_source_est_refusee():
         # Un contexte vide : la ContextVar y a sa valeur par défaut, sans breaker.
         contextvars.Context().run(http_retry.http_request_with_retry, "GET", "http://x")
     req.assert_not_called()
+
+
+def test_les_requetes_suivent_le_rythme_de_la_source():
+    """Chaque tentative attend son tour au rythme de la source : trois requêtes à 20 req/s prennent au moins deux intervalles."""
+    with (
+        source_circuit_breaker("test", max_per_second=20),
+        patch.object(http_retry.httpx2, "request", return_value=_resp(200)),
+    ):
+        began_at = time.monotonic()
+        for _ in range(3):
+            http_retry.http_request_with_retry("GET", "http://x", label="t")
+        assert time.monotonic() - began_at >= 2 / 20
 
 
 def test_success_returns_json():

@@ -14,9 +14,7 @@ from pipeline.ingestion.datacite.api import fetch_doi
 
 class DataciteStaleRefetch(StaleRefetch):
     source_key = "datacite"
-    # Tier identifié DataCite ~3,3 req/s (cf. `fetch_missing`).
     max_concurrent = 3
-    request_delay_s = 0.9
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         node = await fetch_doi(client, source_id)

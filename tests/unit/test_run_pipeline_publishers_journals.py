@@ -3,7 +3,7 @@
 La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, enrichissement des revues via OpenAlex, vérification des ISSN dans le Sudoc, import DOAJ). Leurs compteurs et signaux doivent remonter à la phase : sinon le log de fin et l'observabilité rapportent « no-op » alors que du travail a été effectué.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
@@ -75,15 +75,3 @@ def test_phase_propagates_substep_signals():
         )
 
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
-
-
-def test_enrichissement_openalex_au_debit_d_openalex():
-    from pipeline.ingestion.api_params import OPENALEX_DELAY
-
-    with patch.object(
-        publishers_journals, "run_enrich_journals_from_openalex", return_value=PhaseMetrics()
-    ) as run:
-        # Le contexte est une doublure : sa transaction aussi.
-        publishers_journals._run_enrich_journals_from_openalex(MagicMock())
-
-    assert run.call_args.kwargs["rate_delay"] == OPENALEX_DELAY

@@ -74,10 +74,6 @@ def test_quota_de_la_source_epuise(lancer, caplog):
 
 
 class TestArretSurCoupeCircuit:
-    @pytest.fixture(autouse=True)
-    def _no_sleep(self, monkeypatch):
-        monkeypatch.setattr(module.time, "sleep", lambda *_: None)
-
     def _run(self, monkeypatch, fetch_batch, n_batches):
         conn = MagicMock()
         rows = [(i, f"P{i}") for i in range(n_batches * module.BATCH_SIZE)]

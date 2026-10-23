@@ -19,7 +19,6 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import HAL_DELAY
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
     pending_failed_lookup_sql,
@@ -30,7 +29,7 @@ from pipeline.ingestion.hal.api import search_one
 from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# HAL ne publie pas de seuil officiel : 5 workers et une pause de HAL_DELAY par worker donnent ~6-7 req/s, sans rafale.
+# Requêtes simultanées à HAL ; le débit suit le profil de la source.
 HAL_MAX_CONCURRENT = 5
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
@@ -129,7 +128,6 @@ async def _fetch_ids(
                 "hal", doc, entry_mode=StagingEntryMode.FETCH_MISSING_HAL
             ),
             max_concurrent=HAL_MAX_CONCURRENT,
-            request_delay_s=HAL_DELAY,
         ),
         ids,
     )
@@ -170,7 +168,6 @@ class HalDoiSearch:
     batch_size = 1
     # API Solr publique sans rate-limit documenté : 5 requêtes simultanées restent courtoises.
     max_concurrent = 5
-    request_delay_s = 0.0
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]

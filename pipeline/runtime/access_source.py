@@ -29,16 +29,19 @@ def access_source(
     logger: logging.Logger,
     credentials_missing: CredentialsMissing,
     threshold: int | None = None,
+    max_per_second: float | None = None,
 ) -> PhaseMetrics:
     """Exécute `execute` sur `source` : identifiants contrôlés, circuit-breaker posé, indisponibilité signalée.
 
-    `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source.
+    `phase` situe les avertissements dans le journal. `credentials_missing` contrôle les identifiants de la source. `max_per_second` règle le rythme de ses requêtes, à défaut le débit du profil de la source.
     """
     if reason := credentials_missing(source):
         metrics = PhaseMetrics()
         signal_source_unconfigured(metrics, source, reason, logger=logger, phase=phase)
         return metrics
-    with source_circuit_breaker(source, threshold=threshold or DEFAULT_THRESHOLD) as breaker:
+    with source_circuit_breaker(
+        source, threshold=threshold or DEFAULT_THRESHOLD, max_per_second=max_per_second
+    ) as breaker:
         try:
             metrics = execute()
         except SourceUnavailableError:

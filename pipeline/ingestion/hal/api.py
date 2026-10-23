@@ -1,7 +1,4 @@
-"""Accès à l'API HAL : recherche Solr des documents (moissonnage, recherche d'un document) et référentiel des structures (`ref/structure`).
-
-Les clients synchrones s'espacent d'au moins `HAL_DELAY` secondes entre deux appels.
-"""
+"""Accès à l'API HAL : recherche Solr des documents (moissonnage, recherche d'un document) et référentiel des structures (`ref/structure`)."""
 
 from __future__ import annotations
 
@@ -13,8 +10,7 @@ from domain.structures.hal_structures import HAL_STRUCTURE_FIELDS
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY, HAL_PER_PAGE
+from pipeline.ingestion.api_params import API_BASE_URLS, HAL_PER_PAGE
 
 type SolrParams = dict[str, str | int | float | bool | None]
 
@@ -72,17 +68,15 @@ HAL_FIELDS_STR = ",".join(HAL_FIELDS)
 
 
 class HalClient:
-    """Client de l'API de recherche HAL (Solr), limité à un appel toutes les `HAL_DELAY` secondes."""
+    """Client de l'API de recherche HAL (Solr)."""
 
     def __init__(self, base_url: str) -> None:
         self._url = f"{base_url.rstrip('/')}/"
-        self._throttle = Throttle(HAL_DELAY)
 
     def _get(self, params: SolrParams, label: str) -> Mapping[str, JsonValue]:
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
-            )
+        return as_mapping(
+            http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        )
 
     def count(self, query: str, fq: str) -> int:
         """Nombre de documents d'une requête, lu sur une réponse sans document (`rows=0`)."""
@@ -130,11 +124,10 @@ HAL_STRUCTURES_BATCH = 100
 
 
 class HalStructuresClient:
-    """Client de `ref/structure`, limité à un appel toutes les `HAL_DELAY` secondes."""
+    """Client de `ref/structure`."""
 
     def __init__(self, base_url: str = API_BASE_URLS["hal_structures"]) -> None:
         self._url = base_url
-        self._throttle = Throttle(HAL_DELAY)
 
     def _docs(self, field: str, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
         params: dict[str, str | int] = {
@@ -143,10 +136,9 @@ class HalStructuresClient:
             "rows": len(ids) * 2,
             "wt": "json",
         }
-        with self._throttle.request():
-            data = http_request_with_retry(
-                "GET", self._url, params=params, label=f"HAL structures {field} ×{len(ids)}"
-            )
+        data = http_request_with_retry(
+            "GET", self._url, params=params, label=f"HAL structures {field} ×{len(ids)}"
+        )
         return [
             as_mapping(d) for d in as_sequence(at_path(as_mapping(data), "response").get("docs"))
         ]

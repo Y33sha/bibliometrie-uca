@@ -1,6 +1,6 @@
 """Recherche dans theses.fr de la phase `fetch_missing` : tâche `fetch_missing.theses_by_nnt`.
 
-NNT de thèses soutenues que d'autres sources contiennent (scanR, OpenAlex, HAL) et que le staging theses.fr n'a pas : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Un seul worker, cadencé à `THESES_DELAY`, comme le moissonnage, par la boucle commune (`pipeline.ingestion.common.lookup`).
+NNT de thèses soutenues que d'autres sources contiennent (scanR, OpenAlex, HAL) et que le staging theses.fr n'a pas : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Une requête à la fois, par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ from sqlalchemy import Connection, text
 
 from domain.source_records.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
-from pipeline.ingestion.api_params import THESES_DELAY
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.theses.api import fetch_thesis
@@ -65,7 +64,6 @@ async def fetch_missing_theses_by_nnt(
             stage=lambda staging, thesis: staging.stage(
                 "theses", thesis, entry_mode=StagingEntryMode.FETCH_MISSING_THESES
             ),
-            request_delay_s=THESES_DELAY,
         ),
         nnts,
     )

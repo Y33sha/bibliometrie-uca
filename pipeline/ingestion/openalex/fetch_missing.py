@@ -17,10 +17,7 @@ class OpenalexDoiSearch:
 
     source_key = "openalex"
     batch_size = 1
-    # OpenAlex plafonne à 10 req/s (polite `mailto` ou authentifié `api_key`, envoyé par `auth_params()`).
-    # `max_concurrent=3` × pause 100 ms, latence ~280 ms → ≈ 3 / (0,28 + 0,1) ≈ 7,9 req/s (marge sous le plafond).
     max_concurrent = 3
-    request_delay_s = 0.1
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]

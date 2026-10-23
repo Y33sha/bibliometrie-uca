@@ -28,7 +28,6 @@ def test_find_countryless_rend_les_editeurs_openalex_sans_pays(sa_sync_conn):
 
 def test_le_pays_est_ecrit_seulement_la_ou_il_manque(sa_sync_conn, monkeypatch):
     candidat = insert_publisher(sa_sync_conn, "A", openalex_id="P1")
-    monkeypatch.setattr(module.time, "sleep", lambda *_: None)
     # Commit neutralisé : la transaction du test est annulée à la fin.
     monkeypatch.setattr(sa_sync_conn, "commit", lambda: None)
 

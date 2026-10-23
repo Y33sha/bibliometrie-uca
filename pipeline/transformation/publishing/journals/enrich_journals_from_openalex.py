@@ -8,7 +8,6 @@ Le fetch OpenAlex est injecté (le HTTP vit dans `pipeline/ingestion/openalex`).
 """
 
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection, any_, func, literal, select, update
@@ -91,7 +90,6 @@ def run_enrich_journals_from_openalex(
     logger: logging.Logger,
     *,
     fetch_batch: FetchSourcesBatch,
-    rate_delay: float = 0.1,
 ) -> PhaseMetrics:
     store = JournalStore(conn)
     pending = find_journals_of_unknown_type(conn)
@@ -116,7 +114,6 @@ def run_enrich_journals_from_openalex(
 
         id_map = {row[1]: row[0] for row in pending[i : i + BATCH_SIZE]}
         sources = fetch_batch(list(id_map))
-        time.sleep(rate_delay)
 
         for oa_id, journal_id in id_map.items():
             data = sources.get(oa_id)

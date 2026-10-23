@@ -23,7 +23,6 @@ class ScanrDoiSearch:
     batch_size = 50
     # API ElasticSearch publique, pas de rate limit documenté — 5 req concurrentes reste courtois sur une API interne DataESR.
     max_concurrent = 5
-    request_delay_s = 0.0
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]

@@ -2,7 +2,7 @@
 
 Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.journals.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 
-Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Un rythme commun (`RequestPace`) plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc est injecté (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
+Les revues passent par `run_fetch_pool` : téléchargements concurrents sur un client HTTP partagé, écritures sérialisées, commit par paquets. Le rythme de la source, posé par l'accès au Sudoc, plafonne le débit, toutes requêtes simultanées confondues. Une revue dont une requête échoue garde ses ISSN non vérifiés : le run suivant la reprend. Le fetch Sudoc est injecté (le HTTP vit dans `pipeline/ingestion/complements/sudoc.py`).
 """
 
 import logging
@@ -30,7 +30,7 @@ from domain.sources.sudoc import SudocSerialRecord
 from infrastructure.db.tables import journal_issns, journals
 from infrastructure.repositories.journal_issns import issn_values, issns_by_journal
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
-from pipeline.http.fetch_pool import RequestPace, run_fetch_pool
+from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.runtime.observability.log_format import BRANCH, inflect, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import track_progress
@@ -232,9 +232,8 @@ async def run_check_journals_in_sudoc(
     fetch_ppns: FetchPpns,
     fetch_record: FetchRecord,
     max_concurrent: int,
-    max_per_second: float,
 ) -> PhaseMetrics:
-    """Vérifie les revues à vérifier, `max_concurrent` à la fois, à `max_per_second` requêtes par seconde au plus."""
+    """Vérifie les revues à vérifier, `max_concurrent` à la fois."""
     titled_as_volumes = [
         j.id
         for j in find_titles_of_journals_with_issn(conn)
@@ -248,19 +247,16 @@ async def run_check_journals_in_sudoc(
     metrics.add(seen=total)
 
     record_by_ppn: dict[str, SudocSerialRecord | None] = {}
-    pace = RequestPace(max_per_second)
 
     async def _read(
         client: httpx2.AsyncClient, issns: Sequence[str], records: dict[str, SudocSerialRecord]
     ) -> None:
         """Ajoute à `records` la notice de chaque ISSN connu du Sudoc. `record_by_ppn` garde les notices déjà lues."""
-        await pace.wait()
         ppns_by_issn = await fetch_ppns(client, issns)
         for issn in issns:
             if not (ppns := ppns_by_issn.get(issn)):
                 continue
             if ppns[0] not in record_by_ppn:
-                await pace.wait()
                 record_by_ppn[ppns[0]] = await fetch_record(client, ppns[0])
             if (record := record_by_ppn[ppns[0]]) is not None:
                 records[issn] = record

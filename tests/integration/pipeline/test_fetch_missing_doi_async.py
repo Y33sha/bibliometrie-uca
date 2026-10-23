@@ -46,7 +46,6 @@ class _FakeAdapter:
     source_key = "openalex"
     batch_size = 1
     max_concurrent = 3
-    request_delay_s = 0.0
 
     def __init__(
         self,

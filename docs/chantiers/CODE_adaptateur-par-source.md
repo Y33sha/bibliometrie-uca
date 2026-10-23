@@ -66,12 +66,12 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ## Décisions
 
-- Le profil de chaque source (`SourceProfile`, dans `domain/sources/registry.py`) déclare ce que le pipeline en fait : libellé, capacités, agence d'enregistrement, politiques. Le graphe, les modes et le domaine le lisent : leurs contrats d'import leur interdisent `pipeline.ingestion`.
-- Chaque source expose un adaptateur dans `<source>/__init__.py`, par des fabriques paresseuses : client, moissonneurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, budget de débit. Les tables des phases se construisent depuis la liste des adaptateurs. Un test vérifie que chaque adaptateur a exactement les capacités de son profil.
+- Le profil de chaque source (`SourceProfile`, dans `domain/sources/registry.py`) déclare ce que le pipeline en fait : libellé, capacités, rôle d'agence d'enregistrement de DOI, politiques, débit. Le graphe, les modes et le domaine le lisent : leurs contrats d'import leur interdisent `pipeline.ingestion`.
+- Chaque source expose un adaptateur dans `<source>/__init__.py`, par des fabriques paresseuses : client, moissonneurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice. Les tables des phases se construisent depuis la liste des adaptateurs. Un test vérifie que chaque adaptateur a exactement les capacités de son profil.
 - L'API sert les libellés des sources au frontend, et calcule les liens vers les portails des sources (`source_record_url`).
 - theses.fr suit la fenêtre d'années du run, comme les autres sources, par l'année de soutenance. Les thèses en cours sont toujours retenues.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
-- Le débit de chaque source est un budget en requêtes par seconde, appliqué par `RequestPace` dans la boucle commune.
+- Le débit de chaque source est un budget en requêtes par seconde, dans son profil. Le circuit-breaker posé par l'accès à la source porte son rythme (`Pace`), que chaque requête HTTP respecte.
 - La ContextVar est le seul canal du circuit-breaker. Toute requête s'exécute sous le breaker d'une source.
 - Une fonction sans I/O classe chaque tentative. Deux enveloppes, synchrone et asynchrone, l'exécutent. L'épuisement des réessais lève `SourceUnavailableError`, quelle qu'en soit la cause.
 - La classe de base de la normalisation fait la séquence d'écriture. Une source fournit l'analyse d'une ligne de `staging`.
@@ -100,13 +100,13 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 - [x] Débit réel de chaque source mesuré sur un run, avant la boucle commune (run 328).
 - [x] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée. c379eeb1c
-- [ ] Boucle commune et écriture des trois issues, pour les cinq canaux, effacement des échecs compris.
+- [x] Boucle commune et écriture des trois issues, pour les cinq canaux, effacement des échecs compris. 8f90a39b2
 - [x] `upsert_staging` dans `StagingStore`, qui reçoit sa connexion à la construction. c379eeb1c
 
 ### Phase 5 — Débit
 
-- [ ] Budget de débit de chaque source dans son adaptateur.
-- [ ] `RequestPace` à la place des pauses par worker et du `Throttle`.
+- [x] Budget de débit de chaque source dans son profil.
+- [x] Rythme de la source (`Pace`), porté par son circuit-breaker, à la place des pauses par worker, du `Throttle` et de `RequestPace`.
 - [ ] Débit réel de chaque source mesuré sur un run, comparé à la mesure de la phase 4.
 
 ### Phase 6 — Politiques de source
@@ -124,5 +124,4 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 ## Questions ouvertes
 
-- Budget de débit des sources sans seuil publié : HAL, theses.fr, ScanR.
 - Optimisation de `harvest_by_person` : plusieurs lots en vol par source, et `select` Crossref pour écarter les champs inutiles. Le temps d'une requête vient du volume des enregistrements de grandes collaborations (5 Mio pour 25 documents DataCite, 13 Mio pour 100 documents Crossref), pas de la recherche (0,3 s).

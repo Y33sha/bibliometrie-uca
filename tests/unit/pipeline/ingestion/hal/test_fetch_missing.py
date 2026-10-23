@@ -62,7 +62,6 @@ class _HalSimule:
         monkeypatch.setattr(fetch_missing, "search_one", search_one)
         monkeypatch.setattr(StagingStore, "upsert", upsert)
         monkeypatch.setattr(fetch_missing, "record_failed_lookup", record_failed_lookup)
-        monkeypatch.setattr(fetch_missing, "HAL_DELAY", 0)
 
 
 class TestParHalId:

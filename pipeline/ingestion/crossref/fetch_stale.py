@@ -14,9 +14,8 @@ from pipeline.ingestion.crossref.api import fetch_work
 
 class CrossrefStaleRefetch(StaleRefetch):
     source_key = "crossref"
-    # Polite pool CrossRef 10 req/s, 3 concurrentes (cf. `fetch_missing`).
+    # Polite pool Crossref : 3 requêtes simultanées au plus.
     max_concurrent = 3
-    request_delay_s = 0.1
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         message = await fetch_work(client, source_id)

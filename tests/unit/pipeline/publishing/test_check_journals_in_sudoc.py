@@ -101,7 +101,6 @@ async def _run(rows, *, on_fetch_ppns=None, max_concurrent=1, titles=()):
             fetch_ppns=fetch_ppns,
             fetch_record=fetch_record,
             max_concurrent=max_concurrent,
-            max_per_second=1000,
         )
     return repo, conn, metrics, calls
 

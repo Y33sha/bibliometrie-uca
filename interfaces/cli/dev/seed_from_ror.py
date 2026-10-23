@@ -9,7 +9,6 @@ La racine est une université. Une fille ROR devient un laboratoire (`facility`)
 
 import argparse
 import re
-import time
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,7 +29,7 @@ from interfaces.cli.dev.generate_seed import (
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.http.polite_pool import get_polite_pool_email_optional
-from pipeline.ingestion.api_params import API_BASE_URLS, HAL_DELAY
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.credentials import get_openalex_api_key
 
 ROR_API = "https://api.ror.org/v2/organizations"
@@ -305,7 +304,6 @@ def acronym_collection_accepted(collection_docs: int, institution_docs: int) -> 
 
 
 def _hal_get(url: str, params: Mapping[str, str | int], label: str) -> Mapping[str, JsonValue]:
-    time.sleep(HAL_DELAY)
     return as_mapping(
         http_request_with_retry("GET", url, params={**params, "wt": "json"}, label=label)
     )

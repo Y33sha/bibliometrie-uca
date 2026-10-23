@@ -5,6 +5,7 @@ import pytest
 from pipeline.http.circuit_breaker import (
     SourceCircuitBreaker,
     SourceUnavailableError,
+    source_circuit_breaker,
 )
 
 
@@ -46,3 +47,12 @@ def test_default_threshold_is_10():
     assert not b.tripped
     b.record_failure()
     assert b.tripped
+
+
+def test_le_rythme_suit_le_profil_de_la_source():
+    with source_circuit_breaker("hal") as breaker:
+        assert breaker.pace is not None
+    with source_circuit_breaker("sudoc") as breaker:
+        assert breaker.pace is None
+    with source_circuit_breaker("sudoc", max_per_second=5) as breaker:
+        assert breaker.pace is not None

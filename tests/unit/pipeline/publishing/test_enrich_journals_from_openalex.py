@@ -29,11 +29,6 @@ def _bound(repo):
         yield
 
 
-@pytest.fixture(autouse=True)
-def _no_sleep(monkeypatch):
-    monkeypatch.setattr(journals_mod.time, "sleep", lambda *_: None)
-
-
 class TestJournalsApc:
     def _run(self, answer):
         journal_repo = MagicMock()

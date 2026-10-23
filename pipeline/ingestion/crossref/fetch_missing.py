@@ -23,9 +23,8 @@ class CrossrefDoiSearch:
 
     source_key = "crossref"
     batch_size = 1
-    # Polite pool CrossRef : 10 req/s, 3 concurrentes max. Avec sem=3 et ~200 ms de latence par requête, request_delay=0.1 plafonne à 3 / (0.1 + 0.2) ≈ 10 req/s sustained, juste sous la limite.
+    # Polite pool Crossref : 3 requêtes simultanées au plus.
     max_concurrent = 3
-    request_delay_s = 0.1
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]

@@ -28,10 +28,7 @@ class DataciteDoiSearch:
 
     source_key = "datacite"
     batch_size = 10
-    # Débit DataCite (tier « identifié », User-Agent avec mailto) : 1000 req / 5 min ≈ 3,3 req/s.
-    # `max_concurrent=3` × `request_delay_s=0,9` ≈ 3,3 req/s ; chaque requête rapatrie 10 DOI (~33 DOI/s utile).
     max_concurrent = 3
-    request_delay_s = 0.9
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]

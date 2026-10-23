@@ -14,9 +14,7 @@ from pipeline.ingestion.openalex.api import fetch_work
 
 class OpenalexStaleRefetch(StaleRefetch):
     source_key = "openalex"
-    # Plafond OpenAlex 10 req/s : 3 workers et 100 ms de pause.
     max_concurrent = 3
-    request_delay_s = 0.1
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         work = await fetch_work(client, source_id)

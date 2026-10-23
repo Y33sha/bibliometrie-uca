@@ -36,13 +36,12 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 class DoiSearch(Protocol):
     """Recherche par DOI dans une source : requête d'un lot de DOI.
 
-    Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées, pause de chaque worker après sa requête.
+    Les attributs règlent la boucle : taille de lot, nombre de requêtes simultanées. Le débit suit le profil de la source.
     """
 
     source_key: str
     batch_size: int  # 1 pour un appel par DOI, >1 pour un appel groupé
     max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
-    request_delay_s: float  # pause par worker après chaque requête (0 = pas de pause)
 
     def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]
@@ -148,7 +147,6 @@ async def fetch_missing_doi(
             ),
             batch_size=search.batch_size,
             max_concurrent=search.max_concurrent,
-            request_delay_s=search.request_delay_s,
         ),
         dois,
     )

@@ -5,7 +5,6 @@ Un canal (`LookupChannel`) dit comment interroger la source pour un lot d'identi
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -75,8 +74,6 @@ class LookupChannel:
     """Compteur des identifiants absents."""
     batch_size: int = 1
     max_concurrent: int = 1
-    request_delay_s: float = 0.0
-    """Pause de chaque worker après sa requête."""
 
 
 async def look_up(
@@ -101,8 +98,6 @@ async def look_up(
             if not source_tripped():
                 slog.error("erreur sur %s : %s", ", ".join(batch), e)
             result = UNAVAILABLE
-        if channel.request_delay_s:
-            await asyncio.sleep(channel.request_delay_s)
         return result
 
     with track_progress(len(keys), source_branch(channel.source), slog, count_kept=True) as bar:

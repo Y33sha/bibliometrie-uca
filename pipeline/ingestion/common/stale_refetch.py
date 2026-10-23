@@ -25,12 +25,11 @@ type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
 class StaleRefetch(ABC):
     """Nouvelle lecture d'un document d'une source par son identifiant natif.
 
-    Les sous-classes fixent `source_key`, `max_concurrent`, `request_delay_s` et implémentent `fetch_by_native_id`.
+    Les sous-classes fixent `source_key` et `max_concurrent`, et implémentent `fetch_by_native_id`. Le débit suit le profil de la source.
     """
 
     source_key: str
     max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
-    request_delay_s: float = 0.0  # pause par worker après chaque requête
 
     @abstractmethod
     async def fetch_by_native_id(
@@ -109,7 +108,6 @@ async def refresh(
             stage=lambda staging, record: staging.stage(source, record, listed=False),
             absent_metric="disappeared",
             max_concurrent=refetch.max_concurrent,
-            request_delay_s=refetch.request_delay_s,
         ),
         get_stale_source_ids(conn, source, years, after_days=after_days),
     )

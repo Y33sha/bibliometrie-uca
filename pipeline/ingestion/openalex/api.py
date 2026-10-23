@@ -10,8 +10,7 @@ from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.http.polite_pool import get_polite_pool_email_optional
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY, OPENALEX_PER_PAGE
+from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_PER_PAGE
 from pipeline.ingestion.credentials import get_openalex_api_key
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
@@ -109,17 +108,15 @@ def filter_params(filter_str: str, *, cursor: str = "*") -> QueryParams:
 
 
 class OpenalexClient:
-    """Client de `/works`, limité à un appel toutes les `OPENALEX_DELAY` secondes."""
+    """Client de `/works`."""
 
     def __init__(self, base_url: str) -> None:
         self._url = base_url
-        self._throttle = Throttle(OPENALEX_DELAY)
 
     def _get(self, params: QueryParams, label: str) -> Mapping[str, JsonValue]:
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
-            )
+        return as_mapping(
+            http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        )
 
     def count(
         self, institution_ids: list[str], *, years: list[int], since: str | None = None

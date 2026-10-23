@@ -10,7 +10,7 @@ Politique de retry :
 
 Une redirection n'est suivie que vers le même hôte, pour une requête GET, et une seule fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection — autre hôte, autre méthode, second saut — est traitée comme une erreur. L'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
 
-Circuit-breaker : chaque requête s'exécute sous le `SourceCircuitBreaker` que l'accès à la source pose dans la ContextVar. Il court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès. Une requête émise hors de l'accès à une source lève `RuntimeError`.
+Circuit-breaker : chaque requête s'exécute sous le `SourceCircuitBreaker` que l'accès à la source pose dans la ContextVar. Il court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès. Chaque tentative attend son tour au rythme de la source (`breaker.pace`). Une requête émise hors de l'accès à une source lève `RuntimeError`.
 """
 
 from __future__ import annotations
@@ -137,6 +137,8 @@ def http_request_with_retry(
     breaker, label = _source_breaker(label)
     reason = ""
     for attempt in range(max_retries):
+        if breaker.pace is not None:
+            breaker.pace.wait()
         try:
             resp = httpx2.request(
                 method,
@@ -307,6 +309,8 @@ async def _request_with_retry_async[T](
     breaker, label = _source_breaker(label)
     reason = ""
     for attempt in range(max_retries):
+        if breaker.pace is not None:
+            await breaker.pace.wait_async()
         try:
             resp = await client.request(
                 method,

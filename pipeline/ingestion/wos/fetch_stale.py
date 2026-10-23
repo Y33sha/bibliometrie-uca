@@ -14,9 +14,8 @@ from pipeline.ingestion.wos.api import get_records, search
 
 class WosStaleRefetch(StaleRefetch):
     source_key = "wos"
-    # API Clarivate rate-limitée (cf. `fetch_missing`) : 2 workers + 500 ms.
+    # API instable : 2 requêtes simultanées au plus.
     max_concurrent = 2
-    request_delay_s = 0.5
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         data = await search(client, f"UT=({source_id})", count=1, label=f"UT {source_id}")

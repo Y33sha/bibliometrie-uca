@@ -7,7 +7,6 @@ Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont systémati
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Mapping
 
@@ -15,7 +14,7 @@ import httpx2
 
 from domain.types import JsonValue
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
-from pipeline.ingestion.api_params import WOS_DELAY, WOS_PER_PAGE
+from pipeline.ingestion.api_params import WOS_PER_PAGE
 from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.wos.api import filter_doi_for_wos, get_records, get_records_found, search
 from pipeline.ingestion.wos.fields import extract_doi
@@ -28,10 +27,8 @@ class WosDoiSearch:
 
     source_key = "wos"
     batch_size = 20
-    # WoS Clarivate : instable, rate-limit serré (~2-5 req/s selon contrat).
-    # `max_concurrent=2` × pause 500 ms, latence ~500 ms → ≈ 2 req/s (sous le seuil).
+    # API instable : 2 requêtes simultanées au plus.
     max_concurrent = 2
-    request_delay_s = 0.5
 
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]
@@ -66,7 +63,6 @@ class WosDoiSearch:
             if first_record + WOS_PER_PAGE - 1 >= total:
                 break
             first_record += WOS_PER_PAGE
-            await asyncio.sleep(WOS_DELAY)
 
         if not complete:
             # Lot interrompu : les records reçus sont écrits, sans conclure sur les absents.

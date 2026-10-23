@@ -28,7 +28,6 @@ from domain.config import ConfigKey
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
-    OPENALEX_DELAY,
     SUDOC_MAX_CONCURRENT,
     SUDOC_MAX_PER_SECOND,
 )
@@ -211,6 +210,7 @@ def build() -> Phase:
                     "Revues",
                     check_journals_in_sudoc.LABEL,
                     threshold=3,
+                    max_per_second=SUDOC_MAX_PER_SECOND,
                 ),
                 "merge_duplicate_journals": TaskStep(
                     _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LABEL
@@ -285,7 +285,6 @@ def _run_enrich_journals_from_openalex(
             fetch_batch=lambda oa_ids: fetch_sources_batch(
                 oa_ids, openalex_sources_api=sources_api
             ),
-            rate_delay=OPENALEX_DELAY,
         )
 
 
@@ -304,7 +303,6 @@ def _run_check_journals_in_sudoc(
                     client, ppn, base_url=base_url
                 ),
                 max_concurrent=SUDOC_MAX_CONCURRENT,
-                max_per_second=SUDOC_MAX_PER_SECOND,
             )
         )
 

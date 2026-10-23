@@ -27,7 +27,7 @@ from infrastructure.observability.log import setup_logger
 from infrastructure.read_models.perimeters import get_extraction_api_ids
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.openalex.api import SELECT_FIELDS, auth_params, build_params
 from pipeline.ingestion.openalex.fields import extract_openalex_id
 from pipeline.ingestion.openalex.payload import BULK_AUTHORSHIPS_CAP
@@ -38,7 +38,6 @@ log = setup_logger("audit_openalex_inline_truncation", os.path.dirname(__file__)
 def _get(
     url: str, params: Mapping[str, str | int | float | bool | None], label: str
 ) -> dict[str, JsonValue]:
-    time.sleep(OPENALEX_DELAY)
     return dict(
         as_mapping(http_request_with_retry("GET", url, params=params, timeout=30, label=label))
     )

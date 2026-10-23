@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import time
 from collections import Counter
 from collections.abc import Callable
 from typing import NamedTuple, NotRequired, TypedDict, cast
@@ -28,7 +27,7 @@ from infrastructure.db.savepoint import rollback_unless_invalidated
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex.api import credential_params
 from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
@@ -141,7 +140,6 @@ def run_enrich_publishers_from_openalex(
     fetch_batch: FetchPublishersBatch,
     limit: int = 0,
     dry_run: bool = False,
-    rate_delay: float = 0.1,
 ) -> None:
     """Pose le pays OpenAlex des éditeurs qui n'en ont pas, par lots de `BATCH_SIZE`, avec un commit par lot."""
     try:
@@ -166,7 +164,6 @@ def run_enrich_publishers_from_openalex(
                 return
             id_map = {oa_id: publisher_id for publisher_id, oa_id in publishers[i : i + BATCH_SIZE]}
             countries_by_id = fetch_batch(list(id_map))
-            time.sleep(rate_delay)
             outcome = _enrich_batch(conn, id_map, countries_by_id, dry_run=dry_run)
             updated += outcome.updated
             no_response += outcome.no_response
@@ -217,7 +214,6 @@ def main() -> int:
             ),
             limit=args.limit,
             dry_run=args.dry_run,
-            rate_delay=OPENALEX_DELAY,
         )
         return PhaseMetrics()
 
