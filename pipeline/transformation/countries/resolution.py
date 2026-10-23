@@ -6,15 +6,18 @@ from collections import defaultdict
 from sqlalchemy import Connection, text
 
 from domain.country_detection import CountryDetectionMethod, retained_countries
+from infrastructure.db.queues import Queue, enqueue_sql
 
 # Adresses résolues par lot : chaque lot charge ses candidats en mémoire.
 _RESOLVE_BATCH = 50_000
+
+_MARK_CHANGED = enqueue_sql(Queue.ADDRESS_COUNTRIES, "SELECT id FROM changed")
 
 
 def resolve_address_countries(conn: Connection, address_ids: list[int] | None = None) -> int:
     """Compose `addresses.countries` pour `address_ids`, ou pour les adresses `candidates_dirty` quand `address_ids` vaut `None`.
 
-    Une adresse sans candidat perd son pays. Pose `countries_dirty` là où le pays change, efface `candidates_dirty`. Retourne le nombre d'adresses dont le pays change.
+    Une adresse sans candidat perd son pays. Marque pour le recalcul des pays de leurs contributions sources les adresses dont le pays change, efface `candidates_dirty`. Retourne le nombre d'adresses dont le pays change.
     """
     if address_ids is None:
         address_ids = list(
@@ -41,19 +44,24 @@ def resolve_address_countries(conn: Connection, address_ids: list[int] | None = 
             ]
         )
         changed += conn.execute(
-            text("""
-                UPDATE addresses a
-                SET countries = d.cty, countries_dirty = true
-                FROM (
-                    SELECT (e->>'id')::int AS id,
-                           nullif(ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[],
-                                  '{}'::char(2)[]) AS cty
-                    FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
-                ) d
-                WHERE a.id = d.id AND a.countries IS DISTINCT FROM d.cty
+            text(f"""
+                WITH changed AS (
+                    UPDATE addresses a
+                    SET countries = d.cty
+                    FROM (
+                        SELECT (e->>'id')::int AS id,
+                               nullif(ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[],
+                                      '{{}}'::char(2)[]) AS cty
+                        FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
+                    ) d
+                    WHERE a.id = d.id AND a.countries IS DISTINCT FROM d.cty
+                    RETURNING a.id
+                ),
+                marked AS ({_MARK_CHANGED})
+                SELECT count(*) FROM changed
             """),
             {"payload": payload},
-        ).rowcount
+        ).scalar_one()
         conn.execute(
             text(
                 "UPDATE addresses SET candidates_dirty = false"

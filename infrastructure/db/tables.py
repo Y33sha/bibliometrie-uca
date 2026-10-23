@@ -20,6 +20,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Float,
+    Identity,
     Integer,
     MetaData,
     Numeric,
@@ -617,11 +618,6 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
-    # Refresh pays incrémental : True = `countries` vient de changer, les
-    # `source_contributions` liés sont à recalculer. Posé gratuitement à l'écriture
-    # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
-    # fin de cascade.
-    Column("countries_dirty", Boolean, nullable=False, server_default="false"),
     Column(
         "candidates_dirty",
         Boolean,
@@ -916,11 +912,6 @@ source_contributions = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    # Refresh pays incrémental : True = les pays dérivés (source_records,
-    # publications) sont à recalculer depuis les adresses de ce source_contribution.
-    # Posé par normalize (nouveaux source_contributions) et la détection (adresse
-    # changée), remis à False par le refresh.
-    Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column(
         "countries",
         ARRAY(Text),
@@ -1603,6 +1594,25 @@ pipeline_phase_executions = Table(
     ),
     schema="ops",
 )
+
+
+# ── Files d'attente de recalcul ───────────────────────────────────
+# Identifiants des lignes qu'une tâche du pipeline doit traiter (`infrastructure.db.queues`).
+# `id` : clé étrangère `ON DELETE CASCADE` vers la table traitée, déclarée en migration.
+
+
+def _queue(name: str) -> Table:
+    return Table(
+        name,
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("seq", BigInteger, Identity(always=True), nullable=False),
+        schema="queues",
+    )
+
+
+source_contribution_countries_queue = _queue("source_contribution_countries_queue")
+address_countries_queue = _queue("address_countries_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

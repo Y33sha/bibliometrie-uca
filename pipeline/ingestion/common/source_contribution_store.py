@@ -14,6 +14,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue_sql
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
@@ -206,11 +207,12 @@ class SourceContributionStore:
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
-        # 2. Insert des contributions sources. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
+        # 2. Insert des contributions sources, marquées pour le recalcul des pays. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
         # position, (source_record_id, author_position) reste unique. `contributor_information_id` résolu
         # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
         stmt = text(
             """
+            WITH inserted AS (
             INSERT INTO source_contributions
                 (source, source_record_id, author_position,
                  is_corresponding, collective, roles, raw_author_name, raw_last_name,
@@ -226,6 +228,8 @@ class SourceContributionStore:
             JOIN contributor_information ci
               ON ci.key_hash = """
             + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
+            + " RETURNING id) "
+            + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM inserted")
         ).bindparams(bindparam("payload", type_=Jsonb))
         self._conn.execute(
             stmt,
@@ -270,7 +274,7 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
-        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
+        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions. Les contributions sources réécrites sont marquées pour le recalcul des pays.
         if not values:
             return
         payload = [
@@ -289,7 +293,9 @@ class SourceContributionStore:
             for v in values
         ]
         self._conn.execute(
-            text("""
+            text(
+                """
+                WITH updated AS (
                 UPDATE source_contributions sc
                 SET author_position = t.author_position,
                     is_corresponding = t.is_corresponding,
@@ -299,14 +305,16 @@ class SourceContributionStore:
                     raw_last_name = t.raw_last_name,
                     raw_first_name = t.raw_first_name,
                     neutralized_identifiers = t.neutralized_identifiers,
-                    content_hash = t.content_hash,
-                    countries_dirty = true
+                    content_hash = t.content_hash
                 FROM jsonb_to_recordset(:payload) AS t(
                     id integer, author_position smallint, is_corresponding boolean,
                     collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
                 WHERE sc.id = t.id
-            """).bindparams(bindparam("payload", type_=Jsonb)),
+                RETURNING sc.id)
+                """
+                + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM updated")
+            ).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
 

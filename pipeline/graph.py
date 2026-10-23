@@ -281,6 +281,7 @@ TASKS: tuple[Task, ...] = (
                 "addresses.candidates_dirty",
                 "address_country_candidates",
                 "publications.contributions_dirty",
+                "source_contribution_countries_queue",
                 *_containers(source),
             ),
             # Ses propres lignes de `staging`, enregistrements sources et contributions sources, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
@@ -304,7 +305,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.staging_id",
             "source_records.publication_id",
         ),
-        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
+        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR, structures HAL et marquages, et les décisions qui les visent.
         writes=(
             "source_records.id",
             "source_records.keys_dirty",
@@ -313,6 +314,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_addresses",
             "source_contribution_rors",
             "source_contribution_hal_structures",
+            "source_contribution_countries_queue",
             "confirmed_source_contributions",
             "rejected_contributions",
         ),
@@ -329,8 +331,8 @@ TASKS: tuple[Task, ...] = (
         "normalize.cleanup_orphan_addresses",
         "normalize",
         reads=("source_contribution_addresses", "addresses.id"),
-        # La suppression d'une adresse emporte ses liens aux structures.
-        writes=("addresses.id", "address_structures"),
+        # La suppression d'une adresse emporte ses liens aux structures et son marquage.
+        writes=("addresses.id", "address_structures", "address_countries_queue"),
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
     ),
@@ -343,7 +345,7 @@ TASKS: tuple[Task, ...] = (
             "ror_relations",
             "ror_dump_imports",
             # Dépendants d'une organisation qui change de pays.
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
             "address_country_candidates",
             "addresses.candidates_dirty",
         ),
@@ -359,7 +361,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structure_relations",
             "hal_structure_aliases",
             # Contributions sources d'une structure qui change de pays.
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
         ),
         previous_run=("hal_structures", "hal_structure_aliases"),
         network="hal",
@@ -1171,7 +1173,7 @@ TASKS: tuple[Task, ...] = (
         ),
         writes=(
             "addresses.countries",
-            "addresses.countries_dirty",
+            "address_countries_queue",
             "addresses.candidates_dirty",
         ),
     ),
@@ -1179,7 +1181,7 @@ TASKS: tuple[Task, ...] = (
         "countries.refresh_publication_countries",
         "countries",
         reads=(
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
             "source_contributions.source_record_id",
             "source_contributions.countries",
             "source_contribution_addresses",
@@ -1189,7 +1191,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structures",
             "hal_structure_aliases",
             "addresses.countries",
-            "addresses.countries_dirty",
+            "address_countries_queue",
             "source_records.publication_id",
             "source_records.countries",
             "publications.id",
@@ -1198,8 +1200,8 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.countries",
             "source_records.countries",
             "publications.countries",
-            "source_contributions.countries_dirty",
-            "addresses.countries_dirty",
+            "source_contribution_countries_queue",
+            "address_countries_queue",
         ),
     ),
     _task(

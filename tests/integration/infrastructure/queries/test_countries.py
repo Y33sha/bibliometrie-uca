@@ -3,9 +3,10 @@
 from sqlalchemy import text
 
 from domain.country_detection import CountryDetectionMethod
+from infrastructure.db.queues import Queue, enqueue
 from pipeline.transformation.countries.refresh_publication_countries import (
-    clear_countries_dirty,
     create_dirty_scope,
+    delete_processed_marks,
     drop_dirty_scope,
     refresh_publication_countries,
     refresh_source_contribution_countries,
@@ -15,6 +16,7 @@ from pipeline.transformation.countries.resolution import resolve_address_countri
 from pipeline.transformation.countries.store import CountryCandidatesStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued, unmark
 from tests.integration.helpers.sources import (
     insert_source_contribution,
     insert_source_contribution_address,
@@ -113,7 +115,7 @@ class TestCandidatesAndResolution:
         assert resolve_address_countries(sa_sync_conn) >= 1
 
         assert _field(sa_sync_conn, addr, "countries") == ["ma"]
-        assert _field(sa_sync_conn, addr, "countries_dirty") is True
+        assert addr in queued(sa_sync_conn, Queue.ADDRESS_COUNTRIES)
         assert _field(sa_sync_conn, addr, "candidates_dirty") is False
 
     def test_une_adresse_sans_candidat_perd_son_pays(self, sa_sync_conn):
@@ -195,7 +197,7 @@ class TestRefreshPublicationCountries:
             source_id="oa-1",
             countries=["US", "FR"],
         )
-        # un sa (dirty par défaut) met la publication dans la portée du refresh.
+        # Une contribution source, marquée à l'insertion, met la publication dans la portée du refresh.
         insert_source_contribution(sa_sync_conn, sd1, source="hal")
         insert_source_contribution(sa_sync_conn, sd2, source="openalex")
 
@@ -222,7 +224,7 @@ class TestRefreshPublicationCountries:
         )
         insert_source_contribution(
             sa_sync_conn, source_record, source="hal"
-        )  # dirty → publication dans la portée
+        )  # marquée → publication dans la portée
         sa_sync_conn.execute(
             text("UPDATE publications SET countries = ARRAY['FR'] WHERE id = :pid"),
             {"pid": publication_id},
@@ -238,23 +240,8 @@ def _source_record_countries(conn, source_record_id):
     ).scalar_one()
 
 
-def _source_contribution_dirty(conn, source_contribution_id):
-    return conn.execute(
-        text("SELECT countries_dirty FROM source_contributions WHERE id = :i"),
-        {"i": source_contribution_id},
-    ).scalar_one()
-
-
-def _addr_dirty(conn, addr_id):
-    return conn.execute(
-        text("SELECT countries_dirty FROM addresses WHERE id = :i"), {"i": addr_id}
-    ).scalar_one()
-
-
 class TestDirtyDrivenSourceCountries:
-    """Refresh `source_records.countries` borné aux documents dont un source_contribution
-    est dirty : `source_contributions.countries_dirty` (nouveaux sa) OU lié à une adresse
-    `countries_dirty` (pays changé). + orphelin (LEFT JOIN), flag adresse, clear."""
+    """Recalcul borné aux enregistrements sources dont une contribution source est en file, ou liée à une adresse en file."""
 
     def test_only_dirty_sources_recomputed(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -266,14 +253,11 @@ class TestDirtyDrivenSourceCountries:
         )
         dirty_source_contribution = insert_source_contribution(
             sa_sync_conn, dirty_source_record, source="openalex"
-        )  # dirty par défaut
+        )
         clean_source_contribution = insert_source_contribution(
             sa_sync_conn, clean_source_record, source="hal"
         )
-        sa_sync_conn.execute(
-            text("UPDATE source_contributions SET countries_dirty = false WHERE id = :i"),
-            {"i": clean_source_contribution},
-        )
+        unmark(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES, clean_source_contribution)
         insert_source_contribution_address(
             sa_sync_conn,
             dirty_source_contribution,
@@ -295,7 +279,7 @@ class TestDirtyDrivenSourceCountries:
         assert _source_record_countries(sa_sync_conn, dirty_source_record) == ["FR"]
         assert (
             _source_record_countries(sa_sync_conn, clean_source_record) is None
-        )  # aucun sa dirty → pas recalculé
+        )  # aucune contribution source en file → pas recalculé
 
     def test_orphan_dirty_source_reset_to_null(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -304,7 +288,7 @@ class TestDirtyDrivenSourceCountries:
         )
         sa = insert_source_contribution(
             sa_sync_conn, source_record, source="openalex"
-        )  # dirty, adresse sans pays
+        )  # en file, adresse sans pays
         insert_source_contribution_address(
             sa_sync_conn,
             sa,
@@ -315,27 +299,23 @@ class TestDirtyDrivenSourceCountries:
         assert _source_record_countries(sa_sync_conn, source_record) is None  # orphelin → NULL
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
-        # Un document NON dirty est recalculé parce que l'adresse de son sa devient dirty.
+        # Une contribution source hors file est recalculée parce que son adresse entre en file.
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-m"
         )
         sa = insert_source_contribution(sa_sync_conn, source_record, source="openalex")
-        sa_sync_conn.execute(
-            text("UPDATE source_contributions SET countries_dirty = false WHERE id = :i"), {"i": sa}
-        )
+        unmark(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES, sa)
         addr = insert_address(sa_sync_conn, "Nantes", countries=None, normalized_text="Nantes")
         insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
 
-        # La résolution pose addresses.countries_dirty sur la ligne changée.
+        # La résolution marque l'adresse dont le pays change.
         _resolve(sa_sync_conn, addr, ["FR"])
-        assert _addr_dirty(sa_sync_conn, addr) is True
+        assert addr in queued(sa_sync_conn, Queue.ADDRESS_COUNTRIES)
         _refresh(
             sa_sync_conn, refresh_source_contribution_countries, refresh_source_record_countries
         )
-        assert _source_record_countries(sa_sync_conn, source_record) == [
-            "FR"
-        ]  # recalculé via l'adresse dirty
+        assert _source_record_countries(sa_sync_conn, source_record) == ["FR"]
 
     def test_le_pays_d_une_contribution_source_sans_adresse_vient_de_sa_structure_hal(
         self, sa_sync_conn
@@ -385,16 +365,44 @@ class TestDirtyDrivenSourceCountries:
             text("SELECT countries FROM source_contributions WHERE id = :sa"), {"sa": sa}
         ).scalar_one() == ["fr"]
 
-    def test_clear_dirty_clears_both_flags(self, sa_sync_conn):
+    def test_les_marquages_traites_sont_supprimes_des_deux_files(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-c"
         )
-        sa = insert_source_contribution(
-            sa_sync_conn, source_record, source="openalex"
-        )  # sa dirty par défaut
+        insert_source_contribution(sa_sync_conn, source_record, source="openalex")
         addr = insert_address(sa_sync_conn, "Paris", countries=None, normalized_text="Paris")
-        _resolve(sa_sync_conn, addr, ["FR"])  # addr dirty
-        clear_countries_dirty(sa_sync_conn)
-        assert _source_contribution_dirty(sa_sync_conn, sa) is False
-        assert _addr_dirty(sa_sync_conn, addr) is False
+        _resolve(sa_sync_conn, addr, ["FR"])
+
+        create_dirty_scope(sa_sync_conn)
+        delete_processed_marks(sa_sync_conn)
+        drop_dirty_scope(sa_sync_conn)
+
+        assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == set()
+        assert queued(sa_sync_conn, Queue.ADDRESS_COUNTRIES) == set()
+
+    def test_un_marquage_fait_pendant_la_phase_reste_en_file(self, sa_sync_conn):
+        """Régression : l'effacement de fin de phase emportait les marquages faits pendant la phase, même ceux d'une ligne déjà marquée."""
+        publication = insert_publication(sa_sync_conn)
+        source_record = insert_source_record(
+            sa_sync_conn, publication, source="openalex", source_id="oa-p"
+        )
+        remarked = insert_source_contribution(sa_sync_conn, source_record, source="openalex")
+        insert_source_contribution(
+            sa_sync_conn, source_record, source="openalex", author_position=1
+        )
+
+        create_dirty_scope(sa_sync_conn)
+        enqueue(
+            sa_sync_conn,
+            Queue.SOURCE_CONTRIBUTION_COUNTRIES,
+            "SELECT CAST(:id AS integer)",
+            {"id": remarked},
+        )
+        added = insert_source_contribution(
+            sa_sync_conn, source_record, source="openalex", author_position=2
+        )
+        delete_processed_marks(sa_sync_conn)
+        drop_dirty_scope(sa_sync_conn)
+
+        assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {remarked, added}

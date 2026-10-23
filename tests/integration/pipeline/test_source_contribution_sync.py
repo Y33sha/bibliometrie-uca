@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from domain.persons.contributor_name import ContributorName
 from domain.structures.identifiers import RorId
+from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.source_contribution_store import (
     SourceContributionStore,
@@ -20,6 +21,7 @@ from pipeline.ingestion.common.source_contributions import (
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source Crossref « 10.9999/sync », de titre « t ».
@@ -391,26 +393,18 @@ def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
 
 
 def test_contribution_source_inchangee_laissee_en_l_etat(sa_sync_conn):
-    """Une contribution source inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
+    """Une contribution source inchangée reste hors de la file du recalcul des pays."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     records = [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
     _write(conn, source_record, records)
     source_contribution_id = _source_contributions(conn, source_record)[0][0]
-    conn.execute(
-        text("UPDATE source_contributions SET countries_dirty = false WHERE id = :i"),
-        {"i": source_contribution_id},
-    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {source_contribution_id}
+    clear(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
 
     _write(conn, source_record, records)
 
-    assert (
-        conn.execute(
-            text("SELECT countries_dirty FROM source_contributions WHERE id = :i"),
-            {"i": source_contribution_id},
-        ).scalar_one()
-        is False
-    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == set()
     assert _addresses(conn, source_contribution_id) == ["Labo A"]
 
 

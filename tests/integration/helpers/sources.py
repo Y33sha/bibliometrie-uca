@@ -5,6 +5,7 @@ import json
 
 from sqlalchemy import Connection
 
+from infrastructure.db.queues import Queue, enqueue
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
@@ -107,13 +108,13 @@ def insert_source_contribution(
     neutralized_identifiers: dict[str, object] | None = None,
     collective: bool = False,
 ) -> int:
-    """Insère une contribution source et renvoie son `id`. `row_id` fixe l'`id`.
+    """Insère une contribution source, la marque pour le recalcul des pays comme la normalisation, et renvoie son `id`. `row_id` fixe l'`id`.
 
     Les informations du contributeur sont `contributor_information_id`, sinon celles de forme `author_name_normalized` et d'identifiants `identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
     """
     if raw_author_name is None and raw_last_name is None:
         raw_author_name = "X"
-    return insert_row(
+    source_contribution_id = insert_row(
         conn,
         "source_contributions",
         {
@@ -144,6 +145,13 @@ def insert_source_contribution(
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
         },
     )
+    enqueue(
+        conn,
+        Queue.SOURCE_CONTRIBUTION_COUNTRIES,
+        "SELECT CAST(:id AS integer)",
+        {"id": source_contribution_id},
+    )
+    return source_contribution_id
 
 
 def insert_source_contribution_address(

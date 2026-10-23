@@ -26,7 +26,7 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 - **Une file d'attente par marqueur.** Une table étroite du schéma `queues`, nommée avec le suffixe `_queue`, car le graphe des tâches identifie les tables par leur nom sans schéma. Colonnes : `id`, clé primaire et clé étrangère `ON DELETE CASCADE` vers la table traitée ; `seq`, numéro de marquage tiré d'une séquence.
 - **Marquer, c'est insérer l'identifiant avec un nouveau `seq`.** Pour un identifiant déjà en file, le marquage renouvelle son `seq` (`ON CONFLICT DO UPDATE`).
 - **L'effacement porte sur les marquages traités.** La phase relève les couples `(id, seq)` au début, et supprime exactement ceux-là à la fin, par `DELETE`. Un marquage fait pendant la phase change `seq`, donc reste dans la file pour le run suivant. `TRUNCATE` bloquerait les marquages de l'API jusqu'à la fin de la phase.
-- **Une seule fonction par file marque.** Chaque point de marquage l'appelle, et le graphe des tâches déclare l'écriture dans la file. Le code qui crée une ligne à traiter l'appelle aussi, à la place des marqueurs à vrai par défaut (`keys_dirty`, `contributions_dirty`, `countries_dirty` des contributions sources, `candidates_dirty`).
+- **Une seule fonction marque, pour toutes les files** (`infrastructure/db/queues.py`). Chaque point de marquage l'appelle, et le graphe des tâches déclare l'écriture dans la file. Le code qui crée une ligne à traiter l'appelle aussi, à la place des marqueurs à vrai par défaut (`keys_dirty`, `contributions_dirty`, `countries_dirty` des contributions sources, `candidates_dirty`).
 - **La migration remplit chaque file depuis le marqueur**, puis supprime la colonne et son index partiel.
 - **`staging.processed` reste une colonne.** `normalize` pose ce marqueur dans l'écriture qui vide `raw_data`. Une file n'économiserait aucune écriture.
 
@@ -34,13 +34,14 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ### Phase 0 — Oneshots joués
 
-- [ ] Supprimer les scripts de `interfaces/cli/oneshot/` déjà joués qui posent des marqueurs, avec leurs tests.
+- [x] Supprimer les scripts de `interfaces/cli/oneshot/` déjà joués qui posent des marqueurs, avec leurs tests.
 
 ### Phase 1 — Pays des contributions sources et des adresses
 
-- [ ] Files `source_contribution_countries_queue` et `address_countries_queue`, remplies depuis `countries_dirty`.
-- [ ] Marquage dans `normalize`, `ror.py`, `hal_structures.py`, `resolution.py` et le recalcul ciblé de l'API. Le recalcul des pays marque les contributions sources qu'il recalcule : garder ce marquage seulement pour les appelants qui en ont besoin.
-- [ ] `create_dirty_scope` lit les files. L'effacement supprime les marquages du périmètre.
+- [x] Files `source_contribution_countries_queue` et `address_countries_queue`, remplies depuis `countries_dirty`.
+- [x] Marquage dans `normalize`, `ror.py`, `hal_structures.py` et `resolution.py`, qui sert aussi à l'API. Le recalcul des pays marque seulement les adresses dont le pays change.
+- [x] `create_dirty_scope` lit les files. L'effacement supprime les marquages du périmètre.
+- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 - [ ] Mesurer la phase `countries` sur le même volume qu'au 22 octobre 2026.
 
 ### Phase 2 — Candidats pays des adresses
