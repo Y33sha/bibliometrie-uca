@@ -1,6 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { structIsLabo, structLabel, type StructInfo } from "$lib/structureLabels";
+  import { structIsLabo, structLabelById, type StructInfo } from "$lib/structureLabels";
 
   // Tag d'une structure liée à une publication : lien vers la fiche labo si c'en est un, sinon span non cliquable (établissement, partenaires…).
   // `tab` : onglet ciblé sur la fiche labo (ex. "theses").
@@ -17,10 +17,10 @@
 
 {#if structIsLabo(structures, sid)}
   <a href="{base}/laboratories/{sid}{tab ? `?tab=${tab}` : ''}" class="struct-tag"
-    >{structLabel(structures, sid)}</a
+    >{structLabelById(structures, sid)}</a
   >
 {:else}
-  <span class="struct-tag">{structLabel(structures, sid)}</span>
+  <span class="struct-tag">{structLabelById(structures, sid)}</span>
 {/if}
 
 <style>

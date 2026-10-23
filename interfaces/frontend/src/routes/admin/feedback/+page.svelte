@@ -5,7 +5,7 @@
   import { replaceState } from "$app/navigation";
   import { api, nameForms } from "$lib/api";
   import { deriveStructDetectionStatus } from "$lib/utils";
-  import { compareStructureLabels } from "$lib/structureLabels";
+  import { compareStructureLabels, structureLabel } from "$lib/structureLabels";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
@@ -329,7 +329,7 @@
       {#each groupOrder(structures) as type}
         <optgroup label={TYPE_LABELS[type] ?? type}>
           {#each structures[type] as s (s.id)}
-            <option value={s.id}>{s.acronym || s.name}</option>
+            <option value={s.id}>{structureLabel(s)}</option>
           {/each}
         </optgroup>
       {/each}
@@ -369,7 +369,7 @@
               {#if a.structures && a.structures.length > 0}
                 {#each a.structures as l}
                   <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
-                    {l.acronym || l.name}
+                    {structureLabel(l)}
                   </span>
                 {/each}
               {:else}
@@ -383,7 +383,7 @@
                 {#if a.matched_forms && a.matched_forms.length > 0}
                   {#each uniqueForms(a.matched_forms) as f (f.form_id)}
                     <div class="form-info">
-                      <span class="form-struct">{f.structure.acronym || f.structure.name} &rarr;</span>
+                      <span class="form-struct">{structureLabel(f.structure)} &rarr;</span>
                       <span class="form-text">{f.form_text}</span>
                       {#if f.requires_context_of && f.requires_context_of.length}
                         <span class="form-ctx">

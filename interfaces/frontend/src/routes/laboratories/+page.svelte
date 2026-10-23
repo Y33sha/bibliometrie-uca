@@ -5,6 +5,7 @@
 	import { base } from "$app/paths";
 	import { api } from "$lib/api";
 	import { rorShortId, rorFullUrl } from "$lib/utils";
+	import { structureLabel } from "$lib/structureLabels";
 	import FacetDropdown from "$lib/components/FacetDropdown.svelte";
 
 	import type { components } from "$lib/api/schema";
@@ -23,7 +24,7 @@
 		for (const lab of labs) {
 			for (const t of lab.tutelles || []) {
 				const key = String(t.id);
-				const entry = byId.get(key) ?? { text: t.acronym || t.name || key, count: 0 };
+				const entry = byId.get(key) ?? { text: structureLabel(t) || key, count: 0 };
 				entry.count++;
 				byId.set(key, entry);
 			}
@@ -58,14 +59,8 @@
 				va = (a.name || "").toLowerCase();
 				vb = (b.name || "").toLowerCase();
 			} else {
-				va = (a.tutelles || [])
-					.map((t) => t.acronym || t.name)
-					.join(", ")
-					.toLowerCase();
-				vb = (b.tutelles || [])
-					.map((t) => t.acronym || t.name)
-					.join(", ")
-					.toLowerCase();
+				va = (a.tutelles || []).map(structureLabel).join(", ").toLowerCase();
+				vb = (b.tutelles || []).map(structureLabel).join(", ").toLowerCase();
 			}
 			if (va < vb) return sortAsc ? -1 : 1;
 			if (va > vb) return sortAsc ? 1 : -1;
@@ -168,7 +163,7 @@
 					<div class="tutelles">
 						{#each lab.tutelles || [] as t (t.id)}
 							<span class="tutelle-tag"
-								>{t.acronym || t.name}</span
+								>{structureLabel(t)}</span
 							>
 						{/each}
 					</div>

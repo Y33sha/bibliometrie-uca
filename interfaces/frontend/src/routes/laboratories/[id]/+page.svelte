@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { rorShortId, rorFullUrl } from '$lib/utils';
+	import { structureLabel } from '$lib/structureLabels';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import PersonsListView from '$lib/components/PersonsListView.svelte';
@@ -143,7 +144,7 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle(lab ? (lab.acronym || lab.name) : 'Laboratoire')}</title>
+	<title>{pageTitle(lab ? structureLabel(lab) : 'Laboratoire')}</title>
 </svelte:head>
 
 {#if canGoBack}
@@ -194,7 +195,7 @@
 				{#if tutelles.length}
 					<span class="meta-label">Tutelles</span>
 					{#each tutelles as t (t.id)}
-						<span class="tutelle-tag">{t.acronym || t.name}</span>
+						<span class="tutelle-tag">{structureLabel(t)}</span>
 					{/each}
 				{/if}
 			</div>
@@ -275,7 +276,7 @@
 				apiKey={`lab-${lab.id}-publications`}
 				externalFilters={{
 					labId: lab.id,
-					labLabel: lab.acronym || lab.name,
+					labLabel: structureLabel(lab),
 					halCollection: lab.hal_collection ?? undefined,
 				}}
 				basePath={`/laboratories/${labId}`}

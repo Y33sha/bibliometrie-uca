@@ -10,7 +10,7 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { autofocus } from '$lib/actions/focus';
-	import { compareStructureLabels } from '$lib/structureLabels';
+	import { compareStructureLabels, structureLabel } from '$lib/structureLabels';
 
 	// ---- Type definitions ----
 
@@ -170,7 +170,7 @@
 
 	// Libellé d'une structure par id (pour les tags des prédicats).
 	const structureLabelById = $derived(
-		new Map(allStructures.map((s) => [s.id, s.acronym || s.name]))
+		new Map(allStructures.map((s) => [s.id, structureLabel(s)]))
 	);
 	const currentStructureName = $derived(
 		(currentStructureId !== null && structureLabelById.get(currentStructureId)) || '—'
@@ -461,7 +461,7 @@
 				{#if structures[type]?.length}
 					<optgroup label={TYPE_LABELS[type]}>
 						{#each structures[type] as s (s.id)}
-							<option value={s.id}>{s.acronym || s.name}</option>
+							<option value={s.id}>{structureLabel(s)}</option>
 						{/each}
 					</optgroup>
 				{/if}
@@ -561,7 +561,7 @@
 						{#each availableStructureGroups as [type, list] (type)}
 							<optgroup label={TYPE_LABELS[type] || type}>
 								{#each list as s (s.id)}
-									<option value={s.id}>{s.acronym || s.name}</option>
+									<option value={s.id}>{structureLabel(s)}</option>
 								{/each}
 							</optgroup>
 						{/each}
@@ -637,7 +637,7 @@
 									>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
-									<span class={structTagClass(s)}>{s.acronym || s.name}</span>
+									<span class={structTagClass(s)}>{structureLabel(s)}</span>
 								{/each}
 							</div>
 						</div>

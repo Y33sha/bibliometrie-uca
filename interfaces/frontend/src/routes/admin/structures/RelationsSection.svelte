@@ -1,5 +1,6 @@
 <script lang="ts">
   import Picker from "$lib/components/Picker.svelte";
+  import { structureLabel } from "$lib/structureLabels";
   import type { RelatedStructure, Structure } from "./types";
 
   let {
@@ -47,7 +48,7 @@
     {#each tutelles as p (p.relation_id)}
       <span class="tag tutelle">
         <button class="tag-name" onclick={() => onselect(p.id)}>
-          {p.acronym || p.name}
+          {structureLabel(p)}
         </button>
         <button class="remove" onclick={() => ondeleteTutelle(p.relation_id)} title="Supprimer"
           >x</button
@@ -71,7 +72,7 @@
     {#each tutellesDe as c (c.relation_id)}
       <span class="tag tutelle">
         <button class="tag-name" onclick={() => onselect(c.id)}>
-          {c.acronym || c.name}
+          {structureLabel(c)}
         </button>
         <button class="remove" onclick={() => ondeleteTutelle(c.relation_id)} title="Supprimer"
           >x</button

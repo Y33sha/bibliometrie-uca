@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compareStructureLabels, structsTooltip, type Affiliation, type StructInfo } from "./structureLabels";
+import { compareStructureLabels, structsTooltip, structureLabel, type Affiliation, type StructInfo } from "./structureLabels";
 
 const struct = (over: Partial<StructInfo>): StructInfo =>
   ({ id: 1, name: "Laboratoire", acronym: "LAB", type: "labo", ...over }) as StructInfo;
@@ -40,6 +40,6 @@ describe("compareStructureLabels", () => {
       { acronym: "ICCF", name: "Institut de chimie" },
       { acronym: "cerdi", name: "Centre d'études" },
     ].sort(compareStructureLabels);
-    expect(sorted.map((s) => s.acronym || s.name)).toEqual(["cerdi", "équipe Gamma", "ICCF", "LMBP"]);
+    expect(sorted.map(structureLabel)).toEqual(["cerdi", "équipe Gamma", "ICCF", "LMBP"]);
   });
 });

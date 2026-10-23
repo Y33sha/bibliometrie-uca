@@ -8,18 +8,25 @@ export interface Affiliation {
 	structure_ids?: number[] | null;
 }
 
-/** Nom d'une structure via son id (acronyme si dispo, sinon nom, sinon `#id`). */
-export function structLabel(structures: Record<string, StructInfo>, id: number): string {
-	const s = structures[String(id)];
-	return s ? s.acronym || s.name : `#${id}`;
+interface Labelled {
+	acronym?: string | null;
+	name?: string | null;
 }
 
-/** Comparateur alphabétique de structures sur leur libellé affiché (acronyme, sinon nom), insensible à la casse et aux accents. */
-export function compareStructureLabels(
-	a: { acronym?: string | null; name?: string | null },
-	b: { acronym?: string | null; name?: string | null },
-): number {
-	return (a.acronym || a.name || '').localeCompare(b.acronym || b.name || '', 'fr', { sensitivity: 'base' });
+/** Libellé affiché d'une structure : son acronyme, à défaut son nom. */
+export function structureLabel(s: Labelled): string {
+	return s.acronym || s.name || '';
+}
+
+/** Libellé d'une structure via son id, `#id` si l'id est absent du dictionnaire. */
+export function structLabelById(structures: Record<string, StructInfo>, id: number): string {
+	const s = structures[String(id)];
+	return s ? structureLabel(s) : `#${id}`;
+}
+
+/** Comparateur alphabétique de structures sur leur libellé affiché, insensible à la casse et aux accents. */
+export function compareStructureLabels(a: Labelled, b: Labelled): number {
+	return structureLabel(a).localeCompare(structureLabel(b), 'fr', { sensitivity: 'base' });
 }
 
 export function structIsLabo(structures: Record<string, StructInfo>, id: number): boolean {
@@ -38,7 +45,7 @@ export function structsTooltip(a: Affiliation, structures: Record<string, Struct
 	}
 	if (a.structure_ids?.length) {
 		parts.push(
-			`Structures identifiées\u00a0: ${a.structure_ids.map((sid) => structLabel(structures, sid)).join(', ')}`,
+			`Structures identifiées\u00a0: ${a.structure_ids.map((sid) => structLabelById(structures, sid)).join(', ')}`,
 		);
 	}
 	return parts.join('\n');
