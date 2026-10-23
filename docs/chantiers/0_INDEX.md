@@ -15,7 +15,6 @@
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
-- [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 - [Monographies](DATA_monographies.md)
