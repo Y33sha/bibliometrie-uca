@@ -266,6 +266,8 @@ TASKS: tuple[Task, ...] = (
                 "contributor_information",
                 "addresses.id",
                 "countries",
+                # Groupes des contributions sources dont les rôles ou le statut de correspondant changent.
+                "source_contribution_group_members",
                 *_containers(source),
             ),
             writes=(
@@ -283,15 +285,17 @@ TASKS: tuple[Task, ...] = (
                 "publication_contributions_queue",
                 "source_contribution_countries_queue",
                 "source_record_keys_queue",
+                "source_contribution_group_attributes_queue",
                 *_containers(source),
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime, et les groupes écrits par `author_grouping`.
             previous_run=(
                 "staging",
                 "source_records",
                 "source_contributions",
                 "contributor_information",
                 "addresses",
+                "source_contribution_group_members",
                 *_containers(source),
             ),
         )
@@ -427,16 +431,20 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "source_contributions.source",
             "source_records.publication_year",
+            # Groupes des contributions sources dont les indices changent, marqués pour la recomposition de leurs attributs.
+            "source_contribution_group_members",
         ),
         writes=(
             "source_contribution_structures",
             "source_contributions.in_perimeter",
             "source_record_keys_queue",
+            "source_contribution_group_attributes_queue",
         ),
         previous_run=(
             "source_records.publication_id",
             "person_identifiers",
             "source_contributions.neutralized_identifiers",
+            "source_contribution_group_members",
         ),
     ),
     _task(
@@ -856,6 +864,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
             "publication_contributions_queue",
+            "source_contribution_group_attributes_queue",
             "publication_author_alignment",
         ),
         # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
@@ -873,6 +882,7 @@ TASKS: tuple[Task, ...] = (
         "author_grouping.attributes",
         "author_grouping",
         reads=(
+            "source_contribution_group_attributes_queue",
             "source_contribution_group_members",
             "source_contributions.is_corresponding",
             "source_contributions.perimeter_evidence",
@@ -886,6 +896,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_groups.is_corresponding",
             "source_contribution_groups.perimeter_evidence",
             "source_contribution_groups.roles",
+            "source_contribution_group_attributes_queue",
         ),
     ),
     _task(

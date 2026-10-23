@@ -2,6 +2,13 @@
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.queues import Queue, enqueue_sql
+from tests.integration.helpers.queues import mark
+
+_MARK_UNGROUPED = enqueue_sql(
+    Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES, "SELECT group_id FROM ungrouped"
+)
+
 
 def insert_group(
     conn: Connection,
@@ -10,7 +17,7 @@ def insert_group(
     *,
     method: str = "name",
 ) -> int:
-    """Groupe les contributions sources `(contribution source, enregistrement source)` d'une publication et renvoie l'`id` du groupe. La première fonde le groupe ; les autres le rejoignent par `method`."""
+    """Groupe les contributions sources `(contribution source, enregistrement source)` d'une publication, marque le groupe pour la recomposition de ses attributs comme le groupement, et renvoie l'`id` du groupe. La première fonde le groupe ; les autres le rejoignent par `method`."""
     group_id = conn.execute(
         text("INSERT INTO source_contribution_groups (publication_id) VALUES (:p) RETURNING id"),
         {"p": publication_id},
@@ -29,13 +36,14 @@ def insert_group(
                 "m": "reference" if rank == 0 else method,
             },
         )
+    mark(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES, [group_id])
     return group_id
 
 
 def group_ungrouped(conn: Connection) -> None:
-    """Donne un groupe à elle seule à chaque contribution source sans groupe d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : le groupe que la phase `author_grouping` forme pour un auteur sans jumelle."""
+    """Donne un groupe à elle seule à chaque contribution source sans groupe d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : le groupe que la phase `author_grouping` forme pour un auteur sans jumelle. Les groupes créés sont marqués pour la recomposition de leurs attributs."""
     conn.execute(
-        text("""
+        text(f"""
             WITH ungrouped AS (
                 SELECT sc.id, sc.source_record_id, sr.publication_id,
                        nextval(pg_get_serial_sequence('publications.source_contribution_groups', 'id')) AS group_id
@@ -48,7 +56,7 @@ def group_ungrouped(conn: Connection) -> None:
             ), groups AS (
                 INSERT INTO source_contribution_groups (id, publication_id)
                 SELECT group_id, publication_id FROM ungrouped
-            )
+            ), marked AS ({_MARK_UNGROUPED})
             INSERT INTO source_contribution_group_members
                 (source_contribution_id, group_id, source_record_id, method)
             SELECT id, group_id, source_record_id, 'reference' FROM ungrouped

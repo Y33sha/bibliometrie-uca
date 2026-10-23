@@ -3,6 +3,7 @@
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import (
@@ -260,6 +261,24 @@ class TestEntreeDansLePerimetre:
         _run_populate_affiliations(sa_sync_conn)
 
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is False
+
+    def test_groupes_des_contributions_sources_entrees_marques(self, sa_sync_conn):
+        """Le groupe d'une contribution source dont les indices de périmètre changent est marqué pour la recomposition de ses attributs."""
+        from sqlalchemy import text
+
+        _setup_affiliations_test_data(sa_sync_conn)
+        group_ungrouped(sa_sync_conn)
+        clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+
+        _run_populate_affiliations(sa_sync_conn)
+
+        group = sa_sync_conn.execute(
+            text(
+                "SELECT group_id FROM source_contribution_group_members"
+                " WHERE source_contribution_id = 80002"
+            )
+        ).scalar_one()
+        assert group in queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
 
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
         from pipeline.transformation.structures.perimeter_evidence import (

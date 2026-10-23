@@ -119,6 +119,16 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
+# Marque les groupes des contributions sources de la CTE `updated(id, attributes_changed)` dont les rôles ou le statut de correspondant changent.
+_MARK_GROUPS_OF_UPDATED = enqueue_sql(
+    Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+    """
+    SELECT gm.group_id FROM source_contribution_group_members gm
+    JOIN updated u ON u.id = gm.source_contribution_id
+    WHERE u.attributes_changed
+    """,
+)
+
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
     """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Rend le nombre d'enregistrements sources marqués."""
@@ -272,7 +282,8 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
-        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions. Les contributions sources réécrites sont marquées pour le recalcul des pays.
+        """Réécrit en place les contributions sources de `values`. Les marque pour le recalcul des pays, et marque les groupes de celles dont les rôles ou le statut de correspondant changent."""
+        # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
         if not values:
             return
         payload = [
@@ -309,8 +320,13 @@ class SourceContributionStore:
                     collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
                 WHERE sc.id = t.id
-                RETURNING sc.id)
-                """
+                RETURNING sc.id,
+                    (old.is_corresponding, old.roles) IS DISTINCT FROM (new.is_corresponding, new.roles)
+                        AS attributes_changed
+                ),
+                marked_groups AS ("""
+                + _MARK_GROUPS_OF_UPDATED
+                + ")"
                 + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM updated")
             ).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},

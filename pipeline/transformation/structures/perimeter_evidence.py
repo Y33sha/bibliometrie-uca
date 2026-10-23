@@ -26,7 +26,7 @@ class InPerimeterSyncCounts(NamedTuple):
 def _sync_sql(scoped: bool) -> str:
     """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux contributions sources `:source_contribution_ids` quand `scoped` est vrai.
 
-    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation : la phase `publications` le met alors en publication.
+    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation : la phase `publications` le met alors en publication. Les groupes des contributions sources écrites sont marqués pour la recomposition de leurs attributs.
     """
     marked = enqueue_sql(
         Queue.SOURCE_RECORD_KEYS,
@@ -34,6 +34,13 @@ def _sync_sql(scoped: bool) -> str:
         SELECT sr.id FROM source_records sr
         WHERE sr.id IN (SELECT source_record_id FROM changed WHERE is_in AND NOT was_in)
           AND sr.publication_id IS NULL
+        """,
+    )
+    marked_groups = enqueue_sql(
+        Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+        """
+        SELECT gm.group_id FROM source_contribution_group_members gm
+        WHERE gm.source_contribution_id IN (SELECT id FROM changed)
         """,
     )
     scope = "AND sc.id = ANY(:source_contribution_ids)" if scoped else ""
@@ -52,8 +59,8 @@ def _sync_sql(scoped: bool) -> str:
             SET perimeter_evidence = t.evidence
             FROM target t
             WHERE sc.id = t.id AND sc.perimeter_evidence IS DISTINCT FROM t.evidence
-            RETURNING sc.source_record_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
-        ), marked AS ({marked})
+            RETURNING sc.id, sc.source_record_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
+        ), marked AS ({marked}), marked_groups AS ({marked_groups})
         SELECT count(*) FILTER (WHERE is_in AND NOT was_in) AS added,
                count(*) FILTER (WHERE was_in AND NOT is_in) AS removed
         FROM changed

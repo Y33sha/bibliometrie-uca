@@ -19,6 +19,7 @@ from pipeline.ingestion.common.source_contributions import (
     write_source_contributions,
 )
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
@@ -237,6 +238,28 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
         ],
     )
     assert _contributions_dirty(conn, publication)
+
+
+def test_les_groupes_des_contributions_sources_dont_les_roles_changent_sont_marques(
+    sa_sync_conn,
+):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    source_record = _source_record(conn, publication)
+    _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
+    source_contribution_id = _source_contributions(conn, source_record)[0][0]
+    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
+    clear(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+
+    _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")])])
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == set()
+
+    _write(
+        conn,
+        source_record,
+        [_rec(0, "Dupont, Jean", roles=["author", "editor"], addresses=[AddressRecord("Labo B")])],
+    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == {group}
 
 
 def test_decomptes_des_auteurs_de_l_enregistrement_source(sa_sync_conn):

@@ -317,7 +317,7 @@ def build_groups(
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Recalcule les groupes des publications marquées, puis les attributs de tous les groupes : l'affiliation d'un membre change sans que son groupe change."""
+        """Recalcule les groupes des publications en file, puis les attributs des groupes en file : l'affiliation d'un membre change sans que son groupe change."""
 
         def build_task(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
@@ -335,12 +335,13 @@ class AuthorGroupingPhase:
                 waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
                 ctx.open_tx() as conn,
             ):
-                updated = SourceContributionGroupStore(conn).propagate_attributes()
+                queued, updated = SourceContributionGroupStore(conn).propagate_attributes()
                 line.conclude(
-                    f"{LAST_BRANCH}{quantity(updated, 'groupe réécrit', 'groupes réécrits')}"
+                    f"{LAST_BRANCH}{quantity(queued, 'groupe examiné', 'groupes examinés')},"
+                    f" {quantity(updated, 'groupe réécrit', 'groupes réécrits')}"
                     f" en {time.perf_counter() - t0:.1f} s"
                 )
-            metrics = PhaseMetrics(updated=updated)
+            metrics = PhaseMetrics(seen=queued, updated=updated)
             metrics.report = quantity(updated, "groupe réécrit", "groupes réécrits")
             return metrics
 

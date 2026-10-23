@@ -71,9 +71,11 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 
 - [x] Journal de la tâche `author_grouping.attributes` : ligne « en cours », puis nombre de groupes réécrits et durée.
 - [ ] Mesurer la durée de la tâche sur un run complet.
-- [ ] File des groupes dont les attributs sont à recomposer.
-- [ ] Marquage là où un attribut d'un membre change : `perimeter_evidence` (`affiliations`, recalcul ciblé de l'API), `roles` et `is_corresponding` (`normalize`). Marquage des groupes dont le groupement change les membres.
-- [ ] `author_grouping.attributes` lit la file. Mesurer la durée de la tâche après.
+- [x] File `source_contribution_group_attributes_queue`, remplie avec tous les groupes.
+- [x] Marquage là où un attribut d'un membre change : `perimeter_evidence` (`affiliations`, recalcul ciblé de l'API), `roles` et `is_corresponding` (`normalize`). Le groupement marque les groupes des publications de chaque lot.
+- [x] `author_grouping.attributes` relève la file au début et supprime les marquages traités à la fin.
+- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
+- [ ] Mesurer la durée de la tâche après.
 
 ### Phase 6 — Mises à jour HOT
 

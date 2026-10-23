@@ -424,6 +424,17 @@ def _dirty(conn, publication_id):
     return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
+def test_le_groupement_marque_les_groupes_pour_la_recomposition_de_leurs_attributs(conn):
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+
+    _run(conn)
+
+    groups = set(_groups(conn, publication))
+    assert len(groups) == 2
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == groups
+
+
 def test_un_marquage_fait_pendant_le_groupement_reste_en_file(conn):
     """Régression : le groupement effaçait le marquage d'une publication remarquée après son relevé."""
     publication = insert_publication(conn)

@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.publications.author_grouping import REPEATED_LIST_CASES
-from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
+from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
     corrected_by,
@@ -21,6 +21,17 @@ _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTI
 
 # Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
 _SNAPSHOT = "publication_contributions_marks"
+
+# Relevé de la file `source_contribution_group_attributes_queue`.
+_ATTRIBUTES_SNAPSHOT = "source_contribution_group_attributes_marks"
+
+# Marque pour la recomposition de leurs attributs les groupes des publications `:publications`.
+_MARK_GROUPS_OF_PUBLICATIONS_SQL = text(
+    enqueue_sql(
+        Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+        "SELECT id FROM source_contribution_groups WHERE publication_id = ANY(:publications)",
+    )
+)
 
 
 def _known_first_name(id_type: str) -> str:
@@ -176,9 +187,19 @@ class SourceContributionGroupStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def propagate_attributes(self) -> int:
-        """Recompose les attributs de tous les groupes depuis leurs membres (`propagate_group_attributes_sql`). Rend le nombre de groupes réécrits."""
-        return self._conn.execute(text(propagate_group_attributes_sql())).rowcount
+    def propagate_attributes(self) -> tuple[int, int]:
+        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_group_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes réécrits."""
+        queue = Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES
+        snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
+        queued = int(
+            self._conn.execute(text(f"SELECT count(*) FROM {_ATTRIBUTES_SNAPSHOT}")).scalar_one()  # noqa: S608
+        )
+        updated = self._conn.execute(
+            text(propagate_group_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
+        ).rowcount
+        delete_processed(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
+        self._conn.execute(text(f"DROP TABLE {_ATTRIBUTES_SNAPSHOT}"))
+        return queued, updated
 
     def refresh_alignment(self) -> None:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
@@ -251,7 +272,7 @@ class SourceContributionGroupStore:
         return list(self._conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
 
     def write(self, plan: BatchPlan) -> None:
-        """Écrit les groupes et les doublons d'auteur des publications du lot.
+        """Écrit les groupes et les doublons d'auteur des publications du lot, et marque leurs groupes pour la recomposition de leurs attributs.
 
         Un groupe déjà en base garde son identifiant. Il garde sa personne et son mode de résolution tant que ses membres restent les mêmes. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
@@ -298,3 +319,6 @@ class SourceContributionGroupStore:
                     "margins": [m.margin for m in memberships],
                 },
             )
+        self._conn.execute(
+            _MARK_GROUPS_OF_PUBLICATIONS_SQL, {"publications": list(publication_ids)}
+        )

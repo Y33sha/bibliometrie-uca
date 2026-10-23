@@ -22,6 +22,8 @@ class Queue(StrEnum):
     """Publications dont les groupes de contributions sources sont à recalculer : un enregistrement source a rejoint ou quitté la publication, ou ses contributions sources ont changé."""
     SOURCE_RECORD_KEYS = "source_record_keys_queue"
     """Enregistrements sources à réconcilier : écrits, corrigés, entrés dans le périmètre, ou voisins d'un enregistrement source supprimé."""
+    SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES = "source_contribution_group_attributes_queue"
+    """Groupes de contributions sources dont les attributs sont à recomposer : un membre a changé de rôles, de statut de correspondant ou d'indices de périmètre, ou le groupement a changé les membres."""
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:
