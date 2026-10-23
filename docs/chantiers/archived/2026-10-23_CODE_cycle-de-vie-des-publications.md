@@ -27,16 +27,16 @@ La dissolution d'une publication, dans `reconcile_components.py`, dépend de l'o
 
 ### Phase 1 — Suppression d'une publication
 
-- [ ] Module du cycle de vie : seul module qui supprime une publication.
+- [x] Module du cycle de vie : seul module qui supprime une publication. fe1734afc
 - [x] `dissolve(publication, successeur)` : report des paiements APC, redirection de l'identifiant, suppression. Appelée par `reconcile_components.py`. 2b6f11f1d
 - [x] Verdict rendu par `refresh_from_sources`, suppression par le module du cycle de vie. 2b6f11f1d
-- [ ] Tâche de suppression après `contributions`, à la place de `delete_without_sources` et de `purge_orphan_publications`, et lectures `previous_run` de `publications.id` qui en découlent.
+- [x] Tâche de suppression après `contributions`, à la place de `delete_without_sources` et de `purge_orphan_publications`. fe1734afc
 
 ### Phase 2 — Référentiels vides et compteurs
 
-- [ ] Suppression des référentiels vides et recalcul des `publication_count` sous `publishing/`, avec leurs tâches.
-- [ ] Recalcul de `addresses.publication_count` sous `structures/`.
+- [x] Suppression des référentiels vides et recalcul des `publication_count` sous `publishing/`.
+- [x] Recalcul de `addresses.publication_count` sous `structures/`. fe1734afc
 
 ### Phase 3 — Documentation
 
-- [ ] Mise à jour de `docs/pipeline`.
+- [x] Mise à jour de `docs/pipeline`. fe1734afc

@@ -8,7 +8,6 @@
 
 ### En pause
 
-- [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé
@@ -29,6 +28,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-23 — [Cycle de vie des publications et des référentiels](archived/2026-10-23_CODE_cycle-de-vie-des-publications.md)
 - 2026-10-23 — [Une source, un adaptateur](archived/2026-10-23_CODE_adaptateur-par-source.md)
 - 2026-10-23 — [Conception du pipeline](archived/2026-10-23_CODE_conception-du-pipeline.md)
 - 2026-10-23 — [Files d'attente de recalcul](archived/2026-10-23_CODE_files-d-attente-de-recalcul.md)
