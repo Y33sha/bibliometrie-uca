@@ -11,7 +11,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources';
+	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type Publisher = components['schemas']['PublisherListItem'];

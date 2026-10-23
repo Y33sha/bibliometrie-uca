@@ -66,9 +66,9 @@ _SOURCE_ID_COLUMNS = ",\n                    ".join(
 def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str, str]:
     """URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
     return {
-        source: url
+        source: source_record_url(source, value, oa_status)
         for source, value in ids.items()
-        if value and (url := source_record_url(source, value, oa_status)) is not None
+        if value
     }
 
 

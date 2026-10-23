@@ -131,7 +131,7 @@ def get_publication_detail(
 
     sources_rows = conn.execute(
         text(f"""
-            SELECT sr.source, sr.source_id, sr.doi, sr.hal_collections, sr.countries,
+            SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
                    COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
                        AS is_secondary
             FROM source_records sr
@@ -144,6 +144,7 @@ def get_publication_detail(
         SourceRecordOut(
             source=r.source,
             source_id=r.source_id,
+            oa_status=r.oa_status,
             doi=r.doi,
             hal_collections=r.hal_collections,
             countries=r.countries,

@@ -7,7 +7,6 @@
   import SourceTag from "$lib/components/SourceTag.svelte";
   import Tooltip from "$lib/components/Tooltip.svelte";
   import { contributionRoleLabels } from "$lib/labels";
-  import { sourceExternalUrl } from "$lib/sources";
   import { structsTooltip } from "$lib/structureLabels";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
@@ -68,7 +67,7 @@
               <span class="record-head">
                 <SourceTag
                   source={r.source}
-                  href={sourceExternalUrl(r.source, r.source_id, r.oa_status)}
+                  href={r.record_url}
                   id={r.source_id}
                 />
                 <span class="record-id">{r.source_id}</span>

@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from application.ports.read_models._common import (
     EntityFacetResponse,
@@ -20,6 +20,7 @@ from application.ports.read_models._common import (
 )
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.publications.licenses import License
+from domain.sources.registry import Source, source_record_url
 
 # Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.
 PublicationSort = Literal[
@@ -139,6 +140,24 @@ class PublicationListItem(BaseModel):
     scanr_id: str | None
     wos_id: str | None
     theses_id: str | None
+
+    @computed_field
+    @property
+    def record_urls(self) -> dict[str, str]:
+        """Lien vers le portail de chaque source où la publication est présente."""
+        ids = {
+            Source.HAL: self.hal_id,
+            Source.OPENALEX: self.openalex_id,
+            Source.SCANR: self.scanr_id,
+            Source.WOS: self.wos_id,
+            Source.THESES: self.theses_id,
+        }
+        return {
+            source: source_record_url(source, source_id, self.oa_status)
+            for source, source_id in ids.items()
+            if source_id
+        }
+
     date_soutenance: str | None
     date_inscription: str | None
     thesis_author_name: str | None
@@ -219,12 +238,19 @@ class PublicationDetailCore(BaseModel):
 class SourceRecordOut(BaseModel):
     source: str
     source_id: str
+    oa_status: str | None
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
     # Forme secondaire convergée (pièce, version ou variante dont le DOI a été substitué par
     # celui de l'œuvre canonique). La fiche replie ces sources sous un groupe dépliable.
     is_secondary: bool
+
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id, self.oa_status)
 
 
 class ExternalIdentifierOut(BaseModel):
@@ -358,6 +384,12 @@ class SourceRecordMetadataOut(BaseModel):
     pages: str | None
     article_number: str | None
 
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id, self.oa_status)
+
 
 class SourceContributionOut(BaseModel):
     """Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
@@ -399,6 +431,12 @@ class SuspectMergeSourceRecordOut(BaseModel):
     source_id: str
     source_contributions: int
     matched_source_contributions: int
+
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id)
 
 
 class SuspectMergeOut(BaseModel):

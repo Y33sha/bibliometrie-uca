@@ -9,8 +9,6 @@ import {
 	titleCase,
 	titleText,
 	formatDate,
-	halDocUrl,
-	scanrPubUrl,
 	deriveStructDetectionStatus,
 	paramsToQuery
 } from './utils';
@@ -122,37 +120,6 @@ describe('formatDate', () => {
 
 	it('retourne une chaîne vide pour null', () => {
 		expect(formatDate(null)).toBe('');
-	});
-});
-
-// ── halDocUrl ──────────────────────────────────────────────────
-
-describe('halDocUrl', () => {
-	it('retourne hal.science pour un halid normal', () => {
-		expect(halDocUrl('hal-04579115')).toBe('https://hal.science/hal-04579115');
-	});
-
-	it('retourne dumas pour un document dumas', () => {
-		expect(halDocUrl('dumas-12345678')).toBe('https://dumas.ccsd.cnrs.fr/dumas-12345678');
-	});
-
-	it('retourne theses.hal.science pour tel-* non closed', () => {
-		expect(halDocUrl('tel-04579115')).toBe('https://theses.hal.science/tel-04579115');
-		expect(halDocUrl('tel-04579115', 'green')).toBe('https://theses.hal.science/tel-04579115');
-		expect(halDocUrl('tel-04579115', null)).toBe('https://theses.hal.science/tel-04579115');
-	});
-
-	it('retourne hal.science pour tel-* closed', () => {
-		expect(halDocUrl('tel-04579115', 'closed')).toBe('https://hal.science/tel-04579115');
-	});
-});
-
-// ── scanrPubUrl ────────────────────────────────────────────────
-
-describe('scanrPubUrl', () => {
-	it('construit une URL ScanR correcte', () => {
-		expect(scanrPubUrl('doi/10.1234/test')).toContain('scanr.enseignementsup-recherche.gouv.fr');
-		expect(scanrPubUrl('doi/10.1234/test')).toContain(encodeURIComponent('doi/10.1234/test'));
 	});
 });
 

@@ -27,8 +27,7 @@ class Source(StrEnum):
 class SourceProfile:
     """Ce que le pipeline fait d'une source."""
 
-    # Nom sous lequel la source se donne à lire, dans le journal comme à l'écran. L'interface en garde
-    # une copie dans `interfaces/frontend/src/lib/sources.ts`, que TypeScript lit sans passer par ici.
+    # Nom sous lequel la source se donne à lire, dans le journal comme à l'écran (servi par `/api/sources`).
     label: str
     # Moissonnée par la phase `harvest`, sur les critères d'affiliation du périmètre.
     harvested: bool = False
@@ -93,31 +92,30 @@ def source_label(source: str) -> str:
     return SOURCE_LABELS.get(source, source)
 
 
-def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str | None:
-    """Lien vers l'enregistrement source sur le portail de sa source, ou `None` pour une source inconnue.
+def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str:
+    """Lien vers l'enregistrement source sur le portail de sa source. Lève `ValueError` pour une source inconnue.
 
-    Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
+    L'hôte est écrit ici, et l'identifiant est encodé : il ne peut ni changer d'hôte ni ajouter de paramètre. Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
     """
-    match source:
+    path = quote(source_id, safe=":")
+    match Source(source):
         case Source.HAL:
             if source_id.startswith("dumas-"):
-                return f"https://dumas.ccsd.cnrs.fr/{source_id}"
+                return f"https://dumas.ccsd.cnrs.fr/{path}"
             if source_id.startswith("tel-") and oa_status != "closed":
-                return f"https://theses.hal.science/{source_id}"
-            return f"https://hal.science/{source_id}"
+                return f"https://theses.hal.science/{path}"
+            return f"https://hal.science/{path}"
         case Source.OPENALEX:
-            return f"https://openalex.org/{source_id}"
+            return f"https://openalex.org/{path}"
         case Source.WOS:
-            return f"https://www.webofscience.com/wos/woscc/full-record/{source_id}"
+            return f"https://www.webofscience.com/wos/woscc/full-record/{path}"
         case Source.SCANR:
-            # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : il est encodé en entier.
-            encoded = quote(source_id, safe="-_.!~*'()")
-            return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{encoded}"
+            # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : ils sont encodés aussi.
+            return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{quote(source_id, safe='')}"
         case Source.THESES:
-            return f"https://theses.fr/{source_id}"
+            return f"https://theses.fr/{path}"
         case Source.CROSSREF | Source.DATACITE:
-            return f"https://doi.org/{source_id}"
-    return None
+            return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)

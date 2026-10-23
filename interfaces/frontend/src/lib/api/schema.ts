@@ -2538,6 +2538,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sources
+         * @description Sources et leur libellé, dans l'ordre d'affichage.
+         */
+        get: operations["list_sources_api_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3267,10 +3287,13 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Halids */
-            halids: string[] | null;
             /** Laboratories */
             laboratories: components["schemas"]["StructureRef"][];
+            /**
+             * Hal Links
+             * @description Dépôts HAL de la publication, avec leur lien.
+             */
+            readonly hal_links: components["schemas"]["SourceLink"][];
         };
         /** HalAffiliationConflictsResponse */
         HalAffiliationConflictsResponse: {
@@ -3316,6 +3339,11 @@ export interface components {
             hal_title: string | null;
             /** Author Count */
             author_count: number;
+            /**
+             * Record Url
+             * @description Lien vers le dépôt sur HAL.
+             */
+            readonly record_url: string;
         };
         /** HalDoiDuplicatePair */
         HalDoiDuplicatePair: {
@@ -3394,10 +3422,13 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Halids */
-            halids: string[] | null;
             /** Outside Perimeter Collections */
             outside_perimeter_collections: boolean;
+            /**
+             * Hal Links
+             * @description Dépôts HAL de la publication, avec leur lien.
+             */
+            readonly hal_links: components["schemas"]["SourceLink"][];
         };
         /** HalMissingCollectionsResponse */
         HalMissingCollectionsResponse: {
@@ -4619,6 +4650,13 @@ export interface components {
             contribution_id: number | null;
             /** Hal Collections */
             hal_collections: string[] | null;
+            /**
+             * Record Urls
+             * @description Lien vers le portail de chaque source où la publication est présente.
+             */
+            readonly record_urls: {
+                [key: string]: string;
+            };
         };
         /** PublicationListResponse */
         PublicationListResponse: {
@@ -5033,6 +5071,16 @@ export interface components {
             source_contribution_id: number;
         };
         /**
+         * SourceLink
+         * @description Identifiant d'un enregistrement source et son lien vers le portail de la source.
+         */
+        SourceLink: {
+            /** Source Id */
+            source_id: string;
+            /** Record Url */
+            record_url: string;
+        };
+        /**
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
@@ -5093,6 +5141,11 @@ export interface components {
             pages: string | null;
             /** Article Number */
             article_number: string | null;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** SourceRecordOut */
         SourceRecordOut: {
@@ -5100,6 +5153,8 @@ export interface components {
             source: string;
             /** Source Id */
             source_id: string;
+            /** Oa Status */
+            oa_status: string | null;
             /** Doi */
             doi: string | null;
             /** Hal Collections */
@@ -5108,6 +5163,11 @@ export interface components {
             countries: string[] | null;
             /** Is Secondary */
             is_secondary: boolean;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** StatsFacetsResponse */
         StatsFacetsResponse: {
@@ -5445,6 +5505,11 @@ export interface components {
             source_contributions: number;
             /** Matched Source Contributions */
             matched_source_contributions: number;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** SuspectMergesResponse */
         SuspectMergesResponse: {
@@ -9642,6 +9707,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnumOption"][];
                 };
             };
         };

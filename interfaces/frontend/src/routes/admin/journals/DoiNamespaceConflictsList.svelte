@@ -3,7 +3,7 @@
 	import { base } from '$app/paths';
 	import { api, ApiError } from '$lib/api';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
-	import { sourceLabel } from '$lib/sources';
+	import { sourceLabel } from '$lib/sources.svelte';
 	import type { components } from '$lib/api/schema';
 	import { mergeJournal } from './mergeJournal';
 

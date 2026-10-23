@@ -4,7 +4,6 @@
 	import { autofocus } from '$lib/actions/focus';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { halDocUrl, scanrPubUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
@@ -734,28 +733,28 @@
 					{/if}
 					<td class="links-cell">
 						{#if p.hal_id}
-							<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src="{base}/icons/hal.ico" alt="HAL" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.openalex_id}
-							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
+							<a href={p.record_urls.openalex} target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
 								<img src="{base}/icons/openalex.png" alt="OA" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.scanr_id}
-							<a href={scanrPubUrl(p.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
+							<a href={p.record_urls.scanr} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
 								<img src="{base}/scanr-icon.svg" alt="ScanR" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.wos_id}
-							<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
+							<a href={p.record_urls.wos} target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
 								<img src="{base}/icons/wos.ico" alt="WoS" />
 							</a>
 						{:else}

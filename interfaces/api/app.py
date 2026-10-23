@@ -64,6 +64,7 @@ from interfaces.api.routers import (  # noqa: E402
     pipeline_runs,
     publications,
     publishers,
+    sources,
     stats,
     structures,
     subjects,
@@ -450,6 +451,7 @@ app.include_router(journals.router)
 app.include_router(monographs.router)
 app.include_router(pipeline_runs.router)
 app.include_router(subjects.router)
+app.include_router(sources.router)
 
 
 # ----- Frontend SPA (prod) -----

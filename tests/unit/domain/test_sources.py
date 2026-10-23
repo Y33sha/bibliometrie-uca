@@ -82,5 +82,11 @@ class TestSourceRecordUrl:
             "https://doi.org/10.5281/zenodo.123"
         )
 
+    def test_identifiant_encode(self):
+        assert source_record_url("hal", "hal-1?x=@evil.org#") == (
+            "https://hal.science/hal-1%3Fx%3D%40evil.org%23"
+        )
+
     def test_source_inconnue(self):
-        assert source_record_url("inconnue", "x") is None
+        with pytest.raises(ValueError):
+            source_record_url("inconnue", "x")

@@ -9,10 +9,12 @@
   import { auth } from "$lib/api";
   import DialogHost from "$lib/components/DialogHost.svelte";
   import { loadInstitution, siteTitle } from "$lib/institution.svelte";
+  import { loadSources } from "$lib/sources.svelte";
 
   let { children }: { children: Snippet } = $props();
 
   loadInstitution();
+  loadSources();
 
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");

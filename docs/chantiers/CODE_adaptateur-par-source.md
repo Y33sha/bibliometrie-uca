@@ -50,7 +50,7 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 
 - Le profil de chaque source (`SourceProfile`, dans `domain/sources/registry.py`) déclare ce que le pipeline en fait : libellé, capacités, agence d'enregistrement, politiques. Le graphe, les modes et le domaine le lisent : leurs contrats d'import leur interdisent `pipeline.ingestion`.
 - Chaque source expose un adaptateur dans `<source>/__init__.py`, par des fabriques paresseuses : client, moissonneurs, recherche par DOI, relecture, normaliseur, empreinte, identité d'une notice, budget de débit. Les tables des phases se construisent depuis la liste des adaptateurs. Un test vérifie que chaque adaptateur a exactement les capacités de son profil.
-- L'API sert les libellés des sources au frontend.
+- L'API sert les libellés des sources au frontend, et calcule les liens vers les portails des sources (`source_record_url`).
 - theses.fr suit la fenêtre d'années du run, comme les autres sources, par l'année de soutenance. Les thèses en cours sont toujours retenues.
 - Une boucle de recherche commune range les trois issues. Les cinq canaux la paramètrent. L'adaptateur lui fournit l'identité d'une notice.
 - Le débit de chaque source est un budget en requêtes par seconde, appliqué par `RequestPace` dans la boucle commune.
@@ -73,10 +73,10 @@ Le circuit-breaker circule par deux canaux. `access_source` le pose dans une Con
 ### Phase 3 — Adaptateur et registre
 
 - [x] Profil des sources, d'où se tirent les listes de sources, les identifiants de personne cherchés, les agences d'enregistrement, les sources sur option et le mode quotidien. ad79d4099
-- [ ] Protocole de l'adaptateur, implémenté pour les sept sources.
-- [ ] Tables des phases construites depuis les adaptateurs.
-- [ ] Test : chaque adaptateur a exactement les capacités de son profil.
-- [ ] Libellés des sources servis par l'API au frontend.
+- [x] Protocole de l'adaptateur, implémenté pour les sept sources. a764e373b
+- [x] Tables des phases construites depuis les adaptateurs. a764e373b
+- [x] Test : chaque adaptateur a exactement les capacités de son profil. a764e373b
+- [ ] Libellés des sources servis par l'API au frontend, et liens vers les portails des sources calculés par l'API.
 
 ### Phase 4 — Boucle de recherche commune et écriture dans `staging`
 

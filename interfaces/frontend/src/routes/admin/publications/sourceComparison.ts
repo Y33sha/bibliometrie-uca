@@ -1,6 +1,6 @@
 import type { components } from '$lib/api/schema';
 import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
-import { SOURCE_ORDER } from '$lib/sources';
+import { sourceOrder } from '$lib/sources.svelte';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];
@@ -45,8 +45,9 @@ const IDENTIFIER_LABELS: Record<string, string> = {
 };
 
 function rank(source: string): number {
-	const i = SOURCE_ORDER.indexOf(source);
-	return i < 0 ? SOURCE_ORDER.length : i;
+	const order = sourceOrder();
+	const i = order.indexOf(source);
+	return i < 0 ? order.length : i;
 }
 
 /** Enregistrements dans l'ordre d'affichage des sources, puis par identifiant dans la source. */

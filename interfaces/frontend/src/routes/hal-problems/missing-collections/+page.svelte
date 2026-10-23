@@ -7,7 +7,6 @@
 	import { api } from '$lib/api';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { docTypeSingular } from '$lib/labels';
-	import { halDocUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -56,7 +55,6 @@
 		list.load();
 	}
 
-	const halUrl = halDocUrl;
 
 	onMount(() => {
 		const urlParams = new URLSearchParams($pageStore.url.search);
@@ -100,9 +98,9 @@
 					<a href="{base}/publications/{pub.id}" class="publication-link"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
-					{#if pub.halids}
-						{#each pub.halids as halid}
-							<a href={halUrl(halid)} target="_blank" rel="noopener" class="hal-badge">{halid}</a>
+					{#if pub.hal_links.length}
+						{#each pub.hal_links as link (link.source_id)}
+							<a href={link.record_url} target="_blank" rel="noopener" class="hal-badge">{link.source_id}</a>
 						{/each}
 					{/if}
 					{#if pub.doi}

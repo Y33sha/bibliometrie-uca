@@ -3,7 +3,7 @@
   import SourceTag from "$lib/components/SourceTag.svelte";
   import { accessTag } from "$lib/labels";
   import { licenseLabels } from "$lib/licenses";
-  import { sourceExternalUrl, sourceLabel, SOURCE_ORDER } from "$lib/sources";
+  import { sourceLabel, sourceOrder } from "$lib/sources.svelte";
   import type { ExternalId, PubDetail, Source } from "./types";
 
   const {
@@ -29,8 +29,8 @@
   };
 
   const orderedSources = $derived([
-    ...SOURCE_ORDER.flatMap((src) => sources.filter((s) => s.source === src)),
-    ...sources.filter((s) => !SOURCE_ORDER.includes(s.source)),
+    ...sourceOrder().flatMap((src) => sources.filter((s) => s.source === src)),
+    ...sources.filter((s) => !sourceOrder().includes(s.source)),
   ]);
 
   // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
@@ -52,7 +52,7 @@
     if (oa === "closed" || oa === "embargoed") return null;
     if (oa === "green" && pub.doi_ra !== "DataCite") {
       const hal = sources.find((s) => s.source === "hal");
-      if (hal) return sourceExternalUrl("hal", hal.source_id, oa);
+      if (hal) return hal.record_url;
     }
     return pub.doi ? `https://doi.org/${pub.doi}` : null;
   });
@@ -108,7 +108,7 @@
 
   {#snippet sourceRow(s: Source)}
     <a
-      href={sourceExternalUrl(s.source, s.source_id, pub.oa_status)}
+      href={s.record_url}
       target="_blank"
       rel="noopener"
       class="source-row"

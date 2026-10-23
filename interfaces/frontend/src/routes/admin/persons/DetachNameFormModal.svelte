@@ -2,7 +2,7 @@
   import { base } from "$app/paths";
   import Modal from "$lib/components/Modal.svelte";
   import PublicationTitle from "$lib/components/PublicationTitle.svelte";
-  import { sourceLabel } from "$lib/sources";
+  import { sourceLabel } from "$lib/sources.svelte";
   import type { DetachModalState } from "./types";
 
   let {

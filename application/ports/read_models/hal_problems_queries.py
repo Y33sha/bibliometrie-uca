@@ -10,9 +10,15 @@ Les modèles Pydantic que ces lectures rendent sont co-localisés ici : leur con
 from enum import StrEnum
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, computed_field
 
-from application.ports.read_models._common import PaginatedResponse, StructureRef
+from application.ports.read_models._common import (
+    PaginatedResponse,
+    SourceLink,
+    StructureRef,
+    hal_links,
+)
+from domain.sources.registry import Source, source_record_url
 
 
 class HalDocSummary(BaseModel):
@@ -24,6 +30,12 @@ class HalDocSummary(BaseModel):
     hal_publication_year: int | None
     hal_title: str | None
     author_count: int
+
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers le dépôt sur HAL."""
+        return source_record_url(Source.HAL, self.halid)
 
 
 class HalPublicationDetail(BaseModel):
@@ -72,9 +84,15 @@ class HalMissingCollectionPublication(BaseModel):
     publication_year: int | None
     doc_type: str
     doi: str | None
-    halids: list[str] | None
+    halids: list[str] | None = Field(exclude=True)
     outside_perimeter_collections: bool
     """Le dépôt HAL ne figure dans aucune collection des structures racines du périmètre : il a été trouvé par la collection d'un autre laboratoire, non par celle de l'établissement."""
+
+    @computed_field
+    @property
+    def hal_links(self) -> list[SourceLink]:
+        """Dépôts HAL de la publication, avec leur lien."""
+        return hal_links(self.halids)
 
 
 class HalMissingCollectionsResponse(PaginatedResponse):
@@ -99,9 +117,15 @@ class HalAffiliationConflictPublication(BaseModel):
     publication_year: int | None
     doc_type: str
     doi: str | None
-    halids: list[str] | None
+    halids: list[str] | None = Field(exclude=True)
     laboratories: list[StructureRef]
     """Laboratoires du périmètre que la publication porte ; l'affichage choisit entre acronyme et nom."""
+
+    @computed_field
+    @property
+    def hal_links(self) -> list[SourceLink]:
+        """Dépôts HAL de la publication, avec leur lien."""
+        return hal_links(self.halids)
 
 
 class HalAffiliationConflictsResponse(PaginatedResponse):

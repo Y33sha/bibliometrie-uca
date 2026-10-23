@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { loadSources } from '$lib/sources.svelte';
 import {
 	authorRows,
 	comparisonRows,
@@ -15,6 +16,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		id: 1,
 		source: 'hal',
 		source_id: 'hal-1',
+		record_url: 'https://hal.science/hal-1',
 		doi: null,
 		identifiers: {},
 		title: 'Titre',
@@ -48,7 +50,15 @@ function row(rows: ComparisonRow[], key: string): ComparisonRow {
 	return found;
 }
 
+// Ordre d'affichage des sources, tel que `/api/sources` le sert.
+vi.mock('$lib/api', () => ({
+	api: async () =>
+		['hal', 'openalex', 'wos'].map((value) => ({ value, label_fr: value }))
+}));
+
 describe('orderRecords', () => {
+	beforeAll(() => loadSources());
+
 	it("suit l'ordre d'affichage des sources, puis l'identifiant dans la source", () => {
 		const ordered = orderRecords([
 			record({ id: 1, source: 'wos', source_id: 'w1' }),
