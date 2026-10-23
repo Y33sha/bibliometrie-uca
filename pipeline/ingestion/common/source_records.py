@@ -2,7 +2,7 @@
 
 Un enregistrement source est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule la clé `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
 
-L'écriture ne porte que sur les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes marquées `keys_dirty` — ce que chaque écriture fait ici. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
+L'écriture concerne seulement les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes de la file `source_record_keys_queue`, où chaque écriture met la ligne. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
 
 import logging
@@ -19,6 +19,7 @@ from domain.source_records.external_ids import normalize_external_ids
 from domain.source_records.languages import language_code
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.db.scalars import scalar_int
 
 logger = logging.getLogger(__name__)
@@ -104,16 +105,20 @@ def _value(column: str) -> str:
     return f"CAST(:{column} AS {cast})" if cast else f":{column}"
 
 
+# Chaque écriture marque l'enregistrement source pour la réconciliation.
 _UPSERT_SQL = text(
     f"""
-    INSERT INTO source_records ({", ".join(_COLUMNS)})
-    VALUES ({", ".join(_value(c) for c in _COLUMNS)})
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        {", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATED_COLUMNS)},
-        corrections = '{{}}'::jsonb,
-        keys_dirty = true,
-        updated_at = clock_timestamp()
-    RETURNING id
+    WITH upserted AS (
+        INSERT INTO source_records ({", ".join(_COLUMNS)})
+        VALUES ({", ".join(_value(c) for c in _COLUMNS)})
+        ON CONFLICT (source, source_id) DO UPDATE SET
+            {", ".join(f"{c} = EXCLUDED.{c}" for c in _UPDATED_COLUMNS)},
+            corrections = '{{}}'::jsonb,
+            updated_at = clock_timestamp()
+        RETURNING id
+    ),
+    marked AS ({enqueue_sql(Queue.SOURCE_RECORD_KEYS, "SELECT id FROM upserted")})
+    SELECT id FROM upserted
     """  # noqa: S608 — listes de colonnes construites depuis le contrat, sans entrée externe
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
@@ -192,32 +197,30 @@ def _external_ids(row: SourceRecordUpsert) -> dict[str, JsonValue]:
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
     """Supprime les `source_records` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
 
-    Les `source_records` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication reçoit `contributions_dirty`. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_contributions` suivent par cascade. Rend le nombre de `source_records` supprimées.
+    Les `source_records` rattachées à la même publication sont d'abord marquées pour la réconciliation : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication est marquée pour le groupement des auteurs. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_contributions` suivent par cascade. Rend le nombre de `source_records` supprimées.
     """
-    conn.execute(
-        text(f"""
-            UPDATE publications p
-            SET contributions_dirty = true
+    enqueue(
+        conn,
+        Queue.PUBLICATION_CONTRIBUTIONS,
+        f"""
+            SELECT sr.publication_id
             FROM source_records sr
             JOIN staging s ON s.id = sr.staging_id
-            WHERE {staging_filter}
-              AND p.id = sr.publication_id
-              AND NOT p.contributions_dirty
-        """),  # noqa: S608
+            WHERE {staging_filter} AND sr.publication_id IS NOT NULL
+        """,  # noqa: S608
         params,
     )
     # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.
-    conn.execute(
-        text(f"""
-            UPDATE source_records soeur
-            SET keys_dirty = true
-            FROM source_records sr
+    enqueue(
+        conn,
+        Queue.SOURCE_RECORD_KEYS,
+        f"""
+            SELECT soeur.id
+            FROM source_records soeur
+            JOIN source_records sr ON sr.publication_id = soeur.publication_id
             JOIN staging s ON s.id = sr.staging_id
-            WHERE {staging_filter}
-              AND soeur.publication_id = sr.publication_id
-              AND soeur.id <> sr.id
-              AND NOT soeur.keys_dirty
-        """),  # noqa: S608
+            WHERE {staging_filter} AND soeur.id <> sr.id
+        """,  # noqa: S608
         params,
     )
     return conn.execute(

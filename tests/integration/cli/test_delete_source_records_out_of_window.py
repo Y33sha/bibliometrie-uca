@@ -4,6 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from interfaces.cli.maintenance.delete_source_records_out_of_window import (
     EXEMPT_SOURCES,
     count_targets,
@@ -12,10 +13,11 @@ from interfaces.cli.maintenance.delete_source_records_out_of_window import (
 from pipeline.ingestion.common.source_records import delete_source_records_before
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_staging
 
-_source_record = partial(insert_source_record, title="Titre", keys_dirty=False)
+_source_record = partial(insert_source_record, title="Titre", marked=False)
 
 
 def _publication(conn) -> int:
@@ -81,9 +83,7 @@ def test_la_soeur_dans_la_plage_reste_et_se_reconcilie(sa_sync_conn_owner):
     delete_source_records_before(conn, 2017, exempt_sources=EXEMPT_SOURCES)
 
     assert _existe(conn, "source_records", soeur)
-    assert conn.execute(
-        text("SELECT keys_dirty FROM source_records WHERE id = :id"), {"id": soeur}
-    ).scalar_one()
+    assert soeur in queued(conn, Queue.SOURCE_RECORD_KEYS)
 
 
 def test_la_these_ancienne_reste(sa_sync_conn_owner):

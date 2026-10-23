@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, ror_relations
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.db.tables import (
     ror_dump_imports,
     ror_organizations,
@@ -89,26 +90,29 @@ class RorStore:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque `countries_dirty` les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses `candidates_dirty` : le tâche `countries.ror` recrée leurs candidats."""
+        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses pour la détection : la tâche `countries.ror` recrée leurs candidats."""
         if not ror_ids:
             return
+        marked_contributions = enqueue_sql(
+            Queue.SOURCE_CONTRIBUTION_COUNTRIES,
+            "SELECT source_contribution_id FROM linked WHERE address_id IS NULL",
+        )
+        marked_addresses = enqueue_sql(
+            Queue.ADDRESS_CANDIDATES,
+            "SELECT address_id FROM linked WHERE address_id IS NOT NULL",
+        )
         self._conn.execute(
-            text("""
+            text(f"""
                 WITH linked AS (
                     SELECT source_contribution_id, address_id
                     FROM source_contribution_rors WHERE ror_id = ANY(:ids)
                 ),
-                marked_contributions AS (
-                    UPDATE source_contributions SET countries_dirty = true
-                    WHERE id IN (SELECT source_contribution_id FROM linked WHERE address_id IS NULL)
-                      AND NOT countries_dirty
-                ),
+                marked_contributions AS ({marked_contributions}),
                 candidates AS (
                     DELETE FROM address_country_candidates
                     WHERE method = 'ror' AND address_id IN (SELECT address_id FROM linked)
                 )
-                UPDATE addresses SET candidates_dirty = true
-                WHERE id IN (SELECT address_id FROM linked) AND NOT candidates_dirty
+                {marked_addresses}
             """),
             {"ids": ror_ids},
         )

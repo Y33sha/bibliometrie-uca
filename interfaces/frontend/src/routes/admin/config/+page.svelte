@@ -3,6 +3,7 @@
   import { onMount } from "svelte";
   import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { STRUCTURE_TYPES } from "$lib/structureTypes";
+  import { structureLabel } from "$lib/structureLabels";
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import Modal from "$lib/components/Modal.svelte";
   import Tooltip from "$lib/components/Tooltip.svelte";
@@ -334,7 +335,7 @@
         <td class="perim-structs">
           <div class="perimeter-rules">
             {#each perim.structures as struct (struct.id)}
-              <span class="tag">{struct.acronym || struct.name}</span>
+              <span class="tag">{structureLabel(struct)}</span>
             {/each}
           </div>
         </td>
@@ -414,7 +415,7 @@
     <div class="perimeter-rules" style="margin: 4px 0 8px;">
       {#each perimModal.structures as struct (struct.id)}
         <span class="tag">
-          {struct.acronym || struct.name}
+          {structureLabel(struct)}
           <button class="remove" onclick={() => perimRemoveStruct(struct.id)}>x</button>
         </span>
       {/each}

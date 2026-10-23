@@ -14,7 +14,7 @@ from domain.structures.structure import StructureType
 class MatchableNameForm(NamedTuple):
     """Forme normalisée d'une structure, avec ses options de reconnaissance.
 
-    `requires_context_of` : liste des structure_ids dont au moins une forme doit aussi matcher pour valider cette forme (anti-faux-positifs cross-établissement : un code de laboratoire ambigu n'est retenu que si son université de tutelle matche le même texte). `None` ou liste vide = pas de contexte requis.
+    `requires_context_of` : liste des structure_ids dont l'une doit aussi être reconnue dans le même texte, son propre contexte compris, pour valider cette forme (anti-faux-positifs cross-établissement : un code de laboratoire ambigu n'est retenu que si son université de tutelle est reconnue). `None` ou liste vide = pas de contexte requis.
     `is_excluding` : si TRUE et que la forme matche, retire la structure des résultats même si d'autres formes la matchent.
     `structure_type` : type de la structure de la forme. Détermine si un appariement vaut affiliation à retenir ou seulement contexte de reconnaissance (`StructureType.is_affiliation`).
     """
@@ -110,28 +110,32 @@ class StructureNameMatcher:
     def resolve(self, text_normalized: str) -> list[StructureMatch]:
         """Résout un texte normalisé : affiliations reconnues et forme à l'origine.
 
-        Pour chaque structure, la première forme par `id` qui matche l'emporte.
+        Une structure est reconnue par une forme présente, hors exclusion, dont le contexte est une structure reconnue. Les contextes s'enchaînent : le calcul itère jusqu'à ce que plus aucune structure ne s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
 
-        Les structures dont le type ne vaut pas affiliation participent à l'arbitrage sans figurer au résultat : elles entrent dans `structs_matched`, donc satisfont le `requires_context_of` des formes qui les invoquent, mais ne produisent aucun rattachement.
+        Les structures dont le type ne vaut pas affiliation (sites) servent de contexte sans figurer au résultat.
         """
         matched_ids = self._matched_form_ids(text_normalized)
         if not matched_ids:
             return []
-        matched = [self._forms_by_id[i] for i in matched_ids]
-        structs_matched = {f.structure_id for f in matched}
+        matched = sorted((self._forms_by_id[i] for i in matched_ids), key=lambda f: f.id)
         excluded = {f.structure_id for f in matched if f.is_excluding}
+        candidates = [f for f in matched if f.structure_id not in excluded]
 
-        result: list[StructureMatch] = []
-        seen: set[int] = set()
-        for f in sorted(matched, key=lambda f: f.id):
-            sid = f.structure_id
-            if sid in seen or sid in excluded or f.is_excluding:
-                continue
-            if not f.structure_type.is_affiliation:
-                continue
-            ctx = f.requires_context_of
-            if ctx and not any(cid in structs_matched for cid in ctx):
-                continue
-            result.append(StructureMatch(sid, f.id))
-            seen.add(sid)
-        return result
+        recognized: dict[int, int] = {}  # structure reconnue → forme retenue
+        changed = True
+        while changed:
+            changed = False
+            for f in candidates:
+                if f.structure_id in recognized and recognized[f.structure_id] <= f.id:
+                    continue
+                ctx = f.requires_context_of
+                if ctx and not any(cid in recognized for cid in ctx):
+                    continue
+                recognized[f.structure_id] = f.id
+                changed = True
+
+        return [
+            StructureMatch(sid, form_id)
+            for sid, form_id in sorted(recognized.items(), key=lambda kv: kv[1])
+            if self._forms_by_id[form_id].structure_type.is_affiliation
+        ]

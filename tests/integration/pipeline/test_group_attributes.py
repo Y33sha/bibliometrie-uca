@@ -1,10 +1,12 @@
-"""Attributs des groupes de contributions sources recomposés depuis leurs membres (`propagate_group_attributes_sql`)."""
+"""Attributs des groupes de contributions sources recomposés depuis leurs membres, pour les groupes en file (`SourceContributionGroupStore.propagate_attributes`)."""
 
 from sqlalchemy import text
 
-from infrastructure.sql_fragments import propagate_group_attributes_sql
+from infrastructure.db.queues import Queue
+from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
@@ -30,10 +32,9 @@ def _member(conn, publication, source, *, corresponding, roles, evidence):
     return source_contribution, source_record
 
 
-def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
-    conn = sa_sync_conn
+def _group_of_two(conn) -> int:
     publication = insert_publication(conn)
-    group = insert_group(
+    return insert_group(
         conn,
         publication,
         [
@@ -56,8 +57,9 @@ def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
         ],
     )
 
-    assert conn.execute(text(propagate_group_attributes_sql())).rowcount == 1
-    row = conn.execute(
+
+def _attributes(conn, group):
+    return conn.execute(
         text(
             "SELECT is_corresponding, roles, perimeter_evidence::text[] AS evidence, in_perimeter"
             " FROM source_contribution_groups WHERE id = :g"
@@ -65,10 +67,30 @@ def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
         {"g": group},
     ).one()
 
+
+def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
+    conn = sa_sync_conn
+    group = _group_of_two(conn)
+    store = SourceContributionGroupStore(conn)
+
+    assert store.propagate_attributes() == (1, 1)
+
+    row = _attributes(conn, group)
     assert (row.is_corresponding, row.roles, row.evidence, row.in_perimeter) == (
         True,
         ["author", "editor"],
         ["address", "hal_structure", "ror"],
         True,
     )
-    assert conn.execute(text(propagate_group_attributes_sql())).rowcount == 0
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == set()
+    assert store.propagate_attributes() == (0, 0)
+
+
+def test_un_groupe_hors_file_garde_ses_attributs(sa_sync_conn):
+    conn = sa_sync_conn
+    group = _group_of_two(conn)
+    clear(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+
+    assert SourceContributionGroupStore(conn).propagate_attributes() == (0, 0)
+
+    assert _attributes(conn, group).roles is None

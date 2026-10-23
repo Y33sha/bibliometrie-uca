@@ -113,7 +113,7 @@ def write_source_contributions(
 ) -> None:
     """Synchronise les contributions sources d'un enregistrement source avec `records` (`plan_source_contribution_sync`).
 
-    Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles pose `contributions_dirty` sur la publication de l'enregistrement source. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
+    Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
     Une contribution source entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
     """
@@ -175,7 +175,7 @@ def write_source_contributions(
         ],
     )
     if plan.regroup:
-        store.mark_contributions_dirty(source_record_id)
+        store.mark_publication_for_grouping(source_record_id)
     authors = [
         (item["last_name_normalized"], item["first_name_normalized"] or "")
         for item in items

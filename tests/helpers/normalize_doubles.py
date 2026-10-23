@@ -85,7 +85,7 @@ class FakeSourceContributionStore:
                 )
             )
 
-    def mark_contributions_dirty(self, source_record_id: int) -> None: ...
+    def mark_publication_for_grouping(self, source_record_id: int) -> None: ...
 
     def set_author_counts(
         self, source_record_id: int, author_count: int, distinct: int

@@ -7,6 +7,8 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
 from domain.publications.author_grouping import REPEATED_LIST_CASES
+from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
+from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
     corrected_by,
     in_clause,
@@ -16,6 +18,20 @@ from infrastructure.sql_fragments import (
 
 # Statuts d'un rattachement d'identifiant posé par un humain.
 _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTICATED.value)
+
+# Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
+_SNAPSHOT = "publication_contributions_marks"
+
+# Relevé de la file `source_contribution_group_attributes_queue`.
+_ATTRIBUTES_SNAPSHOT = "source_contribution_group_attributes_marks"
+
+# Marque pour la recomposition de leurs attributs les groupes des publications `:publications`.
+_MARK_GROUPS_OF_PUBLICATIONS_SQL = text(
+    enqueue_sql(
+        Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+        "SELECT id FROM source_contribution_groups WHERE publication_id = ANY(:publications)",
+    )
+)
 
 
 def _known_first_name(id_type: str) -> str:
@@ -171,9 +187,24 @@ class SourceContributionGroupStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def propagate_attributes(self) -> int:
-        """Recompose les attributs de tous les groupes depuis leurs membres (`propagate_group_attributes_sql`). Rend le nombre de groupes réécrits."""
-        return self._conn.execute(text(propagate_group_attributes_sql())).rowcount
+    def propagate_attributes(self) -> tuple[int, int]:
+        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_group_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes réécrits."""
+        queue = Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES
+        snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
+        queued = int(
+            self._conn.execute(
+                text(
+                    f"SELECT count(*) FROM {_ATTRIBUTES_SNAPSHOT} t"  # noqa: S608
+                    " JOIN source_contribution_groups g ON g.id = t.id"
+                )
+            ).scalar_one()
+        )
+        updated = self._conn.execute(
+            text(propagate_group_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
+        ).rowcount
+        delete_processed(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
+        self._conn.execute(text(f"DROP TABLE {_ATTRIBUTES_SNAPSHOT}"))
+        return queued, updated
 
     def refresh_alignment(self) -> None:
         """Rafraîchit `publication_author_alignment`, le recouvrement des listes d'auteurs de chaque publication."""
@@ -181,25 +212,34 @@ class SourceContributionGroupStore:
             text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_author_alignment")
         )
 
-    def mark_all_dirty(self) -> int:
-        """Pose `contributions_dirty` sur toutes les publications. Rend le nombre de publications marquées."""
-        return self._conn.execute(
-            text("UPDATE publications SET contributions_dirty = true WHERE NOT contributions_dirty")
-        ).rowcount
+    def mark_all(self) -> int:
+        """Marque toutes les publications pour le groupement. Rend le nombre de publications marquées."""
+        return enqueue(
+            self._conn, Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM publications", {}
+        )
 
-    def fetch_dirty_publications(self) -> list[tuple[int, int]]:
-        """Publications marquées `contributions_dirty`, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+    def snapshot_queued_publications(self) -> list[tuple[int, int]]:
+        """Relève la file des publications à regrouper. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+        snapshot(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT)
         rows = self._conn.execute(
-            text("""
-                SELECT p.id, coalesce(sum(sr.author_count), 0)::integer AS source_contributions
-                FROM publications p
-                LEFT JOIN source_records sr ON sr.publication_id = p.id
-                WHERE p.contributions_dirty
-                GROUP BY p.id
-                ORDER BY p.id
-            """)
+            text(f"""
+                SELECT t.id, coalesce(sum(sr.author_count), 0)::integer AS source_contributions
+                FROM {_SNAPSHOT} t
+                JOIN publications p ON p.id = t.id
+                LEFT JOIN source_records sr ON sr.publication_id = t.id
+                GROUP BY t.id
+                ORDER BY t.id
+            """)  # noqa: S608
         ).all()
         return [(r.id, r.source_contributions) for r in rows]
+
+    def delete_processed_marks(self, publication_ids: Sequence[int] | None = None) -> None:
+        """Supprime de la file les marquages relevés de ces publications, ou tous les marquages relevés."""
+        delete_processed(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT, publication_ids)
+
+    def drop_snapshot(self) -> None:
+        """Supprime le relevé de `snapshot_queued_publications`."""
+        self._conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
 
     def fetch_source_contributions(
         self, publication_ids: Sequence[int]
@@ -208,8 +248,8 @@ class SourceContributionGroupStore:
         rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
             {"publications": list(publication_ids), "repeated": list(REPEATED_LIST_CASES)},
-        ).mappings()
-        return [SourceContributionRow(**row) for row in rows]
+        )
+        return rows_as(SourceContributionRow, rows)
 
     def fetch_groups(
         self, publication_ids: Sequence[int]
@@ -238,7 +278,7 @@ class SourceContributionGroupStore:
         return list(self._conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
 
     def write(self, plan: BatchPlan) -> None:
-        """Écrit les groupes et les doublons d'auteur des publications du lot, et retire leur drapeau `contributions_dirty`.
+        """Écrit les groupes et les doublons d'auteur des publications du lot, et marque leurs groupes pour la recomposition de leurs attributs.
 
         Un groupe déjà en base garde son identifiant. Il garde sa personne et son mode de résolution tant que ses membres restent les mêmes. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
@@ -286,6 +326,5 @@ class SourceContributionGroupStore:
                 },
             )
         self._conn.execute(
-            text("UPDATE publications SET contributions_dirty = false WHERE id = ANY(:ids)"),
-            {"ids": list(publication_ids)},
+            _MARK_GROUPS_OF_PUBLICATIONS_SQL, {"publications": list(publication_ids)}
         )

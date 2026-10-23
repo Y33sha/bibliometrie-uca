@@ -23,8 +23,8 @@ class PureteDuNoyau(Contract):
     type_name = "purete_du_noyau"
 
     # À l'exécution, ces attributs portent les valeurs lues dans la configuration.
-    paquet: str = fields.StringField()  # type: ignore[assignment]
-    autorises: list[str] | None = fields.ListField(  # type: ignore[assignment]
+    paquet: str = fields.StringField()  # pyrefly: ignore[bad-assignment]
+    autorises: list[str] | None = fields.ListField(  # pyrefly: ignore[bad-assignment]
         subfield=fields.StringField(), required=False
     )
 

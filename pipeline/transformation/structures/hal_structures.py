@@ -13,6 +13,7 @@ from sqlalchemy import Connection, text
 
 from domain.structures.hal_structures import HalStructure, parse_hal_structure
 from domain.types import JsonValue
+from infrastructure.db.queues import Queue, enqueue
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.hal.api import HAL_STRUCTURES_BATCH
 from pipeline.runtime.observability.log_format import LAST_BRANCH, step
@@ -76,7 +77,7 @@ class HalStructureStore:
         )
 
     def save(self, structures: Collection[HalStructure], aliases: Mapping[int, int]) -> None:
-        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté. Marque `countries_dirty` les contributions sources qui citent une structure dont le pays change, ou un alias qui change de structure."""
+        """Écrit les structures et les alias. Un alias qui est lui-même une structure du référentiel est écarté. Marque pour le recalcul des pays les contributions sources qui citent une structure dont le pays change, ou un alias qui change de structure."""
         previous_countries: dict[int, str | None] = dict(
             self._conn.execute(
                 text(
@@ -146,23 +147,21 @@ class HalStructureStore:
         )
 
     def _mark_source_contributions(self, structure_ids: list[int], alias_ids: list[int]) -> None:
-        """Marque `countries_dirty` les contributions sources qui citent une structure de `structure_ids`, directement ou par un alias, ou qui citent un alias de `alias_ids`."""
+        """Marque pour le recalcul des pays les contributions sources qui citent une structure de `structure_ids`, directement ou par un alias, ou qui citent un alias de `alias_ids`."""
         if not structure_ids and not alias_ids:
             return
-        self._conn.execute(
-            text("""
-                UPDATE source_contributions SET countries_dirty = true
-                WHERE id IN (
-                    SELECT source_contribution_id FROM source_contribution_hal_structures
-                    WHERE hal_structure_id IN (
-                        SELECT unnest(CAST(:structures AS int[]) || CAST(:aliases AS int[]))
-                        UNION
-                        SELECT alias_id FROM hal_structure_aliases
-                        WHERE hal_structure_id = ANY(:structures)
-                    )
-                )
-                  AND NOT countries_dirty
-            """),
+        enqueue(
+            self._conn,
+            Queue.SOURCE_CONTRIBUTION_COUNTRIES,
+            """
+            SELECT source_contribution_id FROM source_contribution_hal_structures
+            WHERE hal_structure_id IN (
+                SELECT unnest(CAST(:structures AS int[]) || CAST(:aliases AS int[]))
+                UNION
+                SELECT alias_id FROM hal_structure_aliases
+                WHERE hal_structure_id = ANY(:structures)
+            )
+            """,
             {"structures": structure_ids, "aliases": alias_ids},
         )
 

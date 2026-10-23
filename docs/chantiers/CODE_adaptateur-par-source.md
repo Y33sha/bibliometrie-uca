@@ -53,7 +53,7 @@ Les identifiants d'un enregistrement source (identifiant, DOI, troncature des au
 
 - [ ] Identifiants d'un enregistrement source fournis par l'adaptateur à tous les points d'entrée.
 - [ ] Écriture commune dans `staging`, effacement des échecs compris.
-- [ ] `upsert_staging` et `StagingQueries` en store : la connexion reçue à la construction.
+- [ ] `upsert_staging` dans `StagingStore`, qui reçoit sa connexion à la construction.
 
 ### Phase 5 — Documentation
 

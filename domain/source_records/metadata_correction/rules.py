@@ -567,7 +567,7 @@ def _correct_field(source_record: MetadataForCorrection, field: str) -> Correcti
         if field not in rule_def["applies_correction"]:
             continue
         if _rule_applies(source_record, rule_def):
-            return Correction(rule_def["applies_correction"][field], rule_id)  # type: ignore[literal-required]
+            return Correction(rule_def["applies_correction"][field], rule_id)
     return None
 
 

@@ -13,12 +13,13 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-from sqlalchemy import Connection, Row, bindparam, text
+from sqlalchemy import Connection, bindparam, text
 
 from domain.publications.identifiers import clean_doi
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.rows import rows_as
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
@@ -132,11 +133,6 @@ class StagingRow:
 _COLUMNS = "id, source_id, doi, raw_data"
 
 
-def _row(r: Row) -> StagingRow:  # type: ignore[type-arg]
-    """Construit le `StagingRow` depuis une ligne SQL."""
-    return StagingRow(id=r.id, source_id=r.source_id, doi=r.doi, raw_data=r.raw_data)
-
-
 _MARK_DONE_SQL = text(
     """
     UPDATE staging s
@@ -180,8 +176,8 @@ class StagingStore:
                 LIMIT :lim
             """),
             {"source": source, "lim": limit},
-        ).all()
-        return [_row(r) for r in rows]
+        )
+        return rows_as(StagingRow, rows)
 
     def fetch_pending_staging_ids(self, source: str) -> list[int]:
         rows = self._conn.execute(
@@ -202,8 +198,8 @@ class StagingStore:
                 ORDER BY id
             """),
             {"ids": staging_ids},
-        ).all()
-        return [_row(r) for r in rows]
+        )
+        return rows_as(StagingRow, rows)
 
     def discard_source_record(self, staging_id: int) -> None:
         delete_source_record_of_staging(self._conn, staging_id)

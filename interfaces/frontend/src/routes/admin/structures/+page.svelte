@@ -15,6 +15,7 @@
     type Perimeter,
   } from "./types";
   import { STRUCTURE_TYPES } from "$lib/structureTypes";
+  import { compareStructureLabels } from "$lib/structureLabels";
   import StructureFormModal from "./StructureFormModal.svelte";
 
   let structures: StructureListItem[] = $state([]);
@@ -26,13 +27,7 @@
   let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Affichage trié par acronyme (les structures sans acronyme retombent sur le nom), comme la liste publique des laboratoires.
-  const sorted = $derived(
-    [...structures].sort((a, b) =>
-      (a.acronym || a.name || "").localeCompare(b.acronym || b.name || "", "fr", {
-        sensitivity: "base",
-      }),
-    ),
-  );
+  const sorted = $derived([...structures].sort(compareStructureLabels));
 
   // Filtre d'appartenance à un périmètre, appliqué côté client sur la liste déjà chargée.
   const displayed = $derived.by(() => {

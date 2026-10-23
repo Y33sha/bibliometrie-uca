@@ -177,7 +177,7 @@ def export(conn: Connection, residual_path: Path, source_contributions_path: Pat
                     max(len(contributions) for contributions in source_records.values())
                     <= FULL_MODEL_MAX_AUTHORS
                 ):
-                    source_contributions += [
+                    source_contributions.extend(
                         {
                             "unique_id": s.id,
                             "publication_id": publication_id,
@@ -192,7 +192,7 @@ def export(conn: Connection, residual_path: Path, source_contributions_path: Pat
                         for source_record_id, contributions in source_records.items()
                         for s in contributions
                         if s.position is not None
-                    ]
+                    )
             residual_out.write_table(pa.Table.from_pylist(residual, _RESIDUAL_SCHEMA))
             source_contributions_out.write_table(
                 pa.Table.from_pylist(source_contributions, _SOURCE_CONTRIBUTIONS_SCHEMA)

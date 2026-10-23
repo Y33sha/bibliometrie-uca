@@ -14,17 +14,15 @@ from functools import partial
 from sqlalchemy import text
 
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.transformation.publications.relations import RelationsPhase
-from pipeline.transformation.publications.relations_queries import (
+from pipeline.transformation.publications import relations
+from pipeline.transformation.publications.relations import (
     DoiPublication,
-    PublicationRelationsQueries,
     RelationEdge,
+    RelationsPhase,
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.sources import insert_source_record
-
-_Q = PublicationRelationsQueries()
 
 # Enregistrement source de titre « t ».
 _source_record = partial(insert_source_record, title="t")
@@ -55,7 +53,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
+        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
             (err, parent, "10.1/parent")
         ]
@@ -71,7 +69,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
+        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [(err, parent, None)]
 
     def test_two_substantive_same_title_blocked(self, sa_sync_conn):
@@ -84,7 +82,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
+        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_preprint_does_not_block_and_article_chosen(self, sa_sync_conn):
         # Le preprint partage le titre mais n'est pas un parent substantiel : on relie l'article.
@@ -100,7 +98,7 @@ class TestFetchErratumTitleMatches:
             title_normalized=f"erratum to {PARENT_TITLE}",
             doi="10.1/err",
         )
-        matches = _Q.fetch_erratum_title_matches(sa_sync_conn)
+        matches = relations.fetch_erratum_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(err, article)]
 
     def test_parent_outside_year_window_not_matched(self, sa_sync_conn):
@@ -118,7 +116,7 @@ class TestFetchErratumTitleMatches:
             doi="10.1/err",
             publication_year=2024,
         )
-        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
+        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_short_title_not_matched(self, sa_sync_conn):
         short = "short title"  # <= 30 caractères → sous la garde de longueur
@@ -126,7 +124,7 @@ class TestFetchErratumTitleMatches:
         _publication(
             sa_sync_conn, doc_type="erratum", title_normalized=f"erratum to {short}", doi="10.1/err"
         )
-        assert _Q.fetch_erratum_title_matches(sa_sync_conn) == []
+        assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
 
 class TestFetchPreprintTitleMatches:
@@ -146,7 +144,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             publication_year=2024,
         )
-        matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
+        matches = relations.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [
             (pre, parent, "10.1/pub")
         ]
@@ -162,7 +160,7 @@ class TestFetchPreprintTitleMatches:
         _publication(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
         )
-        assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
+        assert relations.fetch_preprint_title_matches(sa_sync_conn) == []
 
     def test_dataset_does_not_block(self, sa_sync_conn):
         article = _publication(
@@ -174,7 +172,7 @@ class TestFetchPreprintTitleMatches:
         pre = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized=PARENT_TITLE, doi="10.1/pre"
         )
-        matches = _Q.fetch_preprint_title_matches(sa_sync_conn)
+        matches = relations.fetch_preprint_title_matches(sa_sync_conn)
         assert [(m.child_id, m.parent_id) for m in matches] == [(pre, article)]
 
     def test_parent_before_preprint_not_matched(self, sa_sync_conn):
@@ -193,7 +191,7 @@ class TestFetchPreprintTitleMatches:
             doi="10.1/pre",
             publication_year=2024,
         )
-        assert _Q.fetch_preprint_title_matches(sa_sync_conn) == []
+        assert relations.fetch_preprint_title_matches(sa_sync_conn) == []
 
 
 class TestRelationTargetDeletionCascades:
@@ -259,7 +257,7 @@ class TestRelationsDeMemeOeuvre:
         )
         sources = [
             s
-            for s in _Q.fetch_declared_relation_sources(sa_sync_conn)
+            for s in relations.fetch_declared_relation_sources(sa_sync_conn)
             if s.publication_id == publication
         ]
         assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
@@ -279,7 +277,7 @@ class TestRelationsDeMemeOeuvre:
         )
         sources = [
             s
-            for s in _Q.fetch_declared_relation_sources(sa_sync_conn)
+            for s in relations.fetch_declared_relation_sources(sa_sync_conn)
             if s.publication_id == publication
         ]
         assert [(s.doc_type, s.source_record_doc_type) for s in sources] == [
@@ -290,12 +288,12 @@ class TestRelationsDeMemeOeuvre:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized="article", doi="10.1007/JHEP.A1"
         )
-        assert _Q.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
+        assert relations.fetch_publications_by_doi(sa_sync_conn, ["10.1007/jhep.a1"]) == {
             "10.1007/jhep.a1": DoiPublication(publication, "article")
         }
 
     def test_aucun_doi_aucune_requete(self, sa_sync_conn):
-        assert _Q.fetch_publications_by_doi(sa_sync_conn, []) == {}
+        assert relations.fetch_publications_by_doi(sa_sync_conn, []) == {}
 
 
 class TestCountByRelationType:
@@ -325,7 +323,7 @@ class TestCountByRelationType:
                 target_doi=target_doi,
             )
 
-        result = _Q.count_by_relation_type(sa_sync_conn)
+        result = relations.count_by_relation_type(sa_sync_conn)
 
         # Types natifs (pas de Row) → sérialisable, condition de l'enregistrement.
         assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)
@@ -350,8 +348,8 @@ class TestRebuildRelations:
         )
         edges = [self._edge(publication, "is_preprint_of", "10.9/x")]
 
-        _Q.rebuild_relations(sa_sync_conn, edges)
-        seconde = _Q.rebuild_relations(sa_sync_conn, edges)
+        relations.rebuild_relations(sa_sync_conn, edges)
+        seconde = relations.rebuild_relations(sa_sync_conn, edges)
 
         assert seconde.written == 1
         assert seconde.added_by_type == []
@@ -361,9 +359,11 @@ class TestRebuildRelations:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/b"
         )
-        _Q.rebuild_relations(sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")])
+        relations.rebuild_relations(
+            sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")]
+        )
 
-        rebuild = _Q.rebuild_relations(
+        rebuild = relations.rebuild_relations(
             sa_sync_conn,
             [
                 self._edge(publication, "is_preprint_of", "10.9/x"),
@@ -379,7 +379,7 @@ class TestRebuildRelations:
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/c"
         )
-        _Q.rebuild_relations(
+        relations.rebuild_relations(
             sa_sync_conn,
             [
                 self._edge(publication, "is_preprint_of", "10.9/x"),
@@ -387,7 +387,7 @@ class TestRebuildRelations:
             ],
         )
 
-        rebuild = _Q.rebuild_relations(
+        rebuild = relations.rebuild_relations(
             sa_sync_conn, [self._edge(publication, "is_preprint_of", "10.9/x")]
         )
 
@@ -416,7 +416,7 @@ class TestFetchSharedKeyPairs:
             external_ids={"hal_id": ["hal-skp-1", "hal-skp-2"]},
         )
 
-        pairs = [p for p in _Q.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
+        pairs = [p for p in relations.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
 
         assert [(p.a_id, p.a_doi, p.b_id, p.b_doi) for p in pairs] == [(a, None, b, None)]
 
@@ -448,7 +448,7 @@ class TestPhaseRelations:
         def open_tx():
             yield sa_sync_conn
 
-        RelationsPhase(_Q).run(
+        RelationsPhase().run(
             PhaseContext(
                 open_tx=open_tx,
                 logger=logging.getLogger("test"),

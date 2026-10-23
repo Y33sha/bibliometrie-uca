@@ -78,7 +78,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - L'outillage HTTP quitte `ingestion/` pour un paquet neutre `pipeline/http/`. `parallel.py` et `access_source.py` rejoignent `runtime/`. Des contrats import-linter fixent le sens des dépendances : le noyau (`runtime`, `graph`, `node_runner`) n'importe ni `ingestion` ni `transformation`.
 - Le contexte de phase est le seul canal des transactions et du journal.
 - Chaque phase par paquet applique les conventions SQL, de nommage et de langue aux modules qu'elle touche. Un module se modifie une seule fois.
-- Les constats couverts par [Une source, un adaptateur](CODE_adaptateur-par-source.md), [Accès réseau des sources](CODE_acces-reseau-des-sources.md), [Contrat des métriques de phase](CODE_contrat-des-metriques.md) et [Cycle de vie des publications](CODE_cycle-de-vie-des-publications.md) restent dans ces fiches.
+- Les constats couverts par [Une source, un adaptateur](../CODE_adaptateur-par-source.md), [Accès réseau des sources](../CODE_acces-reseau-des-sources.md), [Contrat des métriques de phase](../CODE_contrat-des-metriques.md) et [Cycle de vie des publications](../CODE_cycle-de-vie-des-publications.md) restent dans ces fiches.
 
 ## Phasage
 
@@ -158,7 +158,10 @@ D'autres modules réunissent des connaissances sans rapport :
 - [x] Identifiants en anglais : `run.py`, `graph.py`, constantes `LABEL` de `publishing/`. f74620b25
 - [x] Identifiants en anglais : `ingestion/`. 2094f2732
 - [x] Identifiants en anglais : `transformation/`. 528b8fbf3
-- [ ] Classes à suffixe `Queries` ou préfixe `Pg` : store d'entité ou SQL du module qui l'utilise.
+- [x] Classes à suffixe `Queries` ou préfixe `Pg` : store d'entité ou SQL du module qui l'utilise. Les stores reçoivent leur connexion à la construction ; les fonctions qui relayaient `conn` sans s'en servir le perdent.
+  - stores de l'ingestion et normaliseurs : 87c3cf1af, 1d05adc8f, 1fce9b731 ;
+  - stores de la transformation : fcbd1d410, d5cef9a80, 80809f2df, 9d3f9c11d, e182cece1, ddb446a50 ;
+  - SQL d'un seul module en fonctions : 5e0eee5b3, 1d75f0f3b, 30f01b13b.
 
 ## Questions ouvertes
 

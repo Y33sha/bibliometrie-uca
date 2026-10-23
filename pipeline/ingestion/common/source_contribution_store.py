@@ -14,6 +14,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
@@ -118,6 +119,16 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
+# Marque les groupes des contributions sources de la CTE `updated(id, attributes_changed)` dont les rôles ou le statut de correspondant changent.
+_MARK_GROUPS_OF_UPDATED = enqueue_sql(
+    Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+    """
+    SELECT gm.group_id FROM source_contribution_group_members gm
+    JOIN updated u ON u.id = gm.source_contribution_id
+    WHERE u.attributes_changed
+    """,
+)
+
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
     """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Rend le nombre d'enregistrements sources marqués."""
@@ -206,11 +217,12 @@ class SourceContributionStore:
             """).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
-        # 2. Insert des contributions sources. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
+        # 2. Insert des contributions sources, marquées pour le recalcul des pays. Pas d'ON CONFLICT : le writer DELETE puis déduplique par
         # position, (source_record_id, author_position) reste unique. `contributor_information_id` résolu
         # par `key_hash` (md5, sentinelles de la colonne générée), lookup indexé.
         stmt = text(
             """
+            WITH inserted AS (
             INSERT INTO source_contributions
                 (source, source_record_id, author_position,
                  is_corresponding, collective, roles, raw_author_name, raw_last_name,
@@ -226,6 +238,8 @@ class SourceContributionStore:
             JOIN contributor_information ci
               ON ci.key_hash = """
             + key_hash_sql([f"t.{c}" for c in CONTRIBUTOR_INFORMATION_KEY_COLUMNS])
+            + " RETURNING id) "
+            + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM inserted")
         ).bindparams(bindparam("payload", type_=Jsonb))
         self._conn.execute(
             stmt,
@@ -252,14 +266,12 @@ class SourceContributionStore:
         ).all()
         return [StoredSourceContributionRow(*r) for r in rows]
 
-    def mark_contributions_dirty(self, source_record_id: int) -> None:
-        """Pose `contributions_dirty` sur la publication de l'enregistrement source."""
-        self._conn.execute(
-            text("""
-                UPDATE publications p SET contributions_dirty = true
-                FROM source_records sr
-                WHERE sr.id = :spid AND p.id = sr.publication_id AND NOT p.contributions_dirty
-            """),
+    def mark_publication_for_grouping(self, source_record_id: int) -> None:
+        """Marque la publication de l'enregistrement source pour le groupement des auteurs."""
+        enqueue(
+            self._conn,
+            Queue.PUBLICATION_CONTRIBUTIONS,
+            "SELECT publication_id FROM source_records WHERE id = :spid AND publication_id IS NOT NULL",
             {"spid": source_record_id},
         )
 
@@ -270,6 +282,7 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
+        """Réécrit en place les contributions sources de `values`. Les marque pour le recalcul des pays, et marque les groupes de celles dont les rôles ou le statut de correspondant changent."""
         # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
         if not values:
             return
@@ -289,7 +302,9 @@ class SourceContributionStore:
             for v in values
         ]
         self._conn.execute(
-            text("""
+            text(
+                """
+                WITH updated AS (
                 UPDATE source_contributions sc
                 SET author_position = t.author_position,
                     is_corresponding = t.is_corresponding,
@@ -299,14 +314,21 @@ class SourceContributionStore:
                     raw_last_name = t.raw_last_name,
                     raw_first_name = t.raw_first_name,
                     neutralized_identifiers = t.neutralized_identifiers,
-                    content_hash = t.content_hash,
-                    countries_dirty = true
+                    content_hash = t.content_hash
                 FROM jsonb_to_recordset(:payload) AS t(
                     id integer, author_position smallint, is_corresponding boolean,
                     collective boolean, roles text[], raw_author_name text, raw_last_name text,
                     raw_first_name text, neutralized_identifiers jsonb, content_hash text)
                 WHERE sc.id = t.id
-            """).bindparams(bindparam("payload", type_=Jsonb)),
+                RETURNING sc.id,
+                    (old.is_corresponding, old.roles) IS DISTINCT FROM (new.is_corresponding, new.roles)
+                        AS attributes_changed
+                ),
+                marked_groups AS ("""
+                + _MARK_GROUPS_OF_UPDATED
+                + ")"
+                + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM updated")
+            ).bindparams(bindparam("payload", type_=Jsonb)),
             {"payload": payload},
         )
 
@@ -362,14 +384,21 @@ class SourceContributionStore:
             )
 
     def upsert_addresses_batch(self, values: list[AddressBatchItem]) -> None:
+        """Crée les adresses absentes de la base, et les marque pour la détection de leur pays."""
         if not values:
             return
-        stmt = text("""
-            INSERT INTO addresses (raw_text, normalized_text)
-            SELECT t.raw, t.norm
-            FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
-            ON CONFLICT (md5(normalized_text)) DO NOTHING
-        """).bindparams(bindparam("payload", type_=Jsonb))
+        stmt = text(
+            """
+            WITH inserted AS (
+                INSERT INTO addresses (raw_text, normalized_text)
+                SELECT t.raw, t.norm
+                FROM jsonb_to_recordset(:payload) AS t(raw text, norm text)
+                ON CONFLICT (md5(normalized_text)) DO NOTHING
+                RETURNING id
+            )
+            """
+            + enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM inserted")
+        ).bindparams(bindparam("payload", type_=Jsonb))
         self._conn.execute(stmt, {"payload": list(values)})
 
     def fetch_address_ids_by_normalized_text(self, normalized_texts: list[str]) -> dict[str, int]:

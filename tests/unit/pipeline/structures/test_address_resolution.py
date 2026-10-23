@@ -49,20 +49,17 @@ def _form(
 # ── Orchestrateurs (run_resolution / process_addresses) ──────────
 
 
-class _FakeQueries:
-    """Lecture des adresses, sans base."""
+@pytest.fixture
+def addresses(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, str]]:
+    """Adresses que lisent `count_addresses` et `fetch_addresses_chunk`, sans base."""
+    rows: list[tuple[int, str]] = []
 
-    def __init__(self, *, addresses: list[tuple[int, str]] | None = None) -> None:
-        self._addresses = addresses or []
+    def chunk(conn, *, after_id: int, limit: int) -> list[tuple[int, str]]:
+        return sorted(a for a in rows if a[0] > after_id)[:limit]
 
-    def count_addresses(self, conn: object) -> int:
-        return len(self._addresses)
-
-    def fetch_addresses_chunk(
-        self, conn: object, *, after_id: int, limit: int
-    ) -> list[tuple[int, str]]:
-        avail = sorted(a for a in self._addresses if a[0] > after_id)
-        return avail[:limit]
+    monkeypatch.setattr(address_resolution, "count_addresses", lambda conn: len(rows))
+    monkeypatch.setattr(address_resolution, "fetch_addresses_chunk", chunk)
+    return rows
 
 
 class _FakeConn:
@@ -100,37 +97,35 @@ def name_forms(monkeypatch: pytest.MonkeyPatch) -> list[MatchableNameForm]:
 
 
 class TestRunResolution:
-    def test_processes_all_addresses(self, logger, name_forms, syncs):
+    def test_processes_all_addresses(self, logger, name_forms, syncs, addresses):
         """Charge les formes, matche toutes les adresses, écrit les détections."""
         name_forms.append(_form(1, "limos", form_id=10))
-        queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
+        addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
 
-        run_resolution(conn, queries, perimeter_ids={1}, logger=logger)
+        run_resolution(conn, perimeter_ids={1}, logger=logger)
 
         assert syncs == [([(101, 1, 10)], [101])]
 
-    def test_no_addresses_skips_writes(self, logger, name_forms, syncs):
+    def test_no_addresses_skips_writes(self, logger, name_forms, syncs, addresses):
         """Si `fetch_addresses_chunk` retourne [], aucun upsert."""
         name_forms.append(_form(1, "limos", form_id=10))
-        queries = _FakeQueries(addresses=[])
+        addresses.extend([])
         conn = _FakeConn()
 
-        run_resolution(conn, queries, perimeter_ids={1}, logger=logger)
+        run_resolution(conn, perimeter_ids={1}, logger=logger)
 
         assert syncs == []
 
 
 class TestProcessAddresses:
-    def test_in_perimeter_counted(self, logger, syncs):
+    def test_in_perimeter_counted(self, logger, syncs, addresses):
         """Une adresse qui matche une structure du périmètre incrémente in_perimeter."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
-        queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
+        addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
 
-        processed, in_perimeter, affil_count = process_addresses(
-            conn, queries, matcher, {1}, logger
-        )
+        processed, in_perimeter, affil_count = process_addresses(conn, matcher, {1}, logger)
 
         assert processed == 1
         assert in_perimeter == 1
@@ -138,40 +133,36 @@ class TestProcessAddresses:
         assert syncs == [([(101, 1, 10)], [101])]
         assert conn.commits == 1
 
-    def test_out_of_perimeter_not_counted(self, logger, syncs):
+    def test_out_of_perimeter_not_counted(self, logger, syncs, addresses):
         """Match hors périmètre : affiliations créées mais in_perimeter reste à 0."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
-        queries = _FakeQueries(addresses=[(101, "lab limos clermont")])
+        addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
 
-        processed, in_perimeter, affil_count = process_addresses(
-            conn, queries, matcher, set(), logger
-        )
+        processed, in_perimeter, affil_count = process_addresses(conn, matcher, set(), logger)
 
         assert in_perimeter == 0
         assert affil_count == 1
 
-    def test_no_match_still_syncs(self, logger, syncs):
+    def test_no_match_still_syncs(self, logger, syncs, addresses):
         """Adresse sans match : la synchronisation de sa tranche retire ses liens non détectés."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
-        queries = _FakeQueries(addresses=[(101, "univ paris saclay")])
+        addresses.extend([(101, "univ paris saclay")])
         conn = _FakeConn()
 
-        processed, in_perimeter, affil_count = process_addresses(
-            conn, queries, matcher, {1}, logger
-        )
+        processed, in_perimeter, affil_count = process_addresses(conn, matcher, {1}, logger)
 
         assert in_perimeter == 0
         assert affil_count == 0
         assert syncs == [([], [101])]
 
-    def test_chunked_one_commit_per_chunk(self, logger, syncs):
+    def test_chunked_one_commit_per_chunk(self, logger, syncs, addresses):
         """Une tranche = un commit ; `chunk_size` borne la tranche (pagination keyset)."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
-        queries = _FakeQueries(addresses=[(i, "lab limos clermont") for i in range(1, 4)])
+        addresses.extend([(i, "lab limos clermont") for i in range(1, 4)])
         conn = _FakeConn()
 
-        process_addresses(conn, queries, matcher, {1}, logger, chunk_size=2)
+        process_addresses(conn, matcher, {1}, logger, chunk_size=2)
 
         # 3 adresses, chunk_size=2 → tranches [1, 2] et [3] → 2 commits.
         assert conn.commits == 2

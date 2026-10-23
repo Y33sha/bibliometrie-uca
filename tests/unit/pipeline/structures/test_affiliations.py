@@ -30,7 +30,7 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         patch.object(
             phase,
             "run_resolution",
-            side_effect=lambda conn, queries, ids, logger: (
+            side_effect=lambda conn, ids, logger: (
                 vus.__setitem__("resolution", ids)
                 or ResolutionStats(processed=processed, in_perimeter=in_perimeter, affiliations=5)
             ),
@@ -42,7 +42,6 @@ def _run(contexte, *, processed=7, in_perimeter=3):
         ),
     ):
         metrics = phase.AffiliationsPhase(
-            object(),
             refresh_ror=lambda _ctx: PhaseMetrics(),
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
@@ -77,7 +76,6 @@ def test_perimetre_d_extraction_vide_arrete_la_phase(contexte, perimetre):
         pytest.raises(EmptyExtractionPerimeterError),
     ):
         phase.AffiliationsPhase(
-            object(),
             refresh_ror=lambda _ctx: PhaseMetrics(),
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,
@@ -98,7 +96,6 @@ def test_rafraichit_le_referentiel_ror_et_reprend_ses_metriques(contexte):
         patch.object(phase, "populate"),
     ):
         metrics = phase.AffiliationsPhase(
-            object(),
             refresh_ror=lambda _ctx: ror,
             refresh_hal_structures=lambda _ctx, _stale: PhaseMetrics(),
             resolve_thesis_partners=lambda _conn, _logger: 0,

@@ -1,6 +1,6 @@
 """Smoke test de `generate_seed` : le script parcourt chaque table de référence sans buter sur une colonne ou une table périmée.
 
-Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comme celui-ci ont un smoke test, pour qu'un renommage de schéma ne les casse pas silencieusement — mypy et ruff ne voient pas les identifiants SQL portés par les chaînes `text()`.
+Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comme celui-ci ont un smoke test, pour qu'un renommage de schéma ne les casse pas silencieusement — pyrefly et ruff ne voient pas les identifiants SQL contenus dans les chaînes `text()`.
 """
 
 from interfaces.cli.dev.generate_seed import COMMON_SEED, INSTITUTION_SEED, generate_seed

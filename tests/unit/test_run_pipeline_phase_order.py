@@ -20,12 +20,6 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
 
     La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
     """
-    address_publication_count = MagicMock()
-    address_publication_count.recompute_publication_count.return_value = 0
-    build_queries = MagicMock()
-    publication_counts = MagicMock()
-    publication_counts.refresh_journal_publication_counts.return_value = 0
-    publication_counts.refresh_publisher_publication_counts.return_value = 0
     with (
         patch.object(
             contributions_phase,
@@ -33,10 +27,22 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
             return_value=PhaseMetrics(details={"summary": {}}),
         ),
         patch.object(contributions_phase, "purge_orphan_publications", return_value=0),
+        patch.object(contributions_phase, "propagate_contribution_attributes"),
+        patch.object(contributions_phase, "count_contributions_in_perimeter"),
+        patch.object(contributions_phase, "refresh_publications_perimeter_evidence"),
+        patch.object(contributions_phase, "refresh_contribution_structures"),
+        patch.object(contributions_phase, "refresh_publication_structures"),
+        patch.object(
+            contributions_phase, "recompute_address_publication_count", return_value=0
+        ) as addresses,
+        patch.object(
+            contributions_phase, "refresh_journal_publication_counts", return_value=0
+        ) as journals,
+        patch.object(
+            contributions_phase, "refresh_publisher_publication_counts", return_value=0
+        ) as publishers,
     ):
-        contributions_phase.ContributionsPhase(
-            build_queries, publication_counts, address_publication_count
-        ).run(
+        contributions_phase.ContributionsPhase().run(
             PhaseContext(
                 open_tx=_fake_tx,
                 logger=logging.getLogger("test"),
@@ -45,9 +51,9 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
                 credentials_missing=lambda _source: None,
             )
         )
-    address_publication_count.recompute_publication_count.assert_called_once()
-    publication_counts.refresh_journal_publication_counts.assert_called_once()
-    publication_counts.refresh_publisher_publication_counts.assert_called_once()
+    addresses.assert_called_once()
+    journals.assert_called_once()
+    publishers.assert_called_once()
 
 
 def test_resolve_ra_runs_after_normalize_before_publishers_journals():

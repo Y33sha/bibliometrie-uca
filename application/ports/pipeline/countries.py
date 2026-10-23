@@ -11,9 +11,7 @@ from sqlalchemy import Connection
 class CountryRecompute(Protocol):
     """Résolution des pays d'adresses, et recalcul ciblé des caches de pays à partir de `addresses.countries`."""
 
-    def resolve_address_countries(
-        self, conn: Connection, address_ids: list[int] | None = None
-    ) -> int:
+    def resolve_address_countries(self, conn: Connection, address_ids: list[int]) -> int:
         """Compose `addresses.countries` des `address_ids` à partir de leurs candidats, par la préséance du domaine. Retourne le nombre d'adresses dont le pays change."""
         ...
 

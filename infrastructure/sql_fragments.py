@@ -344,13 +344,14 @@ def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
     """
 
 
-def propagate_group_attributes_sql() -> str:
-    """Recompose les attributs de chaque groupe de contributions sources depuis ses membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
+def propagate_group_attributes_sql(group_ids: str) -> str:
+    """Recompose les attributs des groupes de contributions sources de la requête `group_ids` depuis leurs membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
     return f"""
         WITH members AS (
             SELECT gm.group_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
             FROM source_contribution_group_members gm
             JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+            WHERE gm.group_id IN ({group_ids})
         ),
         scal AS (
             SELECT group_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY group_id

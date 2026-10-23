@@ -408,6 +408,29 @@ def seed_source_contribution(
         return cur.fetchone()["id"]
 
 
+def seed_group(publication_id: int, source_contributions: list[tuple[int, int]]) -> int:
+    """Groupe des contributions sources `(contribution source, enregistrement source)` de la publication `publication_id` ; la première le fonde, les autres le rejoignent par le nom."""
+    with owner_pool() as cur:
+        cur.execute(
+            "INSERT INTO source_contribution_groups (publication_id) VALUES (%s) RETURNING id",
+            (publication_id,),
+        )
+        group_id = cur.fetchone()["id"]
+        for rank, (source_contribution, source_record) in enumerate(source_contributions):
+            cur.execute(
+                "INSERT INTO source_contribution_group_members "
+                "(source_contribution_id, group_id, source_record_id, method) "
+                "VALUES (%s, %s, %s, CAST(%s AS grouping_method))",
+                (
+                    source_contribution,
+                    group_id,
+                    source_record,
+                    "reference" if rank == 0 else "name",
+                ),
+            )
+        return group_id
+
+
 def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
     """Sujet de libellé unique par défaut. Le compte d'usage par défaut est celui du schéma."""
     label = label or uniq("Subject")

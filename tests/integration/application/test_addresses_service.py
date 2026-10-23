@@ -16,6 +16,7 @@ from application.services.addresses.structure_links import (
 )
 from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError, ValidationError
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import address_repository, contribution_repository
 from pipeline.transformation.countries.refresh_publication_countries import CountryRecompute
 from pipeline.transformation.countries.store import CountryCandidatesStore
@@ -26,6 +27,7 @@ from tests.integration.helpers.addresses import (
     insert_address_structure,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import (
     insert_source_contribution,
     insert_source_contribution_address,
@@ -322,13 +324,11 @@ class TestBatchSetCountryByFilter:
             batch_set_country_by_filter(sa_sync_conn, "FR", repo=repo, country_recompute=_GATEWAY)
 
 
-def _countries_dirty(conn, address_id):
-    return conn.execute(
-        text("SELECT countries_dirty FROM addresses WHERE id = :id"), {"id": address_id}
-    ).scalar_one()
+def _marked(conn, address_id):
+    return address_id in queued(conn, Queue.ADDRESS_COUNTRIES)
 
 
-class TestCountriesDirty:
+class TestAddressCountriesQueue:
     """Une saisie de pays marque l'adresse : le run suivant reprend la propagation vers les publications si le recalcul ciblé a échoué."""
 
     def test_set_country_marks_the_address(self, sa_sync_conn, repo):
@@ -337,7 +337,7 @@ class TestCountriesDirty:
 
         set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_recompute=_GATEWAY)
 
-        assert _countries_dirty(sa_sync_conn, addr) is True
+        assert _marked(sa_sync_conn, addr)
 
     def test_batch_by_ids_marks_the_addresses(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
@@ -345,7 +345,7 @@ class TestCountriesDirty:
 
         batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo, country_recompute=_GATEWAY)
 
-        assert _countries_dirty(sa_sync_conn, addr) is True
+        assert _marked(sa_sync_conn, addr)
 
     def test_batch_by_filter_marks_the_addresses(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
@@ -355,7 +355,7 @@ class TestCountriesDirty:
             sa_sync_conn, "FR", search="Clermont", repo=repo, country_recompute=_GATEWAY
         )
 
-        assert _countries_dirty(sa_sync_conn, addr) is True
+        assert _marked(sa_sync_conn, addr)
 
 
 # ── propagate_countries_to_publications ─────────────────────────────

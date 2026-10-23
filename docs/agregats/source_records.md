@@ -1,6 +1,6 @@
 # Source_records — cycle de vie
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-23.*
 
 Un enregistrement source est l'image d'un document dans **une** source — HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref, DataCite — avant toute fusion. C'est la couche qui garde ce que chaque source a dit, une ligne par couple source et identifiant dans cette source. Elle naît d'un import direct : la phase `normalize` transforme les données brutes déposées dans `staging` en enregistrements typés. Le pipeline seul y écrit ; l'API ne fait que les lire.
 
@@ -10,7 +10,7 @@ Un enregistrement source est l'image d'un document dans **une** source — HAL, 
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `source_records` | Image d'un document dans une source | `(source, source_id)`, `publication_id`, `doi`, `doc_type`, `external_ids`, `raw_doc_type`, `title_normalized`, `corrections`, `source_extras`, `keys_dirty` |
+| `source_records` | Image d'un document dans une source | `(source, source_id)`, `publication_id`, `doi`, `doc_type`, `external_ids`, `raw_doc_type`, `title_normalized`, `corrections`, `source_extras` |
 | `source_contributions` | Contribution source d'auteur pour cette source | `source_record_id`, `contributor_information_id`, `person_id`, `author_position`, `roles`, `in_perimeter`, `resolution_mode` |
 | `contributor_information` | Informations du contributeur dédoublonnées | `author_name_normalized`, `identifiers`, `key_hash` |
 | `source_contribution_addresses` | Lien entre une contribution source et ses adresses | `source_contribution_id`, `address_id` |
@@ -28,7 +28,7 @@ Lors d'un réimport, le rattachement à la publication est préservé, les ident
 
 `normalize` écrit aussi les tables satellites : les contributions sources sont réécrites en bloc, les informations du contributeur dédoublonnées, les adresses créées au besoin et reliées aux contributions sources. La vue matérialisée reliant contributions sources et structures, elle, est produite par la phase `affiliations`.
 
-**`metadata_correction`.** Trois sous-étapes, chacune dans sa transaction : rattachement à une revue par l'espace de noms du DOI, corrections portant sur un enregistrement isolé, puis corrections portant sur un groupe. Elles modifient les colonnes typées et conservent la valeur d'origine dans `corrections`, sous des clés qui ne se recouvrent pas. Chaque passage repart des données brutes reconstituées, si bien qu'il se rejoue sans dommage et rattrape une correction devenue caduque. Toute modification pose `keys_dirty`, ce qui remet l'enregistrement dans la file de regroupement.
+**`metadata_correction`.** Trois sous-étapes, chacune dans sa transaction : rattachement à une revue par l'espace de noms du DOI, corrections portant sur un enregistrement isolé, puis corrections portant sur un groupe. Elles modifient les colonnes typées et conservent la valeur d'origine dans `corrections`, sous des clés qui ne se recouvrent pas. Chaque passage repart des données brutes reconstituées, si bien qu'il se rejoue sans dommage et rattrape une correction devenue caduque. Toute modification met l'enregistrement source dans la file de regroupement, `source_record_keys_queue`.
 
 **`fetch_missing` et `fetch_stale`** s'exécutent avant `normalize` et n'écrivent pas cette couche : elles alimentent `staging`, que `normalize` consomme dans le même passage. La reprise sans doublon tient à l'empreinte des données brutes, portée par `staging` : une empreinte inchangée laisse la ligne traitée, une empreinte différente la remet en file et `normalize` met à jour le **même** enregistrement.
 

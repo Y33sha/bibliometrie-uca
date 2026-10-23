@@ -7,7 +7,7 @@ Trois caches dénormalisés, en cascade :
 
 Deux portées partagent l'agrégation : les contributions sources à recalculer (`refresh`, tâche `countries.refresh_publication_countries`), ou les contributions sources d'un lot d'adresses (`CountryRecompute`, appelé par l'API après une saisie manuelle).
 
-Une contribution source est à recalculer quand elle est marquée `countries_dirty` ou liée à une adresse marquée `countries_dirty`. `create_dirty_scope` relève ces contributions sources une fois, dans deux tables temporaires que lisent les trois étapes :
+Une contribution source est à recalculer quand elle est dans la file `source_contribution_countries_queue`, ou liée à une adresse de la file `address_countries_queue`. `create_dirty_scope` relève les deux files, puis ces contributions sources, dans des tables temporaires que lisent les trois étapes :
 
 - `countries_dirty_scope` : toutes ces contributions sources, avec leur enregistrement source ;
 - `countries_recompute_scope` : parmi elles, celles dont les pays peuvent changer, numérotées pour le traitement par tranches. Une contribution source sans adresse, sans ROR sans adresse, sans structure HAL et sans pays garde des pays vides : elle en est absente.
@@ -18,6 +18,7 @@ import time
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.queues import Queue, delete_processed, snapshot
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, quantity, step
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.countries.resolution import resolve_address_countries
@@ -25,16 +26,22 @@ from pipeline.transformation.countries.resolution import resolve_address_countri
 BATCH_SIZE = 50_000
 """Nombre de contributions sources recalculées par requête."""
 
+# Relevés des deux files, que `delete_processed_marks` supprime des files.
+_SNAPSHOTS = (
+    (Queue.SOURCE_CONTRIBUTION_COUNTRIES, "source_contribution_countries_marks"),
+    (Queue.ADDRESS_COUNTRIES, "address_countries_marks"),
+)
+
 _CREATE_DIRTY_SCOPE = """
     CREATE TEMP TABLE countries_dirty_scope AS
-    SELECT id, source_record_id, countries IS NOT NULL AS has_countries
-    FROM source_contributions WHERE countries_dirty
+    SELECT sc.id, sc.source_record_id, sc.countries IS NOT NULL AS has_countries
+    FROM source_contribution_countries_marks m
+    JOIN source_contributions sc ON sc.id = m.id
     UNION
     SELECT sc.id, sc.source_record_id, sc.countries IS NOT NULL
-    FROM source_contribution_addresses sca
-    JOIN addresses a ON a.id = sca.address_id
+    FROM address_countries_marks m
+    JOIN source_contribution_addresses sca ON sca.address_id = m.id
     JOIN source_contributions sc ON sc.id = sca.source_contribution_id
-    WHERE a.countries_dirty
 """
 
 _CREATE_RECOMPUTE_SCOPE = """
@@ -50,7 +57,7 @@ _CREATE_RECOMPUTE_SCOPE = """
                   WHERE x.source_contribution_id = d.id)
 """
 
-# Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)` ; marque `countries_dirty` les contributions sources modifiées.
+# Recalcul de `source_contributions.countries` sur la CTE amont `scoped_sa(id)`.
 _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
     contributions AS (
         SELECT sca.source_contribution_id AS source_contribution_id, c::text AS code
@@ -78,7 +85,7 @@ _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE = """,
         GROUP BY source_contribution_id
     )
     UPDATE source_contributions sc
-    SET countries = agg.new_countries, countries_dirty = true
+    SET countries = agg.new_countries
     FROM scoped_sa s
     LEFT JOIN agg ON agg.source_contribution_id = s.id
     WHERE sc.id = s.id
@@ -124,7 +131,9 @@ _PUBLICATION_COUNTRIES_FROM_SCOPE = """,
 
 
 def create_dirty_scope(conn: Connection) -> int:
-    """Crée `countries_dirty_scope` et `countries_recompute_scope`. Retourne le nombre de contributions sources à recalculer."""
+    """Relève les deux files, puis crée `countries_dirty_scope` et `countries_recompute_scope`. Retourne le nombre de contributions sources à recalculer."""
+    for queue, table in _SNAPSHOTS:
+        snapshot(conn, queue, table)
     conn.execute(text(_CREATE_DIRTY_SCOPE))
     conn.execute(text(_CREATE_RECOMPUTE_SCOPE))
     conn.execute(text("ALTER TABLE countries_recompute_scope ADD PRIMARY KEY (rank)"))
@@ -133,9 +142,16 @@ def create_dirty_scope(conn: Connection) -> int:
     return int(conn.execute(text("SELECT count(*) FROM countries_recompute_scope")).scalar_one())
 
 
+def delete_processed_marks(conn: Connection) -> None:
+    """Supprime des deux files les marquages relevés par `create_dirty_scope`."""
+    for queue, table in _SNAPSHOTS:
+        delete_processed(conn, queue, table)
+
+
 def drop_dirty_scope(conn: Connection) -> None:
-    """Supprime les tables de `create_dirty_scope`."""
-    conn.execute(text("DROP TABLE countries_dirty_scope, countries_recompute_scope"))
+    """Supprime les tables temporaires de `create_dirty_scope`."""
+    tables = ", ".join(table for _, table in _SNAPSHOTS)
+    conn.execute(text(f"DROP TABLE countries_dirty_scope, countries_recompute_scope, {tables}"))
 
 
 def refresh_source_contribution_countries(
@@ -155,27 +171,6 @@ def refresh_source_contribution_countries(
             )"""
         params = {"lo": ranks[0], "hi": ranks[1]}
     return conn.execute(text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE), params).rowcount
-
-
-def refresh_source_contribution_countries_in_id_range(
-    conn: Connection, id_range: tuple[int, int]
-) -> int:
-    """Recalcule `source_contributions.countries` de toutes les contributions sources de l'intervalle d'identifiants `id_range` (bornes incluses) qui ont une adresse, un ROR sans adresse ou une structure HAL. Retourne le nombre de contributions sources modifiées."""
-    scope = """
-        WITH scoped_sa AS (
-            SELECT source_contribution_id AS id FROM source_contribution_addresses
-            WHERE source_contribution_id BETWEEN :lo AND :hi
-            UNION
-            SELECT source_contribution_id FROM source_contribution_rors
-            WHERE source_contribution_id BETWEEN :lo AND :hi AND address_id IS NULL
-            UNION
-            SELECT source_contribution_id FROM source_contribution_hal_structures
-            WHERE source_contribution_id BETWEEN :lo AND :hi
-        )"""
-    return conn.execute(
-        text(scope + _SOURCE_CONTRIBUTION_COUNTRIES_FROM_SCOPE),
-        {"lo": id_range[0], "hi": id_range[1]},
-    ).rowcount
 
 
 def refresh_source_record_countries(conn: Connection) -> int:
@@ -210,14 +205,6 @@ def refresh_publication_countries(conn: Connection) -> int:
     ).rowcount
 
 
-def clear_countries_dirty(conn: Connection) -> None:
-    """Purge les flags `countries_dirty` (`source_contributions` et `addresses`) en fin de cascade."""
-    conn.execute(
-        text("UPDATE source_contributions SET countries_dirty = false WHERE countries_dirty")
-    )
-    conn.execute(text("UPDATE addresses SET countries_dirty = false WHERE countries_dirty"))
-
-
 def _refresh_source_contributions_in_batches(
     conn: Connection, total: int, logger: logging.Logger
 ) -> int:
@@ -232,7 +219,7 @@ def _refresh_source_contributions_in_batches(
 
 
 def refresh(conn: Connection, logger: logging.Logger) -> int:
-    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis purge les flags. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
     step(logger, "Rafraîchissement des pays associés aux publications")
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
@@ -247,33 +234,40 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
         time.perf_counter() - t0,
     )
-    for singular, plural, refresh_step in (
-        ("enregistrement source", "enregistrements sources", refresh_source_record_countries),
-        ("publication", "publications", refresh_publication_countries),
+    for label, singular, plural, refresh_step in (
+        (
+            "enregistrements sources",
+            "enregistrement source mis à jour",
+            "enregistrements sources mis à jour",
+            refresh_source_record_countries,
+        ),
+        (
+            "publications",
+            "publication mise à jour",
+            "publications mises à jour",
+            refresh_publication_countries,
+        ),
     ):
         t0 = time.perf_counter()
-        with waiting(f"{BRANCH}{plural} : en cours", logger) as line:
+        with waiting(f"{BRANCH}{label} : en cours", logger) as line:
             updated = refresh_step(conn)
             line.conclude(
-                f"{BRANCH}{quantity(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
-                f" en {time.perf_counter() - t0:.1f} s"
+                f"{BRANCH}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
             )
-    drop_dirty_scope(conn)
     t0 = time.perf_counter()
-    with waiting(f"{LAST_BRANCH}effacement des marqueurs de recalcul : en cours", logger) as line:
-        clear_countries_dirty(conn)
+    with waiting(f"{LAST_BRANCH}suppression des marquages traités : en cours", logger) as line:
+        delete_processed_marks(conn)
         line.conclude(
-            f"{LAST_BRANCH}marqueurs de recalcul effacés en {time.perf_counter() - t0:.1f} s"
+            f"{LAST_BRANCH}marquages traités supprimés en {time.perf_counter() - t0:.1f} s"
         )
+    drop_dirty_scope(conn)
     return updated
 
 
 class CountryRecompute:
     """Résolution des pays d'un lot d'adresses et recalcul ciblé de leurs caches (port injecté par l'API)."""
 
-    def resolve_address_countries(
-        self, conn: Connection, address_ids: list[int] | None = None
-    ) -> int:
+    def resolve_address_countries(self, conn: Connection, address_ids: list[int]) -> int:
         return resolve_address_countries(conn, address_ids)
 
     def refresh_source_records_countries_for_addresses(

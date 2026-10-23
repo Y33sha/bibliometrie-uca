@@ -5,7 +5,9 @@ from dataclasses import replace
 from sqlalchemy import text
 
 from domain.structures.hal_structures import HalStructureStatus, parse_hal_structure
+from infrastructure.db.queues import Queue
 from pipeline.transformation.structures.hal_structures import HalStructureStore
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
@@ -84,16 +86,11 @@ def test_un_changement_de_pays_marque_les_contributions_sources_de_la_structure_
             ),
             {"s": cited[hal_structure_id], "h": hal_structure_id},
         )
-    sa_sync_conn.execute(text("UPDATE source_contributions SET countries_dirty = false"))
+    clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
 
     store.save([replace(_structure(2, aliases=[9]), country_code="fr"), _structure(3)], {9: 2})
 
-    dirty = set(
-        sa_sync_conn.execute(
-            text("SELECT id FROM source_contributions WHERE countries_dirty")
-        ).scalars()
-    )
-    assert dirty == {cited[2], cited[9]}
+    assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {cited[2], cited[9]}
 
 
 def test_ids_to_fetch_reprend_les_parents_absents(sa_sync_conn):

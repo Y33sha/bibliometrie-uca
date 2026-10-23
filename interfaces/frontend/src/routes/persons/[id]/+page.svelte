@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { api, apiDetail, auth, contributions } from '$lib/api';
 	import { titleCase, formatDate } from '$lib/utils';
+	import { structureLabel } from '$lib/structureLabels';
 	import BarChart from '$lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import IdentifiersCell from '$lib/components/IdentifiersCell.svelte';
@@ -310,7 +311,7 @@
 								<td>
 									{#if a.structures?.length}
 										{#each a.structures as s (s.id)}
-											<span class="struct-tag">{s.acronym || s.name}</span>
+											<span class="struct-tag">{structureLabel(s)}</span>
 										{/each}
 									{/if}
 								</td>

@@ -92,7 +92,8 @@ class TestSansLaBibliotheque:
     """L'absence de `tqdm` conduit au même repli que l'absence de terminal."""
 
     def test_les_jalons_prennent_le_relais(self, avec_terminal, caplog, monkeypatch):
-        monkeypatch.setattr(module, "tqdm", None)
+        for name in ("tqdm", "_Bar", "_KeptBar"):
+            monkeypatch.setattr(module, name, None)
         with (
             caplog.at_level(logging.INFO),
             module.track_progress(100, "hal", logging.getLogger(__name__), interval_s=0) as p,
@@ -292,6 +293,16 @@ class TestAttente:
         with module.waiting("mise à jour en cours", None) as ligne:
             ligne.conclude("Terminé en 12.3s")
         assert stream.getvalue().endswith(f"Terminé en 12.3s{module.CLEAR_TO_END_OF_LINE}\n")
+
+    def test_en_terminal_la_conclusion_va_aussi_au_journal(
+        self, avec_terminal, monkeypatch, caplog
+    ):
+        """Régression : en terminal, la conclusion restait au terminal, et le fichier de journal perdait la durée de l'étape."""
+        monkeypatch.setattr(module, "_bar_stream", io.StringIO())
+        with caplog.at_level(logging.INFO), module.waiting("en cours", _log()) as ligne:
+            ligne.conclude("Terminé en 12.3s")
+        [record] = [r for r in caplog.records if r.getMessage() == "Terminé en 12.3s"]
+        assert record.detail is True
 
     def test_une_sortie_capturee_recoit_une_ligne_de_journal(self, sans_terminal, caplog):
         with caplog.at_level(logging.INFO), module.waiting("maintenance des tables", _log()):

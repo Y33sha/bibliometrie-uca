@@ -3,8 +3,10 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api, nameForms } from "$lib/api";
+  import { api, nameForms, structures as structuresApi } from "$lib/api";
   import { deriveStructDetectionStatus } from "$lib/utils";
+  import { structureLabel } from "$lib/structureLabels";
+  import { groupStructuresByType, structureGroupLabel } from "$lib/structureTypes";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
@@ -20,24 +22,10 @@
   type FeedbackAddress = components["schemas"]["FeedbackAddressItem"];
   type Structure = components["schemas"]["StructureListItem"];
 
-  type GroupedStructures = Record<string, Structure[]>;
-
   interface NameForm {
     id: number;
     requires_context_of: (string | number)[];
   }
-
-  // ---------- Constants ----------
-
-  // Libellés d'affichage pour les groupes de structures. L'ordre des clés sert aussi d'ordre d'affichage dans le picker ; un type absent d'ici s'affiche après, sous son code.
-  const TYPE_LABELS: Record<string, string> = {
-    universite: "Universités",
-    onr: "Organismes de recherche",
-    chu: "CHU",
-    ecole: "Écoles",
-    labo: "Laboratoires",
-  };
-  const TYPE_ORDER = Object.keys(TYPE_LABELS);
 
   // ---------- URL params helpers ----------
 
@@ -68,8 +56,8 @@
   type Tab = "fn" | "fp";
 
   let currentStructureId = $state<number | null>(null);
-  let structures = $state<GroupedStructures>({});
   let allStructures = $state<Structure[]>([]);
+  const structureGroups = $derived(groupStructuresByType(allStructures));
 
   let stats: FeedbackStats | null = $state(null);
   let currentTab: Tab = $state("fn");
@@ -114,25 +102,9 @@
   // ---------- Data loading ----------
 
   async function loadStructures(): Promise<void> {
-    // Un site porte les formes de nom d'un lieu pour servir de contexte au matching : une adresse qui le mentionne n'atteste d'aucun rattachement, il n'a pas de détection à juger.
-    allStructures = (await api<Structure[]>("/api/structures")).filter((s) => s.type !== "site");
-
-    const grouped: GroupedStructures = {};
-    for (const s of allStructures) (grouped[s.type] ??= []).push(s);
-    structures = grouped;
-
+    allStructures = await structuresApi.listDetectable();
     // À défaut de choix dans l'URL, la première structure du premier groupe affiché.
-    if (currentStructureId === null) {
-      const firstType = groupOrder(grouped).find((t) => grouped[t]?.length);
-      currentStructureId = firstType ? grouped[firstType][0].id : null;
-    }
-  }
-
-  /** Types présents, ceux de `TYPE_LABELS` d'abord, les autres ensuite par ordre alphabétique. */
-  function groupOrder(grouped: GroupedStructures): string[] {
-    const known = TYPE_ORDER.filter((t) => t in grouped);
-    const extra = Object.keys(grouped).filter((t) => !TYPE_ORDER.includes(t)).sort();
-    return [...known, ...extra];
+    currentStructureId ??= structureGroups[0]?.[1][0].id ?? null;
   }
 
   async function loadStats() {
@@ -323,10 +295,10 @@
   <!-- Toolbar -->
   <div class="toolbar">
     <select class="structure-filter" value={currentStructureId ?? ""} onchange={onStructureChange}>
-      {#each groupOrder(structures) as type}
-        <optgroup label={TYPE_LABELS[type] ?? type}>
-          {#each structures[type] as s (s.id)}
-            <option value={s.id}>{s.acronym || s.name}</option>
+      {#each structureGroups as [type, group] (type)}
+        <optgroup label={structureGroupLabel(type)}>
+          {#each group as s (s.id)}
+            <option value={s.id}>{structureLabel(s)}</option>
           {/each}
         </optgroup>
       {/each}
@@ -366,7 +338,7 @@
               {#if a.structures && a.structures.length > 0}
                 {#each a.structures as l}
                   <span class={structDetectionClasses[structDetectionStatus(l)]} title={structTagTitle(l)}>
-                    {l.acronym || l.name}
+                    {structureLabel(l)}
                   </span>
                 {/each}
               {:else}
@@ -380,7 +352,7 @@
                 {#if a.matched_forms && a.matched_forms.length > 0}
                   {#each uniqueForms(a.matched_forms) as f (f.form_id)}
                     <div class="form-info">
-                      <span class="form-struct">{f.structure.acronym || f.structure.name} &rarr;</span>
+                      <span class="form-struct">{structureLabel(f.structure)} &rarr;</span>
                       <span class="form-text">{f.form_text}</span>
                       {#if f.requires_context_of && f.requires_context_of.length}
                         <span class="form-ctx">

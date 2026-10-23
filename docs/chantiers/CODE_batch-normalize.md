@@ -4,7 +4,7 @@
 
 La phase `normalize` traite les sources l'une après l'autre, dans l'ordre de `SOURCE_PRIORITY`. Pour chaque source, la boucle de `SourceNormalizer.run` (`pipeline/ingestion/common/normalize.py`) lit le `staging` par sous-lots de 50 lignes. Chaque document est analysé puis écrit sous un SAVEPOINT. Un commit a lieu tous les 100 ou 500 documents selon la source (`DEFAULT_BATCH_SIZE`).
 
-Le writer partagé (`pipeline/ingestion/common/source_contributions.py`) écrit les contributions sources de toutes les sources, theses comprise. Ses requêtes (`ContributionsBatchQueries`, dans `source_contribution_queries.py`) traitent déjà plusieurs contributions sources en une requête, mais toujours celles d'un seul document. Le writer fait donc un nombre constant d'allers-retours par document :
+Le writer partagé (`pipeline/ingestion/common/source_contributions.py`) écrit les contributions sources de toutes les sources, theses comprise. Ses requêtes (`SourceContributionStore`, dans `source_contribution_store.py`) traitent déjà plusieurs contributions sources en une requête, mais toujours celles d'un seul document. Le writer fait donc un nombre constant d'allers-retours par document :
 
 - lecture de l'empreinte du bloc auteurs (`fetch_authors_hash`) : un bloc inchangé s'arrête là, sauf avec `--normalize-full` ;
 - lecture des contributions sources stockées (`fetch_stored_source_contributions`), relue après insertion pour obtenir les identifiants des contributions sources insérées ;
@@ -45,7 +45,7 @@ L'upsert de `source_records` et les `find_or_create` de revues, éditeurs et con
 
 ### 2. Lectures et écritures des contributions sources par lot
 
-- [ ] `ContributionsBatchQueries` : variantes multi-documents des lectures et écritures.
+- [ ] `SourceContributionStore` : variantes multi-documents des lectures et écritures.
 - [ ] Writer : traitement de K documents, repli document par document sur erreur.
 - [ ] Boucle de `SourceNormalizer.run` : accumulation de K documents analysés avant écriture.
 - [ ] Tests : résultat identique au traitement par document ; un document en erreur isolé par le repli, les autres écrits.

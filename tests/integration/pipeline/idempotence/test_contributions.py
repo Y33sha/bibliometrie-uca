@@ -11,11 +11,8 @@ def _run_build_contributions(conn):
     import logging
 
     from pipeline.transformation.publications.contributions.build_contributions import build
-    from pipeline.transformation.publications.contributions.contributions_queries import (
-        ContributionsBuild,
-    )
 
-    build(conn, ContributionsBuild(), logging.getLogger("test"))
+    build(conn, logging.getLogger("test"))
 
 
 def _count_contributions_tables(conn) -> dict:

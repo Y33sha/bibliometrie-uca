@@ -9,19 +9,40 @@
 -- Les ordres s'appliquent sous le propriétaire du schéma — `ALTER DEFAULT PRIVILEGES` ne porte
 -- que sur les objets créés par le rôle courant. Le fichier se rejoue sans dommage : chaque
 -- passage aligne les droits sur son contenu.
+--
+-- Les droits sur tout le contenu de la base s'accordent schéma par schéma, dans un bloc `DO`
+-- qui parcourt les schémas de la base, hors schémas système. Un schéma créé par une migration
+-- les reçoit sans modification de ce fichier.
 
 
 -- =============================================================
 -- Rôle applicatif : privilèges de l'API, et rien de plus
 -- =============================================================
 
--- Traverser les schémas, sans rien y créer.
-GRANT USAGE ON SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_app;
-
--- Lecture de tout : l'API sert des données bibliométriques, et aucune n'est réservée.
--- `ALL TABLES` couvre les vues matérialisées, qu'elle lit sans jamais les rafraîchir.
-GRANT SELECT ON ALL TABLES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_app;
+-- Pour chaque schéma :
+-- - traverser le schéma, sans rien y créer ;
+-- - lire tout : l'API sert des données bibliométriques, et aucune n'est réservée. `ALL TABLES`
+--   couvre les vues matérialisées, qu'elle lit sans jamais les rafraîchir ;
+-- - retirer toute écriture, accordée ensuite table par table ;
+-- - lire seulement les tables créées par une migration future : sa nature se tranche en
+--   l'ajoutant nommément ci-dessous, plutôt qu'en la découvrant écrite.
+DO $$
+DECLARE
+    s text;
+BEGIN
+    FOR s IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname NOT LIKE 'pg\_%' AND nspname <> 'information_schema'
+    LOOP
+        EXECUTE format('GRANT USAGE ON SCHEMA %I TO bibliometrie_app', s);
+        EXECUTE format('GRANT SELECT ON ALL TABLES IN SCHEMA %I TO bibliometrie_app', s);
+        EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO bibliometrie_app', s);
+        EXECUTE format('REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA %I FROM bibliometrie_app', s);
+        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT ON TABLES TO bibliometrie_app', s);
+        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT ON SEQUENCES TO bibliometrie_app', s);
+    END LOOP;
+END
+$$;
 
 -- Écriture sur les seules tables que les points d'entrée d'administration modifient, et
 -- pour la seule opération que chacune reçoit. Une table qu'on ne fait que mettre à jour
@@ -38,8 +59,6 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public, sources, publications, pe
 --
 -- Toute écriture est d'abord retirée : rejouer le fichier aligne les droits sur cette liste,
 -- y compris quand une table en sort.
-
-REVOKE INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops FROM bibliometrie_app;
 
 GRANT INSERT, UPDATE, DELETE ON
     structures.address_structures, publications.contributions, structures.perimeters, persons.person_name_forms,
@@ -61,6 +80,17 @@ TO bibliometrie_app;
 -- conflit ou non.
 GRANT INSERT, UPDATE, DELETE ON
     persons.confirmed_source_contributions
+TO bibliometrie_app;
+
+-- Une saisie manuelle de pays marque l'adresse saisie, et les adresses dont le pays change.
+-- Une décision sur un ORCID ou un IdRef, ou la correction d'un prénom, marque les
+-- publications à regrouper. Une correction d'adresse marque les enregistrements sources sans
+-- publication qui entrent dans le périmètre, et les groupes des contributions sources dont les
+-- indices de périmètre changent. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
+GRANT INSERT, UPDATE ON
+    queues.address_candidates_queue, queues.address_countries_queue,
+    queues.publication_contributions_queue, queues.source_record_keys_queue,
+    queues.source_contribution_group_attributes_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
@@ -85,13 +115,6 @@ GRANT UPDATE ON
     sources.source_records, publications.source_contribution_groups
 TO bibliometrie_app;
 
--- Une table créée par une migration future est lisible, et rien de plus : sa nature se
--- tranche en l'ajoutant nommément ci-dessus, plutôt qu'en la découvrant écrite.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops
-    GRANT SELECT ON TABLES TO bibliometrie_app;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops
-    GRANT USAGE, SELECT ON SEQUENCES TO bibliometrie_app;
-
 -- Ce qui n'est délibérément pas accordé : TRUNCATE, l'écriture sur les tables du pipeline,
 -- la propriété des objets, et CREATE sur les schémas. `CONNECT` sur la base et `TEMPORARY`
 -- (l'API crée des tables temporaires en tâche de fond) viennent du rôle PUBLIC ; les
@@ -102,30 +125,39 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public, sources, publications, persons, publi
 -- Rôle du pipeline : construire les données, sans toucher au schéma
 -- =============================================================
 
--- Traverser les schémas, sans rien y créer.
-GRANT USAGE ON SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_pipeline;
-
--- Lecture et écriture de l'ensemble des données. Le pipeline construit le contenu de ces
--- tables et le reconstruit d'une exécution à l'autre : les énumérer ici n'ajouterait aucune
--- information — la liste serait celle du schéma — et vieillirait à chaque migration. La
--- restriction qui porte n'est pas la table atteinte, c'est ce qui reste hors d'atteinte : la
--- structure, la propriété des objets, et les deux exceptions retirées plus bas.
-GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE
-    ON ALL TABLES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops
-    TO bibliometrie_pipeline;
--- `UPDATE` sur les séquences : `setval` le demande, et le pipeline remet à un le compteur des
--- tables qu'il reconstruit entièrement.
-GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_pipeline;
-
--- `MAINTAIN` couvre `VACUUM`, `ANALYZE`, `REFRESH MATERIALIZED VIEW`, `CLUSTER`, `REINDEX` et
--- `LOCK TABLE`. Le pipeline exerce les trois premières : le staging est nettoyé après la
--- normalisation, les statistiques sont rafraîchies avant les jointures lourdes, et trois vues
--- matérialisées sont recalculées.
---
--- Ce privilège date de PostgreSQL 17. Avant lui, rafraîchir une vue matérialisée exigeait d'en
--- être propriétaire, faute de droit accordable : le pipeline se connectait alors sous le
--- propriétaire du schéma pour un pouvoir qu'il n'exerce pas.
-GRANT MAINTAIN ON ALL TABLES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops TO bibliometrie_pipeline;
+-- Pour chaque schéma :
+-- - traverser le schéma, sans rien y créer ;
+-- - lire et écrire l'ensemble des données. Le pipeline construit le contenu de ces tables et
+--   le reconstruit d'une exécution à l'autre : les énumérer ici n'ajouterait aucune
+--   information — la liste serait celle du schéma — et vieillirait à chaque migration. La
+--   restriction qui porte n'est pas la table atteinte, c'est ce qui reste hors d'atteinte : la
+--   structure, la propriété des objets, et les deux exceptions retirées plus bas ;
+-- - `UPDATE` sur les séquences : `setval` le demande, et le pipeline remet à un le compteur
+--   des tables qu'il reconstruit entièrement ;
+-- - `MAINTAIN`, qui couvre `VACUUM`, `ANALYZE`, `REFRESH MATERIALIZED VIEW`, `CLUSTER`,
+--   `REINDEX` et `LOCK TABLE`. Le pipeline exerce les trois premières : le staging est nettoyé
+--   après la normalisation, les statistiques sont rafraîchies avant les jointures lourdes, et
+--   trois vues matérialisées sont recalculées. Ce privilège date de PostgreSQL 17. Avant lui,
+--   rafraîchir une vue matérialisée exigeait d'en être propriétaire ;
+-- - ouvrir en écriture les tables créées par une migration future : une telle table est un
+--   produit du pipeline jusqu'à preuve du contraire, là où l'API ne la reçoit qu'en lecture.
+DO $$
+DECLARE
+    s text;
+BEGIN
+    FOR s IN
+        SELECT nspname FROM pg_namespace
+        WHERE nspname NOT LIKE 'pg\_%' AND nspname <> 'information_schema'
+    LOOP
+        EXECUTE format('GRANT USAGE ON SCHEMA %I TO bibliometrie_pipeline', s);
+        EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA %I TO bibliometrie_pipeline', s);
+        EXECUTE format('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA %I TO bibliometrie_pipeline', s);
+        EXECUTE format('GRANT MAINTAIN ON ALL TABLES IN SCHEMA %I TO bibliometrie_pipeline', s);
+        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, MAINTAIN ON TABLES TO bibliometrie_pipeline', s);
+        EXECUTE format('ALTER DEFAULT PRIVILEGES IN SCHEMA %I GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO bibliometrie_pipeline', s);
+    END LOOP;
+END
+$$;
 
 -- Deux tables sont reprises, l'accord global les ayant d'abord couvertes. Les retirer après
 -- coup dit ce qu'elles sont plutôt que de les oublier dans une énumération.
@@ -139,13 +171,6 @@ GRANT MAINTAIN ON ALL TABLES IN SCHEMA public, sources, publications, persons, p
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
     ON ops.audit_log, alembic_version
     FROM bibliometrie_pipeline;
-
--- Une table créée par une migration future est un produit du pipeline jusqu'à preuve du
--- contraire : elle lui est ouverte en écriture, là où l'API ne la reçoit qu'en lecture.
-ALTER DEFAULT PRIVILEGES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops
-    GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, MAINTAIN ON TABLES TO bibliometrie_pipeline;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public, sources, publications, persons, publishing, structures, ref, ops
-    GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO bibliometrie_pipeline;
 
 -- Ce qui n'est délibérément pas accordé : la propriété des objets et `CREATE` sur les schémas,
 -- donc toute modification de structure — création, altération, suppression de table, d'index

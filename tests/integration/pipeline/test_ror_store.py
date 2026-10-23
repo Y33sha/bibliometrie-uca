@@ -2,8 +2,10 @@ from sqlalchemy import text
 
 from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
+from infrastructure.db.queues import Queue
 from pipeline.transformation.structures.ror import RorStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 UNIV, LABO = RorId("01a8ajp46"), RorId("03vgfxd91")
@@ -83,17 +85,12 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
         ),
         {"addr": address},
     )
-    sa_sync_conn.execute(text("UPDATE source_contributions SET countries_dirty = false"))
-    sa_sync_conn.execute(text("UPDATE addresses SET candidates_dirty = false"))
+    clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
+    clear(sa_sync_conn, Queue.ADDRESS_CANDIDATES)
 
     store.replace_all([_org(UNIV, "it"), _org(LABO)], [], version="v2.14")
 
-    dirty = set(
-        sa_sync_conn.execute(
-            text("SELECT id FROM source_contributions WHERE countries_dirty")
-        ).scalars()
-    )
-    assert dirty == {without_address}
+    assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {without_address}
     methods = (
         sa_sync_conn.execute(
             text("SELECT method::text FROM address_country_candidates WHERE address_id = :a"),
@@ -103,6 +100,4 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
         .all()
     )
     assert methods == ["city"]
-    assert sa_sync_conn.execute(
-        text("SELECT candidates_dirty FROM addresses WHERE id = :a"), {"a": address}
-    ).scalar_one()
+    assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == {address}

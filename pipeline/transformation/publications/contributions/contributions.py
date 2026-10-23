@@ -22,19 +22,21 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.scalars import scalar_int
+from infrastructure.sql_fragments import propagate_contribution_attributes_sql
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.contributions.address_publication_count import (
-    AddressPublicationCountQueries,
+    recompute_address_publication_count,
 )
 from pipeline.transformation.publications.contributions.build_contributions import (
     build as build_contributions,
 )
-from pipeline.transformation.publications.contributions.contributions_queries import (
-    ContributionsBuild,
+from pipeline.transformation.publications.publication_perimeter import (
+    refresh_publications_perimeter_evidence,
 )
 from pipeline.transformation.publishing.journals import delete_empty_journals
 from pipeline.transformation.publishing.journals.delete_empty_journals import (
@@ -44,7 +46,10 @@ from pipeline.transformation.publishing.monographs import delete_empty_monograph
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
-from pipeline.transformation.publishing.publication_counts import PgPublicationCountsQueries
+from pipeline.transformation.publishing.publication_counts import (
+    refresh_journal_publication_counts,
+    refresh_publisher_publication_counts,
+)
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
@@ -76,27 +81,42 @@ def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> 
     ).rowcount
 
 
+def propagate_contribution_attributes(conn: Connection) -> int:
+    """Recopie sur chaque contribution les attributs de ses contributions sources."""
+    return conn.execute(text(propagate_contribution_attributes_sql())).rowcount
+
+
+def count_contributions_in_perimeter(conn: Connection) -> int:
+    return scalar_int(
+        conn.execute(text("SELECT COUNT(*) AS n FROM contributions WHERE in_perimeter = TRUE"))
+    )
+
+
+def refresh_contribution_structures(conn: Connection) -> None:
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY contribution_structures"))
+
+
+def refresh_publication_structures(conn: Connection) -> None:
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_structures"))
+
+
 @dataclass(frozen=True)
 class ContributionsPhase:
-    build_queries: ContributionsBuild
-    publication_counts_queries: PgPublicationCountsQueries
-    address_publication_count_queries: AddressPublicationCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Exécute les tâches de la phase et retourne les métriques du build."""
-        queries = self.build_queries
 
         def build(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                return build_contributions(conn, queries, ctx.logger)
+                return build_contributions(conn, ctx.logger)
 
         def propagate(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
-                queries.propagate_contribution_attributes(conn)
-                in_perimeter = queries.count_contributions_in_perimeter(conn)
+                propagate_contribution_attributes(conn)
+                in_perimeter = count_contributions_in_perimeter(conn)
             metrics = _timed(t0)
             metrics.details["in_perimeter"] = in_perimeter
             return metrics
@@ -104,14 +124,14 @@ class ContributionsPhase:
         def publications_in_perimeter(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
-                queries.refresh_publications_perimeter_evidence(conn)
+                refresh_publications_perimeter_evidence(conn)
             return _timed(t0)
 
         def structures(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
-                queries.refresh_contribution_structures(conn)
-                queries.refresh_publication_structures(conn)
+                refresh_contribution_structures(conn)
+                refresh_publication_structures(conn)
             return _timed(t0)
 
         def purge(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
@@ -125,12 +145,7 @@ class ContributionsPhase:
             return metrics
 
         def publication_counts(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            _refresh_publication_counts(
-                ctx.open_tx,
-                self.publication_counts_queries,
-                self.address_publication_count_queries,
-                ctx.logger,
-            )
+            _refresh_publication_counts(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 
         sync_section = "Synchronisation des tables"
@@ -204,12 +219,7 @@ def _delete_empty_containers(
         ctx.logger.info("%s%s : %s", branch, label, sub.report or "rien à faire")
 
 
-def _refresh_publication_counts(
-    open_tx: OpenTransaction,
-    publication_counts_queries: PgPublicationCountsQueries,
-    address_publication_count_queries: AddressPublicationCountQueries,
-    logger: logging.Logger,
-) -> None:
+def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger) -> None:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
     Les trois se lisent des mêmes publications et contributions sources, stabilisées à ce point du pipeline. Le décompte des éditeurs somme celui des revues, donc le suit.
@@ -220,21 +230,21 @@ def _refresh_publication_counts(
 
     with waiting(f"{BRANCH}par adresse", logger) as line:
         with open_tx() as conn:
-            addresses = address_publication_count_queries.recompute_publication_count(conn)
+            addresses = recompute_address_publication_count(conn)
         line.conclude(
             f"{BRANCH}{quantity(addresses, 'adresse')} {inflect(addresses, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{BRANCH}par revue", logger) as line:
         with open_tx() as conn:
-            journals = publication_counts_queries.refresh_journal_publication_counts(conn)
+            journals = refresh_journal_publication_counts(conn)
         line.conclude(
             f"{BRANCH}{quantity(journals, 'revue')} {inflect(journals, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
         with open_tx() as conn:
-            publishers = publication_counts_queries.refresh_publisher_publication_counts(conn)
+            publishers = refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
@@ -244,9 +254,6 @@ def _refresh_publication_counts(
 
 def build() -> Phase:
     return ContributionsPhase(
-        ContributionsBuild(),
-        PgPublicationCountsQueries(),
-        AddressPublicationCountQueries(),
         empty_containers=(
             (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
             (delete_empty_journals.LABEL, _run_delete_empty_journals),

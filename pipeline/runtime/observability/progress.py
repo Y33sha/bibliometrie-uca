@@ -27,7 +27,7 @@ try:
     # pipeline affiche une barre : un verrou de threads suffit et ne laisse rien.
     tqdm.set_lock(threading.RLock())
 except ImportError:  # `tqdm` est une dépendance de développement.
-    tqdm = None  # type: ignore[assignment,misc]
+    tqdm = None
 
 MILESTONE_INTERVAL_S = 30.0
 """Délai entre deux jalons de journal, quand aucune barre ne s'affiche."""
@@ -53,6 +53,12 @@ class TextStream(Protocol):
     def flush(self) -> None: ...
 
 
+class WritableStream(Protocol):
+    """Flux que `tqdm` confie au redessin d'une barre : seule l'écriture y est garantie."""
+
+    def write(self, s: str, /) -> object: ...
+
+
 CLEAR_TO_END_OF_LINE = "\x1b[K"
 """Séquence effaçant du curseur à la fin de la ligne."""
 
@@ -66,12 +72,15 @@ def _counter_column(done: object, total: object) -> str:
 
 
 if tqdm is not None:
-
-    class _Bar(tqdm):  # type: ignore[misc]
+    # `tqdm` est générique dans ses stubs seulement : `tqdm[str]` lèverait à l'exécution.
+    class _Bar(tqdm):  # pyrefly: ignore[implicit-any-type-argument]
         """Barre dont le redessin résiste au redimensionnement du terminal.
 
         Un terminal rétréci reçoit une barre plus longue que sa largeur. Il la replie sur autant de lignes qu'il faut, et le redessin suivant les efface toutes.
         """
+
+        kept = 0
+        """Éléments retenus, affichés par `_KeptBar`."""
 
         @property
         def format_dict(self) -> dict[str, object]:
@@ -79,7 +88,7 @@ if tqdm is not None:
 
             `{counter}` occupe une colonne fixe, de sorte que le remplissage qui la précède en occupe une aussi : deux sources aux volumes différents tracent des barres de même longueur.
             """
-            fields: dict[str, object] = super().format_dict
+            fields: dict[str, object] = dict(super().format_dict)
             width = fields.get("ncols")
             if isinstance(width, int):
                 # `self.ncols` sert aussi au redessin, qui compare la longueur écrite à la largeur.
@@ -92,7 +101,7 @@ if tqdm is not None:
             """Éléments parcourus sur le total, complétés à la largeur de la colonne."""
             return _counter_column(fields["n"], fields["total"])
 
-        def status_printer(self, stream: TextStream) -> Callable[[str], None]:
+        def status_printer(self, file: WritableStream) -> Callable[[str], None]:
             """Réécrit la ligne en place : retour chariot, barre, effacement de ce qui suit.
 
             L'effacement passe par une séquence, qui occupe une colonne quelle que soit la largeur. Des espaces jusqu'à la longueur du redessin précédent déborderaient d'un terminal rétréci entre-temps, et le redessin d'après s'installerait sur ce débordement, laissant la barre précédente affichée au-dessus.
@@ -100,13 +109,15 @@ if tqdm is not None:
             Le curseur revient en début de ligne. Un terminal qui replie une ligne garde le curseur à la place qu'il occupe dans le texte : laissé en fin de barre, il passerait sur la dernière ligne du repli, hors de portée du redessin suivant.
             """
             previous_length = 0
+            flush = getattr(file, "flush", None)
 
             def redraw(line: str) -> None:
                 nonlocal previous_length
                 wrapped = previous_length > (self.ncols or 0)
                 clear = CLEAR_TO_END_OF_SCREEN if wrapped else CLEAR_TO_END_OF_LINE
-                stream.write(f"\r{line}{clear}\r")
-                stream.flush()
+                file.write(f"\r{line}{clear}\r")
+                if flush is not None:
+                    flush()
                 previous_length = disp_len(line)
 
             return redraw
@@ -114,13 +125,11 @@ if tqdm is not None:
     class _KeptBar(_Bar):
         """Barre dont le compteur donne les éléments retenus, quand le remplissage suit les parcourus."""
 
-        kept = 0
-
         def _counter(self, fields: dict[str, object]) -> str:
             return _counter_column(self.kept, fields["total"])
 else:
-    _Bar = None  # type: ignore[assignment,misc]
-    _KeptBar = None  # type: ignore[assignment,misc]
+    _Bar = None
+    _KeptBar = None
 
 REFRESH_S = 0.1
 """Délai entre deux redessins de la barre à l'arrêt, pendant qu'une source répond."""
@@ -201,7 +210,7 @@ class Progress:
                 file=_bar_stream,
                 dynamic_ncols=True,
             )
-            if tqdm is not None and _interactive_terminal()
+            if bar_class is not None and _interactive_terminal()
             else None
         )
         if self._bar is not None:
@@ -224,7 +233,7 @@ class Progress:
             bar = self._bar
             if bar is None:
                 return
-            with tqdm.get_lock():
+            with bar.get_lock():
                 bar.refresh()
 
     def set_total(self, total: int) -> None:
@@ -239,7 +248,7 @@ class Progress:
         self._label = label
         bar = self._bar
         if bar is not None:
-            with tqdm.get_lock():
+            with bar.get_lock():
                 bar.set_description_str(label)
 
     def advance(self, n: int = 1) -> None:
@@ -279,7 +288,7 @@ class Progress:
         if bar is None:
             return
         self._bar = None
-        with tqdm.get_lock():
+        with bar.get_lock():
             last_frame = str(bar)
             bar.close()
             if not self._erase:
@@ -377,7 +386,7 @@ class Waiting:
         self._erase = True
 
     def close(self) -> None:
-        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne."""
+        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne. En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`)."""
         self._finished.set()
         if self._stream is not None:
             if self._erase:
@@ -386,6 +395,8 @@ class Waiting:
                 self._label = self._conclusion or self._label
                 self._write("")
                 self._stream.write("\n")
+                if self._logger is not None:
+                    self._logger.info("%s", self._label, extra={"detail": True})
             self._stream.flush()
             self._stream = None
         elif self._conclusion and not self._erase and self._logger is not None:

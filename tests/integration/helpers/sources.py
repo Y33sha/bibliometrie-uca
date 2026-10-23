@@ -5,7 +5,9 @@ import json
 
 from sqlalchemy import Connection
 
+from infrastructure.db.queues import Queue
 from tests.integration.helpers.contributions import upsert_contributor_information
+from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
@@ -39,15 +41,15 @@ def insert_source_record(
     oa_status: str | None = None,
     is_retracted: bool | None = None,
     embargo_until: datetime.date | None = None,
-    keys_dirty: bool | None = None,
+    marked: bool = True,
     external_ids: dict[str, object] | None = None,
     biblio: dict[str, object] | None = None,
     source_extras: dict[str, object] | None = None,
     topics: object = None,
     corrections: dict[str, object] | None = None,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`."""
-    return insert_row(
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
+    source_record_id = insert_row(
         conn,
         "source_records",
         {
@@ -74,7 +76,6 @@ def insert_source_record(
             "oa_status": oa_status,
             "is_retracted": is_retracted,
             "embargo_until": embargo_until,
-            "keys_dirty": keys_dirty,
             "external_ids": _jsonb(external_ids),
             "biblio": _jsonb(biblio),
             "source_extras": _jsonb(source_extras),
@@ -85,6 +86,9 @@ def insert_source_record(
             ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
         ),
     )
+    if marked:
+        mark(conn, Queue.SOURCE_RECORD_KEYS, [source_record_id])
+    return source_record_id
 
 
 def insert_source_contribution(
@@ -107,13 +111,13 @@ def insert_source_contribution(
     neutralized_identifiers: dict[str, object] | None = None,
     collective: bool = False,
 ) -> int:
-    """Insère une contribution source et renvoie son `id`. `row_id` fixe l'`id`.
+    """Insère une contribution source, la marque pour le recalcul des pays comme la normalisation, et renvoie son `id`. `row_id` fixe l'`id`.
 
     Les informations du contributeur sont `contributor_information_id`, sinon celles de forme `author_name_normalized` et d'identifiants `identifiers`. Sans nom découpé (`raw_last_name`), le nom brut vaut « X » par défaut.
     """
     if raw_author_name is None and raw_last_name is None:
         raw_author_name = "X"
-    return insert_row(
+    source_contribution_id = insert_row(
         conn,
         "source_contributions",
         {
@@ -144,6 +148,8 @@ def insert_source_contribution(
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
         },
     )
+    mark(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES, [source_contribution_id])
+    return source_contribution_id
 
 
 def insert_source_contribution_address(

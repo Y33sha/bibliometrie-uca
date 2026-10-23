@@ -34,7 +34,7 @@ class _FakeCountryQueries:
         monkeypatch.setattr(
             phase, "count_address_country_status", self.count_address_country_status
         )
-        monkeypatch.setattr(phase, "resolve_address_countries", lambda conn: 3)
+        monkeypatch.setattr(phase, "resolve_queued_addresses", lambda conn: 3)
         monkeypatch.setattr(phase, "CountryCandidatesStore", _FakeStore)
 
 

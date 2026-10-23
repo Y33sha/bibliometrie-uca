@@ -7,6 +7,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { docTypeSingular } from '$lib/labels';
 	import { halDocUrl } from '$lib/utils';
+	import { structureLabel } from '$lib/structureLabels';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -61,7 +62,7 @@
 				<div class="publication-meta-line">
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{lab.acronym || lab.name}</span>{/each}
+					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
 					<a href="{base}/publications/{pub.id}" class="publication-link"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">

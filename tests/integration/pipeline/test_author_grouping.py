@@ -5,6 +5,7 @@ import logging
 import pytest
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from infrastructure.read_models.publications.suspect_merges import (
     suspect_merges,
     suspect_merges_count,
@@ -15,6 +16,7 @@ from pipeline.transformation.publications.author_grouping.store import SourceCon
 from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import mark, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 logger = logging.getLogger("test_author_grouping")
@@ -91,10 +93,7 @@ def test_les_contributions_sources_d_un_meme_auteur_sont_groupees(conn):
     groups = sorted(_groups(conn, publication).values(), key=min)
     assert groups == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
     assert metrics.details["summary"] == {"publications": 1, "groups": 3, "reference": 3, "name": 2}
-    dirty = conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication}
-    )
-    assert dirty.scalar_one() is False
+    assert publication not in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
 def _attached_group(conn, publication, source_contribution):
@@ -112,9 +111,7 @@ def _attached_group(conn, publication, source_contribution):
         ),
         {"person": person, "g": group},
     )
-    conn.execute(
-        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
-    )
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
     return group, person
 
 
@@ -159,9 +156,7 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     _run(conn)
     tuples = "SELECT source_contribution_id, ctid::text FROM source_contribution_group_members"
     before = dict(conn.execute(text(tuples)).all())
-    conn.execute(
-        text("UPDATE publications SET contributions_dirty = true WHERE id = :p"), {"p": publication}
-    )
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
 
     _run(conn)
 
@@ -196,7 +191,7 @@ def test_un_enregistrement_source_deplace_quitte_les_groupes_de_sa_publication(c
         text("UPDATE source_records SET publication_id = :p WHERE source_id = 'W1'"),
         {"p": arrival},
     )
-    conn.execute(text("UPDATE publications SET contributions_dirty = true"))
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [arrival, departure])
 
     _run(conn)
 
@@ -426,9 +421,42 @@ def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
 
 
 def _dirty(conn, publication_id):
-    return conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication_id}
-    ).scalar_one()
+    return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+
+
+def test_le_groupement_marque_les_groupes_pour_la_recomposition_de_leurs_attributs(conn):
+    publication = insert_publication(conn)
+    _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
+
+    _run(conn)
+
+    groups = set(_groups(conn, publication))
+    assert len(groups) == 2
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == groups
+
+
+def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
+    publication = insert_publication(conn)
+    conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": publication})
+    assert _dirty(conn, publication)
+
+    metrics = _run(conn)
+
+    assert metrics.seen == 0
+    assert not _dirty(conn, publication)
+
+
+def test_un_marquage_fait_pendant_le_groupement_reste_en_file(conn):
+    """Régression : le groupement effaçait le marquage d'une publication remarquée après son relevé."""
+    publication = insert_publication(conn)
+    store = SourceContributionGroupStore(conn)
+    store.snapshot_queued_publications()
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
+
+    store.delete_processed_marks([publication])
+    store.drop_snapshot()
+
+    assert _dirty(conn, publication)
 
 
 def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):

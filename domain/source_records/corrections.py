@@ -72,9 +72,9 @@ def removal_entry(
 
 def without_values(mapping: dict[str, JsonValue], entry: JsonValue) -> dict[str, JsonValue]:
     """`mapping` privé des valeurs que `entry` (`removal_entry`) retire. Une clé vidée disparaît."""
-    if not isinstance(entry, dict) or not isinstance(entry.get(REMOVED), dict):
+    removed = entry.get(REMOVED) if isinstance(entry, dict) else None
+    if not isinstance(removed, dict):
         return mapping
-    removed = entry[REMOVED]
     result = dict(mapping)
     for key, values in removed.items():
         if not isinstance(values, list) or key not in result:
@@ -93,9 +93,10 @@ def without_values(mapping: dict[str, JsonValue], entry: JsonValue) -> dict[str,
 
 def with_values_restored(mapping: dict[str, JsonValue], entry: JsonValue) -> dict[str, JsonValue]:
     """`mapping` où chaque clé que `entry` (`removal_entry`) a touchée reprend sa valeur d'avant le retrait."""
-    if not isinstance(entry, dict) or not isinstance(entry.get(BEFORE), dict):
+    before = entry.get(BEFORE) if isinstance(entry, dict) else None
+    if not isinstance(before, dict):
         return mapping
-    return {**mapping, **entry[BEFORE]}
+    return {**mapping, **before}
 
 
 def raw_value[T](corrections: Mapping[str, JsonValue] | None, field: str, current: T) -> T:

@@ -60,7 +60,7 @@ def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
     """Suite de valeurs portée par `obj` : l'API rend un objet seul là où elle annonce une liste."""
     if obj is None:
         return []
-    if isinstance(obj, str | Mapping):
+    if isinstance(obj, (str, Mapping)):
         return [obj]
     if isinstance(obj, Sequence):
         return obj

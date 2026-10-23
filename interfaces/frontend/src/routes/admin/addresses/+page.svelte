@@ -4,12 +4,14 @@
 	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import { replaceState } from '$app/navigation';
-	import { addresses as addressesApi, api, ApiError } from '$lib/api';
+	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '$lib/api';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import { toast } from '$lib/dialogs.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { autofocus } from '$lib/actions/focus';
+	import { structureLabel } from '$lib/structureLabels';
+	import { groupStructuresByType, structureGroupLabel } from '$lib/structureTypes';
 
 	// ---- Type definitions ----
 
@@ -20,19 +22,7 @@
 	type AddressesResponse = components['schemas']['AddressListResponse'];
 	type Publication = components['schemas']['AddressPublicationItem'];
 	type PublicationsResponse = components['schemas']['AddressPublicationsResponse'];
-
-	// Structure : forme propre au front (utilisée par le picker de structure pour assigner manuellement). Côté API, l'endpoint qui liste les structures cibles est dans le router structures, pas addresses — type local conservé.
-	interface Structure {
-		id: number;
-		name: string;
-		acronym: string | null;
-		code: string | null;
-		type: string;
-	}
-
-	interface GroupedStructures {
-		[type: string]: Structure[];
-	}
+	type Structure = components['schemas']['StructureListItem'];
 
 	// Prédicats composables.
 	interface TextPredicate {
@@ -43,17 +33,6 @@
 		operator: 'recognized' | 'not_recognized';
 		structureIds: number[];
 	}
-
-	// ---- Constants ----
-
-	const TYPE_LABELS: Record<string, string> = {
-		universite: 'Universités',
-		onr: 'Organismes de recherche',
-		chu: 'CHU',
-		ecole: 'Écoles',
-		labo: 'Laboratoires'
-	};
-	const ALLOWED_TYPES = Object.keys(TYPE_LABELS);
 
 	// ---- URL params helpers ----
 
@@ -129,9 +108,12 @@
 	let structurePredicates = $state<StructurePredicate[]>([]);
 	let currentStructureId = $state<number | null>(null);
 
-	let structures = $state<GroupedStructures>({});
-	// Liste plate de toutes les structures (hors `site`) pour le picker des prédicats Structure — distincte du scope (limité aux ALLOWED_TYPES).
 	let allStructures = $state<Structure[]>([]);
+	// Le choix de la structure étudiée se limite à ces types. Le picker des prédicats Structure propose tous les types.
+	const SCOPE_TYPES = ['universite', 'onr', 'chu', 'ecole', 'labo'];
+	const scopeGroups = $derived(
+		groupStructuresByType(allStructures).filter(([type]) => SCOPE_TYPES.includes(type))
+	);
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	const list = usePaginatedFetch<Address, AddressesResponse>({
 		endpoint: '/api/addresses',
@@ -169,7 +151,7 @@
 
 	// Libellé d'une structure par id (pour les tags des prédicats).
 	const structureLabelById = $derived(
-		new Map(allStructures.map((s) => [s.id, s.acronym || s.name]))
+		new Map(allStructures.map((s) => [s.id, structureLabel(s)]))
 	);
 	const currentStructureName = $derived(
 		(currentStructureId !== null && structureLabelById.get(currentStructureId)) || '—'
@@ -178,18 +160,9 @@
 	const usedStructureIds = $derived(
 		new Set(structurePredicates.flatMap((s) => s.structureIds))
 	);
-	// Structures sélectionnables, groupées par type, ALLOWED_TYPES d'abord.
-	const availableStructureGroups = $derived.by((): [string, Structure[]][] => {
-		const groups = new Map<string, Structure[]>();
-		for (const s of allStructures) {
-			if (usedStructureIds.has(s.id)) continue;
-			(groups.get(s.type) ?? groups.set(s.type, []).get(s.type)!).push(s);
-		}
-		const extra = [...groups.keys()].filter((t) => !ALLOWED_TYPES.includes(t));
-		return [...ALLOWED_TYPES, ...extra]
-			.filter((t) => groups.has(t))
-			.map((t) => [t, groups.get(t)!]);
-	});
+	const availableStructureGroups = $derived(
+		groupStructuresByType(allStructures.filter((s) => !usedStructureIds.has(s.id)))
+	);
 
 	function reload(): void {
 		list.page = 1;
@@ -199,32 +172,20 @@
 	// ---- Data loading ----
 
 	async function loadStructures(): Promise<void> {
-		const all = await api<Structure[]>('/api/structures');
-		allStructures = all.filter((s) => s.type !== 'site');
-		const grouped: GroupedStructures = {};
-		for (const s of all) {
-			if (!ALLOWED_TYPES.includes(s.type)) continue;
-			if (!grouped[s.type]) grouped[s.type] = [];
-			grouped[s.type].push(s);
-		}
-		structures = grouped;
+		allStructures = await structuresApi.listDetectable();
 	}
 
 	/** Structure de scope par défaut : une racine du périmètre de l'établissement, sinon la première du premier type peuplé. */
 	function defaultStructureId(): number | null {
 		const root = allStructures.find((s) => institution.rootStructureIds.includes(s.id));
-		if (root) return root.id;
-		for (const type of ALLOWED_TYPES) {
-			if (structures[type]?.length) return structures[type][0].id;
-		}
-		return null;
+		return root?.id ?? scopeGroups[0]?.[1][0].id ?? null;
 	}
 
 	/** Résout la structure de scope : URL > localStorage (si valides) > défaut. Une seule assignation, pas de passage transitoire par le défaut. */
 	function resolveScopeStructure(): void {
 		const candidate = $page.url.searchParams.get('structure_id') ?? localStorage.getItem('admin_structure_id');
 		const id = candidate ? parseInt(candidate) : NaN;
-		const isScope = !isNaN(id) && Object.values(structures).some((list) => list.some((s) => s.id === id));
+		const isScope = !isNaN(id) && scopeGroups.some(([, list]) => list.some((s) => s.id === id));
 		currentStructureId = isScope ? id : defaultStructureId();
 		if (currentStructureId) localStorage.setItem('admin_structure_id', String(currentStructureId));
 	}
@@ -456,14 +417,12 @@
 			value={currentStructureId ?? ''}
 			onchange={onStructureChange}
 		>
-			{#each ALLOWED_TYPES as type}
-				{#if structures[type]?.length}
-					<optgroup label={TYPE_LABELS[type]}>
-						{#each structures[type] as s (s.id)}
-							<option value={s.id}>{s.acronym || s.name}</option>
-						{/each}
-					</optgroup>
-				{/if}
+			{#each scopeGroups as [type, list] (type)}
+				<optgroup label={structureGroupLabel(type)}>
+					{#each list as s (s.id)}
+						<option value={s.id}>{structureLabel(s)}</option>
+					{/each}
+				</optgroup>
 			{/each}
 		</select>
 		<div class="stats-bar">
@@ -558,9 +517,9 @@
 					>
 						<option value="" disabled selected>+ structure</option>
 						{#each availableStructureGroups as [type, list] (type)}
-							<optgroup label={TYPE_LABELS[type] || type}>
+							<optgroup label={structureGroupLabel(type)}>
 								{#each list as s (s.id)}
-									<option value={s.id}>{s.acronym || s.name}</option>
+									<option value={s.id}>{structureLabel(s)}</option>
 								{/each}
 							</optgroup>
 						{/each}
@@ -636,7 +595,7 @@
 									>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
 								>
 								{#each addr.structures || [] as s}
-									<span class={structTagClass(s)}>{s.acronym || s.name}</span>
+									<span class={structTagClass(s)}>{structureLabel(s)}</span>
 								{/each}
 							</div>
 						</div>

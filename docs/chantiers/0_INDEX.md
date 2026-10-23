@@ -18,9 +18,7 @@
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
-- [Conception du pipeline](CODE_conception-du-pipeline.md)
 - [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
-- [Files d'attente de recalcul](CODE_files-d-attente-de-recalcul.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Indicateurs d'impact dans les rapports par laboratoire](METIER_rapports-impact.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
@@ -36,6 +34,8 @@
 
 ## Chantiers archivés
 
+- 2026-10-23 — [Conception du pipeline](archived/2026-10-23_CODE_conception-du-pipeline.md)
+- 2026-10-23 — [Files d'attente de recalcul](archived/2026-10-23_CODE_files-d-attente-de-recalcul.md)
 - 2026-10-21 — [Règles du domaine complètes et uniques](archived/2026-10-21_CODE_profondeur-du-domaine.md)
 - 2026-10-19 — [Reconstruction après un changement de règle](archived/2026-10-19_CODE_reconstruction-apres-changement-de-regle.md)
 - 2026-10-17 — [Signatures collectives](archived/2026-10-17_DATA_signatures-collectives.md)

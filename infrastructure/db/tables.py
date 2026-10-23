@@ -20,6 +20,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     Float,
+    Identity,
     Integer,
     MetaData,
     Numeric,
@@ -617,18 +618,6 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
-    # Refresh pays incrémental : True = `countries` vient de changer, les
-    # `source_contributions` liés sont à recalculer. Posé gratuitement à l'écriture
-    # de `countries` (detect / institution), dérivé par JOIN au refresh, purgé en
-    # fin de cascade.
-    Column("countries_dirty", Boolean, nullable=False, server_default="false"),
-    Column(
-        "candidates_dirty",
-        Boolean,
-        nullable=False,
-        server_default="true",
-        comment="Adresse à traiter : détection du pays par le texte, puis résolution des candidats.",
-    ),
     # Index UNIQUE sur expression md5(normalized_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
     schema="structures",
@@ -803,6 +792,8 @@ source_contribution_groups = Table(
         "liste la plus longue. Une personne correspond au maximum à un groupe par publication."
     ),
     schema="publications",
+    # Place gardée dans chaque page pour les mises à jour HOT des attributs et de `reference_position`.
+    postgresql_with={"fillfactor": 90},
 )
 
 
@@ -916,11 +907,6 @@ source_contributions = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    # Refresh pays incrémental : True = les pays dérivés (source_records,
-    # publications) sont à recalculer depuis les adresses de ce source_contribution.
-    # Posé par normalize (nouveaux source_contributions) et la détection (adresse
-    # changée), remis à False par le refresh.
-    Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column(
         "countries",
         ARRAY(Text),
@@ -997,6 +983,8 @@ source_contributions = Table(
     # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
     # qui rejoint `contributor_information` sur `contributor_information_id`.
     schema="sources",
+    # Place gardée dans chaque page pour les mises à jour HOT de `countries`, `perimeter_evidence` et `neutralized_identifiers`.
+    postgresql_with={"fillfactor": 90},
 )
 
 
@@ -1182,16 +1170,6 @@ publications = Table(
     # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
-    Column(
-        "contributions_dirty",
-        Boolean,
-        nullable=False,
-        server_default="true",
-        comment=(
-            "Groupes de contributions sources à recalculer : un enregistrement source a rejoint ou "
-            "quitté la publication, ou ses contributions sources ont changé."
-        ),
-    ),
     # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
     # publication_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
@@ -1283,7 +1261,6 @@ source_records = Table(
         nullable=False,
         server_default=text("'{}'::jsonb"),
     ),
-    Column("keys_dirty", Boolean, nullable=False, server_default="true"),
     Column(
         "authors_hash",
         Text,
@@ -1603,6 +1580,28 @@ pipeline_phase_executions = Table(
     ),
     schema="ops",
 )
+
+
+# ── Files d'attente de recalcul ───────────────────────────────────
+# Identifiants des lignes qu'une tâche du pipeline doit traiter (`infrastructure.db.queues`).
+
+
+def _queue(name: str) -> Table:
+    return Table(
+        name,
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("seq", BigInteger, Identity(always=True), nullable=False),
+        schema="queues",
+    )
+
+
+source_contribution_countries_queue = _queue("source_contribution_countries_queue")
+address_countries_queue = _queue("address_countries_queue")
+address_candidates_queue = _queue("address_candidates_queue")
+publication_contributions_queue = _queue("publication_contributions_queue")
+source_record_keys_queue = _queue("source_record_keys_queue")
+source_contribution_group_attributes_queue = _queue("source_contribution_group_attributes_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

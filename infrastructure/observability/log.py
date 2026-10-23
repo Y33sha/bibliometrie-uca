@@ -68,7 +68,7 @@ def console_stream() -> TextIO:
     global _console
     if _console is None:
         flux = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", line_buffering=True)
-        flux.close = lambda: None  # type: ignore[method-assign]
+        flux.close = lambda: None
         _console = flux
     return _console
 

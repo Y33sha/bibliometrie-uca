@@ -106,7 +106,7 @@ def _get_publication_oa_status(conn, hal_id):
 def _fetch_stale_publications(conn):
     """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
 
-    Le re-normalize a re-marqué les enregistrements sources touchés `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute enregistrement source modifié est dirty, donc reprise).
+    Le re-normalize a marqué pour la réconciliation les enregistrements sources touchés ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées de leurs publications. La réconciliation reprend tout enregistrement source modifié.
 
     Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes enregistrement source avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit la valeur corrigée en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """

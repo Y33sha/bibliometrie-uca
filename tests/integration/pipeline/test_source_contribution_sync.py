@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from domain.persons.contributor_name import ContributorName
 from domain.structures.identifiers import RorId
+from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.source_contribution_store import (
     SourceContributionStore,
@@ -18,8 +19,10 @@ from pipeline.ingestion.common.source_contributions import (
     write_source_contributions,
 )
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source Crossref « 10.9999/sync », de titre « t ».
@@ -181,10 +184,8 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     assert _addresses(conn, source_contribution_id) == ["Labo B"]
 
 
-def _contributions_dirty(conn, publication_id: int) -> bool:
-    return conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication_id}
-    ).scalar_one()
+def _marked_for_grouping(conn, publication_id: int) -> bool:
+    return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
 def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_roles(sa_sync_conn):
@@ -196,23 +197,23 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
         source_record,
         [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")]), _rec(1, "Xu, Z.")],
     )
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
     _write(
         conn,
         source_record,
         [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")]), _rec(1, "Xu, Z.")],
     )
-    assert not _contributions_dirty(conn, publication)
+    assert not _marked_for_grouping(conn, publication)
 
     _write(
         conn,
         source_record,
         [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean", addresses=[AddressRecord("Labo B")])],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
 
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
         conn,
         source_record,
@@ -223,9 +224,9 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
 
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
         conn,
         source_record,
@@ -236,7 +237,29 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
+
+
+def test_les_groupes_des_contributions_sources_dont_les_roles_changent_sont_marques(
+    sa_sync_conn,
+):
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    source_record = _source_record(conn, publication)
+    _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
+    source_contribution_id = _source_contributions(conn, source_record)[0][0]
+    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
+    clear(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+
+    _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")])])
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == set()
+
+    _write(
+        conn,
+        source_record,
+        [_rec(0, "Dupont, Jean", roles=["author", "editor"], addresses=[AddressRecord("Labo B")])],
+    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == {group}
 
 
 def test_decomptes_des_auteurs_de_l_enregistrement_source(sa_sync_conn):
@@ -391,26 +414,18 @@ def test_ror_rattaches_a_l_adresse_de_leur_affiliation(sa_sync_conn):
 
 
 def test_contribution_source_inchangee_laissee_en_l_etat(sa_sync_conn):
-    """Une contribution source inchangée garde son `countries_dirty`, remis à faux par la phase affiliations."""
+    """Une contribution source inchangée reste hors de la file du recalcul des pays."""
     conn = sa_sync_conn
     source_record = _source_record(conn)
     records = [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])]
     _write(conn, source_record, records)
     source_contribution_id = _source_contributions(conn, source_record)[0][0]
-    conn.execute(
-        text("UPDATE source_contributions SET countries_dirty = false WHERE id = :i"),
-        {"i": source_contribution_id},
-    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {source_contribution_id}
+    clear(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
 
     _write(conn, source_record, records)
 
-    assert (
-        conn.execute(
-            text("SELECT countries_dirty FROM source_contributions WHERE id = :i"),
-            {"i": source_contribution_id},
-        ).scalar_one()
-        is False
-    )
+    assert queued(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == set()
     assert _addresses(conn, source_contribution_id) == ["Labo A"]
 
 

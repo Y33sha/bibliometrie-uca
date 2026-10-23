@@ -3,7 +3,7 @@
 Quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
 
 1. `countries.ror` — candidats `ror` : pays des organisations ROR de l'affiliation de chaque adresse.
-2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses à traiter (`candidates_dirty`).
+2. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses en file (`address_candidates_queue`).
 3. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
 4. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (contributions sources, source_records, publications).
 
@@ -26,7 +26,7 @@ from pipeline.transformation.countries import (
     detect_by_place_name,
     refresh_publication_countries,
 )
-from pipeline.transformation.countries.resolution import resolve_address_countries
+from pipeline.transformation.countries.resolution import resolve_queued_addresses
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
@@ -81,7 +81,7 @@ class CountriesPhase:
         def resolve(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
             step(ctx.logger, "Choix du pays des adresses parmi les pays trouvés")
             with ctx.open_tx() as conn:
-                changed = resolve_address_countries(conn)
+                changed = resolve_queued_addresses(conn)
             ctx.logger.info(
                 "%s%s",
                 LAST_BRANCH,

@@ -266,6 +266,8 @@ TASKS: tuple[Task, ...] = (
                 "contributor_information",
                 "addresses.id",
                 "countries",
+                # Groupes des contributions sources dont les rôles ou le statut de correspondant changent.
+                "source_contribution_group_members",
                 *_containers(source),
             ),
             writes=(
@@ -278,18 +280,22 @@ TASKS: tuple[Task, ...] = (
                 "source_contribution_hal_structures",
                 "contributor_information",
                 "addresses.id",
-                "addresses.candidates_dirty",
+                "address_candidates_queue",
                 "address_country_candidates",
-                "publications.contributions_dirty",
+                "publication_contributions_queue",
+                "source_contribution_countries_queue",
+                "source_record_keys_queue",
+                "source_contribution_group_attributes_queue",
                 *_containers(source),
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime, et les groupes écrits par `author_grouping`.
             previous_run=(
                 "staging",
                 "source_records",
                 "source_contributions",
                 "contributor_information",
                 "addresses",
+                "source_contribution_group_members",
                 *_containers(source),
             ),
         )
@@ -307,8 +313,8 @@ TASKS: tuple[Task, ...] = (
         # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_records.id",
-            "source_records.keys_dirty",
-            "publications.contributions_dirty",
+            "source_record_keys_queue",
+            "publication_contributions_queue",
             "source_contributions.id",
             "source_contribution_addresses",
             "source_contribution_rors",
@@ -343,9 +349,9 @@ TASKS: tuple[Task, ...] = (
             "ror_relations",
             "ror_dump_imports",
             # Dépendants d'une organisation qui change de pays.
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
             "address_country_candidates",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
         previous_run=("ror_dump_imports",),
         network="zenodo",
@@ -359,7 +365,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structure_relations",
             "hal_structure_aliases",
             # Contributions sources d'une structure qui change de pays.
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
         ),
         previous_run=("hal_structures", "hal_structure_aliases"),
         network="hal",
@@ -419,16 +425,20 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "source_contributions.source",
             "source_records.publication_year",
+            # Groupes des contributions sources dont les indices changent, marqués pour la recomposition de leurs attributs.
+            "source_contribution_group_members",
         ),
         writes=(
             "source_contribution_structures",
             "source_contributions.in_perimeter",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
+            "source_contribution_group_attributes_queue",
         ),
         previous_run=(
             "source_records.publication_id",
             "person_identifiers",
             "source_contributions.neutralized_identifiers",
+            "source_contribution_group_members",
         ),
     ),
     _task(
@@ -684,7 +694,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_records.journal_id",
             "source_records.corrections",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
         ),
         previous_run=("source_records",),
     ),
@@ -728,7 +738,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.language",
             "source_records.external_ids",
             "source_records.corrections",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
         ),
         # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
         previous_run=(
@@ -772,8 +782,8 @@ TASKS: tuple[Task, ...] = (
             "source_records.doi",
             "source_records.external_ids",
             "source_records.corrections",
-            "source_records.keys_dirty",
-            "publications.contributions_dirty",
+            "source_record_keys_queue",
+            "publication_contributions_queue",
         ),
         previous_run=("source_records",),
     ),
@@ -782,6 +792,7 @@ TASKS: tuple[Task, ...] = (
         "publications",
         reads=(
             "source_records",
+            "source_record_keys_queue",
             "source_contributions.in_perimeter",
             "publications",
             "apc_payments",
@@ -793,8 +804,9 @@ TASKS: tuple[Task, ...] = (
             "publications",
             "publications_detail",
             "source_records.publication_id",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
             "apc_payments.publication_id",
+            "publication_contributions_queue",
         ),
         # Verdicts d'Unpaywall ; publications que `contributions.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `contributions.delete_empty_containers`.
         previous_run=(
@@ -819,7 +831,7 @@ TASKS: tuple[Task, ...] = (
         "author_grouping",
         reads=(
             "publications.id",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "source_records.publication_id",
             "source_records.source_id",
             "source_records.corrections",
@@ -844,13 +856,14 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_groups.resolution_mode",
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
+            "source_contribution_group_attributes_queue",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
+        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
@@ -862,6 +875,7 @@ TASKS: tuple[Task, ...] = (
         "author_grouping.attributes",
         "author_grouping",
         reads=(
+            "source_contribution_group_attributes_queue",
             "source_contribution_group_members",
             "source_contributions.is_corresponding",
             "source_contributions.perimeter_evidence",
@@ -875,6 +889,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_groups.is_corresponding",
             "source_contribution_groups.perimeter_evidence",
             "source_contribution_groups.roles",
+            "source_contribution_group_attributes_queue",
         ),
     ),
     _task(
@@ -901,7 +916,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.resolution_mode",
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "persons",
             "person_identifiers",
             "person_name_forms",
@@ -1144,7 +1159,7 @@ TASKS: tuple[Task, ...] = (
         "countries.ror",
         "countries",
         reads=("source_contribution_rors", "ror_organizations", "countries", "addresses.id"),
-        writes=("address_country_candidates", "addresses.candidates_dirty"),
+        writes=("address_country_candidates", "address_candidates_queue"),
     ),
     _task(
         "countries.detect",
@@ -1154,11 +1169,11 @@ TASKS: tuple[Task, ...] = (
             "countries",
             "addresses.id",
             "addresses.normalized_text",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
-        writes=("address_country_candidates", "addresses.candidates_dirty"),
-        # Adresses marquées depuis la dernière résolution, que `countries.resolve` efface.
-        previous_run=("addresses.candidates_dirty",),
+        writes=("address_country_candidates",),
+        # Adresses marquées depuis la dernière résolution, que `countries.resolve` retire de la file.
+        previous_run=("address_candidates_queue",),
     ),
     _task(
         "countries.resolve",
@@ -1167,19 +1182,19 @@ TASKS: tuple[Task, ...] = (
             "address_country_candidates",
             "addresses.id",
             "addresses.countries",
-            "addresses.candidates_dirty",
+            "address_candidates_queue",
         ),
         writes=(
             "addresses.countries",
-            "addresses.countries_dirty",
-            "addresses.candidates_dirty",
+            "address_countries_queue",
+            "address_candidates_queue",
         ),
     ),
     _task(
         "countries.refresh_publication_countries",
         "countries",
         reads=(
-            "source_contributions.countries_dirty",
+            "source_contribution_countries_queue",
             "source_contributions.source_record_id",
             "source_contributions.countries",
             "source_contribution_addresses",
@@ -1189,7 +1204,7 @@ TASKS: tuple[Task, ...] = (
             "hal_structures",
             "hal_structure_aliases",
             "addresses.countries",
-            "addresses.countries_dirty",
+            "address_countries_queue",
             "source_records.publication_id",
             "source_records.countries",
             "publications.id",
@@ -1198,8 +1213,8 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.countries",
             "source_records.countries",
             "publications.countries",
-            "source_contributions.countries_dirty",
-            "addresses.countries_dirty",
+            "source_contribution_countries_queue",
+            "address_countries_queue",
         ),
     ),
     _task(

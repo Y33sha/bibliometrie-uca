@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays saisis à la main (candidats `manual`, unitairement ou par lot).
 
-La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/structures/countries/countries_queries.py`). Chaque saisie marque l'adresse `candidates_dirty` : le run suivant résout l'adresse si la résolution immédiate a échoué.
+La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/countries/`). Chaque saisie met l'adresse dans la file `address_candidates_queue` : le run suivant résout l'adresse si la résolution immédiate a échoué.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
@@ -12,13 +12,16 @@ from application.ports.repositories.address_repository import (
 )
 from domain.country_detection import CountryDetectionMethod
 from domain.errors import NotFoundError
+from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.db.tables import (
     address_country_candidates,
     address_structures,
-    addresses,
     countries,
 )
 from infrastructure.sql_fragments import address_country_conditions
+
+# Marque les adresses de la CTE `target(id, countries)`.
+_MARK_TARGET = enqueue_sql(Queue.ADDRESS_CANDIDATES, "SELECT id FROM target")
 
 
 class PgAddressRepository(AddressRepository):
@@ -130,10 +133,13 @@ class PgAddressRepository(AddressRepository):
         return row is not None
 
     def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
-        result = self._conn.execute(
-            update(addresses).where(addresses.c.id == address_id).values(candidates_dirty=True)
+        marked = enqueue(
+            self._conn,
+            Queue.ADDRESS_CANDIDATES,
+            "SELECT id FROM addresses WHERE id = :id",
+            {"id": address_id},
         )
-        if result.rowcount == 0:
+        if marked == 0:
             raise NotFoundError(f"Adresse {address_id} introuvable")
         self._conn.execute(
             delete(address_country_candidates).where(
@@ -159,17 +165,15 @@ class PgAddressRepository(AddressRepository):
         if not address_ids:
             return []
         result = self._conn.execute(
-            text("""
+            text(f"""
                 WITH target AS (
-                    UPDATE addresses SET candidates_dirty = true
-                    WHERE id = ANY(:ids)
-                    RETURNING id, countries
-                ), added AS (
+                    SELECT id, countries FROM addresses WHERE id = ANY(:ids)
+                ), marked AS ({_MARK_TARGET}), added AS (
                     INSERT INTO address_country_candidates (address_id, country_code, method)
                     SELECT DISTINCT t.id, code, 'manual'::country_detection_method
                     FROM target t
                     CROSS JOIN LATERAL unnest(
-                        coalesce(t.countries, '{}') || ARRAY[CAST(:cc AS char(2))]
+                        coalesce(t.countries, '{{}}') || ARRAY[CAST(:cc AS char(2))]
                     ) code
                     ON CONFLICT DO NOTHING
                 )

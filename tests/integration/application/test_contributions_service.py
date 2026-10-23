@@ -18,8 +18,12 @@ from application.services.contributions.core import (
 from domain.errors import NotFoundError
 from infrastructure.repositories import contribution_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.transformation.publications.contributions.contributions_queries import (
-    ContributionsBuild,
+from pipeline.transformation.publications.contributions.build_contributions import (
+    insert_missing_contributions,
+    prune_orphan_contributions,
+)
+from pipeline.transformation.publications.contributions.contributions import (
+    propagate_contribution_attributes,
 )
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from pipeline.transformation.structures.perimeter_evidence import (
@@ -52,7 +56,6 @@ _publication = partial(
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 _PERIMETER_RECOMPUTE = SourceContributionPerimeterRecompute()
-_BUILD = ContributionsBuild()
 
 
 @pytest.fixture
@@ -122,7 +125,7 @@ class TestExcludeContribution:
 
         exclude_contribution(contribution_id, repo=repo)
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
-        _BUILD.insert_missing_contributions(sa_sync_conn)
+        insert_missing_contributions(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -236,7 +239,7 @@ class TestRejectPair:
             text("UPDATE source_contributions SET person_id = :pid WHERE id = :i"),
             {"pid": person_id, "i": source_contribution_id},
         )
-        _BUILD.insert_missing_contributions(sa_sync_conn)
+        insert_missing_contributions(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -342,7 +345,7 @@ class TestPruneOrphanContributions:
         publication_id = _publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
-        n = _BUILD.prune_orphan_contributions(sa_sync_conn)
+        n = prune_orphan_contributions(sa_sync_conn)
 
         assert n == 1
         assert sa_sync_conn.execute(text("SELECT id FROM contributions")).first() is None
@@ -354,7 +357,7 @@ class TestPruneOrphanContributions:
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
 
-        n = _BUILD.prune_orphan_contributions(sa_sync_conn)
+        n = prune_orphan_contributions(sa_sync_conn)
 
         assert n == 0
         assert (
@@ -380,7 +383,7 @@ class TestPruneOrphanContributions:
         pub2 = _publication(sa_sync_conn, title="Autre")
         insert_contribution(sa_sync_conn, pub2, person_id=p_orphan2)
 
-        n = _BUILD.prune_orphan_contributions(sa_sync_conn)
+        n = prune_orphan_contributions(sa_sync_conn)
 
         assert n == 2
         rows = sa_sync_conn.execute(text("SELECT person_id FROM contributions")).all()
@@ -422,7 +425,7 @@ class TestPropagateContributionAttributes:
             {"w": source_contribution_wos, "h": source_contribution_hal},
         )
 
-        _BUILD.propagate_contribution_attributes(sa_sync_conn)
+        propagate_contribution_attributes(sa_sync_conn)
         assert self._attrs(sa_sync_conn, aid).is_corresponding is True
 
     def test_converges_when_sources_drop_signal(self, sa_sync_conn):
@@ -441,7 +444,7 @@ class TestPropagateContributionAttributes:
             {"id": source_contribution_id},
         )
 
-        _BUILD.propagate_contribution_attributes(sa_sync_conn)
+        propagate_contribution_attributes(sa_sync_conn)
         before = self._attrs(sa_sync_conn, aid)
         assert (before.is_corresponding, before.in_perimeter, before.roles) == (
             True,
@@ -457,7 +460,7 @@ class TestPropagateContributionAttributes:
             ),
             {"id": source_contribution_id},
         )
-        _BUILD.propagate_contribution_attributes(sa_sync_conn)
+        propagate_contribution_attributes(sa_sync_conn)
         after = self._attrs(sa_sync_conn, aid)
         # Convergence : tout retombe (le garde `IS NULL` historique figeait ces valeurs).
         assert (after.is_corresponding, after.in_perimeter, after.roles) == (
@@ -670,7 +673,7 @@ class TestRejectionAnchoredOnSourceRecords:
         )
         insert_confirmed_source_contribution(sa_sync_conn, confirmed, person_id=person_id)
 
-        _BUILD.insert_missing_contributions(sa_sync_conn)
+        insert_missing_contributions(sa_sync_conn)
 
         assert self._has_contribution(sa_sync_conn, publication_id, person_id)
 
@@ -692,6 +695,6 @@ class TestRejectionAnchoredOnSourceRecords:
         )
         insert_source_contribution(sa_sync_conn, new_source_record, person_id=person_id)
 
-        _BUILD.insert_missing_contributions(sa_sync_conn)
+        insert_missing_contributions(sa_sync_conn)
 
         assert not self._has_contribution(sa_sync_conn, publication_id, person_id)

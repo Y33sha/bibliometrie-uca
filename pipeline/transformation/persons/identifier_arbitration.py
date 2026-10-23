@@ -31,6 +31,7 @@ from domain.persons.matching import (
     identifier_misplaced,
 )
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
@@ -49,6 +50,15 @@ from pipeline.runtime.observability.log_format import (
 )
 from pipeline.runtime.observability.progress import waiting
 from pipeline.transformation.persons.store import PersonsStore
+
+# Marque pour le groupement des auteurs les publications des contributions sources de la CTE `modifiees`.
+_MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
+    Queue.PUBLICATION_CONTRIBUTIONS,
+    """
+    SELECT sr.publication_id FROM source_records sr
+    WHERE sr.id IN (SELECT source_record_id FROM modifiees) AND sr.publication_id IS NOT NULL
+    """,
+)
 
 
 class ContributorInformationIdentifier(NamedTuple):
@@ -121,7 +131,7 @@ def fetch_contributor_information_identifiers(
 def write_misplaced_neutralizations(
     conn: Connection, misplaced: Mapping[int, Sequence[str]]
 ) -> MisplacedNeutralizations:
-    """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications reçoivent `contributions_dirty`."""
+    """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications sont marquées pour le groupement des auteurs."""
     payload = [
         {
             "contributor_information_id": contributor_information_id,
@@ -163,12 +173,7 @@ def write_misplaced_neutralizations(
                 WHERE sc.id = c.id AND c.apres IS DISTINCT FROM c.avant
                 RETURNING sc.id, sc.source_record_id, sc.resolution_mode, c.avant, c.apres
             ),
-            regroupees AS (
-                UPDATE publications p SET contributions_dirty = true
-                FROM source_records sr
-                WHERE sr.id IN (SELECT source_record_id FROM modifiees)
-                  AND p.id = sr.publication_id AND NOT p.contributions_dirty
-            )
+            regroupees AS ({_MARK_MODIFIED_PUBLICATIONS})
             SELECT id,
                    coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
                    AND NOT {pinned("modifiees.id")} AS a_detacher
