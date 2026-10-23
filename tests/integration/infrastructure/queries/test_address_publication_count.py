@@ -1,12 +1,10 @@
-"""Tests de caractérisation pour `recompute_publication_count` (cache `addresses.publication_count`)."""
+"""Tests de caractérisation pour `recompute_address_publication_count` (cache `addresses.publication_count`)."""
 
 from sqlalchemy import text
 
 from pipeline.transformation.publications.contributions.address_publication_count import (
-    AddressPublicationCountQueries,
+    recompute_address_publication_count,
 )
-
-_Q = AddressPublicationCountQueries()
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -44,7 +42,7 @@ class TestRecomputePublicationCount:
                 "Shared Address",
             )
 
-        _Q.recompute_publication_count(sa_sync_conn)
+        recompute_address_publication_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -59,7 +57,7 @@ class TestRecomputePublicationCount:
         """Une adresse sans lien mais au publication_count figé (cache périmé) repasse à 0."""
         addr = insert_address(sa_sync_conn, "Stale", publication_count=42)
 
-        _Q.recompute_publication_count(sa_sync_conn)
+        recompute_address_publication_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(
@@ -76,7 +74,7 @@ class TestRecomputePublicationCount:
             "Orphan Address",
         )
 
-        _Q.recompute_publication_count(sa_sync_conn)
+        recompute_address_publication_count(sa_sync_conn)
 
         assert (
             sa_sync_conn.execute(

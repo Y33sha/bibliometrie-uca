@@ -28,7 +28,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publications.contributions.address_publication_count import (
-    AddressPublicationCountQueries,
+    recompute_address_publication_count,
 )
 from pipeline.transformation.publications.contributions.build_contributions import (
     build as build_contributions,
@@ -44,7 +44,10 @@ from pipeline.transformation.publishing.monographs import delete_empty_monograph
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
-from pipeline.transformation.publishing.publication_counts import PgPublicationCountsQueries
+from pipeline.transformation.publishing.publication_counts import (
+    refresh_journal_publication_counts,
+    refresh_publisher_publication_counts,
+)
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
@@ -79,8 +82,6 @@ def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> 
 @dataclass(frozen=True)
 class ContributionsPhase:
     build_queries: ContributionsBuild
-    publication_counts_queries: PgPublicationCountsQueries
-    address_publication_count_queries: AddressPublicationCountQueries
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
@@ -125,12 +126,7 @@ class ContributionsPhase:
             return metrics
 
         def publication_counts(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
-            _refresh_publication_counts(
-                ctx.open_tx,
-                self.publication_counts_queries,
-                self.address_publication_count_queries,
-                ctx.logger,
-            )
+            _refresh_publication_counts(ctx.open_tx, ctx.logger)
             return PhaseMetrics()
 
         sync_section = "Synchronisation des tables"
@@ -204,12 +200,7 @@ def _delete_empty_containers(
         ctx.logger.info("%s%s : %s", branch, label, sub.report or "rien à faire")
 
 
-def _refresh_publication_counts(
-    open_tx: OpenTransaction,
-    publication_counts_queries: PgPublicationCountsQueries,
-    address_publication_count_queries: AddressPublicationCountQueries,
-    logger: logging.Logger,
-) -> None:
+def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger) -> None:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
     Les trois se lisent des mêmes publications et contributions sources, stabilisées à ce point du pipeline. Le décompte des éditeurs somme celui des revues, donc le suit.
@@ -220,21 +211,21 @@ def _refresh_publication_counts(
 
     with waiting(f"{BRANCH}par adresse", logger) as line:
         with open_tx() as conn:
-            addresses = address_publication_count_queries.recompute_publication_count(conn)
+            addresses = recompute_address_publication_count(conn)
         line.conclude(
             f"{BRANCH}{quantity(addresses, 'adresse')} {inflect(addresses, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{BRANCH}par revue", logger) as line:
         with open_tx() as conn:
-            journals = publication_counts_queries.refresh_journal_publication_counts(conn)
+            journals = refresh_journal_publication_counts(conn)
         line.conclude(
             f"{BRANCH}{quantity(journals, 'revue')} {inflect(journals, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
         with open_tx() as conn:
-            publishers = publication_counts_queries.refresh_publisher_publication_counts(conn)
+            publishers = refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
 
@@ -245,8 +236,6 @@ def _refresh_publication_counts(
 def build() -> Phase:
     return ContributionsPhase(
         ContributionsBuild(),
-        PgPublicationCountsQueries(),
-        AddressPublicationCountQueries(),
         empty_containers=(
             (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
             (delete_empty_journals.LABEL, _run_delete_empty_journals),

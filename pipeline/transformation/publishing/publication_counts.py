@@ -36,51 +36,49 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
     )
 
 
-class PgPublicationCountsQueries:
-    """Recalcul en masse des `publication_count` sur `journals` puis `publishers`, en fin de phase `contributions`."""
+def refresh_journal_publication_counts(conn: Connection) -> int:
+    """Recalcule le `publication_count` de chaque revue.
 
-    def refresh_journal_publication_counts(self, conn: Connection) -> int:
-        """Recalcule le `publication_count` de chaque revue.
+    Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
+    """
+    return conn.execute(
+        text("""
+            WITH counts AS (
+                SELECT journal_id, COUNT(*) AS n
+                FROM publications
+                WHERE in_perimeter
+                  AND journal_id IS NOT NULL
+                GROUP BY journal_id
+            )
+            UPDATE journals j
+            SET publication_count = COALESCE(c.n, 0)
+            FROM journals j2
+            LEFT JOIN counts c ON c.journal_id = j2.id
+            WHERE j2.id = j.id AND j.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
+        """)
+    ).rowcount
 
-        Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
-        """
-        return conn.execute(
-            text("""
-                WITH counts AS (
-                    SELECT journal_id, COUNT(*) AS n
-                    FROM publications
-                    WHERE in_perimeter
-                      AND journal_id IS NOT NULL
-                    GROUP BY journal_id
-                )
-                UPDATE journals j
-                SET publication_count = COALESCE(c.n, 0)
-                FROM journals j2
-                LEFT JOIN counts c ON c.journal_id = j2.id
-                WHERE j2.id = j.id AND j.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
-            """)
-        ).rowcount
 
-    def refresh_publisher_publication_counts(self, conn: Connection) -> int:
-        """Recalcule le `publication_count` de chaque éditeur, somme de celui de ses revues.
+def refresh_publisher_publication_counts(conn: Connection) -> int:
+    """Recalcule le `publication_count` de chaque éditeur, somme de celui de ses revues.
 
-        À appeler après `refresh_journal_publication_counts`, dont il lit le résultat. Rend le nombre de lignes changées.
-        """
-        return conn.execute(
-            text("""
-                WITH counts AS (
-                    SELECT publisher_id, SUM(publication_count) AS n
-                    FROM journals
-                    WHERE publisher_id IS NOT NULL
-                    GROUP BY publisher_id
-                )
-                UPDATE publishers p
-                SET publication_count = COALESCE(c.n, 0)
-                FROM publishers p2
-                LEFT JOIN counts c ON c.publisher_id = p2.id
-                WHERE p2.id = p.id AND p.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
-            """)
-        ).rowcount
+    À appeler après `refresh_journal_publication_counts`, dont il lit le résultat. Rend le nombre de lignes changées.
+    """
+    return conn.execute(
+        text("""
+            WITH counts AS (
+                SELECT publisher_id, SUM(publication_count) AS n
+                FROM journals
+                WHERE publisher_id IS NOT NULL
+                GROUP BY publisher_id
+            )
+            UPDATE publishers p
+            SET publication_count = COALESCE(c.n, 0)
+            FROM publishers p2
+            LEFT JOIN counts c ON c.publisher_id = p2.id
+            WHERE p2.id = p.id AND p.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
+        """)
+    ).rowcount
 
 
 class PublicationCountRecompute:

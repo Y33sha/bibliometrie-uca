@@ -45,44 +45,45 @@ class _FakePurgeQueries:
         return self._lots.pop(0)
 
 
-class _FakePublicationCountsQueries:
+class _Counts:
+    """Décomptes appelés, dans l'ordre."""
+
     def __init__(self) -> None:
-        self.appels = 0
+        self.appels: list[str] = []
 
-    def refresh_journal_publication_counts(self, conn) -> int:
-        self.appels += 1
-        return 3
+    def counter(self, name: str, n: int):
+        def count(_conn) -> int:
+            self.appels.append(name)
+            return n
 
-    def refresh_publisher_publication_counts(self, conn) -> int:
-        self.appels += 1
-        return 2
+        return count
 
 
-class _FakeAddressPublicationCountQueries:
-    def __init__(self) -> None:
-        self.appels = 0
-
-    def recompute_publication_count(self, conn) -> int:
-        self.appels += 1
-        return 7
+def _patch_counts(counts: _Counts):
+    return (
+        patch.object(phase, "recompute_address_publication_count", counts.counter("adresses", 7)),
+        patch.object(phase, "refresh_journal_publication_counts", counts.counter("revues", 3)),
+        patch.object(phase, "refresh_publisher_publication_counts", counts.counter("éditeurs", 2)),
+    )
 
 
 def _run(contexte, lots, *, build_metrics=None):
     purge = _FakePurgeQueries(lots)
-    publication_counts = _FakePublicationCountsQueries()
-    adresses = _FakeAddressPublicationCountQueries()
+    counts = _Counts()
     metrics = build_metrics or PhaseMetrics(new=12)
     metrics.details.setdefault("summary", {})
+    addresses, journals, publishers = _patch_counts(counts)
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(
             phase, "purge_orphan_publications", side_effect=purge.purge_orphan_publications
         ),
+        addresses,
+        journals,
+        publishers,
     ):
-        rendu = phase.ContributionsPhase(_FakeBuildQueries(), publication_counts, adresses).run(
-            contexte()
-        )
-    return rendu, purge, publication_counts
+        rendu = phase.ContributionsPhase(_FakeBuildQueries()).run(contexte())
+    return rendu, purge, counts
 
 
 def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
@@ -91,7 +92,7 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
     assert rendu.details["summary"]["publications_purged"] == 10120
     assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
     assert open_tx.conn.commits == 3  # un commit par lot supprimé, aucun pour le lot vide
-    assert publication_counts.appels == 2  # revues puis éditeurs
+    assert publication_counts.appels == ["adresses", "revues", "éditeurs"]
 
 
 def test_rien_a_purger(open_tx, contexte):
@@ -155,15 +156,17 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
 
     metrics = PhaseMetrics(new=1)
     metrics.details["summary"] = {}
+    addresses, journals, publishers = _patch_counts(_Counts())
     with (
         patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(phase, "purge_orphan_publications", return_value=0),
+        addresses,
+        journals,
+        publishers,
         caplog.at_level(logging.INFO, logger="test"),
     ):
         rendu = phase.ContributionsPhase(
             _FakeBuildQueries(),
-            _FakePublicationCountsQueries(),
-            _FakeAddressPublicationCountQueries(),
             empty_containers=(
                 ("Monographies vides", suppression("monographies", 0)),
                 ("Revues vides", suppression("revues", 2)),
