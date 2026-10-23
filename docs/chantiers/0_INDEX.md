@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [Une source, un adaptateur](CODE_adaptateur-par-source.md)
 - [Résolution des personnes par groupe](DATA_resolution-personnes.md)
 
 ### En pause
@@ -31,6 +30,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-23 — [Une source, un adaptateur](archived/2026-10-23_CODE_adaptateur-par-source.md)
 - 2026-10-23 — [Conception du pipeline](archived/2026-10-23_CODE_conception-du-pipeline.md)
 - 2026-10-23 — [Files d'attente de recalcul](archived/2026-10-23_CODE_files-d-attente-de-recalcul.md)
 - 2026-10-21 — [Règles du domaine complètes et uniques](archived/2026-10-21_CODE_profondeur-du-domaine.md)

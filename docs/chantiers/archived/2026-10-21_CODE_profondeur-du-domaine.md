@@ -40,7 +40,7 @@ Classes d'identifiants : 15 value objects répètent `__post_init__`, `try_parse
 - Un fait évalué en SQL et en Python a un test de parité.
 - La projection SQL des faits que lisent les règles de correction se trouve à côté des règles. L'appelant demande la correction d'enregistrements sources, sans connaître les faits que lisent les règles.
 - Un fait inconnu vaut `None`. Une règle qui lit un fait inconnu ne s'applique pas.
-- `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](../CODE_adaptateur-par-source.md).
+- `PERSON_SEARCH_IDENTIFIERS` et les listes de sources propres aux phases relèvent du chantier [Une source, un adaptateur](2026-10-23_CODE_adaptateur-par-source.md).
 - La cascade de matching des personnes et le verdict d'une forme de nom relèvent du chantier [Résolution des personnes](../DATA_resolution-personnes.md).
 - `normalize` traduit le type de document et la langue dans le vocabulaire du référentiel. `raw_doc_type` et `raw_language` gardent la valeur de la source. `corrections` garde seulement les corrections par une règle : pour `doc_type`, la valeur traduite avant correction.
 - `application.ports` est la zone neutre de `infrastructure/` et du pipeline. `domain/config.py` reste dans le domaine : il définit les réglages et valide les valeurs saisies.
