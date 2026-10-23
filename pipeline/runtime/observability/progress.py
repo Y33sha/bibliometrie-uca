@@ -386,7 +386,7 @@ class Waiting:
         self._erase = True
 
     def close(self) -> None:
-        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne."""
+        """Arrête les points en laissant sur la ligne le libellé ou la conclusion posée, ou en effaçant la ligne. En terminal, la ligne laissée va aussi au journal, masquée au terminal (`detail`)."""
         self._finished.set()
         if self._stream is not None:
             if self._erase:
@@ -395,6 +395,8 @@ class Waiting:
                 self._label = self._conclusion or self._label
                 self._write("")
                 self._stream.write("\n")
+                if self._logger is not None:
+                    self._logger.info("%s", self._label, extra={"detail": True})
             self._stream.flush()
             self._stream = None
         elif self._conclusion and not self._erase and self._logger is not None:

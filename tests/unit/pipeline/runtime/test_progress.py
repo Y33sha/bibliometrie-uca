@@ -294,6 +294,16 @@ class TestAttente:
             ligne.conclude("Terminé en 12.3s")
         assert stream.getvalue().endswith(f"Terminé en 12.3s{module.CLEAR_TO_END_OF_LINE}\n")
 
+    def test_en_terminal_la_conclusion_va_aussi_au_journal(
+        self, avec_terminal, monkeypatch, caplog
+    ):
+        """Régression : en terminal, la conclusion restait au terminal, et le fichier de journal perdait la durée de l'étape."""
+        monkeypatch.setattr(module, "_bar_stream", io.StringIO())
+        with caplog.at_level(logging.INFO), module.waiting("en cours", _log()) as ligne:
+            ligne.conclude("Terminé en 12.3s")
+        [record] = [r for r in caplog.records if r.getMessage() == "Terminé en 12.3s"]
+        assert record.detail is True
+
     def test_une_sortie_capturee_recoit_une_ligne_de_journal(self, sans_terminal, caplog):
         with caplog.at_level(logging.INFO), module.waiting("maintenance des tables", _log()):
             pass
