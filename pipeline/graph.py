@@ -310,7 +310,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.staging_id",
             "source_records.publication_id",
         ),
-        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR, structures HAL et marquages, et les décisions qui les visent.
+        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_records.id",
             "source_record_keys_queue",
@@ -319,7 +319,6 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_addresses",
             "source_contribution_rors",
             "source_contribution_hal_structures",
-            "source_contribution_countries_queue",
             "confirmed_source_contributions",
             "rejected_contributions",
         ),
@@ -336,13 +335,8 @@ TASKS: tuple[Task, ...] = (
         "normalize.cleanup_orphan_addresses",
         "normalize",
         reads=("source_contribution_addresses", "addresses.id"),
-        # La suppression d'une adresse emporte ses liens aux structures et son marquage.
-        writes=(
-            "addresses.id",
-            "address_structures",
-            "address_countries_queue",
-            "address_candidates_queue",
-        ),
+        # La suppression d'une adresse emporte ses liens aux structures.
+        writes=("addresses.id", "address_structures"),
         # La normalisation vide `staging.raw_data`. `VACUUM FULL` en mode full.
         maintenance=("VACUUM staging",),
     ),
@@ -828,8 +822,7 @@ TASKS: tuple[Task, ...] = (
         "publications.delete_without_sources",
         "publications",
         reads=("publications.id", "source_records.publication_id"),
-        # La suppression d'une publication emporte son marquage.
-        writes=("publications.id", "publication_contributions_queue"),
+        writes=("publications.id",),
         # Lignes que `contributions.purge_orphan_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
@@ -1070,8 +1063,7 @@ TASKS: tuple[Task, ...] = (
         "contributions.purge_orphan_publications",
         "contributions",
         reads=("publications.id", "contributions"),
-        # La suppression d'une publication emporte son marquage.
-        writes=("publications.id", "publication_contributions_queue"),
+        writes=("publications.id",),
     ),
     _task(
         "contributions.delete_empty_containers",

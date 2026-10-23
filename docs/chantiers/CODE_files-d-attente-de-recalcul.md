@@ -25,7 +25,8 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 
 ## Décisions
 
-- **Une file d'attente par marqueur.** Une table étroite du schéma `queues`, nommée avec le suffixe `_queue`, car le graphe des tâches identifie les tables par leur nom sans schéma. Colonnes : `id`, clé primaire et clé étrangère `ON DELETE CASCADE` vers la table traitée ; `seq`, numéro de marquage tiré d'une séquence.
+- **Une file d'attente par marqueur.** Une table étroite du schéma `queues`, nommée avec le suffixe `_queue`, car le graphe des tâches identifie les tables par leur nom sans schéma. Colonnes : `id`, clé primaire ; `seq`, numéro de marquage tiré d'une séquence.
+- **Pas de clé étrangère vers la table traitée.** Sa vérification verrouille la ligne référencée à chaque marquage : marquer les 32 millions de contributions sources a réécrit toutes les pages de `source_contributions`. L'identifiant d'une ligne supprimée reste en file. La tâche qui lit la file l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
 - **Marquer, c'est insérer l'identifiant avec un nouveau `seq`.** Pour un identifiant déjà en file, le marquage renouvelle son `seq` (`ON CONFLICT DO UPDATE`).
 - **L'effacement porte sur les marquages traités.** La phase relève les couples `(id, seq)` au début, et supprime exactement ceux-là à la fin, par `DELETE`. Un marquage fait pendant la phase change `seq`, donc reste dans la file pour le run suivant. `TRUNCATE` bloquerait les marquages de l'API jusqu'à la fin de la phase.
 - **Une seule fonction marque, pour toutes les files** (`infrastructure/db/queues.py`). Chaque point de marquage l'appelle, et le graphe des tâches déclare l'écriture dans la file. Le code qui crée une ligne à traiter l'appelle aussi, à la place des marqueurs à vrai par défaut (`keys_dirty`, `contributions_dirty`, `countries_dirty` des contributions sources, `candidates_dirty`).

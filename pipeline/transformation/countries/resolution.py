@@ -20,7 +20,14 @@ _SNAPSHOT = "address_candidates_marks"
 def resolve_queued_addresses(conn: Connection) -> int:
     """Compose `addresses.countries` pour les adresses en file, puis supprime les marquages traités. Retourne le nombre d'adresses dont le pays change."""
     snapshot(conn, Queue.ADDRESS_CANDIDATES, _SNAPSHOT)
-    address_ids = list(conn.execute(text(f"SELECT id FROM {_SNAPSHOT} ORDER BY id")).scalars())  # noqa: S608
+    address_ids = list(
+        conn.execute(
+            text(
+                f"SELECT m.id FROM {_SNAPSHOT} m"  # noqa: S608
+                " JOIN addresses a ON a.id = m.id ORDER BY m.id"
+            )
+        ).scalars()
+    )
     changed = resolve_address_countries(conn, address_ids)
     delete_processed(conn, Queue.ADDRESS_CANDIDATES, _SNAPSHOT)
     conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))

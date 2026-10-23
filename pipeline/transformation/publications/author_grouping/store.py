@@ -192,7 +192,12 @@ class SourceContributionGroupStore:
         queue = Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
-            self._conn.execute(text(f"SELECT count(*) FROM {_ATTRIBUTES_SNAPSHOT}")).scalar_one()  # noqa: S608
+            self._conn.execute(
+                text(
+                    f"SELECT count(*) FROM {_ATTRIBUTES_SNAPSHOT} t"  # noqa: S608
+                    " JOIN source_contribution_groups g ON g.id = t.id"
+                )
+            ).scalar_one()
         )
         updated = self._conn.execute(
             text(propagate_group_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
@@ -214,12 +219,13 @@ class SourceContributionGroupStore:
         )
 
     def snapshot_queued_publications(self) -> list[tuple[int, int]]:
-        """Relève la file des publications à regrouper. Rend ces publications, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+        """Relève la file des publications à regrouper. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         snapshot(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT)
         rows = self._conn.execute(
             text(f"""
                 SELECT t.id, coalesce(sum(sr.author_count), 0)::integer AS source_contributions
                 FROM {_SNAPSHOT} t
+                JOIN publications p ON p.id = t.id
                 LEFT JOIN source_records sr ON sr.publication_id = t.id
                 GROUP BY t.id
                 ORDER BY t.id
@@ -227,8 +233,8 @@ class SourceContributionGroupStore:
         ).all()
         return [(r.id, r.source_contributions) for r in rows]
 
-    def delete_processed_marks(self, publication_ids: Sequence[int]) -> None:
-        """Supprime de la file les marquages relevés de ces publications."""
+    def delete_processed_marks(self, publication_ids: Sequence[int] | None = None) -> None:
+        """Supprime de la file les marquages relevés de ces publications, ou tous les marquages relevés."""
         delete_processed(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT, publication_ids)
 
     def drop_snapshot(self) -> None:

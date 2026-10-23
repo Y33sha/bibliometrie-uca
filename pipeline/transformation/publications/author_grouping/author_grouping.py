@@ -279,6 +279,7 @@ def build_groups(
     publication_ids = [publication_id for publication_id, _ in dirty]
     step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
+        store.delete_processed_marks()
         store.drop_snapshot()
         nothing_to_do(logger)
         return PhaseMetrics()
@@ -295,6 +296,8 @@ def build_groups(
             group_count += regroup(store, batch, methods, progress.advance, mapper)
             store.delete_processed_marks(batch)
             conn.commit()
+    # Marquages relevés des publications supprimées.
+    store.delete_processed_marks()
     store.drop_snapshot()
     step(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()

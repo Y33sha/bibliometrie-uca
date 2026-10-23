@@ -435,6 +435,17 @@ def test_le_groupement_marque_les_groupes_pour_la_recomposition_de_leurs_attribu
     assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == groups
 
 
+def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
+    publication = insert_publication(conn)
+    conn.execute(text("DELETE FROM publications WHERE id = :p"), {"p": publication})
+    assert _dirty(conn, publication)
+
+    metrics = _run(conn)
+
+    assert metrics.seen == 0
+    assert not _dirty(conn, publication)
+
+
 def test_un_marquage_fait_pendant_le_groupement_reste_en_file(conn):
     """Régression : le groupement effaçait le marquage d'une publication remarquée après son relevé."""
     publication = insert_publication(conn)

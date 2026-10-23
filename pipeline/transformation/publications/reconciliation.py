@@ -174,9 +174,16 @@ def mark_publication_siblings(conn: Connection) -> int:
 
 
 def snapshot_queued_source_records(conn: Connection) -> list[int]:
-    """Relève la file des `source_records` à réconcilier, orphelines comprises : la réconciliation est aussi l'assignation. Rend leurs identifiants, que `delete_processed_marks` retire de la file."""
+    """Relève la file des `source_records` à réconcilier, orphelines comprises : la réconciliation est aussi l'assignation. Rend les identifiants de celles qui existent. `delete_processed_marks` retire de la file tous les marquages relevés."""
     snapshot(conn, Queue.SOURCE_RECORD_KEYS, _SNAPSHOT)
-    return list(conn.execute(text(f"SELECT id FROM {_SNAPSHOT} ORDER BY id")).scalars())  # noqa: S608
+    return list(
+        conn.execute(
+            text(
+                f"SELECT m.id FROM {_SNAPSHOT} m"  # noqa: S608
+                " JOIN source_records sr ON sr.id = m.id ORDER BY m.id"
+            )
+        ).scalars()
+    )
 
 
 def delete_processed_marks(conn: Connection) -> None:

@@ -1580,7 +1580,6 @@ pipeline_phase_executions = Table(
 
 # ── Files d'attente de recalcul ───────────────────────────────────
 # Identifiants des lignes qu'une tâche du pipeline doit traiter (`infrastructure.db.queues`).
-# `id` : clé étrangère `ON DELETE CASCADE` vers la table traitée, déclarée en migration.
 
 
 def _queue(name: str) -> Table:
