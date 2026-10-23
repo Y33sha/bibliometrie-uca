@@ -792,6 +792,8 @@ source_contribution_groups = Table(
         "liste la plus longue. Une personne correspond au maximum à un groupe par publication."
     ),
     schema="publications",
+    # Place gardée dans chaque page pour les mises à jour HOT des attributs et de `reference_position`.
+    postgresql_with={"fillfactor": 90},
 )
 
 
@@ -981,6 +983,8 @@ source_contributions = Table(
     # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
     # qui rejoint `contributor_information` sur `contributor_information_id`.
     schema="sources",
+    # Place gardée dans chaque page pour les mises à jour HOT de `countries`, `perimeter_evidence` et `neutralized_identifiers`.
+    postgresql_with={"fillfactor": 90},
 )
 
 
