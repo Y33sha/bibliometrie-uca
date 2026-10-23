@@ -45,7 +45,15 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 - [x] Marquage dans `normalize`, `ror.py`, `hal_structures.py` et `resolution.py`, qui sert aussi à l'API. Le recalcul des pays marque seulement les adresses dont le pays change.
 - [x] `create_dirty_scope` lit les files. L'effacement supprime les marquages du périmètre.
 - [x] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
-- [ ] Mesurer la phase `countries` sur le même volume qu'au 22 octobre 2026.
+- [x] Mesurer la phase `countries`. Run 462 du 23 octobre 2026 : 32 millions de contributions sources en file, dont 10,8 millions à recalculer.
+
+  | Étape | Durée |
+  |---|---|
+  | Relevé de la file, portée | 425 s |
+  | Contributions sources | 292 s |
+  | Enregistrements sources | 250 s |
+  | Publications | 21 s |
+  | Suppression des marquages traités | 145 s |
 
 ### Phase 2 — Candidats pays des adresses
 

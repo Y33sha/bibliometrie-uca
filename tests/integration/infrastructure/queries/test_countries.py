@@ -1,5 +1,7 @@
 """Tests d'intégration du SQL de la phase `countries` : candidats, résolution, recopie en cascade."""
 
+import logging
+
 from sqlalchemy import text
 
 from domain.country_detection import CountryDetectionMethod
@@ -8,6 +10,7 @@ from pipeline.transformation.countries.refresh_publication_countries import (
     create_dirty_scope,
     delete_processed_marks,
     drop_dirty_scope,
+    refresh,
     refresh_publication_countries,
     refresh_source_contribution_countries,
     refresh_source_record_countries,
@@ -187,6 +190,21 @@ class TestRefreshAddressSourceCountries:
             {"sd": source_record},
         ).scalar_one()
         assert result == ["FR"]
+
+    def test_le_journal_accorde_les_enregistrements_sources_mis_a_jour(self, sa_sync_conn, caplog):
+        """Régression : le journal écrivait « enregistrements sources mises à jour »."""
+        ensure_country(sa_sync_conn, "FR")
+        source_record = insert_source_record(
+            sa_sync_conn, insert_publication(sa_sync_conn), source="openalex", source_id="oa-j"
+        )
+        sa = insert_source_contribution(sa_sync_conn, source_record, source="openalex")
+        addr = insert_address(sa_sync_conn, "Lyon", countries=["FR"], normalized_text="Lyon")
+        insert_source_contribution_address(sa_sync_conn, sa, address_id=addr)
+
+        with caplog.at_level(logging.INFO):
+            refresh(sa_sync_conn, logging.getLogger(__name__))
+
+        assert "1 enregistrement source mis à jour" in caplog.text
 
     def test_noop_without_address_countries(self, sa_sync_conn):
         publication_id = insert_publication(sa_sync_conn)

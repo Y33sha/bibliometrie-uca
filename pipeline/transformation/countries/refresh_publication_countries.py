@@ -234,16 +234,25 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
         time.perf_counter() - t0,
     )
-    for singular, plural, refresh_step in (
-        ("enregistrement source", "enregistrements sources", refresh_source_record_countries),
-        ("publication", "publications", refresh_publication_countries),
+    for label, singular, plural, refresh_step in (
+        (
+            "enregistrements sources",
+            "enregistrement source mis à jour",
+            "enregistrements sources mis à jour",
+            refresh_source_record_countries,
+        ),
+        (
+            "publications",
+            "publication mise à jour",
+            "publications mises à jour",
+            refresh_publication_countries,
+        ),
     ):
         t0 = time.perf_counter()
-        with waiting(f"{BRANCH}{plural} : en cours", logger) as line:
+        with waiting(f"{BRANCH}{label} : en cours", logger) as line:
             updated = refresh_step(conn)
             line.conclude(
-                f"{BRANCH}{quantity(updated, f'{singular} mise à jour', f'{plural} mises à jour')}"
-                f" en {time.perf_counter() - t0:.1f} s"
+                f"{BRANCH}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
             )
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}suppression des marquages traités : en cours", logger) as line:
