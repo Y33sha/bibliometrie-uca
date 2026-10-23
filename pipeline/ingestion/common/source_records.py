@@ -19,6 +19,7 @@ from domain.source_records.external_ids import normalize_external_ids
 from domain.source_records.languages import language_code
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
+from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.scalars import scalar_int
 
 logger = logging.getLogger(__name__)
@@ -192,18 +193,17 @@ def _external_ids(row: SourceRecordUpsert) -> dict[str, JsonValue]:
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
     """Supprime les `source_records` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
 
-    Les `source_records` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication reçoit `contributions_dirty`. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_contributions` suivent par cascade. Rend le nombre de `source_records` supprimées.
+    Les `source_records` rattachées à la même publication sont d'abord marquées `keys_dirty` : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication est marquée pour le groupement des auteurs. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_contributions` suivent par cascade. Rend le nombre de `source_records` supprimées.
     """
-    conn.execute(
-        text(f"""
-            UPDATE publications p
-            SET contributions_dirty = true
+    enqueue(
+        conn,
+        Queue.PUBLICATION_CONTRIBUTIONS,
+        f"""
+            SELECT sr.publication_id
             FROM source_records sr
             JOIN staging s ON s.id = sr.staging_id
-            WHERE {staging_filter}
-              AND p.id = sr.publication_id
-              AND NOT p.contributions_dirty
-        """),  # noqa: S608
+            WHERE {staging_filter} AND sr.publication_id IS NOT NULL
+        """,  # noqa: S608
         params,
     )
     # noqa S608 : `staging_filter` est une constante de ce module, jamais une entrée.

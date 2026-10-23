@@ -53,9 +53,10 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ### Phase 3 — Groupement des auteurs
 
-- [ ] File `publication_contributions_queue`, remplie depuis `contributions_dirty`.
-- [ ] Marquage dans `normalize`, `metadata_correction`, la réconciliation des publications et l'arbitrage des identifiants. Le `--rebuild` de `author_grouping` remplit la file avec toutes les publications.
-- [ ] `author_grouping` lit la file par lots, et supprime chaque lot traité.
+- [x] File `publication_contributions_queue`, remplie depuis `contributions_dirty`.
+- [x] Marquage dans `normalize`, `metadata_correction`, la création et la réconciliation des publications, l'arbitrage des identifiants et la fonction `regroup_identifier_publications` des déclencheurs de l'API. Le `--rebuild` de `author_grouping` remplit la file avec toutes les publications.
+- [x] `author_grouping` relève la file au début, et supprime les marquages de chaque lot avant son commit.
+- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 4 — Réconciliation des publications
 

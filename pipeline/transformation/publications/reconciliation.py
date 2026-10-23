@@ -27,6 +27,7 @@ from domain.source_records.keys import (
     project_confirmation_keys,
 )
 from domain.types import JsonValue
+from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
 from pipeline.runtime.observability.log_format import (
@@ -238,15 +239,16 @@ def detach_source_records(conn: Connection, source_record_ids: list[int]) -> Non
     conn.execute(stmt, {"ids": source_record_ids})
 
 
-def mark_contributions_dirty(conn: Connection, publication_ids: list[int]) -> int:
-    """Pose `contributions_dirty` sur ces publications. Retourne le nombre de publications marquées."""
+def mark_publications_for_grouping(conn: Connection, publication_ids: list[int]) -> int:
+    """Marque ces publications pour le groupement des auteurs. Retourne le nombre de publications marquées."""
     if not publication_ids:
         return 0
-    stmt = text(
-        "UPDATE publications SET contributions_dirty = true"
-        " WHERE id = ANY(:ids) AND NOT contributions_dirty"
-    ).bindparams(bindparam("ids"))
-    return conn.execute(stmt, {"ids": publication_ids}).rowcount
+    return enqueue(
+        conn,
+        Queue.PUBLICATION_CONTRIBUTIONS,
+        "SELECT unnest(CAST(:ids AS integer[]))",
+        {"ids": publication_ids},
+    )
 
 
 def clear_keys_dirty(conn: Connection, source_record_ids: list[int]) -> int:
@@ -424,7 +426,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
                 lifecycle.refresh(conn, publication_id)
 
     # 5. Les publications qui gagnent ou perdent un enregistrement source regroupent leurs contributions sources.
-    mark_contributions_dirty(conn, sorted(membership_changed - dissolved_ids))
+    mark_publications_for_grouping(conn, sorted(membership_changed - dissolved_ids))
     clear_keys_dirty(conn, dirty_ids)
     return ReconcileStats(
         processed=len(dirty_ids),

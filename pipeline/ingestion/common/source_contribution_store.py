@@ -14,7 +14,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.country_detection import CountryDetectionMethod
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.db.queues import Queue, enqueue_sql
+from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from pipeline.transformation.countries.store import CountryCandidatesStore
 
 
@@ -256,14 +256,12 @@ class SourceContributionStore:
         ).all()
         return [StoredSourceContributionRow(*r) for r in rows]
 
-    def mark_contributions_dirty(self, source_record_id: int) -> None:
-        """Pose `contributions_dirty` sur la publication de l'enregistrement source."""
-        self._conn.execute(
-            text("""
-                UPDATE publications p SET contributions_dirty = true
-                FROM source_records sr
-                WHERE sr.id = :spid AND p.id = sr.publication_id AND NOT p.contributions_dirty
-            """),
+    def mark_publication_for_grouping(self, source_record_id: int) -> None:
+        """Marque la publication de l'enregistrement source pour le groupement des auteurs."""
+        enqueue(
+            self._conn,
+            Queue.PUBLICATION_CONTRIBUTIONS,
+            "SELECT publication_id FROM source_records WHERE id = :spid AND publication_id IS NOT NULL",
             {"spid": source_record_id},
         )
 

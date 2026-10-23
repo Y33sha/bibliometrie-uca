@@ -5,8 +5,9 @@ import json
 
 from sqlalchemy import Connection
 
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue
 from tests.integration.helpers.contributions import upsert_contributor_information
+from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
@@ -145,12 +146,7 @@ def insert_source_contribution(
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
         },
     )
-    enqueue(
-        conn,
-        Queue.SOURCE_CONTRIBUTION_COUNTRIES,
-        "SELECT CAST(:id AS integer)",
-        {"id": source_contribution_id},
-    )
+    mark(conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES, [source_contribution_id])
     return source_contribution_id
 
 

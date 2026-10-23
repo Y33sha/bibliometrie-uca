@@ -82,10 +82,12 @@ GRANT INSERT, UPDATE, DELETE ON
     persons.confirmed_source_contributions
 TO bibliometrie_app;
 
--- Une saisie manuelle de pays marque l'adresse saisie, et les adresses dont le pays change,
--- par `INSERT … ON CONFLICT DO UPDATE`.
+-- Une saisie manuelle de pays marque l'adresse saisie, et les adresses dont le pays change.
+-- Une décision sur un ORCID ou un IdRef, ou la correction d'un prénom, marque les
+-- publications à regrouper. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
 GRANT INSERT, UPDATE ON
-    queues.address_candidates_queue, queues.address_countries_queue
+    queues.address_candidates_queue, queues.address_countries_queue,
+    queues.publication_contributions_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON

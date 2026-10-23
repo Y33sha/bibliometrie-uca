@@ -9,8 +9,11 @@ from domain.merge import MergedEntity
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.types import JsonValue
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.db.scalars import scalar_int
 from infrastructure.repositories.merge_steps import record_redirect
+
+_MARK_INSERTED = enqueue_sql(Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM inserted")
 
 
 class PublicationStore:
@@ -171,15 +174,19 @@ class PublicationStore:
         doi: str | None,
         oa_status: str,
     ) -> int:
-        """Insère une publication (INSERT brut, la déduplication relève du caller) et retourne son `id`. Les colonnes hors NOT NULL et DOI prennent leur défaut ; `save` les pose."""
+        """Insère une publication (INSERT brut, la déduplication relève du caller), la marque pour le groupement des auteurs, et retourne son `id`. Les colonnes hors NOT NULL et DOI prennent leur défaut ; `save` les pose."""
         return scalar_int(
             self._conn.execute(
-                text("""
-                INSERT INTO publications
-                    (title, title_normalized, doc_type, publication_year, doi, oa_status)
-                VALUES (:title, :tn, CAST(:doc_type AS doc_type), :py, :doi,
-                        CAST(:oa AS oa_type))
-                RETURNING id
+                text(f"""
+                WITH inserted AS (
+                    INSERT INTO publications
+                        (title, title_normalized, doc_type, publication_year, doi, oa_status)
+                    VALUES (:title, :tn, CAST(:doc_type AS doc_type), :py, :doi,
+                            CAST(:oa AS oa_type))
+                    RETURNING id
+                ),
+                marked AS ({_MARK_INSERTED})
+                SELECT id FROM inserted
             """),
                 {
                     "title": title,

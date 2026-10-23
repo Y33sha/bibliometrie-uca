@@ -7,6 +7,7 @@ from functools import partial
 from sqlalchemy import text
 
 from domain.dates import today
+from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.correction import journal_by_doi
 from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
 from pipeline.transformation.publications.correction.correct_unary import compute_update
@@ -20,6 +21,7 @@ from tests.integration.helpers.journals import (
     insert_publisher,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de titre « T », OpenAlex par défaut.
@@ -653,13 +655,13 @@ def test_une_correction_de_doi_regroupe_les_contributions_sources_de_la_publicat
         },
     )
     insert_source_record(conn, other, source="openalex", source_id="W-other", title="Other")
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
     assert _apply_cluster(conn) == 1
 
-    dirty = dict(conn.execute(text("SELECT id, contributions_dirty FROM publications")).all())
-    assert dirty[publication] is True
-    assert dirty[other] is False
+    marked = queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+    assert publication in marked
+    assert other not in marked
 
 
 def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):

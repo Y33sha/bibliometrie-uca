@@ -280,7 +280,7 @@ TASKS: tuple[Task, ...] = (
                 "addresses.id",
                 "address_candidates_queue",
                 "address_country_candidates",
-                "publications.contributions_dirty",
+                "publication_contributions_queue",
                 "source_contribution_countries_queue",
                 *_containers(source),
             ),
@@ -309,7 +309,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_records.id",
             "source_records.keys_dirty",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "source_contributions.id",
             "source_contribution_addresses",
             "source_contribution_rors",
@@ -780,7 +780,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.external_ids",
             "source_records.corrections",
             "source_records.keys_dirty",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
         ),
         previous_run=("source_records",),
     ),
@@ -802,6 +802,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.keys_dirty",
             "apc_payments.publication_id",
+            "publication_contributions_queue",
         ),
         # Verdicts d'Unpaywall ; publications que `contributions.purge_orphan_publications` supprime ; revues et monographies vides supprimées par `contributions.delete_empty_containers`.
         previous_run=(
@@ -817,7 +818,8 @@ TASKS: tuple[Task, ...] = (
         "publications.delete_without_sources",
         "publications",
         reads=("publications.id", "source_records.publication_id"),
-        writes=("publications.id",),
+        # La suppression d'une publication emporte son marquage.
+        writes=("publications.id", "publication_contributions_queue"),
         # Lignes que `contributions.purge_orphan_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
@@ -826,7 +828,7 @@ TASKS: tuple[Task, ...] = (
         "author_grouping",
         reads=(
             "publications.id",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "source_records.publication_id",
             "source_records.source_id",
             "source_records.corrections",
@@ -851,13 +853,13 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_groups.resolution_mode",
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; drapeau que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
+        # Publications que `contributions.purge_orphan_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "person_identifiers",
             "persons",
             "source_contributions.neutralized_identifiers",
@@ -908,7 +910,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.resolution_mode",
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
-            "publications.contributions_dirty",
+            "publication_contributions_queue",
             "persons",
             "person_identifiers",
             "person_name_forms",
@@ -1055,7 +1057,8 @@ TASKS: tuple[Task, ...] = (
         "contributions.purge_orphan_publications",
         "contributions",
         reads=("publications.id", "contributions"),
-        writes=("publications.id",),
+        # La suppression d'une publication emporte son marquage.
+        writes=("publications.id", "publication_contributions_queue"),
     ),
     _task(
         "contributions.delete_empty_containers",

@@ -3,6 +3,8 @@
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text
+from infrastructure.db.queues import Queue
+from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
 
@@ -22,13 +24,13 @@ def insert_publication(
     sources: list[str] | None = None,
     in_perimeter: bool | None = None,
 ) -> int:
-    """Insère une publication et renvoie son `id`. `row_id` fixe l'`id`.
+    """Insère une publication, la marque pour le groupement des auteurs comme la phase `publications`, et renvoie son `id`. `row_id` fixe l'`id`.
 
     `title_normalized` vaut par défaut le titre normalisé, NULL si `normalize_title` est faux. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma, `doc_type` compris.
     """
     if title_normalized is None and normalize_title:
         title_normalized = normalize_text(title)
-    return insert_row(
+    publication_id = insert_row(
         conn,
         "publications",
         {
@@ -51,6 +53,8 @@ def insert_publication(
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
         },
     )
+    mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication_id])
+    return publication_id
 
 
 def insert_publication_relation(

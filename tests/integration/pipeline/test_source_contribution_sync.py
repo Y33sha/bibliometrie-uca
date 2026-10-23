@@ -184,9 +184,7 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
 
 
 def _contributions_dirty(conn, publication_id: int) -> bool:
-    return conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :p"), {"p": publication_id}
-    ).scalar_one()
+    return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
 def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_roles(sa_sync_conn):
@@ -198,7 +196,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
         source_record,
         [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")]), _rec(1, "Xu, Z.")],
     )
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
     _write(
         conn,
@@ -214,7 +212,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
     )
     assert _contributions_dirty(conn, publication)
 
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
         conn,
         source_record,
@@ -227,7 +225,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
     )
     assert _contributions_dirty(conn, publication)
 
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
         conn,
         source_record,

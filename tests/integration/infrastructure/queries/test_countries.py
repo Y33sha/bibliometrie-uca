@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from domain.country_detection import CountryDetectionMethod
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue
 from pipeline.transformation.countries.refresh_publication_countries import (
     create_dirty_scope,
     delete_processed_marks,
@@ -19,7 +19,7 @@ from pipeline.transformation.countries.resolution import (
 from pipeline.transformation.countries.store import CountryCandidatesStore
 from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.queues import queued, unmark
+from tests.integration.helpers.queues import mark, queued, unmark
 from tests.integration.helpers.sources import (
     insert_source_contribution,
     insert_source_contribution_address,
@@ -410,12 +410,7 @@ class TestDirtyDrivenSourceCountries:
         )
 
         create_dirty_scope(sa_sync_conn)
-        enqueue(
-            sa_sync_conn,
-            Queue.SOURCE_CONTRIBUTION_COUNTRIES,
-            "SELECT CAST(:id AS integer)",
-            {"id": remarked},
-        )
+        mark(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES, [remarked])
         added = insert_source_contribution(
             sa_sync_conn, source_record, source="openalex", author_position=2
         )

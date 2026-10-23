@@ -1166,16 +1166,6 @@ publications = Table(
     # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
-    Column(
-        "contributions_dirty",
-        Boolean,
-        nullable=False,
-        server_default="true",
-        comment=(
-            "Groupes de contributions sources à recalculer : un enregistrement source a rejoint ou "
-            "quitté la publication, ou ses contributions sources ont changé."
-        ),
-    ),
     # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
     # publication_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
@@ -1607,6 +1597,7 @@ def _queue(name: str) -> Table:
 source_contribution_countries_queue = _queue("source_contribution_countries_queue")
 address_countries_queue = _queue("address_countries_queue")
 address_candidates_queue = _queue("address_candidates_queue")
+publication_contributions_queue = _queue("publication_contributions_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

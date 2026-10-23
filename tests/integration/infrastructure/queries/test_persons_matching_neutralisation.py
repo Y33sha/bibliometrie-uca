@@ -3,6 +3,7 @@
 from sqlalchemy import text
 
 from domain.persons.matching import ResolutionMode
+from infrastructure.db.queues import Queue
 from pipeline.transformation.persons.identifier_arbitration import (
     MisplacedNeutralizations,
     fetch_identifier_votes,
@@ -13,6 +14,7 @@ from tests.integration.helpers.contributions import upsert_contributor_informati
 from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _ORCID = "0000-0001-2345-6789"
@@ -118,16 +120,11 @@ def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
         ),
         {"id": source_contribution_id},
     ).scalar_one()
-    sa_sync_conn.execute(
-        text("UPDATE publications SET contributions_dirty = false WHERE id = :id"),
-        {"id": publication_id},
-    )
+    clear(sa_sync_conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
     write_misplaced_neutralizations(sa_sync_conn, {contributor_information_id: ["orcid"]})
 
-    assert sa_sync_conn.execute(
-        text("SELECT contributions_dirty FROM publications WHERE id = :id"), {"id": publication_id}
-    ).scalar_one()
+    assert queued(sa_sync_conn, Queue.PUBLICATION_CONTRIBUTIONS) == {publication_id}
 
 
 def test_shared_prime_sur_misplaced(sa_sync_conn):

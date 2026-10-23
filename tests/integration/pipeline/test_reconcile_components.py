@@ -10,6 +10,7 @@ from sqlalchemy import bindparam, text
 
 from domain.merge import MergedEntity
 from domain.source_records.keys import project_confirmation_keys
+from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.reconciliation import (
     fetch_dirty_source_record_ids,
     fetch_reconciliation_universe,
@@ -18,6 +19,7 @@ from pipeline.transformation.publications.reconciliation import (
     reconcile,
 )
 from pipeline.transformation.publications.store import PublicationStore
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -188,13 +190,13 @@ class TestEndToEnd:
         _source_record(conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False)
         _source_record(conn, publication_b, source_id="c", doi="10.1/y", keys_dirty=False)
         _source_record(conn, untouched, source_id="d", doi="10.9/z")
-        conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+        clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
         reconcile(conn, logger)
 
-        dirty = dict(conn.execute(text("SELECT id, contributions_dirty FROM publications")).all())
-        assert dirty[publication_a] and dirty[publication_b]
-        assert not dirty[untouched]
+        marked = queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+        assert {publication_a, publication_b} <= marked
+        assert untouched not in marked
 
     def test_sans_document_a_retraiter_le_journal_dit_rien_a_faire(self, sa_sync_conn, caplog):
         conn = sa_sync_conn

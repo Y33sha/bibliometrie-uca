@@ -1,6 +1,6 @@
 """Phase `author_grouping` : groupes des contributions sources d'un même auteur dans chaque publication (`source_contribution_groups`, `source_contribution_group_members`).
 
-Les publications marquées `contributions_dirty` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de contributions sources.
 
 Tâche `author_grouping.build`.
 """
@@ -267,18 +267,19 @@ def build_groups(
     *,
     rebuild: bool = False,
 ) -> PhaseMetrics:
-    """Recalcule les groupes des publications marquées, lot par lot, avec un commit par lot. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
+    """Recalcule les groupes des publications en file, lot par lot, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
 
     `rebuild` marque d'abord toutes les publications, pour appliquer une évolution des règles d'alignement sur tout le stock. Le marquage est commité aussitôt : un run interrompu reprend les publications restantes.
     """
     if rebuild:
-        marked = store.mark_all_dirty()
+        marked = store.mark_all()
         conn.commit()
         step(logger, "%s marquées à regrouper", quantity(marked, "publication"))
-    dirty = store.fetch_dirty_publications()
+    dirty = store.snapshot_queued_publications()
     publication_ids = [publication_id for publication_id, _ in dirty]
     step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
     if not publication_ids:
+        store.drop_snapshot()
         nothing_to_do(logger)
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
@@ -292,7 +293,9 @@ def build_groups(
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
             group_count += regroup(store, batch, methods, progress.advance, mapper)
+            store.delete_processed_marks(batch)
             conn.commit()
+    store.drop_snapshot()
     step(logger, "Recouvrement des listes d'auteurs")
     t0 = time.perf_counter()
     with waiting(LAST_BRANCH, logger) as line:

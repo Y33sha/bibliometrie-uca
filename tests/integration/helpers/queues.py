@@ -1,8 +1,15 @@
-"""Lecture et vidage des files d'attente de recalcul."""
+"""Marquage, lecture et vidage des files d'attente de recalcul."""
+
+from collections.abc import Iterable
 
 from sqlalchemy import Connection, text
 
-from infrastructure.db.queues import Queue
+from infrastructure.db.queues import Queue, enqueue
+
+
+def mark(conn: Connection, queue: Queue, row_ids: Iterable[int]) -> None:
+    """Marque `row_ids` dans `queue`."""
+    enqueue(conn, queue, "SELECT unnest(CAST(:ids AS integer[]))", {"ids": list(row_ids)})
 
 
 def queued(conn: Connection, queue: Queue) -> set[int]:

@@ -8,9 +8,11 @@ from unittest.mock import MagicMock
 
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.source_records import delete_disappeared_source_records
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.transformation.publications.store import PublicationStore
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.staging import insert_staging
 
@@ -128,13 +130,11 @@ def test_la_publication_de_l_enregistrement_source_disparu_regroupe_ses_contribu
     _source_record(
         conn, autre, source_id="hal-autre", staging_id=_staging(conn, source_id="hal-autre")
     )
-    conn.execute(text("UPDATE publications SET contributions_dirty = false"))
+    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
     delete_disappeared_source_records(conn)
 
-    dirty = dict(conn.execute(text("SELECT id, contributions_dirty FROM publications")).all())
-    assert dirty[publication] is True
-    assert dirty[autre] is False
+    assert queued(conn, Queue.PUBLICATION_CONTRIBUTIONS) == {publication}
 
 
 def test_le_document_encore_rendu_est_laisse(sa_sync_conn_owner):

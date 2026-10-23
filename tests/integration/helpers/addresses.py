@@ -2,7 +2,8 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue
+from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import insert_row
 
 
@@ -34,7 +35,7 @@ def insert_address(
             "publication_count": publication_count,
         },
     )
-    enqueue(conn, Queue.ADDRESS_CANDIDATES, "SELECT CAST(:id AS integer)", {"id": address_id})
+    mark(conn, Queue.ADDRESS_CANDIDATES, [address_id])
     return address_id
 
 
