@@ -5,6 +5,7 @@ Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_
 
 from dataclasses import dataclass
 from enum import StrEnum
+from urllib.parse import quote
 
 from domain.errors import ValidationError
 from domain.persons.identifiers import PersonIdentifierType
@@ -90,6 +91,33 @@ SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PR
 def source_label(source: str) -> str:
     """Nom lisible d'une source. Une clé inconnue se rend telle quelle."""
     return SOURCE_LABELS.get(source, source)
+
+
+def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str | None:
+    """Lien vers l'enregistrement source sur le portail de sa source, ou `None` pour une source inconnue.
+
+    Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
+    """
+    match source:
+        case Source.HAL:
+            if source_id.startswith("dumas-"):
+                return f"https://dumas.ccsd.cnrs.fr/{source_id}"
+            if source_id.startswith("tel-") and oa_status != "closed":
+                return f"https://theses.hal.science/{source_id}"
+            return f"https://hal.science/{source_id}"
+        case Source.OPENALEX:
+            return f"https://openalex.org/{source_id}"
+        case Source.WOS:
+            return f"https://www.webofscience.com/wos/woscc/full-record/{source_id}"
+        case Source.SCANR:
+            # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : il est encodé en entier.
+            encoded = quote(source_id, safe="-_.!~*'()")
+            return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{encoded}"
+        case Source.THESES:
+            return f"https://theses.fr/{source_id}"
+        case Source.CROSSREF | Source.DATACITE:
+            return f"https://doi.org/{source_id}"
+    return None
 
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)

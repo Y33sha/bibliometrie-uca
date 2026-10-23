@@ -18,7 +18,7 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
-from domain.sources.registry import Source
+from domain.sources.registry import Source, source_record_url
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_STATUSES,
@@ -54,16 +54,6 @@ from infrastructure.sql_fragments import has_author_role, source_extra
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
-# Gabarits d'URL publique par source, pour la colonne « Sources » des exports CSV.
-_SOURCE_URL = {
-    "hal": "https://hal.science/{}",
-    "openalex": "https://openalex.org/{}",
-    "wos": "https://www.webofscience.com/wos/woscc/full-record/{}",
-    "scanr": "https://scanr.enseignementsup-recherche.gouv.fr/publications/{}",
-    "theses": "https://theses.fr/{}",
-}
-
-
 # Pivot des identifiants source (alias `sd` sur `source_records`) : une colonne `<source>_id`
 # par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
 # thèses n'en expose que quatre (pas `wos`) et garde son pivot en clair.
@@ -73,9 +63,13 @@ _SOURCE_ID_COLUMNS = ",\n                    ".join(
 )
 
 
-def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
+def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str, str]:
     """URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
-    return {source: _SOURCE_URL[source].format(value) for source, value in ids.items() if value}
+    return {
+        source: url
+        for source, value in ids.items()
+        if value and (url := source_record_url(source, value, oa_status)) is not None
+    }
 
 
 def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
@@ -551,7 +545,8 @@ def _publication_lines(
                 "wos": row.wos_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            }
+            },
+            row.oa_status,
         )
         cell = {
             "Type": row.doc_type or "",
@@ -671,7 +666,8 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
                 "openalex": row.openalex_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            }
+            },
+            row.oa_status,
         )
         access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
         yield writer.line(
