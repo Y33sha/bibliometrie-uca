@@ -96,7 +96,7 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 
 ### Phase 7 — Documentation
 
-- [ ] `docs/donnees/08-donnees-derivees.md`, `docs/agregats/addresses.md`, `docs/agregats/source_contributions.md` et les docstrings qui nomment les marqueurs.
+- [x] `docs/donnees/08-donnees-derivees.md`, `docs/agregats/addresses.md`, `docs/agregats/source_contributions.md`, `docs/agregats/source_records.md` et les docstrings qui nomment les marqueurs.
 
 ## Questions ouvertes
 

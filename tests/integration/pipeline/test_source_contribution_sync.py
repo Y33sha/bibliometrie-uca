@@ -184,7 +184,7 @@ def test_adresses_reecrites_si_modifiees(sa_sync_conn):
     assert _addresses(conn, source_contribution_id) == ["Labo B"]
 
 
-def _contributions_dirty(conn, publication_id: int) -> bool:
+def _marked_for_grouping(conn, publication_id: int) -> bool:
     return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
@@ -204,14 +204,14 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
         source_record,
         [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")]), _rec(1, "Xu, Z.")],
     )
-    assert not _contributions_dirty(conn, publication)
+    assert not _marked_for_grouping(conn, publication)
 
     _write(
         conn,
         source_record,
         [_rec(0, "Xu, Z."), _rec(1, "Dupont, Jean", addresses=[AddressRecord("Labo B")])],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
 
     clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
@@ -224,7 +224,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
 
     clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
     _write(
@@ -237,7 +237,7 @@ def test_regroupement_demande_par_les_seuls_changements_d_identite_position_ou_r
             ),
         ],
     )
-    assert _contributions_dirty(conn, publication)
+    assert _marked_for_grouping(conn, publication)
 
 
 def test_les_groupes_des_contributions_sources_dont_les_roles_changent_sont_marques(
