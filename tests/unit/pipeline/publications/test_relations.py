@@ -4,20 +4,18 @@ import logging
 
 from domain.publications.relations import RelationType
 from pipeline.transformation.publications.relations import (
-    _build_distinct_work_edges,
-    _build_shared_key_edges,
-    _build_title_match_edges,
-    _count_by_pair_label,
-    _declared_pairs,
-    _log_changes,
-)
-from pipeline.transformation.publications.relations_queries import (
     DeclaredRelationSource,
     DoiPublication,
     RelationEdge,
     RelationsRebuild,
     SharedKeyPair,
     TitleMatch,
+    _build_distinct_work_edges,
+    _build_shared_key_edges,
+    _build_title_match_edges,
+    _count_by_pair_label,
+    _declared_pairs,
+    _log_changes,
 )
 
 
