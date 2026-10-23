@@ -23,18 +23,24 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ## Décisions
 
-- **Une file d'attente par marqueur.** Une table étroite, avec l'identifiant de la ligne à traiter pour seule colonne et clé primaire, et une clé étrangère `ON DELETE CASCADE` vers la table traitée. Marquer, c'est insérer l'identifiant (`ON CONFLICT DO NOTHING`). Traiter, c'est lire la file. Effacer, c'est supprimer de la file les identifiants traités. La table traitée n'est plus réécrite pour marquer ni pour effacer, et perd son index partiel.
-- **L'effacement porte sur les identifiants traités.** La phase relève les identifiants de la file au début, et supprime exactement ceux-là à la fin. Un identifiant inséré pendant la phase reste dans la file pour le run suivant.
-- **Chaque création de ligne à traiter insère dans la file.** Les marqueurs à vrai par défaut (`keys_dirty`, `contributions_dirty`, `countries_dirty` des contributions sources, `candidates_dirty`) se remplacent par une insertion explicite dans le code qui crée la ligne.
-- **La migration remplit chaque file depuis le marqueur**, puis supprime la colonne et son index partiel. Aucun traitement en attente n'est perdu.
+- **Une file d'attente par marqueur.** Une table étroite du schéma `queues`, nommée avec le suffixe `_queue`, car le graphe des tâches identifie les tables par leur nom sans schéma. Colonnes : `id`, clé primaire et clé étrangère `ON DELETE CASCADE` vers la table traitée ; `seq`, numéro de marquage tiré d'une séquence.
+- **Marquer, c'est insérer l'identifiant avec un nouveau `seq`.** Pour un identifiant déjà en file, le marquage renouvelle son `seq` (`ON CONFLICT DO UPDATE`).
+- **L'effacement porte sur les marquages traités.** La phase relève les couples `(id, seq)` au début, et supprime exactement ceux-là à la fin, par `DELETE`. Un marquage fait pendant la phase change `seq`, donc reste dans la file pour le run suivant. `TRUNCATE` bloquerait les marquages de l'API jusqu'à la fin de la phase.
+- **Une seule fonction par file marque.** Chaque point de marquage l'appelle, et le graphe des tâches déclare l'écriture dans la file. Le code qui crée une ligne à traiter l'appelle aussi, à la place des marqueurs à vrai par défaut (`keys_dirty`, `contributions_dirty`, `countries_dirty` des contributions sources, `candidates_dirty`).
+- **La migration remplit chaque file depuis le marqueur**, puis supprime la colonne et son index partiel.
+- **`staging.processed` reste une colonne.** `normalize` pose ce marqueur dans l'écriture qui vide `raw_data`. Une file n'économiserait aucune écriture.
 
 ## Phasage
+
+### Phase 0 — Oneshots joués
+
+- [ ] Supprimer les scripts de `interfaces/cli/oneshot/` déjà joués qui posent des marqueurs, avec leurs tests.
 
 ### Phase 1 — Pays des contributions sources et des adresses
 
 - [ ] Files `source_contribution_countries_queue` et `address_countries_queue`, remplies depuis `countries_dirty`.
-- [ ] Marquage dans `normalize`, `ror.py`, `hal_structures.py`, `resolution.py`, le recalcul des pays et le recalcul ciblé de l'API.
-- [ ] `create_dirty_scope` lit les files. L'effacement supprime les identifiants du périmètre.
+- [ ] Marquage dans `normalize`, `ror.py`, `hal_structures.py`, `resolution.py` et le recalcul ciblé de l'API. Le recalcul des pays marque les contributions sources qu'il recalcule : garder ce marquage seulement pour les appelants qui en ont besoin.
+- [ ] `create_dirty_scope` lit les files. L'effacement supprime les marquages du périmètre.
 - [ ] Mesurer la phase `countries` sur le même volume qu'au 22 octobre 2026.
 
 ### Phase 2 — Candidats pays des adresses
@@ -58,7 +64,7 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 ### Phase 5 — Mises à jour HOT
 
 - [ ] Pour chaque table traitée, relever les colonnes que le pipeline met à jour en masse et vérifier qu'elles sont absentes de tous les index.
-- [ ] Fixer un `fillfactor` inférieur à 100 sur les tables où ces mises à jour peuvent devenir HOT, puis réécrire la table (`VACUUM FULL`) pour libérer de la place dans les pages existantes.
+- [ ] Fixer un `fillfactor` inférieur à 100 sur les tables où ces mises à jour peuvent devenir HOT, puis réécrire la table (`VACUUM FULL`) pour libérer de la place dans les pages existantes. `VACUUM FULL` pose un verrou exclusif et double temporairement l'espace disque de la table.
 - [ ] Mesurer le taux de mises à jour HOT (`pg_stat_user_tables`) avant et après.
 
 ### Phase 6 — Documentation
@@ -67,6 +73,4 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ## Questions ouvertes
 
-- **`staging.processed`.** `normalize` réécrit déjà la ligne en vidant `raw_data` au moment où il pose le marqueur : la file ne supprime pas cette réécriture. Elle supprime l'index partiel et aligne `staging` sur les autres tables. L'`UPSERT` de `staging` pose aussi le marqueur selon `raw_hash`, dans la même instruction : il faudrait l'insertion dans la file à côté. Inclure `staging`, ou le laisser hors du chantier ?
-- **Insertion explicite ou trigger.** Un trigger `AFTER INSERT` garantit qu'aucune création n'oublie la file, mais déplace dans la base une règle que le code ne montre plus. L'insertion explicite est visible et testable, mais dépend de la discipline de chaque point de création.
-- **`TRUNCATE` ou `DELETE`.** `TRUNCATE` vide une file instantanément, mais pose un verrou exclusif et efface aussi les identifiants insérés pendant la phase. Il convient seulement à une file que seul le pipeline remplit, et que la phase traite en entier.
+- **Stockage du JSON brut.** Stocker le JSON des sources dans un stockage objet, sans passer par `staging`. Chantier à part.
