@@ -70,7 +70,7 @@ La tâche `author_grouping.attributes` recompose à chaque run les attributs de 
 ### Phase 5 — Attributs des groupes
 
 - [x] Journal de la tâche `author_grouping.attributes` : ligne « en cours », puis nombre de groupes réécrits et durée.
-- [ ] Mesurer la durée de la tâche sur un run complet.
+- [x] Mesurer la durée de la tâche sur un run complet. Run 461 du 23 octobre 2026 : 3 min 20 s pour la phase `author_grouping`, dont la recomposition de tous les groupes, avec 5,93 millions de groupes réécrits.
 - [x] File `source_contribution_group_attributes_queue`, remplie avec tous les groupes.
 - [x] Marquage là où un attribut d'un membre change : `perimeter_evidence` (`affiliations`, recalcul ciblé de l'API), `roles` et `is_corresponding` (`normalize`). Le groupement marque les groupes des publications de chaque lot.
 - [x] `author_grouping.attributes` relève la file au début et supprime les marquages traités à la fin.
