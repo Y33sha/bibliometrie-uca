@@ -60,9 +60,10 @@ L'effacement final de la phase `countries` porte sur toutes les lignes marquées
 
 ### Phase 4 — Réconciliation des publications
 
-- [ ] File `source_record_keys_queue`, remplie depuis `keys_dirty`.
-- [ ] Marquage dans `normalize`, `metadata_correction`, `perimeter_evidence`, la propagation aux enregistrements sources d'une même publication et l'outil de re-matérialisation des clés.
-- [ ] La réconciliation lit la file. Reformuler dans `domain/publications/reconciliation.py` et `pipeline/transformation/publications/reconciliation.py` l'invariant du voisinage à un saut, aujourd'hui exprimé avec le marqueur.
+- [x] File `source_record_keys_queue`, remplie depuis `keys_dirty`.
+- [x] Marquage dans `normalize`, `metadata_correction`, `perimeter_evidence`, la propagation aux enregistrements sources d'une même publication et l'outil de re-matérialisation des clés.
+- [x] La réconciliation relève la file au début et supprime les marquages traités à la fin. L'invariant du voisinage à un saut s'exprime avec le marquage.
+- [ ] Régénérer `infrastructure/db/schema.sql` une fois la migration appliquée.
 
 ### Phase 5 — Mises à jour HOT
 

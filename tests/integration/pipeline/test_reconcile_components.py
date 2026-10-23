@@ -1,6 +1,6 @@
 """Intégration : passe de réconciliation des composantes (merge-only).
 
-Valide le SQL neuf (voisinage 1-hop, fetch dirty, clear) sur vraie base, et le bout-en-bout `reconcile()` (fusion + nettoyage du drapeau), dans la transaction rollbackée.
+Valide le SQL (voisinage 1-hop, relevé de la file, suppression des marquages) sur vraie base, et le bout-en-bout `reconcile()` (fusion + suppression des marquages traités), dans la transaction rollbackée.
 """
 
 import logging
@@ -12,14 +12,14 @@ from domain.merge import MergedEntity
 from domain.source_records.keys import project_confirmation_keys
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.reconciliation import (
-    fetch_dirty_source_record_ids,
     fetch_reconciliation_universe,
-    mark_keys_dirty,
-    mark_publication_siblings_dirty,
+    mark_for_reconciliation,
+    mark_publication_siblings,
     reconcile,
+    snapshot_queued_source_records,
 )
 from pipeline.transformation.publications.store import PublicationStore
-from tests.integration.helpers.queues import clear, queued
+from tests.integration.helpers.queues import clear, mark, queued
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -52,10 +52,17 @@ def _publication_exists(conn, publication_id) -> bool:
 
 
 def _source_record_state(conn, source_record_id) -> tuple:
-    return conn.execute(
-        text("SELECT publication_id, keys_dirty FROM source_records WHERE id = :id"),
-        {"id": source_record_id},
-    ).one()
+    """`publication_id` de l'enregistrement source, et sa présence dans la file de la réconciliation."""
+    publication_id = conn.execute(
+        text("SELECT publication_id FROM source_records WHERE id = :id"), {"id": source_record_id}
+    ).scalar_one()
+    return publication_id, source_record_id in queued(conn, Queue.SOURCE_RECORD_KEYS)
+
+
+def _universe(conn) -> set[int]:
+    """Relève la file, puis rend les identifiants du voisinage 1-hop."""
+    snapshot_queued_source_records(conn)
+    return {r.id for r in fetch_reconciliation_universe(conn)}
 
 
 class TestUniverse:
@@ -69,13 +76,10 @@ class TestUniverse:
         publication_b = _seed_publication(conn)
         unrelated_publication = _seed_publication(conn)
         dirty = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
-        neighbor = _source_record(
-            conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False
-        )
-        _source_record(conn, unrelated_publication, source_id="c", doi="10.9/z", keys_dirty=False)
+        neighbor = _source_record(conn, publication_b, source_id="b", doi="10.1/x", marked=False)
+        _source_record(conn, unrelated_publication, source_id="c", doi="10.9/z", marked=False)
 
-        universe = {r.id for r in fetch_reconciliation_universe(conn)}
-        assert universe == {dirty, neighbor}
+        assert _universe(conn) == {dirty, neighbor}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
         conn = sa_sync_conn
@@ -88,19 +92,19 @@ class TestUniverse:
             conn,
             publication_b,
             source_id="b",
-            keys_dirty=False,
+            marked=False,
             external_ids={"hal_id": ["hal-1", "hal-2"]},
         )
-        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert _universe(conn) == {dirty, neighbor}
 
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'un enregistrement source est le premier identifiant qu'il liste : les suivants ne relient rien."""
         conn = sa_sync_conn
         dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
         _source_record(
-            conn, source_id="b", keys_dirty=False, external_ids={"hal_id": ["hal-1", "hal-2"]}
+            conn, source_id="b", marked=False, external_ids={"hal_id": ["hal-1", "hal-2"]}
         )
-        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty}
+        assert _universe(conn) == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
         """Voisinage par token bloc métadonnée : deux enregistrements sources de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
@@ -120,16 +124,16 @@ class TestUniverse:
             source_id="b",
             title_normalized="ma these de doctorat au titre suffisamment long",
             doc_type="thesis",
-            keys_dirty=False,
+            marked=False,
         )
-        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+        assert _universe(conn) == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
         """Un enregistrement source orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
         (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
         orphan = _source_record(conn, source_id="orphan", doi="10.1/x")
-        assert fetch_dirty_source_record_ids(conn) == [orphan]
+        assert snapshot_queued_source_records(conn) == [orphan]
 
 
 class TestEndToEnd:
@@ -166,10 +170,10 @@ class TestEndToEnd:
         publication_b = _seed_publication(conn)
         source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
         source_record_b = _source_record(
-            conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False
+            conn, publication_b, source_id="b", doi="10.1/x", marked=False
         )
         source_record_other = _source_record(
-            conn, publication_b, source_id="c", doi="10.1/y", keys_dirty=False
+            conn, publication_b, source_id="c", doi="10.1/y", marked=False
         )
 
         reconcile(conn, logger)
@@ -187,8 +191,8 @@ class TestEndToEnd:
         publication_b = _seed_publication(conn)
         untouched = _seed_publication(conn)
         _source_record(conn, publication_a, source_id="a", doi="10.1/x")
-        _source_record(conn, publication_b, source_id="b", doi="10.1/x", keys_dirty=False)
-        _source_record(conn, publication_b, source_id="c", doi="10.1/y", keys_dirty=False)
+        _source_record(conn, publication_b, source_id="b", doi="10.1/x", marked=False)
+        _source_record(conn, publication_b, source_id="c", doi="10.1/y", marked=False)
         _source_record(conn, untouched, source_id="d", doi="10.9/z")
         clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
@@ -396,29 +400,29 @@ class TestMetadataBlock:
         assert _source_record_state(conn, source_record_b)[1] is False
 
 
-class TestMarkKeysDirty:
-    """Primitive de re-matérialisation : re-dirty total ou ciblé (CLI maintenance + flag rebuild)."""
+class TestMarkForReconciliation:
+    """Primitive de re-matérialisation : marquage total ou ciblé (CLI maintenance + flag rebuild)."""
 
     def test_mark_all(self, sa_sync_conn):
         conn = sa_sync_conn
-        a = _source_record(conn, source_id="a", keys_dirty=False)
-        b = _source_record(conn, source_id="b", doc_type="book_chapter", keys_dirty=False)
-        assert mark_keys_dirty(conn) >= 2
+        a = _source_record(conn, source_id="a", marked=False)
+        b = _source_record(conn, source_id="b", doc_type="book_chapter", marked=False)
+        assert mark_for_reconciliation(conn) >= 2
         assert _source_record_state(conn, a)[1] is True
         assert _source_record_state(conn, b)[1] is True
 
     def test_mark_where_targets_subset(self, sa_sync_conn):
         conn = sa_sync_conn
-        art = _source_record(conn, source_id="art", keys_dirty=False)
-        chap = _source_record(conn, source_id="chap", doc_type="book_chapter", keys_dirty=False)
-        mark_keys_dirty(conn, "doc_type = 'book_chapter'")
+        art = _source_record(conn, source_id="art", marked=False)
+        chap = _source_record(conn, source_id="chap", doc_type="book_chapter", marked=False)
+        mark_for_reconciliation(conn, "doc_type = 'book_chapter'")
         assert _source_record_state(conn, chap)[1] is True
         assert _source_record_state(conn, art)[1] is False
 
     def test_dry_run_counts_without_writing(self, sa_sync_conn):
         conn = sa_sync_conn
-        source_record = _source_record(conn, source_id="d", doc_type="poster", keys_dirty=False)
-        assert mark_keys_dirty(conn, "doc_type = 'poster'", dry_run=True) >= 1
+        source_record = _source_record(conn, source_id="d", doc_type="poster", marked=False)
+        assert mark_for_reconciliation(conn, "doc_type = 'poster'", dry_run=True) >= 1
         assert _source_record_state(conn, source_record)[1] is False  # dry-run n'écrit pas
 
 
@@ -436,18 +440,18 @@ class TestUniverseMatchesPythonTokens:
         long_a, long_b = "a" * 40, "b" * 40
         len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
         ids = [
-            _source_record(conn, source_id="doi1", doi="10.1/x", keys_dirty=False),
-            _source_record(conn, source_id="doi2", doi="10.1/x", keys_dirty=False),
+            _source_record(conn, source_id="doi1", doi="10.1/x", marked=False),
+            _source_record(conn, source_id="doi2", doi="10.1/x", marked=False),
             _source_record(
                 conn,
                 source_id="hal1",
-                keys_dirty=False,
+                marked=False,
                 external_ids={"hal_id": ["hal-00000001", "hal-00000002"]},
             ),
             _source_record(
                 conn,
                 source_id="hal2",
-                keys_dirty=False,
+                marked=False,
                 external_ids={"hal_id": ["hal-00000002", "hal-00000003"]},
             ),
             # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
@@ -456,45 +460,41 @@ class TestUniverseMatchesPythonTokens:
             _source_record(
                 conn,
                 source_id="emse1",
-                keys_dirty=False,
+                marked=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
             _source_record(
                 conn,
                 source_id="emse2",
-                keys_dirty=False,
+                marked=False,
                 external_ids={"hal_id": ["emse-04836977"]},
             ),
-            _source_record(
-                conn, source_id="nnt1", keys_dirty=False, external_ids={"nnt": "2024UCA01"}
-            ),
-            _source_record(
-                conn, source_id="nnt2", keys_dirty=False, external_ids={"nnt": "2024UCA01"}
-            ),
+            _source_record(conn, source_id="nnt1", marked=False, external_ids={"nnt": "2024UCA01"}),
+            _source_record(conn, source_id="nnt2", marked=False, external_ids={"nnt": "2024UCA01"}),
             _source_record(
                 conn,
                 source_id="mb1",
                 title_normalized=long_a,
                 doc_type="conference_paper",
-                keys_dirty=False,
+                marked=False,
             ),
             _source_record(
                 conn,
                 source_id="mb2",
                 title_normalized=long_a,
                 doc_type="conference_paper",
-                keys_dirty=False,
+                marked=False,
             ),
             _source_record(
                 conn,
                 source_id="mbo",
                 title_normalized=long_b,
                 doc_type="conference_paper",
-                keys_dirty=False,
+                marked=False,
             ),
-            _source_record(conn, source_id="s1", title_normalized=len30, keys_dirty=False),
-            _source_record(conn, source_id="s2", title_normalized=len30, keys_dirty=False),
-            _source_record(conn, source_id="lone", title_normalized="zz", keys_dirty=False),
+            _source_record(conn, source_id="s1", title_normalized=len30, marked=False),
+            _source_record(conn, source_id="s2", title_normalized=len30, marked=False),
+            _source_record(conn, source_id="lone", title_normalized="zz", marked=False),
         ]
         rows = {
             r.id: r
@@ -514,13 +514,9 @@ class TestUniverseMatchesPythonTokens:
         }
         seeded = set(ids)
         for i in ids:
-            conn.execute(
-                text(
-                    "UPDATE source_records SET keys_dirty = (id = :i) WHERE id = ANY(:ids)"
-                ).bindparams(bindparam("ids")),
-                {"i": i, "ids": ids},
-            )
-            sql_neighbors = {r.id for r in fetch_reconciliation_universe(conn)} & seeded - {i}
+            clear(conn, Queue.SOURCE_RECORD_KEYS)
+            mark(conn, Queue.SOURCE_RECORD_KEYS, [i])
+            sql_neighbors = _universe(conn) & seeded - {i}
             py_neighbors = {j for j in ids if j != i and toks[i] & toks[j]}
             assert sql_neighbors == py_neighbors, (
                 f"divergence enregistrement source {i} : SQL={sql_neighbors} Python={py_neighbors}"
@@ -575,7 +571,7 @@ class TestStaleMembership:
     Cas typique : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex
     porte le DOI de la préversion, puis la source bascule sur le DOI de la version publiée. Le
     voisinage 1-hop se calcule sur les clés d'après : la préversion n'y figure dans aucun bras, et
-    seule la propagation de `keys_dirty` aux source_records co-rattachées la ramène dans la
+    seul le marquage des source_records co-rattachées la ramène dans la
     passe. Sans elle, la publication porte deux DOI distincts.
     """
 
@@ -592,7 +588,7 @@ class TestStaleMembership:
             source_id="preprint",
             doi=self.PREPRINT_DOI,
             doc_type="preprint",
-            keys_dirty=False,
+            marked=False,
         )
         published = _source_record(conn, publication, source_id="published", doi=self.PUBLISHED_DOI)
         return publication, preprint, published
@@ -602,10 +598,10 @@ class TestStaleMembership:
         publication, ni les orphelines."""
         conn = sa_sync_conn
         _, preprint, _ = self._seed_drifted_pair(conn)
-        other = _source_record(conn, _seed_publication(conn), source_id="other", keys_dirty=False)
-        orphan = _source_record(conn, source_id="orphan", keys_dirty=False)
+        other = _source_record(conn, _seed_publication(conn), source_id="other", marked=False)
+        orphan = _source_record(conn, source_id="orphan", marked=False)
 
-        assert mark_publication_siblings_dirty(conn) == 1
+        assert mark_publication_siblings(conn) == 1
         assert _source_record_state(conn, preprint)[1] is True
         assert _source_record_state(conn, other)[1] is False
         assert _source_record_state(conn, orphan)[1] is False

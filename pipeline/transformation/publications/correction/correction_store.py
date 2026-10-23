@@ -170,12 +170,12 @@ def _unary_rows(rows: Iterable[Row[tuple[object, ...]]]) -> list[UnaryCorrection
 _UPDATE = (
     source_records.update()
     .where(source_records.c.id == bindparam("source_record_id"))
-    .values(keys_dirty=True, updated_at=func.clock_timestamp())
+    .values(updated_at=func.clock_timestamp())
 )
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
-    """UPDATE en lot sur `source_records` : chaque mise à jour pose ses colonnes sur l'enregistrement source de sa clé `id`, marque `keys_dirty` et met à jour `updated_at`. Retourne le nombre de lignes.
+    """UPDATE en lot sur `source_records` : chaque mise à jour pose ses colonnes sur l'enregistrement source de sa clé `id` et met à jour `updated_at`. Les enregistrements sources mis à jour sont marqués pour la réconciliation. Retourne le nombre de lignes.
 
     Lève `ValueError` sur une clé qui ne nomme aucune colonne de `source_records`.
     """
@@ -188,6 +188,12 @@ def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) 
         {"source_record_id": u["id"], **{k: v for k, v in u.items() if k != "id"}} for u in updates
     ]
     conn.execute(_UPDATE, params)
+    enqueue(
+        conn,
+        Queue.SOURCE_RECORD_KEYS,
+        "SELECT unnest(CAST(:ids AS integer[]))",
+        {"ids": [u["id"] for u in updates]},
+    )
     return len(updates)
 
 
@@ -236,7 +242,7 @@ class SourceRecordCorrectionStore:
         )
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `corrections`, bump `updated_at`, marque `keys_dirty` — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `corrections`, bump `updated_at`, marque pour la réconciliation — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         return _persist_updates(
             self._conn, [{"id": u.id, **u.corrected._asdict()} for u in updates]
         )
@@ -262,7 +268,7 @@ class SourceRecordCorrectionStore:
         return rows_as(JournalCorrectionRow, rows)
 
     def persist_journal_corrections(self, updates: list[JournalCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `journal_id` + `corrections`, bump `updated_at`, marque `keys_dirty` (pour que la réconciliation rafraîchisse le `journal_id` de la publication — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
+        """UPDATE en lot de la colonne `journal_id` + `corrections`, bump `updated_at`, marque pour la réconciliation (pour que la réconciliation rafraîchisse le `journal_id` de la publication — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
@@ -403,7 +409,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes `doi`, `external_ids` et `corrections`, bump `updated_at`, marque `keys_dirty` — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
+        """UPDATE en lot des colonnes `doi`, `external_ids` et `corrections`, bump `updated_at`, marque pour la réconciliation — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
 
         La publication de chaque enregistrement source est marquée pour le groupement des auteurs : le groupement des contributions sources écarte un enregistrement source dont le DOI converge sur celui d'une autre œuvre.
         """

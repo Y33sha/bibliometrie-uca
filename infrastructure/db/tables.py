@@ -1257,7 +1257,6 @@ source_records = Table(
         nullable=False,
         server_default=text("'{}'::jsonb"),
     ),
-    Column("keys_dirty", Boolean, nullable=False, server_default="true"),
     Column(
         "authors_hash",
         Text,
@@ -1598,6 +1597,7 @@ source_contribution_countries_queue = _queue("source_contribution_countries_queu
 address_countries_queue = _queue("address_countries_queue")
 address_candidates_queue = _queue("address_candidates_queue")
 publication_contributions_queue = _queue("publication_contributions_queue")
+source_record_keys_queue = _queue("source_record_keys_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

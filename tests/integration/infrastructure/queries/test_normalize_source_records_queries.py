@@ -4,10 +4,12 @@ from functools import partial
 
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
     SourceRecordUpsert,
 )
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».
@@ -99,19 +101,14 @@ class TestUpsertSourceRecord:
         assert row.abstract is None
         assert row.language is None
 
-    def test_reimport_marks_keys_dirty(self, sa_sync_conn):
-        """`keys_dirty` signale la ligne à la phase `publications`, qui recalcule son rattachement."""
+    def test_reimport_marks_for_reconciliation(self, sa_sync_conn):
+        """La file `source_record_keys_queue` signale la ligne à la phase `publications`, qui recalcule son rattachement."""
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(_row(staging_id))
-        sa_sync_conn.execute(
-            text("UPDATE source_records SET keys_dirty = false WHERE id = :id"),
-            {"id": source_record_id},
-        )
+        assert queued(sa_sync_conn, Queue.SOURCE_RECORD_KEYS) == {source_record_id}
+        clear(sa_sync_conn, Queue.SOURCE_RECORD_KEYS)
         SourceRecordStore(sa_sync_conn).upsert_source_record(_row(staging_id))
-        assert sa_sync_conn.execute(
-            text("SELECT keys_dirty FROM source_records WHERE id = :id"),
-            {"id": source_record_id},
-        ).scalar_one()
+        assert queued(sa_sync_conn, Queue.SOURCE_RECORD_KEYS) == {source_record_id}
 
     def test_reimport_clears_the_original_values_of_corrections(self, sa_sync_conn):
         """Régression : une valeur d'origine gardée d'un import précédent l'emportait sur la valeur fraîche à la correction suivante."""

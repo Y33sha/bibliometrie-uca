@@ -1,6 +1,6 @@
 """Décision pure de réconciliation des composantes — assignation, merge et split unifiés.
 
-À partir des `source_records` d'un voisinage (les enregistrements sources *dirty* et leurs voisins directs, cf. `pipeline/transformation/publications/reconciliation.py`), calcule **où chaque enregistrement source doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
+À partir des `source_records` d'un voisinage (les enregistrements sources marqués pour la réconciliation et leurs voisins directs, cf. `pipeline/transformation/publications/reconciliation.py`), calcule **où chaque enregistrement source doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
 
 **Opération unique.** Chaque enregistrement source est assigné à la **publication ancre** de sa partition. Un enregistrement source est soit **matérialisé** (`publication_id` posé), soit **orphelin** (`publication_id = None`) — la passe ne fait aucune différence, c'est le clustering qui décide. Les quatre cas du matcher en sont des facettes :
 
@@ -13,7 +13,7 @@
 
 **Cannot-link DOI** (décision « un DOI, une œuvre ») : deux DOI non-nuls distincts ne fusionnent jamais. Dans une composante multi-DOI, chaque DOI est sa propre partition ; les enregistrements sources **sans DOI** y sont **résiduels** (laissés tels quels, inertes).
 
-Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invariant *dirty* garantit que toute arête susceptible d'imposer une assignation/merge/split a une extrémité dirty, donc l'autre est son voisin direct. `connected_components` sur l'union des 1-hop voit toutes les arêtes neuves. Une arête **retirée**, elle, ne laisse aucune trace dans les clés d'après : seule l'appartenance déjà matérialisée la conserve, d'où la propagation de `keys_dirty` aux enregistrements sources co-rattachés à une publication avec un enregistrement source dirty, en amont de la constitution du voisinage. Sur un full rerun (tout dirty), l'univers = tout le stock → la passe dégénère en cluster-then-materialize global.
+Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invariant du marquage garantit que toute arête susceptible d'imposer une assignation/merge/split a une extrémité marquée, donc l'autre est son voisin direct. `connected_components` sur l'union des 1-hop voit toutes les arêtes neuves. Une arête **retirée**, elle, ne laisse aucune trace dans les clés d'après : seule l'appartenance déjà matérialisée la conserve, d'où le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, en amont de la constitution du voisinage. Sur un full rerun (tout marqué), l'univers = tout le stock → la passe dégénère en cluster-then-materialize global.
 """
 
 from collections import Counter

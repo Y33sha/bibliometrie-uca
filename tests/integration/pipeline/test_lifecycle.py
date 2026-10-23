@@ -78,7 +78,7 @@ def test_seules_les_publications_sans_source_sont_supprimees(sa_sync_conn):
     conn = sa_sync_conn
     vide = insert_publication(conn)
     garnie = insert_publication(conn)
-    _source_record(conn, garnie, source_id="garnie", keys_dirty=False)
+    _source_record(conn, garnie, source_id="garnie", marked=False)
 
     assert delete_publications_without_sources(conn) == 1
     assert not _publication_exists(conn, vide)

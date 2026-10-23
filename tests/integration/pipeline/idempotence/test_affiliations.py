@@ -1,8 +1,10 @@
 """Idempotence : phase `populate_affiliations` (propagation périmètre/structures)."""
 
+from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import (
     insert_source_contribution,
     insert_source_contribution_address,
@@ -230,27 +232,18 @@ class TestPopulateAffiliationsTheses:
         assert row.structure_ids == [80001]
 
 
-def _keys_dirty(conn, source_record_id: int) -> bool:
-    from sqlalchemy import text
-
-    return conn.execute(
-        text("SELECT keys_dirty FROM source_records WHERE id = :id"),
-        {"id": source_record_id},
-    ).scalar_one()
+def _marked_for_reconciliation(conn, source_record_id: int) -> bool:
+    return source_record_id in queued(conn, Queue.SOURCE_RECORD_KEYS)
 
 
 class TestEntreeDansLePerimetre:
-    """Régression : un enregistrement sans publication qui entre dans le périmètre après sa normalisation n'était jamais mis en publication, faute d'être marqué `keys_dirty` (1 936 publications UCA créées tardivement en septembre 2026)."""
+    """Régression : un enregistrement sans publication qui entre dans le périmètre après sa normalisation n'était jamais mis en publication, faute d'être marqué pour la réconciliation (1 936 publications UCA créées tardivement en septembre 2026)."""
 
     def _orpheline(self, conn) -> None:
         from sqlalchemy import text
 
-        conn.execute(
-            text(
-                "UPDATE source_records SET publication_id = NULL, keys_dirty = FALSE"
-                " WHERE id = 80002"
-            )
-        )
+        conn.execute(text("UPDATE source_records SET publication_id = NULL WHERE id = 80002"))
+        clear(conn, Queue.SOURCE_RECORD_KEYS)
 
     def test_enregistrement_sans_publication_marque(self, sa_sync_conn):
         _setup_affiliations_test_data(sa_sync_conn)
@@ -258,17 +251,15 @@ class TestEntreeDansLePerimetre:
 
         _run_populate_affiliations(sa_sync_conn)
 
-        assert _keys_dirty(sa_sync_conn, 80002) is True
+        assert _marked_for_reconciliation(sa_sync_conn, 80002) is True
 
     def test_enregistrement_en_publication_non_marque(self, sa_sync_conn):
-        from sqlalchemy import text
-
         _setup_affiliations_test_data(sa_sync_conn)
-        sa_sync_conn.execute(text("UPDATE source_records SET keys_dirty = FALSE"))
+        clear(sa_sync_conn, Queue.SOURCE_RECORD_KEYS)
 
         _run_populate_affiliations(sa_sync_conn)
 
-        assert _keys_dirty(sa_sync_conn, 80002) is False
+        assert _marked_for_reconciliation(sa_sync_conn, 80002) is False
 
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
         from pipeline.transformation.structures.perimeter_evidence import (
@@ -282,4 +273,4 @@ class TestEntreeDansLePerimetre:
             sa_sync_conn, [80002], [80000, 80001]
         )
 
-        assert _keys_dirty(sa_sync_conn, 80002) is True
+        assert _marked_for_reconciliation(sa_sync_conn, 80002) is True

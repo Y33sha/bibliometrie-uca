@@ -282,6 +282,7 @@ TASKS: tuple[Task, ...] = (
                 "address_country_candidates",
                 "publication_contributions_queue",
                 "source_contribution_countries_queue",
+                "source_record_keys_queue",
                 *_containers(source),
             ),
             # Ses propres lignes de `staging`, enregistrements sources et contributions sources, et les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime.
@@ -308,7 +309,7 @@ TASKS: tuple[Task, ...] = (
         # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR, structures HAL et marquages, et les décisions qui les visent.
         writes=(
             "source_records.id",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
             "publication_contributions_queue",
             "source_contributions.id",
             "source_contribution_addresses",
@@ -430,7 +431,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_contribution_structures",
             "source_contributions.in_perimeter",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
         ),
         previous_run=(
             "source_records.publication_id",
@@ -691,7 +692,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_records.journal_id",
             "source_records.corrections",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
         ),
         previous_run=("source_records",),
     ),
@@ -735,7 +736,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.language",
             "source_records.external_ids",
             "source_records.corrections",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
         ),
         # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
         previous_run=(
@@ -779,7 +780,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.doi",
             "source_records.external_ids",
             "source_records.corrections",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
             "publication_contributions_queue",
         ),
         previous_run=("source_records",),
@@ -789,6 +790,7 @@ TASKS: tuple[Task, ...] = (
         "publications",
         reads=(
             "source_records",
+            "source_record_keys_queue",
             "source_contributions.in_perimeter",
             "publications",
             "apc_payments",
@@ -800,7 +802,7 @@ TASKS: tuple[Task, ...] = (
             "publications",
             "publications_detail",
             "source_records.publication_id",
-            "source_records.keys_dirty",
+            "source_record_keys_queue",
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),

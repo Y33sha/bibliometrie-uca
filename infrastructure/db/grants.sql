@@ -84,10 +84,12 @@ TO bibliometrie_app;
 
 -- Une saisie manuelle de pays marque l'adresse saisie, et les adresses dont le pays change.
 -- Une décision sur un ORCID ou un IdRef, ou la correction d'un prénom, marque les
--- publications à regrouper. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
+-- publications à regrouper. Une correction d'adresse marque les enregistrements sources sans
+-- publication qui entrent dans le périmètre. Le marquage passe par `INSERT … ON CONFLICT DO
+-- UPDATE`.
 GRANT INSERT, UPDATE ON
     queues.address_candidates_queue, queues.address_countries_queue,
-    queues.publication_contributions_queue
+    queues.publication_contributions_queue, queues.source_record_keys_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON

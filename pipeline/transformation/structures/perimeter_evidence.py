@@ -4,6 +4,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.sql_fragments import (
     NO_PERIMETER_EVIDENCE,
     SOURCE_CONTRIBUTIONS_SCOPE,
@@ -25,8 +26,16 @@ class InPerimeterSyncCounts(NamedTuple):
 def _sync_sql(scoped: bool) -> str:
     """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux contributions sources `:source_contribution_ids` quand `scoped` est vrai.
 
-    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement sans publication dont une contribution source entre dans le périmètre est marqué `keys_dirty` : la phase `publications` le met alors en publication.
+    Seules les contributions sources dont les indices changent sont écrites. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation : la phase `publications` le met alors en publication.
     """
+    marked = enqueue_sql(
+        Queue.SOURCE_RECORD_KEYS,
+        """
+        SELECT sr.id FROM source_records sr
+        WHERE sr.id IN (SELECT source_record_id FROM changed WHERE is_in AND NOT was_in)
+          AND sr.publication_id IS NULL
+        """,
+    )
     scope = "AND sc.id = ANY(:source_contribution_ids)" if scoped else ""
     return f"""
         WITH computed AS (
@@ -44,13 +53,7 @@ def _sync_sql(scoped: bool) -> str:
             FROM target t
             WHERE sc.id = t.id AND sc.perimeter_evidence IS DISTINCT FROM t.evidence
             RETURNING sc.source_record_id, old.in_perimeter AS was_in, new.in_perimeter AS is_in
-        ), marked AS (
-            UPDATE source_records
-            SET keys_dirty = TRUE
-            WHERE id IN (SELECT source_record_id FROM changed WHERE is_in AND NOT was_in)
-              AND publication_id IS NULL AND NOT keys_dirty
-            RETURNING 1
-        )
+        ), marked AS ({marked})
         SELECT count(*) FILTER (WHERE is_in AND NOT was_in) AS added,
                count(*) FILTER (WHERE was_in AND NOT is_in) AS removed
         FROM changed

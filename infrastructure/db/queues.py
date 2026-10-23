@@ -20,6 +20,8 @@ class Queue(StrEnum):
     """Adresses dont les pays candidats sont à détecter par le texte, puis à résoudre."""
     PUBLICATION_CONTRIBUTIONS = "publication_contributions_queue"
     """Publications dont les groupes de contributions sources sont à recalculer : un enregistrement source a rejoint ou quitté la publication, ou ses contributions sources ont changé."""
+    SOURCE_RECORD_KEYS = "source_record_keys_queue"
+    """Enregistrements sources à réconcilier : écrits, corrigés, entrés dans le périmètre, ou voisins d'un enregistrement source supprimé."""
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:

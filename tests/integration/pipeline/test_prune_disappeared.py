@@ -20,7 +20,7 @@ from tests.integration.helpers.staging import insert_staging
 _staging = partial(insert_staging, processed=True)
 
 # Enregistrement source de titre « Titre », aux clés à jour.
-_source_record = partial(insert_source_record, title="Titre", keys_dirty=False)
+_source_record = partial(insert_source_record, title="Titre", marked=False)
 
 
 def _publication(conn) -> int:
@@ -35,10 +35,7 @@ def _publication(conn) -> int:
 
 
 def _a_reconcilier(conn, source_record_id: int) -> bool:
-    return conn.execute(
-        text("SELECT keys_dirty FROM source_records WHERE id = :id"),
-        {"id": source_record_id},
-    ).scalar_one()
+    return source_record_id in queued(conn, Queue.SOURCE_RECORD_KEYS)
 
 
 def _source_contribution(conn, source_record_id: int) -> None:

@@ -1,6 +1,6 @@
 """Passe d'assignation + réconciliation des composantes — match/create/skip **et** merge/split unifiés.
 
-Recalcule les composantes connexes du voisinage 1-hop des `source_records` marquées `keys_dirty` et assigne chaque enregistrement source à la publication ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision revient à `domain.publications.reconciliation.plan_reconciliation` (pure) ; ce module l'applique :
+Recalcule les composantes connexes du voisinage 1-hop des `source_records` de la file `source_record_keys_queue` et assigne chaque enregistrement source à la publication ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision revient à `domain.publications.reconciliation.plan_reconciliation` (pure) ; ce module l'applique :
 
 - **groupes** : les enregistrements sources de chaque groupe sont rattachés à son ancre (publication existante conservée), ou à une publication créée quand la partition est sans ancre existante (split) ;
 - **publications dissoutes** (vidées de tous leurs enregistrements sources par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
@@ -8,7 +8,7 @@ Recalcule les composantes connexes du voisinage 1-hop des `source_records` marqu
 
 Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des enregistrements sources et les métadonnées des publications, et laisse les contributions.
 
-Voisinage 1-hop, pas de fermeture transitive : l'invariant *dirty* garantit que toute arête neuve a une extrémité dirty (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur la propagation de `keys_dirty` aux enregistrements sources co-rattachés à une publication avec un enregistrement source dirty, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
+Voisinage 1-hop, pas de fermeture transitive : l'invariant du marquage garantit que toute arête neuve a une extrémité marquée (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
 Tâche `publications.reconcile`.
 """
@@ -27,7 +27,7 @@ from domain.source_records.keys import (
     project_confirmation_keys,
 )
 from domain.types import JsonValue
-from infrastructure.db.queues import Queue, enqueue
+from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
 from pipeline.runtime.observability.log_format import (
@@ -61,7 +61,10 @@ class ReconcileRow(NamedTuple):
     in_perimeter: bool
 
 
-# Voisinage 1-hop : les `source_records` dirty (orphelines comprises) et celles qui
+# Relevé de la file `source_record_keys_queue`.
+_SNAPSHOT = "source_record_keys_marks"
+
+# Voisinage 1-hop : les `source_records` relevées dans la file (orphelines comprises) et celles qui
 # partagent une clé de confirmation avec elles. Une branche UNION par type de clé (chacune
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
@@ -90,9 +93,9 @@ _SCALAR_KEY_ARMS = "".join(
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
         SELECT {_COLS.format(a="sr")}
-        FROM source_records sr
+        FROM {_SNAPSHOT} m
+        JOIN source_records sr ON sr.id = m.id
         LEFT JOIN publications p ON p.id = sr.publication_id
-        WHERE sr.keys_dirty
     )
     SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
            publication_doi, in_perimeter
@@ -130,24 +133,27 @@ _UNIVERSE_SQL = text(f"""
 
 
 # Clôture du voisinage sur l'appartenance déjà matérialisée : les `source_records` rattachées
-# à la même publication qu'un enregistrement source dirty deviennent dirty à leur tour. Le voisinage 1-hop est calculé
+# à la même publication qu'un enregistrement source en file entrent en file à leur tour. Le voisinage 1-hop est calculé
 # sur les clés courantes : un enregistrement source rattaché par une clé disparue en est absent, et resterait sur sa
-# publication sans être réexaminée. Marquées dirty, ces voisines obtiennent leur propre 1-hop, donc
+# publication sans être réexaminé. Marquées, ces voisines obtiennent leur propre 1-hop, donc
 # un rattachement à la publication de leurs vraies voisines, sans publication en doublon.
-_SPREAD_TO_SIBLINGS_SQL = text("""
-    UPDATE source_records SET keys_dirty = true
-    WHERE NOT keys_dirty
-      AND publication_id IN (
-          SELECT publication_id FROM source_records
-          WHERE keys_dirty AND publication_id IS NOT NULL
-      )
-""")
+_SIBLINGS_SQL = f"""
+    SELECT o.id FROM source_records o
+    WHERE o.publication_id IN (
+        SELECT sr.publication_id FROM {Queue.SOURCE_RECORD_KEYS} q
+        JOIN source_records sr ON sr.id = q.id
+        WHERE sr.publication_id IS NOT NULL
+    )
+      AND NOT EXISTS (SELECT 1 FROM {Queue.SOURCE_RECORD_KEYS} q WHERE q.id = o.id)
+"""  # noqa: S608
 
 
-def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool = False) -> int:
-    """Pose `keys_dirty = true` sur les source_records — toutes, ou le sous-ensemble `where`.
+def mark_for_reconciliation(
+    conn: Connection, where: str | None = None, *, dry_run: bool = False
+) -> int:
+    """Marque pour la réconciliation les source_records — toutes, ou le sous-ensemble `where`.
 
-    Outil de re-matérialisation : quand une règle de clés de confirmation change (token, seuil de garde, projection), le stock déjà réconcilié diverge de la règle. Re-marquer `keys_dirty` fait re-réconcilier les source_records concernées au prochain run de la phase `publications` ; sur tout le stock, c'est le *cluster-then-materialize* global. `where` est un **fragment SQL de confiance** (CLI maintenance / run_pipeline, jamais une entrée externe). `dry_run` compte sans écrire. Retourne le nombre de source_records (marquées, ou qui le seraient).
+    Outil de re-matérialisation : quand une règle de clés de confirmation change (token, seuil de garde, projection), le stock déjà réconcilié diverge de la règle. Les source_records marquées sont re-réconciliées au prochain run de la phase `publications` ; sur tout le stock, c'est le *cluster-then-materialize* global. `where` est un **fragment SQL de confiance** (CLI maintenance / run_pipeline, jamais une entrée externe). `dry_run` compte sans écrire. Retourne le nombre de source_records (marquées, ou qui le seraient).
     """
     clause = f" WHERE {where}" if where else ""
     if dry_run:
@@ -156,27 +162,31 @@ def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool
                 text(f"SELECT count(*) FROM source_records{clause}")  # noqa: S608
             )
         )
-    return conn.execute(
-        text(f"UPDATE source_records SET keys_dirty = true{clause}")  # noqa: S608
-    ).rowcount
+    return enqueue(conn, Queue.SOURCE_RECORD_KEYS, f"SELECT id FROM source_records{clause}", {})
 
 
-def mark_publication_siblings_dirty(conn: Connection) -> int:
-    """Propage `keys_dirty` aux `source_records` rattachés à la même publication qu'un enregistrement source déjà dirty. Retourne le nombre de lignes marquées.
+def mark_publication_siblings(conn: Connection) -> int:
+    """Marque pour la réconciliation les `source_records` rattachés à la même publication qu'un enregistrement source en file. Retourne le nombre de lignes marquées.
 
-    Clôt le voisinage sur l'appartenance déjà matérialisée. Un enregistrement source rattaché par une clé de confirmation disparue (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) est absent du voisinage 1-hop, calculé sur les clés courantes : marqué dirty, il est réexaminé.
+    Clôt le voisinage sur l'appartenance déjà matérialisée. Un enregistrement source rattaché par une clé de confirmation disparue (identifiant corrigé chez la source, par exemple un DOI de préversion remplacé par celui de la version publiée) est absent du voisinage 1-hop, calculé sur les clés courantes : marqué, il est réexaminé.
     """
-    return conn.execute(_SPREAD_TO_SIBLINGS_SQL).rowcount
+    return enqueue(conn, Queue.SOURCE_RECORD_KEYS, _SIBLINGS_SQL, {})
 
 
-def fetch_dirty_source_record_ids(conn: Connection) -> list[int]:
-    """Les `source_records` `keys_dirty`, orphelines comprises : la réconciliation est aussi l'assignation. Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""
-    rows = conn.execute(text("SELECT id FROM source_records WHERE keys_dirty ORDER BY id")).all()
-    return [row.id for row in rows]
+def snapshot_queued_source_records(conn: Connection) -> list[int]:
+    """Relève la file des `source_records` à réconcilier, orphelines comprises : la réconciliation est aussi l'assignation. Rend leurs identifiants, que `delete_processed_marks` retire de la file."""
+    snapshot(conn, Queue.SOURCE_RECORD_KEYS, _SNAPSHOT)
+    return list(conn.execute(text(f"SELECT id FROM {_SNAPSHOT} ORDER BY id")).scalars())  # noqa: S608
+
+
+def delete_processed_marks(conn: Connection) -> None:
+    """Supprime de la file les marquages relevés par `snapshot_queued_source_records`, puis le relevé."""
+    delete_processed(conn, Queue.SOURCE_RECORD_KEYS, _SNAPSHOT)
+    conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
 
 
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    """Le voisinage 1-hop : les enregistrements sources dirty (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
+    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
         ReconcileRow(
@@ -251,16 +261,6 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
     )
 
 
-def clear_keys_dirty(conn: Connection, source_record_ids: list[int]) -> int:
-    """Efface `keys_dirty` sur les enregistrements sources réconciliés. Retourne le nombre de lignes touchées."""
-    if not source_record_ids:
-        return 0
-    stmt = text("UPDATE source_records SET keys_dirty = false WHERE id = ANY(:ids)").bindparams(
-        bindparam("ids")
-    )
-    return conn.execute(stmt, {"ids": source_record_ids}).rowcount
-
-
 # ─── Réconciliation ──────────────────────────────────────────────
 
 
@@ -308,7 +308,7 @@ def _create_new_publication(
 class ReconcileStats(NamedTuple):
     """Bilan d'une passe de réconciliation.
 
-    `processed` = enregistrements sources dirty traités ; `publications` = publications résultantes (auxquelles des enregistrements sources sont rattachés) ; `created` = parmi elles, publications créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = publications existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = publications créées par une scission (un DOI distinct détaché d'une publication existante) ; `detached` = `source_records` rendues orphelines, faute de pouvoir fonder une publication.
+    `processed` = enregistrements sources en file traités ; `publications` = publications résultantes (auxquelles des enregistrements sources sont rattachés) ; `created` = parmi elles, publications créées (orphelins matérialisés **et** spin-offs de scission) ; `existing` = publications existantes conservées ; `merges` = publications redondantes absorbées dans une autre et supprimées ; `splits` = publications créées par une scission (un DOI distinct détaché d'une publication existante) ; `detached` = `source_records` rendues orphelines, faute de pouvoir fonder une publication.
     """
 
     processed: int = 0
@@ -321,15 +321,16 @@ class ReconcileStats(NamedTuple):
 
 
 def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False) -> ReconcileStats:
-    """Planifie et applique la réconciliation du voisinage dirty. Rend un bilan à zéro si aucun enregistrement source n'est dirty. Le commit est à la charge de l'appelant.
+    """Planifie et applique la réconciliation du voisinage des enregistrements sources en file, puis supprime les marquages traités. Rend un bilan à zéro si la file est vide. Le commit est à la charge de l'appelant.
 
-    `rebuild` marque d'abord toutes les `source_records` dirty : la réconciliation reprend alors le stock entier.
+    `rebuild` marque d'abord toutes les `source_records` : la réconciliation reprend alors le stock entier.
     """
     if rebuild:
-        mark_keys_dirty(conn)
-    mark_publication_siblings_dirty(conn)
-    dirty_ids = fetch_dirty_source_record_ids(conn)
+        mark_for_reconciliation(conn)
+    mark_publication_siblings(conn)
+    dirty_ids = snapshot_queued_source_records(conn)
     if not dirty_ids:
+        delete_processed_marks(conn)
         step(logger, "Aucun document nouveau ou mis à jour")
         nothing_to_do(logger)
         return ReconcileStats()
@@ -427,7 +428,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
 
     # 5. Les publications qui gagnent ou perdent un enregistrement source regroupent leurs contributions sources.
     mark_publications_for_grouping(conn, sorted(membership_changed - dissolved_ids))
-    clear_keys_dirty(conn, dirty_ids)
+    delete_processed_marks(conn)
     return ReconcileStats(
         processed=len(dirty_ids),
         publications=len(survivors),

@@ -41,15 +41,15 @@ def insert_source_record(
     oa_status: str | None = None,
     is_retracted: bool | None = None,
     embargo_until: datetime.date | None = None,
-    keys_dirty: bool | None = None,
+    marked: bool = True,
     external_ids: dict[str, object] | None = None,
     biblio: dict[str, object] | None = None,
     source_extras: dict[str, object] | None = None,
     topics: object = None,
     corrections: dict[str, object] | None = None,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`."""
-    return insert_row(
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
+    source_record_id = insert_row(
         conn,
         "source_records",
         {
@@ -76,7 +76,6 @@ def insert_source_record(
             "oa_status": oa_status,
             "is_retracted": is_retracted,
             "embargo_until": embargo_until,
-            "keys_dirty": keys_dirty,
             "external_ids": _jsonb(external_ids),
             "biblio": _jsonb(biblio),
             "source_extras": _jsonb(source_extras),
@@ -87,6 +86,9 @@ def insert_source_record(
             ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
         ),
     )
+    if marked:
+        mark(conn, Queue.SOURCE_RECORD_KEYS, [source_record_id])
+    return source_record_id
 
 
 def insert_source_contribution(
