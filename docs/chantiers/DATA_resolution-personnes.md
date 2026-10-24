@@ -20,7 +20,7 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - Le périmètre d'un groupe est l'union des indices de ses contributions sources (`perimeter_evidence` : adresse, ROR, structure HAL, fiche RH, thèse). Sur une contribution source, un ROR attaché à une adresse compte seulement si l'adresse est rattachée à une structure du périmètre (`source_contribution_structures`).
 - Le rattachement d'un groupe à une personne est figé tant que ses membres restent les mêmes. Un groupe dont les membres changent est réévalué.
 - `source_contribution_groups.resolution_mode` a sa propre enum, `group_resolution_mode` : `manual`, `orcid`, `hal_person_id`, `idref`, `name`, `compatible_name`.
-- Pendant la transition, la cascade des groupes écrit seulement la personne des groupes, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id` jusqu'à la bascule des lecteurs ; les écarts entre les deux signalent des conflits.
+- Pendant la transition, la cascade des groupes écrit seulement la personne des groupes, sans créer de personne. L'ancienne cascade tient `source_contributions.person_id` jusqu'à la bascule des lecteurs ; les écarts entre les deux signalent des conflits. Entre le gel de `source_contributions.person_id` et la création par les groupes, aucune cascade ne crée de personne.
 - Les décisions humaines visent des entités stables et se propagent au groupe :
   - l'épinglage d'une contribution source rattache son groupe ;
   - le rejet d'un couple (enregistrement source, personne) interdit de lier la personne à la publication de l'enregistrement source, donc à tout groupe de cette publication.
@@ -133,10 +133,12 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [ ] La phase `contributions` cesse de construire la table `contributions`.
-- [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs.
+- [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs. L'ancienne cascade cesse de créer des personnes.
+- [ ] La cascade par groupe crée les personnes des groupes du périmètre restés sans personne, sur un index tenu à jour après chaque création.
 
 #### Étape D — Suppressions
 
+- [ ] Décisions humaines contradictoires entre les groupes et `contributions` recherchées et tranchées.
 - [ ] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement.
 - [ ] Scripts ponctuels qui écrivent ces colonnes supprimés.
 - [ ] `source_contribution_groups` renommée `contributions`.
