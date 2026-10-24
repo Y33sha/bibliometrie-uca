@@ -10,7 +10,6 @@ from domain.publications.author_grouping import REPEATED_LIST_CASES
 from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
-    DETACHED_GROUP,
     corrected_by,
     in_clause,
     propagate_group_attributes_sql,
@@ -82,9 +81,12 @@ _DELETE_MEMBERSHIPS_SQL = text(
 
 _DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
 
-_DETACH_GROUPS_SQL = text(
-    f"UPDATE source_contribution_groups SET {DETACHED_GROUP}"
-    " WHERE id = ANY(:ids) AND person_id IS NOT NULL"
+# Marque pour la redécision de leur personne les groupes recomposés `:ids` qui en ont une.
+_MARK_RECOMPOSED_SQL = text(
+    enqueue_sql(
+        Queue.GROUP_RESOLUTION,
+        "SELECT id FROM source_contribution_groups WHERE id = ANY(:ids) AND person_id IS NOT NULL",
+    )
 )
 
 _CLEAR_COPIES_SQL = text("""
@@ -281,7 +283,7 @@ class SourceContributionGroupStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les groupes et les doublons d'auteur des publications du lot, et marque leurs groupes pour la recomposition de leurs attributs.
 
-        Un groupe déjà en base garde son identifiant. Il garde sa personne et son mode de résolution tant que ses membres restent les mêmes. Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Un groupe dont les membres changent est marqué pour la redécision de sa personne (`Queue.GROUP_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
@@ -297,7 +299,7 @@ class SourceContributionGroupStore:
         if unmatched_ids:
             self._conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
         if plan.recomposed:
-            self._conn.execute(_DETACH_GROUPS_SQL, {"ids": list(plan.recomposed)})
+            self._conn.execute(_MARK_RECOMPOSED_SQL, {"ids": list(plan.recomposed)})
         kept = [g for g in groups if g.existing]
         if kept:
             self._conn.execute(

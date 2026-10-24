@@ -198,14 +198,12 @@ def update_identifier_status(
     ident_id: int,
     status: str,
     *,
-    conn: Connection,
     repo: PersonRepository,
-    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet détache de la personne ses groupes de contributions sources rattachés par ses identifiants rejetés (`detach_groups_of_rejected_identifiers`), puis recalcule l'appartenance au périmètre de leurs publications. Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les groupes de contributions sources que ses identifiants rejetés lui rattachent (`mark_groups_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
     propagated = (
@@ -214,8 +212,7 @@ def update_identifier_status(
         else 0
     )
     if status == AttributionStatus.REJECTED.value:
-        publication_ids = repo.detach_groups_of_rejected_identifiers(row["person_id"])
-        perimeter_recompute.refresh_publications(conn, publication_ids)
+        repo.mark_groups_of_rejected_identifiers(row["person_id"])
     emit_event(
         audit_repo,
         "person_identifier.status_changed",
@@ -257,22 +254,19 @@ def update_name_form_status(
     name_form: str,
     status: str,
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
-    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il détache aussi les groupes de la personne rattachés par le nom dont un membre contient la forme (`detach_groups_for_name_form`). Les groupes épinglés restent rattachés. L'appartenance au périmètre des publications des groupes détachés est recalculée.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il marque aussi pour la redécision de leur personne les groupes de la personne rattachés par le nom dont un membre contient la forme (`mark_groups_for_name_form`) : le run suivant les redécide. Les groupes épinglés ne sont pas marqués.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        publication_ids = contribution_repo.detach_groups_for_name_form(person_id, name_form)
-        perimeter_recompute.refresh_publications(conn, publication_ids)
+        contribution_repo.mark_groups_for_name_form(person_id, name_form)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",

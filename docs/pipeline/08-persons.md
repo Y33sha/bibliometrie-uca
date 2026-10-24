@@ -43,12 +43,14 @@ Les contributions sources collectives, les doublons d'auteur et les contribution
 
 ## Rattachements conservés d'un run à l'autre
 
-La phase décide les groupes sans personne. Un groupe rattaché garde sa personne d'un run à l'autre. Il la perd dans quatre cas :
+La phase décide les groupes sans personne. Un groupe rattaché garde sa personne d'un run à l'autre. Il entre dans une file de redécision dans quatre cas :
 
 - ses membres changent (phase `author_grouping`) ;
 - l'arbitrage des identifiants neutralise l'identifiant qui l'a rattaché, ou le transfère à une autre personne ;
-- la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge) ;
-- la personne est supprimée.
+- l'administration rejette l'identifiant ou la forme de nom qui l'a rattaché ;
+- la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge).
+
+Le rattachement des groupes redécide les groupes de la file, sauf les groupes épinglés. Un groupe qui désigne encore sa personne la garde, sans écriture. Un groupe qui en désigne une autre en change. Un groupe que rien ne soutient plus perd sa personne. Un groupe perd aussi sa personne quand elle est supprimée.
 
 ## Données préservées
 

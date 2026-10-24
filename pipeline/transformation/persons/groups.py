@@ -1,10 +1,9 @@
 """Tâche `persons.resolve_groups` : rattache à une personne les groupes de contributions sources qui n'en ont pas (`domain.persons.group_matching`).
 
-Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne : `author_grouping` vide la personne d'un groupe dont les membres changent. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne. Les groupes du périmètre au nom inconnu sont traités ensuite, un à un, contre l'index tenu à jour : un groupe rejoint une personne créée plus tôt dans le passage, ou fonde la sienne (`create_persons`).
+Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne, jusqu'à sa redécision quand il entre dans la file `Queue.GROUP_RESOLUTION` : ses membres changent, ou l'identifiant ou la forme de nom qui le rattachait est invalidé. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne, et les groupes non manuels de la file. Un groupe de la file qui désigne encore sa personne la garde ; un groupe que sa décision ne rattache plus la perd. Les groupes du périmètre au nom inconnu sont traités ensuite, un à un, contre l'index tenu à jour : un groupe rejoint une personne créée plus tôt dans le passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
-from collections.abc import Iterable
 
 from sqlalchemy import Connection, text
 
@@ -28,8 +27,10 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import validated_name
+from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
+    DETACHED_GROUP,
     GROUP_MEMBERS,
     pinned,
     pinned_groups_sql,
@@ -55,12 +56,21 @@ from pipeline.transformation.persons.store import (
     fetch_rejected_person_ids_by_publication,
 )
 
+# Relevé de la file des groupes à redécider (`Queue.GROUP_RESOLUTION`), pris en début de tâche.
+_RESOLUTION_SNAPSHOT = "group_resolution_snapshot"
+
 _CANDIDATES_SQL = " UNION ".join(
     [
         f"""
         SELECT g.id AS group_id
         FROM {GROUP_MEMBERS}
         WHERE g.person_id IS NULL AND (sc.in_perimeter OR {pinned("sc.id")})
+        """,
+        f"""
+        SELECT g.id AS group_id
+        FROM {_RESOLUTION_SNAPSHOT} q
+        JOIN source_contribution_groups g ON g.id = q.id
+        WHERE g.resolution_mode IS DISTINCT FROM '{GroupMatchReason.MANUAL}'
         """,
         *(
             strong_identifier_source_contributions(
@@ -95,20 +105,28 @@ _MEMBERS_SQL = f"""
     ORDER BY g.id
 """
 
-# Personnes déjà rattachées à un groupe, par publication.
+# Personnes rattachées à un groupe de chaque publication, hors des groupes à décider.
 _TAKEN_SQL = """
     SELECT publication_id, array_agg(person_id) AS person_ids
     FROM source_contribution_groups
-    WHERE person_id IS NOT NULL AND publication_id = ANY(:publications)
+    WHERE person_id IS NOT NULL AND publication_id = ANY(:publications) AND id <> ALL(:groups)
     GROUP BY publication_id
 """
 
+# Seuls les groupes dont la personne ou le mode change sont écrits.
 _WRITE_SQL = text("""
     UPDATE source_contribution_groups g
     SET person_id = u.person_id, resolution_mode = CAST(u.mode AS group_resolution_mode)
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[]), CAST(:modes AS text[]))
         AS u(id, person_id, mode)
-    WHERE g.id = u.id AND g.person_id IS NULL
+    WHERE g.id = u.id
+      AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
+""")
+
+# Groupes de la file sans personne désignée par leur décision : ils perdent leur personne.
+_DETACH_UNSUPPORTED_SQL = text(f"""
+    UPDATE source_contribution_groups SET {DETACHED_GROUP}
+    WHERE id = ANY(:ids) AND person_id IS NOT NULL
 """)
 
 
@@ -128,7 +146,8 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
 
 
 def load_candidate_groups(conn: Connection) -> dict[int, dict[int, list[GroupMember]]]:
-    """Membres des groupes à décider, par publication puis par groupe."""
+    """Membres des groupes à décider, par publication puis par groupe : groupes sans personne, et groupes non manuels de la file à redécider. Relève la file (`snapshot`) : `resolve_groups` en retire ensuite les marquages relevés."""
+    snapshot(conn, Queue.GROUP_RESOLUTION, _RESOLUTION_SNAPSHOT)
     groups: dict[int, dict[int, list[GroupMember]]] = defaultdict(lambda: defaultdict(list))
     for r in conn.execute(text(_MEMBERS_SQL)):
         groups[r.publication_id][r.group_id].append(
@@ -146,9 +165,17 @@ def load_candidate_groups(conn: Connection) -> dict[int, dict[int, list[GroupMem
     return groups
 
 
-def taken_persons(conn: Connection, publication_ids: Iterable[int]) -> dict[int, frozenset[int]]:
-    """Personnes déjà rattachées à un groupe de chaque publication."""
-    rows = conn.execute(text(_TAKEN_SQL), {"publications": list(publication_ids)})
+def taken_persons(
+    conn: Connection, groups: dict[int, dict[int, list[GroupMember]]]
+) -> dict[int, frozenset[int]]:
+    """Personnes rattachées à un autre groupe de chaque publication des groupes à décider."""
+    rows = conn.execute(
+        text(_TAKEN_SQL),
+        {
+            "publications": list(groups),
+            "groups": [group_id for by_group in groups.values() for group_id in by_group],
+        },
+    )
     return {r.publication_id: frozenset(r.person_ids) for r in rows}
 
 
@@ -178,7 +205,7 @@ def decide_groups(
 
 
 def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
-    """Écrit la personne et le mode des groupes rattachés. Rend le nombre de groupes écrits."""
+    """Écrit la personne et le mode des groupes rattachés, quand ils changent. Rend le nombre de groupes écrits."""
     matched = [
         (group_id, d.person_id, str(d.reason))
         for group_id, d in decisions.items()
@@ -374,6 +401,13 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
     with track_progress(to_create, BRANCH.rstrip(), logger, count_kept=True) as progress:
         created = create_persons(conn, groups, decisions, index, rejected, taken, progress)
     logger.info("%s%s %s", LAST_BRANCH, quantity(created, "personne"), inflect(created, "créée"))
+    unsupported = [
+        group_id
+        for group_id, d in decisions.items()
+        if d.person_id is None or d.outcome == GroupOutcome.SKIP
+    ]
+    detached = conn.execute(_DETACH_UNSUPPORTED_SQL, {"ids": unsupported}).rowcount
+    delete_processed(conn, Queue.GROUP_RESOLUTION, _RESOLUTION_SNAPSHOT)
     counts: Counter[str] = Counter(
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()
@@ -384,5 +418,6 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
         "groups": len(decisions),
         "written": written,
         "created": created,
+        "detached": detached,
         **counts,
     }

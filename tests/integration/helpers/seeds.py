@@ -454,6 +454,13 @@ def publication_perimeter_evidence(publication_id: int) -> list[str]:
         return cur.fetchone()["evidence"]
 
 
+def group_to_resolve(group_id: int) -> bool:
+    """Le groupe `group_id` est dans la file des groupes dont la personne est à redécider."""
+    with owner_pool() as cur:
+        cur.execute("SELECT 1 FROM group_resolution_queue WHERE id = %s", (group_id,))
+        return cur.fetchone() is not None
+
+
 def group_person(group_id: int) -> tuple[int | None, str | None]:
     """Personne et mode de résolution du groupe `group_id`."""
     with owner_pool() as cur:

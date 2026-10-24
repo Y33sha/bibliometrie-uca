@@ -37,8 +37,8 @@ class ContributionRepository(Protocol):
 
     # ── Contributions : groupes de contributions sources ─────────────
 
-    def detach_groups_for_name_form(self, person_id: int, name_form: str) -> list[int]:
-        """Retire la personne (et le mode de résolution) de ses groupes de contributions sources rattachés par le nom (`name`, `compatible_name`) dont un membre porte la forme de nom. Les groupes `manual` et ceux d'un autre mode restent rattachés. Retourne les `publication_id` distincts des groupes détachés."""
+    def mark_groups_for_name_form(self, person_id: int, name_form: str) -> int:
+        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par le nom (`name`, `compatible_name`) dont un membre porte la forme de nom. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués."""
         ...
 
     def find_groups(self, group_ids: list[int]) -> list[GroupRow]:

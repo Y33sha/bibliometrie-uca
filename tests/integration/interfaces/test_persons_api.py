@@ -14,7 +14,7 @@ import pytest
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     group_person,
-    publication_perimeter_evidence,
+    group_to_resolve,
     seed_contribution,
     seed_group,
     seed_perimeter_author_group,
@@ -327,7 +327,7 @@ class TestUpdateIdentifierStatus:
         assert r.status_code == 200
         assert r.json()["status"] == "confirmed"
 
-    def test_rejection_detaches_groups_resolved_by_the_identifier(self, auth_client):
+    def test_rejection_marks_groups_resolved_by_the_identifier(self, auth_client):
         pid = seed_person()
         idref = uniq("idref", sep="")
         publication, group = _seed_perimeter_group(
@@ -338,8 +338,8 @@ class TestUpdateIdentifierStatus:
         r = auth_client.patch(f"/api/persons/identifiers/{iid}/status", json={"status": "rejected"})
 
         assert r.status_code == 200
-        assert group_person(group) == (None, None)
-        assert publication_perimeter_evidence(publication) == []
+        assert group_to_resolve(group)
+        assert group_person(group)[0] == pid
 
 
 # ── Reject / update name / merge ────────────────────────────────
@@ -483,7 +483,7 @@ class TestUpdateNameFormStatus:
         assert body["name_form"] == name_form
         assert body["status"] == "rejected"
 
-    def test_rejection_detaches_groups_resolved_by_name(self, auth_client):
+    def test_rejection_marks_groups_resolved_by_name(self, auth_client):
         pid = seed_person("RejectGroup", "Nf")
         name_form = uniq("rejectgroup nf")
         publication, group = _seed_perimeter_group(pid, "name", raw_author_name=name_form)
@@ -495,8 +495,8 @@ class TestUpdateNameFormStatus:
         )
 
         assert r.status_code == 200
-        assert group_person(group) == (None, None)
-        assert publication_perimeter_evidence(publication) == []
+        assert group_to_resolve(group)
+        assert group_person(group)[0] == pid
 
     def test_unknown_form_404(self, auth_client):
         pid = seed_person("UnknownForm", "Nf")

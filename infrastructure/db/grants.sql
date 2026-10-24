@@ -86,11 +86,12 @@ TO bibliometrie_app;
 -- Une décision sur un ORCID ou un IdRef, ou la correction d'un prénom, marque les
 -- publications à regrouper. Une correction d'adresse marque les enregistrements sources sans
 -- publication qui entrent dans le périmètre, et les groupes des contributions sources dont les
--- indices de périmètre changent. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
+-- indices de périmètre changent. Le rejet d'un identifiant ou d'une forme de nom marque les
+-- groupes dont la personne est à redécider. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
 GRANT INSERT, UPDATE ON
     queues.address_candidates_queue, queues.address_countries_queue,
     queues.publication_contributions_queue, queues.source_record_keys_queue,
-    queues.source_contribution_group_attributes_queue
+    queues.source_contribution_group_attributes_queue, queues.group_resolution_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON

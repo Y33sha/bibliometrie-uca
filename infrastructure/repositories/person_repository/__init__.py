@@ -126,8 +126,8 @@ class PgPersonRepository(PersonRepository):
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
         return _identifiers.propagate_status_to_hal_accounts(self._conn, ident_id, status)
 
-    def detach_groups_of_rejected_identifiers(self, person_id: int) -> list[int]:
-        return _identifiers.detach_groups_of_rejected_identifiers(self._conn, person_id)
+    def mark_groups_of_rejected_identifiers(self, person_id: int) -> int:
+        return _identifiers.mark_groups_of_rejected_identifiers(self._conn, person_id)
 
     # ── person_name_forms ──────────────────────────────────────────
 

@@ -212,7 +212,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "first_names_completed", label: "Prénoms complétés" },
       { key: "identifiers_neutralized", label: "Contributions sources à identifiant mal placé" },
       { key: "identifiers_transferred", label: "Identifiants transférés" },
-      { key: "reorphaned_nominal", label: "Contributions détachées (nom devenu ambigu)" },
+      { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
       { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },
       { key: "deleted_persons", label: "Personnes supprimées" },
       { key: "name_forms_inserted", label: "Formes de nom ajoutées" },

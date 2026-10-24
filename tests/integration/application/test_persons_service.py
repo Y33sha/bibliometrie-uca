@@ -30,6 +30,7 @@ from domain.errors import (
 from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import (
     contribution_repository,
     person_repository,
@@ -55,6 +56,7 @@ from tests.integration.helpers.persons import (
     insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import insert_persons_perimeter
@@ -251,18 +253,14 @@ class TestUpdateIdentifierStatus:
             sa_sync_conn, p, id_type="orcid", id_value="0000-0001", status="pending"
         )
 
-        result = update_identifier_status(
-            ident_id, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        result = update_identifier_status(ident_id, "confirmed", repo=repo)
 
         assert result.status == "confirmed"
         assert result.propagated == 0
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_identifier_status(
-                999999, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-            )
+            update_identifier_status(999999, "confirmed", repo=repo)
 
 
 class TestIdentifierStatusPropagation:
@@ -312,9 +310,7 @@ class TestIdentifierStatusPropagation:
         )
         idref_scanr = insert_person_identifier(sa_sync_conn, p, id_type="idref", id_value="999")
 
-        result = update_identifier_status(
-            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        result = update_identifier_status(orcid, "rejected", repo=repo)
 
         assert result.propagated == 3
         assert {self._status(sa_sync_conn, i) for i in (orcid, account, idhal, idhal_2)} == {
@@ -333,9 +329,7 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, other, id_type="idhal", id_value="nina-radosevic-robin"
         )
 
-        update_identifier_status(
-            orcid, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        update_identifier_status(orcid, "confirmed", repo=repo)
 
         assert self._status(sa_sync_conn, other_account) == "pending"
 
@@ -354,12 +348,7 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, p, id_type="hal_person_id", id_value="11581"
         )
 
-        assert (
-            update_identifier_status(
-                orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-            ).propagated
-            == 0
-        )
+        assert update_identifier_status(orcid, "rejected", repo=repo).propagated == 0
         assert self._status(sa_sync_conn, account) == "pending"
 
     def test_back_to_pending_is_not_propagated(self, sa_sync_conn, repo):
@@ -370,12 +359,7 @@ class TestIdentifierStatusPropagation:
         )
         insert_person_identifier(sa_sync_conn, p, id_type="hal_person_id", id_value="11581")
 
-        assert (
-            update_identifier_status(
-                orcid, "pending", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-            ).propagated
-            == 0
-        )
+        assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
 
 
 class TestIdentifierRejectionOnGroups:
@@ -383,7 +367,7 @@ class TestIdentifierRejectionOnGroups:
 
     ORCID = "0000-0002-1825-0097"
 
-    def test_detaches_groups_resolved_by_the_identifier(self, sa_sync_conn, repo):
+    def test_marks_groups_resolved_by_the_identifier(self, sa_sync_conn, repo):
         p = _person(sa_sync_conn)
         identifiers = {"orcid": self.ORCID}
         by_orcid, orcid_group = _perimeter_group(
@@ -397,16 +381,10 @@ class TestIdentifierRejectionOnGroups:
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(
-            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        update_identifier_status(orcid, "rejected", repo=repo)
 
-        assert _group_person(sa_sync_conn, orcid_group) == (None, None)
-        assert _publication_evidence(sa_sync_conn, by_orcid) == []
-        assert _group_person(sa_sync_conn, name_group) == (p, "name")
-        assert _group_person(sa_sync_conn, manual_group) == (p, "manual")
-        assert _publication_evidence(sa_sync_conn, by_name) == ["address"]
-        assert _publication_evidence(sa_sync_conn, manual) == ["address"]
+        assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {orcid_group}
+        assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
 
     def test_group_without_the_value_is_untouched(self, sa_sync_conn, repo):
         p = _person(sa_sync_conn)
@@ -415,9 +393,7 @@ class TestIdentifierRejectionOnGroups:
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(
-            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        update_identifier_status(orcid, "rejected", repo=repo)
 
         assert _group_person(sa_sync_conn, group) == (p, "orcid")
 
@@ -428,9 +404,7 @@ class TestIdentifierRejectionOnGroups:
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(
-            orcid, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
-        )
+        update_identifier_status(orcid, "confirmed", repo=repo)
 
         assert _group_person(sa_sync_conn, group) == (p, "orcid")
 
@@ -1059,8 +1033,6 @@ class TestUpdateNameFormStatus:
             person_id,
             "intrus unique",
             "rejected",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1076,8 +1048,6 @@ class TestUpdateNameFormStatus:
             person_id,
             "alpha b",
             "rejected",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1085,8 +1055,6 @@ class TestUpdateNameFormStatus:
             person_id,
             "alpha b",
             "confirmed",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1102,8 +1070,6 @@ class TestUpdateNameFormStatus:
                 person_id,
                 "delta gamma",
                 "rejected",
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1116,8 +1082,6 @@ class TestUpdateNameFormStatus:
                 person_id,
                 "inexistante xyz",
                 "rejected",
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1131,8 +1095,6 @@ class TestUpdateNameFormStatus:
             pid,
             "intrus etranger",
             "rejected",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1152,7 +1114,7 @@ class TestUpdateNameFormStatus:
 class TestNameFormRejectionOnGroups:
     """Le rejet d'une forme de nom détache de la personne les groupes rattachés par le nom dont un membre porte la forme."""
 
-    def test_detaches_groups_resolved_by_name(self, sa_sync_conn, repo, contribution_repo):
+    def test_marks_groups_resolved_by_name(self, sa_sync_conn, repo, contribution_repo):
         p = _person(sa_sync_conn)
         form = {"author_name_normalized": "intrus unique"}
         by_name, name_group = _perimeter_group(sa_sync_conn, p, "name", source_id="hal-n", **form)
@@ -1171,20 +1133,12 @@ class TestNameFormRejectionOnGroups:
             p,
             "intrus unique",
             "rejected",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
 
-        assert _group_person(sa_sync_conn, name_group) == (None, None)
-        assert _group_person(sa_sync_conn, initials_group) == (None, None)
-        assert _publication_evidence(sa_sync_conn, by_name) == []
-        assert _publication_evidence(sa_sync_conn, by_initials) == []
-        assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
-        assert _group_person(sa_sync_conn, manual_group) == (p, "manual")
-        assert _publication_evidence(sa_sync_conn, by_orcid) == ["address"]
-        assert _publication_evidence(sa_sync_conn, manual) == ["address"]
+        assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {name_group, initials_group}
+        assert _group_person(sa_sync_conn, name_group) == (p, "name")
 
     def test_group_under_another_form_is_untouched(self, sa_sync_conn, repo, contribution_repo):
         p = _person(sa_sync_conn)
@@ -1197,8 +1151,6 @@ class TestNameFormRejectionOnGroups:
             p,
             "intrus unique",
             "rejected",
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )

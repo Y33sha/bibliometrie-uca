@@ -11,6 +11,7 @@ from application.ports.repositories.contribution_repository import (
     GroupRow,
 )
 from domain.persons.group_matching import NAME_MATCH_REASONS
+from infrastructure.db.queues import Queue, enqueue
 from infrastructure.sql_fragments import (
     DETACHED_GROUP,
     GROUP_MEMBERS,
@@ -74,26 +75,18 @@ class PgContributionRepository(ContributionRepository):
 
     # ── Contributions : groupes de contributions sources ─────────────
 
-    def detach_groups_for_name_form(self, person_id: int, name_form: str) -> list[int]:
-        return list(
-            self._conn.execute(
-                text(f"""
-                    WITH detached AS (
-                        UPDATE source_contribution_groups
-                        SET {DETACHED_GROUP}
-                        WHERE id IN (
-                            SELECT g.id
-                            FROM {GROUP_MEMBERS}
-                            WHERE g.person_id = :pid
-                              AND g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
-                              AND ci.author_name_normalized = :nf
-                        )
-                        RETURNING publication_id
-                    )
-                    SELECT DISTINCT publication_id FROM detached
-                """),
-                {"pid": person_id, "nf": name_form},
-            ).scalars()
+    def mark_groups_for_name_form(self, person_id: int, name_form: str) -> int:
+        return enqueue(
+            self._conn,
+            Queue.GROUP_RESOLUTION,
+            f"""
+                SELECT g.id
+                FROM {GROUP_MEMBERS}
+                WHERE g.person_id = :pid
+                  AND g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
+                  AND ci.author_name_normalized = :nf
+            """,
+            {"pid": person_id, "nf": name_form},
         )
 
     def find_groups(self, group_ids: list[int]) -> list[GroupRow]:

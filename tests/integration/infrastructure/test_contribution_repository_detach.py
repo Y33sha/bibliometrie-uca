@@ -1,10 +1,12 @@
 """Les détachements du repository des contributions retirent la personne et le mode de résolution du groupe."""
 
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository
 from infrastructure.repositories.contribution_repository import detach_rejected_groups
 from tests.integration.helpers.groups import group_person, insert_person_group
 from tests.integration.helpers.persons import insert_person, insert_rejected_contribution
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
@@ -28,16 +30,14 @@ def test_detachement_d_une_paire_rejetee(sa_sync_conn):
     assert group_person(sa_sync_conn, group) == (None, None)
 
 
-def test_detachement_par_forme_de_nom(sa_sync_conn):
+def test_marquage_par_forme_de_nom(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
     publication = insert_publication(sa_sync_conn)
     by_name = _group(sa_sync_conn, publication, person, mode="name")
-    by_orcid = _group(sa_sync_conn, insert_publication(sa_sync_conn), person, mode="orcid")
+    _group(sa_sync_conn, insert_publication(sa_sync_conn), person, mode="orcid")
 
-    detached = contribution_repository(sa_sync_conn).detach_groups_for_name_form(
-        person, "jean dupont"
-    )
+    marked = contribution_repository(sa_sync_conn).mark_groups_for_name_form(person, "jean dupont")
 
-    assert detached == [publication]
-    assert group_person(sa_sync_conn, by_name) == (None, None)
-    assert group_person(sa_sync_conn, by_orcid) == (person, "orcid")
+    assert marked == 1
+    assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {by_name}
+    assert group_person(sa_sync_conn, by_name) == (person, "name")

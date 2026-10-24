@@ -836,13 +836,12 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_contribution_groups.id",
             "source_contribution_groups.reference_position",
-            # Un groupe dont les membres changent perd sa personne.
-            "source_contribution_groups.person_id",
-            "source_contribution_groups.resolution_mode",
             "source_contribution_group_members.id",
             "source_contributions.duplicate_of",
             "publication_contributions_queue",
             "source_contribution_group_attributes_queue",
+            # Un groupe rattaché dont les membres changent est marqué pour la redécision de sa personne.
+            "group_resolution_queue",
             "publication_author_alignment",
         ),
         # Publications que `contributions.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
@@ -897,9 +896,8 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
             "publication_contributions_queue",
-            # Groupes rattachés par un identifiant neutralisé ou transféré.
-            "source_contribution_groups.person_id",
-            "source_contribution_groups.resolution_mode",
+            # Groupes rattachés par un identifiant neutralisé ou transféré, à redécider.
+            "group_resolution_queue",
             "person_identifiers",
         ),
         # Identifiants attribués par `resolve_groups` et supprimés par `purge` ; groupes rattachés par `resolve_groups` et vidés par `purge`.
@@ -928,6 +926,7 @@ TASKS: tuple[Task, ...] = (
             "person_identifiers",
             "person_name_forms",
             "persons",
+            "group_resolution_queue",
         ),
         writes=(
             "source_contribution_groups.person_id",
@@ -935,13 +934,16 @@ TASKS: tuple[Task, ...] = (
             "person_identifiers",
             "persons",
             "person_name_forms",
+            # Marquages traités, retirés de la file.
+            "group_resolution_queue",
         ),
-        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés et groupes vidés par `purge`.
+        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, groupes vidés et marqués par `purge`.
         previous_run=(
             "person_identifiers",
             "person_name_forms",
             "persons",
             "source_contribution_groups.person_id",
+            "group_resolution_queue",
         ),
     ),
     _task(
@@ -981,10 +983,11 @@ TASKS: tuple[Task, ...] = (
             "rejected_contributions",
             "distinct_persons",
         ),
-        # La suppression d'une personne emporte ses formes de nom et vide ses groupes.
+        # La suppression d'une personne emporte ses formes de nom et vide ses groupes ; un groupe à forme de nom ambiguë est marqué pour la redécision de sa personne.
         writes=(
             "source_contribution_groups.person_id",
             "source_contribution_groups.resolution_mode",
+            "group_resolution_queue",
             "person_identifiers.id",
             "persons.id",
             "person_name_forms.id",

@@ -49,17 +49,11 @@ def update_identifier_status(
     status: str,
     *,
     repo: PersonRepository,
-    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> IdentifierStatusResult:
-    """Met à jour le statut d'un identifiant, et celui des identifiants de ses comptes HAL. Un rejet détache les groupes rattachés par les identifiants rejetés."""
+    """Met à jour le statut d'un identifiant, et celui des identifiants de ses comptes HAL. Un rejet marque pour la redécision les groupes rattachés par les identifiants rejetés."""
     result = persons_service.update_identifier_status(
-        ident_id,
-        status,
-        conn=conn,
-        repo=repo,
-        perimeter_recompute=perimeter_recompute,
-        audit_repo=audit_repo,
+        ident_id, status, repo=repo, audit_repo=audit_repo
     )
     conn.commit()
     return result
@@ -167,18 +161,15 @@ def update_name_form_status(
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
-    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> NameFormStatusRow:
-    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les groupes rattachés par le nom sous cette forme. Retourne la ligne {person_id, name_form, status}."""
+    """Met à jour le statut d'une forme de nom. `rejected` marque aussi pour la redécision les groupes rattachés par le nom sous cette forme. Retourne la ligne {person_id, name_form, status}."""
     row = persons_service.update_name_form_status(
         person_id,
         name_form,
         status,
-        conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
-        perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
     )
     conn.commit()

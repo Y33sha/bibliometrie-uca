@@ -5,6 +5,7 @@ import logging
 from sqlalchemy import text
 
 from application.services.persons.core import create_person
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import person_repository
 from pipeline.transformation.persons.groups import resolve_groups
 from tests.integration.helpers.groups import insert_group
@@ -15,6 +16,7 @@ from tests.integration.helpers.persons import (
     insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import mark, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _ORCID = "0000-0002-1825-0097"
@@ -403,3 +405,61 @@ def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync
     assert "  └─ 1 contribution identifiée, dont" in caplog.messages
     assert "     1 par ORCID" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
+
+
+class TestResolutionQueue:
+    """Un groupe en file garde sa personne jusqu'à sa redécision, qui ne l'écrit que si elle change."""
+
+    def test_meme_personne_rien_n_est_ecrit(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        group = _group(
+            conn, insert_publication(conn), [("crossref", "Jean Martin", {"orcid": _ORCID}, True)]
+        )
+        _attach(conn, group, person, "orcid")
+        mark(conn, Queue.GROUP_RESOLUTION, [group])
+
+        counts = resolve_groups(conn, logging.getLogger("test"))
+
+        assert _person(conn, group) == (person, "orcid")
+        assert counts["written"] == 0
+        assert queued(conn, Queue.GROUP_RESOLUTION) == set()
+
+    def test_une_autre_personne_designee_remplace_la_premiere(self, sa_sync_conn):
+        conn = sa_sync_conn
+        first = insert_person(conn, "Dupont", first_name="Paul")
+        second = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, second, id_type="orcid", id_value=_ORCID, status="confirmed")
+        group = _group(
+            conn, insert_publication(conn), [("crossref", "Jean Martin", {"orcid": _ORCID}, True)]
+        )
+        _attach(conn, group, first, "name")
+        mark(conn, Queue.GROUP_RESOLUTION, [group])
+
+        resolve_groups(conn, logging.getLogger("test"))
+
+        assert _person(conn, group) == (second, "orcid")
+
+    def test_un_groupe_que_rien_ne_soutient_perd_sa_personne(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        group = _group(conn, insert_publication(conn), [("hal", "Jean Martin", None, False)])
+        _attach(conn, group, person, "name")
+        mark(conn, Queue.GROUP_RESOLUTION, [group])
+
+        counts = resolve_groups(conn, logging.getLogger("test"))
+
+        assert _person(conn, group) == (None, None)
+        assert counts["detached"] == 1
+
+    def test_un_groupe_manuel_en_file_reste_rattache(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, False)])
+        _attach(conn, group, person, "manual")
+        mark(conn, Queue.GROUP_RESOLUTION, [group])
+
+        resolve_groups(conn, logging.getLogger("test"))
+
+        assert _person(conn, group) == (person, "manual")

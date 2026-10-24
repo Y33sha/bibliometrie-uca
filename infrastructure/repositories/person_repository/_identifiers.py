@@ -10,8 +10,9 @@ from application.ports.repositories.person_repository import (
 from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin, PersonIdentifierType
+from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.db.scalars import row_int
-from infrastructure.sql_fragments import DETACHED_GROUP, GROUP_MEMBERS, identifier_neutralized
+from infrastructure.sql_fragments import GROUP_MEMBERS, identifier_neutralized
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> IdentifierAttribution | None:
@@ -155,11 +156,10 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
 
 
 # Groupe de la personne rattaché par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'un de ses membres porte la valeur.
-_DETACH_GROUPS_OF_REJECTED_IDENTIFIERS_SQL = text(f"""
-    WITH detached AS (
-        UPDATE source_contribution_groups
-        SET {DETACHED_GROUP}
-        WHERE id IN (
+_MARK_GROUPS_OF_REJECTED_IDENTIFIERS_SQL = text(
+    enqueue_sql(
+        Queue.GROUP_RESOLUTION,
+        f"""
             SELECT g.id
             FROM {GROUP_MEMBERS}
             JOIN person_identifiers pi
@@ -168,14 +168,10 @@ _DETACH_GROUPS_OF_REJECTED_IDENTIFIERS_SQL = text(f"""
              AND ci.identifiers ->> pi.id_type = pi.id_value
             WHERE g.person_id = :pid
               AND pi.status = '{AttributionStatus.REJECTED.value}'
-        )
-        RETURNING publication_id
+        """,
     )
-    SELECT DISTINCT publication_id FROM detached
-""")
+)
 
 
-def detach_groups_of_rejected_identifiers(conn: Connection, person_id: int) -> list[int]:
-    return list(
-        conn.execute(_DETACH_GROUPS_OF_REJECTED_IDENTIFIERS_SQL, {"pid": person_id}).scalars()
-    )
+def mark_groups_of_rejected_identifiers(conn: Connection, person_id: int) -> int:
+    return conn.execute(_MARK_GROUPS_OF_REJECTED_IDENTIFIERS_SQL, {"pid": person_id}).rowcount

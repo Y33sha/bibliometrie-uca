@@ -16,7 +16,7 @@ def _install(monkeypatch, queries: MagicMock) -> None:
         "fetch_identifier_votes",
         "fetch_contributor_information_identifiers",
         "write_misplaced_neutralizations",
-        "release_misplaced_groups",
+        "mark_misplaced_groups",
     ):
         monkeypatch.setattr(identifier_arbitration, name, getattr(queries, name))
 
@@ -43,10 +43,10 @@ def test_identite_contredisant_le_consensus_neutralisee_et_groupes_liberes(monke
     )
     gained = {10: ["orcid"], 11: ["orcid"], 12: ["orcid"]}
     queries.write_misplaced_neutralizations.return_value = gained
-    queries.release_misplaced_groups.return_value = 2
+    queries.mark_misplaced_groups.return_value = 2
 
     result = requalify_misplaced_identifiers(MagicMock(), {("orcid", "X"): "s dahbi"})
 
     queries.write_misplaced_neutralizations.assert_called_once_with(ANY, {2: ["orcid"]})
-    queries.release_misplaced_groups.assert_called_once_with(ANY, gained)
-    assert result == {"neutralized": 3, "released_groups": 2}
+    queries.mark_misplaced_groups.assert_called_once_with(ANY, gained)
+    assert result == {"neutralized": 3, "marked_groups": 2}

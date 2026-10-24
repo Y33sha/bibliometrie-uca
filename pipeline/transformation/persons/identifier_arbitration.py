@@ -1,8 +1,8 @@
 """Arbitrage des identifiants de personne, avant le rattachement des groupes : identifiants mal placés et conflits d'attribution.
 
-Le consensus de nom d'une valeur d'identifiant est le nom que contiennent strictement plus de contributions sources que chacun des autres (`strict_majority`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`). Des informations du contributeur dont le nom désigne une autre personne que celle du consensus contiennent la valeur par erreur. Ses contributions sources la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`). Un groupe rattaché par ce type d'identifiant dont un membre gagne la marque perd sa personne.
+Le consensus de nom d'une valeur d'identifiant est le nom que contiennent strictement plus de contributions sources que chacun des autres (`strict_majority`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`). Des informations du contributeur dont le nom désigne une autre personne que celle du consensus contiennent la valeur par erreur. Ses contributions sources la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`). Un groupe rattaché par ce type d'identifiant dont un membre gagne la marque est marqué pour la redécision de sa personne (`Queue.GROUP_RESOLUTION`).
 
-Un conflit (`IdentifierConflict`) est une valeur attribuée à une personne, le titulaire, et portée par un groupe d'une autre personne. Le vote des groupes le tranche (`resolve_identifier_transfers`). Chaque groupe qui porte la valeur donne une voix à sa personne. La valeur va à la personne qui a strictement plus de voix que chacune des autres. Seules les attributions `pending` sont transférables. Après un transfert, les groupes de l'ancien titulaire rattachés par ce type d'identifiant et qui portent la valeur perdent leur personne. Le rattachement des groupes (`persons.resolve_groups`) les re-décide.
+Un conflit (`IdentifierConflict`) est une valeur attribuée à une personne, le titulaire, et portée par un groupe d'une autre personne. Le vote des groupes le tranche (`resolve_identifier_transfers`). Chaque groupe qui porte la valeur donne une voix à sa personne. La valeur va à la personne qui a strictement plus de voix que chacune des autres. Seules les attributions `pending` sont transférables. Après un transfert, les groupes de l'ancien titulaire rattachés par ce type d'identifiant et qui portent la valeur sont marqués pour la redécision de leur personne. Le rattachement des groupes (`persons.resolve_groups`) les redécide.
 
 L'arbitrage est ordre-indépendant : le calcul repart des données à chaque exécution.
 """
@@ -26,10 +26,9 @@ from domain.persons.matching import (
     strict_majority,
 )
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.db.queues import Queue, enqueue_sql
+from infrastructure.db.queues import Queue, enqueue, enqueue_sql
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
-    DETACHED_GROUP,
     GROUP_MEMBERS,
     identifier_neutralized,
     person_source_contribution,
@@ -181,8 +180,8 @@ def write_misplaced_neutralizations(
     return {r.id: list(r.types) for r in rows}
 
 
-def release_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str]]) -> int:
-    """Retire leur personne aux groupes rattachés par un type d'identifiant dont un membre gagne la marque `misplaced` pour ce type (`gained` : `{source_contribution_id: types d'identifiant}`). Rend le nombre de groupes libérés."""
+def mark_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str]]) -> int:
+    """Marque pour la redécision de leur personne (`Queue.GROUP_RESOLUTION`) les groupes rattachés par un type d'identifiant dont un membre gagne la marque `misplaced` pour ce type (`gained` : `{source_contribution_id: types d'identifiant}`). Rend le nombre de groupes marqués."""
     pairs = [
         (source_contribution_id, id_type)
         for source_contribution_id, id_types in gained.items()
@@ -191,17 +190,19 @@ def release_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str
     if not pairs:
         return 0
     source_contribution_ids, id_types = zip(*pairs, strict=True)
-    return conn.execute(
-        text(f"""
-            UPDATE source_contribution_groups g
-            SET {DETACHED_GROUP}
-            FROM source_contribution_group_members gm
+    return enqueue(
+        conn,
+        Queue.GROUP_RESOLUTION,
+        """
+            SELECT g.id
+            FROM source_contribution_groups g
+            JOIN source_contribution_group_members gm ON gm.group_id = g.id
             JOIN unnest(CAST(:ids AS integer[]), CAST(:types AS text[])) AS m(source_contribution_id, id_type)
                 ON m.source_contribution_id = gm.source_contribution_id
-            WHERE gm.group_id = g.id AND g.resolution_mode::text = m.id_type
-        """),
+            WHERE g.resolution_mode::text = m.id_type
+        """,
         {"ids": list(source_contribution_ids), "types": list(id_types)},
-    ).rowcount
+    )
 
 
 def fetch_identifier_owners(conn: Connection, id_type: str) -> dict[str, tuple[int, str]]:
@@ -243,23 +244,21 @@ def fetch_identifier_group_votes(conn: Connection, id_type: str) -> dict[str, di
     return votes
 
 
-def release_identifier_groups(conn: Connection, id_type: str, id_value: str, person_id: int) -> int:
-    """Retire leur personne aux groupes de `person_id` rattachés par le type d'identifiant dont un membre porte la valeur (`_bears_identifier`). Rend le nombre de groupes libérés."""
-    return conn.execute(
-        text(f"""
-            UPDATE source_contribution_groups
-            SET {DETACHED_GROUP}
-            WHERE id IN (
-                SELECT g.id
-                FROM {GROUP_MEMBERS}
-                WHERE g.person_id = :person_id
-                  AND g.resolution_mode::text = :id_type
-                  AND ci.identifiers->>:id_type = :id_value
-                  AND {_bears_identifier(id_type)}
-            )
-        """),
+def mark_identifier_groups(conn: Connection, id_type: str, id_value: str, person_id: int) -> int:
+    """Marque pour la redécision de leur personne (`Queue.GROUP_RESOLUTION`) les groupes de `person_id` rattachés par le type d'identifiant dont un membre porte la valeur (`_bears_identifier`). Rend le nombre de groupes marqués."""
+    return enqueue(
+        conn,
+        Queue.GROUP_RESOLUTION,
+        f"""
+            SELECT g.id
+            FROM {GROUP_MEMBERS}
+            WHERE g.person_id = :person_id
+              AND g.resolution_mode::text = :id_type
+              AND ci.identifiers->>:id_type = :id_value
+              AND {_bears_identifier(id_type)}
+        """,
         {"person_id": person_id, "id_type": id_type, "id_value": id_value},
-    ).rowcount
+    )
 
 
 IdentifierConsensus = dict[tuple[str, str], str]
@@ -280,9 +279,9 @@ def requalify_misplaced_identifiers(
     conn: Connection,
     consensus: IdentifierConsensus,
 ) -> dict[str, int]:
-    """Neutralise les identifiants mal placés et libère les groupes rattachés par eux (`release_misplaced_groups`).
+    """Neutralise les identifiants mal placés et marque pour la redécision de leur personne les groupes rattachés par eux (`mark_misplaced_groups`).
 
-    Retourne `{neutralized, released_groups}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, et de groupes qui perdent leur personne.
+    Retourne `{neutralized, marked_groups}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, et de groupes marqués pour la redécision de leur personne.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
@@ -293,7 +292,7 @@ def requalify_misplaced_identifiers(
     gained = write_misplaced_neutralizations(conn, misplaced)
     return {
         "neutralized": len(gained),
-        "released_groups": release_misplaced_groups(conn, gained),
+        "marked_groups": mark_misplaced_groups(conn, gained),
     }
 
 
@@ -354,7 +353,7 @@ def resolve_identifier_transfers(
             continue
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
-        release_identifier_groups(conn, id_type, id_value, owner)
+        mark_identifier_groups(conn, id_type, id_value, owner)
         logger.info(
             "%sTransfert %s=%s : personne %d → %d (%s contre %d)",
             BRANCH,
@@ -385,7 +384,7 @@ def arbitrate_identifier_conflicts(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
 
-    Retourne `{neutralized, released_groups, transferred}`. Le commit est laissé au caller.
+    Retourne `{neutralized, marked_groups, transferred}`. Le commit est laissé au caller.
     """
     step(logger, "Identifiants mal placés et conflits d'attribution")
     with waiting(BRANCH, logger) as line:

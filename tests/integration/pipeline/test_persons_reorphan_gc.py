@@ -1,10 +1,11 @@
-"""Purge de la phase personnes : re-orphelinage des groupes à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
+"""Purge de la phase personnes : marquage des groupes à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
 
 from sqlalchemy import text
 
+from infrastructure.db.queues import Queue
 from pipeline.transformation.persons.purge import (
     delete_persons_out_of_perimeter,
-    reorphan_ambiguous_nominal,
+    mark_ambiguous_nominal,
 )
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.groups import group_person, insert_person_group
@@ -16,6 +17,7 @@ from tests.integration.helpers.persons import (
     insert_rejected_contribution,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
@@ -54,7 +56,7 @@ def _publication_of(conn, group_id):
     ).scalar_one()
 
 
-def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_re_orphelines(sa_sync_conn):
+def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_marques(sa_sync_conn):
     conn = sa_sync_conn
     a = insert_person(conn, "Martin", first_name="Jean")
     b = insert_person(conn, "Martin", first_name="Jeanne")
@@ -65,17 +67,14 @@ def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_re_orphelines(sa_sync_c
 
     by_name = _group(conn, form="j martin", person_id=a)
     by_compatible_name = _group(conn, form="j martin", person_id=a, mode="compatible_name")
-    unambiguous = _group(conn, form="jean martin", person_id=b)
-    manual = _group(conn, form="j martin", person_id=a, mode="manual")
-    by_identifier = _group(conn, form="j martin", person_id=a, mode="orcid")
+    _group(conn, form="jean martin", person_id=b)  # forme univoque
+    _group(conn, form="j martin", person_id=a, mode="manual")  # rattachement manuel
+    _group(conn, form="j martin", person_id=a, mode="orcid")  # rattachement par identifiant
 
-    assert reorphan_ambiguous_nominal(conn) == 2
+    assert mark_ambiguous_nominal(conn) == 2
 
-    assert group_person(conn, by_name) == (None, None)
-    assert group_person(conn, by_compatible_name) == (None, None)
-    assert group_person(conn, unambiguous)[0] == b  # forme univoque
-    assert group_person(conn, manual)[0] == a  # rattachement manuel
-    assert group_person(conn, by_identifier)[0] == a  # rattachement par identifiant
+    assert queued(conn, Queue.GROUP_RESOLUTION) == {by_name, by_compatible_name}
+    assert group_person(conn, by_name)[0] == a
 
 
 def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):
@@ -86,7 +85,7 @@ def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):
     insert_person_name_form(conn, b, name_form="j martin", status="rejected")
     group = _group(conn, form="j martin", person_id=a)
 
-    assert reorphan_ambiguous_nominal(conn) == 0
+    assert mark_ambiguous_nominal(conn) == 0
     assert group_person(conn, group)[0] == a
 
 
@@ -105,10 +104,10 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     insert_rejected_contribution(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
     sans_rejet = _group(conn, form="l tixier", person_id=retenue)
 
-    assert reorphan_ambiguous_nominal(conn) == 1
+    assert mark_ambiguous_nominal(conn) == 1
 
-    assert group_person(conn, avec_rejet)[0] == retenue  # un seul candidat pour sa publication
-    assert group_person(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
+    # Un seul candidat pour la publication du groupe avec rejet ; deux pour l'autre : forme ambiguë.
+    assert queued(conn, Queue.GROUP_RESOLUTION) == {sans_rejet}
 
 
 def test_une_personne_sans_groupe_du_perimetre_est_supprimee(sa_sync_conn):

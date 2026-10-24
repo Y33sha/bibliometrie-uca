@@ -134,19 +134,21 @@ def test_un_groupe_aux_membres_inchanges_garde_sa_personne(conn):
     assert tuple(_group_person(conn, martin)) == (person, "name")
 
 
-def test_un_groupe_recompose_garde_son_identifiant_et_perd_sa_personne(conn):
+def test_un_groupe_recompose_garde_son_identifiant_et_sa_personne_et_entre_dans_la_file(conn):
+    """Un nouveau membre ne vide pas le groupe : sa personne est à redécider."""
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    martin, _ = _attached_group(conn, publication, hal[0])
+    martin, person = _attached_group(conn, publication, hal[0])
     _source_record(conn, publication, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
 
     _run(conn)
 
     groups = _groups(conn, publication)
     assert hal[0] in groups[martin] and len(groups[martin]) == 3
-    assert tuple(_group_person(conn, martin)) == (None, None)
+    assert tuple(_group_person(conn, martin)) == (person, "name")
+    assert martin in queued(conn, Queue.GROUP_RESOLUTION)
 
 
 def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):

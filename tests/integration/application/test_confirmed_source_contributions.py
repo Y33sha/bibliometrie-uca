@@ -7,6 +7,7 @@ from application.services.contributions.assign_orphans import assign_orphan_cont
 from application.services.contributions.core import reject_pair
 from application.services.persons.core import update_name_form_status
 from domain.errors import PersonAlreadyInPublicationError
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository, person_repository
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
@@ -15,6 +16,7 @@ from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.groups import group_person, insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _PERIMETER = PublicationPerimeterRecompute()
@@ -87,7 +89,7 @@ def test_detach_unpins(sa_sync_conn):
 
 
 def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
-    """Rejeter une forme de nom détache les groupes rattachés par le nom sous cette forme, sauf ceux que l'admin a épinglés sur la personne."""
+    """Rejeter une forme de nom marque pour la redécision les groupes rattachés par le nom sous cette forme, sauf ceux que l'admin a épinglés sur la personne."""
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
     pinned, pinned_group, _ = _orphan_source_contribution(sa_sync_conn)
     _, matched_group, _ = _orphan_source_contribution(sa_sync_conn)
@@ -114,8 +116,6 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
         pid,
         "jean martin",
         "rejected",
-        conn=sa_sync_conn,
-        perimeter_recompute=_PERIMETER,
         repo=persons,
         contribution_repo=contributions,
     )
@@ -124,7 +124,7 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
         (pid, "manual"),
         pid,
     )
-    assert group_person(sa_sync_conn, matched_group) == (None, None)
+    assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {matched_group}
 
 
 def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(sa_sync_conn):
