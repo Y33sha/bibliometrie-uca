@@ -95,6 +95,15 @@ class GroupMember:
         last_name, first_name = self.name.normalized()
         return contributor_name_forms(last_name, first_name)
 
+    @property
+    def trusted_identifiers(self) -> dict[str, str]:
+        """Identifiants qui servent de signal de rattachement (`trusted_identifier`)."""
+        return {
+            id_type: value
+            for id_type, value in self.identifiers.items()
+            if trusted_identifier(id_type, self.source)
+        }
+
 
 @dataclass(frozen=True)
 class PersonIndex:
@@ -147,8 +156,8 @@ def decide_group(
     for id_type in IDENTIFIER_ORDER:
         identifier_map = index.identifiers.get(id_type, {})
         for m in members:
-            value = m.identifiers.get(id_type)
-            if not value or not trusted_identifier(id_type, m.source):
+            value = m.trusted_identifiers.get(id_type)
+            if not value:
                 continue
             match = decide_match_by_identifier(
                 value, identifier_map, m.name, m.name_forms, index.name_form_status
@@ -279,3 +288,18 @@ def settle_publication(
                 refused=decision.refused,
             )
     return settled
+
+
+def identifiers_to_attribute(
+    members: Sequence[GroupMember], decision: GroupDecision
+) -> list[dict[str, str]]:
+    """Identifiants fiables des membres d'un groupe rattaché, à attribuer à sa personne. Les valeurs dont la corroboration a été refusée (`decision.refused`) en sont écartées."""
+    refused = {(id_type, value) for id_type, value, _ in decision.refused}
+    return [
+        {
+            id_type: value
+            for id_type, value in m.trusted_identifiers.items()
+            if (id_type, value) not in refused
+        }
+        for m in members
+    ]

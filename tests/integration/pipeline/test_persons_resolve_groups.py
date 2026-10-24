@@ -181,3 +181,53 @@ class TestPins:
         resolve_groups(conn)
 
         assert _person(conn, group) == (first, "name")
+
+
+def _identifiers_of(conn, person):
+    return {
+        (r.id_type, r.id_value, r.status, r.source)
+        for r in conn.execute(
+            text(
+                "SELECT id_type::text, id_value, status::text, source::text"
+                " FROM person_identifiers WHERE person_id = :p"
+            ),
+            {"p": person},
+        )
+    }
+
+
+class TestIdentifierAttribution:
+    def test_les_identifiants_fiables_des_membres_sont_attribues_en_attente(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        group = _group(
+            conn,
+            insert_publication(conn),
+            [
+                ("crossref", "Jean Martin", {"orcid": _ORCID}, True),
+                ("hal", "Jean Martin", {"idref": "123456789"}, True),
+            ],
+        )
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (person, "orcid")
+        assert ("idref", "123456789", "pending", "auto") in _identifiers_of(conn, person)
+
+    def test_l_orcid_d_une_source_non_fiable_n_est_pas_attribue(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = insert_person(conn, "Martin", first_name="Jean")
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        _group(
+            conn,
+            insert_publication(conn),
+            [
+                ("crossref", "Jean Martin", {"orcid": _ORCID}, True),
+                ("scanr", "Jean Martin", {"orcid": "0000-0001-5109-3700"}, True),
+            ],
+        )
+
+        resolve_groups(conn)
+
+        assert not any(v == "0000-0001-5109-3700" for _, v, _, _ in _identifiers_of(conn, person))

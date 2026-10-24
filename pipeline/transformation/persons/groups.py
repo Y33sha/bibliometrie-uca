@@ -17,16 +17,19 @@ from domain.persons.group_matching import (
     GroupOutcome,
     PersonIndex,
     decide_group,
+    identifiers_to_attribute,
     settle_publication,
 )
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
+from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     pinned,
     pinned_groups_sql,
     strong_identifier_source_contributions,
     usable_identifier,
 )
+from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
 from pipeline.transformation.persons.store import (
     PersonsStore,
     fetch_identifier_to_person_map,
@@ -168,6 +171,26 @@ def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> in
     ).rowcount
 
 
+def attribute_identifiers(
+    conn: Connection,
+    groups: dict[int, dict[int, list[GroupMember]]],
+    decisions: dict[int, GroupDecision],
+) -> None:
+    """Attribue en attente, à la personne de chaque groupe rattaché par la décision, les identifiants fiables de ses membres (`identifiers_to_attribute`)."""
+    members_by_group = {
+        group_id: members for by_group in groups.values() for group_id, members in by_group.items()
+    }
+    repo = PgPersonRepository(conn)
+    for group_id, decision in decisions.items():
+        if decision.outcome != GroupOutcome.MATCH or decision.person_id is None:
+            continue
+        add_identifiers_from_contributions(
+            decision.person_id,
+            identifiers_to_attribute(members_by_group[group_id], decision),
+            repo=repo,
+        )
+
+
 def apply_pins(conn: Connection) -> int:
     """Rattache à la personne épinglée les groupes dont un membre est épinglé (`pinned_groups_sql`). Rend le nombre de groupes rattachés."""
     release, attach = pinned_groups_sql("SELECT id FROM source_contribution_groups")
@@ -186,6 +209,7 @@ def resolve_groups(conn: Connection) -> dict[str, int]:
         taken_persons(conn, groups),
     )
     written = write_decisions(conn, decisions)
+    attribute_identifiers(conn, groups, decisions)
     counts: Counter[str] = Counter(
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()

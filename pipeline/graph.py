@@ -937,6 +937,7 @@ TASKS: tuple[Task, ...] = (
         writes=(
             "source_contribution_groups.person_id",
             "source_contribution_groups.resolution_mode",
+            "person_identifiers",
         ),
         # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés et groupes vidés par `purge`.
         previous_run=(
