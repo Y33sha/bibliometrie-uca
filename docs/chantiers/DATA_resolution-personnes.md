@@ -139,7 +139,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [x] La phase `contributions` cesse de construire la table `contributions`, que l'API cesse d'écrire. Les derniers lecteurs, dont la file des orphelins, lisent les groupes. 4ed641c65
 - [x] `source_contributions.person_id` figé : l'ancienne cascade disparaît, et plus rien n'écrit la colonne. Aucune personne n'est créée jusqu'à la création par les groupes. eac158104
-- [ ] La cascade par groupe crée les personnes des groupes du périmètre restés sans personne, sur un index tenu à jour après chaque création.
+- [x] La cascade par groupe crée les personnes des groupes du périmètre restés sans personne, sur un index tenu à jour après chaque création. 6f2e8b723
 
 #### Étape D — Suppressions
 
