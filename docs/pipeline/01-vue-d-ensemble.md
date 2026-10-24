@@ -40,7 +40,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Consolidation des relations publications-personnes-structures
 
-- [Contributions](09-contributions.md) : peuple la table `contributions` (table de liaison entre les référentiels `publications` et `persons`) à partir des contributions sources.
+- [Finalisation](09-finalize.md) : met à jour, après la résolution des personnes, le périmètre des publications, les vues des structures, la purge des publications et des référentiels vides, et les compteurs de publications.
 
 ## Enrichissements
 

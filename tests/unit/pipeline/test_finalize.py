@@ -8,7 +8,7 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publications.contributions import contributions as phase
+from pipeline.transformation import finalize as phase
 
 
 class _FakePurgeQueries:
@@ -62,7 +62,7 @@ def _run(contexte, lots):
     ):
         for patcher in _patch_sql(counts):
             stack.enter_context(patcher)
-        rendu = phase.ContributionsPhase().run(contexte())
+        rendu = phase.FinalizePhase().run(contexte())
     return rendu, purge, counts
 
 
@@ -123,7 +123,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
     ):
         for patcher in _patch_sql(_Counts()):
             stack.enter_context(patcher)
-        rendu = phase.ContributionsPhase(
+        rendu = phase.FinalizePhase(
             empty_containers=(
                 ("Monographies vides", suppression("monographies", 0)),
                 ("Revues vides", suppression("revues", 2)),

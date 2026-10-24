@@ -58,11 +58,11 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
+from pipeline.transformation import finalize
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
-from pipeline.transformation.publications.contributions import contributions
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
 from pipeline.transformation.publishing import publishers_journals, resolve_ra
@@ -97,7 +97,7 @@ _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "author_grouping": author_grouping.build,
     "relations": relations.build,
     "persons": persons.build,
-    "contributions": contributions.build,
+    "finalize": finalize.build,
     "countries": countries.build,
     "subjects": subjects.build,
     "oa_status": oa_status.build,

@@ -36,7 +36,7 @@ L'opération est refusée quand deux revues de même titre, une chez chaque édi
 
 ## Lecture par le pipeline
 
-`journals.publication_count` est recalculé d'abord, puis `publishers.publication_count` en est la somme. La phase `contributions` fait ce calcul en totalité une fois le périmètre posé ; une fusion administrative ne recalcule que les éditeurs concernés.
+`journals.publication_count` est recalculé d'abord, puis `publishers.publication_count` en est la somme. La phase `finalize` fait ce calcul en totalité une fois le périmètre posé ; une fusion administrative ne recalcule que les éditeurs concernés.
 
 ## Lecture par l'API
 

@@ -805,7 +805,7 @@ TASKS: tuple[Task, ...] = (
             "apc_payments.publication_id",
             "publication_contributions_queue",
         ),
-        # Verdicts d'Unpaywall ; publications que `contributions.purge_publications` supprime ; revues et monographies vides supprimées par `contributions.delete_empty_containers`.
+        # Verdicts d'Unpaywall ; publications que `finalize.purge_publications` supprime ; revues et monographies vides supprimées par `finalize.delete_empty_containers`.
         previous_run=(
             "source_records.countries",
             "publications.id",
@@ -848,7 +848,7 @@ TASKS: tuple[Task, ...] = (
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        # Publications que `contributions.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
+        # Publications que `finalize.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publication_contributions_queue",
@@ -998,8 +998,8 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "contributions.publications_in_perimeter",
-        "contributions",
+        "finalize.publications_in_perimeter",
+        "finalize",
         reads=(
             "contributions.person_id",
             "contributions.perimeter_evidence",
@@ -1008,12 +1008,12 @@ TASKS: tuple[Task, ...] = (
             "publications.id",
         ),
         writes=("publications.in_perimeter",),
-        # Lignes que `contributions.purge_publications` supprime plus loin dans le même run.
+        # Lignes que `finalize.purge_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),
     ),
     _task(
-        "contributions.structures",
-        "contributions",
+        "finalize.structures",
+        "finalize",
         reads=(
             "source_contribution_structures",
             "contributions.id",
@@ -1026,8 +1026,8 @@ TASKS: tuple[Task, ...] = (
         writes=("contribution_structures", "publication_structures"),
     ),
     _task(
-        "contributions.purge_publications",
-        "contributions",
+        "finalize.purge_publications",
+        "finalize",
         reads=(
             "publications.id",
             "source_records.publication_id",
@@ -1038,8 +1038,8 @@ TASKS: tuple[Task, ...] = (
         writes=("publications.id",),
     ),
     _task(
-        "contributions.delete_empty_containers",
-        "contributions",
+        "finalize.delete_empty_containers",
+        "finalize",
         reads=(
             "monographs.id",
             "monographs.journal_id",
@@ -1056,8 +1056,8 @@ TASKS: tuple[Task, ...] = (
         writes=("monographs.id", "journals.id", "publishers.id", "journal_issns"),
     ),
     _task(
-        "contributions.publication_counts",
-        "contributions",
+        "finalize.publication_counts",
+        "finalize",
         reads=(
             "addresses.id",
             "source_contribution_addresses",
@@ -1226,7 +1226,7 @@ PHASE_LABELS: dict[str, str] = {
     "publications": "Dédoublonnage des publications",
     "author_grouping": "Alignement des auteurs des enregistrements sources d'une même publication",
     "persons": "Résolution des personnes",
-    "contributions": "Rafraîchissement des liens entre publications, personnes et structures",
+    "finalize": "Finalisation : périmètre des publications, vues des structures, purges et compteurs",
     "relations": "Relations entre publications apparentées",
     "subjects": "Sujets des publications",
     "countries": "Pays associés aux contributions sources",

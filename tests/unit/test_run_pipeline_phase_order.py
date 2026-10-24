@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from pipeline import run as run_pipeline
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.transformation.publications.contributions import contributions as contributions_phase
+from pipeline.transformation import finalize as finalize_phase
 
 
 @contextmanager
@@ -20,22 +20,22 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
     La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
     """
     with (
-        patch.object(contributions_phase, "purge_publications", return_value=0),
-        patch.object(contributions_phase, "count_contributions_in_perimeter"),
-        patch.object(contributions_phase, "refresh_publications_perimeter_evidence"),
-        patch.object(contributions_phase, "refresh_contribution_structures"),
-        patch.object(contributions_phase, "refresh_publication_structures"),
+        patch.object(finalize_phase, "purge_publications", return_value=0),
+        patch.object(finalize_phase, "count_contributions_in_perimeter"),
+        patch.object(finalize_phase, "refresh_publications_perimeter_evidence"),
+        patch.object(finalize_phase, "refresh_contribution_structures"),
+        patch.object(finalize_phase, "refresh_publication_structures"),
         patch.object(
-            contributions_phase, "recompute_address_publication_count", return_value=0
+            finalize_phase, "recompute_address_publication_count", return_value=0
         ) as addresses,
         patch.object(
-            contributions_phase, "refresh_journal_publication_counts", return_value=0
+            finalize_phase, "refresh_journal_publication_counts", return_value=0
         ) as journals,
         patch.object(
-            contributions_phase, "refresh_publisher_publication_counts", return_value=0
+            finalize_phase, "refresh_publisher_publication_counts", return_value=0
         ) as publishers,
     ):
-        contributions_phase.ContributionsPhase().run(
+        finalize_phase.FinalizePhase().run(
             PhaseContext(
                 open_tx=_fake_tx,
                 logger=logging.getLogger("test"),

@@ -33,7 +33,7 @@ Routeur `interfaces/api/routers/journals.py`, commandes dans `application/servic
 
 ## Lecture par le pipeline
 
-**Compteur de publications.** `pipeline/transformation/publishing/publication_counts.py` recalcule `journals.publication_count`, puis celui des éditeurs. La phase `contributions` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
+**Compteur de publications.** `pipeline/transformation/publishing/publication_counts.py` recalcule `journals.publication_count`, puis celui des éditeurs. La phase `finalize` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
 
 **Type de revue.** `refresh_from_sources` lit `get_journal_type` pour rejouer les règles de type de document qui en dépendent.
 

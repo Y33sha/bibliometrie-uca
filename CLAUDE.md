@@ -65,7 +65,7 @@ A jour au 2026-10-11
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
 `persons` — Création personnes
-`contributions` — Construction de la table consolidée
+`finalize` — Périmètre des publications, vues des structures, purges et compteurs
 `relations` — Relations sémantiques entre publications
 `subjects` — Sujets/mots-clés
 `countries` — Détection pays

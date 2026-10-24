@@ -26,7 +26,7 @@ La phase `publications` constitue les publications ; les phases `relations`, `oa
 
 **Recalcul de l'état consolidé (`refresh_from_sources`).** L'état est recalculé en entier, jamais complété au coup par coup : première valeur non nulle selon le classement des sources, statut d'accès le plus ouvert, réunion dédoublonnée des listes, arbitrage entre sous-types d'article. La règle de type de document dépendant de la revue est rejouée, puis l'ensemble est enregistré avec la liste des sources contributrices et le complément de détail.
 
-**Suppression (`pipeline/transformation/publications/lifecycle.py`).** Une publication existe si elle a au moins un enregistrement source, un type de document admissible et au moins une contribution. Après un recalcul, le module du cycle de vie supprime une publication sans enregistrement source ou de type non admissible ; ses enregistrements sources s'en détachent. La phase `contributions` supprime les publications sans contribution. Une publication réunie à une autre est dissoute : ses paiements APC passent à la publication conservée, son identifiant redirige vers elle, puis elle est supprimée.
+**Suppression (`pipeline/transformation/publications/lifecycle.py`).** Une publication existe si elle a au moins un enregistrement source, un type de document admissible et au moins une contribution. Après un recalcul, le module du cycle de vie supprime une publication sans enregistrement source ou de type non admissible ; ses enregistrements sources s'en détachent. La phase `finalize` supprime les publications sans contribution. Une publication réunie à une autre est dissoute : ses paiements APC passent à la publication conservée, son identifiant redirige vers elle, puis elle est supprimée.
 
 **Relations (`pipeline/transformation/publications/relations.py`).** La table est reconstruite à chaque passage, à partir de trois signaux :
 
@@ -38,7 +38,7 @@ Les liens vont du dépendant vers le parent, et les liens inverses sont dédoubl
 
 **Statut *open access* (`pipeline/transformation/publications/oa_status.py`).** Unpaywall est interrogé pour les publications à DOI jamais vérifiées ou dont la vérification a vieilli, et fait autorité — à une exception près : une archive ouverte détenant le fichier rouvre une publication annoncée fermée ou indéterminée.
 
-**Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `contributions` y reporte l'appartenance au périmètre.
+**Pays et périmètre.** La phase `countries` propage les pays des adresses jusqu'à la publication ; la phase `finalize` y reporte l'appartenance au périmètre.
 
 ## Écriture par l'API
 

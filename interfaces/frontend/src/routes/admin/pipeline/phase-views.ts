@@ -237,7 +237,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  contributions: {
+  finalize: {
     summary: [
       { key: "publications_purged", label: "Publications orphelines supprimées" },
       { key: "total_in_perimeter", label: "Contributions du périmètre" },

@@ -34,7 +34,7 @@ Une seule phase écrit ces tables, `subjects`, exécutée après `contributions`
 
 L'ingestion lit les thématiques dans les enregistrements source, et non dans le détail consolidé de la publication : c'est ce qui permet de retenir quelle source a fourni chaque lien. Les co-occurrences lisent les liens non rejetés.
 
-Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `contributions` a déjà supprimé en amont les publications hors périmètre, si bien que les liens ne portent que sur le périmètre et que les deux valeurs dérivées en héritent.
+Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `finalize` a déjà supprimé en amont les publications hors périmètre, si bien que les liens ne portent que sur le périmètre et que les deux valeurs dérivées en héritent.
 
 ## Lecture par l'API
 

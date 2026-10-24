@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-12.*
 
-La phase `publishers_journals` complète les référentiels d'éditeurs, de revues et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents. Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des revues. Elle cherche auprès de sources externes le type des revues et leurs frais de publication. Elle fusionne les doublons et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [contributions](09-contributions.md), après les dernières suppressions de publications. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
+La phase `publishers_journals` complète les référentiels d'éditeurs, de revues et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents. Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des revues. Elle cherche auprès de sources externes le type des revues et leurs frais de publication. Elle fusionne les doublons et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [finalize](09-finalize.md), après les dernières suppressions de publications. Le `journal_type` qu'elle pose nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
 Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : éditeurs, revues, monographies. Chaque sous-étape y tient une ligne de bilan.
 

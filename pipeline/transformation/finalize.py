@@ -1,4 +1,4 @@
-"""Phase `contributions` : synchronisation des publications sur les contributions, groupes de contributions sources rattachés à une personne.
+"""Phase `finalize` : données dérivées des contributions, mises à jour après la résolution des personnes et avant les enrichissements.
 
 Tâches (`pipeline.graph`), chacune dans sa transaction :
 
@@ -70,7 +70,7 @@ def refresh_publication_structures(conn: Connection) -> None:
 
 
 @dataclass(frozen=True)
-class ContributionsPhase:
+class FinalizePhase:
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
@@ -109,28 +109,28 @@ class ContributionsPhase:
 
         sync_section = "Synchronisation des tables"
         by_task = run_tasks(
-            "contributions",
+            "finalize",
             {
-                "contributions.publications_in_perimeter": TaskStep(
+                "finalize.publications_in_perimeter": TaskStep(
                     publications_in_perimeter,
                     section=sync_section,
                     label="Périmètre des publications",
                 ),
-                "contributions.structures": TaskStep(
+                "finalize.structures": TaskStep(
                     structures, section=sync_section, label="Structures des liens"
                 ),
-                "contributions.purge_publications": TaskStep(purge),
-                "contributions.delete_empty_containers": TaskStep(empty_containers),
-                "contributions.publication_counts": TaskStep(publication_counts),
+                "finalize.purge_publications": TaskStep(purge),
+                "finalize.delete_empty_containers": TaskStep(empty_containers),
+                "finalize.publication_counts": TaskStep(publication_counts),
             },
             ctx,
         )
-        metrics = by_task["contributions.delete_empty_containers"]
+        metrics = by_task["finalize.delete_empty_containers"]
         metrics.details["summary"] = {
-            "total_in_perimeter": by_task["contributions.publications_in_perimeter"].details[
+            "total_in_perimeter": by_task["finalize.publications_in_perimeter"].details[
                 "in_perimeter"
             ],
-            "publications_purged": by_task["contributions.purge_publications"].details["purged"],
+            "publications_purged": by_task["finalize.purge_publications"].details["purged"],
         }
         return metrics
 
@@ -205,7 +205,7 @@ def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger
 
 
 def build() -> Phase:
-    return ContributionsPhase(
+    return FinalizePhase(
         empty_containers=(
             (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
             (delete_empty_journals.LABEL, _run_delete_empty_journals),
