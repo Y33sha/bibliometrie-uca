@@ -42,7 +42,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         id="pe.id",
         label="pe.first_name || ' ' || pe.last_name",
         join=(
-            f"JOIN source_contribution_groups au ON au.publication_id = p.id AND {has_author_role('au')} "
+            f"JOIN contributions au ON au.publication_id = p.id AND {has_author_role('au')} "
             "JOIN persons pe ON pe.id = au.person_id AND pe.exclusion IS NULL"
         ),
     ),

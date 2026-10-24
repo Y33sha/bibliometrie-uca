@@ -18,7 +18,7 @@ def _refresh_sql(scope: str) -> str:
             SELECT id, array_agg(DISTINCT e ORDER BY e) AS evidence
             FROM (
                 SELECT a.publication_id AS id, e
-                FROM source_contribution_groups a
+                FROM contributions a
                 JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
                 CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
                 WHERE a.publication_id {scope} AND {has_author_role("a")}
@@ -45,9 +45,7 @@ def _refresh_sql(scope: str) -> str:
 
 _ALL = text(_refresh_sql("IS NOT NULL"))
 _OF_PERSON = text(
-    _refresh_sql(
-        "IN (SELECT publication_id FROM source_contribution_groups WHERE person_id = :pid)"
-    )
+    _refresh_sql("IN (SELECT publication_id FROM contributions WHERE person_id = :pid)")
 )
 _OF_PUBLICATIONS = text(_refresh_sql("= ANY(:publication_ids)"))
 

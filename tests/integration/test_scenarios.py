@@ -188,9 +188,7 @@ class TestMergePersons:
             is None
         )
 
-    def test_merge_transfers_source_contribution_groups_one_per_publication(
-        self, sa_sync_conn, person_repo
-    ):
+    def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, person_repo):
         """Régression : les groupes de contributions sources référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses contributions sources."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")
@@ -204,7 +202,7 @@ class TestMergePersons:
         ):
             groups[key] = conn.execute(
                 text(
-                    "INSERT INTO source_contribution_groups (publication_id, person_id, resolution_mode)"
+                    "INSERT INTO contributions (publication_id, person_id, resolution_mode)"
                     " VALUES (:p, :person, 'name') RETURNING id"
                 ),
                 {"p": publication, "person": person},
@@ -212,9 +210,7 @@ class TestMergePersons:
 
         merge_person(target, source, repo=person_repo)
 
-        persons = dict(
-            conn.execute(text("SELECT id, person_id FROM source_contribution_groups")).all()
-        )
+        persons = dict(conn.execute(text("SELECT id, person_id FROM contributions")).all())
         assert persons[groups["target"]] == target
         assert persons[groups["source_shared"]] is None
         assert persons[groups["source_alone"]] == target

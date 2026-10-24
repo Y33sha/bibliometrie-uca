@@ -18,7 +18,7 @@ class SourceContributionRef(BaseModel):
 class AssignOrphanContribution(BaseModel):
     """Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage."""
 
-    group_id: int
+    contribution_id: int
     person_id: int | None = None
     create_person: CreatePersonName | None = None
     force: bool = False

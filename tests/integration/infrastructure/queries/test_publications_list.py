@@ -27,7 +27,7 @@ _source_record = partial(insert_source_record, title="T")
 
 
 def _attach(conn, publication_id, lab_id):
-    """Contribution reliant la publication à un labo par la vue `group_structures`, semée par la chaîne source minimale."""
+    """Contribution reliant la publication à un labo par la vue `contribution_structures`, semée par la chaîne source minimale."""
     aid = insert_contribution(
         conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
@@ -321,7 +321,7 @@ class TestPersonView:
             add_contribution_structure(conn, contribution, author_lab)
         conn.execute(
             text(
-                "UPDATE source_contribution_groups SET is_corresponding = TRUE"
+                "UPDATE contributions SET is_corresponding = TRUE"
                 " WHERE publication_id = :p AND person_id = :person"
             ),
             {"p": publication, "person": person},
@@ -377,9 +377,7 @@ class TestPersonView:
         orphan = insert_source_contribution(sa_sync_conn, source_record, roles=["author"])
         insert_group(sa_sync_conn, thesis, [(orphan, source_record)])
         sa_sync_conn.execute(
-            text(
-                "UPDATE source_contribution_groups SET roles = ARRAY['author'] WHERE publication_id = :p"
-            ),
+            text("UPDATE contributions SET roles = ARRAY['author'] WHERE publication_id = :p"),
             {"p": thesis},
         )
         contribution = insert_contribution(

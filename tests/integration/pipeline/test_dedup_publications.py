@@ -273,7 +273,7 @@ class TestRefreshFromSources:
         assert (
             _scalar(
                 conn,
-                "SELECT count(*) FROM source_contribution_groups WHERE publication_id = :id",
+                "SELECT count(*) FROM contributions WHERE publication_id = :id",
                 id=pid,
             )
             == 0

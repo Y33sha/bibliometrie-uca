@@ -45,7 +45,7 @@ def _group(conn, publication, members):
 def _person(conn, group):
     return tuple(
         conn.execute(
-            text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+            text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
             {"g": group},
         ).one()
     )
@@ -124,10 +124,7 @@ def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sy
     publication = insert_publication(conn)
     attached = _group(conn, publication, [("hal", "Jean Martin", None, True)])
     conn.execute(
-        text(
-            "UPDATE source_contribution_groups SET person_id = :p, resolution_mode = 'manual'"
-            " WHERE id = :g"
-        ),
+        text("UPDATE contributions SET person_id = :p, resolution_mode = 'manual' WHERE id = :g"),
         {"p": person, "g": attached},
     )
     repeated = _group(conn, publication, [("openalex", "Jean Martin", None, True)])
@@ -141,8 +138,8 @@ def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sy
 def _attach(conn, group, person, mode):
     conn.execute(
         text(
-            "UPDATE source_contribution_groups"
-            " SET person_id = :p, resolution_mode = CAST(:m AS group_resolution_mode) WHERE id = :g"
+            "UPDATE contributions"
+            " SET person_id = :p, resolution_mode = CAST(:m AS resolution_mode) WHERE id = :g"
         ),
         {"p": person, "g": group, "m": mode},
     )
@@ -153,7 +150,7 @@ def _pin_members(conn, group, person):
     conn.execute(
         text("""
             INSERT INTO confirmed_source_contributions (source_contribution_id, person_id)
-            SELECT source_contribution_id, :p FROM source_contribution_group_members WHERE group_id = :g
+            SELECT source_contribution_id, :p FROM aligned_source_contributions WHERE contribution_id = :g
         """),
         {"p": person, "g": group},
     )
@@ -214,8 +211,8 @@ class TestPins:
         members = (
             conn.execute(
                 text(
-                    "SELECT source_contribution_id FROM source_contribution_group_members"
-                    " WHERE group_id = :g ORDER BY source_contribution_id"
+                    "SELECT source_contribution_id FROM aligned_source_contributions"
+                    " WHERE contribution_id = :g ORDER BY source_contribution_id"
                 ),
                 {"g": group},
             )

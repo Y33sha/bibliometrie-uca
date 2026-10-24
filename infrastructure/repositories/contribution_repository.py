@@ -43,7 +43,7 @@ def detach_rejected_groups(
     )
     return conn.execute(
         text(f"""
-            UPDATE source_contribution_groups g
+            UPDATE contributions g
             SET {DETACHED_GROUP}
             FROM ({REJECTED_PAIRS}) r
             WHERE r.publication_id = g.publication_id
@@ -94,7 +94,7 @@ class PgContributionRepository(ContributionRepository):
             return []
         rows = self._conn.execute(
             text(
-                "SELECT id, person_id, publication_id FROM source_contribution_groups"
+                "SELECT id, person_id, publication_id FROM contributions"
                 " WHERE id = ANY(:ids) ORDER BY id"
             ),
             {"ids": group_ids},
@@ -106,7 +106,7 @@ class PgContributionRepository(ContributionRepository):
             return {}
         rows = self._conn.execute(
             text(
-                "SELECT publication_id, id FROM source_contribution_groups"
+                "SELECT publication_id, id FROM contributions"
                 " WHERE person_id = :pid AND resolution_mode = 'manual'"
                 " AND publication_id = ANY(:publication_ids)"
             ),
@@ -121,10 +121,10 @@ class PgContributionRepository(ContributionRepository):
             text("""
                 SELECT gm.source_contribution_id, sc.source::text AS source,
                        ci.author_name_normalized
-                FROM source_contribution_group_members gm
+                FROM aligned_source_contributions gm
                 JOIN source_contributions sc ON sc.id = gm.source_contribution_id
                 JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                WHERE gm.group_id = ANY(:ids)
+                WHERE gm.contribution_id = ANY(:ids)
                 ORDER BY gm.source_contribution_id
             """),
             {"ids": group_ids},
@@ -180,7 +180,7 @@ class PgContributionRepository(ContributionRepository):
             {"ids": source_contribution_ids, "pid": person_id},
         )
         for sql in pinned_groups_sql(
-            "SELECT group_id FROM source_contribution_group_members"
+            "SELECT contribution_id FROM aligned_source_contributions"
             " WHERE source_contribution_id = ANY(:ids)"
         ):
             self._conn.execute(text(sql), {"ids": source_contribution_ids})

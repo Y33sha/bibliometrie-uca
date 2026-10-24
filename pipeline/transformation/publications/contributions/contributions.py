@@ -2,7 +2,7 @@
 
 Tâches (`pipeline.graph`), chacune dans sa transaction :
 
-1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `group_structures`, `publication_structures`.
+1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`.
 2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
 3. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 4. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
@@ -56,16 +56,13 @@ def count_contributions_in_perimeter(conn: Connection) -> int:
     """Nombre de groupes de contributions sources du périmètre rattachés à une personne."""
     return scalar_int(
         conn.execute(
-            text(
-                "SELECT COUNT(*) FROM source_contribution_groups"
-                " WHERE person_id IS NOT NULL AND in_perimeter"
-            )
+            text("SELECT COUNT(*) FROM contributions WHERE person_id IS NOT NULL AND in_perimeter")
         )
     )
 
 
-def refresh_group_structures(conn: Connection) -> None:
-    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY group_structures"))
+def refresh_contribution_structures(conn: Connection) -> None:
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY contribution_structures"))
 
 
 def refresh_publication_structures(conn: Connection) -> None:
@@ -92,7 +89,7 @@ class ContributionsPhase:
         def structures(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
-                refresh_group_structures(conn)
+                refresh_contribution_structures(conn)
                 refresh_publication_structures(conn)
             return _timed(t0)
 

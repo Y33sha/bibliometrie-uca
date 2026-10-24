@@ -2787,8 +2787,8 @@ export interface components {
          * @description Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage.
          */
         AssignOrphanContribution: {
-            /** Group Id */
-            group_id: number;
+            /** Contribution Id */
+            contribution_id: number;
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
@@ -4023,8 +4023,8 @@ export interface components {
          * @description Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne.
          */
         OrphanContributionOut: {
-            /** Group Id */
-            group_id: number;
+            /** Contribution Id */
+            contribution_id: number;
             /** Sources */
             sources: string[];
             /** Full Name */
@@ -5026,7 +5026,7 @@ export interface components {
          * SourceContributionOut
          * @description Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `group_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
+         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
          */
         SourceContributionOut: {
             /** Id */
@@ -5051,8 +5051,8 @@ export interface components {
             raw_affiliation: string | null;
             /** Countries */
             countries: string[] | null;
-            /** Group Id */
-            group_id: number | null;
+            /** Contribution Id */
+            contribution_id: number | null;
             /** Group Position */
             group_position: number | null;
             /** Method */

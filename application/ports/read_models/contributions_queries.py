@@ -19,7 +19,7 @@ class OrphanCountResponse(BaseModel):
 class OrphanContributionOut(BaseModel):
     """Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne."""
 
-    group_id: int
+    contribution_id: int
     sources: list[str]
     """Sources des membres du groupe, sans doublon, par ordre de priorité."""
     full_name: str

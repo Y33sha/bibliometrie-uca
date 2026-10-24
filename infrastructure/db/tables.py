@@ -6,7 +6,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 
 Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
-Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`group_structures`, `publication_author_alignment`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
+Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
 from sqlalchemy import (
@@ -691,16 +691,16 @@ idref_structures = Table(
 # ── Contributions (groupes et contributions sources) ──────────────────────────
 
 
-# `group_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
+# `contribution_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
 # contributions sources rattaché à une personne non exclue aux structures de ses membres.
 # Pas modélisée dans le metadata SQLAlchemy — tous les accès se font en SQL brut par nom
 # (lectures) ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
 # en table.
 #
 # `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
-# publication↔structure dédoublonné, dérivé des groupes d'auteur × `group_structures`.
+# publication↔structure dédoublonné, dérivé des groupes d'auteur × `contribution_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
-# + REFRESH dans le pipeline, après `group_structures`).
+# + REFRESH dans le pipeline, après `contribution_structures`).
 
 
 rejected_contributions = Table(
@@ -716,17 +716,15 @@ rejected_contributions = Table(
 
 grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
 
-group_resolution_mode_enum = PgEnum(
-    *GroupMatchReason, name="group_resolution_mode", create_type=False
-)
+resolution_mode_enum = PgEnum(*GroupMatchReason, name="resolution_mode", create_type=False)
 
-source_contribution_groups = Table(
-    "source_contribution_groups",
+contributions = Table(
+    "contributions",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
     Column("person_id", Integer),
-    Column("resolution_mode", group_resolution_mode_enum),
+    Column("resolution_mode", resolution_mode_enum),
     Column("reference_position", SmallInteger),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
@@ -743,12 +741,10 @@ source_contribution_groups = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    UniqueConstraint(
-        "publication_id", "person_id", name="source_contribution_groups_publication_person_uq"
-    ),
+    UniqueConstraint("publication_id", "person_id", name="contributions_publication_person_uq"),
     CheckConstraint(
         "(person_id IS NULL) = (resolution_mode IS NULL)",
-        name="source_contribution_groups_resolution_mode_with_person",
+        name="contributions_resolution_mode_with_person",
     ),
     comment=(
         "Contributions sources d'un même auteur dans une publication, avec au maximum une "
@@ -761,21 +757,23 @@ source_contribution_groups = Table(
 )
 
 
-source_contribution_group_members = Table(
-    "source_contribution_group_members",
+aligned_source_contributions = Table(
+    "aligned_source_contributions",
     metadata,
     Column("source_contribution_id", Integer, primary_key=True),
-    Column("group_id", Integer, nullable=False),
+    Column("contribution_id", Integer, nullable=False),
     Column("source_record_id", Integer, nullable=False),
     Column("method", grouping_method_enum, nullable=False),
     Column("score", REAL),
     Column("margin", REAL),
     UniqueConstraint(
-        "group_id", "source_record_id", name="source_contribution_group_members_group_record_uq"
+        "contribution_id",
+        "source_record_id",
+        name="aligned_source_contributions_contribution_record_uq",
     ),
     CheckConstraint(
         "method = 'model' OR (score IS NULL AND margin IS NULL)",
-        name="source_contribution_group_members_score_check",
+        name="aligned_source_contributions_score_check",
     ),
     comment=(
         "Appartenance d'une contribution source à son groupe. method : origine du lien. score et "
@@ -1560,8 +1558,8 @@ address_countries_queue = _queue("address_countries_queue")
 address_candidates_queue = _queue("address_candidates_queue")
 publication_contributions_queue = _queue("publication_contributions_queue")
 source_record_keys_queue = _queue("source_record_keys_queue")
-source_contribution_group_attributes_queue = _queue("source_contribution_group_attributes_queue")
-group_resolution_queue = _queue("group_resolution_queue")
+contribution_attributes_queue = _queue("contribution_attributes_queue")
+contribution_resolution_queue = _queue("contribution_resolution_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

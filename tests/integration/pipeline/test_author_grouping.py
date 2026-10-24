@@ -48,8 +48,8 @@ def _groups(conn, publication_id):
     """Contributions sources de chaque groupe de la publication : identifiant de groupe → ensemble de contributions sources."""
     rows = conn.execute(
         text("""
-            SELECT g.id, gs.source_contribution_id FROM source_contribution_groups g
-            JOIN source_contribution_group_members gs ON gs.group_id = g.id
+            SELECT g.id, gs.source_contribution_id FROM contributions g
+            JOIN aligned_source_contributions gs ON gs.contribution_id = g.id
             WHERE g.publication_id = :p
         """),
         {"p": publication_id},
@@ -106,8 +106,7 @@ def _attached_group(conn, publication, source_contribution):
     person = insert_person(conn, "Martin", first_name="Anne")
     conn.execute(
         text(
-            "UPDATE source_contribution_groups SET person_id = :person, resolution_mode = 'name'"
-            " WHERE id = :g"
+            "UPDATE contributions SET person_id = :person, resolution_mode = 'name' WHERE id = :g"
         ),
         {"person": person, "g": group},
     )
@@ -117,7 +116,7 @@ def _attached_group(conn, publication, source_contribution):
 
 def _group_person(conn, group):
     return conn.execute(
-        text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+        text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
         {"g": group},
     ).one()
 
@@ -156,7 +155,7 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "bruno")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
     _run(conn)
-    tuples = "SELECT source_contribution_id, ctid::text FROM source_contribution_group_members"
+    tuples = "SELECT source_contribution_id, ctid::text FROM aligned_source_contributions"
     before = dict(conn.execute(text(tuples)).all())
     mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
 
@@ -170,9 +169,7 @@ def test_la_reconstruction_regroupe_les_publications_non_marquees(conn):
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
     _run(conn)
-    conn.execute(
-        text("DELETE FROM source_contribution_groups WHERE publication_id = :p"), {"p": publication}
-    )
+    conn.execute(text("DELETE FROM contributions WHERE publication_id = :p"), {"p": publication})
 
     metrics = build_groups(conn, SourceContributionGroupStore(conn), logger, rebuild=True)
 
@@ -214,8 +211,8 @@ def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
     assert _groups(conn, publication) == {}
     orphans = conn.execute(
         text("""
-            SELECT count(*) FROM source_contribution_group_members gs
-            WHERE NOT EXISTS (SELECT 1 FROM source_contribution_groups g WHERE g.id = gs.group_id)
+            SELECT count(*) FROM aligned_source_contributions gs
+            WHERE NOT EXISTS (SELECT 1 FROM contributions g WHERE g.id = gs.contribution_id)
         """)
     )
     assert orphans.scalar_one() == 0
@@ -239,8 +236,8 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
 
     references = conn.execute(
         text("""
-            SELECT gs.source_contribution_id FROM source_contribution_group_members gs
-            JOIN source_contribution_groups g ON g.id = gs.group_id
+            SELECT gs.source_contribution_id FROM aligned_source_contributions gs
+            JOIN contributions g ON g.id = gs.contribution_id
             WHERE g.publication_id = :p AND gs.method = 'reference'
         """),
         {"p": publication},

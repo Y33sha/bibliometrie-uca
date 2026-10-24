@@ -34,8 +34,8 @@ def _group(conn, person, mode, *, name="jean martin", source="crossref", orcid=_
     group = insert_group(conn, publication, [(source_contribution, source_record)])
     conn.execute(
         text(
-            "UPDATE source_contribution_groups"
-            " SET person_id = :p, resolution_mode = CAST(:m AS group_resolution_mode) WHERE id = :g"
+            "UPDATE contributions"
+            " SET person_id = :p, resolution_mode = CAST(:m AS resolution_mode) WHERE id = :g"
         ),
         {"p": person, "g": group, "m": mode},
     )
@@ -60,7 +60,7 @@ def _orcid_owner(conn):
 def _person_of(conn, group):
     return tuple(
         conn.execute(
-            text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+            text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
             {"g": group},
         ).one()
     )

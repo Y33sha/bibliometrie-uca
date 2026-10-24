@@ -38,10 +38,10 @@ def _join_group(conn, source_contribution, *, publication_id, person_id):
     source_contribution_id, source_record_id = source_contribution
     conn.execute(
         text("""
-            INSERT INTO source_contribution_group_members
-                (source_contribution_id, group_id, source_record_id, method)
+            INSERT INTO aligned_source_contributions
+                (source_contribution_id, contribution_id, source_record_id, method)
             SELECT :sc, g.id, :sr, 'reference'
-            FROM source_contribution_groups g
+            FROM contributions g
             WHERE g.publication_id = :p AND g.person_id = :person
         """),
         {

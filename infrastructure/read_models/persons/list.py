@@ -31,8 +31,8 @@ from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_CONTRIBUTIONS = (
-    " AND EXISTS (SELECT 1 FROM group_structures aus "
-    "WHERE aus.group_id = a.id AND aus.structure_id = :flt_person_lab_id)"
+    " AND EXISTS (SELECT 1 FROM contribution_structures aus "
+    "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
 )
 
 # ── Autocomplete ─────────────────────────────────────────────────
@@ -75,9 +75,9 @@ def _contribution_counts_sql(*, lab_scoped: bool) -> str:
     """Les deux dénombrements de contributions en tant qu'auteur, sous la même condition de scope."""
     scope = _LAB_SCOPED_CONTRIBUTIONS if lab_scoped else ""
     return f"""
-        (SELECT COUNT(*) FROM source_contribution_groups a
+        (SELECT COUNT(*) FROM contributions a
          WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS contribution_count,
-        (SELECT COUNT(*) FROM source_contribution_groups a
+        (SELECT COUNT(*) FROM contributions a
          WHERE a.person_id = p.id AND {has_author_role("a")} AND a.in_perimeter = TRUE{scope}
         ) AS in_perimeter_contribution_count
     """

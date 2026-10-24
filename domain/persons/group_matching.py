@@ -61,7 +61,7 @@ class GroupSkipReason(StrEnum):
 
 
 class GroupMatchReason(StrEnum):
-    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `group_resolution_mode`."""
+    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `resolution_mode`."""
 
     MANUAL = "manual"
     ORCID = "orcid"
@@ -291,21 +291,21 @@ def settle_publication(
     `decisions` : décision et nombre de membres de chaque groupe, par identifiant de groupe. `taken` : personnes déjà rattachées à un autre groupe de la publication ; un groupe qui en désigne une reste sans personne. Quand plusieurs groupes désignent la même personne, elle revient au groupe le mieux appuyé (épinglage, puis identifiant, puis nom), à égalité au groupe qui a le plus de membres, puis au plus petit identifiant. Les autres groupes restent sans personne.
     """
 
-    def rank(group_id: int) -> tuple[int, int, int]:
-        decision, member_count = decisions[group_id]
+    def rank(contribution_id: int) -> tuple[int, int, int]:
+        decision, member_count = decisions[contribution_id]
         assert isinstance(decision.reason, GroupMatchReason)
-        return (_STRENGTH[decision.reason], -member_count, group_id)
+        return (_STRENGTH[decision.reason], -member_count, contribution_id)
 
     by_person: dict[int, list[int]] = {}
-    for group_id, (decision, _) in decisions.items():
+    for contribution_id, (decision, _) in decisions.items():
         if decision.outcome == GroupOutcome.MATCH and decision.person_id is not None:
-            by_person.setdefault(decision.person_id, []).append(group_id)
-    settled = {group_id: decision for group_id, (decision, _) in decisions.items()}
+            by_person.setdefault(decision.person_id, []).append(contribution_id)
+    settled = {contribution_id: decision for contribution_id, (decision, _) in decisions.items()}
     for person_id, group_ids in by_person.items():
         kept = set() if person_id in taken else {min(group_ids, key=rank)}
-        for group_id in set(group_ids) - kept:
-            decision = settled[group_id]
-            settled[group_id] = GroupDecision(
+        for contribution_id in set(group_ids) - kept:
+            decision = settled[contribution_id]
+            settled[contribution_id] = GroupDecision(
                 GroupOutcome.SKIP,
                 reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
                 evidence=decision.evidence,

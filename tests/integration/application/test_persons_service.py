@@ -86,14 +86,11 @@ def _publication_evidence(conn, publication_id):
     )
 
 
-def _group_person(conn, group_id):
+def _group_person(conn, contribution_id):
     return tuple(
         conn.execute(
-            text(
-                "SELECT person_id, resolution_mode::text FROM source_contribution_groups"
-                " WHERE id = :g"
-            ),
-            {"g": group_id},
+            text("SELECT person_id, resolution_mode::text FROM contributions WHERE id = :g"),
+            {"g": contribution_id},
         ).one()
     )
 
@@ -800,7 +797,7 @@ class TestDetachContributions:
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        group_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
 
         result = detach_contributions(
@@ -813,7 +810,7 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 1
-        assert _group_person(sa_sync_conn, group_id) == (None, None)
+        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
 
     def test_detaches_all_sources_of_publication_from_single_ref(
         self, sa_sync_conn, repo, contribution_repo
@@ -822,7 +819,7 @@ class TestDetachContributions:
         détache le groupe de la paire et peuple le store."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        group_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_record_hal = _source_record(sa_sync_conn, publication_id)
         source_record_oa = _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="oa-1"
@@ -841,7 +838,7 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 1
-        assert _group_person(sa_sync_conn, group_id) == (None, None)
+        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
         assert (
             _scalar(
                 sa_sync_conn,
@@ -1382,7 +1379,7 @@ class TestMergePersonRejectedContributions:
 
         groups_with_person = sa_sync_conn.execute(
             text(
-                "SELECT count(*) FROM source_contribution_groups"
+                "SELECT count(*) FROM contributions"
                 " WHERE publication_id = :publication AND person_id IS NOT NULL"
             ),
             {"publication": publication},

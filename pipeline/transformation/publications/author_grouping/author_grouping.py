@@ -1,4 +1,4 @@
-"""Phase `author_grouping` : groupes des contributions sources d'un même auteur dans chaque publication (`source_contribution_groups`, `source_contribution_group_members`).
+"""Phase `author_grouping` : groupes des contributions sources d'un même auteur dans chaque publication (`contributions`, `aligned_source_contributions`).
 
 Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de contributions sources.
 
@@ -230,12 +230,16 @@ def _plan_batch(
     memberships: list[MembershipRow] = []
     for publication_id, (reference, members), gid in planned:
         existing_id = gid is not None
-        group_id = gid if gid is not None else next(fresh)
-        group_rows.append(GroupRow(group_id, publication_id, positions[reference], existing_id))
+        contribution_id = gid if gid is not None else next(fresh)
+        group_rows.append(
+            GroupRow(contribution_id, publication_id, positions[reference], existing_id)
+        )
         for source_contribution, source_record, method, score, margin in members:
             methods[method] += 1
             memberships.append(
-                MembershipRow(source_contribution, group_id, source_record, method, score, margin)
+                MembershipRow(
+                    source_contribution, contribution_id, source_record, method, score, margin
+                )
             )
     removed, inserted = membership_changes(stored, memberships)
     return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, recomposed, copies)

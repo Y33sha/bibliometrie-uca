@@ -112,7 +112,7 @@ class TestListOrphanContributions:
 
         res = _list(sa_sync_conn)
         assert res.total >= 1
-        [orphan] = [a for a in res.contributions if a.group_id == group_of(sa_sync_conn, sa)]
+        [orphan] = [a for a in res.contributions if a.contribution_id == group_of(sa_sync_conn, sa)]
         assert (orphan.publication_id, orphan.sources) == (publication, ["hal"])
 
     def test_aggregates_the_members_of_the_group(self, sa_sync_conn):
@@ -133,7 +133,7 @@ class TestListOrphanContributions:
         _group(sa_sync_conn)
         sa_sync_conn.execute(
             text(
-                "UPDATE source_contribution_group_members SET group_id = :g"
+                "UPDATE aligned_source_contributions SET contribution_id = :g"
                 " WHERE source_contribution_id = :s"
             ),
             {"g": group_of(sa_sync_conn, hal), "s": openalex},
@@ -141,7 +141,7 @@ class TestListOrphanContributions:
         recompose_group_attributes(sa_sync_conn)
 
         (orphan,) = _list(sa_sync_conn, search="Zzmembre Openalex").contributions
-        assert orphan.group_id == group_of(sa_sync_conn, hal)
+        assert orphan.contribution_id == group_of(sa_sync_conn, hal)
         assert orphan.sources == ["hal", "openalex"]
         assert orphan.full_name == "Zzmembre Hal"
 
@@ -157,7 +157,7 @@ class TestListOrphanContributions:
         )
 
         res = _list(sa_sync_conn, search="zorphine caldefie")
-        [orphan] = [a for a in res.contributions if a.group_id == group_of(sa_sync_conn, sa)]
+        [orphan] = [a for a in res.contributions if a.contribution_id == group_of(sa_sync_conn, sa)]
         assert (orphan.full_name, orphan.last_name, orphan.first_name) == (
             "Zorphine Caldefie Chezet",
             "Caldefie Chezet",
@@ -183,7 +183,7 @@ class TestListOrphanContributions:
         )
 
         res = _list(sa_sync_conn, search="Special")
-        assert [a.group_id for a in res.contributions] == [
+        assert [a.contribution_id for a in res.contributions] == [
             group_of(sa_sync_conn, source_contribution_match)
         ]
 
@@ -229,7 +229,8 @@ class TestListOrphanContributions:
 
         def listed(**filters):
             return {
-                a.group_id for a in _list(sa_sync_conn, search="Zzorph", **filters).contributions
+                a.contribution_id
+                for a in _list(sa_sync_conn, search="Zzorph", **filters).contributions
             }
 
         assert listed(lab_ids=[ids["lab"]]) == {ids["sa_group"]}

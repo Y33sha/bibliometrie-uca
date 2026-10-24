@@ -44,7 +44,7 @@ def _patch_sql(counts: _Counts) -> list:
         for name, label, n in (
             ("count_contributions_in_perimeter", "périmètre des contributions", 9),
             ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
-            ("refresh_group_structures", "structures des groupes", None),
+            ("refresh_contribution_structures", "structures des groupes", None),
             ("refresh_publication_structures", "structures des publications", None),
             ("recompute_address_publication_count", "adresses", 7),
             ("refresh_journal_publication_counts", "revues", 3),

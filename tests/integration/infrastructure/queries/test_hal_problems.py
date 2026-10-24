@@ -57,8 +57,7 @@ def _create_hal_source_contribution_with_hal_id(
     group = insert_group(conn, publication, [(source_contribution, source_record)])
     conn.execute(
         text(
-            "UPDATE source_contribution_groups"
-            " SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
+            "UPDATE contributions SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
         ),
         {"person": person_id, "g": group},
     )

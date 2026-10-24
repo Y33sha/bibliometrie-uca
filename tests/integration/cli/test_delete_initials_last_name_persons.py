@@ -45,10 +45,10 @@ def test_vide_les_groupes_de_la_personne_supprimee(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "P.P.", first_name="Lechalard")
     publication_id = insert_publication(sa_sync_conn)
     insert_contribution(sa_sync_conn, publication_id, person_id=pid)
-    group_id = group_id_of(sa_sync_conn, publication_id, pid)
+    contribution_id = group_id_of(sa_sync_conn, publication_id, pid)
 
     assert delete_persons(sa_sync_conn, apply=True) == [pid]
     assert sa_sync_conn.execute(
-        text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
-        {"g": group_id},
+        text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
+        {"g": contribution_id},
     ).one() == (None, None)

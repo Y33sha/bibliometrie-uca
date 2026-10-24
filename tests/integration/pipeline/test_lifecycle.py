@@ -102,9 +102,7 @@ class TestPurge:
     def test_groupe_sans_personne_ne_retient_pas_la_publication(self, sa_sync_conn):
         conn = sa_sync_conn
         pid = self._publication(conn, source=True, contribution=False)
-        conn.execute(
-            text("INSERT INTO source_contribution_groups (publication_id) VALUES (:p)"), {"p": pid}
-        )
+        conn.execute(text("INSERT INTO contributions (publication_id) VALUES (:p)"), {"p": pid})
 
         purge_publications(conn)
 

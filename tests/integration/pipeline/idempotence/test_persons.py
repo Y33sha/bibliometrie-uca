@@ -68,7 +68,7 @@ def _state(conn) -> dict[str, object]:
     counts["groups"] = sorted(
         tuple(r)
         for r in conn.execute(
-            text("SELECT id, person_id, resolution_mode::text FROM source_contribution_groups")
+            text("SELECT id, person_id, resolution_mode::text FROM contributions")
         )
     )
     return counts
@@ -90,7 +90,7 @@ def test_les_groupes_d_un_meme_compte_hal_vont_a_la_meme_personne(sa_sync_conn):
     _run(sa_sync_conn)
 
     attached = sa_sync_conn.execute(
-        text("SELECT person_id, count(*) FROM source_contribution_groups GROUP BY person_id")
+        text("SELECT person_id, count(*) FROM contributions GROUP BY person_id")
     ).all()
     assert dict(attached) == {persons["eve"]: 2, persons["frank"]: 1, persons["grace"]: 1}
 

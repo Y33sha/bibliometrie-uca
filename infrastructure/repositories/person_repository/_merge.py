@@ -66,20 +66,20 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
     _name_forms.refresh_name_forms(conn, target_id, forms)
 
 
-def _merge_source_contribution_groups(conn: Connection, target_id: int, source_id: int) -> None:
+def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> None:
     """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text(f"""
-            UPDATE source_contribution_groups s SET {DETACHED_GROUP}
+            UPDATE contributions s SET {DETACHED_GROUP}
             WHERE s.person_id = :s AND EXISTS (
-                SELECT 1 FROM source_contribution_groups t
+                SELECT 1 FROM contributions t
                 WHERE t.person_id = :t AND t.publication_id = s.publication_id
             )
         """),
         {"t": target_id, "s": source_id},
     )
     conn.execute(
-        text("UPDATE source_contribution_groups SET person_id = :t WHERE person_id = :s"),
+        text("UPDATE contributions SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )
 
@@ -103,13 +103,7 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 
 # Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
-    # Colonne sans lecteur : la suppression de l'absorbée la vide (`ON DELETE SET NULL`).
-    "source_contributions": untouched("source_contributions", "person_id"),
-    # Table sans lecteur : les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`).
-    "contributions": untouched("contributions", "person_id"),
-    "source_contribution_groups": MergeStep(
-        (("source_contribution_groups", "person_id"),), _merge_source_contribution_groups
-    ),
+    "contributions": MergeStep((("contributions", "person_id"),), _merge_contributions),
     "rejected_contributions": transfer_unique(
         "rejected_contributions", "person_id", "source_record_id"
     ).of_nature(DataNature.DECISION),

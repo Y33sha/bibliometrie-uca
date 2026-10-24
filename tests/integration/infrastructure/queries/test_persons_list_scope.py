@@ -1,6 +1,6 @@
 """Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution de rôle auteur rattachée au laboratoire via `group_structures`, et le filtre d'exclusion.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
 """
 
 from sqlalchemy import text

@@ -38,7 +38,7 @@ def _sync_sql(scoped: bool) -> str:
     marked_groups = enqueue_sql(
         Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
         """
-        SELECT gm.group_id FROM source_contribution_group_members gm
+        SELECT gm.contribution_id FROM aligned_source_contributions gm
         WHERE gm.source_contribution_id IN (SELECT id FROM changed)
         """,
     )
@@ -73,7 +73,7 @@ _SYNC_SCOPED = text(_sync_sql(scoped=True))
 def refresh_source_contribution_structures(conn: Connection) -> None:
     """Rafraîchit la matview `source_contribution_structures`, qui alimente `sync_perimeter_evidence`.
 
-    À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le rafraîchissement de `group_structures`, qui en dérive.
+    À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le rafraîchissement de `contribution_structures`, qui en dérive.
     """
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_contribution_structures"))
 
@@ -111,7 +111,7 @@ class SourceContributionPerimeterRecompute:
         conn.execute(
             text(
                 propagate_group_attributes_sql(
-                    "SELECT group_id FROM source_contribution_group_members"
+                    "SELECT contribution_id FROM aligned_source_contributions"
                     " WHERE source_contribution_id = ANY(:source_contribution_ids)"
                 )
             ),

@@ -27,20 +27,20 @@ from infrastructure.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
-# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par `group_structures`, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `source_contribution_groups`.
+# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par `contribution_structures`, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
 AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}
     AND EXISTS (
-        SELECT 1 FROM group_structures aus
-        WHERE aus.group_id = a.id AND aus.structure_id = :structure_id
+        SELECT 1 FROM contribution_structures aus
+        WHERE aus.contribution_id = a.id AND aus.structure_id = :structure_id
     )
 """
 
 # Publication `p` que la structure signe. La forme `EXISTS` compte chaque publication une fois, là où une jointure la dupliquerait par auteur de la structure.
 AUTHORED_PUBLICATION = f"""
     EXISTS (
-        SELECT 1 FROM source_contribution_groups a
+        SELECT 1 FROM contributions a
         WHERE a.publication_id = p.id AND {AUTHOR_SOURCE_CONTRIBUTION}
     )
 """
@@ -195,8 +195,8 @@ class PgStructuresQueries(StructuresQueries):
             text(f"""
                 SELECT COUNT(*) AS n
                 FROM publications p
-                JOIN source_contribution_groups a ON a.publication_id = p.id
-                JOIN group_structures aus ON aus.group_id = a.id
+                JOIN contributions a ON a.publication_id = p.id
+                JOIN contribution_structures aus ON aus.contribution_id = a.id
                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
                   AND aus.structure_id = :id
                   AND {has_author_role("a")}
@@ -265,8 +265,8 @@ class PgStructuresQueries(StructuresQueries):
         rows = self._conn.execute(
             text(
                 entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM source_contribution_groups a "
-                    "JOIN group_structures aus ON aus.group_id = a.id "
+                    "EXISTS (SELECT 1 FROM contributions a "
+                    "JOIN contribution_structures aus ON aus.contribution_id = a.id "
                     "WHERE a.publication_id = p.id AND aus.structure_id = :structure_id "
                     f"AND {has_author_role('a')})"
                 )
@@ -283,7 +283,7 @@ class PgStructuresQueries(StructuresQueries):
             text(f"""
                 SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
-                JOIN source_contribution_groups a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SOURCE_CONTRIBUTION}
                   AND p.publication_year IS NOT NULL
                   AND p.publication_year >= :min_year
@@ -298,7 +298,7 @@ class PgStructuresQueries(StructuresQueries):
                 SELECT
                     {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
-                JOIN source_contribution_groups a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SOURCE_CONTRIBUTION}
             """),
             {"structure_id": structure_id},
@@ -314,7 +314,7 @@ class PgStructuresQueries(StructuresQueries):
                                         WHERE c <> ALL(:non_international))
                     ) AS international
                 FROM publications p
-                JOIN source_contribution_groups a ON a.publication_id = p.id
+                JOIN contributions a ON a.publication_id = p.id
                 WHERE {AUTHOR_SOURCE_CONTRIBUTION}
                   AND p.doc_type = '{DocType.ARTICLE.value}'
             """),

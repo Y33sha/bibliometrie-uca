@@ -1,4 +1,4 @@
-"""Port ContributionRepository — accès aux contributions (groupes de `source_contribution_groups`) et aux `source_contributions`.
+"""Port ContributionRepository — accès aux contributions (groupes de `contributions`) et aux `source_contributions`.
 
 Un seul port pour les deux : leurs opérations sont étroitement couplées.
 """
@@ -8,7 +8,7 @@ from typing import Protocol, TypedDict
 
 
 class GroupRow(TypedDict):
-    """Ligne renvoyée par `find_groups` : clés d'un groupe de `source_contribution_groups`."""
+    """Ligne renvoyée par `find_groups` : clés d'un groupe de `contributions`."""
 
     id: int
     person_id: int | None
@@ -42,7 +42,7 @@ class ContributionRepository(Protocol):
         ...
 
     def find_groups(self, group_ids: list[int]) -> list[GroupRow]:
-        """Les groupes (`id`, `person_id`, `publication_id`) de `source_contribution_groups` parmi `group_ids`. Les ids absents sont omis."""
+        """Les groupes (`id`, `person_id`, `publication_id`) de `contributions` parmi `group_ids`. Les ids absents sont omis."""
         ...
 
     def manual_groups_of_person(self, person_id: int, publication_ids: list[int]) -> dict[int, int]:

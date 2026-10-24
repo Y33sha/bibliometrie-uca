@@ -274,7 +274,7 @@ class TestEntreeDansLePerimetre:
 
         group = sa_sync_conn.execute(
             text(
-                "SELECT group_id FROM source_contribution_group_members"
+                "SELECT contribution_id FROM aligned_source_contributions"
                 " WHERE source_contribution_id = 80002"
             )
         ).scalar_one()
@@ -297,8 +297,8 @@ class TestEntreeDansLePerimetre:
 
         assert sa_sync_conn.execute(
             text(
-                "SELECT g.in_perimeter FROM source_contribution_groups g"
-                " JOIN source_contribution_group_members m ON m.group_id = g.id"
+                "SELECT g.in_perimeter FROM contributions g"
+                " JOIN aligned_source_contributions m ON m.contribution_id = g.id"
                 " WHERE m.source_contribution_id = 80002"
             )
         ).scalar_one()

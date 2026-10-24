@@ -76,7 +76,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
     """Supprime les personnes sans groupe du périmètre, sans fiche RH et sans décision humaine (`person_without_decision_sql`). Leurs groupes perdent d'abord leur personne. La suppression emporte leurs formes de nom et leurs identifiants. Rend le nombre de personnes supprimées."""
     deletable = f"""
         NOT EXISTS (
-            SELECT 1 FROM source_contribution_groups g_in
+            SELECT 1 FROM contributions g_in
             WHERE g_in.person_id = p.id AND g_in.in_perimeter
         )
         AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
@@ -85,7 +85,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
     # La clé étrangère des groupes vide seulement `person_id` : le mode de résolution est vidé avec lui.
     conn.execute(
         text(f"""
-            UPDATE source_contribution_groups g SET {DETACHED_GROUP}
+            UPDATE contributions g SET {DETACHED_GROUP}
             FROM persons p WHERE g.person_id = p.id AND {deletable}
         """)
     )

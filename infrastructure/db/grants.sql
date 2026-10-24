@@ -91,7 +91,7 @@ TO bibliometrie_app;
 GRANT INSERT, UPDATE ON
     queues.address_candidates_queue, queues.address_countries_queue,
     queues.publication_contributions_queue, queues.source_record_keys_queue,
-    queues.source_contribution_group_attributes_queue, queues.group_resolution_queue
+    queues.contribution_attributes_queue, queues.contribution_resolution_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
@@ -113,7 +113,7 @@ TO bibliometrie_app;
 
 GRANT UPDATE ON
     structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_contributions,
-    sources.source_records, publications.source_contribution_groups
+    sources.source_records, publications.contributions
 TO bibliometrie_app;
 
 -- Ce qui n'est délibérément pas accordé : TRUNCATE, l'écriture sur les tables du pipeline,

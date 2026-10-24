@@ -63,24 +63,24 @@ _RESOLUTION_SNAPSHOT = "group_resolution_snapshot"
 _CANDIDATES_SQL = " UNION ".join(
     [
         f"""
-        SELECT g.id AS group_id
+        SELECT g.id AS contribution_id
         FROM {GROUP_MEMBERS}
         WHERE g.person_id IS NULL AND (sc.in_perimeter OR {pinned("sc.id")})
         """,
         f"""
-        SELECT g.id AS group_id
+        SELECT g.id AS contribution_id
         FROM {_RESOLUTION_SNAPSHOT} q
-        JOIN source_contribution_groups g ON g.id = q.id
+        JOIN contributions g ON g.id = q.id
         WHERE g.resolution_mode IS DISTINCT FROM '{GroupMatchReason.MANUAL}'
         """,
         *(
             strong_identifier_source_contributions(
                 id_type,
                 identifiers="person_identifiers",
-                select="gm.group_id",
+                select="gm.contribution_id",
                 joins="""
-                    JOIN source_contribution_group_members gm ON gm.source_contribution_id = sc_auth.id
-                    JOIN source_contribution_groups g ON g.id = gm.group_id
+                    JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc_auth.id
+                    JOIN contributions g ON g.id = gm.contribution_id
                 """,
                 where=f"g.person_id IS NULL AND pi.status <> '{AttributionStatus.REJECTED.value}'",
             )
@@ -95,29 +95,29 @@ _IDENTIFIERS_OBJECT = ", ".join(
 )
 
 _MEMBERS_SQL = f"""
-    SELECT g.id AS group_id, g.publication_id, sc.source::text AS source,
+    SELECT g.id AS contribution_id, g.publication_id, sc.source::text AS source,
            sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
            jsonb_strip_nulls(jsonb_build_object({_IDENTIFIERS_OBJECT})) AS identifiers,
            sc.in_perimeter, sc.roles,
            (SELECT ca.person_id FROM confirmed_source_contributions ca
             WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
     FROM {GROUP_MEMBERS}
-    JOIN ({_CANDIDATES_SQL}) c ON c.group_id = g.id
+    JOIN ({_CANDIDATES_SQL}) c ON c.contribution_id = g.id
     ORDER BY g.id
 """
 
 # Personnes rattachées à un groupe de chaque publication, hors des groupes à décider.
 _TAKEN_SQL = """
     SELECT publication_id, array_agg(person_id) AS person_ids
-    FROM source_contribution_groups
+    FROM contributions
     WHERE person_id IS NOT NULL AND publication_id = ANY(:publications) AND id <> ALL(:groups)
     GROUP BY publication_id
 """
 
 # Seuls les groupes dont la personne ou le mode change sont écrits.
 _WRITE_SQL = text("""
-    UPDATE source_contribution_groups g
-    SET person_id = u.person_id, resolution_mode = CAST(u.mode AS group_resolution_mode)
+    UPDATE contributions g
+    SET person_id = u.person_id, resolution_mode = CAST(u.mode AS resolution_mode)
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[]), CAST(:modes AS text[]))
         AS u(id, person_id, mode)
     WHERE g.id = u.id
@@ -126,7 +126,7 @@ _WRITE_SQL = text("""
 
 # Groupes décidés dont la personne diffère de celle que désigne leur décision : ils la perdent.
 _RELEASE_SQL = text(f"""
-    UPDATE source_contribution_groups g SET {DETACHED_GROUP}
+    UPDATE contributions g SET {DETACHED_GROUP}
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
     WHERE g.id = u.id AND g.person_id IS NOT NULL AND g.person_id IS DISTINCT FROM u.person_id
 """)
@@ -152,7 +152,7 @@ def load_candidate_groups(conn: Connection) -> dict[int, dict[int, list[GroupMem
     snapshot(conn, Queue.GROUP_RESOLUTION, _RESOLUTION_SNAPSHOT)
     groups: dict[int, dict[int, list[GroupMember]]] = defaultdict(lambda: defaultdict(list))
     for r in conn.execute(text(_MEMBERS_SQL)):
-        groups[r.publication_id][r.group_id].append(
+        groups[r.publication_id][r.contribution_id].append(
             GroupMember(
                 source=r.source,
                 name=ContributorName.from_columns(
@@ -175,7 +175,9 @@ def taken_persons(
         text(_TAKEN_SQL),
         {
             "publications": list(groups),
-            "groups": [group_id for by_group in groups.values() for group_id in by_group],
+            "groups": [
+                contribution_id for by_group in groups.values() for contribution_id in by_group
+            ],
         },
     )
     return {r.publication_id: frozenset(r.person_ids) for r in rows}
@@ -193,8 +195,8 @@ def decide_groups(
     for publication_id, by_group in groups.items():
         rejected_here = rejected.get(publication_id, frozenset())
         decided = {
-            group_id: (decide_group(members, index, rejected_here), len(members))
-            for group_id, members in by_group.items()
+            contribution_id: (decide_group(members, index, rejected_here), len(members))
+            for contribution_id, members in by_group.items()
         }
         settled = settle_publication(decided, taken.get(publication_id, frozenset()))
         if progress is not None:
@@ -224,8 +226,8 @@ def release_groups(conn: Connection, decisions: dict[int, GroupDecision]) -> int
 def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
     """Écrit la personne et le mode des groupes rattachés, quand ils changent. Rend le nombre de groupes écrits."""
     matched = [
-        (group_id, d.person_id, str(d.reason))
-        for group_id, d in decisions.items()
+        (contribution_id, d.person_id, str(d.reason))
+        for contribution_id, d in decisions.items()
         if d.outcome == GroupOutcome.MATCH
     ]
     if not matched:
@@ -243,15 +245,17 @@ def attribute_identifiers(
 ) -> None:
     """Attribue en attente, à la personne de chaque groupe rattaché par la décision, les identifiants fiables de ses membres (`identifiers_to_attribute`)."""
     members_by_group = {
-        group_id: members for by_group in groups.values() for group_id, members in by_group.items()
+        contribution_id: members
+        for by_group in groups.values()
+        for contribution_id, members in by_group.items()
     }
     repo = PgPersonRepository(conn)
-    for group_id, decision in decisions.items():
+    for contribution_id, decision in decisions.items():
         if decision.outcome != GroupOutcome.MATCH or decision.person_id is None:
             continue
         add_identifiers_from_contributions(
             decision.person_id,
-            identifiers_to_attribute(members_by_group[group_id], decision),
+            identifiers_to_attribute(members_by_group[contribution_id], decision),
             repo=repo,
         )
 
@@ -271,14 +275,14 @@ def create_persons(
     for publication_id in sorted(groups):
         by_group = groups[publication_id]
         taken_here = set(taken.get(publication_id, frozenset())) | {
-            decisions[group_id].person_id
-            for group_id in by_group
-            if decisions[group_id].outcome == GroupOutcome.MATCH
+            decisions[contribution_id].person_id
+            for contribution_id in by_group
+            if decisions[contribution_id].outcome == GroupOutcome.MATCH
         }
-        for group_id in sorted(by_group):
-            if decisions[group_id].outcome != GroupOutcome.CREATE:
+        for contribution_id in sorted(by_group):
+            if decisions[contribution_id].outcome != GroupOutcome.CREATE:
                 continue
-            members = by_group[group_id]
+            members = by_group[contribution_id]
             if progress is not None:
                 progress.advance()
             decision = decide_group(members, index, rejected.get(publication_id, frozenset()))
@@ -313,13 +317,13 @@ def create_persons(
                     evidence=decision.evidence,
                     refused=decision.refused,
                 )
-            decisions[group_id] = decision
+            decisions[contribution_id] = decision
             if decision.person_id is None or decision.outcome == GroupOutcome.SKIP:
                 continue
             conn.execute(
                 _WRITE_SQL,
                 {
-                    "ids": [group_id],
+                    "ids": [contribution_id],
                     "persons": [decision.person_id],
                     "modes": [str(decision.reason)],
                 },
@@ -333,7 +337,7 @@ def create_persons(
 
 def apply_pins(conn: Connection) -> int:
     """Rattache à la personne épinglée les groupes dont un membre est épinglé (`pinned_groups_sql`). Rend le nombre de groupes rattachés."""
-    release, attach = pinned_groups_sql("SELECT id FROM source_contribution_groups")
+    release, attach = pinned_groups_sql("SELECT id FROM contributions")
     conn.execute(text(release))
     return conn.execute(text(attach)).rowcount
 

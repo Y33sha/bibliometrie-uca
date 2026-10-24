@@ -5,17 +5,17 @@
 ```mermaid
 flowchart LR
     F@{shape: procs, label: "source_contributions"}---G
-    G[source_contribution_groups]---A[publications]
+    G[contributions]---A[publications]
     G---C[persons]
     G---D[structures]
     classDef new  fill:#bbf
     class A,D new;
 ```
 
-Une contribution est un groupe de contributions sources (`source_contribution_groups`) rattaché à une personne : les contributions sources d'un même auteur d'une publication, une par enregistrement source au plus. La phase `author_grouping` forme les groupes, la phase `persons` et les décisions de l'administration leur donnent une personne. La phase `contributions` reporte les contributions sur les publications et les structures.
+Une contribution est un groupe de contributions sources (`contributions`) rattaché à une personne : les contributions sources d'un même auteur d'une publication, une par enregistrement source au plus. La phase `author_grouping` forme les groupes, la phase `persons` et les décisions de l'administration leur donnent une personne. La phase `contributions` reporte les contributions sur les publications et les structures.
 
 1. **Report sur les publications** : `publications.in_perimeter` est matérialisé, pour que les filtres de liste lisent un drapeau au lieu de recalculer l'appartenance au périmètre à chaque requête.
-2. **Rafraîchissement des vues matérialisées** `group_structures` et `publication_structures`, qui rattachent groupes de contributions sources et publications à leurs structures.
+2. **Rafraîchissement des vues matérialisées** `contribution_structures` et `publication_structures`, qui rattachent groupes de contributions sources et publications à leurs structures.
 
 ## Opérations finales
 

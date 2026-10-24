@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`source_contribution_groups`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging

@@ -171,10 +171,13 @@ class TestSourceContributions:
         assert result is not None
         by_id = {s.id: s for s in result.source_contributions}
         assert set(by_id) == {hal_martin, openalex_martin, collective}
-        assert (by_id[hal_martin].group_id, by_id[hal_martin].method) == (group, "reference")
-        assert (by_id[openalex_martin].group_id, by_id[openalex_martin].method) == (group, "name")
+        assert (by_id[hal_martin].contribution_id, by_id[hal_martin].method) == (group, "reference")
+        assert (by_id[openalex_martin].contribution_id, by_id[openalex_martin].method) == (
+            group,
+            "name",
+        )
         assert by_id[openalex_martin].source_record_id == openalex
-        assert by_id[collective].group_id is None
+        assert by_id[collective].contribution_id is None
         assert by_id[collective].collective is True
 
     def test_une_structure_atteinte_par_deux_indices_figure_une_fois(self, sa_sync_conn):

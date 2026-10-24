@@ -88,12 +88,12 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
                     FROM source_contribution_addresses sca
                     JOIN addresses addr ON addr.id = sca.address_id
                     WHERE sca.source_contribution_id = sc.id) AS raw_affiliation,
-                   gs.group_id, g.reference_position AS group_position, gs.method::text AS method,
+                   gs.contribution_id, g.reference_position AS group_position, gs.method::text AS method,
                    gs.score, gs.margin
             FROM source_records sr
             JOIN source_contributions sc ON sc.source_record_id = sr.id
-            LEFT JOIN source_contribution_group_members gs ON gs.source_contribution_id = sc.id
-            LEFT JOIN source_contribution_groups g ON g.id = gs.group_id
+            LEFT JOIN aligned_source_contributions gs ON gs.source_contribution_id = sc.id
+            LEFT JOIN contributions g ON g.id = gs.contribution_id
             WHERE sr.publication_id = :pid
             ORDER BY sc.source_record_id, sc.author_position NULLS LAST, sc.id
         """),  # noqa: S608
@@ -112,7 +112,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             structure_ids=r.structure_ids,
             raw_affiliation=r.raw_affiliation,
             countries=r.countries,
-            group_id=r.group_id,
+            contribution_id=r.contribution_id,
             group_position=r.group_position,
             method=r.method,
             score=r.score,

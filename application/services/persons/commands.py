@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les personnes : frontière transactionnelle de l'agrégat.
 
-Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des contributions (`source_contribution_groups`) aux personnes.
+Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des contributions (`contributions`) aux personnes.
 """
 
 from sqlalchemy import Connection

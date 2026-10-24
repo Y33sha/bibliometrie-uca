@@ -27,16 +27,16 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`source_contribution_group_members`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
+    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`aligned_source_contributions`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
     return (
-        "EXISTS (SELECT 1 FROM source_contribution_group_members gm"
+        "EXISTS (SELECT 1 FROM aligned_source_contributions gm"
         f" WHERE gm.source_contribution_id = {source_contribution}.id)"
     )
 
 
 GROUP_MEMBERS = """
-    source_contribution_groups g
-    JOIN source_contribution_group_members gm ON gm.group_id = g.id
+    contributions g
+    JOIN aligned_source_contributions gm ON gm.contribution_id = g.id
     JOIN source_contributions sc ON sc.id = gm.source_contribution_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
 """
@@ -57,7 +57,7 @@ def active_name_form(form: str) -> str:
 
 
 DETACHED_GROUP = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE source_contribution_groups` qui retire sa personne à un groupe."""
+"""Affectations d'un `UPDATE contributions` qui retire sa personne à un groupe."""
 
 
 def diamond_journal_sql(journal: str = "j") -> str:
@@ -265,30 +265,30 @@ def propagate_group_attributes_sql(group_ids: str) -> str:
     """Recompose les attributs des groupes de contributions sources de la requête `group_ids` depuis leurs membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
     return f"""
         WITH members AS (
-            SELECT gm.group_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
-            FROM source_contribution_group_members gm
+            SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
+            FROM aligned_source_contributions gm
             JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-            WHERE gm.group_id IN ({group_ids})
+            WHERE gm.contribution_id IN ({group_ids})
         ),
         scal AS (
-            SELECT group_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY group_id
+            SELECT contribution_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY contribution_id
         ),
         ev AS (
-            SELECT m.group_id, array_agg(DISTINCT e ORDER BY e) AS evidence
+            SELECT m.contribution_id, array_agg(DISTINCT e ORDER BY e) AS evidence
             FROM members m, LATERAL unnest(m.perimeter_evidence) AS e
-            GROUP BY m.group_id
+            GROUP BY m.contribution_id
         ),
         rol AS (
-            SELECT m.group_id, array_agg(DISTINCT r ORDER BY r) AS roles
+            SELECT m.contribution_id, array_agg(DISTINCT r ORDER BY r) AS roles
             FROM members m, LATERAL unnest(m.roles) AS r
-            GROUP BY m.group_id
+            GROUP BY m.contribution_id
         )
-        UPDATE source_contribution_groups g
+        UPDATE contributions g
         SET is_corresponding = scal.is_corr,
             perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
             roles = rol.roles
-        FROM scal LEFT JOIN rol ON rol.group_id = scal.group_id LEFT JOIN ev ON ev.group_id = scal.group_id
-        WHERE g.id = scal.group_id
+        FROM scal LEFT JOIN rol ON rol.contribution_id = scal.contribution_id LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
+        WHERE g.id = scal.contribution_id
           AND (g.is_corresponding, g.perimeter_evidence, g.roles)
               IS DISTINCT FROM (scal.is_corr, coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
     """
@@ -301,20 +301,20 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
     """
     target = f"""
         WITH pinned AS (
-            SELECT gm.group_id, min(c.person_id) AS person_id
+            SELECT gm.contribution_id, min(c.person_id) AS person_id
             FROM confirmed_source_contributions c
-            JOIN source_contribution_group_members gm
+            JOIN aligned_source_contributions gm
                 ON gm.source_contribution_id = c.source_contribution_id
-            WHERE gm.group_id IN ({group_ids})
-            GROUP BY gm.group_id
+            WHERE gm.contribution_id IN ({group_ids})
+            GROUP BY gm.contribution_id
             HAVING count(DISTINCT c.person_id) = 1
         ),
         target AS (
             SELECT DISTINCT ON (g.publication_id, p.person_id) g.id, g.publication_id, p.person_id
             FROM pinned p
-            JOIN source_contribution_groups g ON g.id = p.group_id
+            JOIN contributions g ON g.id = p.contribution_id
             WHERE NOT EXISTS (
-                SELECT 1 FROM source_contribution_groups o
+                SELECT 1 FROM contributions o
                 WHERE o.publication_id = g.publication_id AND o.person_id = p.person_id
                   AND o.id <> g.id AND o.resolution_mode = 'manual'
             )
@@ -322,17 +322,17 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
         )
     """
     release = f"""{target}
-        UPDATE source_contribution_groups o
+        UPDATE contributions o
         SET {DETACHED_GROUP}
         FROM target t
         WHERE o.publication_id = t.publication_id AND o.person_id = t.person_id AND o.id <> t.id
     """
     attach = f"""{target}
-        UPDATE source_contribution_groups g
+        UPDATE contributions g
         SET person_id = t.person_id, resolution_mode = 'manual'
         FROM target t
         WHERE g.id = t.id
-          AND (g.person_id, g.resolution_mode) IS DISTINCT FROM (t.person_id, 'manual'::group_resolution_mode)
+          AND (g.person_id, g.resolution_mode) IS DISTINCT FROM (t.person_id, 'manual'::resolution_mode)
     """
     return release, attach
 

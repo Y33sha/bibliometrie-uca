@@ -29,7 +29,7 @@ flowchart TB
     source_contributions --> contributions
     contributions --> publications
     contributions --> persons
-    contributions -.->|via matview group_structures| structures
+    contributions -.->|via matview contribution_structures| structures
     addresses --> address_structures --> structures
     source_records --- publishing
     publications --- publishing
@@ -68,7 +68,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `apc_payments` | frais de publication (import CSV) | [publishing](04-publishing.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](07-ref-et-ops.md) |
 | `contributor_information` | informations du contributeur d'une contribution source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
-| `group_structures` | *vue matérialisée* : structures liées à un groupe de contributions sources | [publications](03-publications.md) |
+| `contribution_structures` | *vue matérialisée* : structures liées à un groupe de contributions sources | [publications](03-publications.md) |
 | `contributions` | table consolidée personne × publication | [publications](03-publications.md) |
 | `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](07-ref-et-ops.md) |

@@ -12,7 +12,7 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 |---|---|---|
 | `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
 | `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `contributions` |
-| `publication_structures` | `source_contribution_groups` ⋈ `group_structures` | phase `contributions` |
+| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `contributions` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées
@@ -29,7 +29,7 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
 | `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `contributions` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
-| `is_corresponding`, `roles`, `perimeter_evidence` | `source_contribution_groups` | phase `author_grouping` |
+| `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
 | `publication_count` | `journals`, `publishers` | phase `contributions` |
 | `publication_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
@@ -43,7 +43,7 @@ Les phases coûteuses retraitent seulement ce qui a changé depuis la dernière 
 |---|---|---|
 | `source_record_keys_queue` | enregistrements sources à rattacher à leur publication | `publications` |
 | `publication_contributions_queue` | publications dont les groupes d'auteurs sont à recalculer | `author_grouping` |
-| `source_contribution_group_attributes_queue` | groupes dont les attributs sont à recomposer | `author_grouping` |
+| `contribution_attributes_queue` | groupes dont les attributs sont à recomposer | `author_grouping` |
 | `address_candidates_queue` | adresses dont les pays sont à détecter et à résoudre | `countries` |
 | `address_countries_queue` | adresses dont le pays change | `countries` |
 | `source_contribution_countries_queue` | contributions sources dont les pays sont à recalculer | `countries` |

@@ -23,15 +23,15 @@ from infrastructure.sql_fragments import case_priority, has_author_role
 _ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
 
 _ORPHANS_FROM = """
-    FROM source_contribution_groups g
+    FROM contributions g
     JOIN publications p ON p.id = g.publication_id
 """
 
 # Membres du groupe `g` : contributions sources `sc_m`.
 _MEMBERS = """
-    source_contribution_group_members gm
+    aligned_source_contributions gm
     JOIN source_contributions sc_m ON sc_m.id = gm.source_contribution_id
-    WHERE gm.group_id = g.id
+    WHERE gm.contribution_id = g.id
 """
 
 # Membre de la source la plus prioritaire, qui donne le nom affiché : jointure latérale `sc`.
@@ -49,9 +49,9 @@ _GROUP_LABS = f"""
     WHERE s.structure_type = '{StructureType.LABO.value}'
       AND s.id IN (
           SELECT scs.structure_id FROM source_contribution_structures scs
-          JOIN source_contribution_group_members gm_s
+          JOIN aligned_source_contributions gm_s
             ON gm_s.source_contribution_id = scs.source_contribution_id
-          WHERE gm_s.group_id = g.id
+          WHERE gm_s.contribution_id = g.id
       )
 """
 
@@ -101,7 +101,7 @@ class PgContributionsQueries(ContributionsQueries):
 
         rows = self._conn.execute(
             text(f"""
-                SELECT g.id AS group_id,
+                SELECT g.id AS contribution_id,
                        ARRAY(
                            SELECT d.source::text
                            FROM (SELECT DISTINCT sc_m.source FROM {_MEMBERS}) d
@@ -133,7 +133,7 @@ class PgContributionsQueries(ContributionsQueries):
             last_name, first_name = name.split()
             contributions.append(
                 OrphanContributionOut(
-                    group_id=row.group_id,
+                    contribution_id=row.contribution_id,
                     sources=row.sources,
                     full_name=name.display(),
                     last_name=last_name,

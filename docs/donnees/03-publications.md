@@ -39,7 +39,7 @@ Légende :
 
 ## `contributions` — table consolidée des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `group_structures` de son groupe de contributions sources). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `contribution_structures` de son groupe de contributions sources). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
 
 **Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_contributions`.
 

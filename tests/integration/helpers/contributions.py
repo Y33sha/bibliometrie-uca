@@ -77,7 +77,7 @@ def insert_contribution(
     """Insère une contribution : groupe de contributions sources sans membre, rattaché à la personne en mode `manual`. Renvoie l'`id` du groupe. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
     return insert_row(
         conn,
-        "source_contribution_groups",
+        "contributions",
         {
             "publication_id": publication_id,
             "person_id": person_id,
@@ -86,7 +86,7 @@ def insert_contribution(
             "perimeter_evidence": perimeter_evidence(in_perimeter),
             "roles": roles,
         },
-        {"perimeter_evidence": PERIMETER_EVIDENCE_CAST, "resolution_mode": "group_resolution_mode"},
+        {"perimeter_evidence": PERIMETER_EVIDENCE_CAST, "resolution_mode": "resolution_mode"},
     )
 
 
@@ -94,7 +94,7 @@ def group_id_of(conn: Connection, publication_id: int, person_id: int) -> int:
     """L'`id` du groupe de contributions sources de la personne `person_id` dans la publication `publication_id`."""
     return conn.execute(
         text(
-            "SELECT id FROM source_contribution_groups"
+            "SELECT id FROM contributions"
             " WHERE publication_id = :publication AND person_id = :person"
         ),
         {"publication": publication_id, "person": person_id},

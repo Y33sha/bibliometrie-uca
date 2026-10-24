@@ -302,7 +302,7 @@ def seed_contribution(
 ) -> int:
     """Contribution de `publication_id` et `person_id` : groupe de contributions sources rattaché à la personne. Renvoie l'`id` du groupe. Les valeurs par défaut sont celles du schéma."""
     return _insert(
-        "INSERT INTO source_contribution_groups "
+        "INSERT INTO contributions "
         "(publication_id, person_id, resolution_mode, perimeter_evidence, roles) "
         "VALUES (%s, %s, 'manual', CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
         (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
@@ -324,7 +324,7 @@ def seed_in_perimeter_contributions(journal_id: int) -> None:
             seed_contribution(pid, person_id=person_id, in_perimeter=True, roles=["author"])
         cur.execute(
             "UPDATE publications p SET perimeter_evidence = coalesce(("
-            "SELECT array_agg(DISTINCT e ORDER BY e) FROM source_contribution_groups a JOIN persons pe "
+            "SELECT array_agg(DISTINCT e ORDER BY e) FROM contributions a JOIN persons pe "
             "ON pe.id = a.person_id AND pe.exclusion IS NULL "
             "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
             "WHERE a.publication_id = p.id), '{}') "
@@ -412,35 +412,35 @@ def seed_group(publication_id: int, source_contributions: list[tuple[int, int]])
     """Groupe des contributions sources `(contribution source, enregistrement source)` de la publication `publication_id` ; la première le fonde, les autres le rejoignent par le nom."""
     with owner_pool() as cur:
         cur.execute(
-            "INSERT INTO source_contribution_groups (publication_id) VALUES (%s) RETURNING id",
+            "INSERT INTO contributions (publication_id) VALUES (%s) RETURNING id",
             (publication_id,),
         )
-        group_id = cur.fetchone()["id"]
+        contribution_id = cur.fetchone()["id"]
         for rank, (source_contribution, source_record) in enumerate(source_contributions):
             cur.execute(
-                "INSERT INTO source_contribution_group_members "
-                "(source_contribution_id, group_id, source_record_id, method) "
+                "INSERT INTO aligned_source_contributions "
+                "(source_contribution_id, contribution_id, source_record_id, method) "
                 "VALUES (%s, %s, %s, CAST(%s AS grouping_method))",
                 (
                     source_contribution,
-                    group_id,
+                    contribution_id,
                     source_record,
                     "reference" if rank == 0 else "name",
                 ),
             )
-        return group_id
+        return contribution_id
 
 
 def seed_perimeter_author_group(
-    group_id: int, *, person_id: int | None = None, mode: str | None = None
+    contribution_id: int, *, person_id: int | None = None, mode: str | None = None
 ) -> None:
-    """Fait du groupe `group_id` un groupe d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    """Fait du groupe `contribution_id` un groupe d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
     with owner_pool() as cur:
         cur.execute(
-            "UPDATE source_contribution_groups SET person_id = %s, "
-            "resolution_mode = CAST(%s AS group_resolution_mode), roles = ARRAY['author'], "
+            "UPDATE contributions SET person_id = %s, "
+            "resolution_mode = CAST(%s AS resolution_mode), roles = ARRAY['author'], "
             "perimeter_evidence = ARRAY['address']::perimeter_evidence[] WHERE id = %s",
-            (person_id, mode, group_id),
+            (person_id, mode, contribution_id),
         )
 
 
@@ -454,20 +454,19 @@ def publication_perimeter_evidence(publication_id: int) -> list[str]:
         return cur.fetchone()["evidence"]
 
 
-def group_to_resolve(group_id: int) -> bool:
-    """Le groupe `group_id` est dans la file des groupes dont la personne est à redécider."""
+def group_to_resolve(contribution_id: int) -> bool:
+    """Le groupe `contribution_id` est dans la file des groupes dont la personne est à redécider."""
     with owner_pool() as cur:
-        cur.execute("SELECT 1 FROM group_resolution_queue WHERE id = %s", (group_id,))
+        cur.execute("SELECT 1 FROM contribution_resolution_queue WHERE id = %s", (contribution_id,))
         return cur.fetchone() is not None
 
 
-def group_person(group_id: int) -> tuple[int | None, str | None]:
-    """Personne et mode de résolution du groupe `group_id`."""
+def group_person(contribution_id: int) -> tuple[int | None, str | None]:
+    """Personne et mode de résolution du groupe `contribution_id`."""
     with owner_pool() as cur:
         cur.execute(
-            "SELECT person_id, resolution_mode::text AS mode FROM source_contribution_groups"
-            " WHERE id = %s",
-            (group_id,),
+            "SELECT person_id, resolution_mode::text AS mode FROM contributions WHERE id = %s",
+            (contribution_id,),
         )
         row = cur.fetchone()
         return row["person_id"], row["mode"]

@@ -157,15 +157,15 @@ def get_publication_detail(
         text(f"""
             SELECT a.reference_position AS author_position, a.in_perimeter, a.is_corresponding,
                    (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
-                    FROM group_structures aus
-                    WHERE aus.group_id = a.id) AS structure_ids,
+                    FROM contribution_structures aus
+                    WHERE aus.contribution_id = a.id) AS structure_ids,
                    {contribution_has_source(Source.HAL.value)} AS source_hal,
                    {contribution_has_source(Source.OPENALEX.value)} AS source_openalex,
                    {contribution_has_source(Source.WOS.value)} AS source_wos,
                    {contribution_has_source(Source.SCANR.value)} AS source_scanr,
                    pe.id AS person_id, pe.last_name, pe.first_name,
                    EXISTS (SELECT 1 FROM hr_records pr WHERE pr.person_id = pe.id) AS has_rh
-            FROM source_contribution_groups a
+            FROM contributions a
             JOIN persons pe ON pe.id = a.person_id
             WHERE a.publication_id = :pid
             ORDER BY a.reference_position
@@ -195,8 +195,8 @@ def get_publication_detail(
             SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, g.person_id,
                    sc.roles, sc.in_perimeter
             FROM source_contributions sc
-            LEFT JOIN source_contribution_group_members gm ON gm.source_contribution_id = sc.id
-            LEFT JOIN source_contribution_groups g ON g.id = gm.group_id
+            LEFT JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
+            LEFT JOIN contributions g ON g.id = gm.contribution_id
             WHERE sc.source_record_id = (
                 SELECT id FROM source_records
                 WHERE source = '{Source.THESES.value}' AND publication_id = :pid

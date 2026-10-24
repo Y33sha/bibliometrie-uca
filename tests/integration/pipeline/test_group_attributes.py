@@ -62,7 +62,7 @@ def _attributes(conn, group):
     return conn.execute(
         text(
             "SELECT is_corresponding, roles, perimeter_evidence::text[] AS evidence, in_perimeter"
-            " FROM source_contribution_groups WHERE id = :g"
+            " FROM contributions WHERE id = :g"
         ),
         {"g": group},
     ).one()

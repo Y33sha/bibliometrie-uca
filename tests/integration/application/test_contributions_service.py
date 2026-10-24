@@ -76,12 +76,10 @@ def repo(sa_sync_conn):
 # ── exclude_contribution ────────────────────────────────────────
 
 
-def _group_person(conn, group_id):
+def _group_person(conn, contribution_id):
     return conn.execute(
-        text(
-            "SELECT person_id, resolution_mode::text AS mode FROM source_contribution_groups WHERE id = :g"
-        ),
-        {"g": group_id},
+        text("SELECT person_id, resolution_mode::text AS mode FROM contributions WHERE id = :g"),
+        {"g": contribution_id},
     ).one()
 
 
@@ -128,13 +126,13 @@ class TestExcludeContribution:
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        group_id = insert_group(
+        contribution_id = insert_group(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
         with pytest.raises(NotFoundError):
             exclude_contribution(
-                group_id,
+                contribution_id,
                 conn=sa_sync_conn,
                 perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
                 repo=repo,
@@ -222,7 +220,7 @@ class TestRejectPair:
 class TestPropagateUcaForAddresses:
     """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs groupes et de leurs publications, après une modification de address_structures.
 
-    `group_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
+    `contribution_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
         """Monte un périmètre UCA minimal + config perimeter_persons/extraction.
@@ -305,9 +303,9 @@ class TestPropagateUcaForAddresses:
             text(
                 "SELECT a.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
-                "        FROM group_structures "
-                "        WHERE group_id = a.id) AS structure_ids "
-                "FROM source_contribution_groups a WHERE a.id = :id"
+                "        FROM contribution_structures "
+                "        WHERE contribution_id = a.id) AS structure_ids "
+                "FROM contributions a WHERE a.id = :id"
             ),
             {"id": group_id_of(sa_sync_conn, publication_id, person_id)},
         ).one()
@@ -402,7 +400,7 @@ class TestHumanDecisionsOnGroups:
         source_record_id = _source_record(sa_sync_conn, publication_id)
         insert_source_contribution(sa_sync_conn, source_record_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        group_id = group_id_of(sa_sync_conn, publication_id, person_id)
+        contribution_id = group_id_of(sa_sync_conn, publication_id, person_id)
 
         reject_pair(
             publication_id,
@@ -412,20 +410,20 @@ class TestHumanDecisionsOnGroups:
             repo=repo,
         )
 
-        assert _group_person(sa_sync_conn, group_id) == (None, None)
+        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
 
     def test_l_epinglage_rattache_le_groupe_sans_personne(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        group_id = insert_group(
+        contribution_id = insert_group(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
         repo.pin_contributions([source_contribution_id], person_id)
 
-        assert _group_person(sa_sync_conn, group_id) == (person_id, "manual")
+        assert _group_person(sa_sync_conn, contribution_id) == (person_id, "manual")
 
     def test_l_epinglage_cede_devant_un_groupe_manuel_de_la_personne(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -478,17 +476,19 @@ class TestHumanDecisionsOnPublicationPerimeter:
         source_contribution_id = insert_source_contribution(
             conn, source_record_id, author_name_normalized="jean dupont"
         )
-        group_id = insert_group(conn, publication_id, [(source_contribution_id, source_record_id)])
-        set_perimeter_author_group(conn, group_id)
-        return publication_id, group_id
+        contribution_id = insert_group(
+            conn, publication_id, [(source_contribution_id, source_record_id)]
+        )
+        set_perimeter_author_group(conn, contribution_id)
+        return publication_id, contribution_id
 
     def test_l_attribution_fait_entrer_la_publication(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        publication_id, group_id = self._orphan(sa_sync_conn, "hal-orphan")
+        publication_id, contribution_id = self._orphan(sa_sync_conn, "hal-orphan")
 
         assign_orphan_contribution(
             person_id,
-            group_id,
+            contribution_id,
             conn=sa_sync_conn,
             perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
             repo=person_repository(sa_sync_conn),

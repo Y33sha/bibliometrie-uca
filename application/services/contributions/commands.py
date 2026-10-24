@@ -25,7 +25,7 @@ def exclude_contribution(
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
 
-    `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne.
+    `contribution_id` désigne un groupe de `contributions` rattaché à une personne.
     """
     contributions_service.exclude_contribution(
         contribution_id,
@@ -40,7 +40,7 @@ def exclude_contribution(
 
 def assign_orphan_contribution(
     conn: Connection,
-    group_id: int,
+    contribution_id: int,
     *,
     person_id: int | None = None,
     new_person: tuple[str, str] | None = None,
@@ -50,7 +50,7 @@ def assign_orphan_contribution(
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue une contribution orpheline, groupe `group_id` sans personne, à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
+    """Attribue une contribution orpheline, groupe `contribution_id` sans personne, à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
 
     L'un de `person_id` ou `new_person` est exigé : la commande rattache à une personne, qu'elle reçoive laquelle ou de quoi la créer. Sans l'un ni l'autre, elle lève `ValidationError`.
 
@@ -62,7 +62,7 @@ def assign_orphan_contribution(
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_contribution(
         person_id,
-        group_id,
+        contribution_id,
         conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,

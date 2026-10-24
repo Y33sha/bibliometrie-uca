@@ -22,14 +22,14 @@ _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTI
 # Relevé de la file `publication_contributions_queue`, gardé d'un lot à l'autre : une table temporaire survit aux commits.
 _SNAPSHOT = "publication_contributions_marks"
 
-# Relevé de la file `source_contribution_group_attributes_queue`.
+# Relevé de la file `contribution_attributes_queue`.
 _ATTRIBUTES_SNAPSHOT = "source_contribution_group_attributes_marks"
 
 # Marque pour la recomposition de leurs attributs les groupes des publications `:publications`.
 _MARK_GROUPS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
         Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
-        "SELECT id FROM source_contribution_groups WHERE publication_id = ANY(:publications)",
+        "SELECT id FROM contributions WHERE publication_id = ANY(:publications)",
     )
 )
 
@@ -70,22 +70,22 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
 _GROUPS_SQL = text("""
     SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
            gs.method::text AS method, gs.score, gs.margin
-    FROM source_contribution_groups g
-    LEFT JOIN source_contribution_group_members gs ON gs.group_id = g.id
+    FROM contributions g
+    LEFT JOIN aligned_source_contributions gs ON gs.contribution_id = g.id
     WHERE g.publication_id = ANY(:publications)
 """)
 
 _DELETE_MEMBERSHIPS_SQL = text(
-    "DELETE FROM source_contribution_group_members WHERE source_contribution_id = ANY(:source_contributions)"
+    "DELETE FROM aligned_source_contributions WHERE source_contribution_id = ANY(:source_contributions)"
 )
 
-_DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
+_DELETE_GROUPS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 
 # Marque pour la redécision de leur personne les groupes recomposés `:ids` qui en ont une.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
         Queue.GROUP_RESOLUTION,
-        "SELECT id FROM source_contribution_groups WHERE id = ANY(:ids) AND person_id IS NOT NULL",
+        "SELECT id FROM contributions WHERE id = ANY(:ids) AND person_id IS NOT NULL",
     )
 )
 
@@ -103,25 +103,25 @@ _SET_COPIES_SQL = text("""
 """)
 
 _UPDATE_POSITIONS_SQL = text("""
-    UPDATE source_contribution_groups g SET reference_position = u.position
+    UPDATE contributions g SET reference_position = u.position
     FROM unnest(CAST(:ids AS integer[]), CAST(:positions AS smallint[])) AS u(id, position)
     WHERE g.id = u.id
 """)
 
 _GROUP_IDS_SQL = text(
-    "SELECT nextval(pg_get_serial_sequence('publications.source_contribution_groups', 'id'))"
+    "SELECT nextval(pg_get_serial_sequence('publications.contributions', 'id'))"
     " FROM generate_series(1, :n)"
 )
 
 _INSERT_GROUPS_SQL = text("""
-    INSERT INTO source_contribution_groups (id, publication_id, reference_position)
+    INSERT INTO contributions (id, publication_id, reference_position)
     SELECT * FROM unnest(
         CAST(:ids AS integer[]), CAST(:publications AS integer[]), CAST(:positions AS smallint[]))
 """)
 
 _INSERT_MEMBERSHIPS_SQL = text("""
-    INSERT INTO source_contribution_group_members
-        (source_contribution_id, group_id, source_record_id, method, score, margin)
+    INSERT INTO aligned_source_contributions
+        (source_contribution_id, contribution_id, source_record_id, method, score, margin)
     SELECT * FROM unnest(
         CAST(:source_contributions AS integer[]), CAST(:groups AS integer[]), CAST(:source_records AS integer[]),
         CAST(:methods AS grouping_method[]), CAST(:scores AS real[]), CAST(:margins AS real[]))
@@ -198,7 +198,7 @@ class SourceContributionGroupStore:
             self._conn.execute(
                 text(
                     f"SELECT count(*) FROM {_ATTRIBUTES_SNAPSHOT} t"  # noqa: S608
-                    " JOIN source_contribution_groups g ON g.id = t.id"
+                    " JOIN contributions g ON g.id = t.id"
                 )
             ).scalar_one()
         )

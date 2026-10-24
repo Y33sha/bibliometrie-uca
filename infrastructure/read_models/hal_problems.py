@@ -42,8 +42,8 @@ _IDREF = usable_identifier("'idref'")
 
 # Contributions sources HAL membres d'un groupe rattaché à une personne `g.person_id`, avec la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
-    FROM source_contribution_groups g
-    JOIN source_contribution_group_members m ON m.group_id = g.id
+    FROM contributions g
+    JOIN aligned_source_contributions m ON m.contribution_id = g.id
     JOIN source_contributions sc ON sc.id = m.source_contribution_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sc.source = 'hal'
@@ -335,9 +335,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         base_where = """
             FROM publications p
-            JOIN source_contribution_groups a ON a.publication_id = p.id
-            WHERE EXISTS (SELECT 1 FROM group_structures aus
-                          WHERE aus.group_id = a.id
+            JOIN contributions a ON a.publication_id = p.id
+            WHERE EXISTS (SELECT 1 FROM contribution_structures aus
+                          WHERE aus.contribution_id = a.id
                             AND aus.structure_id = ANY(:lab_arr))
               AND EXISTS (SELECT 1 FROM source_records sr
                           WHERE sr.publication_id = p.id AND sr.source = 'hal')
@@ -447,8 +447,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
                                         ORDER BY COALESCE(l.acronym, l.name))
                         FROM (SELECT DISTINCT s.acronym, s.name
-                              FROM source_contribution_groups a2
-                              JOIN group_structures aus2 ON aus2.group_id = a2.id
+                              FROM contributions a2
+                              JOIN contribution_structures aus2 ON aus2.contribution_id = a2.id
                               JOIN structures s ON s.id = aus2.structure_id
                               WHERE a2.publication_id = p.id
                                 AND a2.in_perimeter = TRUE

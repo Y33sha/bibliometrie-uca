@@ -203,7 +203,7 @@ export function authorRows(records: SourceRecord[], contributions: SourceContrib
 	for (const s of contributions) {
 		const col = column.get(s.source_record_id);
 		if (col === undefined) continue;
-		const key = s.group_id != null ? `g${s.group_id}` : `s${s.id}`;
+		const key = s.contribution_id != null ? `g${s.contribution_id}` : `s${s.id}`;
 		members.set(key, [...(members.get(key) ?? []), s]);
 		present.add(col);
 	}

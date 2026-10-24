@@ -107,7 +107,7 @@ def _attach_groups(
 
 def assign_orphan_contribution(
     person_id: int,
-    group_id: int,
+    contribution_id: int,
     *,
     conn: Connection,
     repo: PersonRepository,
@@ -116,7 +116,7 @@ def assign_orphan_contribution(
     audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> None:
-    """Attribue une contribution orpheline, le groupe `group_id` sans personne, à une personne.
+    """Attribue une contribution orpheline, le groupe `contribution_id` sans personne, à une personne.
 
     1. Pré-contrôle de rejet : si la paire (publication, personne) est rejetée et que `force` est faux, lève `RejectedPairError` ; avec `force`, lève le rejet d'abord (cf. `_resolve_rejection`)
     2. Rattache le groupe à la personne (`_attach_groups`)
@@ -125,11 +125,11 @@ def assign_orphan_contribution(
     """
     _require_person(person_id, repo=repo)
 
-    group = next(iter(contribution_repo.find_groups([group_id])), None)
+    group = next(iter(contribution_repo.find_groups([contribution_id])), None)
     if group is None:
-        raise NotFoundError(f"Contribution #{group_id} introuvable")
+        raise NotFoundError(f"Contribution #{contribution_id} introuvable")
     if group["person_id"] is not None:
-        raise ContributionAlreadyAssignedError(group_id, group["person_id"])
+        raise ContributionAlreadyAssignedError(contribution_id, group["person_id"])
     manual = contribution_repo.manual_groups_of_person(person_id, [group["publication_id"]])
     if group["publication_id"] in manual:
         raise PersonAlreadyInPublicationError(
@@ -157,7 +157,7 @@ def assign_orphan_contribution(
         "contribution.assigned",
         "person",
         person_id,
-        {"group_id": group_id, "publication_id": group["publication_id"]},
+        {"contribution_id": contribution_id, "publication_id": group["publication_id"]},
     )
 
 

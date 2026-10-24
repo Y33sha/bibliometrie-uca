@@ -49,10 +49,10 @@ def _person_exists(conn, person_id):
     ).scalar_one()
 
 
-def _publication_of(conn, group_id):
+def _publication_of(conn, contribution_id):
     return conn.execute(
-        text("SELECT publication_id FROM source_contribution_groups WHERE id = :g"),
-        {"g": group_id},
+        text("SELECT publication_id FROM contributions WHERE id = :g"),
+        {"g": contribution_id},
     ).scalar_one()
 
 
@@ -190,7 +190,7 @@ def test_une_personne_supprimee_libere_ses_groupes(sa_sync_conn):
     empty = insert_person(conn, "Ghost", first_name="G")
     group = conn.execute(
         text(
-            "INSERT INTO source_contribution_groups (publication_id, person_id, resolution_mode)"
+            "INSERT INTO contributions (publication_id, person_id, resolution_mode)"
             " VALUES (:p, :person, 'name') RETURNING id"
         ),
         {"p": insert_publication(conn, "t"), "person": empty},

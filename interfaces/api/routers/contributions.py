@@ -1,6 +1,6 @@
 """Router des contributions : exclusion d'une contribution, et revue des contributions orphelines. Sert `/api/contributions/*`.
 
-Une contribution est un groupe de `source_contribution_groups`. L'exclusion vise un groupe rattaché à une personne, par son `contribution_id`. Les orphelines sont les groupes du périmètre, sous un rôle d'auteur, rattachés à aucune personne, que le router liste et attribue sous `/orphans`, par leur `group_id`.
+Une contribution est un groupe de `contributions`. L'exclusion vise un groupe rattaché à une personne, par son `contribution_id`. Les orphelines sont les groupes du périmètre, sous un rôle d'auteur, rattachés à aucune personne, que le router liste et attribue sous `/orphans`, par leur `contribution_id`.
 
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{contribution_id}` s'y ferait absorber.
 """
@@ -102,7 +102,7 @@ def assign_orphan_contribution(
 
     person_id = contribution_commands.assign_orphan_contribution(
         conn,
-        body.group_id,
+        body.contribution_id,
         person_id=body.person_id,
         new_person=new_person,
         repo=persons,

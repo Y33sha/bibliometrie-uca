@@ -30,7 +30,7 @@ _PINS = text("""
                     JOIN contributor_information oci ON oci.id = o.contributor_information_id
                     WHERE osr.publication_id = sr.publication_id
                       AND oci.author_name_normalized = ci.author_name_normalized
-                      AND EXISTS (SELECT 1 FROM source_contribution_group_members gm
+                      AND EXISTS (SELECT 1 FROM aligned_source_contributions gm
                                   WHERE gm.source_contribution_id = o.id)
                     ORDER BY o.id)
            END AS doubles
@@ -39,7 +39,7 @@ _PINS = text("""
     JOIN source_records sr ON sr.id = sc.source_record_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sr.publication_id IS NOT NULL AND NOT sc.collective
-      AND NOT EXISTS (SELECT 1 FROM source_contribution_group_members gm
+      AND NOT EXISTS (SELECT 1 FROM aligned_source_contributions gm
                       WHERE gm.source_contribution_id = sc.id)
     ORDER BY csc.source_contribution_id
 """)

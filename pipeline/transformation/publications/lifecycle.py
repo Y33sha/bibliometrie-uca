@@ -69,7 +69,7 @@ def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
                 SELECT p.id FROM publications p
                 WHERE NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publication_id = p.id)
                    OR NOT EXISTS (
-                       SELECT 1 FROM source_contribution_groups g
+                       SELECT 1 FROM contributions g
                        WHERE g.publication_id = p.id AND g.person_id IS NOT NULL
                    )
                 {limit_clause}

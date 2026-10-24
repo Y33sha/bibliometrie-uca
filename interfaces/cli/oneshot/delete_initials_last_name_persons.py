@@ -46,9 +46,7 @@ def delete_persons(conn: Connection, *, apply: bool) -> list[int]:
     if apply and ids:
         # Les groupes de la personne perdent personne et mode avant sa suppression : la clé étrangère vide seulement `person_id`.
         conn.execute(
-            text(
-                f"UPDATE source_contribution_groups SET {DETACHED_GROUP} WHERE person_id = ANY(:ids)"
-            ),
+            text(f"UPDATE contributions SET {DETACHED_GROUP} WHERE person_id = ANY(:ids)"),
             {"ids": ids},
         )
         conn.execute(text("DELETE FROM persons WHERE id = ANY(:ids)"), {"ids": ids})

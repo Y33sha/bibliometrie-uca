@@ -194,8 +194,8 @@ def mark_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str]])
         Queue.GROUP_RESOLUTION,
         """
             SELECT g.id
-            FROM source_contribution_groups g
-            JOIN source_contribution_group_members gm ON gm.group_id = g.id
+            FROM contributions g
+            JOIN aligned_source_contributions gm ON gm.contribution_id = g.id
             JOIN unnest(CAST(:ids AS integer[]), CAST(:types AS text[])) AS m(source_contribution_id, id_type)
                 ON m.source_contribution_id = gm.source_contribution_id
             WHERE g.resolution_mode::text = m.id_type
