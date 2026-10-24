@@ -3,7 +3,7 @@
 Quatre tâches (`pipeline.graph`), chacune sur sa transaction :
 
 1. **arbitrate_identifiers** — neutralise les identifiants mal placés d'après le consensus de nom de leurs porteurs, puis tranche les conflits d'attribution par le vote des groupes. Les groupes rattachés par un identifiant neutralisé ou transféré perdent leur personne (`pipeline.transformation.persons.identifier_arbitration`).
-2. **resolve_groups** — applique les épinglages aux groupes de contributions sources, complète les prénoms réduits, puis rattache à une personne existante les groupes sans personne (`pipeline.transformation.persons.groups`). Un groupe dont la décision est une création reste sans personne.
+2. **resolve_groups** — applique les épinglages aux groupes de contributions sources, complète les prénoms réduits, puis rattache les groupes sans personne à une personne existante, ou à une personne créée de leur nom (`pipeline.transformation.persons.groups`).
 3. **populate** — régénère les formes de nom des personnes et des membres de leurs groupes.
 4. **purge** — re-orpheline les groupes dont la forme de nom devient ambiguë après régénération, supprime les attributions d'identifiant automatiques qu'aucun membre des groupes de leur personne ne contient, et supprime les personnes sans contribution du périmètre.
 

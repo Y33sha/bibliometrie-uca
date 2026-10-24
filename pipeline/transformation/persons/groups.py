@@ -1,6 +1,6 @@
 """Tâche `persons.resolve_groups` : rattache à une personne les groupes de contributions sources qui n'en ont pas (`domain.persons.group_matching`).
 
-Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne : `author_grouping` vide la personne d'un groupe dont les membres changent. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne. La tâche ne crée pas de personne : un groupe dont la décision est une création reste sans personne.
+Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne : `author_grouping` vide la personne d'un groupe dont les membres changent. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne. Les groupes du périmètre au nom inconnu sont traités ensuite, un à un, contre l'index tenu à jour : un groupe rejoint une personne créée plus tôt dans le passage, ou fonde la sienne (`create_persons`).
 """
 
 from collections import Counter, defaultdict
@@ -8,20 +8,26 @@ from collections.abc import Iterable
 
 from sqlalchemy import Connection, text
 
+from domain.errors import ValidationError
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.group_matching import (
     IDENTIFIER_ORDER,
     GroupDecision,
+    GroupMatchReason,
     GroupMember,
     GroupOutcome,
+    GroupSkipReason,
     PersonIndex,
     decide_group,
+    founding_name,
     identifiers_to_attribute,
     settle_publication,
 )
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
+from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.person import validated_name
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     GROUP_MEMBERS,
@@ -190,6 +196,76 @@ def attribute_identifiers(
         )
 
 
+def create_persons(
+    conn: Connection,
+    groups: dict[int, dict[int, list[GroupMember]]],
+    decisions: dict[int, GroupDecision],
+    index: PersonIndex,
+    rejected: dict[int, frozenset[int]],
+    taken: dict[int, frozenset[int]],
+) -> int:
+    """Traite un à un les groupes dont la décision est une création, contre l'index tenu à jour : un groupe que désigne une personne créée plus tôt dans le passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à un autre groupe de la publication n'est pas reprise. Met `decisions` à jour et rend le nombre de personnes créées."""
+    repo = PgPersonRepository(conn)
+    created = 0
+    for publication_id in sorted(groups):
+        by_group = groups[publication_id]
+        taken_here = set(taken.get(publication_id, frozenset())) | {
+            decisions[group_id].person_id
+            for group_id in by_group
+            if decisions[group_id].outcome == GroupOutcome.MATCH
+        }
+        for group_id in sorted(by_group):
+            if decisions[group_id].outcome != GroupOutcome.CREATE:
+                continue
+            members = by_group[group_id]
+            decision = decide_group(members, index, rejected.get(publication_id, frozenset()))
+            if decision.outcome == GroupOutcome.CREATE:
+                try:
+                    last_name, first_name = validated_name(*founding_name(members))
+                except ValidationError:
+                    continue
+                person_id = repo.create(last_name, first_name)
+                repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+                identifiers = identifiers_to_attribute(members, decision)
+                index.register(
+                    person_id,
+                    last_name,
+                    first_name,
+                    {k: v for attributed in identifiers for k, v in attributed.items()},
+                )
+                created += 1
+                decision = GroupDecision(
+                    GroupOutcome.CREATE,
+                    person_id,
+                    GroupMatchReason.NAME,
+                    decision.evidence,
+                    decision.refused,
+                )
+            elif decision.outcome == GroupOutcome.MATCH and decision.person_id in taken_here:
+                decision = GroupDecision(
+                    GroupOutcome.SKIP,
+                    reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
+                    evidence=decision.evidence,
+                    refused=decision.refused,
+                )
+            decisions[group_id] = decision
+            if decision.person_id is None or decision.outcome == GroupOutcome.SKIP:
+                continue
+            conn.execute(
+                _WRITE_SQL,
+                {
+                    "ids": [group_id],
+                    "persons": [decision.person_id],
+                    "modes": [str(decision.reason)],
+                },
+            )
+            add_identifiers_from_contributions(
+                decision.person_id, identifiers_to_attribute(members, decision), repo=repo
+            )
+            taken_here.add(decision.person_id)
+    return created
+
+
 def apply_pins(conn: Connection) -> int:
     """Rattache à la personne épinglée les groupes dont un membre est épinglé (`pinned_groups_sql`). Rend le nombre de groupes rattachés."""
     release, attach = pinned_groups_sql("SELECT id FROM source_contribution_groups")
@@ -198,18 +274,17 @@ def apply_pins(conn: Connection) -> int:
 
 
 def resolve_groups(conn: Connection) -> dict[str, int]:
-    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), puis décide et écrit la personne des groupes sans personne. Rend les compteurs par issue et par motif."""
+    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide et écrit la personne des groupes sans personne, puis crée les personnes des groupes du périmètre au nom inconnu (`create_persons`). Rend les compteurs par issue et par motif."""
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     groups = load_candidate_groups(conn)
-    decisions = decide_groups(
-        groups,
-        load_index(conn, completion.conflicting),
-        fetch_rejected_person_ids_by_publication(conn),
-        taken_persons(conn, groups),
-    )
+    index = load_index(conn, completion.conflicting)
+    rejected = fetch_rejected_person_ids_by_publication(conn)
+    taken = taken_persons(conn, groups)
+    decisions = decide_groups(groups, index, rejected, taken)
     written = write_decisions(conn, decisions)
     attribute_identifiers(conn, groups, decisions)
+    created = create_persons(conn, groups, decisions, index, rejected, taken)
     counts: Counter[str] = Counter(
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()
@@ -219,5 +294,6 @@ def resolve_groups(conn: Connection) -> dict[str, int]:
         "first_names_completed": completion.completed,
         "groups": len(decisions),
         "written": written,
+        "created": created,
         **counts,
     }

@@ -15,18 +15,22 @@ def build_metrics(
 ) -> PhaseMetrics:
     """Métriques de la phase : compteurs du rattachement des groupes (`resolve_groups`), de l'arbitrage des identifiants, de la régénération des formes de nom et de la purge.
 
-    `details.table` compte les groupes rattachés pendant le run, par mode de résolution (`GroupMatchReason`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
+    `details.table` compte les groupes rattachés pendant le run, par mode de résolution (`GroupMatchReason`), et ceux qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
     """
     attached = {
         reason: resolution.get(f"{GroupOutcome.MATCH}:{reason}", 0) for reason in GroupMatchReason
     }
     attached[GroupMatchReason.MANUAL] += resolution.get("pinned", 0)
+    created = resolution.get(f"{GroupOutcome.CREATE}:{GroupMatchReason.NAME}", 0)
 
     metrics = PhaseMetrics()
-    metrics.add(seen=resolution.get("groups", 0), updated=sum(attached.values()))
+    metrics.add(seen=resolution.get("groups", 0), new=created, updated=sum(attached.values()))
     # Clés techniques : le frontend donne les libellés.
     metrics.details["table"] = {
-        "rows": [{"key": str(reason), "count": count} for reason, count in attached.items()]
+        "rows": [
+            *({"key": str(reason), "count": count} for reason, count in attached.items()),
+            {"key": "created", "count": created},
+        ]
     }
     metrics.details["summary"] = {
         **resolution,

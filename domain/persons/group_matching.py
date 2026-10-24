@@ -10,10 +10,11 @@ Un groupe réunit les contributions sources d'un même auteur dans une publicati
 Deux personnes désignées au même niveau laissent le groupe sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à un seul groupe (`settle_publication`).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import PersonIdentifierType
@@ -26,7 +27,8 @@ from domain.persons.matching import (
     decide_name_form_outcome,
     trusted_identifier,
 )
-from domain.persons.name_forms import contributor_name_forms
+from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
+from domain.persons.name_matching import first_name_initials
 
 IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
@@ -116,12 +118,31 @@ class PersonIndex:
     - `name_forms` : personnes de chaque forme de nom active.
     - `name_form_status` : verdict d'un couple (forme de nom, personne), qui corrobore ou refuse un identifiant.
     - `namesakes` : personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
+
+    `register` y ajoute une personne créée pendant la décision.
     """
 
-    identifiers: Mapping[str, Mapping[str, IdentifiedPerson]]
-    name_forms: Mapping[str, Sequence[int]]
+    identifiers: Mapping[str, MutableMapping[str, IdentifiedPerson]]
+    name_forms: MutableMapping[str, list[int]]
     name_form_status: Mapping[tuple[str, int], str]
-    namesakes: Mapping[str, Sequence[Namesake]]
+    namesakes: MutableMapping[str, list[Namesake]]
+
+    def register(
+        self, person_id: int, last_name: str, first_name: str, identifiers: Mapping[str, str]
+    ) -> None:
+        """Ajoute la personne `person_id` : homonyme de son nom de famille, formes de son nom, identifiants encore libres. Une forme déjà portée par une autre personne devient ambiguë."""
+        last_key = normalize_text(last_name)
+        self.namesakes[last_key] = [
+            *self.namesakes.get(last_key, ()),
+            Namesake(person_id, last_name, first_name),
+        ]
+        for form in compute_person_name_forms(last_name, first_name):
+            self.name_forms[form] = [*self.name_forms.get(form, ()), person_id]
+        identified = IdentifiedPerson(person_id, last_key, normalize_text(first_name))
+        for id_type, value in identifiers.items():
+            by_value = self.identifiers.get(id_type)
+            if by_value is not None and value not in by_value:
+                by_value[value] = identified
 
 
 @dataclass(frozen=True)
@@ -291,6 +312,24 @@ def settle_publication(
                 refused=decision.refused,
             )
     return settled
+
+
+def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
+    """(nom de famille, prénom) de la personne que fonde un groupe : ceux d'un membre autorisé à créer une personne, de préférence du périmètre, d'une source qui sépare nom et prénom, au prénom plein le plus long."""
+
+    def rank(member: GroupMember) -> tuple[bool, bool, bool, int, str]:
+        _, first_name = member.name.split()
+        reduced = not first_name or first_name_initials(first_name) is not None
+        return (
+            not member.in_perimeter,
+            not member.name.split_by_source,
+            reduced,
+            -len(first_name),
+            member.source,
+        )
+
+    eligible = [m for m in members if allow_person_creation(list(m.roles))] or list(members)
+    return min(eligible, key=rank).name.split()
 
 
 def identifiers_to_attribute(

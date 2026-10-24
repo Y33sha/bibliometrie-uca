@@ -11,7 +11,7 @@ flowchart LR
 
 La phase `persons` rattache chaque contribution à une personne. Une contribution source est un auteur tel qu'une source le donne sur une publication : un même chercheur en produit une par publication et par source. La phase `author_grouping` réunit les contributions sources d'un même auteur d'une publication en un groupe (`source_contribution_groups`). Une contribution est un groupe rattaché à une personne. La phase décide la personne de chaque groupe à partir de tous ses membres.
 
-La phase ne crée pas de personne : un groupe au nom inconnu reste sans personne.
+Un groupe du périmètre au nom inconnu fonde une personne, d'après le nom de son meilleur membre : autorisé à créer une personne, de préférence du périmètre, d'une source qui sépare nom et prénom, au prénom plein le plus long. Les groupes au même nom, dans d'autres publications, la rejoignent dans le même passage.
 
 ## Rattacher un groupe à une personne
 

@@ -31,6 +31,7 @@ def test_la_table_compte_les_rattachements_par_mode_epinglages_compris():
         "idref": 0,
         "name": 1,
         "compatible_name": 0,
+        "created": 0,
     }
 
 

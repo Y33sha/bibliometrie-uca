@@ -62,19 +62,61 @@ def test_un_identifiant_d_un_membre_rattache_le_groupe_hors_perimetre(sa_sync_co
     assert _person(conn, group) == (person, "orcid")
 
 
-def test_un_nom_inconnu_du_perimetre_ne_cree_pas_de_personne(sa_sync_conn):
-    conn = sa_sync_conn
-    group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+def _person_name(conn, person):
+    return tuple(
+        conn.execute(
+            text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": person}
+        ).one()
+    )
 
-    counts = resolve_groups(conn)
 
-    assert _person(conn, group) == (None, None)
-    assert counts["create"] == 1
+class TestCreation:
+    def test_un_nom_inconnu_du_perimetre_cree_une_personne(self, sa_sync_conn):
+        conn = sa_sync_conn
+        group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+
+        counts = resolve_groups(conn)
+
+        person, mode = _person(conn, group)
+        assert mode == "name"
+        assert _person_name(conn, person) == ("Durand", "Claire")
+        assert counts["created"] == 1
+
+    def test_un_nom_inconnu_hors_perimetre_ne_cree_pas_de_personne(self, sa_sync_conn):
+        conn = sa_sync_conn
+        group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, False)])
+
+        counts = resolve_groups(conn)
+
+        assert _person(conn, group) == (None, None)
+        assert counts["created"] == 0
+
+    def test_le_meme_nom_dans_une_autre_publication_rejoint_la_personne_creee(self, sa_sync_conn):
+        conn = sa_sync_conn
+        first = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+        second = _group(conn, insert_publication(conn), [("openalex", "Claire Durand", None, True)])
+
+        counts = resolve_groups(conn)
+
+        assert counts["created"] == 1
+        assert _person(conn, first)[0] == _person(conn, second)[0] is not None
+
+    def test_le_nom_vient_du_membre_au_prenom_plein(self, sa_sync_conn):
+        conn = sa_sync_conn
+        group = _group(
+            conn,
+            insert_publication(conn),
+            [("hal", "C. Durand", None, True), ("openalex", "Claire Durand", None, True)],
+        )
+
+        resolve_groups(conn)
+
+        assert _person_name(conn, _person(conn, group)[0]) == ("Durand", "Claire")
 
 
 def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sync_conn):
     conn = sa_sync_conn
-    person = insert_person(conn, "Martin", first_name="Jean")
+    person = create_person("Martin", "Jean", repo=person_repository(conn))
     publication = insert_publication(conn)
     attached = _group(conn, publication, [("hal", "Jean Martin", None, True)])
     conn.execute(
