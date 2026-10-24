@@ -142,11 +142,10 @@ def insert_persons_perimeter(conn: Connection, code: str = "uca", *, extra_root_
 
 
 def refresh_structure_matviews(conn) -> None:
-    """Rafraîchit les vues des structures dans l'ordre de leurs dépendances : `source_contribution_structures`, puis `contribution_structures` et `group_structures`, puis `publication_structures`.
+    """Rafraîchit les vues des structures dans l'ordre de leurs dépendances : `source_contribution_structures`, puis `group_structures`, puis `publication_structures`.
 
     Le rafraîchissement sans `CONCURRENTLY` est transactionnel, donc annulé avec le test. Le pipeline maintient ces vues ; les tests les rafraîchissent eux-mêmes."""
     conn.execute(text("REFRESH MATERIALIZED VIEW source_contribution_structures"))
-    conn.execute(text("REFRESH MATERIALIZED VIEW contribution_structures"))
     conn.execute(text("REFRESH MATERIALIZED VIEW group_structures"))
     conn.execute(text("REFRESH MATERIALIZED VIEW publication_structures"))
 

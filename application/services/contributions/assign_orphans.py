@@ -134,7 +134,7 @@ def assign_orphan_contribution(
 
     if publication_id is not None:
         contribution_repo.consolidate_contributions(person_id, [publication_id])
-    # `contribution_structures` (agrégation des structure_ids) maintenue uniquement
+    # `group_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
     emit_event(
@@ -200,7 +200,7 @@ def batch_assign_orphan_contributions(
         ):
             repo.add_name_form(person_id, name_form)
 
-    # `contribution_structures` (agrégation des structure_ids) maintenue uniquement
+    # `group_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
     emit_event(

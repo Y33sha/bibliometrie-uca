@@ -27,8 +27,7 @@ _source_record = partial(insert_source_record, title="T")
 
 
 def _attach(conn, publication_id, lab_id):
-    """Contribution reliant la publi à un labo via la matview contribution_structures
-    (semée par la chaîne source minimale)."""
+    """Contribution reliant la publication à un labo par la vue `group_structures`, semée par la chaîne source minimale."""
     aid = insert_contribution(
         conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )

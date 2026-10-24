@@ -490,7 +490,7 @@ class TestPropagateContributionAttributes:
 class TestPropagateUcaForAddresses:
     """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs contributions et de leurs publications, après une modification de address_structures.
 
-    `contribution_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
+    `group_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
         """Monte un périmètre UCA minimal + config perimeter_persons/extraction.
@@ -535,9 +535,7 @@ class TestPropagateUcaForAddresses:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        contribution_id = insert_contribution(
-            sa_sync_conn, publication_id, person_id=person_id, roles=["author"]
-        )
+        insert_contribution(sa_sync_conn, publication_id, person_id=person_id, roles=["author"])
         source_contribution_id = insert_source_contribution(
             sa_sync_conn, source_record_id, person_id=person_id
         )
@@ -577,11 +575,11 @@ class TestPropagateUcaForAddresses:
             text(
                 "SELECT a.in_perimeter, "
                 "       (SELECT array_agg(structure_id ORDER BY structure_id) "
-                "        FROM contribution_structures "
-                "        WHERE contribution_id = a.id) AS structure_ids "
-                "FROM contributions a WHERE a.id = :id"
+                "        FROM group_structures "
+                "        WHERE group_id = a.id) AS structure_ids "
+                "FROM source_contribution_groups a WHERE a.id = :id"
             ),
-            {"id": contribution_id},
+            {"id": group_id_of(sa_sync_conn, publication_id, person_id)},
         ).one()
         assert a.in_perimeter is True
         assert a.structure_ids == [uca_id]

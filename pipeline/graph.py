@@ -1051,7 +1051,7 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_group_members",
             "persons.exclusion",
         ),
-        writes=("contribution_structures", "group_structures", "publication_structures"),
+        writes=("group_structures", "publication_structures"),
     ),
     _task(
         "contributions.purge_publications",

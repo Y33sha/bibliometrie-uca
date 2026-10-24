@@ -48,7 +48,7 @@ flowchart LR
     subgraph consolidé
         publications---contributions
         persons---contributions
-        contributions-.->|via matview contribution_structures|structures
+        contributions-.->|via matview group_structures|structures
 
     end
     source_contributions-->addresses

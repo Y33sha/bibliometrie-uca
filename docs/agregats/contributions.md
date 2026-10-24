@@ -14,7 +14,7 @@ Aucun objet de domaine ne lui correspond. Son vocabulaire de rôles et la corres
 | `source_contributions` | Contribution source relevée dans une source | `person_id`, `resolution_mode` |
 | `confirmed_source_contributions` | Contribution source épinglée par une décision humaine | `(source_contribution_id, person_id)` |
 | `rejected_contributions` | Paire écartée durablement | `(publication_id, person_id)` |
-| `contribution_structures` | Vue matérialisée : contribution ↔ structure | `(contribution_id, structure_id)` |
+| `group_structures` | Vue matérialisée : groupe de contributions sources ↔ structure | `(group_id, structure_id)` |
 | `publication_structures` | Vue matérialisée : publication ↔ structure | `(publication_id, structure_id)` |
 
 Les contributions sources elles-mêmes relèvent de la fiche [source_records](source_records.md), qui les décrit comme amont de cette table.
@@ -49,6 +49,6 @@ L'API n'écrit jamais `contributions`. L'édition manuelle agit sur les tables e
 
 | Usage | Ce qui est joint |
 |---|---|
-| Détail d'une publication | `contributions`, `persons` et `contribution_structures` : les auteurs, leurs structures et l'auteur de correspondance |
-| Fiche et tableau de bord d'une personne | `contributions` et `publications` |
+| Détail d'une publication | `source_contribution_groups`, `persons` et `group_structures` : les auteurs, leurs structures et l'auteur de correspondance |
+| Fiche et tableau de bord d'une personne | `source_contribution_groups` et `publications` |
 | Listes, facettes et statistiques | `publication_structures` pour la facette laboratoire ; les décomptes se limitent au périmètre |

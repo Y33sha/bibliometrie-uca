@@ -6,7 +6,7 @@ Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usag
 
 Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
 
-Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
+Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`group_structures`, `publication_author_alignment`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
 """
 
 from sqlalchemy import (
@@ -726,15 +726,11 @@ contributions = Table(
 )
 
 
-# `contribution_structures` est une MATERIALIZED VIEW (DDL via migration
-# a2c6e4f8b1d7), pas une table : dérivée des `source_contribution_structures` des
-# `source_contributions` reliées à une contribution, hors contributions d'une personne
-# exclue. Pas modélisée dans le metadata
-# SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
-# REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
-#
 # `group_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
 # contributions sources rattaché à une personne non exclue aux structures de ses membres.
+# Pas modélisée dans le metadata SQLAlchemy — tous les accès se font en SQL brut par nom
+# (lectures) ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
+# en table.
 #
 # `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
 # publication↔structure dédoublonné, dérivé des groupes d'auteur × `group_structures`.

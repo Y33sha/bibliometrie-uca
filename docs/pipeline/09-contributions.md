@@ -21,7 +21,7 @@ La phase `contributions` consolide en une table les contributions sources que ra
 2. **Élagage** des contributions orphelines : les paires que plus aucune `source_contribution` n'atteste sont supprimées.
 3. **Recomposition des attributs**, en une passe, depuis les contributions sources qui attestent chaque contribution : même publication par leur enregistrement source, même personne. `author_position` vient de la source la plus prioritaire qui le renseigne : theses > Crossref > DataCite > HAL > OpenAlex > ScanR > WoS. `is_corresponding`, `in_perimeter` et `roles` sont des unions : les booléens sont vrais dès qu'une source les porte.
 4. **Report sur les publications** : `publications.in_perimeter` est matérialisé, pour que les filtres de liste lisent un drapeau au lieu de recalculer l'appartenance au périmètre à chaque requête.
-5. **Rafraîchissement des vues matérialisées** `contribution_structures` et `publication_structures`, qui rattachent contributions et publications à leurs structures.
+5. **Rafraîchissement des vues matérialisées** `group_structures` et `publication_structures`, qui rattachent groupes de contributions sources et publications à leurs structures.
 
 ## Opérations finales
 

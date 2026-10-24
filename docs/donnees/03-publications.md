@@ -39,7 +39,7 @@ Légende :
 
 ## `contributions` — table consolidée des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `contribution_structures`). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `group_structures` de son groupe de contributions sources). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
 
 **Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_contributions`.
 
@@ -52,7 +52,7 @@ Colonnes notables :
 
 **Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une contribution source orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
 
-**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_contributions`. `in_perimeter`, les liens via `contribution_structures`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
+**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_contributions`. `in_perimeter`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
 
 ## Sujets / mots-clés
 

@@ -12,7 +12,7 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 |---|---|---|
 | `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
 | `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `contributions` |
-| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `contributions` |
+| `publication_structures` | `source_contribution_groups` ⋈ `group_structures` | phase `contributions` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées

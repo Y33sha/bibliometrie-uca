@@ -32,7 +32,7 @@ def _count_contributions_tables(conn) -> dict:
         )
     ).scalar_one()
     counts["with_structs"] = conn.execute(
-        text("SELECT COUNT(DISTINCT contribution_id) AS cnt FROM contribution_structures")
+        text("SELECT COUNT(DISTINCT group_id) AS cnt FROM group_structures")
     ).scalar_one()
     return counts
 

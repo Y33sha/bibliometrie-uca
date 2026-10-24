@@ -30,7 +30,6 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
         patch.object(contributions_phase, "propagate_contribution_attributes"),
         patch.object(contributions_phase, "count_contributions_in_perimeter"),
         patch.object(contributions_phase, "refresh_publications_perimeter_evidence"),
-        patch.object(contributions_phase, "refresh_contribution_structures"),
         patch.object(contributions_phase, "refresh_group_structures"),
         patch.object(contributions_phase, "refresh_publication_structures"),
         patch.object(
