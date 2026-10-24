@@ -20,6 +20,30 @@ Les colonnes de `journals` décrivent une revue : présence dans le DOAJ, modèl
 
 Le nom `journals` couvre ainsi des collections d'ouvrages, des serveurs de prépublications et des entrepôts de données. Il désigne mal son contenu.
 
+### Localisations
+
+Une publication désigne une version d'une œuvre. Un preprint forme une publication distincte, reliée à l'article par `is_preprint_of`. Une copie déposée de la version publiée rejoint la publication de l'article.
+
+Trois sources décrivent les localisations d'un document :
+
+- OpenAlex donne le lieu, l'URL, la version (`submittedVersion`, `acceptedVersion`, `publishedVersion`) et la licence de chaque localisation. La normalisation garde les URL, les identifiants et la licence de la localisation principale.
+- Crossref donne la cible de résolution du DOI (`resource.primary.URL`) et les URL du texte intégral (`link`). La normalisation ne les lit pas.
+- Unpaywall donne les localisations en open access. Le pipeline lit seulement son statut open access.
+
+### Éditeur d'une publication
+
+Une publication a l'éditeur de sa revue : ni `publications` ni `source_records` n'ont de `publisher_id`. Quand une revue change d'éditeur, ses anciens articles passent au nouvel éditeur.
+
+Mesure sur une base proche de la production (`measure_journal_publisher_changes`) : 42 revues ont deux éditeurs de préfixe DOI sur des périodes disjointes, pour 719 publications. 315 d'entre elles ont un éditeur de préfixe différent de celui de la revue (*animal* : Cambridge jusqu'en 2020, Elsevier ensuite). L'ISSN rattache ces publications à la même revue, donc aucun doublon de revue n'apparaît.
+
+Trois données désignent l'éditeur d'un DOI Crossref :
+
+- **Le titulaire du préfixe** (`doi_prefixes`) reste l'éditeur d'origine.
+- **Le membre qui détient le DOI** (`member`, `publisher`) change avec la revue. Les DOI d'*animal* en 10.1017, préfixe de Cambridge, sont détenus par Elsevier. Sur les 37 250 enregistrements Crossref du raw store local, 1 519 ont un membre autre que le titulaire du préfixe, dont 1 181 hors des 42 revues. Les principaux cas : bioRxiv et medRxiv passés à openRxiv (442), Research Square à Springer (213), revues vendues (de BMJ, Springer, Cambridge et OUP à Elsevier, de Hindawi à Wiley, de Lavoisier à JLE).
+- **Le domaine de résolution** désigne l'hébergeur : `agupubs.onlinelibrary.wiley.com` pour l'American Geophysical Union, `linkinghub.elsevier.com` pour l'American Dairy Science Association, `books.openedition.org` pour les presses universitaires. Il désigne parfois le propriétaire : `comptes-rendus.academie-sciences.fr`, pour les revues que Centre Mersenne héberge. Le raw store compte 1 459 domaines. 50 couvrent 82 % des enregistrements, 200 en couvrent 92 %.
+
+Le membre Crossref est tantôt la société savante (AGU), tantôt l'éditeur commercial (OUP pour *Plant Physiology*, revue de l'ASPB), tantôt la plateforme (Centre Mersenne, OpenEdition). Sur 6 609 revues à publications Crossref, 6 446 ont un seul éditeur de préfixe. 1 995 d'entre elles ont un autre éditeur en base, pour 6 045 publications. Dans 1 818 de ces cas, l'éditeur de la revue n'a aucun membre Crossref.
+
 ### Points des autres fiches que le modèle conditionne
 
 - [Conférences et actes](DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
@@ -33,11 +57,14 @@ Le nom `journals` couvre ainsi des collections d'ouvrages, des serveurs de prép
   - publication isolée : monographie, livre ou volume d'actes, rattachée ou non à une série ;
   - localisation : entrepôt, serveur de prépublications, plateforme.
 - Les localisations sortent de `journals`.
+- Le lieu de publication est une série ou une monographie. Un preprint n'en a pas : son serveur est une localisation.
 
 ## Phasage
 
 ### Phase 1 — Inventaire
 
+- [x] Revues qui changent d'éditeur, d'après le préfixe DOI de leurs publications (`f02277482`).
+- [x] Membre qui détient les DOI Crossref et domaine de résolution, sur le raw store.
 - [ ] Répartition des entrées de `journals` par type, et des publications rattachées, sur la base de production.
 - [ ] Usages de chaque nature : normalisation, rattachement par ISSN et par préfixe DOI, enrichissements (DOAJ, Sudoc, OpenAlex), statut open access, APC, interface.
 
@@ -66,5 +93,8 @@ Le nom `journals` couvre ainsi des collections d'ouvrages, des serveurs de prép
 - Place de `media`, et sort de `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
 - **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
+- **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer.
+- **Éditeur d'une publication.** Une colonne `publisher_id` sur `source_records` et `publications`, remplie par le membre Crossref, à défaut par l'agrégation des sources. Le membre donne l'éditeur actuel, le titulaire du préfixe l'éditeur d'origine, le domaine l'hébergeur : lequel retenir ? Le membre qui détient les DOI récents d'une revue corrigerait aussi l'éditeur de la revue.
+- **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
 - **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` en désigne une seule : laquelle ?
 - **Ouvrage en plusieurs volumes** (« Current Developments in Biotechnology and Bioengineering »). Chaque volume est-il une monographie, et qu'est-ce qui les relie ?
