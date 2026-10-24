@@ -26,10 +26,10 @@ from domain.persons.person import PersonExclusion
 PersonSort = Literal[
     "name_asc",
     "name_desc",
-    "source_contributions_asc",
-    "source_contributions_desc",
-    "in_perimeter_source_contributions_asc",
-    "in_perimeter_source_contributions_desc",
+    "contributions_asc",
+    "contributions_desc",
+    "in_perimeter_contributions_asc",
+    "in_perimeter_contributions_desc",
     "dept_asc",
     "dept_desc",
     "role_asc",
@@ -122,10 +122,10 @@ class PersonOut(BaseModel):
     end_date: date | None
     has_rh: bool
     exclusion: PersonExclusion | None
-    source_contribution_count: int
-    """Contributions sources où la personne tient le rôle d'auteur."""
-    in_perimeter_source_contribution_count: int
-    """Celles de ces contributions sources que le périmètre retient."""
+    contribution_count: int
+    """Contributions où la personne tient le rôle d'auteur."""
+    in_perimeter_contribution_count: int
+    """Celles de ces contributions que le périmètre retient."""
     identifiers: list[PersonIdentifierOut]
 
 
@@ -280,8 +280,8 @@ class CurationPersonOut(BaseModel):
     first_name: str
     last_name: str
     has_rh: bool
-    source_contribution_count: int
-    """Contributions sources où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
+    contribution_count: int
+    """Contributions où la personne tient le rôle d'auteur, même mesure que la liste des personnes."""
     labs: list[str]
 
 

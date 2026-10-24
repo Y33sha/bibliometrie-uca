@@ -9,7 +9,7 @@ psycopg) pour obtenir l'`contributor_information_id` correspondant.
 
 import json
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
 
@@ -101,6 +101,17 @@ def insert_contribution(
         },
         {"perimeter_evidence": PERIMETER_EVIDENCE_CAST},
     )
+
+
+def group_id_of(conn: Connection, publication_id: int, person_id: int) -> int:
+    """L'`id` du groupe de contributions sources de la personne `person_id` dans la publication `publication_id`."""
+    return conn.execute(
+        text(
+            "SELECT id FROM source_contribution_groups"
+            " WHERE publication_id = :publication AND person_id = :person"
+        ),
+        {"publication": publication_id, "person": person_id},
+    ).scalar_one()
 
 
 def insert_confirmed_source_contribution(

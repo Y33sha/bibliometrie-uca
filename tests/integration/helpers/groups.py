@@ -40,6 +40,20 @@ def insert_group(
     return group_id
 
 
+def add_group_member(
+    conn: Connection, group_id: int, source_contribution_id: int, source_record_id: int
+) -> None:
+    """Ajoute la contribution source `source_contribution_id`, de l'enregistrement source `source_record_id`, au groupe `group_id`."""
+    conn.execute(
+        text("""
+            INSERT INTO source_contribution_group_members
+                (source_contribution_id, group_id, source_record_id, method)
+            VALUES (:s, :g, :n, 'name')
+        """),
+        {"s": source_contribution_id, "g": group_id, "n": source_record_id},
+    )
+
+
 def group_ungrouped(conn: Connection) -> None:
     """Donne un groupe à elle seule à chaque contribution source sans groupe d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : le groupe que la phase `author_grouping` forme pour un auteur sans jumelle. Les groupes créés sont marqués pour la recomposition de leurs attributs."""
     conn.execute(

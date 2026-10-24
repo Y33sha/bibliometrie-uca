@@ -8,7 +8,7 @@ from typing import Protocol, TypedDict
 
 
 class ContributionPersonRow(TypedDict):
-    """Ligne renvoyée par `get_contribution_person` : clés d'une ligne de `contributions`."""
+    """Ligne renvoyée par `get_contribution_person` : clés d'un groupe de `source_contribution_groups` rattaché à une personne."""
 
     id: int
     person_id: int
@@ -75,7 +75,7 @@ class ContributionRepository(Protocol):
     # ── contributions ────────────────────────────────────────────────
 
     def get_contribution_person(self, contribution_id: int) -> ContributionPersonRow | None:
-        """La ligne `contributions` (`id`, `person_id`, `publication_id`), ou `None` si l'id n'existe pas."""
+        """Le groupe (`id`, `person_id`, `publication_id`) de `source_contribution_groups`, ou `None` si l'id n'existe pas ou si le groupe n'a pas de personne."""
         ...
 
     def reject_contribution(self, publication_id: int, person_id: int) -> None:
@@ -91,7 +91,7 @@ class ContributionRepository(Protocol):
         ...
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        """Détache toutes les contributions sources de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de contributions sources détachées."""
+        """Détache toutes les contributions sources et le groupe de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de contributions sources détachées."""
         ...
 
     def delete_orphan_contributions_for_person(self, person_id: int) -> int:
@@ -116,5 +116,5 @@ class ContributionRepository(Protocol):
     # ── Recomposition d'une contribution depuis ses contributions sources ───────
 
     def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
-        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses contributions sources, par les requêtes de la phase `contributions`."""
+        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses contributions sources, par les requêtes de la phase `contributions`. Rattache à la personne le groupe sans personne de ses contributions sources, dans chaque publication où elle n'en a pas."""
         ...

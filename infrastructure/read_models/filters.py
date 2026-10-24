@@ -261,7 +261,7 @@ def source_clause(source_values: list[str]) -> WhereClause | None:
 def _authored_by(person_id: int, bind: str) -> WhereClause:
     """La personne est auteur (rôle 'author') de la publication ; son id est lié sous `:bind`."""
     return WhereClause(
-        f"""EXISTS (SELECT 1 FROM contributions a
+        f"""EXISTS (SELECT 1 FROM source_contribution_groups a
                 WHERE a.publication_id = p.id AND a.person_id = :{bind}
                   AND {has_author_role("a")})""",
         {bind: person_id},
@@ -308,7 +308,7 @@ def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause 
         return None
     return _toggle_clause(
         corr_filter,
-        """EXISTS (SELECT 1 FROM contributions a
+        """EXISTS (SELECT 1 FROM source_contribution_groups a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
                   AND a.is_corresponding = TRUE)""",
         {"flt_corr_person": person_id},
@@ -382,7 +382,7 @@ def in_perimeter_person_clause(
         return None
     return _toggle_clause(
         in_perimeter,
-        """EXISTS (SELECT 1 FROM contributions a
+        """EXISTS (SELECT 1 FROM source_contribution_groups a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person
                   AND a.in_perimeter = TRUE)""",
         {"flt_in_per_person": person_id},
@@ -530,9 +530,7 @@ def person_active_clause(value: bool | None) -> WhereClause | None:
     """Filtre : la personne a (ou n'a pas) une contribution ou une fiche RH."""
     if value is None:
         return None
-    active = (
-        "(prh.id IS NOT NULL OR EXISTS (SELECT 1 FROM contributions a WHERE a.person_id = p.id))"
-    )
+    active = "(prh.id IS NOT NULL OR EXISTS (SELECT 1 FROM source_contribution_groups a WHERE a.person_id = p.id))"
     return WhereClause(active if value else f"NOT {active}", {})
 
 
@@ -557,8 +555,8 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
         return None
     return WhereClause(
         f"""EXISTS (
-            SELECT 1 FROM contributions a
-            JOIN contribution_structures aus ON aus.contribution_id = a.id
+            SELECT 1 FROM source_contribution_groups a
+            JOIN group_structures aus ON aus.group_id = a.id
             WHERE a.person_id = p.id
               AND aus.structure_id = :flt_person_lab_id
               AND {has_author_role("a")}
@@ -570,10 +568,10 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
 _PERSONS_SORT_MAP = {
     "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
     "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-    "source_contributions_asc": "source_contribution_count ASC, LOWER(p.last_name) ASC",
-    "source_contributions_desc": "source_contribution_count DESC, LOWER(p.last_name) ASC",
-    "in_perimeter_source_contributions_asc": "in_perimeter_source_contribution_count ASC, LOWER(p.last_name) ASC",
-    "in_perimeter_source_contributions_desc": "in_perimeter_source_contribution_count DESC, LOWER(p.last_name) ASC",
+    "contributions_asc": "contribution_count ASC, LOWER(p.last_name) ASC",
+    "contributions_desc": "contribution_count DESC, LOWER(p.last_name) ASC",
+    "in_perimeter_contributions_asc": "in_perimeter_contribution_count ASC, LOWER(p.last_name) ASC",
+    "in_perimeter_contributions_desc": "in_perimeter_contribution_count DESC, LOWER(p.last_name) ASC",
     "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
     "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
     "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",

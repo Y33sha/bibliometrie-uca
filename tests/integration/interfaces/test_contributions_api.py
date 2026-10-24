@@ -44,14 +44,31 @@ def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[i
 # ── PATCH /api/contributions/{id}/exclude ─────────────────────────
 
 
+def _group_id(publication_id: int, person_id: int | None) -> int:
+    """L'`id` du groupe de la personne `person_id` dans la publication, ou du groupe sans personne si `person_id` vaut `None`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "SELECT id FROM source_contribution_groups"
+            " WHERE publication_id = %s AND person_id IS NOT DISTINCT FROM %s",
+            (publication_id, person_id),
+        )
+        return cur.fetchone()["id"]
+
+
 class TestExcludeContribution:
     def test_ok(self, auth_client):
         pid = seed_person()
         publication = seed_publication("Exclude test")
-        aid = seed_contribution(publication, person_id=pid, in_perimeter=True)
-        r = auth_client.patch(f"/api/contributions/{aid}/exclude")
+        seed_contribution(publication, person_id=pid, in_perimeter=True)
+        r = auth_client.patch(f"/api/contributions/{_group_id(publication, pid)}/exclude")
         assert r.status_code == 200
         assert r.json()["ok"] is True
+
+    def test_group_without_person_is_not_found(self, auth_client):
+        """L'id d'un groupe sans personne ne désigne pas une contribution."""
+        _, publication = _seed_orphan_with_publication()
+        r = auth_client.patch(f"/api/contributions/{_group_id(publication, None)}/exclude")
+        assert r.status_code == 404
 
 
 # ── Orphan contributions ──────────────────────────────────────────

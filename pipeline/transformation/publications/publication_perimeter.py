@@ -1,6 +1,6 @@
 """Recalcul de `publications.perimeter_evidence`, par la phase `contributions`, après l'exclusion d'une personne et après une correction d'adresse.
 
-Une publication réunit les indices de ses contributions d'auteurs, de personnes non exclues : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
+Une publication réunit les indices de ses contributions d'auteurs (groupes de contributions sources rattachés à une personne non exclue) : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
 """
 
 from sqlalchemy import Connection, text
@@ -18,7 +18,7 @@ def _refresh_sql(scope: str) -> str:
             SELECT id, array_agg(DISTINCT e ORDER BY e) AS evidence
             FROM (
                 SELECT a.publication_id AS id, e
-                FROM contributions a
+                FROM source_contribution_groups a
                 JOIN persons pe ON pe.id = a.person_id AND pe.exclusion IS NULL
                 CROSS JOIN LATERAL unnest(a.perimeter_evidence) e
                 WHERE a.publication_id {scope} AND {has_author_role("a")}
@@ -45,7 +45,9 @@ def _refresh_sql(scope: str) -> str:
 
 _ALL = text(_refresh_sql("IS NOT NULL"))
 _OF_PERSON = text(
-    _refresh_sql("IN (SELECT publication_id FROM contributions WHERE person_id = :pid)")
+    _refresh_sql(
+        "IN (SELECT publication_id FROM source_contribution_groups WHERE person_id = :pid)"
+    )
 )
 _OF_PUBLICATIONS = text(_refresh_sql("= ANY(:publication_ids)"))
 

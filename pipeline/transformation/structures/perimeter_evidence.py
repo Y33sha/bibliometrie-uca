@@ -9,6 +9,7 @@ from infrastructure.sql_fragments import (
     NO_PERIMETER_EVIDENCE,
     SOURCE_CONTRIBUTIONS_SCOPE,
     propagate_contribution_attributes_sql,
+    propagate_group_attributes_sql,
     source_contribution_perimeter_evidence,
 )
 from pipeline.transformation.publications.publication_perimeter import (
@@ -102,7 +103,7 @@ class SourceContributionPerimeterRecompute:
         source_contribution_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        """Rafraîchit la matview `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs contributions et de leurs publications, par les mêmes requêtes que le pipeline."""
+        """Rafraîchit la matview `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs contributions, de leurs groupes et de leurs publications, par les mêmes requêtes que le pipeline."""
         refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(
             conn,
@@ -111,6 +112,15 @@ class SourceContributionPerimeterRecompute:
         )
         conn.execute(
             text(propagate_contribution_attributes_sql(scope=SOURCE_CONTRIBUTIONS_SCOPE)),
+            {"source_contribution_ids": source_contribution_ids},
+        )
+        conn.execute(
+            text(
+                propagate_group_attributes_sql(
+                    "SELECT group_id FROM source_contribution_group_members"
+                    " WHERE source_contribution_id = ANY(:source_contribution_ids)"
+                )
+            ),
             {"source_contribution_ids": source_contribution_ids},
         )
         publication_ids = conn.execute(

@@ -266,12 +266,12 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM contributions a
+                        SELECT 1 FROM source_contribution_groups a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
                           AND a.is_corresponding = TRUE
                     )) AS yes_count,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM contributions a
+                        SELECT 1 FROM source_contribution_groups a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
                           AND a.is_corresponding = TRUE
                     )) AS no_count
@@ -402,12 +402,12 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE EXISTS (
-                        SELECT 1 FROM contributions a
+                        SELECT 1 FROM source_contribution_groups a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
                           AND a.in_perimeter = TRUE
                     )) AS yes,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
-                        SELECT 1 FROM contributions a
+                        SELECT 1 FROM source_contribution_groups a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
                           AND a.in_perimeter = TRUE
                     )) AS no

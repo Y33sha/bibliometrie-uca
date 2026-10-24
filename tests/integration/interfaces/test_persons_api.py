@@ -141,10 +141,8 @@ class TestPersonList:
         assert r.status_code == 200
 
     def test_public_directory_call(self, client):
-        """L'appel de l'annuaire public : personnes retenues, tri sur les contributions sources d'auteur."""
-        r = client.get(
-            "/api/persons", params={"exclusion": "none", "sort": "source_contributions_desc"}
-        )
+        """L'appel de l'annuaire public : personnes retenues, tri sur les contributions d'auteur."""
+        r = client.get("/api/persons", params={"exclusion": "none", "sort": "contributions_desc"})
         assert r.status_code == 200
         assert all(p["exclusion"] is None for p in r.json()["persons"])
 

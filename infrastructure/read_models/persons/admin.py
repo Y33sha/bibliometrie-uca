@@ -231,16 +231,18 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
         text(f"""
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh,
-                   (SELECT count(*) FROM contributions a
-                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS source_contribution_count,
+                   (SELECT count(*) FROM source_contribution_groups a
+                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS contribution_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
                        WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
                            SELECT scs.structure_id FROM source_contribution_structures scs
-                           JOIN source_contributions sc ON sc.id = scs.source_contribution_id
-                           WHERE sc.person_id = p.id
+                           JOIN source_contribution_group_members m
+                             ON m.source_contribution_id = scs.source_contribution_id
+                           JOIN source_contribution_groups g ON g.id = m.group_id
+                           WHERE g.person_id = p.id
                        )
                    ), ARRAY[]::text[]) AS labs
             FROM persons p WHERE p.id = ANY(:ids)
@@ -253,7 +255,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
             first_name=r.first_name,
             last_name=r.last_name,
             has_rh=r.has_rh,
-            source_contribution_count=r.source_contribution_count,
+            contribution_count=r.contribution_count,
             labs=list(r.labs or []),
         )
         for r in rows
@@ -374,28 +376,28 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain `contributions`. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
-        FROM contributions a1
-        JOIN contributions a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
+        FROM source_contribution_groups a1
+        JOIN source_contribution_groups a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
         WHERE a1.person_id = ANY(:ids) AND a2.person_id IS NOT NULL
     """,
     "shared_publications": """
         SELECT a.person_id AS person, a.publication_id AS val
-        FROM contributions a WHERE a.person_id = ANY(:ids)
+        FROM source_contribution_groups a WHERE a.person_id = ANY(:ids)
     """,
     "labs": f"""
         SELECT a.person_id AS person, aus.structure_id AS val
-        FROM contributions a
-        JOIN contribution_structures aus ON aus.contribution_id = a.id
+        FROM source_contribution_groups a
+        JOIN group_structures aus ON aus.group_id = a.id
         JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
     "journals": """
         SELECT a.person_id AS person, p.journal_id AS val
-        FROM contributions a
+        FROM source_contribution_groups a
         JOIN publications p ON p.id = a.publication_id
         WHERE a.person_id = ANY(:ids) AND p.journal_id IS NOT NULL
     """,

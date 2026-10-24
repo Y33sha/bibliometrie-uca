@@ -40,20 +40,22 @@ _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Contributions sources HAL rattachées à une personne, avec la référence d'un compte HAL.
+# Contributions sources HAL membres d'un groupe rattaché à une personne `g.person_id`, avec la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
-    FROM source_contributions sc
+    FROM source_contribution_groups g
+    JOIN source_contribution_group_members m ON m.group_id = g.id
+    JOIN source_contributions sc ON sc.id = m.source_contribution_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sc.source = 'hal'
-      AND sc.person_id IS NOT NULL
+      AND g.person_id IS NOT NULL
       AND {_HAL_PERSON_ID} IS NOT NULL
 """
 
 # Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
-    SELECT sc.person_id
+    SELECT g.person_id
     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-    GROUP BY sc.person_id
+    GROUP BY g.person_id
     HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
 """
 
@@ -132,7 +134,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text(f"""
                 WITH hal_accounts AS (
                     SELECT
-                        sc.person_id,
+                        g.person_id,
                         ({_HAL_PERSON_ID})::int AS hal_person_id,
                         MIN({contributor_display_name()}) AS full_name,
                         MIN({_ORCID}) AS orcid,
@@ -140,7 +142,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         MIN({_IDREF}) AS idref,
                         COUNT(*) AS publication_count
                     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-                    GROUP BY sc.person_id, {_HAL_PERSON_ID}
+                    GROUP BY g.person_id, {_HAL_PERSON_ID}
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,
@@ -333,9 +335,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         base_where = """
             FROM publications p
-            JOIN contributions a ON a.publication_id = p.id
-            WHERE EXISTS (SELECT 1 FROM contribution_structures aus
-                          WHERE aus.contribution_id = a.id
+            JOIN source_contribution_groups a ON a.publication_id = p.id
+            WHERE EXISTS (SELECT 1 FROM group_structures aus
+                          WHERE aus.group_id = a.id
                             AND aus.structure_id = ANY(:lab_arr))
               AND EXISTS (SELECT 1 FROM source_records sr
                           WHERE sr.publication_id = p.id AND sr.source = 'hal')
@@ -445,8 +447,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        (SELECT json_agg(json_build_object('acronym', l.acronym, 'name', l.name)
                                         ORDER BY COALESCE(l.acronym, l.name))
                         FROM (SELECT DISTINCT s.acronym, s.name
-                              FROM contributions a2
-                              JOIN contribution_structures aus2 ON aus2.contribution_id = a2.id
+                              FROM source_contribution_groups a2
+                              JOIN group_structures aus2 ON aus2.group_id = a2.id
                               JOIN structures s ON s.id = aus2.structure_id
                               WHERE a2.publication_id = p.id
                                 AND a2.in_perimeter = TRUE

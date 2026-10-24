@@ -280,6 +280,29 @@ class TestEntreeDansLePerimetre:
         ).scalar_one()
         assert group in queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
 
+    def test_recalcul_cible_recompose_le_groupe(self, sa_sync_conn):
+        """Le recalcul après une correction d'adresse recompose tout de suite les indices du groupe de la contribution source."""
+        from sqlalchemy import text
+
+        from pipeline.transformation.structures.perimeter_evidence import (
+            SourceContributionPerimeterRecompute,
+        )
+
+        _setup_affiliations_test_data(sa_sync_conn)
+        group_ungrouped(sa_sync_conn)
+
+        SourceContributionPerimeterRecompute().recompute_perimeter(
+            sa_sync_conn, [80002], [80000, 80001]
+        )
+
+        assert sa_sync_conn.execute(
+            text(
+                "SELECT g.in_perimeter FROM source_contribution_groups g"
+                " JOIN source_contribution_group_members m ON m.group_id = g.id"
+                " WHERE m.source_contribution_id = 80002"
+            )
+        ).scalar_one()
+
     def test_recalcul_cible_marque_l_enregistrement_sans_publication(self, sa_sync_conn):
         from pipeline.transformation.structures.perimeter_evidence import (
             SourceContributionPerimeterRecompute,

@@ -1,6 +1,6 @@
 """Router des contributions sources : exclusion d'une contribution, et revue des contributions sources orphelines. Sert `/api/contributions/*`.
 
-L'exclusion rejette une contribution au niveau consolidé, et son `contribution_id` désigne une ligne d'`contributions`. Les orphelines vivent un cran en dessous : ce sont les lignes de `source_contributions` du périmètre qu'aucune personne ne porte (`person_id` nul), que le router liste et attribue sous `/orphans`, par leur `source_contribution_id`.
+L'exclusion rejette une contribution au niveau consolidé. Son `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne. Les orphelines vivent un cran en dessous : ce sont les lignes de `source_contributions` du périmètre qu'aucune personne ne porte (`person_id` nul), que le router liste et attribue sous `/orphans`, par leur `source_contribution_id`.
 
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{contribution_id}` s'y ferait absorber.
 """
@@ -154,7 +154,7 @@ def exclude_contribution(
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
-    Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+    `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     contribution_commands.exclude_contribution(
         conn, contribution_id, repo=repo, person_repo=persons, audit_repo=audit

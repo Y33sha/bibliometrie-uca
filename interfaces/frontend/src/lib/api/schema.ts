@@ -1551,7 +1551,7 @@ export interface paths {
          * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -3016,8 +3016,8 @@ export interface components {
             last_name: string;
             /** Has Rh */
             has_rh: boolean;
-            /** Source Contribution Count */
-            source_contribution_count: number;
+            /** Contribution Count */
+            contribution_count: number;
             /** Labs */
             labs: string[];
         };
@@ -4263,10 +4263,10 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
-            /** Source Contribution Count */
-            source_contribution_count: number;
-            /** In Perimeter Source Contribution Count */
-            in_perimeter_source_contribution_count: number;
+            /** Contribution Count */
+            contribution_count: number;
+            /** In Perimeter Contribution Count */
+            in_perimeter_contribution_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
@@ -7261,7 +7261,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "source_contributions_asc" | "source_contributions_desc" | "in_perimeter_source_contributions_asc" | "in_perimeter_source_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
                 search?: string;
                 department?: string;
                 role?: string;

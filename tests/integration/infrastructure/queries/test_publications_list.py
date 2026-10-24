@@ -11,10 +11,11 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv,
     list_publications,
 )
-from tests.integration.helpers.contributions import insert_contribution
+from tests.integration.helpers.contributions import group_id_of, insert_contribution
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
@@ -302,6 +303,102 @@ class TestExcludedPersonLab:
 
         assert not listed(lab_excluded)
         assert listed(lab_kept)
+
+
+class TestPersonView:
+    """Page personne : les contributions sont les groupes de contributions sources rattachés à une personne."""
+
+    def _seed(self, conn):
+        person, coauthor = (
+            insert_person(conn, name, first_name="Y", normalizer="lower")
+            for name in ("Focus", "Coauteur")
+        )
+        lab, coauthor_lab = (insert_structure(conn, code) for code in ("LAB-P", "LAB-C"))
+        publication = insert_publication(conn, "Copublication")
+        for author, author_lab in ((person, lab), (coauthor, coauthor_lab)):
+            contribution = insert_contribution(
+                conn, publication, person_id=author, in_perimeter=True, roles=["author"]
+            )
+            add_contribution_structure(conn, contribution, author_lab)
+        # Attributs propres au groupe de la personne : la table `contributions` diverge.
+        conn.execute(
+            text(
+                "UPDATE source_contribution_groups SET is_corresponding = TRUE"
+                " WHERE publication_id = :p AND person_id = :person"
+            ),
+            {"p": publication, "person": person},
+        )
+        conn.execute(
+            text(
+                "UPDATE contributions SET is_corresponding = FALSE, perimeter_evidence = '{}'"
+                " WHERE publication_id = :p AND person_id = :person"
+            ),
+            {"p": publication, "person": person},
+        )
+        return person, lab, publication
+
+    def _list(self, conn, **filters):
+        return list_publications(
+            conn,
+            filters=PublicationFilters(**filters),
+            perimeter_structure_ids=[],
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        ).publications
+
+    def test_item_reads_the_group_of_the_person(self, sa_sync_conn):
+        person, lab, publication = self._seed(sa_sync_conn)
+
+        [item] = self._list(sa_sync_conn, person_id=person)
+
+        assert item.contribution_id == group_id_of(sa_sync_conn, publication, person)
+        assert item.is_corresponding is True
+        assert [i.id for i in item.lab_items or []] == [lab]
+
+    def test_corresponding_and_perimeter_filters_read_the_group(self, sa_sync_conn):
+        person, _, publication = self._seed(sa_sync_conn)
+
+        assert [
+            p.id for p in self._list(sa_sync_conn, person_id=person, is_corresponding=["yes"])
+        ] == [publication]
+        assert self._list(sa_sync_conn, person_id=person, is_corresponding=["no"]) == []
+        assert [p.id for p in self._list(sa_sync_conn, person_id=person, in_perimeter=["yes"])] == [
+            publication
+        ]
+
+        builder = _PublicationFacetsBuilder(sa_sync_conn, PublicationFilters(person_id=person), [])
+        assert {(o.value, o.count) for o in builder._facet_corresponding()} == {
+            ("yes", 1),
+            ("no", 0),
+        }
+        assert {(o.value, o.count) for o in builder._facet_in_perimeter()} == {
+            ("yes", 1),
+            ("no", 0),
+        }
+
+    def test_thesis_author_is_a_group_with_person(self, sa_sync_conn):
+        """Un groupe d'auteur sans personne n'est pas l'auteur de la thèse."""
+        author = insert_person(sa_sync_conn, "Doctorant", first_name="Y", normalizer="lower")
+        lab = _lab(sa_sync_conn)
+        thesis = insert_publication(sa_sync_conn, "These", doc_type="thesis")
+        source_record = _source_record(sa_sync_conn, thesis, source="theses", source_id="2024X")
+        orphan = insert_source_contribution(sa_sync_conn, source_record, roles=["author"])
+        insert_group(sa_sync_conn, thesis, [(orphan, source_record)])
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_contribution_groups SET roles = ARRAY['author'] WHERE publication_id = :p"
+            ),
+            {"p": thesis},
+        )
+        contribution = insert_contribution(
+            sa_sync_conn, thesis, person_id=author, in_perimeter=True, roles=["author"]
+        )
+        add_contribution_structure(sa_sync_conn, contribution, lab)
+
+        [item] = self._list(sa_sync_conn, lab_ids=[lab])
+
+        assert item.thesis_author_person_id == author
 
 
 class TestExportsRunTheirQueryBeforeStreaming:

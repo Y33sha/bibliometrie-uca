@@ -50,9 +50,11 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     theses_count_row = conn.execute(
         text(f"""
             SELECT COUNT(*) AS n
-            FROM source_contributions sc
+            FROM source_contribution_group_members m
+            JOIN source_contribution_groups g ON g.id = m.group_id
+            JOIN source_contributions sc ON sc.id = m.source_contribution_id
             JOIN source_records sr ON sr.id = sc.source_record_id
-            WHERE sc.person_id = :pid
+            WHERE g.person_id = :pid
               AND sc.source = '{Source.THESES.value}'
               AND NOT ({has_author_role("sc")})
               AND sr.publication_id IS NOT NULL
@@ -95,7 +97,7 @@ _THESIS_ROLE_LABELS = {
 def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     """Thèses et HDR liées à cette personne avec un rôle non-auteur (direction, jury, rapport), soutenues dans l'établissement ou ailleurs.
 
-    Les rôles proviennent de la table `contributions` canonique.
+    Les rôles sont ceux de la contribution de la personne.
     """
     rows = conn.execute(
         text(f"""
@@ -104,18 +106,18 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
                    author.author_name,
                    author.author_person_id,
                    (SELECT ARRAY_AGG(DISTINCT aus.structure_id)
-                    FROM contributions a2
-                    JOIN contribution_structures aus ON aus.contribution_id = a2.id
+                    FROM source_contribution_groups a2
+                    JOIN group_structures aus ON aus.group_id = a2.id
                     JOIN structures st ON st.id = aus.structure_id
                     WHERE a2.publication_id = p.id AND a2.in_perimeter
                       AND st.structure_type = '{StructureType.LABO.value}'
                    ) AS structure_ids
-            FROM contributions a
+            FROM source_contribution_groups a
             JOIN publications p ON p.id = a.publication_id
             LEFT JOIN LATERAL (
                 SELECT a2.person_id AS author_person_id,
                        pe2.first_name || ' ' || pe2.last_name AS author_name
-                FROM contributions a2
+                FROM source_contribution_groups a2
                 JOIN persons pe2 ON pe2.id = a2.person_id
                 WHERE a2.publication_id = p.id
                   AND {has_author_role("a2")}
@@ -177,12 +179,14 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
 def person_addresses(
     conn: Connection, person_id: int, *, page: int, per_page: int
 ) -> PersonAddressesResponse:
-    """Adresses distinctes utilisées dans les contributions sources de cette personne."""
+    """Adresses distinctes des contributions sources membres des groupes de cette personne."""
     base_where = """a.id IN (
             SELECT DISTINCT sca.address_id
             FROM source_contribution_addresses sca
-            JOIN source_contributions sc ON sc.id = sca.source_contribution_id
-            WHERE sc.person_id = :pid
+            JOIN source_contribution_group_members m
+              ON m.source_contribution_id = sca.source_contribution_id
+            JOIN source_contribution_groups g ON g.id = m.group_id
+            WHERE g.person_id = :pid
         )"""
     count_row = conn.execute(
         text(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}"),
@@ -233,7 +237,7 @@ def person_subjects(conn: Connection, person_id: int, *, limit: int) -> list[Sub
     rows = conn.execute(
         text(
             entity_subjects_sql(
-                "EXISTS (SELECT 1 FROM contributions a "
+                "EXISTS (SELECT 1 FROM source_contribution_groups a "
                 "WHERE a.publication_id = p.id AND a.person_id = :pid "
                 f"AND {has_author_role('a')})"
             )
@@ -251,7 +255,7 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
         text(f"""
             SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
             FROM publications p
-            JOIN contributions a ON a.publication_id = p.id
+            JOIN source_contribution_groups a ON a.publication_id = p.id
             WHERE a.person_id = :pid
               AND {has_author_role("a")}
               AND p.publication_year IS NOT NULL
@@ -270,7 +274,7 @@ def person_dashboard(conn: Connection, person_id: int) -> PersonDashboardRespons
             SELECT
                 {OA_DASHBOARD_COLS_SQL}
             FROM publications p
-            JOIN contributions a ON a.publication_id = p.id
+            JOIN source_contribution_groups a ON a.publication_id = p.id
             WHERE a.person_id = :pid
               AND {has_author_role("a")}
         """),

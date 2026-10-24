@@ -23,6 +23,7 @@ from tests.integration.helpers.persons import (
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 
 # Forme de nom de source HAL.
 _hal_name_form = partial(insert_person_name_form, sources=["hal"])
@@ -221,6 +222,21 @@ class TestNameDuplicates:
         assert name_duplicates_count(sa_sync_conn) >= 1
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
         assert pair.overlaps.coauthors == 1
+
+    def test_shared_lab_counts_and_lists_the_lab(self, sa_sync_conn):
+        """Un laboratoire atteint par les membres des groupes des deux personnes compte comme recouvrement et figure dans leur fiche allégée."""
+        lab = insert_structure(sa_sync_conn, "LAB-DUP", acronym="LABDUP")
+        a = insert_person(sa_sync_conn, "Lacombe", first_name="R")
+        b = insert_person(sa_sync_conn, "Lacombe", first_name="Rémi")
+        for person in (a, b):
+            contribution = _author(sa_sync_conn, insert_publication(sa_sync_conn), person_id=person)
+            add_contribution_structure(sa_sync_conn, contribution, lab)
+
+        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        assert pair.overlaps.labs == 1
+        for curated in (pair.person_a, pair.person_b):
+            assert curated.labs == ["LABDUP"]
+            assert curated.contribution_count == 1
 
     def test_disjoint_pair_has_no_overlap(self, sa_sync_conn):
         a = insert_person(sa_sync_conn, "Bernard", first_name="M")

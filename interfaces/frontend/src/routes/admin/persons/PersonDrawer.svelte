@@ -174,8 +174,8 @@
   {/snippet}
 
     <div class="drawer-meta">
-      <span>{person.source_contribution_count ?? 0} publications</span>
-      <span>{person.in_perimeter_source_contribution_count ?? 0} dans le périmètre</span>
+      <span>{person.contribution_count ?? 0} publications</span>
+      <span>{person.in_perimeter_contribution_count ?? 0} dans le périmètre</span>
       {#if person.exclusion}<span class="tag tag-excluded">{personExclusionLabels[person.exclusion]}</span>{/if}
     </div>
 

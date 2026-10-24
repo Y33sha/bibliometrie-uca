@@ -22,7 +22,7 @@ from infrastructure.sql_fragments import (
 def detach_rejected_source_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
-    """Détache les contributions sources de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de contributions sources détachées.
+    """Détache les contributions sources et les groupes de la personne sur les publications où elle est rejetée, et retire leurs épinglages. Avec `publication_id`, sur cette publication seulement. Retourne le nombre de contributions sources détachées.
 
     Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
     """
@@ -36,6 +36,16 @@ def detach_rejected_source_contributions(
               AND sc.source_record_id = sr.id
               AND r.publication_id = sr.publication_id
               AND r.person_id = :pid AND ca.person_id = :pid {scope}
+        """),
+        params,
+    )
+    conn.execute(
+        text(f"""
+            UPDATE source_contribution_groups g
+            SET person_id = NULL, resolution_mode = NULL
+            FROM ({REJECTED_PAIRS}) r
+            WHERE r.publication_id = g.publication_id
+              AND r.person_id = :pid AND g.person_id = :pid {scope}
         """),
         params,
     )
@@ -77,10 +87,33 @@ class PgContributionRepository(ContributionRepository):
     # ── Recomposition d'une contribution depuis ses contributions sources ───────
 
     def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
-        """Les structures dérivées vivent dans la matview `contribution_structures`, rafraîchie par le pipeline."""
+        """Les structures dérivées vivent dans les vues matérialisées, rafraîchies par le pipeline."""
         if not publication_ids:
             return
         params = {"person_id": person_id, "publication_ids": publication_ids}
+        # Dans une publication, un groupe par personne au plus : le premier groupe sans personne.
+        self._conn.execute(
+            text("""
+                WITH target AS (
+                    SELECT DISTINCT ON (g.publication_id) g.id
+                    FROM source_contribution_groups g
+                    JOIN source_contribution_group_members m ON m.group_id = g.id
+                    JOIN source_contributions sc ON sc.id = m.source_contribution_id
+                    WHERE g.person_id IS NULL AND sc.person_id = :person_id
+                      AND g.publication_id = ANY(:publication_ids)
+                      AND NOT EXISTS (
+                          SELECT 1 FROM source_contribution_groups o
+                          WHERE o.publication_id = g.publication_id AND o.person_id = :person_id
+                      )
+                    ORDER BY g.publication_id, g.id
+                )
+                UPDATE source_contribution_groups g
+                SET person_id = :person_id, resolution_mode = 'manual'
+                FROM target t
+                WHERE g.id = t.id
+            """),
+            params,
+        )
         self._conn.execute(
             text(insert_missing_contributions_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
         )
@@ -188,7 +221,10 @@ class PgContributionRepository(ContributionRepository):
 
     def get_contribution_person(self, contribution_id: int) -> ContributionPersonRow | None:
         result = self._conn.execute(
-            text("SELECT id, person_id, publication_id FROM contributions WHERE id = :id"),
+            text(
+                "SELECT id, person_id, publication_id FROM source_contribution_groups"
+                " WHERE id = :id AND person_id IS NOT NULL"
+            ),
             {"id": contribution_id},
         )
         row = result.first()

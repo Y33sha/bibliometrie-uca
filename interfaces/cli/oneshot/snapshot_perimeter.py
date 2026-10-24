@@ -56,8 +56,8 @@ _SOURCE_CONTRIBUTION_STRUCTURES = text("""
 
 _CONTRIBUTIONS = text("""
     SELECT publication_id, person_id, perimeter_evidence::text[] AS evidence
-    FROM contributions
-    WHERE in_perimeter
+    FROM source_contribution_groups
+    WHERE in_perimeter AND person_id IS NOT NULL
 """)
 
 _PUBLICATIONS = text("""

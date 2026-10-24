@@ -212,7 +212,7 @@ def list_publications(
                 {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT pe.first_name || ' ' || pe.last_name
-                     FROM contributions ath
+                     FROM source_contribution_groups ath
                      JOIN persons pe ON pe.id = ath.person_id
                      WHERE ath.publication_id = p.id
                        AND {has_author_role("ath")}
@@ -220,22 +220,23 @@ def list_publications(
                  END) AS thesis_author_name,
                 (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
                     (SELECT ath.person_id
-                     FROM contributions ath
+                     FROM source_contribution_groups ath
                      WHERE ath.publication_id = p.id
+                       AND ath.person_id IS NOT NULL
                        AND {has_author_role("ath")}
                      LIMIT 1)
                  END) AS thesis_author_person_id,
-                (SELECT a.is_corresponding FROM contributions a
+                (SELECT a.is_corresponding FROM source_contribution_groups a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS is_corresponding,
-                (SELECT a.id FROM contributions a
+                (SELECT a.id FROM source_contribution_groups a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS contribution_id,
                 (SELECT json_agg(sub ORDER BY sub.label)
                  FROM (
                     SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
-                    FROM contributions a4
-                    JOIN contribution_structures aus4 ON aus4.contribution_id = a4.id
+                    FROM source_contribution_groups a4
+                    JOIN group_structures aus4 ON aus4.group_id = a4.id
                     JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                     WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
                       AND {has_author_role("a4")}
@@ -468,13 +469,13 @@ def export_publications_csv(
                 src_ids.wos_id, src_ids.theses_id,
                 (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
                  WHERE ap.publication_id = p.id) AS apc_total,
-                (SELECT a.is_corresponding FROM contributions a
+                (SELECT a.is_corresponding FROM source_contribution_groups a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                  LIMIT 1) AS is_corresponding,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
-                 FROM contributions a3
-                 JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
+                 FROM source_contribution_groups a3
+                 JOIN group_structures aus3 ON aus3.group_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                       AND {has_author_role("a3")}
@@ -610,8 +611,8 @@ def export_theses_csv(
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
-                 FROM contributions a3
-                 JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
+                 FROM source_contribution_groups a3
+                 JOIN group_structures aus3 ON aus3.group_id = a3.id
                  JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
                       AND {has_author_role("a3")}

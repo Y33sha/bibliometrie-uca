@@ -272,7 +272,7 @@ class OpenScienceReport:
             f"""
             SELECT j.apc_amount, j.apc_currency,
                    EXISTS (
-                       SELECT 1 FROM contributions a
+                       SELECT 1 FROM source_contribution_groups a
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
@@ -429,13 +429,15 @@ class OpenScienceReport:
         return self._one(f"""
             WITH lab_authors AS (
                 SELECT DISTINCT a.person_id
-                FROM publications p JOIN contributions a ON a.publication_id = p.id
+                FROM publications p JOIN source_contribution_groups a ON a.publication_id = p.id
                 WHERE p.publication_year = :year AND a.person_id IS NOT NULL AND {AUTHOR_SOURCE_CONTRIBUTION}
             ),
             hal_accounts AS (
                 SELECT la.person_id, bool_or(k.identifiers ? 'orcid') AS has_orcid
                 FROM lab_authors la
-                JOIN source_contributions sc ON sc.person_id = la.person_id AND sc.source = 'hal'
+                JOIN source_contribution_groups g ON g.person_id = la.person_id
+                JOIN source_contribution_group_members m ON m.group_id = g.id
+                JOIN source_contributions sc ON sc.id = m.source_contribution_id AND sc.source = 'hal'
                 JOIN contributor_information k ON k.id = sc.contributor_information_id
                 WHERE k.identifiers ? 'hal_person_id'
                 GROUP BY la.person_id
@@ -570,7 +572,7 @@ class OpenScienceReport:
             SELECT COUNT(*) AS total,
                    COUNT(*) FILTER (WHERE {INTERNATIONAL}) AS international,
                    COUNT(*) FILTER (WHERE EXISTS (
-                       SELECT 1 FROM contributions a
+                       SELECT 1 FROM source_contribution_groups a
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    )) AS corresponding
             FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year

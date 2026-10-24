@@ -32,9 +32,11 @@ from pipeline.transformation.structures.perimeter_evidence import (
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import (
+    group_id_of,
     insert_confirmed_source_contribution,
     insert_contribution,
 )
+from tests.integration.helpers.groups import add_group_member, insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -88,7 +90,7 @@ class TestExcludeContribution:
             sa_sync_conn, source_record_id, person_id=person_id
         )
 
-        exclude_contribution(contribution_id, repo=repo)
+        exclude_contribution(group_id_of(sa_sync_conn, publication_id, person_id), repo=repo)
 
         # Row contributions supprimée
         assert (
@@ -120,10 +122,10 @@ class TestExcludeContribution:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
 
-        exclude_contribution(contribution_id, repo=repo)
+        exclude_contribution(group_id_of(sa_sync_conn, publication_id, person_id), repo=repo)
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
         insert_missing_contributions(sa_sync_conn)
 
@@ -139,6 +141,18 @@ class TestExcludeContribution:
         with pytest.raises(NotFoundError):
             exclude_contribution(999999, repo=repo)
 
+    def test_raises_not_found_for_group_without_person(self, sa_sync_conn, repo):
+        """Un groupe sans personne n'est pas une contribution."""
+        publication_id = _publication(sa_sync_conn)
+        source_record_id = _source_record(sa_sync_conn, publication_id)
+        source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
+        group_id = insert_group(
+            sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
+        )
+
+        with pytest.raises(NotFoundError):
+            exclude_contribution(group_id, repo=repo)
+
     def test_does_not_touch_other_contributions(self, sa_sync_conn, repo):
         """Rejeter une contribution ne touche ni les autres paires ni leurs sources."""
         publication_id = _publication(sa_sync_conn)
@@ -146,14 +160,14 @@ class TestExcludeContribution:
 
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
-        a1 = insert_contribution(sa_sync_conn, publication_id, person_id=p1)
+        insert_contribution(sa_sync_conn, publication_id, person_id=p1)
         a2 = insert_contribution(sa_sync_conn, publication_id, person_id=p2)
         insert_source_contribution(sa_sync_conn, source_record_id, person_id=p1)
         sa2 = insert_source_contribution(
             sa_sync_conn, source_record_id, author_position=1, person_id=p2
         )
 
-        exclude_contribution(a1, repo=repo)
+        exclude_contribution(group_id_of(sa_sync_conn, publication_id, p1), repo=repo)
 
         # a2 toujours là
         assert (
@@ -527,6 +541,12 @@ class TestPropagateUcaForAddresses:
         source_contribution_id = insert_source_contribution(
             sa_sync_conn, source_record_id, person_id=person_id
         )
+        add_group_member(
+            sa_sync_conn,
+            group_id_of(sa_sync_conn, publication_id, person_id),
+            source_contribution_id,
+            source_record_id,
+        )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=True)
         insert_source_contribution_address(sa_sync_conn, source_contribution_id, address_id=addr_id)
@@ -698,3 +718,62 @@ class TestRejectionAnchoredOnSourceRecords:
         insert_missing_contributions(sa_sync_conn)
 
         assert not self._has_contribution(sa_sync_conn, publication_id, person_id)
+
+
+# ── Groupes des décisions humaines ──────────────────────────────
+
+
+def _group_person(conn, group_id):
+    return conn.execute(
+        text(
+            "SELECT person_id, resolution_mode::text AS mode FROM source_contribution_groups WHERE id = :g"
+        ),
+        {"g": group_id},
+    ).one()
+
+
+class TestHumanDecisionsOnGroups:
+    """Les décisions humaines écrivent aussi le groupe, que les lecteurs affichent sans attendre le run suivant."""
+
+    def test_le_rejet_detache_le_groupe(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        publication_id = _publication(sa_sync_conn)
+        source_record_id = _source_record(sa_sync_conn, publication_id)
+        insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
+        insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        group_id = group_id_of(sa_sync_conn, publication_id, person_id)
+
+        reject_pair(publication_id, person_id, repo=repo)
+
+        assert _group_person(sa_sync_conn, group_id) == (None, None)
+
+    def test_la_consolidation_rattache_le_groupe_sans_personne(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        publication_id = _publication(sa_sync_conn)
+        source_record_id = _source_record(sa_sync_conn, publication_id)
+        source_contribution_id = insert_source_contribution(
+            sa_sync_conn, source_record_id, person_id=person_id
+        )
+        group_id = insert_group(
+            sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
+        )
+
+        repo.consolidate_contributions(person_id, [publication_id])
+
+        assert _group_person(sa_sync_conn, group_id) == (person_id, "manual")
+
+    def test_la_consolidation_garde_le_groupe_existant_de_la_personne(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        publication_id = _publication(sa_sync_conn)
+        insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        source_record_id = _source_record(sa_sync_conn, publication_id)
+        source_contribution_id = insert_source_contribution(
+            sa_sync_conn, source_record_id, person_id=person_id
+        )
+        other_group = insert_group(
+            sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
+        )
+
+        repo.consolidate_contributions(person_id, [publication_id])
+
+        assert _group_person(sa_sync_conn, other_group) == (None, None)

@@ -1026,7 +1026,13 @@ TASKS: tuple[Task, ...] = (
     _task(
         "contributions.publications_in_perimeter",
         "contributions",
-        reads=("contributions", "persons.exclusion", "publications.id"),
+        reads=(
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.perimeter_evidence",
+            "source_contribution_groups.roles",
+            "persons.exclusion",
+            "publications.id",
+        ),
         writes=("publications.in_perimeter",),
         # Lignes que `contributions.purge_publications` supprime plus loin dans le même run.
         previous_run=("publications.id",),

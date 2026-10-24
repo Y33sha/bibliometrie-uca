@@ -57,11 +57,11 @@ def exclude_contribution(
     person_repo: PersonRepository | None = None,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, JsonValue]:
-    """Rejette une contribution à partir de sa ligne consolidée (`contributions`).
+    """Rejette une contribution à partir de son groupe (`source_contribution_groups`).
 
-    Retrouve la paire (publication, personne) à partir de l'`contribution_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
+    Retrouve la paire (publication, personne) à partir du groupe `contribution_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Lève NotFoundError si la ligne n'existe pas.
+    Lève NotFoundError si le groupe n'existe pas ou n'a pas de personne.
     """
     row = repo.get_contribution_person(contribution_id)
     if not row:
