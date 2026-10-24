@@ -911,7 +911,7 @@ TASKS: tuple[Task, ...] = (
             "person_identifiers",
             "person_name_forms",
         ),
-        # Formes de nom peuplées, contributions sources détachées et personnes supprimées par `populate_person_name_forms` et `purge` ; groupes rattachés par `resolve_groups` et vidés par `purge`.
+        # Formes de nom peuplées par `populate_person_name_forms`, personnes supprimées par `purge`, contributions sources détachées par la tâche elle-même ; groupes rattachés par `resolve_groups` et vidés par `purge`.
         previous_run=(
             "person_name_forms",
             "persons",
@@ -962,23 +962,27 @@ TASKS: tuple[Task, ...] = (
         "persons",
         reads=(
             "persons",
-            "source_contributions.person_id",
+            "source_contribution_groups.person_id",
+            "source_contribution_group_members",
+            "source_contributions.source",
             "source_contributions.contributor_information_id",
             "contributor_information",
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Contributions sources détachées et personnes supprimées par `purge`.
-        previous_run=("persons", "person_name_forms", "source_contributions.person_id"),
+        # Groupes vidés et personnes supprimées par `purge`.
+        previous_run=("persons", "person_name_forms", "source_contribution_groups.person_id"),
     ),
     _task(
         "persons.purge",
         "persons",
         reads=(
-            "source_contributions.person_id",
-            "source_contributions.resolution_mode",
+            "source_contribution_groups.publication_id",
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
+            "source_contribution_groups.perimeter_evidence",
+            "source_contribution_group_members",
             "source_contributions.contributor_information_id",
-            "source_contributions.source_record_id",
             "source_contributions.neutralized_identifiers",
             "source_records.publication_id",
             "contributor_information",
@@ -992,8 +996,6 @@ TASKS: tuple[Task, ...] = (
         ),
         # La suppression d'une personne emporte ses formes de nom et vide ses groupes.
         writes=(
-            "source_contributions.person_id",
-            "source_contributions.resolution_mode",
             "source_contribution_groups.person_id",
             "source_contribution_groups.resolution_mode",
             "person_identifiers.id",

@@ -69,6 +69,9 @@ class GroupMatchReason(StrEnum):
     COMPATIBLE_NAME = "compatible_name"
 
 
+# Signaux qui rattachent un groupe à une personne par le nom.
+NAME_MATCH_REASONS = (GroupMatchReason.NAME, GroupMatchReason.COMPATIBLE_NAME)
+
 _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, GroupMatchReason] = {
     PersonIdentifierType.ORCID: GroupMatchReason.ORCID,
     PersonIdentifierType.HAL_PERSON_ID: GroupMatchReason.HAL_PERSON_ID,

@@ -1,10 +1,11 @@
-"""Purge des attributions d'identifiant automatiques qu'aucune contribution source de leur personne ne contient."""
+"""Purge des attributions d'identifiant automatiques qu'aucun membre des groupes de leur personne ne contient."""
 
 from functools import partial
 
 from sqlalchemy import text
 
 from pipeline.transformation.persons.purge import delete_unsupported_identifier_attributions
+from tests.integration.helpers.groups import insert_person_group
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -21,17 +22,16 @@ def _source_contribution(conn, person_id, name, *, neutralized=None):
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
     )
-    insert_source_contribution(
+    source_contribution = insert_source_contribution(
         conn,
         source_record,
         raw_author_name=name,
         author_name_normalized=name,
         identifiers={"orcid": _ORCID},
-        person_id=person_id,
         in_perimeter=True,
-        resolution_mode="name",
         neutralized_identifiers=neutralized,
     )
+    insert_person_group(conn, source_contribution, person_id=person_id)
 
 
 def _attribution_remaining(conn, person_id):
@@ -41,14 +41,14 @@ def _attribution_remaining(conn, person_id):
     ).scalar_one()
 
 
-def test_attribution_automatique_sans_contribution_source_supprimee(sa_sync_conn):
+def test_attribution_automatique_sans_membre_de_groupe_supprimee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
     assert delete_unsupported_identifier_attributions(sa_sync_conn) >= 1
     assert not _attribution_remaining(sa_sync_conn, person)
 
 
-def test_contribution_source_qui_neutralise_l_identifiant_ne_le_porte_pas(sa_sync_conn):
+def test_membre_qui_neutralise_l_identifiant_ne_le_porte_pas(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
     _source_contribution(sa_sync_conn, person, "monteil jean", neutralized={"orcid": "misplaced"})
@@ -56,7 +56,7 @@ def test_contribution_source_qui_neutralise_l_identifiant_ne_le_porte_pas(sa_syn
     assert not _attribution_remaining(sa_sync_conn, person)
 
 
-def test_attribution_portee_par_une_contribution_source_conservee(sa_sync_conn):
+def test_attribution_portee_par_un_membre_de_groupe_conservee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Monteil", first_name="Jean")
     _attribution(sa_sync_conn, person)
     _source_contribution(sa_sync_conn, person, "monteil jean")
@@ -76,3 +76,22 @@ def test_attribution_manuelle_conservee(sa_sync_conn):
     _attribution(sa_sync_conn, person, source="manual")
     delete_unsupported_identifier_attributions(sa_sync_conn)
     assert _attribution_remaining(sa_sync_conn, person)
+
+
+def test_contribution_source_hors_groupe_ne_porte_pas_l_attribution(sa_sync_conn):
+    """Une contribution source rattachée à la personne, hors de ses groupes, ne compte pas."""
+    conn = sa_sync_conn
+    person = insert_person(conn, "Monteil", first_name="Jean")
+    _attribution(conn, person)
+    source_record = insert_source_record(conn, insert_publication(conn, "t"), source_id="hal-x")
+    insert_source_contribution(
+        conn,
+        source_record,
+        raw_author_name="monteil jean",
+        author_name_normalized="monteil jean",
+        identifiers={"orcid": _ORCID},
+        person_id=person,
+        resolution_mode="name",
+    )
+    delete_unsupported_identifier_attributions(conn)
+    assert not _attribution_remaining(conn, person)

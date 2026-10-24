@@ -5,6 +5,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.sql_fragments import propagate_group_attributes_sql
 from tests.integration.helpers.queues import mark
+from tests.integration.helpers.rows import perimeter_evidence
 
 _MARK_UNGROUPED = enqueue_sql(
     Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES, "SELECT group_id FROM ungrouped"
@@ -110,3 +111,50 @@ def set_perimeter_author_group(
         """),
         {"g": group_id, "person": person_id, "mode": mode},
     )
+
+
+def insert_person_group(
+    conn: Connection,
+    source_contribution_id: int,
+    *,
+    person_id: int,
+    mode: str = "name",
+    in_perimeter: bool = True,
+) -> int:
+    """Place la contribution source `source_contribution_id` seule dans un groupe, et rattache ce groupe à la personne `person_id` par le mode de résolution `mode`. `in_perimeter` pose l'indice `address`. Renvoie l'`id` du groupe."""
+    row = conn.execute(
+        text("""
+            SELECT sc.source_record_id, sr.publication_id
+            FROM source_contributions sc JOIN source_records sr ON sr.id = sc.source_record_id
+            WHERE sc.id = :s
+        """),
+        {"s": source_contribution_id},
+    ).one()
+    group_id = insert_group(
+        conn, row.publication_id, [(source_contribution_id, row.source_record_id)]
+    )
+    conn.execute(
+        text("""
+            UPDATE source_contribution_groups
+            SET person_id = :person,
+                resolution_mode = CAST(:mode AS group_resolution_mode),
+                perimeter_evidence = CAST(:evidence AS perimeter_evidence[])
+            WHERE id = :g
+        """),
+        {
+            "g": group_id,
+            "person": person_id,
+            "mode": mode,
+            "evidence": perimeter_evidence(in_perimeter) or [],
+        },
+    )
+    return group_id
+
+
+def group_person(conn: Connection, group_id: int) -> tuple[int | None, str | None]:
+    """Personne et mode de résolution du groupe `group_id`."""
+    row = conn.execute(
+        text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+        {"g": group_id},
+    ).one()
+    return row.person_id, row.resolution_mode

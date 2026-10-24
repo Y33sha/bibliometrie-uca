@@ -9,7 +9,9 @@ from pipeline.transformation.persons.populate_person_name_forms import (
     insert_raw_forms_batch,
     sync_from_raw_forms,
 )
+from tests.integration.helpers.groups import insert_person_group
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
+from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
@@ -22,6 +24,24 @@ def _fetch_pnf_for(conn, person_id):
         {"pid": person_id},
     ).all()
     return [(r.name_form, list(r.sources)) for r in rows]
+
+
+def _source_contribution(conn, name_form, source, *, person_id=None):
+    """Contribution source de forme `name_form` venue de `source`, rattachée à la personne `person_id`."""
+    source_record = insert_source_record(
+        conn, insert_publication(conn, "t"), source=source, source_id=f"{source}-1"
+    )
+    return insert_source_contribution(
+        conn, source_record, source=source, author_name_normalized=name_form, person_id=person_id
+    )
+
+
+def _sync(conn, raw_forms=()):
+    create_temp_raw_forms_table(conn)
+    insert_raw_forms_batch(conn, list(raw_forms))
+    counts = sync_from_raw_forms(conn)
+    drop_temp_raw_forms_table(conn)
+    return counts
 
 
 class TestFetchPersonsNames:
@@ -49,75 +69,53 @@ class TestSyncFromRawForms:
         """Une forme `'persons'` poussée en `_raw_forms` apparaît en base après sync, avec `sources = ['persons']`."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        insert_raw_forms_batch(
-            sa_sync_conn,
-            [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
+        inserted, updated, deleted = _sync(
+            sa_sync_conn, [{"name_form": "dupond j", "person_id": pid, "source": "persons"}]
         )
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
 
         assert _fetch_pnf_for(sa_sync_conn, pid) == [("dupond j", ["persons"])]
         assert inserted == 1 and updated == 0 and deleted == 0
 
-    def test_aggregates_sources_across_contributions_and_persons(self, sa_sync_conn):
-        """Une forme observée à la fois en `_raw_forms` (source 'persons')
-        et en `source_contributions` (source 'hal') aboutit à `sources` mergé."""
+    def test_aggregates_sources_across_group_members_and_persons(self, sa_sync_conn):
+        """Une forme présente en `_raw_forms` (source 'persons') et portée par un membre HAL d'un groupe de la personne réunit les deux sources."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        source_record = insert_source_record(sa_sync_conn, source_id="h-1")
-        insert_source_contribution(
-            sa_sync_conn,
-            source_record,
-            person_id=pid,
-            author_name_normalized="dupond j",
-            source="hal",
+        insert_person_group(
+            sa_sync_conn, _source_contribution(sa_sync_conn, "dupond j", "hal"), person_id=pid
         )
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        insert_raw_forms_batch(
-            sa_sync_conn,
-            [{"name_form": "dupond j", "person_id": pid, "source": "persons"}],
-        )
-        sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        _sync(sa_sync_conn, [{"name_form": "dupond j", "person_id": pid, "source": "persons"}])
 
-        rows = _fetch_pnf_for(sa_sync_conn, pid)
-        assert ("dupond j", ["hal", "persons"]) in rows
+        assert ("dupond j", ["hal", "persons"]) in _fetch_pnf_for(sa_sync_conn, pid)
+
+    def test_ignores_source_contributions_outside_the_person_groups(self, sa_sync_conn):
+        """Une contribution source rattachée à la personne, hors de ses groupes, ne lui donne pas sa forme."""
+        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        _source_contribution(sa_sync_conn, "dupond j", "hal", person_id=pid)
+
+        _sync(sa_sync_conn)
+
+        assert _fetch_pnf_for(sa_sync_conn, pid) == []
 
     def test_deletes_missing_form(self, sa_sync_conn):
-        """Une row en base qui n'est plus attendue (ni dans `_raw_forms`
-        ni dans `source_contributions`) est supprimée."""
+        """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni portée par un membre des groupes de la personne) est supprimée."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         insert_person_name_form(sa_sync_conn, pid, name_form="obsolete", sources=["persons"])
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        # _raw_forms vide + aucune source_contribution → l'attendu est vide
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = _sync(sa_sync_conn)
 
         assert deleted >= 1
-        rows = _fetch_pnf_for(sa_sync_conn, pid)
-        assert ("obsolete", ["persons"]) not in rows
+        assert ("obsolete", ["persons"]) not in _fetch_pnf_for(sa_sync_conn, pid)
 
     def test_updates_sources_when_changed(self, sa_sync_conn):
-        """Une row existante dont `sources` diffère de l'attendu est UPDATE,
-        pas DELETE/INSERT (et `updated` est incrémenté)."""
+        """Une forme en base dont `sources` diffère de l'attendu est mise à jour, sans suppression ni insertion."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        source_record = insert_source_record(sa_sync_conn, source_id="h-1")
-        insert_source_contribution(
-            sa_sync_conn,
-            source_record,
-            person_id=pid,
-            author_name_normalized="dupond j",
-            source="openalex",
+        insert_person_group(
+            sa_sync_conn, _source_contribution(sa_sync_conn, "dupond j", "openalex"), person_id=pid
         )
-        # Base : sources = ['hal'] (obsolète vs source_contributions qui dit openalex)
+        # Sources en base : ['hal'], alors que le membre du groupe vient d'OpenAlex.
         insert_person_name_form(sa_sync_conn, pid, name_form="dupond j", sources=["hal"])
 
-        create_temp_raw_forms_table(sa_sync_conn)
-        inserted, updated, deleted = sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
+        inserted, updated, deleted = _sync(sa_sync_conn)
 
         assert updated >= 1
-        rows = _fetch_pnf_for(sa_sync_conn, pid)
-        assert ("dupond j", ["openalex"]) in rows
+        assert ("dupond j", ["openalex"]) in _fetch_pnf_for(sa_sync_conn, pid)

@@ -10,16 +10,12 @@ from application.ports.repositories.contribution_repository import (
     GroupMemberRow,
     GroupRow,
 )
-from domain.persons.group_matching import GroupMatchReason
+from domain.persons.group_matching import NAME_MATCH_REASONS
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
     REJECTED_PAIRS,
+    in_clause,
     pinned_groups_sql,
-)
-
-# Modes de résolution d'un groupe rattaché par le nom.
-_NAME_RESOLUTION_MODES = ", ".join(
-    f"'{mode.value}'" for mode in (GroupMatchReason.NAME, GroupMatchReason.COMPATIBLE_NAME)
 )
 
 
@@ -123,7 +119,7 @@ class PgContributionRepository(ContributionRepository):
                         UPDATE source_contribution_groups g
                         SET person_id = NULL, resolution_mode = NULL
                         WHERE g.person_id = :pid
-                          AND g.resolution_mode IN ({_NAME_RESOLUTION_MODES})
+                          AND g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
                           AND EXISTS (
                               SELECT 1
                               FROM source_contribution_group_members gm

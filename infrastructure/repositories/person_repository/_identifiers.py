@@ -11,7 +11,7 @@ from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin, PersonIdentifierType
 from infrastructure.db.scalars import row_int
-from infrastructure.sql_fragments import identifier_neutralized
+from infrastructure.sql_fragments import GROUP_MEMBERS, identifier_neutralized
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> IdentifierAttribution | None:
@@ -91,8 +91,8 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> Id
 
 _HAL = PersonIdentifierType.HAL_PERSON_ID.value
 
-# Comptes HAL d'un identifiant : `hal_person_id` des contributions sources HAL de sa personne qui le contiennent.
-# Groupe : identifiants des contributions sources HAL de la personne sous ces comptes.
+# Comptes HAL d'un identifiant : `hal_person_id` des membres HAL des groupes de sa personne qui le contiennent.
+# Lot : identifiants des membres HAL des groupes de la personne sous ces comptes.
 # Un identifiant neutralisé par sa contribution source reste hors de l'un et de l'autre.
 _HAL_ACCOUNT_PEERS_SQL = text(f"""
     WITH src AS (
@@ -100,11 +100,11 @@ _HAL_ACCOUNT_PEERS_SQL = text(f"""
         FROM person_identifiers WHERE id = ANY(:ids)
     ),
     hal_identities AS (
-        SELECT DISTINCT sc.person_id, sc.neutralized_identifiers, ci.identifiers
-        FROM (SELECT DISTINCT person_id FROM src) p
-        JOIN source_contributions sc ON sc.person_id = p.person_id AND sc.source = 'hal'
-        JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-        WHERE ci.identifiers ? '{_HAL}'
+        SELECT DISTINCT g.person_id, sc.neutralized_identifiers, ci.identifiers
+        FROM {GROUP_MEMBERS}
+        WHERE g.person_id IN (SELECT person_id FROM src)
+          AND sc.source = 'hal'
+          AND ci.identifiers ? '{_HAL}'
     ),
     accounts AS (
         SELECT DISTINCT src.src_id, src.person_id, sc.identifiers->>'{_HAL}' AS hal

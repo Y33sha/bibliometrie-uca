@@ -34,6 +34,15 @@ def person_source_contribution(source_contribution: str = "sc") -> str:
     )
 
 
+GROUP_MEMBERS = """
+    source_contribution_groups g
+    JOIN source_contribution_group_members gm ON gm.group_id = g.id
+    JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+"""
+"""Clause `FROM` des groupes `g` et de leurs membres : contributions sources `sc`, avec leurs informations du contributeur `ci`."""
+
+
 def pinned(source_contribution_id: str) -> str:
     """Condition vraie quand l'administration a épinglé la contribution source d'identifiant `source_contribution_id` à une personne (`confirmed_source_contributions`)."""
     return f"EXISTS (SELECT 1 FROM confirmed_source_contributions ca WHERE ca.source_contribution_id = {source_contribution_id})"

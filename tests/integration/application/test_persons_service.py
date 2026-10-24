@@ -45,6 +45,7 @@ from tests.integration.helpers.contributions import (
 from tests.integration.helpers.groups import (
     add_group_member,
     insert_group,
+    insert_person_group,
     set_perimeter_author_group,
 )
 from tests.integration.helpers.persons import (
@@ -284,12 +285,14 @@ class TestIdentifierStatusPropagation:
         )
 
     def _source_contribution(self, conn, person_id, source, source_id, identifiers, **kw):
+        """Contribution source seule dans un groupe rattaché à la personne `person_id`."""
         source_record = _source_record(
             conn, insert_publication(conn), source=source, source_id=source_id
         )
-        _jean_dupont_source_contribution(
-            conn, source_record, source=source, person_id=person_id, identifiers=identifiers, **kw
+        source_contribution = _jean_dupont_source_contribution(
+            conn, source_record, source=source, identifiers=identifiers, **kw
         )
+        insert_person_group(conn, source_contribution, person_id=person_id)
 
     def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, repo):
         p = _person(sa_sync_conn)
@@ -997,8 +1000,7 @@ class TestDetachContributions:
         )
 
     def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, contribution_repo):
-        """Une forme encore attestée par une source d'une autre publication
-        n'est pas supprimée quand on détache une seule publication."""
+        """Une forme encore portée par un membre d'un groupe de la personne, dans une autre publication, reste quand on détache une seule publication."""
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
@@ -1007,9 +1009,10 @@ class TestDetachContributions:
         sa1 = _jean_dupont_source_contribution(
             sa_sync_conn, sp1, person_id=person_id, author_name_normalized="dupont jean"
         )
-        _jean_dupont_source_contribution(
+        backing = _jean_dupont_source_contribution(
             sa_sync_conn, sp2, person_id=person_id, author_name_normalized="dupont jean"
         )
+        insert_person_group(sa_sync_conn, backing, person_id=person_id)
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
         result = detach_contributions(

@@ -2,14 +2,6 @@
 
 from domain.persons.identifiers import AttributionStatus
 
-GROUP_MEMBERS = """
-    source_contribution_groups g
-    JOIN source_contribution_group_members gm ON gm.group_id = g.id
-    JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-"""
-"""Clause `FROM` des groupes `g` et de leurs membres : contributions sources `sc`, avec leurs informations du contributeur `ci`."""
-
 
 def contributor_display_name(source_contribution: str = "sc") -> str:
     """Nom de la contribution source aliasée `source_contribution` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`ContributorName.display`)."""

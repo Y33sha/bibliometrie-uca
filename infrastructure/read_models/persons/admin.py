@@ -25,11 +25,10 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.structures.structure import StructureType
 from infrastructure.read_models.sql_fragments import (
-    GROUP_MEMBERS,
     name_form_holder,
     other_name_form_holders,
 )
-from infrastructure.sql_fragments import has_author_role, identifier_neutralized
+from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role, identifier_neutralized
 
 # ── Name-form contributions ────────────────────────────────────────
 

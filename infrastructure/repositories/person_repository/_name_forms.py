@@ -10,7 +10,9 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_text
+from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from infrastructure.sql_fragments import GROUP_MEMBERS
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
@@ -74,16 +76,16 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
+    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des membres de ses groupes. Rend le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf
             WHERE pnf.person_id = :pid
-              AND pnf.status = 'pending'
+              AND pnf.status = '{AttributionStatus.PENDING.value}'
               AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
               AND NOT EXISTS (
-                  SELECT 1 FROM source_contributions sc
-                  JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                  WHERE sc.person_id = :pid
+                  SELECT 1 FROM {GROUP_MEMBERS}
+                  WHERE g.person_id = :pid
                     AND ci.author_name_normalized = pnf.name_form
               )
         """),

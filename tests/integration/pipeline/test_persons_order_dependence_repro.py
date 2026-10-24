@@ -4,7 +4,7 @@ Deux contributions sources d'une **même personne** sans identifiant partagé, l
 
 La création live sème la map en mémoire via `compute_person_name_forms` (ordres + initiales) : une contribution source initiale rattrape une personne créée en forme pleine. Dans l'ordre inverse, la contribution source pleine rejoint la personne réduite par ses initiales compatibles, et la personne prend le prénom plein. Les deux ordres donnent une seule personne dès le premier run.
 
-Les tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback de la fixture) ; `_populate_canonical_forms` simule le peuplement des formes de nom.
+`_populate_canonical_forms` simule le peuplement des formes de nom dérivées du nom des personnes.
 """
 
 import logging
@@ -16,9 +16,14 @@ from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.cascade import run_cascade
+from pipeline.transformation.persons.groups import resolve_groups
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.purge import purge
-from tests.integration.helpers.groups import group_ungrouped, insert_group
+from tests.integration.helpers.groups import (
+    group_ungrouped,
+    insert_group,
+    recompose_group_attributes,
+)
 from tests.integration.helpers.persons import insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -102,11 +107,10 @@ def _populate_canonical_forms(conn):
 
 
 def _run_phase(conn):
-    """Run complet de la phase personnes : rattachement/création, peuplement des formes, purge.
-
-    Le peuplement est simulé (`populate` committe, incompatible avec le rollback de la fixture),
-    la purge appelée directement — l'ordre reproduit `PersonsPhase`."""
+    """Run complet de la phase personnes, dans l'ordre de `PersonsPhase` : cascade, rattachement des groupes, peuplement simulé des formes de nom, purge. Les attributs des groupes sont recomposés avant le rattachement, comme le groupement."""
     _run_create(conn)
+    recompose_group_attributes(conn)
+    resolve_groups(conn)
     _populate_canonical_forms(conn)
     purge(conn)
 
@@ -120,6 +124,19 @@ def _martin_count(conn) -> int:
 def _person_of(conn, source_contribution_id):
     return conn.execute(
         text("SELECT person_id FROM source_contributions WHERE id = :i"),
+        {"i": source_contribution_id},
+    ).scalar_one()
+
+
+def _group_person_of(conn, source_contribution_id):
+    """Personne du groupe de la contribution source `source_contribution_id`."""
+    return conn.execute(
+        text("""
+            SELECT g.person_id
+            FROM source_contribution_groups g
+            JOIN source_contribution_group_members gm ON gm.group_id = g.id
+            WHERE gm.source_contribution_id = :i
+        """),
         {"i": source_contribution_id},
     ).scalar_one()
 
@@ -198,8 +215,8 @@ def test_initial_then_full_stays_joined_over_runs(sa_sync_conn):
     _run_phase(conn)
     _run_phase(conn)
     assert _martin_first_names(conn) == ["jean"]
-    assert _person_of(conn, 95003) is not None
-    assert _person_of(conn, 95003) == _person_of(conn, 95004)
+    assert _group_person_of(conn, 95003) is not None
+    assert _group_person_of(conn, 95003) == _group_person_of(conn, 95004)
 
 
 def test_reduced_name_joins_a_compound_first_name(sa_sync_conn):
@@ -237,8 +254,8 @@ def test_a_completed_first_name_turns_away_another_first_name(sa_sync_conn):
     _run_phase(conn)
 
     assert _martin_first_names(conn) == ["jean", "julie"]
-    assert _person_of(conn, 95082) != _person_of(conn, 95081)
-    assert _person_of(conn, 95080) is None
+    assert _group_person_of(conn, 95082) != _group_person_of(conn, 95081)
+    assert _group_person_of(conn, 95080) is None
 
 
 def test_existing_reduced_person_takes_the_attested_first_name(sa_sync_conn):
@@ -309,22 +326,21 @@ def test_reduced_person_with_competing_first_names_keeps_its_initials(sa_sync_co
 
 def test_ambiguous_form_reorphaned_when_homonym_appears(sa_sync_conn):
     """Sur-regroupement : « H Chanal » se colle d'abord à l'unique « Hervé Chanal » présent ;
-    dès que « Hélène Chanal » coexiste et rend « h chanal » ambiguë, la contribution source réduite est
-    re-orphelinée — elle ne reste pas collée au premier arrivé, quel que soit l'ordre."""
+    dès que « Hélène Chanal » coexiste et rend « h chanal » ambiguë, le groupe de la forme réduite perd sa personne, quel que soit l'ordre."""
     conn = sa_sync_conn
     _seed_source_contribution(
         conn, publication_id=95010, raw_name="Hervé Chanal", name_norm="herve chanal"
     )
     _seed_source_contribution(conn, publication_id=95011, raw_name="H Chanal", name_norm="h chanal")
     _run_phase(conn)
-    assert _person_of(conn, 95011) is not None  # rattachée à l'unique candidat
+    assert _group_person_of(conn, 95011) is not None  # rattaché à l'unique candidat
 
     _seed_source_contribution(
         conn, publication_id=95012, raw_name="Hélène Chanal", name_norm="helene chanal"
     )
     _run_phase(conn)  # crée « Hélène Chanal » ; « h chanal » devient ambiguë → re-orphelinage
 
-    assert _person_of(conn, 95011) is None  # orpheline, plus collée à Hervé
+    assert _group_person_of(conn, 95011) is None  # groupe sans personne
 
 
 def test_la_creation_annonce_les_indecidables_a_part(sa_sync_conn, caplog):

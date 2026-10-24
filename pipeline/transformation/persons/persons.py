@@ -7,8 +7,8 @@ Quatre tâches (`pipeline.graph`). Les quatre premières étapes forment la tâc
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **resolve_groups** — applique les épinglages aux groupes de contributions sources, puis rattache à une personne existante les groupes sans personne (`pipeline.transformation.persons.groups`). La régénération des formes de nom et la purge voient ainsi les groupes du run, y compris ceux des personnes créées par la cascade.
-6. **populate** — régénère les formes de nom canoniques.
-7. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
+6. **populate** — régénère les formes de nom des personnes et des membres de leurs groupes.
+7. **purge** — re-orpheline les groupes dont la forme de nom devient ambiguë après régénération, supprime les attributions d'identifiant automatiques qu'aucun membre des groupes de leur personne ne contient, et supprime les personnes sans contribution du périmètre.
 
 Les publications hors scope sont écartées (`domain/publications/scope`).
 
@@ -106,8 +106,7 @@ class PersonsPhase:
         summary = metrics.details["summary"]
         assert isinstance(summary, dict)
         summary["reorphaned_nominal"] = purge_counts.get("reorphaned", 0)
-        summary["detached_out_of_perimeter"] = purge_counts.get("detached_out_of_perimeter", 0)
-        summary["deleted_empty_persons"] = purge_counts.get("deleted_persons", 0)
+        summary["deleted_persons"] = purge_counts.get("deleted_persons", 0)
         for key, count in name_form_counts.items():
             summary[f"name_forms_{key}"] = count
         return metrics
