@@ -135,7 +135,9 @@ Usages du type dans le code :
 - [x] Normalisation : l'enregistrement source reçoit l'éditeur que nomme sa source. Pas d'éditeur pour les types `preprint`, `dataset`, `software`, `report`, `thesis`, `ongoing_thesis`, `hdr`, `memoir`, `poster`, `conference` et `patent`, ni pour un enregistrement DataCite sans série ni monographie (`b123a7487`).
 - [x] Agrégation : la publication reçoit le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur non nul dans l'ordre de priorité des sources. Pas d'éditeur pour les mêmes types (`b123a7487`).
 - [x] Suppression des éditeurs vides et fusion d'éditeurs : prise en compte des éditeurs des enregistrements sources et des publications (`b123a7487`).
-- [ ] Stock : oneshot `backfill_source_record_publishers` depuis `biblio.publisher`, puis phase `publications`.
+- [x] Stock : oneshot `backfill_source_record_publishers` depuis `biblio.publisher`, puis phase `publications`. 46 139 publications ont un éditeur ; 9 242 diffèrent de celui de leur revue.
+- [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
+- [ ] Titulaires de préfixe « Éditions Techniques [1987-1994] » et « Éditions du Juris-classeur [2009] » sur des revues LexisNexis : à examiner.
 - [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
 - [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
 
@@ -146,6 +148,7 @@ Usages du type dans le code :
 - [ ] Localisations de Crossref (`resource`, `link`) et d'OpenAlex.
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
+- [ ] Préfixe DOI d'une plateforme (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources. Règle et oneshot de correction des publications (environ 4 650).
 - [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
 - [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
 - [x] Vérification Unpaywall : DOI DataCite écartés (`e1d7daeb6`).
