@@ -46,6 +46,6 @@ Code : `pipeline/transformation/structures/countries/`.
 
 Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI et conserve son verdict dans `sources.unpaywall`. Le statut d'une publication se calcule à partir de ses sources et de ce verdict, ici et à chaque recalcul de la publication.
 
-Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou dont le verdict date de plus de `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Quand Unpaywall est indisponible, le DOI est repris au run suivant.
+Incrémentale : chaque exécution est plafonnée (`unpaywall_max_per_run`, 10 000 DOI par défaut) et vérifie seulement les DOI sans verdict, ou dont le verdict date de plus de `unpaywall_recheck_after_days` (15 jours par défaut, réglable dans `admin/config`). Les DOI DataCite, absents d'Unpaywall, sont écartés. Quand Unpaywall est indisponible, le DOI est repris au run suivant.
 
 Code : `pipeline/transformation/publications/oa_status.py`.

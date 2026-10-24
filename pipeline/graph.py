@@ -1191,6 +1191,7 @@ TASKS: tuple[Task, ...] = (
             "publications.doi",
             "publications.oa_status",
             "unpaywall",
+            "doi_prefixes.ra",
             "source_records.publication_id",
             "source_records.source",
             "source_records.oa_status",
