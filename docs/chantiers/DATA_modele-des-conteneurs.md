@@ -5,25 +5,26 @@
 Le conteneur d'une publication est ce qui la publie ou l'héberge. Le schéma en donne trois représentations :
 
 - `publishing.journals`, que référence `publications.journal_id` ;
-- `publishing.monographs`, que référence `publications.monograph_id`, avec un ISBN et un `journal_id` vers sa collection ;
+- `publishing.monographs`, que référence `publications.monograph_id` : livres et volumes d'actes, avec ou sans ISBN, avec un `journal_id` vers leur collection ;
 - `publications.container_title`, un titre libre quand aucune des deux tables ne convient.
 
-`journals` réunit des choses de natures différentes. Son type (`journal_type`) vaut :
+Le chantier [Monographies](DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
+
+`journals` réunit encore des choses de natures différentes. Son type (`journal_type`) vaut :
 
 - `journal`, `book_series`, `proceedings`, `media` : des publications en série ;
 - `repository`, `preprint_server`, `ebook_platform` : des localisations, qui hébergent des publications sans les publier ;
 - `unknown`.
 
-Les colonnes de `journals` décrivent une revue : présence dans le DOAJ, modèle open access, APC. Elles n'ont pas de sens pour un entrepôt.
-
-`monographs` apparaît après `journals`, pour réunir les volumes d'actes sous une même collection d'actes. Un livre sans ISBN n'a pas d'entité : son titre reste dans `container_title`.
+Les colonnes de `journals` décrivent une revue : présence dans le DOAJ, modèle open access, APC. Elles n'ont pas de sens pour un entrepôt. Le modèle open access (`oa_model`) a une valeur propre aux entrepôts, `repository`.
 
 Le nom `journals` couvre ainsi des collections d'ouvrages, des serveurs de prépublications et des entrepôts de données. Il désigne mal son contenu.
 
-Deux fiches portent sur des cas que le modèle conditionne :
+### Points des autres fiches que le modèle conditionne
 
-- [Monographies](DATA_monographies.md) : livres, ISBN, chapitres, recueils d'actes ;
-- [Conférences et actes](DATA_conferences-et-actes.md) : séries d'actes typées `journal` ou `book_series`, `container_title` qui contient tantôt un colloque, tantôt une archive.
+- [Conférences et actes](DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
+- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
+- [Monographies](DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
 
 ## Décisions
 
@@ -64,4 +65,6 @@ Deux fiches portent sur des cas que le modèle conditionne :
 - Une publication peut-elle avoir à la fois une série, une monographie et une ou plusieurs localisations ?
 - Place de `media`, et sort de `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
-- Ordre avec les fiches Monographies et Conférences et actes.
+- **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
+- **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` en désigne une seule : laquelle ?
+- **Ouvrage en plusieurs volumes** (« Current Developments in Biotechnology and Bioengineering »). Chaque volume est-il une monographie, et qu'est-ce qui les relie ?

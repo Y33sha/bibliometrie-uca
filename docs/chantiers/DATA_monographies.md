@@ -4,22 +4,15 @@ Périmètre : les publications qui portent un ISBN, celles de type `book` ou `bo
 
 ## Contexte
 
-Un livre n'a pas d'entité dans la base. Le conteneur d'un livre ou d'un chapitre est le livre lui-même, et le titre du livre va dans la colonne `container_title`. Deux cas font exception :
-
-- l'enregistrement source porte un ISSN, celui de la collection : cette collection devient la revue du document ;
-- le titre du conteneur est déjà celui d'un recueil d'actes en base : le document y est rattaché, sans création.
-
-Un volume d'actes, lui, a une entrée dans `journals`. La table range donc au même niveau les revues, les recueils d'actes et les collections dont ils font partie.
-
-Les chapitres d'un même livre ne partagent qu'une chaîne de caractères, qui varie d'une source à l'autre. Rien ne réunit un livre et ses chapitres.
+Le conteneur d'un livre ou d'un chapitre est le livre lui-même. Le livre et le volume d'actes ont une entité, la monographie, que partagent leurs chapitres et leurs communications. La monographie est rattachée à sa collection dans `journals`.
 
 ### ISBN
 
-L'ISBN identifie un livre. Seul ceux issus de Crossref sont lus (`external_ids.isbn`) ; pourtant HAL (TEI `idno type="isbn"`) et WoS (`isbn`, `eisbn`) le fournissent aussi, DataCite dans un `relatedIdentifiers` de type ISBN ou dans l'identifiant de son conteneur.
+L'ISBN identifie un livre. Crossref le fournit, WoS dans `isbn` et `eisbn`, HAL dans la zone TEI `idno type="isbn"`, DataCite dans un `relatedIdentifiers` de type ISBN ou dans l'identifiant de son conteneur.
 
-Un livre porte souvent deux ISBN, un par support. Crossref et WoS disent lequel est électronique ; HAL et DataCite le taisent. Le numéro lui-même n'en dit rien : l'éditeur attribue un numéro par format. Un ISBN-13 est un EAN-13, à préfixe 978 ou 979.
+Un livre a souvent deux ISBN, un par support. Crossref et WoS disent lequel est électronique. L'éditeur attribue un numéro par format, sans marque du support. Un ISBN-13 est un EAN-13, à préfixe 978 ou 979.
 
-Le DOI porte souvent l'ISBN. Sa forme annonce alors la nature du document :
+Le DOI contient souvent l'ISBN. Sa forme annonce alors la nature du document :
 
 - ISBN seul en fin de DOI (`10.1007/978-3-030-20131-9`) : le DOI est celui du livre ou du volume d'actes ;
 - ISBN suivi d'un suffixe (`10.1007/978-3-030-58080-3_309`, `10.48611/isbn.978-2-406-17883-5.p.0071`) : le DOI est celui d'un chapitre ou d'une communication.
@@ -154,9 +147,6 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ## Questions ouvertes
 
-- **Identification sans ISBN.** L'ISBN réunit deux enregistrements quand il est là. Sinon, quel signal les réunit : le titre normalisé du conteneur, l'éditeur, le préfixe du DOI ? Les titres divergent d'une source à l'autre.
-- **Volumes multiples.** Un titre paru en plusieurs volumes n'est pas traité. Chaque volume est-il une monographie, et qu'est-ce qui les relie ?
-- **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui porte un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` n'en désigne qu'une : laquelle ?
 - **Niveau d'un conteneur sans ISSN.** Le conteneur sans ISSN d'un livre, d'un chapitre ou d'un article de congrès désigne tantôt le volume (« Silicon Photonics XIII », « Proceedings of the Thirty-Second International Joint Conference on Artificial Intelligence »), tantôt la série (« SPIE Proceedings »). Pistes :
     - Années différentes. Le conteneur est une monographie par défaut, promue en série quand ses enregistrements couvrent plusieurs années. Mesure sur les années des enregistrements. Deux années consécutives mêlent livres parus en ligne puis imprimés, ouvrages de référence enrichis au fil de l'eau, écarts entre sources, volumes parus l'année suivant le congrès (PoS(ICHEP2022)) et quelques séries (GECCO, IEOM). Des années non consécutives ou au moins trois années désignent presque toujours une série : AIP Conference Proceedings, AAAI, AAMAS, Winter Simulation Conference, sessions du congrès ERS. Un faux positif sur 19 : « Handbook of Labor, Human Resources and Population Economics ».
     - Chiffres romains (« Silicon Photonics XIII ») comme marque de volume dans `container_level`. Risque de confusion avec d'autres emplois.
