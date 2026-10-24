@@ -7,7 +7,7 @@ Create Date: 2026-10-20 20:00:00.000000
 Renomme les tables, vues, colonnes, contraintes, index et séquences selon le vocabulaire du code : `source_publications` → `source_records`, `source_authorships` → `source_contributions`, `authorships` → `contributions`, `author_identifying_keys` → `contributor_information`, `persons_rh` → `hr_records`, `structure_tutelles` → `structure_parents`, `pub_year` → `publication_year`, `pub_count` → `publication_count`. Les noms d'index abrégés passent en mots entiers. La migration réécrit aussi la fonction `regroup_identifier_publications`, les commentaires des objets, la phase `authorships` de l'historique des exécutions et les événements `authorship.*` du journal d'audit.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Iterable, Sequence
 
 from sqlalchemy import text
 
@@ -109,7 +109,7 @@ _KIND = {
 }
 
 
-def _rename_objects(rename) -> None:
+def _rename_objects(rename: Callable[[str], str]) -> None:
     """Applique `rename` aux colonnes, aux contraintes, puis aux relations, index et séquences."""
     conn = op.get_bind()
     columns = conn.execute(
@@ -266,7 +266,7 @@ def _sql_literal(value: str) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def _rename_sql(expression: str, pairs) -> str:
+def _rename_sql(expression: str, pairs: Iterable[tuple[str, str]]) -> str:
     for old, new in pairs:
         expression = f"replace({expression}, {_sql_literal(old)}, {_sql_literal(new)})"
     return expression
@@ -279,7 +279,7 @@ _HISTORY_FRAGMENTS = (
 )
 
 
-def _rename_history(pairs, old_phase: str, new_phase: str) -> None:
+def _rename_history(pairs: Sequence[tuple[str, str]], old_phase: str, new_phase: str) -> None:
     """Renomme la phase de l'historique, les événements d'audit et les clés de leur payload."""
     op.execute(
         f"UPDATE ops.pipeline_phase_executions SET phase = '{new_phase}' WHERE phase = '{old_phase}'"

@@ -5,6 +5,7 @@ Trois comportements distinguent ce service d'un service de fichiers statiques or
 Une erreur qui n'est pas un fichier absent remonte telle quelle : les reprises ne valent que pour le 404.
 """
 
+from collections.abc import Set as AbstractSet
 from unittest.mock import patch
 
 import pytest
@@ -17,7 +18,7 @@ from interfaces.api.spa import SPAStaticFiles
 _SCOPE = {"type": "http", "method": "GET"}
 
 
-def _service_de_fichiers(*, disponibles: set[str] = frozenset(), erreur: int | None = None):
+def _service_de_fichiers(*, disponibles: AbstractSet[str] = frozenset(), erreur: int | None = None):
     """Remplace le service de fichiers sous-jacent : seuls `disponibles` existent.
 
     `erreur` fait échouer tout accès sur ce code, pour éprouver ce qui n'est pas un fichier absent.

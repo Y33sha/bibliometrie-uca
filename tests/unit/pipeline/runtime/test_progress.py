@@ -134,7 +134,8 @@ class TestRedessinDeLaBarre:
     """La ligne réécrite en place emporte de quoi effacer le redessin précédent."""
 
     @staticmethod
-    def _bar(stream: io.StringIO, largeur: int) -> "module._Barre":
+    def _bar(stream: io.StringIO, largeur: int):
+        assert module._Bar is not None
         barre = module._Bar(
             total=100, desc="hal", bar_format=module.BAR_FORMAT, file=stream, dynamic_ncols=True
         )

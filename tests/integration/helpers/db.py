@@ -29,7 +29,7 @@ def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
     conn = psycopg.connect(**_ARGS, row_factory=dict_row)
     conn.autocommit = True
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             yield cur
     finally:
         conn.close()

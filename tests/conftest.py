@@ -103,16 +103,3 @@ def http_mock(breaker: SourceCircuitBreaker) -> Iterator[HttpMock]:  # noqa: ARG
         patch.object(httpx2._api, "Client", client),
     ):
         yield router
-
-
-@pytest.fixture(autouse=True)
-def _clear_caches():
-    """Vide les caches module-level restants entre chaque test (rollback-safe)."""
-    yield
-    # HAL author cache
-    try:
-        from pipeline.ingestion.hal.normalize import _hal_author_cache
-
-        _hal_author_cache.clear()
-    except ImportError:
-        pass

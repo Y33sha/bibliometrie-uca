@@ -15,6 +15,7 @@
 - [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
+- [Typage des tests et des scripts ponctuels](CODE_typage-des-tests.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 - [Monographies](DATA_monographies.md)

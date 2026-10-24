@@ -3,6 +3,7 @@
 
 # ── OpenAlex ─────────────────────────────────────────────────────
 
+from domain.source_records.source_record import SourceRecord
 from pipeline.ingestion.openalex.normalize import extract_locations_data
 
 
@@ -267,8 +268,7 @@ class TestFirstDocTypeArbitration:
     nomenclatures sources brutes."""
 
     @staticmethod
-    def _src(source: str, doc_type: str | None) -> "SourceRecord":  # noqa: F821
-        from domain.source_records.source_record import SourceRecord
+    def _src(source: str, doc_type: str | None) -> SourceRecord:
 
         return SourceRecord(
             id=None,
