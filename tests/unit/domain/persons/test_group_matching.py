@@ -10,6 +10,7 @@ from domain.persons.group_matching import (
     GroupSkipReason,
     PersonIndex,
     decide_group,
+    founding_name,
     settle_publication,
 )
 from domain.persons.matching import IdentifiedPerson, Namesake
@@ -201,3 +202,43 @@ def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise():
     settled = settle_publication({10: (decision, 3)}, taken=frozenset({1}))
 
     assert settled[10].reason == GroupSkipReason.PERSON_IN_OTHER_GROUP
+
+
+def _split_member(last, first, source):
+    return GroupMember(
+        source=source,
+        name=ContributorName(last_name=last, first_name=first),
+        identifiers={},
+        in_perimeter=True,
+    )
+
+
+class TestFoundingName:
+    def test_une_source_qui_separe_nom_et_prenom_l_emporte(self):
+        members = [_member("Jean Martin", source="theses"), _split_member("Martin", "J.", "wos")]
+        assert founding_name(members) == ("Martin", "J.")
+
+    def test_un_prenom_complet_l_emporte_sur_une_initiale(self):
+        members = [
+            _split_member("Martin", "J.", "crossref"),
+            _split_member("Martin", "Jean", "hal"),
+        ]
+        assert founding_name(members) == ("Martin", "Jean")
+
+    def test_la_preseance_des_sources_departage_et_non_la_longueur_du_prenom(self):
+        members = [
+            _split_member("Martin", "Jean-Pierre", "hal"),
+            _split_member("Martin", "Jean", "openalex"),
+        ]
+        assert founding_name(members) == ("Martin", "Jean")
+
+    def test_le_role_et_le_perimetre_des_membres_sont_ignores(self):
+        hors = GroupMember(
+            source="crossref",
+            name=ContributorName(last_name="Martin", first_name="Jean"),
+            identifiers={},
+            in_perimeter=False,
+            roles=("jury",),
+        )
+        members = [_split_member("Martin", "Jeanne", "hal"), hors]
+        assert founding_name(members) == ("Martin", "Jean")

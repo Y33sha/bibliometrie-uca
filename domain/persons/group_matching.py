@@ -29,6 +29,7 @@ from domain.persons.matching import (
 )
 from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
 from domain.persons.name_matching import first_name_initials
+from domain.sources.registry import Source
 
 IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
@@ -314,22 +315,33 @@ def settle_publication(
     return settled
 
 
-def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
-    """(nom de famille, prénom) de la personne que fonde un groupe : ceux d'un membre autorisé à créer une personne, de préférence du périmètre, d'une source qui sépare nom et prénom, au prénom plein le plus long."""
+# Préséance des sources pour le nom d'une personne créée. HAL vient après les autres agrégateurs : un compte HAL attribué à tort donne le nom d'une autre personne. WoS ferme la marche, pour ses erreurs de reconnaissance de caractères.
+NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
+    Source.THESES,
+    Source.CROSSREF,
+    Source.DATACITE,
+    Source.OPENALEX,
+    Source.SCANR,
+    Source.HAL,
+    Source.WOS,
+)
+_NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURCE_PRIORITY)}
 
-    def rank(member: GroupMember) -> tuple[bool, bool, bool, int, str]:
-        _, first_name = member.name.split()
+
+def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
+    """(nom de famille, prénom) de la personne que fonde un groupe : ceux d'un membre d'une source qui sépare nom et prénom, de préférence au prénom complet, puis selon la préséance des sources (`NAME_SOURCE_PRIORITY`)."""
+
+    def rank(member: GroupMember) -> tuple[bool, bool, int, tuple[str, str]]:
+        last_name, first_name = member.name.split()
         reduced = not first_name or first_name_initials(first_name) is not None
         return (
-            not member.in_perimeter,
             not member.name.split_by_source,
             reduced,
-            -len(first_name),
-            member.source,
+            _NAME_SOURCE_RANK.get(member.source, len(NAME_SOURCE_PRIORITY)),
+            (last_name, first_name),
         )
 
-    eligible = [m for m in members if allow_person_creation(list(m.roles))] or list(members)
-    return min(eligible, key=rank).name.split()
+    return min(members, key=rank).name.split()
 
 
 def identifiers_to_attribute(
