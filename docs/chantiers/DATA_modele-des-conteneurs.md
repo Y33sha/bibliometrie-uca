@@ -114,7 +114,8 @@ Usages du type dans le code :
   - `platforms` : lieux qui hébergent des publications, à savoir entrepôts, serveurs de preprints, plateformes d'éditeurs, index et agrégateurs. Type, identifiant d'entrepôt Unpaywall (`endpoint_id`), source OpenAlex ;
   - `platform_domains` : domaine → plateforme, plateforme nullable ;
   - localisations d'un enregistrement source : URL de la page, URL du PDF, plateforme nullable, version, licence, date d'ouverture. L'agrégation les réunit par publication ;
-  - `publisher_id` sur `source_records` et `publications`.
+  - `publisher_id` sur `source_records` et `publications`, écrit par l'agrégation : le titulaire du préfixe pour un DOI Crossref, à défaut l'éditeur que donnent les sources ;
+  - `doi_prefix`, colonne générée de `publications`, pour les jointures sur `doi_prefixes`.
 - L'éditeur d'une série est celui de ses publications les plus récentes. Une publication a donc l'éditeur à la date de sa publication.
 
 ## Phasage
@@ -140,6 +141,7 @@ Usages du type dans le code :
 - [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
 - [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
 - [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
+- [x] Vérification Unpaywall : DOI DataCite écartés (`e1d7daeb6`).
 
 ### Phase 4 — API et interface
 
@@ -157,7 +159,6 @@ Usages du type dans le code :
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
 - **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
 - **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
-- **Éditeur d'une publication.** Quelle règle remplit l'éditeur à la date de publication ? Le titulaire du préfixe donne l'éditeur d'origine, le membre Crossref l'éditeur actuel, le domaine l'hébergeur. À défaut de DOI Crossref, l'agrégation des sources.
 - **Maintenance des référentiels.** Chaque table a son régime : recalcul à chaque run, mise à jour incrémentale par file d'attente, ou valeur posée une fois (typage OpenAlex, `doi_prefixes`). Comment rafraîchir une valeur posée une fois ? `doi_prefixes` attribue à Hindawi un préfixe dont Wiley détient les DOI.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
 - **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` en désigne une seule : laquelle ?
