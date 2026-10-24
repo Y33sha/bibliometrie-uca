@@ -22,7 +22,7 @@ Source d'enrichissement consultée par DOI pour le statut open access des public
 
 ### Données récupérées
 
-Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/10-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.unpaywall`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
+Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.unpaywall`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
 
 ### Particularités
 

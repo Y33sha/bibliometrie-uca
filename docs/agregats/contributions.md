@@ -25,9 +25,9 @@ Les contributions sources relèvent de la fiche [source_contributions](source_co
 
 **`author_grouping` — alignement.** La phase aligne les contributions sources des enregistrements sources d'une publication : chaque auteur donne une contribution, et ses contributions sources entrent dans `aligned_source_contributions`, avec l'origine du lien (`method`). `reference_position` est la position de l'auteur dans la liste la plus longue. Une contribution garde son identifiant d'un run à l'autre : elle reprend celui de la contribution en base avec laquelle elle partage le plus de contributions sources. Les attributs (`roles`, `is_corresponding`, `perimeter_evidence`) sont l'union de ceux des contributions sources alignées, recomposés pour les contributions de la file `contribution_attributes_queue`. Une contribution rattachée dont les contributions sources changent entre dans la file `contribution_resolution_queue`.
 
-**`persons` — personne.** La phase décide la personne des contributions orphelines et des contributions de `contribution_resolution_queue`, et crée les personnes des contributions du périmètre au nom inconnu ([phase persons](../pipeline/08-persons.md)). Elle retire leur personne aux contributions que la décision ne rattache plus. La purge retire leur personne aux contributions des personnes qu'elle supprime.
+**`persons` — personne.** La phase décide la personne des contributions orphelines et des contributions de `contribution_resolution_queue`, et crée les personnes des contributions du périmètre au nom inconnu ([phase persons](../pipeline/09-persons.md)). Elle retire leur personne aux contributions que la décision ne rattache plus. La purge retire leur personne aux contributions des personnes qu'elle supprime.
 
-**`finalize` — données dérivées.** La phase reporte le périmètre sur les publications, rafraîchit les deux vues matérialisées et supprime les publications sans contribution rattachée ([phase finalize](../pipeline/09-finalize.md)).
+**`finalize` — données dérivées.** La phase reporte le périmètre sur les publications, rafraîchit les deux vues matérialisées et supprime les publications sans contribution rattachée ([phase finalize](../pipeline/10-finalize.md)).
 
 ## Écriture par l'API — décisions humaines
 

@@ -36,15 +36,16 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des personnes
 
-- [Personnes](08-persons.md) : rattache chaque contribution source à une personne, et peuple la table `persons` avec ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef).
+- [Alignement des auteurs](08-author-grouping.md) : réunit en une contribution les contributions sources d'un même auteur dans une publication.
+- [Personnes](09-persons.md) : rattache chaque contribution à une personne, et peuple la table `persons` avec ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef).
 
-## Consolidation des relations publications-personnes-structures
+## Données dérivées des contributions
 
-- [Finalisation](09-finalize.md) : met à jour, après la résolution des personnes, le périmètre des publications, les vues des structures, la purge des publications et des référentiels vides, et les compteurs de publications.
+- [Finalisation](10-finalize.md) : met à jour, après la résolution des personnes, le périmètre des publications, les vues des structures, la purge des publications et des référentiels vides, et les compteurs de publications.
 
 ## Enrichissements
 
-- [Relations entre publications](10-enrichissements.md#relations-entre-publications-relations) : peuple `publication_relations`, qui relie des publications apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
-- [Sujets](10-enrichissements.md#sujets-subjects) : ingestion des sujets des `source_records` vers les référentiels `subjects` et `publication_subjects`, puis recalcul de `subjects.usage_count` et de la table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
-- [Pays](10-enrichissements.md#pays-des-adresses-countries) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
-- [Statut open access](10-enrichissements.md#statut-open-access-oa_status) : interroge Unpaywall pour obtenir le statut OA à jour des publications.
+- [Relations entre publications](11-enrichissements.md#relations-entre-publications-relations) : peuple `publication_relations`, qui relie des publications apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
+- [Sujets](11-enrichissements.md#sujets-subjects) : ingestion des sujets des `source_records` vers les référentiels `subjects` et `publication_subjects`, puis recalcul de `subjects.usage_count` et de la table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Pays](11-enrichissements.md#pays-des-adresses-countries) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
+- [Statut open access](11-enrichissements.md#statut-open-access-oa_status) : interroge Unpaywall pour obtenir le statut OA à jour des publications.

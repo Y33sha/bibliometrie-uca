@@ -116,7 +116,7 @@ Chaque source procède différemment. HAL porte les domaines choisis par le dép
 | ScanR | `Julien Ah-Pine` | IdRef `139791140`, ORCID `0000-0001-6898-3961` | IdRef `253123445`, ORCID `0000-0002-4302-1878` |
 | Web of Science | `Ah-Pine, Julien` | ResearcherID `PQT-5225-2026` | ResearcherID `DUU-4326-2022` |
 
-Web of Science inverse le nom et le prénom ; les autres sources donnent la forme directe. Ces formes et ces identifiants alimentent `contributor_information`. La [phase `persons`](../pipeline/08-persons.md) crée ou retrouve les personnes à partir de cette table.
+Web of Science inverse le nom et le prénom ; les autres sources donnent la forme directe. Ces formes et ces identifiants alimentent `contributor_information`. La [phase `persons`](../pipeline/09-persons.md) crée ou retrouve les personnes à partir de cette table.
 
 Le second auteur porte deux ORCID différents. Une seule des deux valeurs peut être exacte : ScanR ou les trois autres sources rattachent le mauvais identifiant.
 

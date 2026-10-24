@@ -22,7 +22,7 @@ Une personne est un chercheur unifié à travers les sources : plusieurs contrib
 
 ## Écriture par le pipeline
 
-`pipeline/transformation/persons/persons.py` exécute quatre tâches, chacune dans sa transaction. Le détail est dans la [phase persons](../pipeline/08-persons.md).
+`pipeline/transformation/persons/persons.py` exécute quatre tâches, chacune dans sa transaction. Le détail est dans la [phase persons](../pipeline/09-persons.md).
 
 1. **Arbitrer les identifiants.** Un identifiant présent sous le nom d'une autre personne est neutralisé sur sa contribution source. Un identifiant attribué à une personne et présent dans les contributions d'une autre va à la personne qui a la majorité stricte des voix ; une attribution confirmée à la main n'est jamais transférée.
 2. **Rattacher les contributions.** Les épinglages s'appliquent d'abord. Les contributions orphelines et celles de la file de redécision reçoivent leur personne par identifiant, puis par nom (`decide_group`). Les contributions du périmètre au nom inconnu fondent une personne.
