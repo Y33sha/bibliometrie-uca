@@ -37,7 +37,7 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import EXTRA_PHASES, PHASE_LABELS, PHASE_ORDER
+from pipeline.graph import EXTRA_PHASES, HARVESTING_PHASES, PHASE_LABELS, PHASE_ORDER
 from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.common import (
     fetch_missing,
@@ -456,6 +456,9 @@ def _run_one_phase(
 
         duration = time.time() - t0_phase
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
+        if name in HARVESTING_PHASES:
+            log.info("")
+            log.info("Total : %s", metrics.as_summary())
         recorder.record(
             phase=name,
             started_at=phase_started_at,

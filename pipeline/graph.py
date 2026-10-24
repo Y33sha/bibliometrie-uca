@@ -1243,8 +1243,16 @@ EXTRA_PHASES: frozenset[str] = frozenset({"relations", "subjects", "countries", 
 Aucune ne dépend d'une autre. Des phases placées avant elles lisent leurs sorties au run suivant : `resolve_ra` et `fetch_missing` lisent les relations, `normalize` et `publications` les pays, `publications` le statut open access.
 """
 
+HARVESTING_PHASES: frozenset[str] = frozenset(
+    {"harvest", "harvest_by_person", "fetch_missing", "fetch_stale", "fetch_truncated"}
+)
+"""Phases qui moissonnent des documents : leur journal se clôt sur le total des documents de toutes leurs sources."""
+
 if not EXTRA_PHASES <= set(PHASE_ORDER):
     raise ValueError("EXTRA_PHASES nomme une phase absente du graphe")
+
+if not HARVESTING_PHASES <= set(PHASE_ORDER):
+    raise ValueError("HARVESTING_PHASES nomme une phase absente du graphe")
 
 if set(PHASE_LABELS) != set(PHASE_ORDER):
     raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")

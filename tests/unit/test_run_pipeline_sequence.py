@@ -140,6 +140,24 @@ class TestRunOnePhase:
 
         assert recorder.records[0]["status"] == "warning"
 
+    def test_une_phase_de_moissonnage_se_clot_sur_son_total(self, caplog):
+        with caplog.at_level(logging.INFO):
+            run_pipeline._run_one_phase(
+                "harvest",
+                _phase(lambda ctx: PhaseMetrics(new=2, updated=5, extras={"not_found": 3})),
+                args=_args(),
+                sources={"hal"},
+                recorder=_FakeRecorder(),
+            )
+
+        assert caplog.messages[-1] == "Total : 2 nouveaux, 5 mis à jour, 3 introuvables"
+
+    def test_une_autre_phase_ne_donne_pas_de_total(self, caplog):
+        with caplog.at_level(logging.INFO):
+            self._executer(lambda ctx: PhaseMetrics(new=3))
+
+        assert not any(m.startswith("Total") for m in caplog.messages)
+
     def test_phase_sans_metriques(self):
         """Une phase qui ne rend rien est consignée avec des compteurs vides, non ignorée."""
         _, recorder = self._executer(lambda ctx: None)
