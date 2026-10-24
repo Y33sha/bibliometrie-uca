@@ -136,10 +136,10 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape D — Suppressions
 
-- [ ] Écarts entre les groupes et les rattachements figés (`contributions`, `source_contributions.person_id`) mesurés ; décisions humaines contradictoires recherchées et tranchées.
-- [ ] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement.
+- [x] Décisions humaines contradictoires recherchées, le 2026-10-24 : sur 1 217 épinglages et 510 rejets, un groupe épinglé à deux personnes (Pierre Bonnet), dont les épinglages sont supprimés. Aucun épinglage ni groupe ne vise une personne rejetée pour la publication. f0a7cb791
+- [x] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement. f0a7cb791
 - [x] Scripts ponctuels qui écrivent ces colonnes supprimés. eac158104
-- [ ] `source_contribution_groups` renommée `contributions`, `source_contribution_group_members` renommée `aligned_source_contributions`.
+- [x] `source_contribution_groups` renommée `contributions`, `source_contribution_group_members` renommée `aligned_source_contributions`, avec la colonne `contribution_id`, la vue `contribution_structures`, les files et l'énumération `resolution_mode`. 37282716e
 - [ ] Phase `contributions` dissoute : ses tâches (périmètre des publications, vues des structures, purge des publications, référentiels vides, compteurs) rejoignent les phases antérieures, au plus tôt selon leurs dépendances.
 
 ### Phase 6 — Règles de la résolution dans le domaine
