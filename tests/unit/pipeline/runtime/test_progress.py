@@ -143,7 +143,7 @@ class TestRedessinDeLaBarre:
         return barre
 
     @staticmethod
-    def _redessine(barre: "module._Barre", stream: io.StringIO) -> str:
+    def _redessine(barre: "module._Bar", stream: io.StringIO) -> str:
         """Vide le flux, redessine la barre, rend ce que le redessin a écrit."""
         stream.seek(0)
         stream.truncate(0)
@@ -185,6 +185,14 @@ class TestRedessinDeLaBarre:
         stream = io.StringIO()
         with self._bar(stream, 300) as barre:
             assert module.disp_len(str(barre)) == module.LINE_WIDTH
+
+    def test_un_compteur_au_dela_du_total_annonce_affiche_100_pourcent(self):
+        """Une source rend plus de documents qu'elle n'en annonçait : le total affiché suit le compteur."""
+        stream = io.StringIO()
+        with self._bar(stream, 80) as barre:
+            barre.update(103)
+            assert "100%" in str(barre)
+            assert "103/103" in str(barre)
 
     def test_deux_volumes_differents_donnent_la_meme_longueur(self):
         """Le compteur occupe une colonne fixe : ce qui reste au remplissage l'est aussi."""

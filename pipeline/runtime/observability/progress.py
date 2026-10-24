@@ -87,8 +87,13 @@ if tqdm is not None:
             """Champs du format, avec le compteur complété et la largeur bornée.
 
             `{counter}` occupe une colonne fixe, de sorte que le remplissage qui la précède en occupe une aussi : deux sources aux volumes différents tracent des barres de même longueur.
+
+            Une source peut rendre plus d'éléments que le total qu'elle annonce. Le total affiché suit alors le compteur : `tqdm` traiterait un compteur supérieur au total comme un total inconnu, à 0 %.
             """
             fields: dict[str, object] = dict(super().format_dict)
+            n, total = fields.get("n"), fields.get("total")
+            if isinstance(n, int | float) and isinstance(total, int | float) and n > total:
+                fields["total"] = n
             width = fields.get("ncols")
             if isinstance(width, int):
                 # `self.ncols` sert aussi au redessin, qui compare la longueur écrite à la largeur.
