@@ -451,7 +451,26 @@ class TestResolutionQueue:
         counts = resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (None, None)
-        assert counts["detached"] == 1
+        assert counts["released"] == 1
+
+    def test_la_personne_passe_au_groupe_mieux_appuye_de_la_publication(self, sa_sync_conn):
+        """Le groupe en file perd sa personne avant que le groupe rattaché par ORCID la reçoive.
+
+        Régression : l'écriture du nouveau rattachement précédait le retrait de l'ancien et violait l'unicité de la personne dans la publication.
+        """
+        conn = sa_sync_conn
+        person = create_person("Martin", "Jean", repo=person_repository(conn))
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        publication = insert_publication(conn)
+        by_name = _group(conn, publication, [("hal", "Jean Martin", None, True)])
+        by_orcid = _group(conn, publication, [("crossref", "J. Martin", {"orcid": _ORCID}, True)])
+        _attach(conn, by_name, person, "name")
+        mark(conn, Queue.GROUP_RESOLUTION, [by_name])
+
+        resolve_groups(conn, logging.getLogger("test"))
+
+        assert _person(conn, by_orcid) == (person, "orcid")
+        assert _person(conn, by_name) == (None, None)
 
     def test_un_groupe_manuel_en_file_reste_rattache(self, sa_sync_conn):
         conn = sa_sync_conn

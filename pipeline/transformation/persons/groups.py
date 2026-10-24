@@ -123,10 +123,11 @@ _WRITE_SQL = text("""
       AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
 
-# Groupes de la file sans personne désignée par leur décision : ils perdent leur personne.
-_DETACH_UNSUPPORTED_SQL = text(f"""
-    UPDATE source_contribution_groups SET {DETACHED_GROUP}
-    WHERE id = ANY(:ids) AND person_id IS NOT NULL
+# Groupes décidés dont la personne diffère de celle que désigne leur décision : ils la perdent.
+_RELEASE_SQL = text(f"""
+    UPDATE source_contribution_groups g SET {DETACHED_GROUP}
+    FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
+    WHERE g.id = u.id AND g.person_id IS NOT NULL AND g.person_id IS DISTINCT FROM u.person_id
 """)
 
 
@@ -202,6 +203,21 @@ def decide_groups(
                     progress.keep()
         decisions |= settled
     return decisions
+
+
+def release_groups(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
+    """Retire leur personne aux groupes que leur décision rattache à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte une personne au plus, et la personne retirée peut revenir à un autre groupe de la publication. Rend le nombre de groupes concernés."""
+    if not decisions:
+        return 0
+    return conn.execute(
+        _RELEASE_SQL,
+        {
+            "ids": list(decisions),
+            "persons": [
+                d.person_id if d.outcome == GroupOutcome.MATCH else None for d in decisions.values()
+            ],
+        },
+    ).rowcount
 
 
 def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
@@ -353,7 +369,7 @@ def _log_identified(
 
 
 def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
-    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide et écrit la personne des groupes sans personne, puis crée les personnes des groupes du périmètre au nom inconnu (`create_persons`). Rend les compteurs par issue et par motif."""
+    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide la personne des groupes sans personne et des groupes en file, retire leur personne aux groupes que leur décision ne rattache plus à elle (`release_groups`), écrit les rattachements, puis crée les personnes des groupes du périmètre au nom inconnu (`create_persons`). Rend les compteurs par issue et par motif."""
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     logger.info(
@@ -371,6 +387,7 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
         line.conclude(f"{BRANCH}{quantity(total, 'contribution')} à examiner")
     with track_progress(total, BRANCH.rstrip(), logger, count_kept=True) as progress:
         decisions = decide_groups(groups, index, rejected, taken, progress)
+    released = release_groups(conn, decisions)
     written = write_decisions(conn, decisions)
     attribute_identifiers(conn, groups, decisions)
     _log_identified(logger, decisions, pinned)
@@ -401,12 +418,6 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
     with track_progress(to_create, BRANCH.rstrip(), logger, count_kept=True) as progress:
         created = create_persons(conn, groups, decisions, index, rejected, taken, progress)
     logger.info("%s%s %s", LAST_BRANCH, quantity(created, "personne"), inflect(created, "créée"))
-    unsupported = [
-        group_id
-        for group_id, d in decisions.items()
-        if d.person_id is None or d.outcome == GroupOutcome.SKIP
-    ]
-    detached = conn.execute(_DETACH_UNSUPPORTED_SQL, {"ids": unsupported}).rowcount
     delete_processed(conn, Queue.GROUP_RESOLUTION, _RESOLUTION_SNAPSHOT)
     counts: Counter[str] = Counter(
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
@@ -418,6 +429,6 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
         "groups": len(decisions),
         "written": written,
         "created": created,
-        "detached": detached,
+        "released": released,
         **counts,
     }
