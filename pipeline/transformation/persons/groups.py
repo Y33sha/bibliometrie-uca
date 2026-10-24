@@ -296,36 +296,33 @@ def apply_pins(conn: Connection) -> int:
 
 # Libellés des modes de rattachement dans le journal.
 _MODE_LABELS: dict[GroupMatchReason, str] = {
-    GroupMatchReason.MANUAL: "épinglage",
-    GroupMatchReason.ORCID: "ORCID",
-    GroupMatchReason.HAL_PERSON_ID: "compte HAL",
-    GroupMatchReason.IDREF: "IdRef",
-    GroupMatchReason.NAME: "forme de nom",
-    GroupMatchReason.COMPATIBLE_NAME: "initiales compatibles",
+    GroupMatchReason.MANUAL: "par épinglage",
+    GroupMatchReason.ORCID: "par ORCID",
+    GroupMatchReason.HAL_PERSON_ID: "par compte HAL",
+    GroupMatchReason.IDREF: "par IdRef",
+    GroupMatchReason.NAME: "par nom sans homonymie",
+    GroupMatchReason.COMPATIBLE_NAME: "par initiales compatibles",
 }
 
 
 def _log_identified(
     logger: ScopedOrPlainLogger, decisions: dict[int, GroupDecision], pinned: int
 ) -> None:
-    """Contributions identifiées, par mode de rattachement. Les épinglages appliqués avant la décision comptent avec le mode `manual`."""
+    """Contributions identifiées, mode de rattachement par mode de rattachement, nombres alignés à droite. Les épinglages appliqués avant la décision comptent avec le mode `manual`."""
     by_mode: Counter[GroupMatchReason] = Counter(
         d.reason
         for d in decisions.values()
         if d.outcome == GroupOutcome.MATCH and isinstance(d.reason, GroupMatchReason)
     )
     by_mode[GroupMatchReason.MANUAL] += pinned
-    detail = ", ".join(
-        f"{count} par {label}" for mode, label in _MODE_LABELS.items() if (count := by_mode[mode])
-    )
     total = sum(by_mode.values())
     logger.info(
-        "%s%s %s%s",
-        BRANCH,
-        quantity(total, "contribution"),
-        inflect(total, "identifiée"),
-        f" : {detail}" if detail else "",
+        "%s%s %s, dont", LAST_BRANCH, quantity(total, "contribution"), inflect(total, "identifiée")
     )
+    width = max(len(str(by_mode[mode])) for mode in _MODE_LABELS)
+    logger.info("")
+    for mode, label in _MODE_LABELS.items():
+        logger.info("     %s %s", str(by_mode[mode]).rjust(width), label)
 
 
 def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:

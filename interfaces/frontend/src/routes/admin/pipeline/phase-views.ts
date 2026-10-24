@@ -228,7 +228,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
           orcid: "ORCID",
           hal_person_id: "Compte HAL",
           idref: "IdRef",
-          name: "Forme de nom",
+          name: "Nom sans homonymie",
           compatible_name: "Initiales compatibles",
           created: "Personne créée",
         },

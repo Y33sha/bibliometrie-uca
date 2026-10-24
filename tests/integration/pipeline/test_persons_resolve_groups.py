@@ -400,5 +400,6 @@ def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync
     with caplog.at_level(logging.INFO):
         resolve_groups(conn, logging.getLogger("test"))
 
-    assert "  ├─ 1 contribution identifiée : 1 par ORCID" in caplog.messages
+    assert "  └─ 1 contribution identifiée, dont" in caplog.messages
+    assert "     1 par ORCID" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
