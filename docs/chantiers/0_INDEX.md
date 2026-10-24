@@ -4,7 +4,7 @@
 
 ### En cours
 
-- [Qualité des contributions](DATA_qualite-des-contributions.md)
+- [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 
 ### En pause
 

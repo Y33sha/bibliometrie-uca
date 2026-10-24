@@ -153,4 +153,4 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 - [x] Mise à jour de la documentation. aede75a00
 
-Les audits de qualité et les questions ouvertes se poursuivent dans le chantier [qualité des contributions](../DATA_qualite-des-contributions.md).
+Les audits de qualité et les questions ouvertes se poursuivent dans le chantier [audit de la qualité de la résolution des personnes](../DATA_audit-qualite-resolution-personnes.md).

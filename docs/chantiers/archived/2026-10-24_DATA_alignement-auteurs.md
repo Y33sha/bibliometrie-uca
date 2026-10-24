@@ -258,4 +258,4 @@ Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de 
 
 - **Lecture anticipée des lots d'`author_grouping`.** Un thread lirait le lot suivant, sur sa propre connexion, pendant le calcul et l'écriture du lot en cours : environ 7 s gagnées par lot de grandes collaborations. Prérequis : supprimer une appartenance par couple (contribution source, groupe). Sinon, la publication de départ d'un enregistrement source déplacé, lue avant le commit du lot qui contient la publication d'arrivée, effacerait la nouvelle appartenance.
 
-Les autres suites de l'alignement se poursuivent dans le chantier [qualité des contributions](../DATA_qualite-des-contributions.md).
+Les autres suites de l'alignement se poursuivent dans le chantier [audit de la qualité de la résolution des personnes](../DATA_audit-qualite-resolution-personnes.md).

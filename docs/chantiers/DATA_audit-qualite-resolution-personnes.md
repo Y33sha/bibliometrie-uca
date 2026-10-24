@@ -1,4 +1,4 @@
-# Chantier — Qualité des contributions
+# Chantier — Audit de la qualité de la résolution des personnes
 
 ## Contexte
 
