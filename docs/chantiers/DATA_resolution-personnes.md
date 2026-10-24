@@ -138,21 +138,22 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [x] Invalidation des rattachements au rejet d'un identifiant ou d'une forme de nom. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources. bc94685f2
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [x] La phase `contributions` cesse de construire la table `contributions`, que l'API cesse d'écrire. Les derniers lecteurs, dont la file des orphelins, lisent les groupes. 4ed641c65
-- [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs. L'ancienne cascade cesse de créer des personnes.
+- [x] `source_contributions.person_id` figé : l'ancienne cascade disparaît, et plus rien n'écrit la colonne. Aucune personne n'est créée jusqu'à la création par les groupes. eac158104
 - [ ] La cascade par groupe crée les personnes des groupes du périmètre restés sans personne, sur un index tenu à jour après chaque création.
 
 #### Étape D — Suppressions
 
-- [ ] Décisions humaines contradictoires entre les groupes et `contributions` recherchées et tranchées.
+- [ ] Écarts entre les groupes et les rattachements figés (`contributions`, `source_contributions.person_id`) mesurés ; décisions humaines contradictoires recherchées et tranchées.
 - [ ] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement.
-- [ ] Scripts ponctuels qui écrivent ces colonnes supprimés.
+- [x] Scripts ponctuels qui écrivent ces colonnes supprimés. eac158104
 - [ ] `source_contribution_groups` renommée `contributions`.
+- [ ] Phase `contributions` dissoute : ses tâches (périmètre des publications, vues des structures, purge des publications, référentiels vides, compteurs) rejoignent les phases antérieures, au plus tôt selon leurs dépendances.
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
 - [x] Une entrée de domaine rend la décision complète d'un groupe (`decide_group`). Elle lit un index de personnes en mémoire et renvoie les refus de corroboration. 02f69c43b
 - [ ] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes.
-- [ ] `NameFormDecision` et `PersonMatchDecision` fusionnent, avec la disparition de l'ancienne cascade.
+- [x] `PersonMatchDecision` disparaît avec l'ancienne cascade ; `decide_group` garde `NameFormDecision`. eac158104
 - [x] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par `decide_group` : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre. 02f69c43b
 - [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
 
