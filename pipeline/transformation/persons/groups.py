@@ -409,11 +409,7 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
         quantity(len(unidentified), "contribution"),
         inflect(len(unidentified), "non identifiée"),
     )
-    logger.info(
-        "%s%s (nom ambigu, noms ou identifiants en conflit, candidats rejetés)",
-        BRANCH,
-        quantity(undecidable, "indécidable"),
-    )
+    logger.info("%s%s", BRANCH, quantity(undecidable, "indécidable"))
     with track_progress(to_create, BRANCH.rstrip(), logger, count_kept=True) as progress:
         created = create_persons(conn, groups, decisions, index, rejected, taken, progress)
     logger.info("%s%s %s", LAST_BRANCH, quantity(created, "personne"), inflect(created, "créée"))
