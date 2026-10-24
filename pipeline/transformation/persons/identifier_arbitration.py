@@ -354,9 +354,9 @@ def resolve_identifier_transfers(
             continue
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
-        released = release_identifier_groups(conn, id_type, id_value, owner)
+        release_identifier_groups(conn, id_type, id_value, owner)
         logger.info(
-            "%sTransfert %s=%s : personne %d → %d (%s contre %d), %s %s",
+            "%sTransfert %s=%s : personne %d → %d (%s contre %d)",
             BRANCH,
             id_type,
             id_value,
@@ -364,8 +364,6 @@ def resolve_identifier_transfers(
             target,
             quantity(conflict.votes[target], "voix", "voix"),
             conflict.votes.get(owner, 0),
-            quantity(released, "contribution"),
-            inflect(released, "libérée"),
         )
         transferred += 1
 
@@ -393,11 +391,9 @@ def arbitrate_identifier_conflicts(
     with waiting(BRANCH, logger) as line:
         requalified = requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))
         if requalified["neutralized"]:
-            released_groups = requalified["released_groups"]
             line.conclude(
                 f"{BRANCH}Identifiants mal placés neutralisés sur "
                 f"{quantity(requalified['neutralized'], 'contribution source', 'contributions sources')}"
-                f", {quantity(released_groups, 'contribution')} {inflect(released_groups, 'libérée')}"
             )
         else:
             line.erase()
