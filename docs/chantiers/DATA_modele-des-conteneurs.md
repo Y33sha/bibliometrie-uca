@@ -111,13 +111,16 @@ Usages du type dans le code :
   - `publishers` et `doi_prefixes`, inchangées. Le titulaire d'un préfixe est l'éditeur d'origine de ses DOI ;
   - `serials`, à la place de `journals` : revues, collections d'ouvrages, séries d'actes, médias. Les ISSN, les formes de nom, les espaces de noms DOI, le DOAJ, les APC et le modèle open access y restent. Aucune colonne d'éditeur ;
   - `monographs` : livres et volumes d'actes, rattachés à leur série (`serial_id`) ;
-  - `platforms` : lieux qui hébergent des publications, à savoir entrepôts, serveurs de preprints, plateformes d'éditeurs, index et agrégateurs. Type, identifiant d'entrepôt Unpaywall (`endpoint_id`), source OpenAlex ;
+  - `platforms` : lieux qui hébergent des publications. Type (`repository`, `preprint_server`, `publisher_platform`, `unknown`), nom et identifiant de la source OpenAlex. Une archive et un entrepôt de données sont des `repository`, que le type de document distingue. Un document déposé sur un serveur de preprints est un preprint ; un entrepôt ne dit rien du type de ses documents ;
   - `platform_domains` : domaine → plateforme, plateforme nullable ;
-  - localisations d'un enregistrement source : URL de la page, URL du PDF, plateforme nullable, version, licence, date d'ouverture. L'agrégation les réunit par publication ;
+  - `source_record_locations` : localisations d'un enregistrement source, réécrites à chaque normalisation. URL de la page et du PDF, identifiant OAI-PMH, version dans le vocabulaire de la source, licence, open access, plateforme nullable. OpenAlex les alimente, puis Crossref ;
   - `publisher_id` sur `source_records` et `publications`, écrit par l'agrégation : le titulaire du préfixe pour un DOI Crossref, à défaut l'éditeur que donnent les sources ;
   - `doi_prefix`, colonne générée de `publications`, pour les jointures sur `doi_prefixes`.
 - L'éditeur d'une série est celui de ses publications les plus récentes. Une publication a donc l'éditeur à la date de sa publication.
 - Une production hébergée sans être publiée n'a pas d'éditeur : preprint, jeu de données, dépôt. La plateforme qui l'héberge n'en est pas l'éditeur, comme le CCSD pour HAL.
+- Une plateforme prend le nom et l'identifiant de sa source OpenAlex. Aucune plateforme n'est créée sans nom fiable : les noms d'institution d'Unpaywall sont erronés (« Asklepios Klinik St. Georg » pour l'archive de Göttingen).
+- Unpaywall donne seulement le verdict open access. OpenAlex couvre 99 % des publications à DOI Crossref, et donne aussi les copies fermées et le nom des entrepôts.
+- Une fiche de catalogue sans copie du texte n'est pas une localisation : le DOAJ (`doaj.org/article`) est écarté.
 
 ## Phasage
 
@@ -143,9 +146,11 @@ Usages du type dans le code :
 
 ### Phase 3 — Plateformes et localisations
 
-- [ ] Migration : `platforms`, `platform_domains`, localisations des enregistrements sources.
-- [ ] Moissonnage des localisations d'Unpaywall, avec archivage des réponses.
-- [ ] Localisations de Crossref (`resource`, `link`) et d'OpenAlex.
+- [ ] Migration : `platforms`, `source_record_locations`.
+- [ ] Normalisation OpenAlex : localisations, plateforme trouvée ou créée pour une source de type `repository`.
+- [ ] Stock : réhydratation du staging OpenAlex et renormalisation.
+- [ ] Serveurs de preprints : règle sur les données (part des preprints parmi les documents d'une plateforme), à mesurer.
+- [ ] Localisations de Crossref (`resource`, `link`).
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
 - [ ] Préfixe DOI d'une plateforme (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources. Règle et oneshot de correction des publications (environ 4 650).
