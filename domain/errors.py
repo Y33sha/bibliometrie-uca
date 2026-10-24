@@ -67,16 +67,16 @@ class PublisherMergeBlockedError(ConflictError):
 
 
 class ContributionAlreadyAssignedError(ConflictError):
-    """Attribution refusée : la contribution source visée est déjà rattachée à une personne.
+    """Attribution refusée : la contribution visée, groupe de contributions sources, est déjà rattachée à une personne.
 
-    Seule une contribution source orpheline s'attribue ; reprendre une contribution source rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
+    Seule une contribution orpheline s'attribue ; reprendre une contribution rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
 
     def __init__(self, contribution_id: int, owner_person_id: int) -> None:
         self.contribution_id = contribution_id
         self.owner_person_id = owner_person_id
         super().__init__(
-            f"La contribution source #{contribution_id} est déjà attribuée à la personne "
-            f"#{owner_person_id} ; seule une contribution source orpheline peut être attribuée."
+            f"La contribution #{contribution_id} est déjà attribuée à la personne "
+            f"#{owner_person_id} ; seule une contribution orpheline peut être attribuée."
         )
 
 

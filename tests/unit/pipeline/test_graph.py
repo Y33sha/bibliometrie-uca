@@ -117,7 +117,7 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
 
 
 def test_les_statistiques_des_contributions_sources_sont_rafraichies_apres_persons():
-    """`normalize` et `persons` réécrivent en masse `source_contributions.person_id`, que la construction des contributions filtre ensuite."""
+    """`normalize` et `persons` réécrivent en masse `source_contributions.person_id`."""
     purge = next(n for n in TASKS if n.name == "persons.purge")
     assert "ANALYZE source_contributions" in purge.maintenance
 

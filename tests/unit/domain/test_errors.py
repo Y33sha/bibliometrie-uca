@@ -49,12 +49,12 @@ class TestPublisherMergeBlockedError:
 
 
 class TestContributionAlreadyAssignedError:
-    def test_nomme_la_contribution_source_et_sa_detentrice(self):
+    def test_nomme_la_contribution_et_sa_detentrice(self):
         exc = ContributionAlreadyAssignedError(7, 42)
         assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
         assert str(exc) == (
-            "La contribution source #7 est déjà attribuée à la personne #42 ; "
-            "seule une contribution source orpheline peut être attribuée."
+            "La contribution #7 est déjà attribuée à la personne #42 ; "
+            "seule une contribution orpheline peut être attribuée."
         )
 
 

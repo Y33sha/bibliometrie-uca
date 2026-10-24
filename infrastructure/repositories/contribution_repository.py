@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour les contributions et source_contributions."""
+"""Adapter PostgreSQL sync pour les contributions (groupes de contributions sources) et les source_contributions."""
 
 from datetime import datetime
 from typing import cast
@@ -6,18 +6,15 @@ from typing import cast
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.contribution_repository import (
-    AssignedSourceContributionRow,
-    ContributionPersonRow,
     ContributionRepository,
+    GroupMemberRow,
+    GroupRow,
 )
 from domain.persons.group_matching import GroupMatchReason
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
-    PERSON_PUBLICATIONS_SCOPE,
     REJECTED_PAIRS,
-    insert_missing_contributions_sql,
     pinned_groups_sql,
-    propagate_contribution_attributes_sql,
 )
 
 # Modes de résolution d'un groupe rattaché par le nom.
@@ -69,64 +66,13 @@ def detach_rejected_source_contributions(
     ).rowcount
 
 
-def delete_orphan_contributions(conn: Connection, person_id: int) -> int:
-    """Supprime les lignes consolidées de la personne qu'aucune contribution source n'atteste. Retourne le nombre supprimé."""
-    return conn.execute(
-        text("""
-            DELETE FROM contributions a
-            WHERE a.person_id = :pid
-              AND NOT EXISTS (
-                  SELECT 1 FROM source_contributions sc
-                  JOIN source_records sr ON sr.id = sc.source_record_id
-                  WHERE sc.person_id = :pid AND sr.publication_id = a.publication_id
-              )
-        """),
-        {"pid": person_id},
-    ).rowcount
-
-
 class PgContributionRepository(ContributionRepository):
     """Accès PostgreSQL sync aux contributions et à leurs contributions sources."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Recomposition d'une contribution depuis ses contributions sources ───────
-
-    def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
-        """Les structures dérivées vivent dans les vues matérialisées, rafraîchies par le pipeline."""
-        if not publication_ids:
-            return
-        params = {"person_id": person_id, "publication_ids": publication_ids}
-        self._conn.execute(
-            text(insert_missing_contributions_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
-        )
-        self._conn.execute(
-            text(propagate_contribution_attributes_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
-        )
-
     # ── source_contributions : lien personne ↔ contribution source
-
-    def find_source_contribution_owner(self, source_contribution_id: int) -> int | None:
-        return self._conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :aid"),
-            {"aid": source_contribution_id},
-        ).scalar_one_or_none()
-
-    def assign_orphan_source_contribution(
-        self, person_id: int, source_contribution_id: int
-    ) -> AssignedSourceContributionRow | None:
-        row = self._conn.execute(
-            text("""
-                UPDATE source_contributions sc SET person_id = :pid
-                FROM contributor_information ci
-                WHERE sc.id = :aid AND sc.person_id IS NULL
-                  AND ci.id = sc.contributor_information_id
-                RETURNING sc.source::text AS source, ci.author_name_normalized
-            """),
-            {"pid": person_id, "aid": source_contribution_id},
-        ).first()
-        return cast(AssignedSourceContributionRow, dict(row._mapping)) if row else None
 
     def assign_orphan_source_contributions(
         self, person_id: int, source_contribution_ids: list[int]
@@ -144,23 +90,6 @@ class PgContributionRepository(ContributionRepository):
             ).scalars()
         )
 
-    def get_distinct_name_forms_from_source_contributions(
-        self, source_contribution_ids: list[int]
-    ) -> list[str]:
-        if not source_contribution_ids:
-            return []
-        rows = self._conn.execute(
-            text("""
-                SELECT DISTINCT ci.author_name_normalized
-                FROM source_contributions sc
-                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                WHERE sc.id = ANY(:ids)
-                  AND ci.author_name_normalized IS NOT NULL
-            """),
-            {"ids": source_contribution_ids},
-        ).all()
-        return [row.author_name_normalized for row in rows]
-
     def find_publication_id_for_source_contribution(
         self, source_contribution_id: int
     ) -> int | None:
@@ -172,21 +101,6 @@ class PgContributionRepository(ContributionRepository):
             """),
             {"aid": source_contribution_id},
         ).scalar_one_or_none()
-
-    def find_publication_ids_for_source_contributions(
-        self, source_contribution_ids: list[int]
-    ) -> list[int]:
-        if not source_contribution_ids:
-            return []
-        rows = self._conn.execute(
-            text("""
-                SELECT DISTINCT d.publication_id FROM source_contributions sc
-                JOIN source_records d ON d.id = sc.source_record_id
-                WHERE sc.id = ANY(:ids) AND d.publication_id IS NOT NULL
-            """),
-            {"ids": source_contribution_ids},
-        ).all()
-        return [row.publication_id for row in rows]
 
     def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
         return self._conn.execute(
@@ -226,18 +140,36 @@ class PgContributionRepository(ContributionRepository):
             ).scalars()
         )
 
-    # ── contributions ────────────────────────────────────────────────
+    # ── Contributions : groupes de contributions sources ─────────────
 
-    def get_contribution_person(self, contribution_id: int) -> ContributionPersonRow | None:
-        result = self._conn.execute(
+    def find_groups(self, group_ids: list[int]) -> list[GroupRow]:
+        if not group_ids:
+            return []
+        rows = self._conn.execute(
             text(
                 "SELECT id, person_id, publication_id FROM source_contribution_groups"
-                " WHERE id = :id AND person_id IS NOT NULL"
+                " WHERE id = ANY(:ids) ORDER BY id"
             ),
-            {"id": contribution_id},
-        )
-        row = result.first()
-        return cast(ContributionPersonRow, dict(row._mapping)) if row else None
+            {"ids": group_ids},
+        ).all()
+        return [cast(GroupRow, dict(row._mapping)) for row in rows]
+
+    def find_group_members(self, group_ids: list[int]) -> list[GroupMemberRow]:
+        if not group_ids:
+            return []
+        rows = self._conn.execute(
+            text("""
+                SELECT gm.source_contribution_id, sc.source::text AS source,
+                       ci.author_name_normalized
+                FROM source_contribution_group_members gm
+                JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+                JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                WHERE gm.group_id = ANY(:ids)
+                ORDER BY gm.source_contribution_id
+            """),
+            {"ids": group_ids},
+        ).all()
+        return [cast(GroupMemberRow, dict(row._mapping)) for row in rows]
 
     def reject_contribution(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
@@ -272,9 +204,6 @@ class PgContributionRepository(ContributionRepository):
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
         return detach_rejected_source_contributions(self._conn, person_id, publication_id)
-
-    def delete_orphan_contributions_for_person(self, person_id: int) -> int:
-        return delete_orphan_contributions(self._conn, person_id)
 
     # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
 

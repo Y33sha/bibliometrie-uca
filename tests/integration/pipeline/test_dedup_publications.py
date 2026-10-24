@@ -259,8 +259,7 @@ class TestRefreshFromSources:
         assert source_record_publication is None
 
     def test_out_of_scope_deletion_cascades_contributions(self, sa_sync_conn):
-        """La suppression d'un type non admissible emporte les contributions canoniques (FK ON
-        DELETE CASCADE) ; la personne, elle, survit."""
+        """La suppression d'un type non admissible emporte les groupes de contributions sources (FK ON DELETE CASCADE) ; la personne, elle, survit."""
         conn = sa_sync_conn
         pid = _insert_publication(conn, doc_type="article", publication_year=2024)
         _source_record(
@@ -272,7 +271,11 @@ class TestRefreshFromSources:
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         assert (
-            _scalar(conn, "SELECT count(*) FROM contributions WHERE publication_id = :id", id=pid)
+            _scalar(
+                conn,
+                "SELECT count(*) FROM source_contribution_groups WHERE publication_id = :id",
+                id=pid,
+            )
             == 0
         )
         assert _scalar(conn, "SELECT count(*) FROM persons WHERE id = :id", id=person_id) == 1

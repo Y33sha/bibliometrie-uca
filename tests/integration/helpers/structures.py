@@ -153,7 +153,7 @@ def refresh_structure_matviews(conn) -> None:
 def add_contribution_structure(conn, contribution_id: int, structure_id: int) -> None:
     """Lie la contribution `contribution_id` et son groupe à `structure_id`, par une contribution source de sa publication et de sa personne, membre du groupe, qui atteint la structure, puis rafraîchit les vues des structures."""
     publication_id, person_id = conn.execute(
-        text("SELECT publication_id, person_id FROM contributions WHERE id = :id"),
+        text("SELECT publication_id, person_id FROM source_contribution_groups WHERE id = :id"),
         {"id": contribution_id},
     ).one()
     source_record_id = insert_source_record(

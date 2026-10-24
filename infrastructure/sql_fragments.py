@@ -11,7 +11,7 @@ from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES, SOURCE_PRIORITY
+from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -61,7 +61,7 @@ def diamond_journal_sql(journal: str = "j") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
+    """Condition vraie quand la contribution source ou le groupe aliasé `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
@@ -250,97 +250,6 @@ def declares_conference_sql(alias: str = "sr") -> str:
 def self_declared_preprint_sql(alias: str = "sr") -> str:
     """Condition vraie quand l'enregistrement source aliasé `alias` déclare être le preprint d'une autre œuvre."""
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
-
-
-# Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la contribution source `sc` et son enregistrement source `sr`.
-PERSON_PUBLICATIONS_SCOPE = (
-    "AND sc.person_id = :person_id AND sr.publication_id = ANY(:publication_ids)"
-)
-"""Paires (publication, personne) de la personne `:person_id` sur les publications `:publication_ids`."""
-
-SOURCE_CONTRIBUTIONS_SCOPE = """AND (sr.publication_id, sc.person_id) IN (
-    SELECT s_sr.publication_id, s.person_id
-    FROM source_contributions s JOIN source_records s_sr ON s_sr.id = s.source_record_id
-    WHERE s.id = ANY(:source_contribution_ids)
-)"""
-"""Paires (publication, personne) des contributions sources `:source_contribution_ids`."""
-
-
-def insert_missing_contributions_sql(*, scope: str = "") -> str:
-    """Insère une contribution par paire (publication, personne) que lient des contributions sources, et absente de la table.
-
-    Une paire rejetée est écartée, sauf si une contribution source confirmée la relie : la confirmation vise la contribution source elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
-    """
-    return f"""
-        WITH all_pairs AS (
-            SELECT sr.publication_id, sc.person_id,
-                   bool_or(ca.source_contribution_id IS NOT NULL) AS confirmed
-            FROM source_contributions sc
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            JOIN publications pub ON pub.id = sr.publication_id
-            LEFT JOIN confirmed_source_contributions ca
-              ON ca.source_contribution_id = sc.id AND ca.person_id = sc.person_id
-            WHERE sc.person_id IS NOT NULL {scope}
-            GROUP BY sr.publication_id, sc.person_id
-        )
-        INSERT INTO contributions (publication_id, person_id)
-        SELECT ap.publication_id, ap.person_id
-        FROM all_pairs ap
-        WHERE NOT EXISTS (
-            SELECT 1 FROM contributions a
-            WHERE a.publication_id = ap.publication_id
-              AND a.person_id = ap.person_id
-        )
-          AND (ap.confirmed
-               OR NOT {publication_rejected_for("ap.publication_id", "ap.person_id")})
-    """
-
-
-def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
-    """Recompose les attributs de chaque contribution depuis ses contributions sources.
-
-    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une contribution source le dit. Les indices de périmètre et les rôles sont l'union de ceux des contributions sources. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
-    """
-    return f"""
-        WITH linked AS (
-            SELECT a.id AS aid, sc.source, sc.author_position, sc.is_corresponding,
-                   sc.perimeter_evidence, sc.roles
-            FROM source_contributions sc
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            JOIN contributions a ON a.publication_id = sr.publication_id
-                              AND a.person_id = sc.person_id
-            WHERE TRUE {scope}
-        ),
-        scal AS (
-            SELECT l.aid,
-                   (array_agg(l.author_position ORDER BY
-                       {case_priority(SOURCE_PRIORITY, "l.source")})
-                       FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
-                   bool_or(l.is_corresponding) AS is_corr
-            FROM linked l
-            GROUP BY l.aid
-        ),
-        ev AS (
-            SELECT l.aid, array_agg(DISTINCT e ORDER BY e) AS evidence
-            FROM linked l, LATERAL unnest(l.perimeter_evidence) AS e
-            GROUP BY l.aid
-        ),
-        rol AS (
-            SELECT l.aid, array_agg(DISTINCT r ORDER BY r) AS roles
-            FROM linked l, LATERAL unnest(l.roles) AS r
-            GROUP BY l.aid
-        )
-        UPDATE contributions a
-        SET author_position = scal.pos,
-            is_corresponding = scal.is_corr,
-            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
-            roles            = rol.roles
-        FROM scal LEFT JOIN rol ON rol.aid = scal.aid LEFT JOIN ev ON ev.aid = scal.aid
-        WHERE a.id = scal.aid
-          AND (a.author_position, a.is_corresponding, a.perimeter_evidence, a.roles)
-              IS DISTINCT FROM (scal.pos, scal.is_corr,
-                                coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
-    """
 
 
 def propagate_group_attributes_sql(group_ids: str) -> str:

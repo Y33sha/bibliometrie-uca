@@ -3,6 +3,7 @@
 from sqlalchemy import Connection, text
 
 from infrastructure.db.queues import Queue, enqueue_sql
+from infrastructure.sql_fragments import propagate_group_attributes_sql
 from tests.integration.helpers.queues import mark
 
 _MARK_UNGROUPED = enqueue_sql(
@@ -76,6 +77,22 @@ def group_ungrouped(conn: Connection) -> None:
             SELECT id, group_id, source_record_id, 'reference' FROM ungrouped
         """)
     )
+
+
+def recompose_group_attributes(conn: Connection) -> None:
+    """Recompose les attributs de tous les groupes depuis leurs membres, comme la phase `author_grouping` pour les groupes en file."""
+    conn.execute(text(propagate_group_attributes_sql("SELECT id FROM source_contribution_groups")))
+
+
+def group_of(conn: Connection, source_contribution_id: int) -> int:
+    """L'`id` du groupe de la contribution source `source_contribution_id`."""
+    return conn.execute(
+        text(
+            "SELECT group_id FROM source_contribution_group_members"
+            " WHERE source_contribution_id = :s"
+        ),
+        {"s": source_contribution_id},
+    ).scalar_one()
 
 
 def set_perimeter_author_group(

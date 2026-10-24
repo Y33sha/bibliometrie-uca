@@ -1,4 +1,4 @@
-"""Tests de caractérisation du service des personnes et de l'attribution des contributions sources orphelines : identifiants, formes de nom, détachement, fusion."""
+"""Tests de caractérisation du service des personnes et de l'attribution des contributions orphelines : identifiants, formes de nom, détachement, fusion."""
 
 from functools import partial
 
@@ -42,7 +42,11 @@ from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
 )
-from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
+from tests.integration.helpers.groups import (
+    add_group_member,
+    insert_group,
+    set_perimeter_author_group,
+)
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -101,6 +105,37 @@ def _perimeter_group(conn, person_id, mode, *, source_id, **source_contribution)
     group = insert_group(conn, publication, [(source_contribution_id, source_record)])
     set_perimeter_author_group(conn, group, person_id=person_id, mode=mode)
     return publication, group
+
+
+def _orphan(conn, publication_id, *, source_id="hal-1", source="hal", **source_contribution):
+    """Contribution orpheline : groupe d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Rend (groupe, contribution source)."""
+    source_record = _source_record(conn, publication_id, source=source, source_id=source_id)
+    source_contribution_id = _jean_dupont_source_contribution(
+        conn, source_record, source=source, **source_contribution
+    )
+    group = insert_group(conn, publication_id, [(source_contribution_id, source_record)])
+    set_perimeter_author_group(conn, group)
+    return group, source_contribution_id
+
+
+def _pinned_to(conn, source_contribution_ids):
+    """Personne à laquelle chaque contribution source est épinglée, `None` sans épinglage."""
+    rows = dict(
+        conn.execute(
+            text(
+                "SELECT source_contribution_id, person_id FROM confirmed_source_contributions"
+                " WHERE source_contribution_id = ANY(:ids)"
+            ),
+            {"ids": source_contribution_ids},
+        ).all()
+    )
+    return [rows.get(i) for i in source_contribution_ids]
+
+
+def _source_contribution_person(conn, source_contribution_id):
+    return _scalar(
+        conn, "SELECT person_id FROM source_contributions WHERE id = :i", i=source_contribution_id
+    )
 
 
 @pytest.fixture
@@ -706,20 +741,23 @@ class TestBatchAssignOrphanContributions:
             == 0
         )
 
-    def test_assigns_and_creates_contribution(self, sa_sync_conn, repo, contribution_repo):
+    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+        """Chaque groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne et la reçoivent dans `source_contributions`."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
-        publication_id = insert_publication(sa_sync_conn)
-        source_record_hal = _source_record(sa_sync_conn, publication_id, source_id="h-1")
-        source_record_oa = _source_record(
-            sa_sync_conn, publication_id, source="openalex", source_id="W1"
+        first = insert_publication(sa_sync_conn)
+        first_group, first_hal = _orphan(sa_sync_conn, first, source_id="h-1")
+        source_record_oa = _source_record(sa_sync_conn, first, source="openalex", source_id="W1")
+        first_oa = _jean_dupont_source_contribution(
+            sa_sync_conn, source_record_oa, source="openalex"
         )
-        sa1 = _jean_dupont_source_contribution(sa_sync_conn, source_record_hal)
-        sa2 = _jean_dupont_source_contribution(sa_sync_conn, source_record_oa, source="openalex")
+        add_group_member(sa_sync_conn, first_group, first_oa, source_record_oa)
+        second = insert_publication(sa_sync_conn)
+        second_group, second_hal = _orphan(sa_sync_conn, second, source_id="h-2")
 
         assigned = batch_assign_orphan_contributions(
             person_id,
-            [sa1, sa2],
+            [first_group, second_group],
             perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
@@ -727,78 +765,54 @@ class TestBatchAssignOrphanContributions:
         )
 
         assert assigned == 2
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT id FROM contributions WHERE publication_id = :publication AND person_id = :pid"
-            ),
-            {"publication": publication_id, "pid": person_id},
-        ).first()
-        assert row is not None
-        rows = sa_sync_conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = ANY(:ids)"),
-            {"ids": [sa1, sa2]},
-        ).all()
-        assert all(r.person_id == person_id for r in rows)
+        assert _group_person(sa_sync_conn, first_group) == (person_id, "manual")
+        assert _group_person(sa_sync_conn, second_group) == (person_id, "manual")
+        members = [first_hal, first_oa, second_hal]
+        assert _pinned_to(sa_sync_conn, members) == [person_id] * 3
+        assert [_source_contribution_person(sa_sync_conn, m) for m in members] == [person_id] * 3
+        assert _publication_evidence(sa_sync_conn, first) == ["address"]
 
-    def test_consolide_comme_la_phase_contributions(self, sa_sync_conn, repo, contribution_repo):
-        """Position de la source prioritaire, union des indices de périmètre et des rôles de toutes les contributions sources."""
+    def test_adds_name_forms_under_their_source(self, sa_sync_conn, repo, contribution_repo):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
-        publication_id = insert_publication(sa_sync_conn)
-        source_contribution_hal = _jean_dupont_source_contribution(
+        group, _ = _orphan(
             sa_sync_conn,
-            _source_record(sa_sync_conn, publication_id),
-            author_position=3,
-            roles=["author"],
-        )
-        source_contribution_oa = _jean_dupont_source_contribution(
-            sa_sync_conn,
-            _source_record(sa_sync_conn, publication_id, source="openalex", source_id="W1"),
+            insert_publication(sa_sync_conn),
             source="openalex",
-            author_position=5,
-            in_perimeter=True,
-            roles=["editor"],
+            source_id="W1",
+            author_name_normalized="j dupont",
         )
 
         batch_assign_orphan_contributions(
             person_id,
-            [source_contribution_hal, source_contribution_oa],
+            [group],
             perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             conn=sa_sync_conn,
         )
 
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
-                "FROM contributions WHERE publication_id = :publication AND person_id = :pid"
-            ),
-            {"publication": publication_id, "pid": person_id},
-        ).one()
-        assert (row.author_position, row.evidence, row.roles) == (
-            3,
-            ["address"],
-            ["author", "editor"],
-        )
+        assert _scalar(
+            sa_sync_conn,
+            "SELECT sources FROM person_name_forms WHERE name_form = 'j dupont' AND person_id = :p",
+            p=person_id,
+        ) == ["openalex"]
 
     def test_skips_already_assigned(self, sa_sync_conn, repo, contribution_repo):
-        """Une contribution source déjà rattachée est écartée : ni confirmation, ni contribution, ni forme de nom pour la personne visée ; l'orpheline du lot est rattachée."""
+        """Un groupe déjà rattaché est écarté : ni épinglage, ni changement de personne ; le groupe orphelin du lot est rattaché."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         owned_publication = insert_publication(sa_sync_conn)
-        owned = _jean_dupont_source_contribution(
-            sa_sync_conn, _source_record(sa_sync_conn, owned_publication), person_id=p1
-        )
-        orphan_publication = insert_publication(sa_sync_conn)
-        orphan = _jean_dupont_source_contribution(
-            sa_sync_conn, _source_record(sa_sync_conn, orphan_publication, source_id="h-2")
+        owned_group, owned = _orphan(sa_sync_conn, owned_publication, person_id=p1)
+        set_perimeter_author_group(sa_sync_conn, owned_group, person_id=p1, mode="name")
+        orphan_group, orphan = _orphan(
+            sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-2"
         )
 
         assigned = batch_assign_orphan_contributions(
             p2,
-            [owned, orphan],
+            [owned_group, orphan_group],
             perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
@@ -806,35 +820,21 @@ class TestBatchAssignOrphanContributions:
         )
 
         assert assigned == 1
-        assert (
-            _scalar(
-                sa_sync_conn, "SELECT person_id FROM source_contributions WHERE id = :i", i=owned
-            )
-            == p1
-        )
-        assert _scalar(
-            sa_sync_conn,
-            "SELECT array_agg(source_contribution_id) FROM confirmed_source_contributions WHERE person_id = :p",
-            p=p2,
-        ) == [orphan]
-        assert _scalar(
-            sa_sync_conn,
-            "SELECT array_agg(publication_id) FROM contributions WHERE person_id = :p",
-            p=p2,
-        ) == [orphan_publication]
+        assert _group_person(sa_sync_conn, owned_group) == (p1, "name")
+        assert _source_contribution_person(sa_sync_conn, owned) == p1
+        assert _pinned_to(sa_sync_conn, [owned, orphan]) == [None, p2]
+        assert _group_person(sa_sync_conn, orphan_group) == (p2, "manual")
 
 
 # ── detach_contributions ─────────────────────────────────────────────
 
 
 class TestDetachContributions:
-    def test_detaches_and_removes_contribution_if_orphan(
-        self, sa_sync_conn, repo, contribution_repo
-    ):
+    def test_detaches_source_contribution_and_group(self, sa_sync_conn, repo, contribution_repo):
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        auth_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        group_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_contribution_id = _jean_dupont_source_contribution(
             sa_sync_conn, source_record_id, person_id=person_id
         )
@@ -849,19 +849,8 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 1
-        assert result["deleted_contributions"] == 1
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT person_id FROM source_contributions WHERE id = :i",
-                i=source_contribution_id,
-            )
-            is None
-        )
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM contributions WHERE id = :i"), {"i": auth_id}
-        ).first()
-        assert row is None
+        assert _source_contribution_person(sa_sync_conn, source_contribution_id) is None
+        assert _group_person(sa_sync_conn, group_id) == (None, None)
 
     def test_detaches_all_sources_of_publication_from_single_ref(
         self, sa_sync_conn, repo, contribution_repo
@@ -870,7 +859,7 @@ class TestDetachContributions:
         détache toutes les sources de la même paire et peuple le store."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        auth_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
+        group_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_record_hal = _source_record(sa_sync_conn, publication_id)
         source_record_oa = _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="oa-1"
@@ -893,7 +882,6 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 2
-        assert result["deleted_contributions"] == 1
         for source_contribution_id in (source_contribution_hal, source_contribution_oa):
             assert (
                 _scalar(
@@ -903,9 +891,7 @@ class TestDetachContributions:
                 )
                 is None
             )
-        assert (
-            _scalar(sa_sync_conn, "SELECT id FROM contributions WHERE id = :i", i=auth_id) is None
-        )
+        assert _group_person(sa_sync_conn, group_id) == (None, None)
         assert (
             _scalar(
                 sa_sync_conn,
@@ -1163,8 +1149,7 @@ class TestUpdateNameFormStatus:
             )
 
     def test_reject_detaches_contributions(self, sa_sync_conn, repo, contribution_repo):
-        """Rejeter une forme détache ses contributions sources (source_contributions → NULL) et
-        supprime les contributions canoniques devenues sans source ; le verrou reste posé."""
+        """Rejeter une forme détache ses contributions sources (source_contributions → NULL) ; le verrou reste posé."""
         pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
         _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
         publication = insert_publication(sa_sync_conn)
@@ -1172,7 +1157,6 @@ class TestUpdateNameFormStatus:
         source_contribution_id = _jean_dupont_source_contribution(
             sa_sync_conn, spid, person_id=pid, author_name_normalized="intrus etranger"
         )
-        insert_contribution(sa_sync_conn, publication, person_id=pid)
 
         update_name_form_status(
             pid,
@@ -1189,13 +1173,6 @@ class TestUpdateNameFormStatus:
                 text("SELECT person_id FROM source_contributions WHERE id = :id"),
                 {"id": source_contribution_id},
             ).scalar_one()
-            is None
-        )
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT 1 FROM contributions WHERE publication_id = :p AND person_id = :pid"),
-                {"p": publication, "pid": pid},
-            ).first()
             is None
         )
         assert (
@@ -1271,83 +1248,66 @@ class TestNameFormRejectionOnGroups:
 
 
 class TestAssignOrphanContribution:
-    def test_recompose_la_contribution_existante_depuis_toutes_ses_contributions_sources(
-        self, sa_sync_conn, repo, contribution_repo
-    ):
-        """La contribution déjà liée par une contribution source HAL reçoit les indices et les rôles de la contribution source rattachée."""
+    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+        """Le groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne et la reçoivent dans `source_contributions`."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        _jean_dupont_source_contribution(
-            sa_sync_conn,
-            _source_record(sa_sync_conn, publication_id),
-            author_position=3,
-            person_id=person_id,
-            roles=["author"],
+        group, hal = _orphan(sa_sync_conn, publication_id)
+        source_record_oa = _source_record(
+            sa_sync_conn, publication_id, source="openalex", source_id="W1"
         )
-        insert_contribution(sa_sync_conn, publication_id, person_id=person_id, author_position=3)
-        orphan = _jean_dupont_source_contribution(
-            sa_sync_conn,
-            _source_record(sa_sync_conn, publication_id, source="openalex", source_id="W1"),
-            source="openalex",
-            author_position=5,
-            in_perimeter=True,
-            roles=["editor"],
+        openalex = _jean_dupont_source_contribution(
+            sa_sync_conn, source_record_oa, source="openalex"
         )
+        add_group_member(sa_sync_conn, group, openalex, source_record_oa)
 
         assign_orphan_contribution(
             person_id,
-            orphan,
+            group,
             conn=sa_sync_conn,
             perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
 
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT author_position, perimeter_evidence::text[] AS evidence, roles "
-                "FROM contributions WHERE publication_id = :publication AND person_id = :pid"
-            ),
-            {"publication": publication_id, "pid": person_id},
-        ).one()
-        assert (row.author_position, row.evidence, row.roles) == (
-            3,
-            ["address"],
-            ["author", "editor"],
-        )
+        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
+        assert _pinned_to(sa_sync_conn, [hal, openalex]) == [person_id, person_id]
+        assert [_source_contribution_person(sa_sync_conn, m) for m in (hal, openalex)] == [
+            person_id,
+            person_id,
+        ]
+        assert _publication_evidence(sa_sync_conn, publication_id) == ["address"]
+        assert _scalar(
+            sa_sync_conn,
+            "SELECT sources FROM person_name_forms WHERE name_form = 'jean dupont' AND person_id = :p",
+            p=person_id,
+        ) == ["hal", "openalex"]
 
     def test_raises_if_already_assigned(self, sa_sync_conn, repo, contribution_repo):
-        """Une contribution source déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
+        """Un groupe déjà rattaché n'est pas repris : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
-        publication_id = insert_publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(
-            sa_sync_conn, source_record_id, person_id=other_id
+        group, source_contribution_id = _orphan(
+            sa_sync_conn, insert_publication(sa_sync_conn), person_id=other_id
         )
+        set_perimeter_author_group(sa_sync_conn, group, person_id=other_id, mode="name")
 
         with pytest.raises(ContributionAlreadyAssignedError) as exc:
             assign_orphan_contribution(
                 person_id,
-                source_contribution_id,
+                group,
                 conn=sa_sync_conn,
                 perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
         assert exc.value.owner_person_id == other_id
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT person_id FROM source_contributions WHERE id = :i",
-                i=source_contribution_id,
-            )
-            == other_id
-        )
+        assert _group_person(sa_sync_conn, group) == (other_id, "name")
+        assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
 
-    def test_raises_if_source_contribution_missing(self, sa_sync_conn, repo, contribution_repo):
+    def test_raises_if_group_missing(self, sa_sync_conn, repo, contribution_repo):
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             assign_orphan_contribution(
@@ -1359,36 +1319,6 @@ class TestAssignOrphanContribution:
                 contribution_repo=contribution_repo,
             )
 
-    def test_assigns_and_creates_contribution(self, sa_sync_conn, repo, contribution_repo):
-        insert_persons_perimeter(sa_sync_conn)
-        person_id = _person(sa_sync_conn)
-        publication_id = insert_publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
-
-        assign_orphan_contribution(
-            person_id,
-            source_contribution_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
-
-        row = sa_sync_conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :i"),
-            {"i": source_contribution_id},
-        ).one()
-        assert row.person_id == person_id
-
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT id FROM contributions WHERE publication_id = :publication AND person_id = :pid"
-            ),
-            {"publication": publication_id, "pid": person_id},
-        ).first()
-        assert row is not None
-
 
 class TestReassignRejectedPairUnit:
     """Pré-contrôle de rejet sur les chemins de réassignation orphan-contributions."""
@@ -1397,14 +1327,13 @@ class TestReassignRejectedPairUnit:
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
+        group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
             assign_orphan_contribution(
                 person_id,
-                source_contribution_id,
+                group,
                 conn=sa_sync_conn,
                 perimeter_recompute=_PERIMETER,
                 repo=repo,
@@ -1414,29 +1343,22 @@ class TestReassignRejectedPairUnit:
         assert pair["publication_id"] == publication_id
         assert pair["person_id"] == person_id
         assert pair["rejected_at"]
-        # Source non assignée : on a levé avant la pose de person_id.
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT person_id FROM source_contributions WHERE id = :i",
-                i=source_contribution_id,
-            )
-            is None
-        )
+        # Rien d'écrit : le pré-contrôle précède l'épinglage.
+        assert _source_contribution_person(sa_sync_conn, source_contribution_id) is None
+        assert _group_person(sa_sync_conn, group) == (None, None)
 
-    def test_assign_forced_unrejects_and_recreates_canonical(
+    def test_assign_forced_unrejects_and_attaches_group(
         self, sa_sync_conn, repo, contribution_repo
     ):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
+        group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
         assign_orphan_contribution(
             person_id,
-            source_contribution_id,
+            group,
             conn=sa_sync_conn,
             perimeter_recompute=_PERIMETER,
             repo=repo,
@@ -1444,7 +1366,6 @@ class TestReassignRejectedPairUnit:
             force=True,
         )
 
-        # Rejet levé
         assert (
             _scalar(
                 sa_sync_conn,
@@ -1454,68 +1375,43 @@ class TestReassignRejectedPairUnit:
             )
             is None
         )
-        # Source assignée et canonique recréée
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT person_id FROM source_contributions WHERE id = :i",
-                i=source_contribution_id,
-            )
-            == person_id
-        )
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT id FROM contributions WHERE publication_id = :p AND person_id = :pid",
-                p=publication_id,
-                pid=person_id,
-            )
-            is not None
-        )
+        assert _source_contribution_person(sa_sync_conn, source_contribution_id) == person_id
+        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
 
     def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, contribution_repo):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
-        sp1 = _source_record(sa_sync_conn, pub1, source_id="h-1")
-        sp2 = _source_record(sa_sync_conn, pub2, source_id="h-2")
-        sa1 = _jean_dupont_source_contribution(sa_sync_conn, sp1)
-        sa2 = _jean_dupont_source_contribution(sa_sync_conn, sp2)
+        group1, sa1 = _orphan(sa_sync_conn, pub1, source_id="h-1")
+        group2, sa2 = _orphan(sa_sync_conn, pub2, source_id="h-2")
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
             batch_assign_orphan_contributions(
                 person_id,
-                [sa1, sa2],
+                [group1, group2],
                 perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
                 conn=sa_sync_conn,
             )
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
-        # Rien d'assigné : on a levé avant la pose.
+        # Rien d'écrit : le pré-contrôle précède l'épinglage.
         for source_contribution_id in (sa1, sa2):
-            assert (
-                _scalar(
-                    sa_sync_conn,
-                    "SELECT person_id FROM source_contributions WHERE id = :i",
-                    i=source_contribution_id,
-                )
-                is None
-            )
+            assert _source_contribution_person(sa_sync_conn, source_contribution_id) is None
+        assert _pinned_to(sa_sync_conn, [sa1, sa2]) == [None, None]
 
     def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, contribution_repo):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
-        sp1 = _source_record(sa_sync_conn, pub1, source_id="h-1")
-        sa1 = _jean_dupont_source_contribution(sa_sync_conn, sp1)
+        group, _ = _orphan(sa_sync_conn, pub1, source_id="h-1")
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
         assigned = batch_assign_orphan_contributions(
             person_id,
-            [sa1],
+            [group],
             perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
@@ -1533,15 +1429,7 @@ class TestReassignRejectedPairUnit:
             )
             is None
         )
-        assert (
-            _scalar(
-                sa_sync_conn,
-                "SELECT id FROM contributions WHERE publication_id = :p AND person_id = :pid",
-                p=pub1,
-                pid=person_id,
-            )
-            is not None
-        )
+        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
 
 
 class TestMergePersonRejectedContributions:
@@ -1589,9 +1477,12 @@ class TestMergePersonRejectedContributions:
         person = sa_sync_conn.execute(
             text("SELECT person_id FROM source_contributions WHERE id = :id"), {"id": sa}
         ).scalar_one()
-        contributions = sa_sync_conn.execute(
-            text("SELECT count(*) FROM contributions WHERE publication_id = :publication"),
+        groups_with_person = sa_sync_conn.execute(
+            text(
+                "SELECT count(*) FROM source_contribution_groups"
+                " WHERE publication_id = :publication AND person_id IS NOT NULL"
+            ),
             {"publication": publication},
         ).scalar_one()
         assert person is None
-        assert contributions == 0
+        assert groups_with_person == 0

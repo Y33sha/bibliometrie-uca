@@ -1425,7 +1425,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1439,7 +1439,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Count
-         * @description Nombre de contributions sources du périmètre rattachées à aucune personne.
+         * @description Nombre de contributions orphelines.
          */
         get: operations["orphan_contributions_count_api_contributions_orphans_count_get"];
         put?: never;
@@ -1459,7 +1459,7 @@ export interface paths {
         };
         /**
          * List Orphan Contributions
-         * @description Liste les contributions sources du périmètre rattachées à aucune personne.
+         * @description Liste les contributions orphelines.
          */
         get: operations["list_orphan_contributions_api_contributions_orphans_get"];
         put?: never;
@@ -1479,7 +1479,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Facets
-         * @description Facette laboratoires des contributions sources orphelines.
+         * @description Facette laboratoires des contributions orphelines.
          */
         get: operations["orphan_contributions_facets_api_contributions_orphans_facets_get"];
         put?: never;
@@ -1501,9 +1501,9 @@ export interface paths {
         put?: never;
         /**
          * Assign Orphan Contribution
-         * @description Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
+         * @description Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source déjà rattachée à une personne (`ContributionAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1523,9 +1523,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Contributions
-         * @description Attribue plusieurs contributions sources orphelines à une personne existante.
+         * @description Attribue plusieurs contributions orphelines à une personne existante.
          *
-         *     Les contributions sources absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions sources rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les groupes absents ou déjà rattachés sont écartés du lot et journalisés ; le décompte rendu compte les groupes rattachés. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -1551,7 +1551,7 @@ export interface paths {
          * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -2784,13 +2784,11 @@ export interface components {
         };
         /**
          * AssignOrphanContribution
-         * @description Attribution unitaire, seule à savoir créer la personne au passage.
-         *
-         *     `source_contributions.id` est une clé primaire : l'id désigne la contribution source à lui seul.
+         * @description Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage.
          */
         AssignOrphanContribution: {
-            /** Source Contribution Id */
-            source_contribution_id: number;
+            /** Group Id */
+            group_id: number;
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
@@ -2822,11 +2820,11 @@ export interface components {
         };
         /**
          * BatchAssignOrphanContributions
-         * @description Attribution en lot à une personne existante.
+         * @description Attribution en lot de contributions orphelines, désignées par leurs groupes de contributions sources, à une personne existante.
          */
         BatchAssignOrphanContributions: {
-            /** Source Contribution Ids */
-            source_contribution_ids: number[];
+            /** Group Ids */
+            group_ids: number[];
             /** Person Id */
             person_id: number;
             /**
@@ -3052,13 +3050,11 @@ export interface components {
         };
         /**
          * DetachContributionsResponse
-         * @description Décompte d'un détachement de contributions sources : contributions sources détachées, contributions supprimées, formes de nom nettoyées.
+         * @description Décompte d'un détachement de contributions sources : contributions sources détachées, formes de nom nettoyées.
          */
         DetachContributionsResponse: {
             /** Detached */
             detached: number;
-            /** Deleted Contributions */
-            deleted_contributions: number;
             /** Cleaned Forms */
             cleaned_forms: number;
         };
@@ -3998,7 +3994,7 @@ export interface components {
         };
         /**
          * OrphanAssignResponse
-         * @description Acquittement de l'attribution d'une contribution source orpheline : la personne rattachée.
+         * @description Acquittement de l'attribution d'une contribution orpheline : la personne rattachée.
          */
         OrphanAssignResponse: {
             /**
@@ -4011,7 +4007,7 @@ export interface components {
         };
         /**
          * OrphanBatchAssignResponse
-         * @description Acquittement de l'attribution en lot : le nombre de contributions sources rattachées.
+         * @description Acquittement de l'attribution en lot : le nombre de contributions rattachées.
          */
         OrphanBatchAssignResponse: {
             /**
@@ -4022,12 +4018,15 @@ export interface components {
             /** Assigned */
             assigned: number;
         };
-        /** OrphanContributionOut */
+        /**
+         * OrphanContributionOut
+         * @description Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne.
+         */
         OrphanContributionOut: {
-            /** Source */
-            source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
+            /** Group Id */
+            group_id: number;
+            /** Sources */
+            sources: string[];
             /** Full Name */
             full_name: string;
             /** Last Name */
@@ -4045,7 +4044,7 @@ export interface components {
         };
         /**
          * OrphanContributionsFacetsResponse
-         * @description Facette laboratoires de la file des contributions sources orphelines : décompte par laboratoire détecté dans la contribution source, et nombre de contributions sources sans laboratoire.
+         * @description Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les membres du groupe, et nombre de groupes sans laboratoire.
          */
         OrphanContributionsFacetsResponse: {
             /** Labs */

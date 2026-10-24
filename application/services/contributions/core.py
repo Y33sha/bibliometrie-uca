@@ -1,8 +1,8 @@
 """Service Contributions — écritures sur l'agrégat Contribution, transaction-agnostiques.
 
-Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`), dont le `person_id` fait le lien vers la personne. Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
+Couvre les contributions, groupes de `source_contribution_groups` rattachés à une personne, et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
 
-La construction du stock relève du pipeline, qui écrit en SQL ensembliste : la phase `contributions` (`build_contributions.py`) reconstruit les contributions depuis les contributions sources, les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources.
+La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes.
 """
 
 from sqlalchemy import Connection
@@ -31,18 +31,16 @@ def reject_pair(
 ) -> dict[str, int]:
     """Rejette durablement une paire (publication, personne) : enregistre que cette personne n'est pas l'auteur de cette publication.
 
-    Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Quatre effets :
+    Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Trois effets :
 
-    1. Enregistre la paire dans `rejected_contributions`. Ce registre est consulté par le matching des personnes et par le rebuild des `contributions`, qui écartent toute paire rejetée : le rejet survit aux exécutions suivantes du pipeline.
+    1. Enregistre la paire dans `rejected_contributions`. Ce registre est consulté par le matching des personnes, qui écarte toute paire rejetée : le rejet survit aux exécutions suivantes du pipeline.
     2. Met à NULL le `person_id` de toutes les `source_contributions` de la paire, sur toutes les sources, et celui du groupe de la personne dans la publication : le lien disparaît côté données sources, et la forme de nom correspondante cesse de lui être attribuée.
-    3. Supprime la ligne consolidée dans `contributions`, qu'aucune source n'atteste.
-    4. Recalcule l'appartenance au périmètre de la publication.
+    3. Recalcule l'appartenance au périmètre de la publication.
 
-    Retourne {"detached": N, "deleted_contributions": M}.
+    Retourne {"detached": N}, N contributions sources détachées.
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)
-    deleted = repo.delete_orphan_contributions_for_person(person_id)
     perimeter_recompute.refresh_publications(conn, [publication_id])
 
     emit_event(
@@ -52,7 +50,7 @@ def reject_pair(
         publication_id,
         {"person_id": person_id},
     )
-    return {"detached": detached, "deleted_contributions": deleted}
+    return {"detached": detached}
 
 
 def exclude_contribution(
@@ -70,12 +68,12 @@ def exclude_contribution(
 
     Lève NotFoundError si le groupe n'existe pas ou n'a pas de personne.
     """
-    row = repo.get_contribution_person(contribution_id)
-    if not row:
+    group = next(iter(repo.find_groups([contribution_id])), None)
+    person_id = group["person_id"] if group else None
+    if group is None or person_id is None:
         raise NotFoundError(f"Contribution {contribution_id} introuvable")
 
-    person_id = row["person_id"]
-    publication_id = row["publication_id"]
+    publication_id = group["publication_id"]
     reject_pair(
         publication_id,
         person_id,
@@ -97,7 +95,7 @@ def propagate_in_perimeter_for_addresses(
     perimeter_structures: PerimeterStructures,
     perimeter_recompute: SourceContributionPerimeterRecompute,
 ) -> None:
-    """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs contributions et de leurs publications.
+    """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs groupes et de leurs publications.
 
     Appelé en tâche de fond après chaque review/assign/unassign d'adresse.
     """
@@ -113,8 +111,3 @@ def propagate_in_perimeter_for_addresses(
         return
 
     perimeter_recompute.recompute_perimeter(conn, affected_source_contribution_ids, perimeter_ids)
-
-
-def delete_orphan_contributions(person_id: int, *, repo: ContributionRepository) -> int:
-    """Supprime les contributions canoniques d'une personne qu'aucune contribution source n'atteste. Retourne le nombre de contributions supprimées."""
-    return repo.delete_orphan_contributions_for_person(person_id)

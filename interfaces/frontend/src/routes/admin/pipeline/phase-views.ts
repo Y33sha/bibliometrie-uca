@@ -226,10 +226,8 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   contributions: {
     summary: [
-      { key: "created", label: "Contributions créées" },
-      { key: "pruned", label: "Contributions orphelines supprimées" },
       { key: "publications_purged", label: "Publications orphelines supprimées" },
-      { key: "total_in_perimeter", label: "Total dans le périmètre" },
+      { key: "total_in_perimeter", label: "Contributions du périmètre" },
     ],
   },
   countries: {

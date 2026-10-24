@@ -47,7 +47,6 @@ class DetachResult(TypedDict):
     """Résultat de `detach_contributions` : compteurs de l'opération."""
 
     detached: int
-    deleted_contributions: int
     cleaned_forms: int
 
 
@@ -266,15 +265,13 @@ def update_name_form_status(
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL et les `contributions` devenues sans source sont supprimées. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris. Les groupes de la personne rattachés par le nom dont un membre porte la forme perdent la personne (`detach_groups_for_name_form`), et l'appartenance au périmètre de leurs publications est recalculée.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris. Les groupes de la personne rattachés par le nom dont un membre porte la forme perdent la personne (`detach_groups_for_name_form`), et l'appartenance au périmètre de leurs publications est recalculée.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        detached = contribution_repo.null_person_id_for_name_form(person_id, name_form)
-        if detached:
-            contribution_repo.delete_orphan_contributions_for_person(person_id)
+        contribution_repo.null_person_id_for_name_form(person_id, name_form)
         publication_ids = contribution_repo.detach_groups_for_name_form(person_id, name_form)
         perimeter_recompute.refresh_publications(conn, publication_ids)
     emit_event(
@@ -299,9 +296,9 @@ def detach_contributions(
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
-    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de toutes les sources de la paire, suppression de la ligne consolidée). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
+    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement du groupe et de toutes les sources de la paire). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Retourne {"detached": N, "deleted_contributions": M, "cleaned_forms": K}.
+    Retourne {"detached": N, "cleaned_forms": K}.
     """
     publication_ids: set[int] = set()
     for a in contributions:
@@ -313,7 +310,6 @@ def detach_contributions(
             publication_ids.add(publication_id)
 
     detached = 0
-    deleted = 0
     for publication_id in publication_ids:
         result = reject_pair(
             publication_id,
@@ -324,13 +320,11 @@ def detach_contributions(
             audit_repo=audit_repo,
         )
         detached += result["detached"]
-        deleted += result["deleted_contributions"]
 
     cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
 
     return {
         "detached": detached,
-        "deleted_contributions": deleted,
         "cleaned_forms": cleaned_forms,
     }
 

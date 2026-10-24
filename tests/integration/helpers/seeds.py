@@ -300,16 +300,11 @@ def seed_contribution(
     in_perimeter: bool = False,
     roles: list[str] | None = None,
 ) -> int:
-    """Contribution de `publication_id` et `person_id`, avec le groupe de contributions sources rattaché à la même personne. Les valeurs par défaut sont celles du schéma."""
-    _insert(
+    """Contribution de `publication_id` et `person_id` : groupe de contributions sources rattaché à la personne. Renvoie l'`id` du groupe. Les valeurs par défaut sont celles du schéma."""
+    return _insert(
         "INSERT INTO source_contribution_groups "
         "(publication_id, person_id, resolution_mode, perimeter_evidence, roles) "
         "VALUES (%s, %s, 'manual', CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
-        (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
-    )
-    return _insert(
-        "INSERT INTO contributions (publication_id, person_id, perimeter_evidence, roles) "
-        "VALUES (%s, %s, CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
         (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
     )
 
@@ -329,7 +324,7 @@ def seed_in_perimeter_contributions(journal_id: int) -> None:
             seed_contribution(pid, person_id=person_id, in_perimeter=True, roles=["author"])
         cur.execute(
             "UPDATE publications p SET perimeter_evidence = coalesce(("
-            "SELECT array_agg(DISTINCT e ORDER BY e) FROM contributions a JOIN persons pe "
+            "SELECT array_agg(DISTINCT e ORDER BY e) FROM source_contribution_groups a JOIN persons pe "
             "ON pe.id = a.person_id AND pe.exclusion IS NULL "
             "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
             "WHERE a.publication_id = p.id), '{}') "

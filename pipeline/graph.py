@@ -32,7 +32,7 @@ class Task:
     previous_run: frozenset[str] = frozenset()
     # API interrogée, si la tâche sort sur le réseau.
     network: str | None = None
-    # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE contributions`.
+    # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`.
     maintenance: tuple[str, ...] = ()
     # Groupe de tâches consécutives exécutées en parallèle.
     parallel_group: str | None = None
@@ -993,44 +993,6 @@ TASKS: tuple[Task, ...] = (
         maintenance=("ANALYZE source_contributions",),
     ),
     _task(
-        "contributions.build",
-        "contributions",
-        reads=(
-            "source_contributions.person_id",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
-            "publications.id",
-            "rejected_contributions",
-            "confirmed_source_contributions",
-            "contributions.id",
-        ),
-        writes=("contributions.id",),
-        # Lignes que `contributions.purge_publications` supprime plus loin dans le même run.
-        previous_run=("publications.id",),
-        # Le planificateur estime la propagation des attributs sur les liens qui viennent d'être créés.
-        maintenance=("ANALYZE contributions",),
-    ),
-    _task(
-        "contributions.propagate",
-        "contributions",
-        reads=(
-            "source_contributions.person_id",
-            "source_contributions.source_record_id",
-            "source_contributions.author_position",
-            "source_contributions.is_corresponding",
-            "source_contributions.roles",
-            "source_contributions.in_perimeter",
-            "source_records.publication_id",
-            "contributions",
-        ),
-        writes=(
-            "contributions.author_position",
-            "contributions.is_corresponding",
-            "contributions.in_perimeter",
-            "contributions.roles",
-        ),
-    ),
-    _task(
         "contributions.publications_in_perimeter",
         "contributions",
         reads=(
@@ -1048,11 +1010,9 @@ TASKS: tuple[Task, ...] = (
         "contributions.structures",
         "contributions",
         reads=(
-            "contributions",
-            "source_contributions.person_id",
-            "source_contributions.source_record_id",
-            "source_records.publication_id",
             "source_contribution_structures",
+            "source_contribution_groups.id",
+            "source_contribution_groups.publication_id",
             "source_contribution_groups.person_id",
             "source_contribution_groups.roles",
             "source_contribution_group_members",
@@ -1063,7 +1023,13 @@ TASKS: tuple[Task, ...] = (
     _task(
         "contributions.purge_publications",
         "contributions",
-        reads=("publications.id", "source_records.publication_id", "contributions"),
+        reads=(
+            "publications.id",
+            "source_records.publication_id",
+            "source_contribution_groups.id",
+            "source_contribution_groups.publication_id",
+            "source_contribution_groups.person_id",
+        ),
         writes=("publications.id",),
     ),
     _task(

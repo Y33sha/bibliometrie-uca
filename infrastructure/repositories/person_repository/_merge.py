@@ -8,7 +8,6 @@ from domain.persons.merge import merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories.contribution_repository import (
-    delete_orphan_contributions,
     detach_rejected_source_contributions,
 )
 from infrastructure.repositories.merge_steps import (
@@ -106,7 +105,8 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 # Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
     "source_contributions": transfer("source_contributions", "person_id"),
-    "contributions": transfer_unique("contributions", "person_id", "publication_id"),
+    # Table sans lecteur : les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`).
+    "contributions": untouched("contributions", "person_id"),
     "source_contribution_groups": MergeStep(
         (("source_contribution_groups", "person_id"),), _merge_source_contribution_groups
     ),
@@ -144,7 +144,6 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
     detach_rejected_source_contributions(conn, target_id)
-    delete_orphan_contributions(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
     record_redirect(conn, MergedEntity.PERSON, target_id, source_id)
 

@@ -99,6 +99,17 @@ class TestPurge:
         assert not _publication_exists(conn, sans_contribution)
         assert _publication_exists(conn, complete)
 
+    def test_groupe_sans_personne_ne_retient_pas_la_publication(self, sa_sync_conn):
+        conn = sa_sync_conn
+        pid = self._publication(conn, source=True, contribution=False)
+        conn.execute(
+            text("INSERT INTO source_contribution_groups (publication_id) VALUES (:p)"), {"p": pid}
+        )
+
+        purge_publications(conn)
+
+        assert not _publication_exists(conn, pid)
+
     def test_limit_borne_le_lot(self, sa_sync_conn):
         conn = sa_sync_conn
         # Purge préalable pour un compte déterministe, annulée par le rollback du test.

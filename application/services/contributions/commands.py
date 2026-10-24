@@ -25,7 +25,7 @@ def exclude_contribution(
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
 
-    `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne, quand les gestes sur les orphelines adressent une contribution source.
+    `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne.
     """
     contributions_service.exclude_contribution(
         contribution_id,
@@ -40,7 +40,7 @@ def exclude_contribution(
 
 def assign_orphan_contribution(
     conn: Connection,
-    source_contribution_id: int,
+    group_id: int,
     *,
     person_id: int | None = None,
     new_person: tuple[str, str] | None = None,
@@ -50,7 +50,7 @@ def assign_orphan_contribution(
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue une contribution orpheline à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
+    """Attribue une contribution orpheline, groupe `group_id` sans personne, à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
 
     L'un de `person_id` ou `new_person` est exigé : la commande rattache à une personne, qu'elle reçoive laquelle ou de quoi la créer. Sans l'un ni l'autre, elle lève `ValidationError`.
 
@@ -62,7 +62,7 @@ def assign_orphan_contribution(
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_contribution(
         person_id,
-        source_contribution_id,
+        group_id,
         conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
@@ -77,7 +77,7 @@ def assign_orphan_contribution(
 def batch_assign_orphan_contributions(
     conn: Connection,
     person_id: int,
-    source_contribution_ids: list[int],
+    group_ids: list[int],
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
@@ -85,10 +85,10 @@ def batch_assign_orphan_contributions(
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue plusieurs contributions orphelines à une même personne. Retourne le nombre assigné."""
+    """Attribue plusieurs contributions orphelines, groupes sans personne, à une même personne. Retourne le nombre de groupes rattachés."""
     assigned = assign_orphans.batch_assign_orphan_contributions(
         person_id,
-        source_contribution_ids,
+        group_ids,
         conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,

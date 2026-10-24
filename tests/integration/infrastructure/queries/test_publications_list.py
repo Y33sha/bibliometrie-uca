@@ -319,17 +319,9 @@ class TestPersonView:
                 conn, publication, person_id=author, in_perimeter=True, roles=["author"]
             )
             add_contribution_structure(conn, contribution, author_lab)
-        # Attributs propres au groupe de la personne : la table `contributions` diverge.
         conn.execute(
             text(
                 "UPDATE source_contribution_groups SET is_corresponding = TRUE"
-                " WHERE publication_id = :p AND person_id = :person"
-            ),
-            {"p": publication, "person": person},
-        )
-        conn.execute(
-            text(
-                "UPDATE contributions SET is_corresponding = FALSE, perimeter_evidence = '{}'"
                 " WHERE publication_id = :p AND person_id = :person"
             ),
             {"p": publication, "person": person},

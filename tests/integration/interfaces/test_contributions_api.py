@@ -31,16 +31,22 @@ def _uniq_name(prefix: str) -> str:
 
 
 def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[int, int]:
-    """source_contribution orpheline (person_id NULL, in_perimeter TRUE, groupe à elle seule) rattachée à une publication.
+    """Contribution orpheline : groupe d'auteur du périmètre sans personne, d'une contribution source de nom brut `raw_author_name`, dans une publication.
 
-    Renvoie (source_contribution_id, publication_id) pour pouvoir rejeter la paire."""
+    Renvoie (groupe, publication) pour pouvoir rejeter la paire."""
     publication_id = seed_publication(title=uniq("Pub"))
     source_record_id = seed_source_record(publication_id=publication_id)
     source_contribution_id = seed_source_contribution(
         source="hal", source_record_id=source_record_id, raw_author_name=raw_author_name
     )
-    seed_group(publication_id, [(source_contribution_id, source_record_id)])
-    return source_contribution_id, publication_id
+    group_id = seed_group(publication_id, [(source_contribution_id, source_record_id)])
+    seed_perimeter_author_group(group_id)
+    return group_id, publication_id
+
+
+def _seed_orphan() -> int:
+    """Groupe d'une contribution orpheline, dans sa publication."""
+    return _seed_orphan_with_publication()[0]
 
 
 # ── PATCH /api/contributions/{id}/exclude ─────────────────────────
@@ -79,8 +85,8 @@ class TestExcludeContribution:
 
     def test_group_without_person_is_not_found(self, auth_client):
         """L'id d'un groupe sans personne ne désigne pas une contribution."""
-        _, publication = _seed_orphan_with_publication()
-        r = auth_client.patch(f"/api/contributions/{_group_id(publication, None)}/exclude")
+        group, _ = _seed_orphan_with_publication()
+        r = auth_client.patch(f"/api/contributions/{group}/exclude")
         assert r.status_code == 404
 
 
@@ -122,6 +128,7 @@ class TestOrphanContributions:
         assert item["last_name"] == marker
         assert item["first_name"] == "Jane"
         assert item["full_name"] == f"{marker}, Jane"
+        assert item["sources"] == ["hal"]
 
     def test_returns_last_name_first_name_from_space_form(self, client):
         """Format "First Last" : parsé en last_name=dernier mot, first_name=reste."""
@@ -139,38 +146,38 @@ class TestOrphanContributions:
 
 class TestAssignOrphanContribution:
     def test_missing_person_id_and_create(self, auth_client):
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa},
+            json={"group_id": group},
         )
         assert r.status_code == 422
 
     def test_create_person_empty_name(self, auth_client):
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
             json={
-                "source_contribution_id": sa,
+                "group_id": group,
                 "create_person": {"last_name": "   ", "first_name": "X"},
             },
         )
         assert r.status_code == 422
 
     def test_person_not_found(self, auth_client):
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": 999999999},
+            json={"group_id": group, "person_id": 999999999},
         )
         assert r.status_code == 404
 
     def test_ok_with_person_id(self, auth_client):
         pid = seed_person()
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": pid},
+            json={"group_id": group, "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["person_id"] == pid
@@ -181,35 +188,34 @@ class TestAssignOrphanContribution:
         # connexion indépendante. Garde-fou du passage final du teardown de
         # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
         pid = seed_person()
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": pid},
+            json={"group_id": group, "person_id": pid},
         )
         assert r.status_code == 200
         with owner_pool() as cur:
-            cur.execute("SELECT person_id FROM source_contributions WHERE id = %s", (sa,))
+            cur.execute("SELECT person_id FROM source_contribution_groups WHERE id = %s", (group,))
             assert cur.fetchone()["person_id"] == pid
 
     def test_assignment_brings_the_publication_into_the_perimeter(self, auth_client):
         pid = seed_person()
-        sa, publication = _seed_orphan_with_publication()
-        seed_perimeter_author_group(_group_id(publication, None))
+        group, publication = _seed_orphan_with_publication()
 
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": pid},
+            json={"group_id": group, "person_id": pid},
         )
 
         assert r.status_code == 200
         assert publication_perimeter_evidence(publication) == ["address"]
 
     def test_ok_with_create_person(self, auth_client):
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/assign",
             json={
-                "source_contribution_id": sa,
+                "group_id": group,
                 "create_person": {"last_name": "Créée", "first_name": "Ici"},
             },
         )
@@ -218,11 +224,11 @@ class TestAssignOrphanContribution:
 
     def test_blocked_when_pair_rejected(self, auth_client):
         pid = seed_person()
-        sa, publication = _seed_orphan_with_publication()
+        group, publication = _seed_orphan_with_publication()
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": pid},
+            json={"group_id": group, "person_id": pid},
         )
         assert r.status_code == 409
         pair = r.json()["rejected_pairs"][0]
@@ -232,11 +238,11 @@ class TestAssignOrphanContribution:
 
     def test_forced_unrejects_and_assigns(self, auth_client):
         pid = seed_person()
-        sa, publication = _seed_orphan_with_publication()
+        group, publication = _seed_orphan_with_publication()
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/assign",
-            json={"source_contribution_id": sa, "person_id": pid, "force": True},
+            json={"group_id": group, "person_id": pid, "force": True},
         )
         assert r.status_code == 200
         assert r.json()["person_id"] == pid
@@ -247,48 +253,47 @@ class TestBatchAssignOrphanContributions:
         pid = seed_person()
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"source_contribution_ids": [], "person_id": pid},
+            json={"group_ids": [], "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 0
 
     def test_person_not_found(self, auth_client):
-        sa = seed_source_contribution(source="hal")
+        group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"source_contribution_ids": [sa], "person_id": 999999999},
+            json={"group_ids": [group], "person_id": 999999999},
         )
         assert r.status_code == 404
 
     def test_ok(self, auth_client):
         pid = seed_person()
-        sa1 = seed_source_contribution(source="hal")
-        sa2 = seed_source_contribution(source="openalex")
+        groups = [_seed_orphan(), _seed_orphan()]
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"source_contribution_ids": [sa1, sa2], "person_id": pid},
+            json={"group_ids": groups, "person_id": pid},
         )
         assert r.status_code == 200
-        assert r.json()["assigned"] >= 0
+        assert r.json()["assigned"] == 2
 
     def test_blocked_when_pair_rejected(self, auth_client):
         pid = seed_person()
-        sa, publication = _seed_orphan_with_publication()
+        group, publication = _seed_orphan_with_publication()
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"source_contribution_ids": [sa], "person_id": pid},
+            json={"group_ids": [group], "person_id": pid},
         )
         assert r.status_code == 409
         assert r.json()["rejected_pairs"][0]["publication_id"] == publication
 
     def test_forced_unrejects_and_assigns(self, auth_client):
         pid = seed_person()
-        sa, publication = _seed_orphan_with_publication()
+        group, publication = _seed_orphan_with_publication()
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"source_contribution_ids": [sa], "person_id": pid, "force": True},
+            json={"group_ids": [group], "person_id": pid, "force": True},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 1

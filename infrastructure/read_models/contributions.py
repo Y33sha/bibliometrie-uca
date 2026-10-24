@@ -1,4 +1,4 @@
-"""Query service : lectures des contributions sources servies par les routes `/api/contributions/*`."""
+"""Query service : lectures des contributions servies par les routes `/api/contributions/*`."""
 
 from sqlalchemy import Connection, text
 
@@ -13,53 +13,66 @@ from application.ports.read_models.contributions_queries import (
 )
 from application.ports.read_models.publications_queries import PublicationLabItem
 from domain.persons.contributor_name import ContributorName
+from domain.sources.registry import SOURCE_PRIORITY
 from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
-from infrastructure.read_models.sql_fragments import (
-    contributor_display_name,
-    source_contribution_structure_ids,
-)
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.read_models.sql_fragments import contributor_display_name
+from infrastructure.sql_fragments import case_priority, has_author_role
 
-# Contribution source orpheline, matière de la file de rattachement : sans personne, du périmètre, sous un rôle d'auteur, membre d'un groupe.
-_ORPHAN_BASE = f"""
-    sc.person_id IS NULL AND sc.in_perimeter = TRUE
-    AND {has_author_role("sc")}
-    AND EXISTS (SELECT 1 FROM source_contribution_group_members gm WHERE gm.source_contribution_id = sc.id)
-"""
+# Contribution orpheline, matière de la file de rattachement : groupe du périmètre, sous un rôle d'auteur, sans personne.
+_ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
 
 _ORPHANS_FROM = """
-    FROM source_contributions sc
-    JOIN source_records sr ON sr.id = sc.source_record_id
-    JOIN publications p ON p.id = sr.publication_id
+    FROM source_contribution_groups g
+    JOIN publications p ON p.id = g.publication_id
 """
 
-# Laboratoires atteints par une contribution source, chacun une fois : clause `FROM … WHERE` sur `structures s`.
-_SOURCE_CONTRIBUTION_LABS = f"""
+# Membres du groupe `g` : contributions sources `sc_m`.
+_MEMBERS = """
+    source_contribution_group_members gm
+    JOIN source_contributions sc_m ON sc_m.id = gm.source_contribution_id
+    WHERE gm.group_id = g.id
+"""
+
+# Membre de la source la plus prioritaire, qui donne le nom affiché : jointure latérale `sc`.
+_DISPLAYED_MEMBER = f"""
+    CROSS JOIN LATERAL (
+        SELECT sc_m.* FROM {_MEMBERS}
+        ORDER BY {case_priority(SOURCE_PRIORITY, "sc_m.source")}, sc_m.id
+        LIMIT 1
+    ) sc
+"""
+
+# Laboratoires atteints par les membres du groupe `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
+_GROUP_LABS = f"""
     structures s
     WHERE s.structure_type = '{StructureType.LABO.value}'
-      AND s.id IN ({source_contribution_structure_ids("sc")})
+      AND s.id IN (
+          SELECT scs.structure_id FROM source_contribution_structures scs
+          JOIN source_contribution_group_members gm_s
+            ON gm_s.source_contribution_id = scs.source_contribution_id
+          WHERE gm_s.group_id = g.id
+      )
 """
 
 
 def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dict[str, object]]:
-    """Condition des contributions sources orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`."""
+    """Condition des contributions orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`."""
     conditions = [_ORPHAN_BASE]
     binds: dict[str, object] = {}
     if filters.search.strip():
         binds["search_pat"] = f"%{filters.search.strip()}%"
         conditions.append(
-            f"unaccent(lower({contributor_display_name()})) LIKE unaccent(lower(:search_pat))"
+            f"EXISTS (SELECT 1 FROM {_MEMBERS} AND unaccent(lower({contributor_display_name('sc_m')}))"
+            " LIKE unaccent(lower(:search_pat)))"
         )
     if with_labs and (filters.lab_ids or filters.lab_none):
         lab_conditions = []
         if filters.lab_ids:
             binds["lab_ids"] = filters.lab_ids
-            lab_conditions.append(
-                f"EXISTS (SELECT 1 FROM {_SOURCE_CONTRIBUTION_LABS} AND s.id = ANY(:lab_ids))"
-            )
+            lab_conditions.append(f"EXISTS (SELECT 1 FROM {_GROUP_LABS} AND s.id = ANY(:lab_ids))")
         if filters.lab_none:
-            lab_conditions.append(f"NOT EXISTS (SELECT 1 FROM {_SOURCE_CONTRIBUTION_LABS})")
+            lab_conditions.append(f"NOT EXISTS (SELECT 1 FROM {_GROUP_LABS})")
         conditions.append(f"({' OR '.join(lab_conditions)})")
     return " AND ".join(f"({c})" for c in conditions), binds
 
@@ -81,25 +94,33 @@ class PgContributionsQueries(ContributionsQueries):
     ) -> OrphanContributionsResponse:
         offset = (page - 1) * per_page
         where, binds = _orphans_where(filters, with_labs=True)
-        from_where = f"{_ORPHANS_FROM} WHERE {where}"
 
-        total = scalar_int(self._conn.execute(text(f"SELECT COUNT(*) {from_where}"), binds))
+        total = scalar_int(
+            self._conn.execute(text(f"SELECT COUNT(*) {_ORPHANS_FROM} WHERE {where}"), binds)
+        )
 
         rows = self._conn.execute(
             text(f"""
-                SELECT sc.source, sc.id AS source_contribution_id,
+                SELECT g.id AS group_id,
+                       ARRAY(
+                           SELECT d.source::text
+                           FROM (SELECT DISTINCT sc_m.source FROM {_MEMBERS}) d
+                           ORDER BY {case_priority(SOURCE_PRIORITY, "d.source")}
+                       ) AS sources,
                        sc.raw_author_name, sc.raw_last_name, sc.raw_first_name,
-                       sr.publication_id,
+                       g.publication_id,
                        p.title AS publication_title, p.publication_year,
                        COALESCE((
                            SELECT json_agg(lab ORDER BY lab.label)
                            FROM (
                                SELECT s.id, COALESCE(s.acronym, s.name) AS label
-                               FROM {_SOURCE_CONTRIBUTION_LABS}
+                               FROM {_GROUP_LABS}
                            ) lab
                        ), '[]') AS labs
-                {from_where}
-                ORDER BY {contributor_display_name()}, p.publication_year DESC
+                {_ORPHANS_FROM}
+                {_DISPLAYED_MEMBER}
+                WHERE {where}
+                ORDER BY {contributor_display_name()}, p.publication_year DESC, g.id
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
@@ -112,8 +133,8 @@ class PgContributionsQueries(ContributionsQueries):
             last_name, first_name = name.split()
             contributions.append(
                 OrphanContributionOut(
-                    source=row.source,
-                    source_contribution_id=row.source_contribution_id,
+                    group_id=row.group_id,
+                    sources=row.sources,
                     full_name=name.display(),
                     last_name=last_name,
                     first_name=first_name,
@@ -132,14 +153,14 @@ class PgContributionsQueries(ContributionsQueries):
         self, *, filters: OrphanFilters
     ) -> OrphanContributionsFacetsResponse:
         where, binds = _orphans_where(filters, with_labs=False)
-        # Une ligne par laboratoire, plus une ligne `id` NULL pour les contributions sources sans laboratoire.
+        # Une ligne par laboratoire, plus une ligne `id` NULL pour les groupes sans laboratoire.
         rows = self._conn.execute(
             text(f"""
-                WITH orphan AS MATERIALIZED (SELECT sc.id {_ORPHANS_FROM} WHERE {where})
+                WITH orphan AS MATERIALIZED (SELECT g.id {_ORPHANS_FROM} WHERE {where})
                 SELECT lab.id, lab.label, COUNT(*) AS n
-                FROM orphan sc
+                FROM orphan g
                 LEFT JOIN LATERAL (
-                    SELECT s.id, COALESCE(s.acronym, s.name) AS label FROM {_SOURCE_CONTRIBUTION_LABS}
+                    SELECT s.id, COALESCE(s.acronym, s.name) AS label FROM {_GROUP_LABS}
                 ) lab ON TRUE
                 GROUP BY lab.id, lab.label
                 ORDER BY lab.label

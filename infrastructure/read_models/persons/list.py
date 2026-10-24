@@ -26,7 +26,7 @@ from infrastructure.read_models.filters import (
     persons_sort_clause,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
-from infrastructure.read_models.sql_fragments import other_name_form_holders
+from infrastructure.read_models.sql_fragments import GROUP_MEMBERS, other_name_form_holders
 from infrastructure.sql_fragments import has_author_role
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
@@ -160,7 +160,7 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
 def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryOut]:
     """Formes de nom d'une personne, avec leur état d'arbitrage.
 
-    Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui portent la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes que la forme signe.
+    Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui portent la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où un membre d'un groupe de la personne porte la forme.
     """
     rows = conn.execute(
         text(f"""
@@ -170,11 +170,9 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
                    (SELECT COUNT(*)
                     FROM ({other_name_form_holders("pnf.name_form", "pnf.person_id")}) holders
                    ) AS shared_count,
-                   (SELECT COUNT(DISTINCT sr.publication_id)
-                    FROM source_contributions sc
-                    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                    JOIN source_records sr ON sr.id = sc.source_record_id
-                    WHERE sc.person_id = pnf.person_id
+                   (SELECT COUNT(DISTINCT g.publication_id)
+                    FROM {GROUP_MEMBERS}
+                    WHERE g.person_id = pnf.person_id
                       AND ci.author_name_normalized = pnf.name_form
                    ) AS publication_count
             FROM person_name_forms pnf

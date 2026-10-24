@@ -1,6 +1,6 @@
-"""Router des contributions sources : exclusion d'une contribution, et revue des contributions sources orphelines. Sert `/api/contributions/*`.
+"""Router des contributions : exclusion d'une contribution, et revue des contributions orphelines. Sert `/api/contributions/*`.
 
-L'exclusion rejette une contribution au niveau consolidé. Son `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne. Les orphelines vivent un cran en dessous : ce sont les lignes de `source_contributions` du périmètre qu'aucune personne ne porte (`person_id` nul), que le router liste et attribue sous `/orphans`, par leur `source_contribution_id`.
+Une contribution est un groupe de `source_contribution_groups`. L'exclusion vise un groupe rattaché à une personne, par son `contribution_id`. Les orphelines sont les groupes du périmètre, sous un rôle d'auteur, rattachés à aucune personne, que le router liste et attribue sous `/orphans`, par leur `group_id`.
 
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{contribution_id}` s'y ferait absorber.
 """
@@ -49,12 +49,12 @@ router = APIRouter(prefix="/api/contributions", tags=["contributions"])
 def orphan_contributions_count(
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanCountResponse:
-    """Nombre de contributions sources du périmètre rattachées à aucune personne."""
+    """Nombre de contributions orphelines."""
     return queries.orphan_contributions_count()
 
 
 def orphan_filters(search: SearchTerm = "", lab_id: str = Query("")) -> OrphanFilters:
-    """Filtres communs à la liste des contributions sources orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les contributions sources sans laboratoire."""
+    """Filtres communs à la liste des contributions orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les contributions sans laboratoire."""
     lab_ids, lab_none = parse_lab_id(lab_id)
     return OrphanFilters(search=search, lab_ids=lab_ids, lab_none=lab_none)
 
@@ -66,7 +66,7 @@ def list_orphan_contributions(
     filters: OrphanFilters = Depends(orphan_filters),
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanContributionsResponse:
-    """Liste les contributions sources du périmètre rattachées à aucune personne."""
+    """Liste les contributions orphelines."""
     return queries.list_orphan_contributions(filters=filters, page=page, per_page=per_page)
 
 
@@ -75,7 +75,7 @@ def orphan_contributions_facets(
     filters: OrphanFilters = Depends(orphan_filters),
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanContributionsFacetsResponse:
-    """Facette laboratoires des contributions sources orphelines."""
+    """Facette laboratoires des contributions orphelines."""
     return queries.orphan_contributions_facets(filters=filters)
 
 
@@ -92,9 +92,9 @@ def assign_orphan_contribution(
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
-    """Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
+    """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source déjà rattachée à une personne (`ContributionAlreadyAssignedError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`).
     """
     new_person: tuple[str, str] | None = None
     if body.create_person:
@@ -102,7 +102,7 @@ def assign_orphan_contribution(
 
     person_id = contribution_commands.assign_orphan_contribution(
         conn,
-        body.source_contribution_id,
+        body.group_id,
         person_id=body.person_id,
         new_person=new_person,
         repo=persons,
@@ -127,17 +127,17 @@ def batch_assign_orphan_contributions(
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs contributions sources orphelines à une personne existante.
+    """Attribue plusieurs contributions orphelines à une personne existante.
 
-    Les contributions sources absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions sources rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+    Les groupes absents ou déjà rattachés sont écartés du lot et journalisés ; le décompte rendu compte les groupes rattachés. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
-    if not body.source_contribution_ids:
+    if not body.group_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
     assigned = contribution_commands.batch_assign_orphan_contributions(
         conn,
         body.person_id,
-        body.source_contribution_ids,
+        body.group_ids,
         repo=persons,
         contribution_repo=contributions,
         perimeter_recompute=perimeter_recompute,
@@ -161,7 +161,7 @@ def exclude_contribution(
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
-    `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+    `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     contribution_commands.exclude_contribution(
         conn,

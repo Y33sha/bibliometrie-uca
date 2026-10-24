@@ -145,7 +145,7 @@ def detach_contributions(
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) des contributions sélectionnées et nettoie les formes de noms orphelines.
 
-    Retourne {"detached": N, "deleted_contributions": M, "cleaned_forms": K}."""
+    Retourne {"detached": N, "cleaned_forms": K}."""
     result = persons_service.detach_contributions(
         person_id,
         contributions,

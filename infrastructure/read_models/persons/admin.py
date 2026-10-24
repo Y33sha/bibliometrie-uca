@@ -24,7 +24,11 @@ from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatu
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.structures.structure import StructureType
-from infrastructure.read_models.sql_fragments import name_form_holder, other_name_form_holders
+from infrastructure.read_models.sql_fragments import (
+    GROUP_MEMBERS,
+    name_form_holder,
+    other_name_form_holders,
+)
 from infrastructure.sql_fragments import has_author_role, identifier_neutralized
 
 # ── Name-form contributions ────────────────────────────────────────
@@ -33,15 +37,14 @@ from infrastructure.sql_fragments import has_author_role, identifier_neutralized
 def name_form_contributions(
     conn: Connection, person_id: int, name_form: str
 ) -> NameFormContributionsResponse:
-    """Contributions sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
+    """Contributions sources d'une personne sous une forme de nom donnée : membres de ses groupes. S'y ajoutent les autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sc.source, sc.id AS source_contribution_id,
                    sr.publication_id, sr.title, sr.publication_year, sr.doi
-            FROM source_contributions sc
-            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            FROM {GROUP_MEMBERS}
             JOIN source_records sr ON sr.id = sc.source_record_id
-            WHERE sc.person_id = :pid AND ci.author_name_normalized = :nf
+            WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
             ORDER BY sr.publication_year DESC, sr.title
         """),
         {"pid": person_id, "nf": name_form},
@@ -175,24 +178,13 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = ci.identifiers ->> k.k
     ),
-    -- Couples (personne, informations du contributeur) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
-    person_identities AS MATERIALIZED (
-        SELECT DISTINCT sc.person_id, sc.contributor_information_id
-        FROM source_contributions sc
-        WHERE sc.person_id IS NOT NULL
-          AND sc.contributor_information_id IN (SELECT id FROM pending_identities)
-    ),
+    -- Personnes porteuses : un membre de l'un de leurs groupes a l'identifiant et ne le neutralise pas.
     bearers AS (
-        SELECT DISTINCT pi.person_id, p.id_type, p.id_value
-        FROM person_identities pi
-        JOIN pending_identities p ON p.id = pi.contributor_information_id
-        -- Une contribution source du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
-        CROSS JOIN LATERAL (
-            SELECT 1 FROM source_contributions sc
-            WHERE sc.person_id = pi.person_id AND sc.contributor_information_id = pi.contributor_information_id
-              AND NOT {identifier_neutralized("p.k")}
-            LIMIT 1
-        ) kept
+        SELECT DISTINCT g.person_id, p.id_type, p.id_value
+        FROM {GROUP_MEMBERS}
+        JOIN pending_identities p ON p.id = ci.id
+        WHERE g.person_id IS NOT NULL
+          AND NOT {identifier_neutralized("p.k")}
     ),
     person_identifier_keys AS (
         SELECT b.* FROM bearers b

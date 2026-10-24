@@ -12,6 +12,7 @@ from pipeline.transformation.persons.persons import enforce_confirmed_source_con
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
+from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -20,7 +21,7 @@ _PERIMETER = PublicationPerimeterRecompute()
 
 
 def _orphan_source_contribution(conn):
-    """Publication + source_record + source_contribution orpheline. Retourne (source_contribution_id, publication_id)."""
+    """Publication + source_record + source_contribution orpheline, seul membre d'un groupe d'auteur du périmètre sans personne. Retourne (source_contribution_id, groupe, publication_id)."""
     publication = insert_publication(conn, "t", normalize_title=False, doc_type=None)
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -32,7 +33,9 @@ def _orphan_source_contribution(conn):
         raw_author_name="Jean Martin",
         author_name_normalized="jean martin",
     )
-    return sa, publication
+    group = insert_group(conn, publication, [(sa, source_record)])
+    set_perimeter_author_group(conn, group)
+    return sa, group, publication
 
 
 def _pin(conn, source_contribution_id):
@@ -53,10 +56,10 @@ def _source_contribution_person(conn, source_contribution_id):
 
 def test_attach_pins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    sa, _publication = _orphan_source_contribution(sa_sync_conn)
+    sa, group, _publication = _orphan_source_contribution(sa_sync_conn)
     assign_orphan_contribution(
         pid,
-        sa,
+        group,
         conn=sa_sync_conn,
         perimeter_recompute=_PERIMETER,
         repo=person_repository(sa_sync_conn),
@@ -68,10 +71,10 @@ def test_attach_pins(sa_sync_conn):
 
 def test_detach_unpins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    sa, publication = _orphan_source_contribution(sa_sync_conn)
+    sa, group, publication = _orphan_source_contribution(sa_sync_conn)
     assign_orphan_contribution(
         pid,
-        sa,
+        group,
         conn=sa_sync_conn,
         perimeter_recompute=_PERIMETER,
         repo=person_repository(sa_sync_conn),
@@ -93,12 +96,12 @@ def test_detach_unpins(sa_sync_conn):
 def test_name_form_rejection_spares_pinned_source_contributions(sa_sync_conn):
     """Rejeter une forme de nom détache les contributions sources sous cette forme, sauf celles que l'admin a épinglées sur la personne."""
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
-    pinned, _ = _orphan_source_contribution(sa_sync_conn)
-    matched, _ = _orphan_source_contribution(sa_sync_conn)
+    pinned, pinned_group, _ = _orphan_source_contribution(sa_sync_conn)
+    matched, _, _ = _orphan_source_contribution(sa_sync_conn)
     persons, contributions = person_repository(sa_sync_conn), contribution_repository(sa_sync_conn)
     assign_orphan_contribution(
         pid,
-        pinned,
+        pinned_group,
         conn=sa_sync_conn,
         perimeter_recompute=_PERIMETER,
         repo=persons,
@@ -136,7 +139,7 @@ def test_name_form_rejection_spares_pinned_source_contributions(sa_sync_conn):
 
 def test_enforce_restores_pinned_source_contribution(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    sa, _publication = _orphan_source_contribution(sa_sync_conn)
+    sa, _group, _publication = _orphan_source_contribution(sa_sync_conn)
     repo = contribution_repository(sa_sync_conn)
     repo.pin_contributions([sa], pid)
     # Une opération quelconque détache la contribution source sans retirer l'épinglage.

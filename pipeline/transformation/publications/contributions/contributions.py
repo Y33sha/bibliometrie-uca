@@ -1,16 +1,13 @@
-"""Phase `contributions` : construction de la table `contributions`.
+"""Phase `contributions` : synchronisation des publications sur les contributions, groupes de contributions sources rattachés à une personne.
 
 Tâches (`pipeline.graph`), chacune dans sa transaction :
 
-1. **build** — consolide les `source_contributions` en contributions (une entrée par couple publication × personne). Sa maintenance `ANALYZE contributions` précède la propagation.
-2. **propagate**, **publications_in_perimeter**, **structures** — recomposent les attributs des contributions (indices de l'entrée dans le périmètre compris), le périmètre des publications et les matviews `group_structures`, `publication_structures`.
-3. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
-4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
-5. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
+1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `group_structures`, `publication_structures`.
+2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
+3. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
+4. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
-La phase reconsolide toutes les sources à chaque run et ignore `--sources` : une contribution source change aussi par d'autres voies que sa normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
-
-Le build est incrémental et convergent (add + prune + recompute en une passe).
+La phase traite toutes les sources à chaque run et ignore `--sources` : une contribution change aussi par d'autres voies que la normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
 """
 
 from __future__ import annotations
@@ -23,15 +20,11 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import propagate_contribution_attributes_sql
 from pipeline.runtime.context import OpenTransaction, Phase, PhaseContext
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
-from pipeline.transformation.publications.contributions.build_contributions import (
-    build as build_contributions,
-)
 from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
@@ -59,14 +52,15 @@ from pipeline.transformation.structures.address_publication_count import (
 _PURGE_BATCH_SIZE = 5000
 
 
-def propagate_contribution_attributes(conn: Connection) -> int:
-    """Recopie sur chaque contribution les attributs de ses contributions sources."""
-    return conn.execute(text(propagate_contribution_attributes_sql())).rowcount
-
-
 def count_contributions_in_perimeter(conn: Connection) -> int:
+    """Nombre de groupes de contributions sources du périmètre rattachés à une personne."""
     return scalar_int(
-        conn.execute(text("SELECT COUNT(*) AS n FROM contributions WHERE in_perimeter = TRUE"))
+        conn.execute(
+            text(
+                "SELECT COUNT(*) FROM source_contribution_groups"
+                " WHERE person_id IS NOT NULL AND in_perimeter"
+            )
+        )
     )
 
 
@@ -84,26 +78,16 @@ class ContributionsPhase:
     empty_containers: tuple[tuple[str, Callable[[PhaseContext], PhaseMetrics]], ...] = ()
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les tâches de la phase et retourne les métriques du build."""
-
-        def build(ctx: PhaseContext) -> PhaseMetrics:
-            with ctx.open_tx() as conn:
-                return build_contributions(conn, ctx.logger)
-
-        def propagate(ctx: PhaseContext) -> PhaseMetrics:
-            t0 = time.perf_counter()
-            with ctx.open_tx() as conn:
-                propagate_contribution_attributes(conn)
-                in_perimeter = count_contributions_in_perimeter(conn)
-            metrics = _timed(t0)
-            metrics.details["in_perimeter"] = in_perimeter
-            return metrics
+        """Exécute les tâches de la phase et retourne ses métriques : celles des référentiels vides, et un résumé."""
 
         def publications_in_perimeter(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
             with ctx.open_tx() as conn:
                 refresh_publications_perimeter_evidence(conn)
-            return _timed(t0)
+                in_perimeter = count_contributions_in_perimeter(conn)
+            metrics = _timed(t0)
+            metrics.details["in_perimeter"] = in_perimeter
+            return metrics
 
         def structures(ctx: PhaseContext) -> PhaseMetrics:
             t0 = time.perf_counter()
@@ -130,10 +114,6 @@ class ContributionsPhase:
         by_task = run_tasks(
             "contributions",
             {
-                "contributions.build": TaskStep(build),
-                "contributions.propagate": TaskStep(
-                    propagate, section=sync_section, label="Attributs des liens"
-                ),
                 "contributions.publications_in_perimeter": TaskStep(
                     publications_in_perimeter,
                     section=sync_section,
@@ -148,16 +128,13 @@ class ContributionsPhase:
             },
             ctx,
         )
-        metrics = by_task["contributions.build"]
-        metrics.merge(by_task["contributions.delete_empty_containers"])
-        summary = metrics.details["summary"]
-        if isinstance(summary, dict):
-            summary["total_in_perimeter"] = by_task["contributions.propagate"].details[
+        metrics = by_task["contributions.delete_empty_containers"]
+        metrics.details["summary"] = {
+            "total_in_perimeter": by_task["contributions.publications_in_perimeter"].details[
                 "in_perimeter"
-            ]
-            summary["publications_purged"] = by_task["contributions.purge_publications"].details[
-                "purged"
-            ]
+            ],
+            "publications_purged": by_task["contributions.purge_publications"].details["purged"],
+        }
         return metrics
 
 

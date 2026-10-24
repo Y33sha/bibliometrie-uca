@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 from pipeline import run as run_pipeline
 from pipeline.runtime.context import PhaseContext, RunOptions
-from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publications.contributions import contributions as contributions_phase
 
 
@@ -21,13 +20,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
     La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
     """
     with (
-        patch.object(
-            contributions_phase,
-            "build_contributions",
-            return_value=PhaseMetrics(details={"summary": {}}),
-        ),
         patch.object(contributions_phase, "purge_publications", return_value=0),
-        patch.object(contributions_phase, "propagate_contribution_attributes"),
         patch.object(contributions_phase, "count_contributions_in_perimeter"),
         patch.object(contributions_phase, "refresh_publications_perimeter_evidence"),
         patch.object(contributions_phase, "refresh_group_structures"),

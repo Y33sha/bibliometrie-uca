@@ -1,1 +1,1 @@
-"""Contributions : construction de la table `contributions` et décomptes qui en dépendent."""
+"""Contributions : synchronisation des publications sur les groupes de contributions sources rattachés à une personne, et décomptes qui en dépendent."""

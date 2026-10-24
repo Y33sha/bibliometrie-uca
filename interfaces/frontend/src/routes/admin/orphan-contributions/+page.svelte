@@ -62,7 +62,7 @@
 		list.load();
 	}
 
-	/** Recharge la liste et la facette après une attribution, qui retire des contributions sources de la file. */
+	/** Recharge la liste et la facette après une attribution, qui retire des contributions de la file. */
 	function reload() {
 		list.load();
 		loadFacets();
@@ -71,9 +71,9 @@
 	// Une seule ligne peut avoir son panneau "attribuer" ouvert à la fois.
 	let activeAssignIdx: number | null = $state(null);
 	const assignSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
-	let selectedIds = $state(new Set<string>());  // clé locale "source-source_contribution_id"
+	let selectedIds = $state(new Set<number>());  // `group_id` des contributions sélectionnées
 	const batchSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
-	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.source_contribution_id}`)));
+	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(o.group_id)));
 	let createModal: { lastName: string; firstName: string; items: OrphanContribution[] } | null = $state(null);
 	// Modale de confirmation quand la réassignation porte sur une paire déjà rejetée (409).
 	let rejectModal: { detail: string; pairs: RejectedPair[]; retry: () => Promise<void> } | null =
@@ -124,10 +124,10 @@
 		assignSearch.clear();
 	}
 
-	async function assign(orphan: any, personId: number) {
+	async function assign(orphan: OrphanContribution, personId: number) {
 		await withRejectGuard(async (force) => {
 			await orphanContributions.assign({
-				source_contribution_id: orphan.source_contribution_id,
+				group_id: orphan.group_id,
 				person_id: personId,
 				force,
 			});
@@ -145,10 +145,9 @@
 		closeAssign();
 	}
 
-	function toggleSelect(o: any) {
-		const key = `${o.source}-${o.source_contribution_id}`;
+	function toggleSelect(o: OrphanContribution) {
 		const s = new Set(selectedIds);
-		if (s.has(key)) s.delete(key); else s.add(key);
+		if (s.has(o.group_id)) s.delete(o.group_id); else s.add(o.group_id);
 		selectedIds = s;
 	}
 
@@ -156,16 +155,16 @@
 		if (allSelected) {
 			selectedIds = new Set();
 		} else {
-			selectedIds = new Set(orphans.map(o => `${o.source}-${o.source_contribution_id}`));
+			selectedIds = new Set(orphans.map(o => o.group_id));
 		}
 	}
 
 	async function batchAssign(personId: number) {
-		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.source_contribution_id}`));
+		const items = orphans.filter(o => selectedIds.has(o.group_id));
 		await withRejectGuard(async (force) => {
 			await orphanContributions.batchAssign({
 				person_id: personId,
-				source_contribution_ids: items.map(o => o.source_contribution_id),
+				group_ids: items.map(o => o.group_id),
 				force,
 			});
 			selectedIds = new Set();
@@ -175,7 +174,7 @@
 	}
 
 	function openCreateModal() {
-		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.source_contribution_id}`));
+		const items = orphans.filter(o => selectedIds.has(o.group_id));
 		if (!items.length) return;
 		const first = items[0];
 		createModal = {
@@ -190,7 +189,7 @@
 		const { lastName, firstName, items } = createModal;
 		// Créer la personne avec la première contribution
 		const data = await orphanContributions.assign({
-			source_contribution_id: items[0].source_contribution_id,
+			group_id: items[0].group_id,
 			create_person: { last_name: lastName, first_name: firstName },
 		}) as { person_id?: number };
 		if (!data.person_id) return;
@@ -199,7 +198,7 @@
 		if (remaining.length) {
 			await orphanContributions.batchAssign({
 				person_id: data.person_id,
-				source_contribution_ids: remaining.map((o: any) => o.source_contribution_id),
+				group_ids: remaining.map(o => o.group_id),
 			});
 		}
 		createModal = null;
@@ -301,10 +300,14 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each orphans as o, i}
+			{#each orphans as o, i (o.group_id)}
 				<tr>
-					<td><input type="checkbox" checked={selectedIds.has(`${o.source}-${o.source_contribution_id}`)} onchange={() => toggleSelect(o)} /></td>
-					<td><span class="tag tag-source">{SOURCE_LABELS[o.source] ?? o.source}</span></td>
+					<td><input type="checkbox" checked={selectedIds.has(o.group_id)} onchange={() => toggleSelect(o)} /></td>
+					<td>
+						{#each o.sources as source (source)}
+							<span class="tag tag-source">{SOURCE_LABELS[source] ?? source}</span>
+						{/each}
+					</td>
 					<td>{o.full_name}</td>
 					<td>
 						<a href="{base}/publications/{o.publication_id}" class="publication-link">
@@ -413,6 +416,7 @@
 	}
 	.toolbar input { width: 300px; }
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
+	.tag-source + .tag-source { margin-left: 3px; }
 	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.publication-link:hover { text-decoration: underline; }
 	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */

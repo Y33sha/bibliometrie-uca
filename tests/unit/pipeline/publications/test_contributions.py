@@ -1,6 +1,6 @@
-"""Orchestrateur de la phase `contributions` : build, synchronisation, purge des publications, référentiels vides, refresh des compteurs.
+"""Orchestrateur de la phase `contributions` : synchronisation, purge des publications, référentiels vides, refresh des compteurs.
 
-Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé du build. Le build lui-même a ses propres tests.
+Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé de la phase.
 """
 
 import logging
@@ -42,7 +42,6 @@ def _patch_sql(counts: _Counts) -> list:
     return [
         patch.object(phase, name, counts.counter(label, n))
         for name, label, n in (
-            ("propagate_contribution_attributes", "propagation", 0),
             ("count_contributions_in_perimeter", "périmètre des contributions", 9),
             ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
             ("refresh_group_structures", "structures des groupes", None),
@@ -54,13 +53,10 @@ def _patch_sql(counts: _Counts) -> list:
     ]
 
 
-def _run(contexte, lots, *, build_metrics=None):
+def _run(contexte, lots):
     purge = _FakePurgeQueries(lots)
     counts = _Counts()
-    metrics = build_metrics or PhaseMetrics(new=12)
-    metrics.details.setdefault("summary", {})
     with (
-        patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(phase, "purge_publications", side_effect=purge.purge_publications),
         ExitStack() as stack,
     ):
@@ -86,38 +82,20 @@ def test_rien_a_purger(open_tx, contexte):
     assert open_tx.conn.commits == 0
 
 
-def test_metriques_du_build_rendues_telles_quelles(contexte):
-    rendu, _, _ = _run(contexte, [], build_metrics=PhaseMetrics(new=42))
-
-    assert rendu.new == 42
-
-
-def test_resume_absent_du_build_laisse_la_purge_sans_trace(contexte):
-    """Le build rend un résumé qui n'est pas un dictionnaire : la purge tourne, sans rien y inscrire."""
-    metrics = PhaseMetrics()
-    metrics.details["summary"] = "rien à dire"
-
-    rendu, purge, _ = _run(contexte, [7], build_metrics=metrics)
-
-    assert rendu.details["summary"] == "rien à dire"
-    assert purge.limites  # la purge a bien tourné
-
-
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # build, propagation, périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 8
+    # périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 6
 
 
-def test_la_synchronisation_suit_le_build(contexte, caplog):
+def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         rendu, _, _ = _run(contexte, [])
     assert rendu.details["summary"]["total_in_perimeter"] == 9
     lignes = [m for m in caplog.messages if m]
     debut = lignes.index("▶ Synchronisation des tables")
-    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 1 : debut + 4]] == [
-        "  ├─ Attributs des liens",
+    assert [ligne.split(" : ")[0] for ligne in lignes[debut + 1 : debut + 3]] == [
         "  ├─ Périmètre des publications",
         "  └─ Structures des liens",
     ]
@@ -138,10 +116,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
 
         return run
 
-    metrics = PhaseMetrics(new=1)
-    metrics.details["summary"] = {}
     with (
-        patch.object(phase, "build_contributions", return_value=metrics),
         patch.object(phase, "purge_publications", return_value=0),
         caplog.at_level(logging.INFO, logger="test"),
         ExitStack() as stack,
