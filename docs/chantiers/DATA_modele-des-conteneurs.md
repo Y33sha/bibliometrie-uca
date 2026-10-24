@@ -131,10 +131,11 @@ Usages du type dans le code :
 
 ### Phase 2 — Éditeur des publications
 
-- [ ] Migration : `publications.doi_prefix`, colonne générée ; `publisher_id` sur `source_records` et `publications`.
-- [ ] Normalisation : l'enregistrement source reçoit l'éditeur de `biblio.publisher`, trouvé ou créé par ses formes de nom. Pas d'éditeur pour les types `preprint`, `dataset`, `software`, `report`, `thesis`, `ongoing_thesis`, `hdr`, `memoir`, `poster`, `conference` et `patent`, ni pour un enregistrement DataCite sans série ni monographie.
-- [ ] Agrégation : la publication reçoit le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur non nul dans l'ordre de priorité des sources. Pas d'éditeur pour les mêmes types.
-- [ ] Suppression des éditeurs vides et fusion d'éditeurs : prise en compte des éditeurs des enregistrements sources et des publications.
+- [x] Migration : `publications.doi_prefix`, colonne générée ; `publisher_id` sur `source_records` et `publications` (`b123a7487`).
+- [x] Normalisation : l'enregistrement source reçoit l'éditeur que nomme sa source. Pas d'éditeur pour les types `preprint`, `dataset`, `software`, `report`, `thesis`, `ongoing_thesis`, `hdr`, `memoir`, `poster`, `conference` et `patent`, ni pour un enregistrement DataCite sans série ni monographie (`b123a7487`).
+- [x] Agrégation : la publication reçoit le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur non nul dans l'ordre de priorité des sources. Pas d'éditeur pour les mêmes types (`b123a7487`).
+- [x] Suppression des éditeurs vides et fusion d'éditeurs : prise en compte des éditeurs des enregistrements sources et des publications (`b123a7487`).
+- [ ] Stock : oneshot `backfill_source_record_publishers` depuis `biblio.publisher`, puis phase `publications`.
 - [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
 - [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
 
