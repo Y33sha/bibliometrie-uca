@@ -1,14 +1,14 @@
 """Orchestrateur unique de la phase personnes.
 
-Quatre tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `populate` (tâche `persons.populate_person_name_forms`), `purge` (tâche `persons.purge`) et `resolve_groups` (tâche `persons.resolve_groups`) ont chacun leur transaction.
+Quatre tâches (`pipeline.graph`). Les quatre premières étapes forment la tâche `persons.resolve`, sur **une seule** transaction : l'arbitrage des identifiants détache des contributions sources, la cascade les re-résout, et le détachement cross-source final retire les liens sans appui. Un échec en cours de tâche annule l'ensemble. `resolve_groups` (tâche `persons.resolve_groups`), `populate` (tâche `persons.populate_person_name_forms`) et `purge` (tâche `persons.purge`) ont chacun leur transaction.
 
 1. **enforce** — réapplique les épinglages admin (`confirmed_source_contributions`, must-link) : entrée fixe reposée avant toute dérivation. Les contributions sources hors groupe, non épinglées, perdent leur personne.
 2. **identifiants mal placés et conflits d'identifiant** — sur un même consensus des porteurs, neutralise les identifiants mal placés, puis tranche les conflits d'attribution ; les contributions sources rattachées par un identifiant neutralisé ou capté repassent à NULL.
 3. **cascade** — un seul balayage en deux passes internes, sur des index vivants partagés : `match` (rattachement ferme + cross-source), puis `create` (rattrapage cross-source + création des inconnues).
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
-5. **populate** — régénère les formes de nom canoniques.
-6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
-7. **resolve_groups** — applique les épinglages aux groupes de contributions sources, puis rattache à une personne existante les groupes sans personne (`pipeline.transformation.persons.groups`).
+5. **resolve_groups** — applique les épinglages aux groupes de contributions sources, puis rattache à une personne existante les groupes sans personne (`pipeline.transformation.persons.groups`). La régénération des formes de nom et la purge voient ainsi les groupes du run, y compris ceux des personnes créées par la cascade.
+6. **populate** — régénère les formes de nom canoniques.
+7. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
 
 Les publications hors scope sont écartées (`domain/publications/scope`).
 
@@ -88,15 +88,15 @@ class PersonsPhase:
             "persons",
             {
                 "persons.resolve": TaskStep(self._resolve),
+                "persons.resolve_groups": TaskStep(
+                    self._resolve_groups,
+                    section="Rattachement des groupes de contributions sources",
+                ),
                 "persons.populate_person_name_forms": TaskStep(
                     self._populate,
                     section="Rafraîchissement des formes de nom associées aux personnes",
                 ),
                 "persons.purge": TaskStep(self._purge),
-                "persons.resolve_groups": TaskStep(
-                    self._resolve_groups,
-                    section="Rattachement des groupes de contributions sources",
-                ),
             },
             ctx,
         )

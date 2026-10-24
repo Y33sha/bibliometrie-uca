@@ -915,6 +915,38 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
+        "persons.resolve_groups",
+        "persons",
+        reads=(
+            "source_contribution_groups.id",
+            "source_contribution_groups.publication_id",
+            "source_contribution_groups.person_id",
+            "source_contribution_group_members",
+            "source_contributions.in_perimeter",
+            "source_contributions.contributor_information_id",
+            "source_contributions.neutralized_identifiers",
+            "source_contributions.roles",
+            "source_records.publication_id",
+            "contributor_information",
+            "confirmed_source_contributions",
+            "rejected_contributions",
+            "person_identifiers",
+            "person_name_forms",
+            "persons",
+        ),
+        writes=(
+            "source_contribution_groups.person_id",
+            "source_contribution_groups.resolution_mode",
+        ),
+        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés et groupes vidés par `purge`.
+        previous_run=(
+            "person_identifiers",
+            "person_name_forms",
+            "persons",
+            "source_contribution_groups.person_id",
+        ),
+    ),
+    _task(
         "persons.populate_person_name_forms",
         "persons",
         reads=(
@@ -959,31 +991,6 @@ TASKS: tuple[Task, ...] = (
         ),
         # `normalize` et `persons` réécrivent en masse `source_contributions.person_id`.
         maintenance=("ANALYZE source_contributions",),
-    ),
-    _task(
-        "persons.resolve_groups",
-        "persons",
-        reads=(
-            "source_contribution_groups.id",
-            "source_contribution_groups.publication_id",
-            "source_contribution_groups.person_id",
-            "source_contribution_group_members",
-            "source_contributions.in_perimeter",
-            "source_contributions.contributor_information_id",
-            "source_contributions.neutralized_identifiers",
-            "source_contributions.roles",
-            "source_records.publication_id",
-            "contributor_information",
-            "confirmed_source_contributions",
-            "rejected_contributions",
-            "person_identifiers",
-            "person_name_forms",
-            "persons",
-        ),
-        writes=(
-            "source_contribution_groups.person_id",
-            "source_contribution_groups.resolution_mode",
-        ),
     ),
     _task(
         "contributions.build",
