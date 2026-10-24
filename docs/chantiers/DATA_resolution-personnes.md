@@ -123,13 +123,13 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape B — Bascule des lecteurs
 
-- [ ] Matviews `contribution_structures` et `publication_structures` calculées par les membres des groupes.
-- [ ] Read models, API, frontend, scripts `report_open_science` et `snapshot_perimeter`. `contribution_id` et `PATCH /api/contributions/{contribution_id}/exclude` désignent un groupe.
-- [ ] Compteurs `source_contribution_count` et `in_perimeter_source_contribution_count` de l'API personnes renommés : ils comptent des contributions.
+- [x] Matviews des structures calculées par les membres des groupes : `group_structures` remplace `contribution_structures`, `publication_structures` lit les groupes. 2e6ee5782 f7d53ca45
+- [x] Read models, API, frontend, scripts `report_open_science` et `snapshot_perimeter`. `contribution_id` et `PATCH /api/contributions/{contribution_id}/exclude` désignent un groupe. Les lecteurs liés à un écrivain de `source_contributions.person_id` (orphelins, formes de nom, conflits d'identifiants) et la purge des publications restent sur l'ancienne table jusqu'à l'étape C. 4e1e81472
+- [x] Compteurs `source_contribution_count` et `in_perimeter_source_contribution_count` de l'API personnes renommés `contribution_count` et `in_perimeter_contribution_count`. 4e1e81472
 
 #### Étape C — Bascule des écrivains
 
-- [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes.
+- [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes. Le rejet d'un couple retire la personne du groupe ; l'attribution et l'épinglage la posent sur le groupe sans personne (4e1e81472).
 - [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [ ] La phase `contributions` cesse de construire la table `contributions`.
