@@ -215,8 +215,8 @@ class TestChangementsJournalises:
         assert caplog.messages[-5:] == [
             "▶ Relations entre publications",
             "  ├─ 8 nouvelles relations, dont",
-            "  │",
             "  │  8 préprint/article",
+            "  │",
             "  └─ 4 relations retirées",
         ]
         assert "is_preprint_of" not in caplog.text

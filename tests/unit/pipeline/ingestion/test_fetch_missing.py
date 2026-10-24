@@ -110,7 +110,7 @@ def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fo
         ).run(contexte(mode="full", sources={"hal", "theses"}))
 
     messages = caplog.messages
-    section = messages.index("▶ Recherche par NNT des thèses manquantes dans chaque source")
+    section = messages.index("▶ Recherche par NNT des thèses trouvées ailleurs")
     assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
     assert messages.count(f"{LAST_BRANCH}Rien à faire") == 1
 

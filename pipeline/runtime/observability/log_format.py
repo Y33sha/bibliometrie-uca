@@ -46,14 +46,15 @@ def breakdown(
     *,
     last: bool = True,
 ) -> None:
-    """Ligne de branche `header`, puis, après une ligne vide, une ligne par `(nombre, libellé)`, nombres alignés à droite. Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail."""
+    """Ligne de branche `header`, puis une ligne par `(nombre, libellé)`, nombres alignés à droite. Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail, et une ligne vide le sépare de la branche suivante."""
     rows = list(rows)
     margin = " " * len(LAST_BRANCH) if last else BRANCH_CONTINUATION
     logger.info("%s%s", LAST_BRANCH if last else BRANCH, header)
-    logger.info("%s", margin.rstrip())
     width = max((len(str(count)) for count, _ in rows), default=0)
     for count, label in rows:
         logger.info("%s%s %s", margin, str(count).rjust(width), label)
+    if not last:
+        logger.info("%s", margin.rstrip())
 
 
 def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:

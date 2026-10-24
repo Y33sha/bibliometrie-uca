@@ -34,7 +34,7 @@ FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
 _THESES_BY_NNT = "fetch_missing.theses_by_nnt"
-_NNT_SECTION = "Recherche par NNT des thèses manquantes dans chaque source"
+_NNT_SECTION = "Recherche par NNT des thèses trouvées ailleurs"
 
 
 def _doi_task(target: str) -> str:
