@@ -745,7 +745,7 @@ class TestHumanDecisionsOnGroups:
 
         assert _group_person(sa_sync_conn, group_id) == (None, None)
 
-    def test_la_consolidation_rattache_le_groupe_sans_personne(self, sa_sync_conn, repo):
+    def test_l_epinglage_rattache_le_groupe_sans_personne(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
@@ -756,11 +756,11 @@ class TestHumanDecisionsOnGroups:
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
-        repo.consolidate_contributions(person_id, [publication_id])
+        repo.pin_contributions([source_contribution_id], person_id)
 
         assert _group_person(sa_sync_conn, group_id) == (person_id, "manual")
 
-    def test_la_consolidation_garde_le_groupe_existant_de_la_personne(self, sa_sync_conn, repo):
+    def test_l_epinglage_cede_devant_un_groupe_manuel_de_la_personne(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
@@ -772,6 +772,6 @@ class TestHumanDecisionsOnGroups:
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
-        repo.consolidate_contributions(person_id, [publication_id])
+        repo.pin_contributions([source_contribution_id], person_id)
 
         assert _group_person(sa_sync_conn, other_group) == (None, None)

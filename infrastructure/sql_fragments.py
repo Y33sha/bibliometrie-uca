@@ -376,6 +376,49 @@ def propagate_group_attributes_sql(group_ids: str) -> str:
     """
 
 
+def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
+    """Deux requêtes, à jouer dans l'ordre, qui rattachent à la personne épinglée les groupes de la requête `group_ids` dont un membre est épinglé.
+
+    Un groupe dont les membres sont épinglés à plusieurs personnes reste en l'état. Dans une publication, un groupe par personne au plus : un groupe épinglé cède devant un autre groupe manuel de la même personne, et prend sa personne à un autre groupe non manuel. La première requête libère ces autres groupes, la seconde rattache les groupes épinglés en mode `manual`.
+    """
+    target = f"""
+        WITH pinned AS (
+            SELECT gm.group_id, min(c.person_id) AS person_id
+            FROM confirmed_source_contributions c
+            JOIN source_contribution_group_members gm
+                ON gm.source_contribution_id = c.source_contribution_id
+            WHERE gm.group_id IN ({group_ids})
+            GROUP BY gm.group_id
+            HAVING count(DISTINCT c.person_id) = 1
+        ),
+        target AS (
+            SELECT DISTINCT ON (g.publication_id, p.person_id) g.id, g.publication_id, p.person_id
+            FROM pinned p
+            JOIN source_contribution_groups g ON g.id = p.group_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM source_contribution_groups o
+                WHERE o.publication_id = g.publication_id AND o.person_id = p.person_id
+                  AND o.id <> g.id AND o.resolution_mode = 'manual'
+            )
+            ORDER BY g.publication_id, p.person_id, g.id
+        )
+    """
+    release = f"""{target}
+        UPDATE source_contribution_groups o
+        SET person_id = NULL, resolution_mode = NULL
+        FROM target t
+        WHERE o.publication_id = t.publication_id AND o.person_id = t.person_id AND o.id <> t.id
+    """
+    attach = f"""{target}
+        UPDATE source_contribution_groups g
+        SET person_id = t.person_id, resolution_mode = 'manual'
+        FROM target t
+        WHERE g.id = t.id
+          AND (g.person_id, g.resolution_mode) IS DISTINCT FROM (t.person_id, 'manual'::group_resolution_mode)
+    """
+    return release, attach
+
+
 def active_issns(journal: str) -> str:
     """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
     return f"""coalesce((

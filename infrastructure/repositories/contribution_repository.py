@@ -15,6 +15,7 @@ from infrastructure.sql_fragments import (
     PERSON_PUBLICATIONS_SCOPE,
     REJECTED_PAIRS,
     insert_missing_contributions_sql,
+    pinned_groups_sql,
     propagate_contribution_attributes_sql,
 )
 
@@ -91,29 +92,6 @@ class PgContributionRepository(ContributionRepository):
         if not publication_ids:
             return
         params = {"person_id": person_id, "publication_ids": publication_ids}
-        # Dans une publication, un groupe par personne au plus : le premier groupe sans personne.
-        self._conn.execute(
-            text("""
-                WITH target AS (
-                    SELECT DISTINCT ON (g.publication_id) g.id
-                    FROM source_contribution_groups g
-                    JOIN source_contribution_group_members m ON m.group_id = g.id
-                    JOIN source_contributions sc ON sc.id = m.source_contribution_id
-                    WHERE g.person_id IS NULL AND sc.person_id = :person_id
-                      AND g.publication_id = ANY(:publication_ids)
-                      AND NOT EXISTS (
-                          SELECT 1 FROM source_contribution_groups o
-                          WHERE o.publication_id = g.publication_id AND o.person_id = :person_id
-                      )
-                    ORDER BY g.publication_id, g.id
-                )
-                UPDATE source_contribution_groups g
-                SET person_id = :person_id, resolution_mode = 'manual'
-                FROM target t
-                WHERE g.id = t.id
-            """),
-            params,
-        )
         self._conn.execute(
             text(insert_missing_contributions_sql(scope=PERSON_PUBLICATIONS_SCOPE)), params
         )
@@ -281,6 +259,11 @@ class PgContributionRepository(ContributionRepository):
             """),
             {"ids": source_contribution_ids, "pid": person_id},
         )
+        for sql in pinned_groups_sql(
+            "SELECT group_id FROM source_contribution_group_members"
+            " WHERE source_contribution_id = ANY(:ids)"
+        ):
+            self._conn.execute(text(sql), {"ids": source_contribution_ids})
 
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 

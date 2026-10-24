@@ -1,6 +1,6 @@
 """Tâche `persons.resolve_groups` : rattache à une personne les groupes de contributions sources qui n'en ont pas (`domain.persons.group_matching`).
 
-Un groupe déjà rattaché garde sa personne : `author_grouping` vide la personne d'un groupe dont les membres changent. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne. La tâche ne crée pas de personne : un groupe dont la décision est une création reste sans personne.
+Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne : `author_grouping` vide la personne d'un groupe dont les membres changent. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne. La tâche ne crée pas de personne : un groupe dont la décision est une création reste sans personne.
 """
 
 from collections import Counter, defaultdict
@@ -23,6 +23,7 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
 from infrastructure.sql_fragments import (
     pinned,
+    pinned_groups_sql,
     strong_identifier_source_contributions,
     usable_identifier,
 )
@@ -167,8 +168,16 @@ def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> in
     ).rowcount
 
 
+def apply_pins(conn: Connection) -> int:
+    """Rattache à la personne épinglée les groupes dont un membre est épinglé (`pinned_groups_sql`). Rend le nombre de groupes rattachés."""
+    release, attach = pinned_groups_sql("SELECT id FROM source_contribution_groups")
+    conn.execute(text(release))
+    return conn.execute(text(attach)).rowcount
+
+
 def resolve_groups(conn: Connection) -> dict[str, int]:
-    """Décide et écrit la personne des groupes sans personne. Rend les compteurs par issue et par motif."""
+    """Applique les épinglages, puis décide et écrit la personne des groupes sans personne. Rend les compteurs par issue et par motif."""
+    pinned = apply_pins(conn)
     groups = load_candidate_groups(conn)
     decisions = decide_groups(
         groups,
@@ -181,4 +190,4 @@ def resolve_groups(conn: Connection) -> dict[str, int]:
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()
     )
-    return {"groups": len(decisions), "written": written, **counts}
+    return {"pinned": pinned, "groups": len(decisions), "written": written, **counts}

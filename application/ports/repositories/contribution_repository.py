@@ -101,7 +101,7 @@ class ContributionRepository(Protocol):
     # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
 
     def pin_contributions(self, source_contribution_ids: list[int], person_id: int) -> None:
-        """Épingle des contributions sources à une personne dans `confirmed_source_contributions` (résolution admin d'orphelines). Upsert par contribution source : le dernier épinglage l'emporte."""
+        """Épingle des contributions sources à une personne dans `confirmed_source_contributions` (résolution admin d'orphelines), et rattache leurs groupes à la personne (`pinned_groups_sql`). Upsert par contribution source : le dernier épinglage l'emporte."""
         ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────
@@ -116,5 +116,5 @@ class ContributionRepository(Protocol):
     # ── Recomposition d'une contribution depuis ses contributions sources ───────
 
     def consolidate_contributions(self, person_id: int, publication_ids: list[int]) -> None:
-        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses contributions sources, par les requêtes de la phase `contributions`. Rattache à la personne le groupe sans personne de ses contributions sources, dans chaque publication où elle n'en a pas."""
+        """Crée et recompose les lignes consolidées de la personne sur ces publications, depuis ses contributions sources, par les requêtes de la phase `contributions`."""
         ...

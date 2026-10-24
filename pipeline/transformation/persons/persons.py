@@ -8,7 +8,7 @@ Quatre tâches (`pipeline.graph`). Les quatre premières étapes forment la tâc
 4. **détachement cross-source** — les liens cross-source restés sans appui ferme repassent à NULL.
 5. **populate** — régénère les formes de nom canoniques.
 6. **purge** — re-orpheline les formes devenues ambiguës après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source ne contient, et supprime les personnes vidées.
-7. **resolve_groups** — rattache à une personne existante les groupes de contributions sources sans personne (`pipeline.transformation.persons.groups`).
+7. **resolve_groups** — applique les épinglages aux groupes de contributions sources, puis rattache à une personne existante les groupes sans personne (`pipeline.transformation.persons.groups`).
 
 Les publications hors scope sont écartées (`domain/publications/scope`).
 
