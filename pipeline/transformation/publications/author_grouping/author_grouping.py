@@ -332,7 +332,7 @@ class AuthorGroupingPhase:
                 )
 
         def attributes_task(ctx: PhaseContext) -> PhaseMetrics:
-            step(ctx.logger, "Attributs des groupes")
+            step(ctx.logger, "Attributs des contributions")
             t0 = time.perf_counter()
             with (
                 waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
@@ -340,12 +340,14 @@ class AuthorGroupingPhase:
             ):
                 queued, updated = SourceContributionGroupStore(conn).propagate_attributes()
                 line.conclude(
-                    f"{LAST_BRANCH}{quantity(queued, 'groupe examiné', 'groupes examinés')},"
-                    f" {quantity(updated, 'groupe mis à jour', 'groupes mis à jour')}"
+                    f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
+                    f" {quantity(updated, 'mise à jour', 'mises à jour')}"
                     f" en {time.perf_counter() - t0:.1f} s"
                 )
             metrics = PhaseMetrics(seen=queued, updated=updated)
-            metrics.report = quantity(updated, "groupe mis à jour", "groupes mis à jour")
+            metrics.report = quantity(
+                updated, "contribution mise à jour", "contributions mises à jour"
+            )
             return metrics
 
         by_task = run_tasks(
