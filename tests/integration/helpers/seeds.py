@@ -300,7 +300,13 @@ def seed_contribution(
     in_perimeter: bool = False,
     roles: list[str] | None = None,
 ) -> int:
-    """Contribution de `publication_id` et `person_id`. Les valeurs par défaut sont celles du schéma."""
+    """Contribution de `publication_id` et `person_id`, avec le groupe de contributions sources rattaché à la même personne. Les valeurs par défaut sont celles du schéma."""
+    _insert(
+        "INSERT INTO source_contribution_groups "
+        "(publication_id, person_id, resolution_mode, perimeter_evidence, roles) "
+        "VALUES (%s, %s, 'manual', CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
+        (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
+    )
     return _insert(
         "INSERT INTO contributions (publication_id, person_id, perimeter_evidence, roles) "
         "VALUES (%s, %s, CAST(%s AS perimeter_evidence[]), %s) RETURNING id",

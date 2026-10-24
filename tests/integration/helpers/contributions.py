@@ -74,7 +74,21 @@ def insert_contribution(
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
 ) -> int:
-    """Insère une contribution et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
+    """Insère une contribution et le groupe de contributions sources rattaché à la même personne, et renvoie l'`id` de la contribution. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
+    evidence = perimeter_evidence(in_perimeter)
+    insert_row(
+        conn,
+        "source_contribution_groups",
+        {
+            "publication_id": publication_id,
+            "person_id": person_id,
+            "resolution_mode": "manual",
+            "reference_position": author_position,
+            "perimeter_evidence": evidence,
+            "roles": roles,
+        },
+        {"perimeter_evidence": PERIMETER_EVIDENCE_CAST, "resolution_mode": "group_resolution_mode"},
+    )
     return insert_row(
         conn,
         "contributions",
@@ -82,7 +96,7 @@ def insert_contribution(
             "publication_id": publication_id,
             "person_id": person_id,
             "author_position": author_position,
-            "perimeter_evidence": perimeter_evidence(in_perimeter),
+            "perimeter_evidence": evidence,
             "roles": roles,
         },
         {"perimeter_evidence": PERIMETER_EVIDENCE_CAST},

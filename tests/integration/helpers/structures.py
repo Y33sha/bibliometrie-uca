@@ -142,22 +142,17 @@ def insert_persons_perimeter(conn: Connection, code: str = "uca", *, extra_root_
 
 
 def refresh_structure_matviews(conn) -> None:
-    """Rafraîchit `source_contribution_structures` → `contribution_structures` →
-    `publication_structures` (chaîne matview-sur-matview, ordre imposé).
-    Non-concurrent = transactionnel, donc compatible avec l'isolation par rollback
-    des tests. En prod ces matviews sont maintenues par le pipeline ; les tests les
-    rafraîchissent explicitement."""
+    """Rafraîchit les vues des structures dans l'ordre de leurs dépendances : `source_contribution_structures`, puis `contribution_structures` et `group_structures`, puis `publication_structures`.
+
+    Le rafraîchissement sans `CONCURRENTLY` est transactionnel, donc annulé avec le test. Le pipeline maintient ces vues ; les tests les rafraîchissent eux-mêmes."""
     conn.execute(text("REFRESH MATERIALIZED VIEW source_contribution_structures"))
     conn.execute(text("REFRESH MATERIALIZED VIEW contribution_structures"))
+    conn.execute(text("REFRESH MATERIALIZED VIEW group_structures"))
     conn.execute(text("REFRESH MATERIALIZED VIEW publication_structures"))
 
 
 def add_contribution_structure(conn, contribution_id: int, structure_id: int) -> None:
-    """Lie `contribution_id` à `structure_id` dans la matview `contribution_structures`
-    (via une contribution source qui atteste la contribution + appartenance au périmètre d'affiliation),
-    puis rafraîchit `source_contribution_structures` et `contribution_structures`.
-
-    La contribution source atteste la contribution par sa publication et sa personne."""
+    """Lie la contribution `contribution_id` et son groupe à `structure_id`, par une contribution source de sa publication et de sa personne, membre du groupe, qui atteint la structure, puis rafraîchit les vues des structures."""
     publication_id, person_id = conn.execute(
         text("SELECT publication_id, person_id FROM contributions WHERE id = :id"),
         {"id": contribution_id},
@@ -169,6 +164,21 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
         publication_id=publication_id,
     )
     source_contribution_id = insert_source_contribution(conn, source_record_id, person_id=person_id)
+    conn.execute(
+        text("""
+            INSERT INTO source_contribution_group_members
+                (source_contribution_id, group_id, source_record_id, method)
+            SELECT :sc, g.id, :sr, 'reference'
+            FROM source_contribution_groups g
+            WHERE g.publication_id = :p AND g.person_id = :person
+        """),
+        {
+            "sc": source_contribution_id,
+            "sr": source_record_id,
+            "p": publication_id,
+            "person": person_id,
+        },
+    )
     add_source_contribution_structure(conn, source_contribution_id, structure_id)
 
 

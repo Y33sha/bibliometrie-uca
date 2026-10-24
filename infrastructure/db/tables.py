@@ -733,10 +733,13 @@ contributions = Table(
 # SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 #
-# `publication_structures` (MATERIALIZED VIEW, migration d8b3f5a2c9e6) : lien
-# publication↔structure dédoublonné, dérivé d'`contributions` × `contribution_structures`.
+# `group_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
+# contributions sources rattaché à une personne non exclue aux structures de ses membres.
+#
+# `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
+# publication↔structure dédoublonné, dérivé des groupes d'auteur × `group_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
-# + REFRESH dans le pipeline, après `contribution_structures`).
+# + REFRESH dans le pipeline, après `group_structures`).
 
 
 rejected_contributions = Table(
