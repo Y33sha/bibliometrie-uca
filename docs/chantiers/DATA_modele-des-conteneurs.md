@@ -148,7 +148,7 @@ Usages du type dans le code :
 
 - [x] Migration : `platforms`, `source_record_locations` (`8d0a6ca00`).
 - [x] Normalisation OpenAlex : localisations, plateforme trouvée ou créée pour une source de type `repository` (`8d0a6ca00`).
-- [ ] Stock : réhydratation du staging OpenAlex et renormalisation.
+- [x] Stock : réhydratation du staging OpenAlex et renormalisation. 303 477 localisations sur 105 496 des 111 022 enregistrements OpenAlex, 1 366 plateformes.
 - [ ] Serveurs de preprints : règle sur les données (part des preprints parmi les documents d'une plateforme), à mesurer.
 - [ ] Localisations de Crossref (`resource`, `link`).
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
