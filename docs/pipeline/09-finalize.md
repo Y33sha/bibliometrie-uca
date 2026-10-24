@@ -19,7 +19,7 @@ Une contribution (`contributions`) réunit les contributions sources d'un même 
 
 ## Opérations finales
 
-- **Purge des publications** : une publication sans enregistrement source ou sans contribution est supprimée. Elle perd son dernier enregistrement source quand le document disparaît de sa source, et sa dernière contribution quand son dernier groupe rattaché à une personne perd sa personne.
+- **Purge des publications** : une publication sans enregistrement source ou sans contribution est supprimée. Elle perd son dernier enregistrement source quand le document disparaît de sa source, et sa dernière contribution rattachée quand celle-ci perd sa personne.
 - **Suppression des référentiels vides**, dans cet ordre, car une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur :
   - les monographies sans enregistrement ni publication ;
   - les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, avec leurs formes de nom. Le journal d'exécution garde le titre, l'éditeur et les ISSN de chaque revue supprimée ;

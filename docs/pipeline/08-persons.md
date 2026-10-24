@@ -9,15 +9,15 @@ flowchart LR
     class B new;
 ```
 
-La phase `persons` rattache chaque contribution à une personne. Une contribution source est un auteur tel qu'une source le donne sur une publication : un même chercheur en produit une par publication et par source. La phase `author_grouping` réunit les contributions sources d'un même auteur d'une publication en un groupe (`contributions`). Une contribution est un groupe rattaché à une personne. La phase décide la personne de chaque groupe à partir de tous ses membres.
+La phase `persons` rattache chaque contribution à une personne. Une contribution source est un auteur tel qu'une source le donne sur une publication : un même chercheur en produit une par publication et par source. La phase `author_grouping` aligne les contributions sources d'un même auteur d'une publication dans une contribution (`contributions`, `aligned_source_contributions`). La phase décide la personne de chaque contribution à partir de toutes ses contributions sources alignées.
 
-Un groupe du périmètre au nom inconnu fonde une personne, d'après le nom d'un de ses membres : de préférence d'une source qui sépare nom et prénom, puis au prénom complet, puis selon la préséance des sources pour le nom (theses.fr, Crossref, DataCite, OpenAlex, ScanR, HAL, WoS). Les groupes au même nom, dans d'autres publications, la rejoignent dans le même passage.
+Une contribution du périmètre au nom inconnu fonde une personne, d'après le nom d'une de ses contributions sources. Le nom vient de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet. L'ordre des sources départage ensuite : theses.fr, Crossref, DataCite, OpenAlex, ScanR, HAL, WoS. Les contributions au même nom, dans d'autres publications, la rejoignent dans le même passage.
 
-## Rattacher un groupe à une personne
+## Rattacher une contribution à une personne
 
-Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le premier qui désigne une personne l'emporte. Deux personnes désignées par le même critère laissent le groupe sans personne.
+Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le premier qui désigne une personne l'emporte. Deux personnes désignées par le même critère laissent la contribution sans personne.
 
-1. **Épinglage** : un membre du groupe est épinglé à une personne par l'administration.
+1. **Épinglage** : une contribution source alignée est épinglée à une personne par l'administration.
 
 2. **ORCID déposé par l'auteur** : ORCID présent dans les métadonnées Crossref ou DataCite de la publication, dans le `raw_orcid` d'OpenAlex, ou dans le TEI HAL (`label_xml`). Les ORCID que la source a devinés sont écartés : `author.orcid` dans OpenAlex, distingué de `raw_orcid` ; dans WoS, où les deux sont indiscernables, `PreferredORCID` est ignoré en entier.
 
@@ -25,35 +25,35 @@ Les critères sont interrogés dans l'ordre, du plus fiable au moins fiable. Le 
 
 4. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-5. **Forme de nom** : le nom normalisé d'un membre désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — « prénom nom » et « initiales nom » — et du nom des membres de ses groupes. Un membre est cherché sous la forme « prénom nom », puis « nom prénom », ce qui rattrape un nom et un prénom inversés par la source. Un nom qui désigne plusieurs personnes laisse le groupe sans personne, pour traitement manuel via `admin/orphan-contributions`.
+5. **Forme de nom** : le nom normalisé d'une contribution source désigne une seule personne dans `person_name_forms`, ou, à défaut, une seule personne aux initiales compatibles (« Abdellah Tnourji » rejoint « Tnourji A. »). Ce référentiel de formes est régénéré à chaque exécution, à partir du nom de chaque personne — « prénom nom » et « initiales nom » — et du nom des contributions sources de ses contributions. Une contribution source est cherchée sous la forme « prénom nom », puis « nom prénom », ce qui rattrape un nom et un prénom inversés par la source. Un nom qui désigne plusieurs personnes laisse la contribution sans personne, pour traitement manuel via `admin/orphan-contributions`.
 
-Dans une publication, une personne revient à un seul groupe : le mieux appuyé (épinglage, puis identifiant, puis nom).
+Dans une publication, une personne revient à une seule contribution : la mieux appuyée (épinglage, puis identifiant, puis nom).
 
-> **Corroboration par le nom.** Un match par identifiant (ORCID, `hal_person_id`, IdRef) n'est retenu que si le nom du membre qui le contient est compatible avec celui du propriétaire de la valeur : un identifiant recopié sur le mauvais co-auteur est refusé.
+> **Corroboration par le nom.** Un rattachement par identifiant (ORCID, `hal_person_id`, IdRef) n'est retenu que si le nom de la contribution source qui le contient est compatible avec celui du titulaire de la valeur : un identifiant recopié sur le mauvais co-auteur est refusé.
 
-> **Garde de rejet.** À chaque critère, les personnes rejetées manuellement pour la publication (une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est, `rejected_contributions`) sont **éliminées des candidats** : un match ne peut pas recréer une paire rejetée. L'élimination peut aussi **désambiguïser** une recherche par nom : si une forme ambiguë correspond à 2 personnes dont l'une est rejetée pour cette publication, il ne reste qu'une candidate et le rattachement devient univoque.
+> **Garde de rejet.** À chaque critère, les personnes rejetées manuellement pour la publication (une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est, `rejected_contributions`) sont **éliminées des candidats** : un rattachement ne peut pas recréer une paire rejetée. L'élimination peut aussi **désambiguïser** une recherche par nom : si une forme ambiguë correspond à 2 personnes dont l'une est rejetée pour cette publication, il ne reste qu'une candidate et le rattachement devient univoque.
 
-### Groupes hors périmètre
+### Contributions hors périmètre
 
-Un groupe sans membre du périmètre est rattaché seulement par épinglage ou par identifiant. Le critère de similitude de nom vaut seulement pour les groupes du périmètre.
+Une contribution sans contribution source du périmètre est rattachée seulement par épinglage ou par identifiant. Le critère de nom vaut seulement pour les contributions du périmètre.
 
-### Contributions sources hors groupe
+### Contributions sources non alignées
 
-Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement restent hors groupe. Elles n'ont pas de personne et ne comptent pas dans l'arbitrage des identifiants.
+Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement ne sont dans aucune contribution. Elles n'ont pas de personne et ne comptent pas dans l'arbitrage des identifiants.
 
 ## Rattachements conservés d'un run à l'autre
 
-La phase décide les groupes sans personne. Un groupe rattaché garde sa personne d'un run à l'autre. Il entre dans une file de redécision dans quatre cas :
+La phase décide les contributions sans personne. Une contribution rattachée garde sa personne d'un run à l'autre. Elle entre dans une file de redécision dans quatre cas :
 
-- ses membres changent (phase `author_grouping`) ;
-- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattaché, ou le transfère à une autre personne ;
-- l'administration rejette l'identifiant ou la forme de nom qui l'a rattaché ;
+- ses contributions sources alignées changent (phase `author_grouping`) ;
+- l'arbitrage des identifiants neutralise l'identifiant qui l'a rattachée, ou le transfère à une autre personne ;
+- l'administration rejette l'identifiant ou la forme de nom qui l'a rattachée ;
 - la forme de nom qui fonde un rattachement par nom désigne plusieurs personnes (purge).
 
-Le rattachement des groupes redécide les groupes de la file, sauf les groupes épinglés. Un groupe qui désigne encore sa personne la garde, sans écriture. Un groupe qui en désigne une autre en change. Un groupe que rien ne soutient plus perd sa personne. Un groupe perd aussi sa personne quand elle est supprimée.
+La phase redécide les contributions de la file, sauf les contributions épinglées. Une contribution qui désigne encore sa personne la garde, sans écriture. Une contribution qui en désigne une autre en change. Une contribution que rien ne soutient plus perd sa personne. Une contribution perd aussi sa personne quand celle-ci est supprimée.
 
 ## Données préservées
 
 Les saisies manuelles (épinglage d'une contribution source, formes de nom confirmées ou rejetées, personnes déclarées distinctes) et les données importées (fiches du référentiel RH) sont des entrées fixes, jamais réinitialisées.
 
-Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses groupes perdent leur personne.
+Une personne sans contribution du périmètre est supprimée, sauf si elle est présente dans le référentiel RH ou fait l'objet d'une décision humaine. Ses contributions perdent leur personne.

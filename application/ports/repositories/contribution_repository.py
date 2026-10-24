@@ -1,4 +1,4 @@
-"""Port ContributionRepository — accès aux contributions (groupes de `contributions`) et aux `source_contributions`.
+"""Port ContributionRepository — accès aux contributions (`contributions`) et aux contributions sources (`source_contributions`).
 
 Un seul port pour les deux : leurs opérations sont étroitement couplées.
 """
@@ -8,7 +8,7 @@ from typing import Protocol, TypedDict
 
 
 class GroupRow(TypedDict):
-    """Ligne renvoyée par `find_groups` : clés d'un groupe de `contributions`."""
+    """Ligne renvoyée par `find_groups` : clés d'une contribution."""
 
     id: int
     person_id: int | None

@@ -49,7 +49,7 @@ Les valeurs lues sont déjà corrigées.
 
 **Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, puis la phase décide ce qu'il faut en faire : rapprocher, créer, réunir ou séparer, puis repointer les rattachements.
 
-**Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `contributions` consolide les contributions sources ; la phase `persons` lit les contributions sources du périmètre.
+**Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `author_grouping` aligne les contributions sources de chaque publication ; la phase `persons` lit les contributions sources alignées.
 
 ## Lecture par l'API
 

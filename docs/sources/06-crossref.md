@@ -80,7 +80,7 @@ Crossref déclare ses relations dans `source_extras.relation`, sous des clés co
 
 ### Affiliations mal renseignées
 
-29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_contribution_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_contributions` CrossRef dans la cascade de résolution des personnes et dans le build des contributions. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
+29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_contribution_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les contributions CrossRef dans le rattachement à une personne. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
 ### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
 

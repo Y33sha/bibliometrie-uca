@@ -108,7 +108,7 @@ Les deux champs de type viennent du déposant du DOI : logiciel de l'entrepôt, 
 
 ### Affiliations textuelles
 
-Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_contributions` DataCite dans la cascade de résolution des personnes.
+Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les contributions DataCite dans le rattachement à une personne.
 
 ### DOI liés et concept/version
 

@@ -1,6 +1,6 @@
 """Service Contributions — écritures sur l'agrégat Contribution, transaction-agnostiques.
 
-Couvre les contributions, groupes de `contributions` rattachés à une personne, et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
+Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
 
 La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes et la phase `persons` les rattache aux personnes.
 """
@@ -62,7 +62,7 @@ def exclude_contribution(
     person_repo: PersonRepository | None = None,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, JsonValue]:
-    """Rejette une contribution à partir de son groupe (`contributions`).
+    """Rejette une contribution désignée par son identifiant.
 
     Retrouve la paire (publication, personne) à partir du groupe `contribution_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
 

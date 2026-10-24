@@ -37,22 +37,21 @@ Légende :
 - **`publications_detail`** : satellite 1:1 de `publications` qui contient les métadonnées volumineuses. Cf. [données dérivées](08-donnees-derivees.md).
 - **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
 
-## `contributions` — table consolidée des contributions
+## `contributions` — contributions des auteurs aux publications
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `contribution_structures` de son groupe de contributions sources). Construite par `pipeline/transformation/publications/contributions/build_contributions.py` à partir des *contributions* sources.
-
-**Couverture partielle assumée** : la table contient seulement les signataires ayant une `person_id`. Les co-auteurs hors périmètre sont absents ; la liste exhaustive des auteurs d'une publication se lit dans `source_contributions`.
+Une contribution réunit les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle est formée par la phase `author_grouping`. Elle désigne la personne de l'auteur (`person_id`) et le mode du rattachement (`resolution_mode`), ou aucune personne : elle est alors orpheline. Une personne a au plus une contribution par publication. Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement ne sont dans aucune contribution.
 
 Colonnes notables :
 
-- `in_perimeter` : TRUE si une contribution source de la personne sur cette publication entre dans le périmètre (`perimeter_evidence` non vide)
-- `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
+- `reference_position` : position de l'auteur dans la liste d'auteurs la plus longue
+- `perimeter_evidence`, `in_perimeter` : indices de périmètre, union de ceux des contributions sources alignées ; `in_perimeter` est vrai dès qu'il y a un indice
+- `roles` (text[]), `is_corresponding` : union de ceux des contributions sources alignées
 
-`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues. C'est une **vue matérialisée**, réunion des `source_contribution_structures` des contributions sources qui attestent la contribution (même publication par leur enregistrement source, même personne), rafraîchie par le pipeline en fin de phase `contributions`.
+`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues des contributions rattachées à une personne non exclue. C'est une **vue matérialisée**, réunion des `source_contribution_structures` de leurs contributions sources alignées, rafraîchie par la phase `finalize`.
 
-**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'assignation d'une contribution source orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
+**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'attribution d'une contribution orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
 
-**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_contributions`. `in_perimeter`, `is_corresponding`, `author_position` et `roles` en sont des consolidations, par union ou par priorité de source. Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
+Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
 
 ## Sujets / mots-clés
 
@@ -69,6 +68,6 @@ Trois tables alimentées par la phase `subjects` du pipeline :
 | `publications` | pipeline | `pipeline/transformation/publications/consolidation.py` (`refresh_from_sources` recalcule depuis les sources) |
 | `publications_detail` | pipeline | `pipeline/transformation/publications/store.py` |
 | `publication_relations` | pipeline | phase `relations` |
-| `contributions` | pipeline | `build_contributions.py` (consolidée depuis les sources) |
+| `contributions`, `aligned_source_contributions` | mixte | alignement par la phase `author_grouping`, personne par la phase `persons` (`pipeline/transformation/persons/groups.py`) ; décisions de l'administration (`application/services/contributions/`) |
 | `subjects`, `publication_subjects` | pipeline | `pipeline/transformation/publications/subjects/subject_ingestion.py` |
 | `subject_cooccurrences` | pipeline | `pipeline/transformation/publications/subjects/subject_cooccurrences.py` (matview) |

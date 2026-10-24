@@ -148,7 +148,6 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [x] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes. 6f2e8b723
 - [x] `PersonMatchDecision` disparaît avec l'ancienne cascade ; `decide_group` garde `NameFormDecision`. eac158104
 - [x] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par `decide_group` : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre. 02f69c43b
-- [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
 
 ### Phase 7 — Fin de chantier
 

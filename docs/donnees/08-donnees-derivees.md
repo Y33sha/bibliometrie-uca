@@ -42,8 +42,9 @@ Les phases coûteuses retraitent seulement ce qui a changé depuis la dernière 
 | File | Lignes à reprendre | Phase |
 |---|---|---|
 | `source_record_keys_queue` | enregistrements sources à rattacher à leur publication | `publications` |
-| `publication_contributions_queue` | publications dont les groupes d'auteurs sont à recalculer | `author_grouping` |
-| `contribution_attributes_queue` | groupes dont les attributs sont à recomposer | `author_grouping` |
+| `publication_contributions_queue` | publications dont les contributions sont à réaligner | `author_grouping` |
+| `contribution_attributes_queue` | contributions dont les attributs sont à recomposer | `author_grouping` |
+| `contribution_resolution_queue` | contributions dont la personne est à redécider | `persons` |
 | `address_candidates_queue` | adresses dont les pays sont à détecter et à résoudre | `countries` |
 | `address_countries_queue` | adresses dont le pays change | `countries` |
 | `source_contribution_countries_queue` | contributions sources dont les pays sont à recalculer | `countries` |

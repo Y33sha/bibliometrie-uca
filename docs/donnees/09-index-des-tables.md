@@ -68,10 +68,11 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `apc_payments` | frais de publication (import CSV) | [publishing](04-publishing.md) |
 | `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](07-ref-et-ops.md) |
 | `contributor_information` | informations du contributeur d'une contribution source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
-| `contribution_structures` | *vue matérialisée* : structures liées à un groupe de contributions sources | [publications](03-publications.md) |
-| `contributions` | table consolidée personne × publication | [publications](03-publications.md) |
+| `contribution_structures` | *vue matérialisée* : structures liées à une contribution | [publications](03-publications.md) |
+| `contributions` | contribution d'un auteur à une publication, avec sa personne | [publications](03-publications.md) |
 | `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](07-ref-et-ops.md) |
+| `aligned_source_contributions` | contribution source alignée dans une contribution | [publications](03-publications.md) |
 | `confirmed_source_contributions` | épinglages admin (must-link) contribution source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
 | `countries` | référentiel des pays | [ref](07-ref-et-ops.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |

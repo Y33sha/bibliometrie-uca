@@ -25,7 +25,7 @@ def exclude_contribution(
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
 
-    `contribution_id` désigne un groupe de `contributions` rattaché à une personne.
+    `contribution_id` désigne une contribution rattachée à une personne.
     """
     contributions_service.exclude_contribution(
         contribution_id,

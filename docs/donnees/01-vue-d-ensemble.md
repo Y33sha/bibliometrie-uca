@@ -33,7 +33,7 @@ Le modèle repose sur la séparation stricte entre les tables **sources** et le 
 | source | contribution source | `source_contributions` | Un contributeur sur un enregistrement source, avec ses rôles et ses adresses. |
 | source | informations du contributeur | `contributor_information` | Le nom et les identifiants qu'une source donne pour un contributeur, partagés par ses contributions sources. |
 | consolidé | publication | `publications` | Une publication du référentiel, construite à partir de ses enregistrements sources. Couvre aussi les jeux de données, les logiciels et les thèses. |
-| consolidé | contribution | `contributions` | Le lien entre une personne et une publication. |
+| consolidé | contribution | `contributions` | Les contributions sources d'un même auteur dans une publication, et la personne de cet auteur. |
 
 Légende:
 - **vert** : table peuplée manuellement

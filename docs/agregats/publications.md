@@ -46,7 +46,7 @@ L'API n'écrit rien sur les publications. Une valeur consolidée fausse se corri
 
 ## Lecture par le pipeline
 
-- La phase `contributions` consolide les contributions sources en `contributions` et lit les publications pour y reporter le périmètre.
+- La phase `finalize` lit les contributions pour reporter le périmètre sur les publications, et supprime les publications sans contribution rattachée.
 - La phase `subjects` verse les thématiques des enregistrements sources vers les sujets, en ne reprenant que les publications dont le contenu a changé.
 - La phase `countries` lit la propagation venue des adresses.
 

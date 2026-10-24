@@ -4,7 +4,7 @@
 
 Référentiel des individus.
 
-**Périmètre** : `persons` couvre les personnes qui ont au moins une contribution source dans le périmètre. Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id`.
+**Périmètre** : `persons` couvre les personnes qui ont au moins une contribution source dans le périmètre. Conséquence : les co-auteurs externes des publications UCA n'ont pas de personne.
 
 ```mermaid
 flowchart LR
@@ -49,7 +49,7 @@ Deux tables contiennent les arbitrages saisis à la main sur les contributions s
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `persons` | mixte | créées par le pipeline (phase persons, `pipeline/transformation/persons/cascade.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
+| `persons` | mixte | créées par le pipeline (phase persons, `pipeline/transformation/persons/groups.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
 | `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
 | `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
 | `distinct_persons` | admin | `application/services/persons/commands.py` |
