@@ -24,7 +24,12 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
 - Les décisions humaines visent des entités stables et se propagent au groupe :
   - l'épinglage d'une contribution source rattache son groupe ;
   - le rejet d'un couple (enregistrement source, personne) interdit de lier la personne à la publication de l'enregistrement source, donc à tout groupe de cette publication.
-- **Rejet d'un identifiant.** Un identifiant est rejeté pour une personne. Le rejet invalide les rattachements non épinglés que cet identifiant soutient seul : le groupe redevient orphelin. Le run suivant le résout sans cet identifiant, par le nom s'il est du périmètre, ou par un autre identifiant du groupe.
+- **Rejet d'un identifiant ou d'une forme de nom.** Un identifiant ou une forme de nom est rejeté pour une personne. Les groupes non manuels rattachés par ce type d'identifiant, ou par le nom, dont un membre porte la valeur rejetée, redeviennent orphelins tout de suite. Le run suivant les résout sans cette valeur, par le nom s'ils sont du périmètre, ou par un autre identifiant du groupe.
+- **Épinglage.** L'épinglage d'une contribution source rattache son groupe à la personne épinglée, à la place d'une personne non manuelle. Un autre groupe non manuel de la même personne dans la publication redevient orphelin.
+- **Orphelins.** Un orphelin est un groupe du périmètre sans personne, avec un rôle d'auteur. L'attribution vise un groupe. Une contribution source hors groupe n'est pas attribuable.
+- **Personnes supprimées.** Une personne sans contribution du périmètre, sans fiche RH et sans décision humaine est supprimée ; ses groupes redeviennent orphelins.
+- **Formes de nom d'une personne.** Elles viennent des membres de ses groupes.
+- Une décision de l'administration recalcule aussitôt le périmètre des publications touchées.
 - Les variantes de la cascade s'évaluent hors pipeline, sur le jeu d'évaluation de la phase 1.
 
 ## Phasage
@@ -130,7 +135,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 #### Étape C — Bascule des écrivains
 
 - [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes. Le rejet d'un couple retire la personne du groupe ; l'attribution et l'épinglage la posent sur le groupe sans personne (4e1e81472).
-- [ ] Invalidation des rattachements au rejet d'un identifiant : l'API recalcule tout de suite les groupes non manuels de la personne dont un membre porte l'identifiant, sur un index réduit à ces groupes. Même recalcul unitaire pour l'épinglage, le détachement et le rejet d'un couple (publication, personne). Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
+- [ ] Invalidation des rattachements au rejet d'un identifiant ou d'une forme de nom. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [ ] La phase `contributions` cesse de construire la table `contributions`.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs. L'ancienne cascade cesse de créer des personnes.
@@ -162,6 +167,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 ## Questions ouvertes
 
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
+- Recalcul immédiat des groupes invalidés par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs membres.
 - Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md). Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
 - Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
