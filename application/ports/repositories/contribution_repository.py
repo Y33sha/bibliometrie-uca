@@ -72,6 +72,10 @@ class ContributionRepository(Protocol):
         """Détache (person_id → NULL) les contributions sources d'une personne sous une forme de nom donnée, sauf celles que l'admin a épinglées sur elle. Retourne le nombre de contributions sources détachées."""
         ...
 
+    def detach_groups_for_name_form(self, person_id: int, name_form: str) -> list[int]:
+        """Retire la personne (et le mode de résolution) de ses groupes de contributions sources rattachés par le nom (`name`, `compatible_name`) dont un membre porte la forme de nom. Les groupes `manual` et ceux d'un autre mode restent rattachés. Retourne les `publication_id` distincts des groupes détachés."""
+        ...
+
     # ── contributions ────────────────────────────────────────────────
 
     def get_contribution_person(self, contribution_id: int) -> ContributionPersonRow | None:

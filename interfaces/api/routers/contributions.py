@@ -8,6 +8,7 @@ Les routes sont groupées par sujet, et les chemins littéraux précèdent celui
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import Connection
 
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.read_models.contributions_queries import (
     ContributionsQueries,
     OrphanContributionsFacetsResponse,
@@ -25,6 +26,7 @@ from interfaces.api.deps import (
     contributions_queries,
     db_conn,
     person_repo,
+    publication_perimeter_recompute,
 )
 from interfaces.api.filters import parse_lab_id
 from interfaces.api.models import (
@@ -87,6 +89,7 @@ def assign_orphan_contribution(
     conn: Connection = Depends(db_conn),
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
     """Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
@@ -104,6 +107,7 @@ def assign_orphan_contribution(
         new_person=new_person,
         repo=persons,
         contribution_repo=contributions,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit,
         force=body.force,
     )
@@ -120,6 +124,7 @@ def batch_assign_orphan_contributions(
     conn: Connection = Depends(db_conn),
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions sources orphelines à une personne existante.
@@ -135,6 +140,7 @@ def batch_assign_orphan_contributions(
         body.source_contribution_ids,
         repo=persons,
         contribution_repo=contributions,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit,
         force=body.force,
     )
@@ -150,6 +156,7 @@ def exclude_contribution(
     conn: Connection = Depends(db_conn),
     repo: ContributionRepository = Depends(contribution_repo),
     persons: PersonRepository = Depends(person_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
@@ -157,6 +164,11 @@ def exclude_contribution(
     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     contribution_commands.exclude_contribution(
-        conn, contribution_id, repo=repo, person_repo=persons, audit_repo=audit
+        conn,
+        contribution_id,
+        repo=repo,
+        person_repo=persons,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit,
     )
     return OkResponse()

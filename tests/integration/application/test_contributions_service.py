@@ -9,6 +9,10 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
+from application.services.contributions.assign_orphans import (
+    assign_orphan_contribution,
+    batch_assign_orphan_contributions,
+)
 from application.services.contributions.core import (
     delete_orphan_contributions,
     exclude_contribution,
@@ -16,7 +20,7 @@ from application.services.contributions.core import (
     reject_pair,
 )
 from domain.errors import NotFoundError
-from infrastructure.repositories import contribution_repository
+from infrastructure.repositories import contribution_repository, person_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
 from pipeline.transformation.publications.contributions.build_contributions import (
     insert_missing_contributions,
@@ -24,6 +28,9 @@ from pipeline.transformation.publications.contributions.build_contributions impo
 )
 from pipeline.transformation.publications.contributions.contributions import (
     propagate_contribution_attributes,
+)
+from pipeline.transformation.publications.publication_perimeter import (
+    PublicationPerimeterRecompute,
 )
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from pipeline.transformation.structures.perimeter_evidence import (
@@ -36,7 +43,11 @@ from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
 )
-from tests.integration.helpers.groups import add_group_member, insert_group
+from tests.integration.helpers.groups import (
+    add_group_member,
+    insert_group,
+    set_perimeter_author_group,
+)
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -58,6 +69,7 @@ _publication = partial(
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 _PERIMETER_RECOMPUTE = SourceContributionPerimeterRecompute()
+_PUBLICATION_PERIMETER_RECOMPUTE = PublicationPerimeterRecompute()
 
 
 @pytest.fixture
@@ -90,7 +102,12 @@ class TestExcludeContribution:
             sa_sync_conn, source_record_id, person_id=person_id
         )
 
-        exclude_contribution(group_id_of(sa_sync_conn, publication_id, person_id), repo=repo)
+        exclude_contribution(
+            group_id_of(sa_sync_conn, publication_id, person_id),
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
 
         # Row contributions supprimée
         assert (
@@ -125,7 +142,12 @@ class TestExcludeContribution:
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
 
-        exclude_contribution(group_id_of(sa_sync_conn, publication_id, person_id), repo=repo)
+        exclude_contribution(
+            group_id_of(sa_sync_conn, publication_id, person_id),
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
         # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
         insert_missing_contributions(sa_sync_conn)
 
@@ -139,7 +161,12 @@ class TestExcludeContribution:
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            exclude_contribution(999999, repo=repo)
+            exclude_contribution(
+                999999,
+                conn=sa_sync_conn,
+                perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+                repo=repo,
+            )
 
     def test_raises_not_found_for_group_without_person(self, sa_sync_conn, repo):
         """Un groupe sans personne n'est pas une contribution."""
@@ -151,7 +178,12 @@ class TestExcludeContribution:
         )
 
         with pytest.raises(NotFoundError):
-            exclude_contribution(group_id, repo=repo)
+            exclude_contribution(
+                group_id,
+                conn=sa_sync_conn,
+                perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+                repo=repo,
+            )
 
     def test_does_not_touch_other_contributions(self, sa_sync_conn, repo):
         """Rejeter une contribution ne touche ni les autres paires ni leurs sources."""
@@ -167,7 +199,12 @@ class TestExcludeContribution:
             sa_sync_conn, source_record_id, author_position=1, person_id=p2
         )
 
-        exclude_contribution(group_id_of(sa_sync_conn, publication_id, p1), repo=repo)
+        exclude_contribution(
+            group_id_of(sa_sync_conn, publication_id, p1),
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
 
         # a2 toujours là
         assert (
@@ -206,7 +243,13 @@ class TestRejectPair:
             sa_sync_conn, source_record_oa, source="openalex", person_id=person_id
         )
 
-        result = reject_pair(publication_id, person_id, repo=repo)
+        result = reject_pair(
+            publication_id,
+            person_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
 
         assert result["detached"] == 2
         assert result["deleted_contributions"] == 1
@@ -247,7 +290,13 @@ class TestRejectPair:
             sa_sync_conn, source_record_id, person_id=person_id
         )
 
-        reject_pair(publication_id, person_id, repo=repo)
+        reject_pair(
+            publication_id,
+            person_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
         # Resurrection simulée du lien source (matching non gardé d'un run antérieur).
         sa_sync_conn.execute(
             text("UPDATE source_contributions SET person_id = :pid WHERE id = :i"),
@@ -273,7 +322,13 @@ class TestRejectPair:
             sa_sync_conn, source_record_id, author_position=1, person_id=p2
         )
 
-        reject_pair(publication_id, p1, repo=repo)
+        reject_pair(
+            publication_id,
+            p1,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
 
         assert (
             sa_sync_conn.execute(
@@ -741,7 +796,13 @@ class TestHumanDecisionsOnGroups:
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         group_id = group_id_of(sa_sync_conn, publication_id, person_id)
 
-        reject_pair(publication_id, person_id, repo=repo)
+        reject_pair(
+            publication_id,
+            person_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
 
         assert _group_person(sa_sync_conn, group_id) == (None, None)
 
@@ -775,3 +836,76 @@ class TestHumanDecisionsOnGroups:
         repo.pin_contributions([source_contribution_id], person_id)
 
         assert _group_person(sa_sync_conn, other_group) == (None, None)
+
+
+def _publication_evidence(conn, publication_id):
+    return conn.execute(
+        text("SELECT perimeter_evidence::text[] FROM publications WHERE id = :p"),
+        {"p": publication_id},
+    ).scalar_one()
+
+
+class TestHumanDecisionsOnPublicationPerimeter:
+    """Les décisions humaines recalculent l'appartenance au périmètre des publications dont elles changent les groupes."""
+
+    def test_le_rejet_sort_la_publication_du_perimetre(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        publication_id = insert_publication(sa_sync_conn, in_perimeter=True)
+        source_record_id = _source_record(sa_sync_conn, publication_id)
+        insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
+        insert_contribution(
+            sa_sync_conn, publication_id, person_id=person_id, in_perimeter=True, roles=["author"]
+        )
+
+        reject_pair(
+            publication_id,
+            person_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=repo,
+        )
+
+        assert _publication_evidence(sa_sync_conn, publication_id) == []
+
+    def _orphan(self, conn, source_id):
+        """Publication hors périmètre dont le seul groupe, sans personne, est un groupe d'auteur du périmètre. Rend (publication, contribution source)."""
+        publication_id = insert_publication(conn)
+        source_record_id = _source_record(conn, publication_id, source_id=source_id)
+        source_contribution_id = insert_source_contribution(
+            conn, source_record_id, author_name_normalized="jean dupont"
+        )
+        group_id = insert_group(conn, publication_id, [(source_contribution_id, source_record_id)])
+        set_perimeter_author_group(conn, group_id)
+        return publication_id, source_contribution_id
+
+    def test_l_attribution_fait_entrer_la_publication(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        publication_id, source_contribution_id = self._orphan(sa_sync_conn, "hal-orphan")
+
+        assign_orphan_contribution(
+            person_id,
+            source_contribution_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=person_repository(sa_sync_conn),
+            contribution_repo=repo,
+        )
+
+        assert _publication_evidence(sa_sync_conn, publication_id) == ["address"]
+
+    def test_l_attribution_en_lot_fait_entrer_les_publications(self, sa_sync_conn, repo):
+        person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
+        first, first_source_contribution = self._orphan(sa_sync_conn, "hal-a")
+        second, second_source_contribution = self._orphan(sa_sync_conn, "hal-b")
+
+        batch_assign_orphan_contributions(
+            person_id,
+            [first_source_contribution, second_source_contribution],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            repo=person_repository(sa_sync_conn),
+            contribution_repo=repo,
+        )
+
+        assert _publication_evidence(sa_sync_conn, first) == ["address"]
+        assert _publication_evidence(sa_sync_conn, second) == ["address"]

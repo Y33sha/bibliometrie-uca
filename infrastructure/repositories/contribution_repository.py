@@ -10,6 +10,7 @@ from application.ports.repositories.contribution_repository import (
     ContributionPersonRow,
     ContributionRepository,
 )
+from domain.persons.group_matching import GroupMatchReason
 from infrastructure.sql_fragments import (
     DETACHED_SOURCE_CONTRIBUTION,
     PERSON_PUBLICATIONS_SCOPE,
@@ -17,6 +18,11 @@ from infrastructure.sql_fragments import (
     insert_missing_contributions_sql,
     pinned_groups_sql,
     propagate_contribution_attributes_sql,
+)
+
+# Modes de résolution d'un groupe rattaché par le nom.
+_NAME_RESOLUTION_MODES = ", ".join(
+    f"'{mode.value}'" for mode in (GroupMatchReason.NAME, GroupMatchReason.COMPATIBLE_NAME)
 )
 
 
@@ -194,6 +200,31 @@ class PgContributionRepository(ContributionRepository):
             ),
             {"pid": person_id, "nf": name_form},
         ).rowcount
+
+    def detach_groups_for_name_form(self, person_id: int, name_form: str) -> list[int]:
+        return list(
+            self._conn.execute(
+                text(f"""
+                    WITH detached AS (
+                        UPDATE source_contribution_groups g
+                        SET person_id = NULL, resolution_mode = NULL
+                        WHERE g.person_id = :pid
+                          AND g.resolution_mode IN ({_NAME_RESOLUTION_MODES})
+                          AND EXISTS (
+                              SELECT 1
+                              FROM source_contribution_group_members gm
+                              JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+                              JOIN contributor_information ci
+                                ON ci.id = sc.contributor_information_id
+                              WHERE gm.group_id = g.id AND ci.author_name_normalized = :nf
+                          )
+                        RETURNING g.publication_id
+                    )
+                    SELECT DISTINCT publication_id FROM detached
+                """),
+                {"pid": person_id, "nf": name_form},
+            ).scalars()
+        )
 
     # ── contributions ────────────────────────────────────────────────
 

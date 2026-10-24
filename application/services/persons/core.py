@@ -199,12 +199,14 @@ def update_identifier_status(
     ident_id: int,
     status: str,
     *,
+    conn: Connection,
     repo: PersonRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet détache de la personne ses groupes de contributions sources rattachés par ses identifiants rejetés (`detach_groups_of_rejected_identifiers`), puis recalcule l'appartenance au périmètre de leurs publications. Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
     propagated = (
@@ -212,6 +214,9 @@ def update_identifier_status(
         if status in _PROPAGATED_STATUSES
         else 0
     )
+    if status == AttributionStatus.REJECTED.value:
+        publication_ids = repo.detach_groups_of_rejected_identifiers(row["person_id"])
+        perimeter_recompute.refresh_publications(conn, publication_ids)
     emit_event(
         audit_repo,
         "person_identifier.status_changed",
@@ -253,13 +258,15 @@ def update_name_form_status(
     name_form: str,
     status: str,
     *,
+    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL et les `contributions` devenues sans source sont supprimées. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL et les `contributions` devenues sans source sont supprimées. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris. Les groupes de la personne rattachés par le nom dont un membre porte la forme perdent la personne (`detach_groups_for_name_form`), et l'appartenance au périmètre de leurs publications est recalculée.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
@@ -268,6 +275,8 @@ def update_name_form_status(
         detached = contribution_repo.null_person_id_for_name_form(person_id, name_form)
         if detached:
             contribution_repo.delete_orphan_contributions_for_person(person_id)
+        publication_ids = contribution_repo.detach_groups_for_name_form(person_id, name_form)
+        perimeter_recompute.refresh_publications(conn, publication_ids)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",
@@ -282,8 +291,10 @@ def detach_contributions(
     person_id: int,
     contributions: list[ContributionRef],
     *,
+    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
@@ -305,7 +316,12 @@ def detach_contributions(
     deleted = 0
     for publication_id in publication_ids:
         result = reject_pair(
-            publication_id, person_id, repo=contribution_repo, audit_repo=audit_repo
+            publication_id,
+            person_id,
+            conn=conn,
+            repo=contribution_repo,
+            perimeter_recompute=perimeter_recompute,
+            audit_repo=audit_repo,
         )
         detached += result["detached"]
         deleted += result["deleted_contributions"]

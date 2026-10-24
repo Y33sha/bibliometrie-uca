@@ -1,4 +1,4 @@
-"""Recalcul de `publications.perimeter_evidence`, par la phase `contributions`, après l'exclusion d'une personne et après une correction d'adresse.
+"""Recalcul de `publications.perimeter_evidence`, par la phase `contributions`, après une correction d'adresse et après les décisions de l'administration sur une personne ou sur ses contributions.
 
 Une publication réunit les indices de ses contributions d'auteurs (groupes de contributions sources rattachés à une personne non exclue) : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
 """
@@ -87,3 +87,9 @@ class PublicationPerimeterRecompute:
     def refresh_publications_of_person(self, conn: Connection, person_id: int) -> int:
         """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
         return refresh_publications_perimeter_evidence(conn, person_id)
+
+    def refresh_publications(self, conn: Connection, publication_ids: list[int]) -> int:
+        """Recalcule `publications.perimeter_evidence` pour les publications `publication_ids`. Rend le nombre de publications changées."""
+        if not publication_ids:
+            return 0
+        return refresh_publications_perimeter_evidence(conn, publication_ids=publication_ids)

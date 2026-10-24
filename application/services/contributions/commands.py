@@ -5,6 +5,7 @@
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -19,6 +20,7 @@ def exclude_contribution(
     *,
     repo: ContributionRepository,
     person_repo: PersonRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
@@ -26,7 +28,12 @@ def exclude_contribution(
     `contribution_id` désigne un groupe de `source_contribution_groups` rattaché à une personne, quand les gestes sur les orphelines adressent une contribution source.
     """
     contributions_service.exclude_contribution(
-        contribution_id, repo=repo, person_repo=person_repo, audit_repo=audit_repo
+        contribution_id,
+        conn=conn,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        person_repo=person_repo,
+        audit_repo=audit_repo,
     )
     conn.commit()
 
@@ -39,6 +46,7 @@ def assign_orphan_contribution(
     new_person: tuple[str, str] | None = None,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
@@ -55,8 +63,10 @@ def assign_orphan_contribution(
     assign_orphans.assign_orphan_contribution(
         person_id,
         source_contribution_id,
+        conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
         force=force,
     )
@@ -71,6 +81,7 @@ def batch_assign_orphan_contributions(
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
@@ -81,6 +92,7 @@ def batch_assign_orphan_contributions(
         conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
         force=force,
     )

@@ -1109,7 +1109,7 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet détache de la personne les groupes de contributions sources que ses identifiants rejetés lui rattachent, et recalcule l'appartenance au périmètre de leurs publications.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -1425,7 +1425,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;

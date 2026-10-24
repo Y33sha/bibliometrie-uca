@@ -76,3 +76,20 @@ def group_ungrouped(conn: Connection) -> None:
             SELECT id, group_id, source_record_id, 'reference' FROM ungrouped
         """)
     )
+
+
+def set_perimeter_author_group(
+    conn: Connection, group_id: int, *, person_id: int | None = None, mode: str | None = None
+) -> None:
+    """Fait du groupe `group_id` un groupe d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    conn.execute(
+        text("""
+            UPDATE source_contribution_groups
+            SET person_id = :person,
+                resolution_mode = CAST(:mode AS group_resolution_mode),
+                roles = ARRAY['author'],
+                perimeter_evidence = ARRAY['address']::perimeter_evidence[]
+            WHERE id = :g
+        """),
+        {"g": group_id, "person": person_id, "mode": mode},
+    )

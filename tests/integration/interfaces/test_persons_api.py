@@ -13,16 +13,39 @@ import pytest
 
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
+    group_person,
+    publication_perimeter_evidence,
     seed_contribution,
+    seed_group,
+    seed_perimeter_author_group,
     seed_person,
     seed_person_identifier,
     seed_person_name_form,
     seed_publication,
+    seed_source_contribution,
+    seed_source_record,
     uniq,
 )
 
 # Forme de nom de source « persons ».
 _persons_name_form = partial(seed_person_name_form, sources=["persons"])
+
+
+def _seed_perimeter_group(
+    person_id: int, mode: str, *, raw_author_name: str, identifiers=None
+) -> tuple[int, int]:
+    """Publication du périmètre dont le seul groupe d'auteur, rattaché à la personne par `mode`, réunit une contribution source de nom `raw_author_name` et d'identifiants `identifiers`. Rend (publication, groupe)."""
+    publication = seed_publication(uniq("Pub"), in_perimeter=True)
+    source_record = seed_source_record(publication_id=publication)
+    source_contribution = seed_source_contribution(
+        source_record_id=source_record,
+        person_id=person_id,
+        raw_author_name=raw_author_name,
+        identifiers=identifiers,
+    )
+    group = seed_group(publication, [(source_contribution, source_record)])
+    seed_perimeter_author_group(group, person_id=person_id, mode=mode)
+    return publication, group
 
 
 class TestPersonsList:
@@ -305,6 +328,20 @@ class TestUpdateIdentifierStatus:
         assert r.status_code == 200
         assert r.json()["status"] == "confirmed"
 
+    def test_rejection_detaches_groups_resolved_by_the_identifier(self, auth_client):
+        pid = seed_person()
+        idref = uniq("idref", sep="")
+        publication, group = _seed_perimeter_group(
+            pid, "idref", raw_author_name="Test Author", identifiers={"idref": idref}
+        )
+        iid = seed_person_identifier(pid, id_type="idref", id_value=idref)
+
+        r = auth_client.patch(f"/api/persons/identifiers/{iid}/status", json={"status": "rejected"})
+
+        assert r.status_code == 200
+        assert group_person(group) == (None, None)
+        assert publication_perimeter_evidence(publication) == []
+
 
 # ── Reject / update name / merge ────────────────────────────────
 
@@ -446,6 +483,21 @@ class TestUpdateNameFormStatus:
         assert body["person_id"] == pid
         assert body["name_form"] == name_form
         assert body["status"] == "rejected"
+
+    def test_rejection_detaches_groups_resolved_by_name(self, auth_client):
+        pid = seed_person("RejectGroup", "Nf")
+        name_form = uniq("rejectgroup nf")
+        publication, group = _seed_perimeter_group(pid, "name", raw_author_name=name_form)
+        seed_person_name_form(pid, name_form=name_form, sources=["hal"])
+
+        r = auth_client.patch(
+            f"/api/persons/{pid}/name-forms/status",
+            json={"name_form": name_form, "status": "rejected"},
+        )
+
+        assert r.status_code == 200
+        assert group_person(group) == (None, None)
+        assert publication_perimeter_evidence(publication) == []
 
     def test_unknown_form_404(self, auth_client):
         pid = seed_person("UnknownForm", "Nf")

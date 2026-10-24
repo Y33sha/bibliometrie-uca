@@ -9,6 +9,7 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.pipeline.source_contribution_perimeter import (
     SourceContributionPerimeterRecompute,
 )
@@ -23,22 +24,26 @@ def reject_pair(
     publication_id: int,
     person_id: int,
     *,
+    conn: Connection,
     repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, int]:
     """Rejette durablement une paire (publication, personne) : enregistre que cette personne n'est pas l'auteur de cette publication.
 
-    Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Trois effets :
+    Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Quatre effets :
 
     1. Enregistre la paire dans `rejected_contributions`. Ce registre est consulté par le matching des personnes et par le rebuild des `contributions`, qui écartent toute paire rejetée : le rejet survit aux exécutions suivantes du pipeline.
-    2. Met à NULL le `person_id` de toutes les `source_contributions` de la paire, sur toutes les sources : le lien disparaît côté données sources, et la forme de nom correspondante cesse de lui être attribuée.
+    2. Met à NULL le `person_id` de toutes les `source_contributions` de la paire, sur toutes les sources, et celui du groupe de la personne dans la publication : le lien disparaît côté données sources, et la forme de nom correspondante cesse de lui être attribuée.
     3. Supprime la ligne consolidée dans `contributions`, qu'aucune source n'atteste.
+    4. Recalcule l'appartenance au périmètre de la publication.
 
     Retourne {"detached": N, "deleted_contributions": M}.
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)
     deleted = repo.delete_orphan_contributions_for_person(person_id)
+    perimeter_recompute.refresh_publications(conn, [publication_id])
 
     emit_event(
         audit_repo,
@@ -53,7 +58,9 @@ def reject_pair(
 def exclude_contribution(
     contribution_id: int,
     *,
+    conn: Connection,
     repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     person_repo: PersonRepository | None = None,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, JsonValue]:
@@ -69,7 +76,14 @@ def exclude_contribution(
 
     person_id = row["person_id"]
     publication_id = row["publication_id"]
-    reject_pair(publication_id, person_id, repo=repo, audit_repo=audit_repo)
+    reject_pair(
+        publication_id,
+        person_id,
+        conn=conn,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit_repo,
+    )
     if person_repo is not None:
         person_repo.delete_orphan_name_forms_for_person(person_id)
     return {"id": contribution_id, "person_id": person_id, "publication_id": publication_id}

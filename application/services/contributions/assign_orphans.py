@@ -12,6 +12,7 @@ import logging
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -84,8 +85,10 @@ def assign_orphan_contribution(
     person_id: int,
     source_contribution_id: int,
     *,
+    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> None:
@@ -97,6 +100,7 @@ def assign_orphan_contribution(
     2. Pose `person_id` sur la contribution source, si elle est orpheline
     3. Ajoute la forme de nom, sous la source de la contribution source
     4. Crée/met à jour la contribution canonique + FK source
+    5. Recalcule l'appartenance au périmètre de la publication
 
     Lève `NotFoundError` si la personne ou la contribution source est absente, `ContributionAlreadyAssignedError` si elle est déjà rattachée à une personne.
     """
@@ -134,6 +138,7 @@ def assign_orphan_contribution(
 
     if publication_id is not None:
         contribution_repo.consolidate_contributions(person_id, [publication_id])
+        perimeter_recompute.refresh_publications(conn, [publication_id])
     # `group_structures` (agrégation des structure_ids) maintenue uniquement
     # par le pipeline — pas de refresh sur action admin (staleness bornée à un run).
 
@@ -153,6 +158,7 @@ def batch_assign_orphan_contributions(
     conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> int:
@@ -162,7 +168,7 @@ def batch_assign_orphan_contributions(
     `_resolve_rejection`) : sans `force`, une seule paire rejetée bloque tout
     le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord levés.
 
-    Une contribution source absente ou déjà rattachée est une anomalie : elle est écartée du lot et journalisée, le reste du lot est rattaché.
+    Une contribution source absente ou déjà rattachée est une anomalie : elle est écartée du lot et journalisée, le reste du lot est rattaché. L'appartenance au périmètre des publications du lot est recalculée.
 
     Retourne le nombre de contributions sources rattachées. Lève `NotFoundError` si la personne n'existe pas.
     """
@@ -195,6 +201,7 @@ def batch_assign_orphan_contributions(
     if assigned:
         contribution_repo.pin_contributions(assigned, person_id)
         contribution_repo.consolidate_contributions(person_id, publication_ids)
+        perimeter_recompute.refresh_publications(conn, publication_ids)
         for name_form in contribution_repo.get_distinct_name_forms_from_source_contributions(
             assigned
         ):

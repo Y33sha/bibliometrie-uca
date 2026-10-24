@@ -102,6 +102,10 @@ class PersonRepository(Protocol):
         """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
+    def detach_groups_of_rejected_identifiers(self, person_id: int) -> list[int]:
+        """Retire la personne (et le mode de résolution) de ses groupes de contributions sources rattachés par un identifiant `rejected` : le mode de résolution du groupe est le type de l'identifiant, et l'un de ses membres porte la valeur. Les groupes `manual` et ceux d'un autre mode restent rattachés. Retourne les `publication_id` distincts des groupes détachés. Idempotent."""
+        ...
+
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:

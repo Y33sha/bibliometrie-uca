@@ -42,6 +42,7 @@ from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
 )
+from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -68,6 +69,38 @@ _jean_dupont_source_contribution = partial(
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
 _PERIMETER = PublicationPerimeterRecompute()
+
+
+def _publication_evidence(conn, publication_id):
+    return _scalar(
+        conn,
+        "SELECT perimeter_evidence::text[] FROM publications WHERE id = :p",
+        p=publication_id,
+    )
+
+
+def _group_person(conn, group_id):
+    return tuple(
+        conn.execute(
+            text(
+                "SELECT person_id, resolution_mode::text FROM source_contribution_groups"
+                " WHERE id = :g"
+            ),
+            {"g": group_id},
+        ).one()
+    )
+
+
+def _perimeter_group(conn, person_id, mode, *, source_id, **source_contribution):
+    """Publication du périmètre dont le seul groupe d'auteur, rattaché à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Rend (publication, groupe)."""
+    publication = insert_publication(conn, in_perimeter=True)
+    source_record = _source_record(conn, publication, source_id=source_id)
+    source_contribution_id = insert_source_contribution(
+        conn, source_record, person_id=person_id, **source_contribution
+    )
+    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
+    set_perimeter_author_group(conn, group, person_id=person_id, mode=mode)
+    return publication, group
 
 
 @pytest.fixture
@@ -190,14 +223,18 @@ class TestUpdateIdentifierStatus:
             sa_sync_conn, p, id_type="orcid", id_value="0000-0001", status="pending"
         )
 
-        result = update_identifier_status(ident_id, "confirmed", repo=repo)
+        result = update_identifier_status(
+            ident_id, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
 
         assert result.status == "confirmed"
         assert result.propagated == 0
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_identifier_status(999999, "confirmed", repo=repo)
+            update_identifier_status(
+                999999, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+            )
 
 
 class TestIdentifierStatusPropagation:
@@ -245,7 +282,9 @@ class TestIdentifierStatusPropagation:
         )
         idref_scanr = insert_person_identifier(sa_sync_conn, p, id_type="idref", id_value="999")
 
-        result = update_identifier_status(orcid, "rejected", repo=repo)
+        result = update_identifier_status(
+            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
 
         assert result.propagated == 3
         assert {self._status(sa_sync_conn, i) for i in (orcid, account, idhal, idhal_2)} == {
@@ -264,7 +303,9 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, other, id_type="idhal", id_value="nina-radosevic-robin"
         )
 
-        update_identifier_status(orcid, "confirmed", repo=repo)
+        update_identifier_status(
+            orcid, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
 
         assert self._status(sa_sync_conn, other_account) == "pending"
 
@@ -283,7 +324,12 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, p, id_type="hal_person_id", id_value="11581"
         )
 
-        assert update_identifier_status(orcid, "rejected", repo=repo).propagated == 0
+        assert (
+            update_identifier_status(
+                orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+            ).propagated
+            == 0
+        )
         assert self._status(sa_sync_conn, account) == "pending"
 
     def test_back_to_pending_is_not_propagated(self, sa_sync_conn, repo):
@@ -294,7 +340,69 @@ class TestIdentifierStatusPropagation:
         )
         insert_person_identifier(sa_sync_conn, p, id_type="hal_person_id", id_value="11581")
 
-        assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
+        assert (
+            update_identifier_status(
+                orcid, "pending", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+            ).propagated
+            == 0
+        )
+
+
+class TestIdentifierRejectionOnGroups:
+    """Le rejet d'un identifiant détache de la personne les groupes que cet identifiant lui rattache."""
+
+    ORCID = "0000-0002-1825-0097"
+
+    def test_detaches_groups_resolved_by_the_identifier(self, sa_sync_conn, repo):
+        p = _person(sa_sync_conn)
+        identifiers = {"orcid": self.ORCID}
+        by_orcid, orcid_group = _perimeter_group(
+            sa_sync_conn, p, "orcid", source_id="hal-orcid", identifiers=identifiers
+        )
+        by_name, name_group = _perimeter_group(
+            sa_sync_conn, p, "name", source_id="hal-name", identifiers=identifiers
+        )
+        manual, manual_group = _perimeter_group(
+            sa_sync_conn, p, "manual", source_id="hal-manual", identifiers=identifiers
+        )
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+
+        update_identifier_status(
+            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
+
+        assert _group_person(sa_sync_conn, orcid_group) == (None, None)
+        assert _publication_evidence(sa_sync_conn, by_orcid) == []
+        assert _group_person(sa_sync_conn, name_group) == (p, "name")
+        assert _group_person(sa_sync_conn, manual_group) == (p, "manual")
+        assert _publication_evidence(sa_sync_conn, by_name) == ["address"]
+        assert _publication_evidence(sa_sync_conn, manual) == ["address"]
+
+    def test_group_without_the_value_is_untouched(self, sa_sync_conn, repo):
+        p = _person(sa_sync_conn)
+        _, group = _perimeter_group(
+            sa_sync_conn, p, "orcid", source_id="hal-other", identifiers={"orcid": "0000-0001"}
+        )
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+
+        update_identifier_status(
+            orcid, "rejected", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
+
+        assert _group_person(sa_sync_conn, group) == (p, "orcid")
+
+    def test_confirmation_leaves_groups(self, sa_sync_conn, repo):
+        p = _person(sa_sync_conn)
+        _, group = _perimeter_group(
+            sa_sync_conn, p, "orcid", source_id="hal-orcid", identifiers={"orcid": self.ORCID}
+        )
+        orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
+
+        update_identifier_status(
+            orcid, "confirmed", conn=sa_sync_conn, perimeter_recompute=_PERIMETER, repo=repo
+        )
+
+        assert _group_person(sa_sync_conn, group) == (p, "orcid")
 
 
 class TestSetExclusion:
@@ -590,6 +698,7 @@ class TestBatchAssignOrphanContributions:
             batch_assign_orphan_contributions(
                 person_id,
                 [],
+                perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
                 conn=sa_sync_conn,
@@ -611,6 +720,7 @@ class TestBatchAssignOrphanContributions:
         assigned = batch_assign_orphan_contributions(
             person_id,
             [sa1, sa2],
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             conn=sa_sync_conn,
@@ -653,6 +763,7 @@ class TestBatchAssignOrphanContributions:
         batch_assign_orphan_contributions(
             person_id,
             [source_contribution_hal, source_contribution_oa],
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             conn=sa_sync_conn,
@@ -688,6 +799,7 @@ class TestBatchAssignOrphanContributions:
         assigned = batch_assign_orphan_contributions(
             p2,
             [owned, orphan],
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             conn=sa_sync_conn,
@@ -730,6 +842,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -772,6 +886,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_hal}],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -817,6 +933,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -854,6 +972,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -875,6 +995,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -907,6 +1029,8 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": sa1}],
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -972,7 +1096,13 @@ class TestUpdateNameFormStatus:
         _hal_name_form(sa_sync_conn, person_id, name_form="intrus unique")
 
         row = update_name_form_status(
-            person_id, "intrus unique", "rejected", repo=repo, contribution_repo=contribution_repo
+            person_id,
+            "intrus unique",
+            "rejected",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
 
         assert row["status"] == "rejected"
@@ -983,24 +1113,42 @@ class TestUpdateNameFormStatus:
         _hal_name_form(sa_sync_conn, person_id, name_form="alpha b")
 
         update_name_form_status(
-            person_id, "alpha b", "rejected", repo=repo, contribution_repo=contribution_repo
+            person_id,
+            "alpha b",
+            "rejected",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
         row = update_name_form_status(
-            person_id, "alpha b", "confirmed", repo=repo, contribution_repo=contribution_repo
+            person_id,
+            "alpha b",
+            "confirmed",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
 
         assert row["status"] == "confirmed"
 
-    def test_derived_form_status_refused(self, repo, contribution_repo):
+    def test_derived_form_status_refused(self, sa_sync_conn, repo, contribution_repo):
         """Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse."""
         person_id = create_person("Gamma", "Delta", repo=repo)
 
         with pytest.raises(ConflictError):
             update_name_form_status(
-                person_id, "delta gamma", "rejected", repo=repo, contribution_repo=contribution_repo
+                person_id,
+                "delta gamma",
+                "rejected",
+                conn=sa_sync_conn,
+                perimeter_recompute=_PERIMETER,
+                repo=repo,
+                contribution_repo=contribution_repo,
             )
 
-    def test_unknown_form_raises(self, repo, contribution_repo):
+    def test_unknown_form_raises(self, sa_sync_conn, repo, contribution_repo):
         person_id = create_person("Gamma", "Delta", repo=repo)
 
         with pytest.raises(NotFoundError):
@@ -1008,6 +1156,8 @@ class TestUpdateNameFormStatus:
                 person_id,
                 "inexistante xyz",
                 "rejected",
+                conn=sa_sync_conn,
+                perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1025,7 +1175,13 @@ class TestUpdateNameFormStatus:
         insert_contribution(sa_sync_conn, publication, person_id=pid)
 
         update_name_form_status(
-            pid, "intrus etranger", "rejected", repo=repo, contribution_repo=contribution_repo
+            pid,
+            "intrus etranger",
+            "rejected",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
 
         assert (
@@ -1052,6 +1208,63 @@ class TestUpdateNameFormStatus:
             ).scalar_one()
             == "rejected"
         )
+
+
+class TestNameFormRejectionOnGroups:
+    """Le rejet d'une forme de nom détache de la personne les groupes rattachés par le nom dont un membre porte la forme."""
+
+    def test_detaches_groups_resolved_by_name(self, sa_sync_conn, repo, contribution_repo):
+        p = _person(sa_sync_conn)
+        form = {"author_name_normalized": "intrus unique"}
+        by_name, name_group = _perimeter_group(sa_sync_conn, p, "name", source_id="hal-n", **form)
+        by_initials, initials_group = _perimeter_group(
+            sa_sync_conn, p, "compatible_name", source_id="hal-c", **form
+        )
+        by_orcid, orcid_group = _perimeter_group(
+            sa_sync_conn, p, "orcid", source_id="hal-o", **form
+        )
+        manual, manual_group = _perimeter_group(
+            sa_sync_conn, p, "manual", source_id="hal-m", **form
+        )
+        _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
+
+        update_name_form_status(
+            p,
+            "intrus unique",
+            "rejected",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
+        )
+
+        assert _group_person(sa_sync_conn, name_group) == (None, None)
+        assert _group_person(sa_sync_conn, initials_group) == (None, None)
+        assert _publication_evidence(sa_sync_conn, by_name) == []
+        assert _publication_evidence(sa_sync_conn, by_initials) == []
+        assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
+        assert _group_person(sa_sync_conn, manual_group) == (p, "manual")
+        assert _publication_evidence(sa_sync_conn, by_orcid) == ["address"]
+        assert _publication_evidence(sa_sync_conn, manual) == ["address"]
+
+    def test_group_under_another_form_is_untouched(self, sa_sync_conn, repo, contribution_repo):
+        p = _person(sa_sync_conn)
+        _, group = _perimeter_group(
+            sa_sync_conn, p, "name", source_id="hal-n", author_name_normalized="jean dupont"
+        )
+        _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
+
+        update_name_form_status(
+            p,
+            "intrus unique",
+            "rejected",
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
+        )
+
+        assert _group_person(sa_sync_conn, group) == (p, "name")
 
 
 # ── assign_orphan_contribution ───────────────────────────────────────
@@ -1083,7 +1296,12 @@ class TestAssignOrphanContribution:
         )
 
         assign_orphan_contribution(
-            person_id, orphan, repo=repo, contribution_repo=contribution_repo
+            person_id,
+            orphan,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
 
         row = sa_sync_conn.execute(
@@ -1112,7 +1330,12 @@ class TestAssignOrphanContribution:
 
         with pytest.raises(ContributionAlreadyAssignedError) as exc:
             assign_orphan_contribution(
-                person_id, source_contribution_id, repo=repo, contribution_repo=contribution_repo
+                person_id,
+                source_contribution_id,
+                conn=sa_sync_conn,
+                perimeter_recompute=_PERIMETER,
+                repo=repo,
+                contribution_repo=contribution_repo,
             )
         assert exc.value.owner_person_id == other_id
         assert (
@@ -1128,7 +1351,12 @@ class TestAssignOrphanContribution:
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             assign_orphan_contribution(
-                person_id, 999999, repo=repo, contribution_repo=contribution_repo
+                person_id,
+                999999,
+                conn=sa_sync_conn,
+                perimeter_recompute=_PERIMETER,
+                repo=repo,
+                contribution_repo=contribution_repo,
             )
 
     def test_assigns_and_creates_contribution(self, sa_sync_conn, repo, contribution_repo):
@@ -1139,7 +1367,12 @@ class TestAssignOrphanContribution:
         source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
 
         assign_orphan_contribution(
-            person_id, source_contribution_id, repo=repo, contribution_repo=contribution_repo
+            person_id,
+            source_contribution_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=repo,
+            contribution_repo=contribution_repo,
         )
 
         row = sa_sync_conn.execute(
@@ -1170,7 +1403,12 @@ class TestReassignRejectedPairUnit:
 
         with pytest.raises(RejectedPairError) as exc:
             assign_orphan_contribution(
-                person_id, source_contribution_id, repo=repo, contribution_repo=contribution_repo
+                person_id,
+                source_contribution_id,
+                conn=sa_sync_conn,
+                perimeter_recompute=_PERIMETER,
+                repo=repo,
+                contribution_repo=contribution_repo,
             )
         pair = exc.value.rejected_pairs[0]
         assert pair["publication_id"] == publication_id
@@ -1199,6 +1437,8 @@ class TestReassignRejectedPairUnit:
         assign_orphan_contribution(
             person_id,
             source_contribution_id,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             force=True,
@@ -1248,6 +1488,7 @@ class TestReassignRejectedPairUnit:
             batch_assign_orphan_contributions(
                 person_id,
                 [sa1, sa2],
+                perimeter_recompute=_PERIMETER,
                 repo=repo,
                 contribution_repo=contribution_repo,
                 conn=sa_sync_conn,
@@ -1275,6 +1516,7 @@ class TestReassignRejectedPairUnit:
         assigned = batch_assign_orphan_contributions(
             person_id,
             [sa1],
+            perimeter_recompute=_PERIMETER,
             repo=repo,
             contribution_repo=contribution_repo,
             conn=sa_sync_conn,

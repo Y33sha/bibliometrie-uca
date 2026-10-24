@@ -12,8 +12,10 @@ import uuid
 
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
+    publication_perimeter_evidence,
     seed_contribution,
     seed_group,
+    seed_perimeter_author_group,
     seed_person,
     seed_publication,
     seed_rejected_contribution,
@@ -63,6 +65,17 @@ class TestExcludeContribution:
         r = auth_client.patch(f"/api/contributions/{_group_id(publication, pid)}/exclude")
         assert r.status_code == 200
         assert r.json()["ok"] is True
+
+    def test_exclusion_takes_the_publication_out_of_the_perimeter(self, auth_client):
+        pid = seed_person()
+        publication = seed_publication(uniq("Pub"), in_perimeter=True)
+        seed_source_record(publication_id=publication)
+        seed_contribution(publication, person_id=pid, in_perimeter=True, roles=["author"])
+
+        r = auth_client.patch(f"/api/contributions/{_group_id(publication, pid)}/exclude")
+
+        assert r.status_code == 200
+        assert publication_perimeter_evidence(publication) == []
 
     def test_group_without_person_is_not_found(self, auth_client):
         """L'id d'un groupe sans personne ne désigne pas une contribution."""
@@ -177,6 +190,19 @@ class TestAssignOrphanContribution:
         with owner_pool() as cur:
             cur.execute("SELECT person_id FROM source_contributions WHERE id = %s", (sa,))
             assert cur.fetchone()["person_id"] == pid
+
+    def test_assignment_brings_the_publication_into_the_perimeter(self, auth_client):
+        pid = seed_person()
+        sa, publication = _seed_orphan_with_publication()
+        seed_perimeter_author_group(_group_id(publication, None))
+
+        r = auth_client.post(
+            "/api/contributions/orphans/assign",
+            json={"source_contribution_id": sa, "person_id": pid},
+        )
+
+        assert r.status_code == 200
+        assert publication_perimeter_evidence(publication) == ["address"]
 
     def test_ok_with_create_person(self, auth_client):
         sa = seed_source_contribution(source="hal")

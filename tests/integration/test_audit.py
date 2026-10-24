@@ -261,6 +261,8 @@ class TestEndToEndServiceIntegration:
                 person_id,
                 "x x",
                 "confirmed",
+                conn=sa_sync_conn,
+                perimeter_recompute=PublicationPerimeterRecompute(),
                 repo=person_repository(sa_sync_conn),
                 contribution_repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
@@ -288,6 +290,8 @@ class TestEndToEndServiceIntegration:
                 person_id,
                 "x x",
                 "rejected",
+                conn=sa_sync_conn,
+                perimeter_recompute=PublicationPerimeterRecompute(),
                 repo=person_repository(sa_sync_conn),
                 contribution_repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
@@ -311,6 +315,8 @@ class TestEndToEndServiceIntegration:
             reject_pair(
                 publication_id,
                 person_id,
+                conn=sa_sync_conn,
+                perimeter_recompute=PublicationPerimeterRecompute(),
                 repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )

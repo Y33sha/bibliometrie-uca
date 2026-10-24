@@ -327,7 +327,7 @@ _publication_count_recompute_singleton: PublicationCountRecomputePort = Publicat
 
 
 def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
-    """Appartenance au périmètre des publications d'une personne, après son exclusion."""
+    """Appartenance au périmètre des publications, après une décision sur une personne ou sur ses contributions."""
     return _publication_perimeter_recompute_singleton
 
 

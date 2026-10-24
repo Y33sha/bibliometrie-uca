@@ -245,14 +245,20 @@ def update_identifier_status(
     body: UpdateIdentifierStatus,
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
-    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet détache de la personne les groupes de contributions sources que ses identifiants rejetés lui rattachent, et recalcule l'appartenance au périmètre de leurs publications.
 
     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
     """
     result = person_commands.update_identifier_status(
-        conn, ident_id, body.status, repo=repo, audit_repo=audit
+        conn,
+        ident_id,
+        body.status,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit,
     )
     return IdentifierStatusResponse(
         id=result.id, status=result.status, propagated=result.propagated
@@ -461,6 +467,7 @@ def detach_contributions(
     conn: Connection = Depends(db_conn),
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DetachContributionsResponse:
     """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
@@ -474,6 +481,7 @@ def detach_contributions(
             ],
             repo=persons,
             contribution_repo=contributions,
+            perimeter_recompute=perimeter_recompute,
             audit_repo=audit,
         )
     )
@@ -486,11 +494,12 @@ def update_name_form_status(
     conn: Connection = Depends(db_conn),
     repo: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
     row = person_commands.update_name_form_status(
         conn,
@@ -499,6 +508,7 @@ def update_name_form_status(
         body.status,
         repo=repo,
         contribution_repo=contributions,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit,
     )
     return NameFormStatusResponse(**row)

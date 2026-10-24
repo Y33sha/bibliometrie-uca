@@ -392,11 +392,12 @@ def seed_source_contribution(
     in_perimeter: bool = True,
     raw_author_name: str = "Test Author",
     author_position: int = 0,
+    identifiers: dict[str, object] | None = None,
 ) -> int:
-    """Contribution source de nom brut `raw_author_name`, sur un enregistrement source semé au besoin."""
+    """Contribution source de nom brut `raw_author_name` et d'identifiants `identifiers`, sur un enregistrement source semé au besoin."""
     source_record = source_record_id or seed_source_record(source=source)
     with owner_pool() as cur:
-        iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower())
+        iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower(), identifiers)
         cur.execute(
             "INSERT INTO source_contributions (source, source_record_id, author_position, "
             "person_id, perimeter_evidence, raw_author_name, contributor_information_id) "
@@ -435,6 +436,41 @@ def seed_group(publication_id: int, source_contributions: list[tuple[int, int]])
                 ),
             )
         return group_id
+
+
+def seed_perimeter_author_group(
+    group_id: int, *, person_id: int | None = None, mode: str | None = None
+) -> None:
+    """Fait du groupe `group_id` un groupe d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "UPDATE source_contribution_groups SET person_id = %s, "
+            "resolution_mode = CAST(%s AS group_resolution_mode), roles = ARRAY['author'], "
+            "perimeter_evidence = ARRAY['address']::perimeter_evidence[] WHERE id = %s",
+            (person_id, mode, group_id),
+        )
+
+
+def publication_perimeter_evidence(publication_id: int) -> list[str]:
+    """Indices d'appartenance au périmètre de la publication `publication_id`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "SELECT perimeter_evidence::text[] AS evidence FROM publications WHERE id = %s",
+            (publication_id,),
+        )
+        return cur.fetchone()["evidence"]
+
+
+def group_person(group_id: int) -> tuple[int | None, str | None]:
+    """Personne et mode de résolution du groupe `group_id`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "SELECT person_id, resolution_mode::text AS mode FROM source_contribution_groups"
+            " WHERE id = %s",
+            (group_id,),
+        )
+        row = cur.fetchone()
+        return row["person_id"], row["mode"]
 
 
 def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
