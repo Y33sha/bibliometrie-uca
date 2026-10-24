@@ -44,6 +44,37 @@ Trois données désignent l'éditeur d'un DOI Crossref :
 
 Le membre Crossref est tantôt la société savante (AGU), tantôt l'éditeur commercial (OUP pour *Plant Physiology*, revue de l'ASPB), tantôt la plateforme (Centre Mersenne, OpenEdition). Sur 6 609 revues à publications Crossref, 6 446 ont un seul éditeur de préfixe. 1 995 d'entre elles ont un autre éditeur en base, pour 6 045 publications. Dans 1 818 de ces cas, l'éditeur de la revue n'a aucun membre Crossref.
 
+### Inventaire
+
+Mesure du 2026-10-24, sur une base proche de la production :
+
+| `journal_type` | Entrées | Avec ISSN | Publications | Monographies rattachées |
+|---|---|---|---|---|
+| `journal` | 9 663 | 9 355 | 37 732 | 168 |
+| `unknown` | 778 | 446 | 2 277 | 4 |
+| `book_series` | 250 | 240 | 870 | 540 |
+| `proceedings` | 180 | 96 | 1 147 | 760 |
+| `media` | 44 | 33 | 633 | 0 |
+| `ebook_platform` | 39 | 1 | 68 | 1 |
+| `preprint_server` | 4 | 2 | 242 | 0 |
+| `repository` | 3 | 1 | 175 | 0 |
+
+- **Localisations.** Elles comptent peu d'entrées, car deux normaliseurs les écartent. OpenAlex ne cherche aucune revue quand la localisation principale est un entrepôt, HAL, theses.fr ou une plateforme d'ebooks (`should_skip_publisher_journal`). DataCite garde seulement les conteneurs qui désignent une revue (`container_names_a_journal`). Restent SSRN (172 publications), bioRxiv (205), Research Square (trois entrées, dont une `unknown` de 87 publications), medRxiv et ChemRxiv (`unknown`), Preprints.org, ArXiv.org, Zenodo (`journal`).
+- **`ebook_platform`.** 38 entrées sur 39 sont des sources OpenAlex au nom d'un éditeur suivi de « eBooks » (« ENS Éditions eBooks »). Elles désignent un éditeur, pas un lieu.
+- **`unknown`.** 61 entrées sont les universités qui délivrent les thèses ScanR (« Université Clermont Auvergne (2021-...) », « Lyon », « Normandie »), avec l'ABES pour éditeur, soit 1 395 publications.
+- **`media`.** Ce sont des publications en série : *The Conversation France* (378), *Revue Politique et Parlementaire* (102), *Le Monde*.
+- **Deux codages des localisations.** Le type (`journal_type`) et le modèle open access `repository` se contredisent. Seuls bioRxiv, Research Square et ArXiv.org ont `oa_model = repository`. Les statistiques écartent leurs 227 publications (`STATS_BASE`), mais gardent celles de SSRN, de medRxiv et de Research Square typé `unknown`.
+- **Localisations hors de `journals`.** 57 990 publications ont un identifiant HAL, 5 256 un PMCID, 5 051 un identifiant arXiv, 2 109 un NNT, 74 533 des URL. 22 726 publications ont seulement un `container_title` : colloque, livre ou archive.
+
+Usages du type dans le code :
+
+- **Espaces de noms DOI** : aucun pour `repository`, `preprint_server`, `ebook_platform` et `book_series` (`domain/journals/doi_namespaces.py`).
+- **Typage** : l'enrichissement OpenAlex type seulement une entrée `unknown` (`repository`, `conference`, `book series`, `ebook platform`). `type_proceedings_journals` et `link_monographs_to_collections` posent `proceedings` et `book_series`. La vérification Sudoc traite `proceedings` et `book_series` comme des séries de volumes (`holds_volumes`).
+- **Corrections du type de document** : `media` donne `media`, `proceedings` donne `conference_paper`, `preprint_server` donne `preprint` (`domain/source_records/metadata_correction/rules.py`). La fusion de deux revues requalifie les publications absorbées d'après le type de la cible.
+- **Open access** : statuts attendus selon `oa_model`, types de document attendus selon `journal_type`, pour le tableau de bord d'une revue (`domain/journals/expected.py`) ; exclusion `oa_model = repository` des statistiques.
+- **DOAJ et APC** : ils concernent en pratique les seules entrées `journal`. 2 266 sont dans le DOAJ et 3 725 ont des APC, contre 54 et 2 pour les autres types.
+- **Interface** : libellé du type, choix du type dans l'administration, liste des recueils d'actes probables.
+
 ### Points des autres fiches que le modèle conditionne
 
 - [Conférences et actes](DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
@@ -57,7 +88,6 @@ Le membre Crossref est tantôt la société savante (AGU), tantôt l'éditeur co
   - publication isolée : monographie, livre ou volume d'actes, rattachée ou non à une série ;
   - localisation : entrepôt, serveur de prépublications, plateforme.
 - Les localisations sortent de `journals`.
-- Le lieu de publication est une série ou une monographie. Un preprint n'en a pas : son serveur est une localisation.
 
 ## Phasage
 
@@ -65,8 +95,8 @@ Le membre Crossref est tantôt la société savante (AGU), tantôt l'éditeur co
 
 - [x] Revues qui changent d'éditeur, d'après le préfixe DOI de leurs publications (`f02277482`).
 - [x] Membre qui détient les DOI Crossref et domaine de résolution, sur le raw store.
-- [ ] Répartition des entrées de `journals` par type, et des publications rattachées, sur la base de production.
-- [ ] Usages de chaque nature : normalisation, rattachement par ISSN et par préfixe DOI, enrichissements (DOAJ, Sudoc, OpenAlex), statut open access, APC, interface.
+- [x] Répartition des entrées de `journals` par type, et des publications rattachées.
+- [x] Usages de chaque nature : normalisation, rattachement par préfixe DOI, enrichissements, statut open access, APC, interface.
 
 ### Phase 2 — Modèle
 
@@ -77,6 +107,9 @@ Le membre Crossref est tantôt la société savante (AGU), tantôt l'éditeur co
 
 - [ ] Normalisation et rattachement des conteneurs selon leur nature.
 - [ ] Enrichissements limités à la nature qu'ils décrivent.
+- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
+- [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
+- [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
 
 ### Phase 4 — API et interface
 
