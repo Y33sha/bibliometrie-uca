@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans libellé écrit elle-même ses lignes.
+Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans libellé écrit elle-même ses lignes. Une section dont toutes les tâches se taisent faute de rien traiter (`silent_when_empty`) se ferme sur « Rien à faire ».
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from functools import partial
 from pipeline.graph import TASKS, Task
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, step
+from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, nothing_to_do, step
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
 
@@ -36,6 +36,8 @@ class TaskStep:
     threshold: int | None = None
     # Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée rend des métriques vides et n'écrit rien.
     when: Callable[[PhaseContext], bool] | None = None
+    # La tâche n'écrit rien quand elle n'a rien traité : `total` nul, sans signal.
+    silent_when_empty: bool = False
 
 
 def run_tasks(
@@ -86,8 +88,30 @@ def run_tasks(
                 steps[selected[index + 1].name].section if index + 1 < len(selected) else None
             )
             _write_lines(task, steps[task.name], results[task.name], next_section, ctx)
+            section = steps[task.name].section
+            if section is not None and section != next_section:
+                _close_if_silent(
+                    [t.name for t in selected if steps[t.name].section == section],
+                    steps,
+                    results,
+                    ctx,
+                )
         start = end
     return results
+
+
+def _close_if_silent(
+    names: list[str],
+    steps: Mapping[str, TaskStep],
+    results: Mapping[str, PhaseMetrics],
+    ctx: PhaseContext,
+) -> None:
+    """Ferme sur « Rien à faire » la section des tâches `names` quand toutes se sont tues : sans cela, le titre resterait seul."""
+    if all(
+        steps[name].silent_when_empty and results[name].total == 0 and not results[name].signals
+        for name in names
+    ):
+        nothing_to_do(ctx.logger)
 
 
 def _write_lines(

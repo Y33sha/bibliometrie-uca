@@ -14,7 +14,6 @@ from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.theses.api import fetch_thesis
-from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 _NNT = f"sr.external_ids ->> '{ExternalIdType.NNT}'"
@@ -51,9 +50,6 @@ async def fetch_missing_theses_by_nnt(
     Compteurs de `look_up`, et `extras["not_found"]` = NNT introuvables.
     """
     nnts = get_missing_nnts(conn, retry_after_days=retry_after_days)
-    if not nnts:
-        nothing_to_do(log)
-        return PhaseMetrics()
     return await look_up(
         conn,
         log,

@@ -204,8 +204,14 @@ TASKS: tuple[Task, ...] = (
         reads=("publications.doc_type",),
         previous_run=("publications.doc_type",),
         network="hal",
+        parallel_group="fetch_missing.nnt",
     ),
-    _task("fetch_missing.theses_by_nnt", "fetch_missing", network="theses"),
+    _task(
+        "fetch_missing.theses_by_nnt",
+        "fetch_missing",
+        network="theses",
+        parallel_group="fetch_missing.nnt",
+    ),
     *(
         _task(
             f"fetch_missing.doi.{source}",

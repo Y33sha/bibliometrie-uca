@@ -12,7 +12,6 @@ from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
-from pipeline.runtime.observability.log_format import LAST_BRANCH
 
 _LOG = logging.getLogger("test")
 
@@ -115,8 +114,8 @@ class TestParHalId:
 
         assert hal.cherches == ["hal-0"]
 
-    async def test_rien_a_faire(self, monkeypatch, caplog):
-        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
+    async def test_sans_hal_id_a_chercher_rien_n_est_ecrit(self, monkeypatch, caplog):
+        """L'exécuteur des tâches ferme la section quand aucune recherche n'a rien cherché."""
         hal = _HalSimule(monkeypatch)
 
         with caplog.at_level(logging.INFO):
@@ -124,7 +123,7 @@ class TestParHalId:
 
         assert metrics.seen == 0
         assert hal.cherches == []
-        assert f"{LAST_BRANCH}Rien à faire" in caplog.text
+        assert caplog.text == ""
 
 
 class TestParNnt:

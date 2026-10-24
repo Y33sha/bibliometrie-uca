@@ -96,6 +96,25 @@ def test_une_source_indisponible_n_est_pas_un_rien_a_faire(contexte, caplog):
     assert "Rien à faire" not in journal
 
 
+def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fois(
+    contexte, caplog
+):
+    """Les recherches par NNT dans HAL et dans theses.fr partagent une section : une seule ligne « Rien à faire » la ferme."""
+    with caplog.at_level(logging.INFO, logger="test"):
+        FetchMissingPhase(
+            fetch_hal_by_id=lambda _ctx: PhaseMetrics(seen=2),
+            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
+            run_parallel=_sync_run_parallel,
+        ).run(contexte(mode="full", sources={"hal", "theses"}))
+
+    messages = caplog.messages
+    section = messages.index("▶ Recherche par NNT des thèses manquantes dans chaque source")
+    assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
+    assert messages.count(f"{LAST_BRANCH}Rien à faire") == 1
+
+
 def test_theses_channel_suit_le_filtre_des_sources(contexte):
     calls: list[str] = []
 

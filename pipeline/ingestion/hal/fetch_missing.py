@@ -26,7 +26,6 @@ from pipeline.ingestion.common.failed_lookups import (
 )
 from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.hal.api import search_one
-from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 # Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
@@ -112,9 +111,6 @@ async def _fetch_ids(
 
     Compteurs de `look_up`, et `extras["not_found"]` = identifiants introuvables.
     """
-    if not ids:
-        nothing_to_do(log)
-        return PhaseMetrics()
     return await look_up(
         conn,
         log,

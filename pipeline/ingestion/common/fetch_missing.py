@@ -1,8 +1,10 @@
 """Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Trois mécanismes, dans cet ordre :
 
-1. **Recherche dans HAL** (`pipeline.ingestion.hal.fetch_missing`) : par hal-id (repéré dans OpenAlex et ScanR), puis par NNT (thèses sans document HAL).
-2. **Recherche dans theses.fr** (`pipeline.ingestion.theses.fetch_missing`) : par NNT repéré dans une autre source.
+1. **Recherche dans HAL par hal-id** (`pipeline.ingestion.hal.fetch_missing`) : hal-id repérés dans OpenAlex et ScanR.
+2. **Recherche par NNT** : dans HAL, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
 3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `fetch_missing.doi.<source>` forment un groupe parallèle.
+
+Une recherche sans identifiant à chercher n'écrit rien. Une section dont aucune recherche n'a rien cherché se ferme sur « Rien à faire » (`silent_when_empty`).
 
 Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`). Il est cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre. WoS est opt-in (`--include-wos`).
 """
@@ -19,7 +21,6 @@ from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
 from pipeline.runtime.config import cap, delay, window_years
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.runtime.parallel import RunParallel, run_parallel
@@ -33,6 +34,7 @@ FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
 _HAL_BY_ID = "fetch_missing.hal_by_id"
 _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
 _THESES_BY_NNT = "fetch_missing.theses_by_nnt"
+_NNT_SECTION = "Recherche par NNT des thèses manquantes dans chaque source"
 
 
 def _doi_task(target: str) -> str:
@@ -86,22 +88,26 @@ class FetchMissingPhase:
                     self.fetch_hal_by_id,
                     section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
                     when=when_selected(_HAL_BY_ID),
+                    silent_when_empty=True,
                 ),
                 _HAL_BY_NNT: TaskStep(
                     self.fetch_hal_by_nnt,
-                    section="Recherche dans HAL des thèses avec NNT trouvées ailleurs",
+                    section=_NNT_SECTION,
                     when=when_selected(_HAL_BY_NNT),
+                    silent_when_empty=True,
                 ),
                 _THESES_BY_NNT: TaskStep(
                     self.fetch_theses_by_nnt,
-                    section="Recherche dans theses.fr des thèses avec NNT trouvées ailleurs",
+                    section=_NNT_SECTION,
                     when=when_selected(_THESES_BY_NNT),
+                    silent_when_empty=True,
                 ),
                 **{
                     _doi_task(target): TaskStep(
                         doi(target),
                         section="Recherche par DOI des documents manquants dans chaque source",
                         when=when_selected(_doi_task(target)),
+                        silent_when_empty=True,
                     )
                     for target in DOI_SEARCHABLE_SOURCES
                 },
@@ -109,11 +115,6 @@ class FetchMissingPhase:
             ctx,
             parallel=self.run_parallel,
         )
-
-        doi_metrics = [by_task[_doi_task(target)] for target in doi_targets]
-        # Une source sans DOI à chercher n'affiche rien : sans aucune barre ni signal, le titre resterait seul.
-        if doi_metrics and all(m.total == 0 and not m.signals for m in doi_metrics):
-            nothing_to_do(ctx.logger)
 
         metrics = PhaseMetrics()
         by_channel: dict[str, dict[str, float | None]] = {}
