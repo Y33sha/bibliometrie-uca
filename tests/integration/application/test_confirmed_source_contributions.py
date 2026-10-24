@@ -2,16 +2,19 @@
 réapplication (enforce) côté pipeline.
 """
 
+import pytest
 from sqlalchemy import text
 
 from application.services.contributions.assign_orphans import assign_orphan_contribution
 from application.services.contributions.core import reject_pair
 from application.services.persons.core import update_name_form_status
+from domain.errors import PersonAlreadyInPublicationError
 from infrastructure.repositories import contribution_repository, person_repository
 from pipeline.transformation.persons.persons import enforce_confirmed_source_contributions
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
+from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
@@ -150,3 +153,20 @@ def test_enforce_restores_pinned_source_contribution(sa_sync_conn):
 
     assert enforce_confirmed_source_contributions(sa_sync_conn) == 1
     assert _source_contribution_person(sa_sync_conn, sa) == pid
+
+
+def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(sa_sync_conn):
+    pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
+    _, group, publication = _orphan_source_contribution(sa_sync_conn)
+    manual = insert_contribution(sa_sync_conn, publication, person_id=pid)
+
+    with pytest.raises(PersonAlreadyInPublicationError) as error:
+        assign_orphan_contribution(
+            pid,
+            group,
+            conn=sa_sync_conn,
+            perimeter_recompute=_PERIMETER,
+            repo=person_repository(sa_sync_conn),
+            contribution_repo=contribution_repository(sa_sync_conn),
+        )
+    assert error.value.contribution_id == manual

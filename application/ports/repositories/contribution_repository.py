@@ -57,6 +57,10 @@ class ContributionRepository(Protocol):
         """Les groupes (`id`, `person_id`, `publication_id`) de `source_contribution_groups` parmi `group_ids`. Les ids absents sont omis."""
         ...
 
+    def manual_groups_of_person(self, person_id: int, publication_ids: list[int]) -> dict[int, int]:
+        """Groupe rattaché à la personne en mode `manual`, par publication de `publication_ids` où elle en a un."""
+        ...
+
     def find_group_members(self, group_ids: list[int]) -> list[GroupMemberRow]:
         """Les membres des groupes `group_ids`, avec leur source et leur forme de nom."""
         ...

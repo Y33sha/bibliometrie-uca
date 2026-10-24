@@ -20,6 +20,7 @@ from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import (
     ContributionAlreadyAssignedError,
     NotFoundError,
+    PersonAlreadyInPublicationError,
     RejectedPairError,
 )
 
@@ -124,7 +125,7 @@ def assign_orphan_contribution(
     1. Pré-contrôle de rejet : si la paire (publication, personne) est rejetée et que `force` est faux, lève `RejectedPairError` ; avec `force`, lève le rejet d'abord (cf. `_resolve_rejection`)
     2. Rattache le groupe à la personne (`_attach_groups`)
 
-    Lève `NotFoundError` si la personne ou le groupe est absent, `ContributionAlreadyAssignedError` si le groupe est déjà rattaché à une personne.
+    Lève `NotFoundError` si la personne ou le groupe est absent, `ContributionAlreadyAssignedError` si le groupe est déjà rattaché à une personne, `PersonAlreadyInPublicationError` si la personne a déjà un groupe manuel dans la publication.
     """
     _require_person(person_id, repo=repo)
 
@@ -133,6 +134,11 @@ def assign_orphan_contribution(
         raise NotFoundError(f"Contribution #{group_id} introuvable")
     if group["person_id"] is not None:
         raise ContributionAlreadyAssignedError(group_id, group["person_id"])
+    manual = contribution_repo.manual_groups_of_person(person_id, [group["publication_id"]])
+    if group["publication_id"] in manual:
+        raise PersonAlreadyInPublicationError(
+            group["publication_id"], manual[group["publication_id"]]
+        )
 
     _resolve_rejection(
         person_id,
@@ -172,7 +178,7 @@ def batch_assign_orphan_contributions(
 ) -> int:
     """Attribue en lot plusieurs contributions orphelines, groupes sans personne, à une personne.
 
-    Un groupe absent ou déjà rattaché est une anomalie : il est écarté du lot et journalisé, le reste du lot est rattaché (`_attach_groups`). Pré-contrôle de rejet sur l'ensemble des publications du lot (cf. `_resolve_rejection`) : sans `force`, une seule paire rejetée bloque tout le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord levés.
+    Un groupe absent, déjà rattaché, ou d'une publication où la personne a déjà un groupe manuel est une anomalie : il est écarté du lot et journalisé, le reste du lot est rattaché (`_attach_groups`). Pré-contrôle de rejet sur l'ensemble des publications du lot (cf. `_resolve_rejection`) : sans `force`, une seule paire rejetée bloque tout le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord levés.
 
     Retourne le nombre de groupes rattachés. Lève `NotFoundError` si la personne n'existe pas.
     """
@@ -181,11 +187,15 @@ def batch_assign_orphan_contributions(
 
     _require_person(person_id, repo=repo)
 
-    groups = [g for g in contribution_repo.find_groups(group_ids) if g["person_id"] is None]
+    orphans = [g for g in contribution_repo.find_groups(group_ids) if g["person_id"] is None]
+    manual = contribution_repo.manual_groups_of_person(
+        person_id, sorted({g["publication_id"] for g in orphans})
+    )
+    groups = [g for g in orphans if g["publication_id"] not in manual]
     skipped = sorted(set(group_ids) - {g["id"] for g in groups})
     if skipped:
         logger.warning(
-            "Rattachement à la personne %d : contributions absentes ou déjà rattachées, écartées : %s",
+            "Rattachement à la personne %d : contributions absentes, déjà rattachées, ou dans une publication où la personne a déjà une contribution manuelle, écartées : %s",
             person_id,
             skipped,
         )

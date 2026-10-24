@@ -154,6 +154,19 @@ class PgContributionRepository(ContributionRepository):
         ).all()
         return [cast(GroupRow, dict(row._mapping)) for row in rows]
 
+    def manual_groups_of_person(self, person_id: int, publication_ids: list[int]) -> dict[int, int]:
+        if not publication_ids:
+            return {}
+        rows = self._conn.execute(
+            text(
+                "SELECT publication_id, id FROM source_contribution_groups"
+                " WHERE person_id = :pid AND resolution_mode = 'manual'"
+                " AND publication_id = ANY(:publication_ids)"
+            ),
+            {"pid": person_id, "publication_ids": publication_ids},
+        ).all()
+        return {row.publication_id: row.id for row in rows}
+
     def find_group_members(self, group_ids: list[int]) -> list[GroupMemberRow]:
         if not group_ids:
             return []

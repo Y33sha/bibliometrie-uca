@@ -94,7 +94,7 @@ def assign_orphan_contribution(
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
     """
     new_person: tuple[str, str] | None = None
     if body.create_person:

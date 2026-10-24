@@ -80,6 +80,18 @@ class ContributionAlreadyAssignedError(ConflictError):
         )
 
 
+class PersonAlreadyInPublicationError(ConflictError):
+    """Attribution refusée : la personne a déjà, dans la publication, une contribution rattachée par une décision humaine. Une personne a au plus une contribution par publication ; la contribution visée resterait sans elle."""
+
+    def __init__(self, publication_id: int, contribution_id: int) -> None:
+        self.publication_id = publication_id
+        self.contribution_id = contribution_id
+        super().__init__(
+            f"La personne a déjà la contribution #{contribution_id} dans la publication "
+            f"#{publication_id}, rattachée par une décision humaine."
+        )
+
+
 class RejectedPair(TypedDict):
     """Paire (publication, personne) figurant dans le registre des rejets, qui bloque une réassignation (cf. `RejectedPairError`)."""
 
