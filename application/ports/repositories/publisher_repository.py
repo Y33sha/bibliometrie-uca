@@ -2,7 +2,7 @@
 
 Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un appelant limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
 
-La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`journals.publisher_id`, `publisher_name_forms`, `journal_name_forms.publisher_id`, `apc_payments.publisher_id`, `doi_prefixes.publisher_id`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
+La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`infrastructure/repositories/publisher_merge.py`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
 """
 
 from typing import Protocol

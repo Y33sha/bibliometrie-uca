@@ -56,7 +56,7 @@ class PublicationStore:
                        CAST(p.oa_status AS text) AS oa_status,
                        CAST(p.license AS text) AS license,
                        CAST(p.deposit_license AS text) AS deposit_license,
-                       p.journal_id, p.monograph_id, p.container_title, p.language,
+                       p.journal_id, p.monograph_id, p.publisher_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
                        d.topics, d.biblio, p.source_extras, p.corrections
                 FROM publications p
@@ -80,6 +80,7 @@ class PublicationStore:
             deposit_license=m["deposit_license"],
             journal_id=m["journal_id"],
             monograph_id=m["monograph_id"],
+            publisher_id=m["publisher_id"],
             container_title=m["container_title"],
             language=m["language"],
             abstract=m["abstract"],
@@ -110,6 +111,7 @@ class PublicationStore:
                     deposit_license = CAST(:deposit_license AS license_type),
                     journal_id = :jid,
                     monograph_id = :mid,
+                    publisher_id = :pid,
                     container_title = :ct,
                     language = :lang,
                     is_retracted = :is_retracted,
@@ -132,6 +134,7 @@ class PublicationStore:
                 "deposit_license": publication.deposit_license,
                 "jid": publication.journal_id,
                 "mid": publication.monograph_id,
+                "pid": publication.publisher_id,
                 "ct": publication.container_title,
                 "lang": publication.language,
                 "is_retracted": publication.is_retracted,

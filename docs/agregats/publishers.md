@@ -14,11 +14,13 @@ Un éditeur publie les revues et reçoit les frais de publication. Il se reconna
 
 Une forme de nom d'éditeur est unique dans toute la table, là où une forme de titre de revue n'est unique que pour un éditeur donné : deux éditeurs ne peuvent pas revendiquer la même forme de nom.
 
-Trois tables extérieures référencent un éditeur : `journals.publisher_id`, `journal_name_forms.publisher_id` et `apc_payments.publisher_id`.
+Les tables `journals`, `monographs`, `source_records`, `publications`, `journal_name_forms` et `apc_payments` référencent un éditeur par leur colonne `publisher_id`.
 
 ## Écriture par le pipeline
 
-**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur.
+**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur. L'enregistrement source reçoit cet éditeur, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans revue ni monographie, dont l'« éditeur » est l'entrepôt.
+
+**Éditeur des publications (`publications`).** Le recalcul d'une publication lui donne l'éditeur de la date de publication : le titulaire du préfixe de son DOI Crossref, à défaut l'éditeur de ses enregistrements sources (fiche [publications](publications.md)).
 
 **Résolution par préfixe de DOI (`publishers_journals`).** Une sous-étape par agence d'enregistrement, Crossref puis DataCite, interroge l'API de l'agence sur les préfixes qu'elle n'a pas vus. Elle enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom, comme dans `normalize`, et renseigne `doi_prefixes.publisher_id`. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Un préfixe dont l'API est indisponible est repris au run suivant.
 
@@ -30,7 +32,7 @@ Routeur `interfaces/api/routers/publishers.py`, adaptateur `PgPublisherRepositor
 
 **Éditer un éditeur** (`PUT /api/publishers/{id}`). Seuls les champs transmis sont modifiés ; le repository re-dérive `name_normalized` depuis le nom.
 
-**Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe `journals`, `journal_name_forms` et `apc_payments` avant de recaler les compteurs.
+**Fusionner deux éditeurs** (`POST /api/publishers/{id}/merge`). Les revues que les deux se partagent sous un même titre sont fusionnées d'abord, puis `merge_publisher_into` repointe vers l'éditeur conservé chaque table qui référence l'éditeur absorbé, avant de recaler les compteurs.
 
 L'opération est refusée quand deux revues de même titre, une chez chaque éditeur, ont des ISSN différents : leurs identités sont distinctes. Elle l'est aussi quand un même titre apparaît deux fois chez l'un des deux éditeurs.
 

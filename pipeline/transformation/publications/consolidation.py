@@ -6,7 +6,10 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
+from domain.publications.aggregation import (
+    assign_publisher,
+    refresh_from_sources as _refresh_aggregate,
+)
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
@@ -48,6 +51,7 @@ class _SourceRecordRow(NamedTuple):
     biblio: dict[str, JsonValue] | None
     source_extras: dict[str, JsonValue] | None
     license: str | None
+    publisher_id: int | None
 
 
 def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
@@ -74,6 +78,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         biblio=row.biblio,
         source_extras=row.source_extras,
         license=row.license,
+        publisher_id=row.publisher_id,
     )
 
 
@@ -91,7 +96,8 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
                    sr.journal_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
-                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license
+                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license,
+                   sr.publisher_id
             FROM source_records sr
             WHERE sr.publication_id = :id
         """),
@@ -134,6 +140,18 @@ def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str]:
     return {r.doi: r.oa_status for r in rows}
 
 
+def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dict[str, int]:
+    """Titulaire de chaque préfixe DOI Crossref connu, pour l'éditeur des publications."""
+    rows = conn.execute(
+        text(
+            "SELECT prefix, publisher_id FROM doi_prefixes"
+            " WHERE prefix = ANY(:prefixes) AND ra = 'Crossref' AND publisher_id IS NOT NULL"
+        ),
+        {"prefixes": list(prefixes)},
+    )
+    return {r.prefix: r.publisher_id for r in rows}
+
+
 def journal_type_of(conn: Connection, journal_id: int) -> str | None:
     """`journal_type` d'un journal, pour le rejeu des corrections qui dépendent de la revue. None si le journal n'existe pas ou son type n'est pas posé."""
     return conn.execute(
@@ -174,7 +192,7 @@ class RefreshVerdict(StrEnum):
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
 
-    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
@@ -206,6 +224,14 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         journal_type=journal_type_of(conn, publication.journal_id)
         if publication.journal_id is not None
         else None,
+    )
+    prefixes = [publication.doi.prefix.value] if publication.doi else []
+    assign_publisher(
+        publication,
+        sources,
+        source_priority=SOURCE_PRIORITY,
+        secondary_ids=secondary_ids,
+        prefix_publishers=crossref_prefix_publishers(conn, prefixes) if prefixes else {},
     )
 
     if publication.doc_type in OUT_OF_SCOPE_DOC_TYPES:

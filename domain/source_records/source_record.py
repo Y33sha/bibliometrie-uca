@@ -36,3 +36,4 @@ class SourceRecord:
     source_extras: dict[str, JsonValue] | None
     # Licence normalisée (valeur de `License`).
     license: str | None = None
+    publisher_id: int | None = None

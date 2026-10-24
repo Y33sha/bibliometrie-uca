@@ -796,6 +796,9 @@ TASKS: tuple[Task, ...] = (
             "journals.journal_type",
             "monographs.journal_id",
             "unpaywall",
+            # Titulaire du préfixe DOI Crossref, éditeur de la publication.
+            "doi_prefixes.ra",
+            "doi_prefixes.publisher_id",
         ),
         writes=(
             "publications",
@@ -1047,8 +1050,10 @@ TASKS: tuple[Task, ...] = (
             "publishers.id",
             "source_records.journal_id",
             "source_records.monograph_id",
+            "source_records.publisher_id",
             "publications.journal_id",
             "publications.monograph_id",
+            "publications.publisher_id",
             "apc_payments",
             "doi_prefixes.publisher_id",
             "journal_name_forms",

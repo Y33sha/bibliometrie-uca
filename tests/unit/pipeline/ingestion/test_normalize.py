@@ -12,6 +12,7 @@ Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -465,7 +466,9 @@ class TestNormalizeRecord:
             ("contributions", "test", 42),
         ]
         assert norm.containers_seen == [Containers(7, None)]
-        norm._record_store.upsert_source_record.assert_called_once_with(_RECORD)
+        norm._record_store.upsert_source_record.assert_called_once_with(
+            replace(_RECORD, publisher_id=5)
+        )
         norm._staging.mark_done.assert_called_once_with(1)
 
     def test_sans_editeur_ni_conteneur(self, writes):

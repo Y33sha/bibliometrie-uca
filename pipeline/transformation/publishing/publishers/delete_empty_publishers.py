@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `contributions` — supprime les éditeurs vides.
+"""Sous-étape de la phase `finalize` — supprime les éditeurs vides.
 
-Un éditeur vide n'a ni revue, ni monographie, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue rattachée à un éditeur retrouve une revue par son titre chez cet éditeur : l'éditeur de la forme reste. Ses propres formes de nom partent avec lui. Le journal garde le nom de chaque éditeur supprimé.
+Un éditeur vide n'a ni revue, ni monographie, ni enregistrement source, ni publication, ni préfixe DOI, ni paiement APC, ni forme de nom de revue. Une forme de nom de revue rattachée à un éditeur retrouve une revue par son titre chez cet éditeur : l'éditeur de la forme reste. Ses propres formes de nom partent avec lui. Le journal garde le nom de chaque éditeur supprimé.
 """
 
 import logging
@@ -21,6 +21,8 @@ _DELETE_EMPTY_PUBLISHERS = text("""
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM journal_name_forms f WHERE f.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.publisher_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publisher_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM publications pu WHERE pu.publisher_id = p.id)
     RETURNING p.id, p.name
 """)
 

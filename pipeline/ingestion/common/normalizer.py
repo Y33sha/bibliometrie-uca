@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
+from dataclasses import replace
 from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
@@ -134,7 +135,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend True, ou False pour un enregistrement refusé, sans rien écrire.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source et ses contributions sources.
+        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, et ses contributions sources.
         """
         doc = self.parse(row)
         if doc is None:
@@ -156,7 +157,7 @@ class SourceNormalizer(ABC):
             else Containers(None, None)
         )
         source_record_id = self._record_store.upsert_source_record(
-            self.source_record(row, doc, containers)
+            replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
         )
         sync_source_contributions(
             self._contribution_store,

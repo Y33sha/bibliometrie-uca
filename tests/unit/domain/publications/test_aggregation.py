@@ -7,7 +7,7 @@ listes restent unionnées.
 
 import pytest
 
-from domain.publications.aggregation import refresh_from_sources
+from domain.publications.aggregation import assign_publisher, refresh_from_sources
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
@@ -298,3 +298,44 @@ class TestCollectionDeLaMonographie:
             monograph_journals={9: 7},
         )
         assert publication.journal_id == 3
+
+
+class TestAssignPublisher:
+    """`assign_publisher` : titulaire du préfixe du DOI Crossref, à défaut éditeur des enregistrements sources."""
+
+    _ORDRE = ("crossref", "hal", "openalex")
+
+    def _publication(self, doc_type: str, doi: str | None = "10.1017/abc") -> Publication:
+        return Publication(
+            id=10,
+            title="t",
+            publication_year=2020,
+            doc_type=doc_type,
+            doi=DOI(doi) if doi else None,
+        )
+
+    def test_le_titulaire_du_prefixe_l_emporte_sur_les_sources(self):
+        publication = self._publication("article")
+        sources = [_source_record(id=1, source="crossref", publisher_id=7)]
+        assign_publisher(
+            publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.1017": 3}
+        )
+        assert publication.publisher_id == 3
+
+    def test_a_defaut_le_premier_editeur_dans_l_ordre_des_sources(self):
+        publication = self._publication("article", doi=None)
+        sources = [
+            _source_record(id=1, source="openalex", publisher_id=9),
+            _source_record(id=2, source="hal", publisher_id=None),
+            _source_record(id=3, source="crossref", publisher_id=7),
+        ]
+        assign_publisher(publication, sources, source_priority=self._ORDRE)
+        assert publication.publisher_id == 7
+
+    def test_une_production_hebergee_n_a_pas_d_editeur(self):
+        publication = self._publication("preprint")
+        sources = [_source_record(id=1, source="crossref", publisher_id=7)]
+        assign_publisher(
+            publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.1017": 3}
+        )
+        assert publication.publisher_id is None

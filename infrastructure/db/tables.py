@@ -1087,12 +1087,15 @@ publications = Table(
     Column("doc_type", doc_type_enum, server_default="other"),
     Column("publication_year", SmallInteger, nullable=False),
     Column("doi", Text),
+    Column("doi_prefix", Text, Computed("split_part(doi, '/', 1)", persisted=True)),
     Column("oa_status", oa_type_enum, server_default="unknown"),
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
+    # Éditeur à la date de publication.
+    Column("publisher_id", Integer),
     Column("container_title", Text),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -1195,6 +1198,8 @@ source_records = Table(
     Column("impact", Jsonb),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
+    # Éditeur que nomme la source ; nul pour une production hébergée sans être publiée.
+    Column("publisher_id", Integer),
     Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),

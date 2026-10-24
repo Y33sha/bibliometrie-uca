@@ -15,6 +15,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
+from domain.publishers.attribution import source_record_has_publisher
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import normalize_external_ids
 from domain.source_records.languages import language_code
@@ -52,6 +53,8 @@ class SourceRecordUpsert:
     """Type de document dans le vocabulaire de la source."""
     journal_id: int | None = None
     monograph_id: int | None = None
+    publisher_id: int | None = None
+    """Éditeur que nomme la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
     raw_language: str | None = None
     """Langue dans le vocabulaire de la source."""
@@ -135,6 +138,12 @@ class SourceRecordStore:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
+        if not source_record_has_publisher(
+            params["doc_type"],
+            row.source,
+            has_container=row.journal_id is not None or row.monograph_id is not None,
+        ):
+            params["publisher_id"] = None
         params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
         return scalar_int(self._conn.execute(_UPSERT_SQL, params))

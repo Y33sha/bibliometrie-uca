@@ -19,6 +19,8 @@ from infrastructure.repositories.merge_steps import (
 MERGE_STEPS: dict[str, MergeStep] = {
     "journals": transfer("journals", "publisher_id"),
     "monographs": transfer("monographs", "publisher_id"),
+    "source_records": transfer("source_records", "publisher_id"),
+    "publications": transfer("publications", "publisher_id"),
     "apc_payments": transfer("apc_payments", "publisher_id"),
     "doi_prefixes": transfer("doi_prefixes", "publisher_id"),
     "name_forms": transfer("publisher_name_forms", "publisher_id"),
