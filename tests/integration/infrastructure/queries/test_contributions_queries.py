@@ -33,12 +33,8 @@ class TestOrphanContributionsCount:
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(sa_sync_conn, publication)
         insert_source_contribution(
-            sa_sync_conn, source_record, author_position=0, person_id=None, in_perimeter=True
-        )  # orpheline
-        pid = insert_person(sa_sync_conn)
-        insert_source_contribution(
-            sa_sync_conn, source_record, author_position=1, person_id=pid, in_perimeter=True
-        )  # attribuée
+            sa_sync_conn, source_record, author_position=0, in_perimeter=True
+        )
         _group(sa_sync_conn)
 
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total >= 1
@@ -46,7 +42,7 @@ class TestOrphanContributionsCount:
     def test_excludes_out_of_perimeter(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(sa_sync_conn, publication)
-        insert_source_contribution(sa_sync_conn, source_record, person_id=None, in_perimeter=False)
+        insert_source_contribution(sa_sync_conn, source_record, in_perimeter=False)
         _group(sa_sync_conn)
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
@@ -68,7 +64,7 @@ class TestOrphanContributionsCount:
     def test_excludes_source_contributions_outside_groups(self, sa_sync_conn):
         """Une contribution source hors groupe (enregistrement source écarté de l'alignement, doublon d'auteur) reste sans personne : elle n'est pas à rattacher."""
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
-        insert_source_contribution(sa_sync_conn, source_record, person_id=None, in_perimeter=True)
+        insert_source_contribution(sa_sync_conn, source_record, in_perimeter=True)
         assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
     def test_excludes_non_author_roles(self, sa_sync_conn):
@@ -80,7 +76,6 @@ class TestOrphanContributionsCount:
             sa_sync_conn,
             source_record,
             source="theses",
-            person_id=None,
             roles=["thesis_director"],
             in_perimeter=True,
         )
@@ -89,7 +84,6 @@ class TestOrphanContributionsCount:
             source_record,
             source="theses",
             author_position=1,
-            person_id=None,
             roles=["jury_member"],
             in_perimeter=True,
         )
@@ -112,7 +106,6 @@ class TestListOrphanContributions:
         sa = insert_source_contribution(
             sa_sync_conn,
             source_record,
-            person_id=None,
             raw_author_name="Dupond Jean",
             in_perimeter=True,
         )
@@ -178,7 +171,6 @@ class TestListOrphanContributions:
             sa_sync_conn,
             source_record,
             author_position=0,
-            person_id=None,
             raw_author_name="SpecialName",
             in_perimeter=True,
         )
@@ -186,7 +178,6 @@ class TestListOrphanContributions:
             sa_sync_conn,
             source_record,
             author_position=1,
-            person_id=None,
             raw_author_name="Autre",
             in_perimeter=True,
         )

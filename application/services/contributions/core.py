@@ -2,7 +2,7 @@
 
 Couvre les contributions, groupes de `source_contribution_groups` rattachés à une personne, et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
 
-La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes.
+La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes et la phase `persons` les rattache aux personnes.
 """
 
 from sqlalchemy import Connection
@@ -34,10 +34,10 @@ def reject_pair(
     Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Trois effets :
 
     1. Enregistre la paire dans `rejected_contributions`. Ce registre est consulté par le matching des personnes, qui écarte toute paire rejetée : le rejet survit aux exécutions suivantes du pipeline.
-    2. Met à NULL le `person_id` de toutes les `source_contributions` de la paire, sur toutes les sources, et celui du groupe de la personne dans la publication : le lien disparaît côté données sources, et la forme de nom correspondante cesse de lui être attribuée.
+    2. Retire la personne à son groupe dans la publication, et retire les épinglages des contributions sources de la publication à elle (`detach_rejected_pair`).
     3. Recalcule l'appartenance au périmètre de la publication.
 
-    Retourne {"detached": N}, N contributions sources détachées.
+    Retourne {"detached": N}, N groupes détachés.
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)

@@ -92,13 +92,9 @@ def _attach_groups(
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
 ) -> None:
-    """Rattache les groupes à la personne : épingle tous leurs membres, ajoute leurs formes de nom sous leur source, puis recalcule l'appartenance au périmètre de leurs publications.
-
-    Les membres orphelins reçoivent aussi la personne dans `source_contributions.person_id`, que lit la résolution des personnes.
-    """
+    """Rattache les groupes à la personne : épingle tous leurs membres, ce qui rattache les groupes (`pin_contributions`), ajoute leurs formes de nom sous leur source, puis recalcule l'appartenance au périmètre de leurs publications."""
     members = contribution_repo.find_group_members([g["id"] for g in groups])
     member_ids = [m["source_contribution_id"] for m in members]
-    contribution_repo.assign_orphan_source_contributions(person_id, member_ids)
     # Épingler la résolution admin (must-link au grain de la contribution source) : le pipeline la
     # relit comme entrée fixe et ne re-dérive jamais ces contributions sources.
     contribution_repo.pin_contributions(member_ids, person_id)

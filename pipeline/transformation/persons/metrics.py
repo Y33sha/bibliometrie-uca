@@ -1,79 +1,40 @@
-"""Métriques de la phase personnes : compteurs de la cascade et métriques de la tâche `persons.resolve`."""
+"""Métriques de la phase personnes, assemblées depuis les compteurs de ses tâches."""
 
-import logging
-from typing import NamedTuple
+from collections.abc import Mapping
 
-from domain.persons.matching import MatchReason
-from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
+from domain.persons.group_matching import GroupMatchReason, GroupOutcome
 from pipeline.runtime.observability.metrics import PhaseMetrics
-
-# Méthodes de rattachement, par fiabilité décroissante de la cascade, et ce qu'elles disent.
-_MATCHING_METHODS: dict[MatchReason, str] = {
-    MatchReason.ORCID: "par ORCID",
-    MatchReason.HAL_PERSON_ID: "par compte HAL",
-    MatchReason.IDREF: "par IdRef",
-    MatchReason.CROSS_SOURCE: "par comparaison entre sources",
-    MatchReason.SINGLE_NAME: "par nom sans homonymie",
-    MatchReason.COMPATIBLE_NAME: "par initiales compatibles",
-}
-
-
-class CascadeResult(NamedTuple):
-    """Compteurs de la cascade, ses deux passes (`match` et `create`) réunies."""
-
-    matched_counts: dict[str, int]
-    skipped_counts: dict[str, int]
-    created: int
-    corroboration_rejected: int
-    corroboration_rejected_distinct: int
-    out_of_perimeter_matched: int
-    in_perimeter_total: int
-    out_of_perimeter_total: int
-    # Incrémental cross-source : les contributions sources cross-source re-jugées ce run, et celles réellement re-résolues. Le complément (candidates − résolues) est détaché par la phase.
-    cross_source_candidate_ids: set[int]
-    resolved_cross_source_ids: set[int]
-    # Personnes au prénom réduit à des initiales qui prennent un prénom plein, avant la cascade ou à un rattachement.
-    first_names_completed: int = 0
-
-
-def log_matching_breakdown(logger: logging.Logger, result: CascadeResult) -> None:
-    """Écrit ce qui a identifié les personnes, méthode par méthode, nombres alignés à droite."""
-    matched = result.matched_counts
-    total = sum(matched.get(method, 0) for method in _MATCHING_METHODS)
-    logger.info("%s%s, dont", LAST_BRANCH, quantity(total, "identification"))
-
-    width = max((len(f"{matched.get(m, 0)}") for m in _MATCHING_METHODS), default=1)
-    logger.info("")
-    for method, label in _MATCHING_METHODS.items():
-        logger.info("     %s %s", f"{matched.get(method, 0)}".rjust(width), label)
 
 
 def build_metrics(
-    result: CascadeResult,
     *,
-    transferred: int,
-    cross_source_detached: int,
+    resolution: Mapping[str, int],
+    arbitration: Mapping[str, int],
+    name_forms: Mapping[str, int],
+    purge: Mapping[str, int],
 ) -> PhaseMetrics:
-    """Assemble les métriques de la tâche `persons.resolve` depuis les compteurs de la cascade. La phase y ajoute ceux de la purge."""
-    matched = result.matched_counts
-    skipped = result.skipped_counts
-    linked_total = sum(matched.values())
-    created = result.created
+    """Métriques de la phase : compteurs du rattachement des groupes (`resolve_groups`), de l'arbitrage des identifiants, de la régénération des formes de nom et de la purge.
+
+    `details.table` compte les groupes rattachés pendant le run, par mode de résolution (`GroupMatchReason`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
+    """
+    attached = {
+        reason: resolution.get(f"{GroupOutcome.MATCH}:{reason}", 0) for reason in GroupMatchReason
+    }
+    attached[GroupMatchReason.MANUAL] += resolution.get("pinned", 0)
 
     metrics = PhaseMetrics()
-    metrics.add(seen=result.in_perimeter_total, new=created, updated=linked_total)
-    # Tableau « méthode de rattachement » : clés techniques (libellés portés par le frontend), ordre par fiabilité décroissante de la cascade.
+    metrics.add(seen=resolution.get("groups", 0), updated=sum(attached.values()))
+    # Clés techniques : le frontend donne les libellés.
     metrics.details["table"] = {
-        "rows": [{"key": method, "count": matched.get(method, 0)} for method in _MATCHING_METHODS]
+        "rows": [{"key": str(reason), "count": count} for reason, count in attached.items()]
     }
     metrics.details["summary"] = {
-        "created": created,
-        "first_names_completed": result.first_names_completed,
-        "skipped_ambiguous": skipped.get("ambiguous_name_form", 0),
-        "skipped_all_rejected": skipped.get("all_candidates_rejected", 0),
-        "corroboration_rejected": result.corroboration_rejected,
-        "corroboration_rejected_distinct": result.corroboration_rejected_distinct,
-        "identifiers_transferred": transferred,
-        "cross_source_detached": cross_source_detached,
+        **resolution,
+        "identifiers_neutralized": arbitration.get("neutralized", 0),
+        "identifiers_transferred": arbitration.get("transferred", 0),
+        "reorphaned_nominal": purge.get("reorphaned", 0),
+        "deleted_attributions": purge.get("deleted_attributions", 0),
+        "deleted_persons": purge.get("deleted_persons", 0),
+        **{f"name_forms_{key}": count for key, count in name_forms.items()},
     }
     return metrics

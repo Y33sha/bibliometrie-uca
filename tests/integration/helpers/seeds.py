@@ -383,7 +383,6 @@ def seed_source_record(
 def seed_source_contribution(
     source: str = "hal",
     source_record_id: int | None = None,
-    person_id: int | None = None,
     in_perimeter: bool = True,
     raw_author_name: str = "Test Author",
     author_position: int = 0,
@@ -395,13 +394,12 @@ def seed_source_contribution(
         iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower(), identifiers)
         cur.execute(
             "INSERT INTO source_contributions (source, source_record_id, author_position, "
-            "person_id, perimeter_evidence, raw_author_name, contributor_information_id) "
-            "VALUES (%s, %s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
+            "perimeter_evidence, raw_author_name, contributor_information_id) "
+            "VALUES (%s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
             (
                 source,
                 source_record,
                 author_position,
-                person_id,
                 perimeter_evidence(in_perimeter) or [],
                 raw_author_name,
                 iid,

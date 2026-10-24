@@ -90,8 +90,6 @@ def test_contribution_source_hors_groupe_ne_porte_pas_l_attribution(sa_sync_conn
         raw_author_name="monteil jean",
         author_name_normalized="monteil jean",
         identifiers={"orcid": _ORCID},
-        person_id=person,
-        resolution_mode="name",
     )
     delete_unsupported_identifier_attributions(conn)
     assert not _attribution_remaining(conn, person)

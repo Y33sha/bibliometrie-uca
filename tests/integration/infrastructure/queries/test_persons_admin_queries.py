@@ -35,9 +35,7 @@ _author = partial(insert_contribution, roles=["author"])
 
 def _person_source_contribution(conn, source_record, *, person_id, **source_contribution):
     """Contribution source décrite par `source_contribution`, seul membre d'un groupe rattaché à la personne `person_id`. Rend l'`id` de la contribution source."""
-    source_contribution_id = insert_source_contribution(
-        conn, source_record, person_id=person_id, **source_contribution
-    )
+    source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
     publication = conn.execute(
         text("SELECT publication_id FROM source_records WHERE id = :s"), {"s": source_record}
     ).scalar_one()
@@ -119,7 +117,6 @@ def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_co
         insert_source_record(
             sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-forme-hors-groupe"
         ),
-        person_id=pid,
         author_name_normalized="dupond j",
     )
 
@@ -144,25 +141,6 @@ def _attribute(conn, person_id, id_type, id_value, status):
 
 class TestIdentifierConflicts:
     """La détection projette `(person_id, id_type, id_value)` à la volée depuis les membres des groupes des personnes ⋈ `contributor_information` : rien à rafraîchir, la lecture voit directement le seed de la transaction rollbackée du fixture."""
-
-    def test_person_outside_groups_is_not_a_bearer(self, sa_sync_conn):
-        """Une contribution source rattachée à une personne dans `source_contributions` sans groupe de la personne ne fait pas d'elle une porteuse."""
-        p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
-        p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
-        source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
-        _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6780", "pending")
-        _person_source_contribution(
-            sa_sync_conn, source_record, identifiers={"orcid": "0000-0001-2345-6780"}, person_id=p1
-        )
-        insert_source_contribution(
-            sa_sync_conn,
-            source_record,
-            author_position=1,
-            identifiers={"orcid": "0000-0001-2345-6780"},
-            person_id=p2,
-        )
-
-        assert identifier_conflicts_count(sa_sync_conn) == 0
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")

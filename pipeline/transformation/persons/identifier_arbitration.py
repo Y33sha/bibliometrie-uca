@@ -1,8 +1,8 @@
-"""Arbitrage des identifiants de personne, avant la cascade : identifiants mal placés et conflits d'attribution.
+"""Arbitrage des identifiants de personne, avant le rattachement des groupes : identifiants mal placés et conflits d'attribution.
 
 Le consensus de nom d'une valeur d'identifiant est le nom que contiennent strictement plus de contributions sources que chacun des autres (`strict_majority`). Il est calculé une fois sur le snapshot (`compute_identifier_consensus`). Des informations du contributeur dont le nom désigne une autre personne que celle du consensus contiennent la valeur par erreur. Ses contributions sources la neutralisent avec le motif `misplaced` (`requalify_misplaced_identifiers`). Un groupe rattaché par ce type d'identifiant dont un membre gagne la marque perd sa personne.
 
-Un conflit (`IdentifierConflict`) est une valeur attribuée à une personne, le titulaire, et portée par un groupe d'une autre personne. Le vote des groupes le tranche (`resolve_identifier_transfers`). Chaque groupe qui porte la valeur donne une voix à sa personne. La valeur va à la personne qui a strictement plus de voix que chacune des autres. Seules les attributions `pending` sont transférables. Après un transfert, les groupes de l'ancien titulaire rattachés par ce type d'identifiant et qui portent la valeur perdent leur personne, de même que ses contributions sources rattachées par identifiant. La suite du run les re-résout.
+Un conflit (`IdentifierConflict`) est une valeur attribuée à une personne, le titulaire, et portée par un groupe d'une autre personne. Le vote des groupes le tranche (`resolve_identifier_transfers`). Chaque groupe qui porte la valeur donne une voix à sa personne. La valeur va à la personne qui a strictement plus de voix que chacune des autres. Seules les attributions `pending` sont transférables. Après un transfert, les groupes de l'ancien titulaire rattachés par ce type d'identifiant et qui portent la valeur perdent leur personne. Le rattachement des groupes (`persons.resolve_groups`) les re-décide.
 
 L'arbitrage est ordre-indépendant : le calcul repart des données à chaque exécution.
 """
@@ -22,7 +22,6 @@ from domain.persons.identifiers import (
 )
 from domain.persons.matching import (
     STRONG_PERSON_IDENTIFIER_TYPES,
-    ResolutionMode,
     identifier_misplaced,
     strict_majority,
 )
@@ -30,10 +29,10 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.queues import Queue, enqueue_sql
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
-    DETACHED_SOURCE_CONTRIBUTION,
+    DETACHED_GROUP,
+    GROUP_MEMBERS,
     identifier_neutralized,
     person_source_contribution,
-    pinned,
     trusted_identifier_sql,
 )
 from pipeline.runtime.observability.log_format import (
@@ -45,7 +44,6 @@ from pipeline.runtime.observability.log_format import (
     step,
 )
 from pipeline.runtime.observability.progress import waiting
-from pipeline.transformation.persons.store import PersonsStore
 
 # Marque pour le groupement des auteurs les publications des contributions sources de la CTE `modifiees`.
 _MARK_MODIFIED_PUBLICATIONS = enqueue_sql(
@@ -63,15 +61,6 @@ class ContributorInformationIdentifier(NamedTuple):
     contributor_information_id: int
     name: str
     value: str
-
-
-class MisplacedNeutralizations(NamedTuple):
-    """Résultat d'une réécriture des neutralisations `misplaced`."""
-
-    gained: dict[int, list[str]]
-    """Contributions sources qui gagnent un identifiant neutralisé, avec les types d'identifiant gagnés."""
-    to_detach: list[int]
-    """Parmi elles, les contributions sources résolues par identifiant et non épinglées : leur rattachement a pu passer par l'identifiant neutralisé."""
 
 
 # Condition vraie quand la contribution source `sc` neutralise l'identifiant du paramètre `:id_type`.
@@ -126,8 +115,11 @@ def fetch_contributor_information_identifiers(
 
 def write_misplaced_neutralizations(
     conn: Connection, misplaced: Mapping[int, Sequence[str]]
-) -> MisplacedNeutralizations:
-    """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications sont marquées pour le groupement des auteurs."""
+) -> dict[int, list[str]]:
+    """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications sont marquées pour le groupement des auteurs.
+
+    Rend les contributions sources qui gagnent un identifiant neutralisé, avec les types d'identifiant gagnés.
+    """
     payload = [
         {
             "contributor_information_id": contributor_information_id,
@@ -167,11 +159,11 @@ def write_misplaced_neutralizations(
                 SET neutralized_identifiers = c.apres
                 FROM cibles c
                 WHERE sc.id = c.id AND c.apres IS DISTINCT FROM c.avant
-                RETURNING sc.id, sc.source_record_id, sc.resolution_mode, c.avant, c.apres
+                RETURNING sc.id, sc.source_record_id, c.avant, c.apres
             ),
             regroupees AS ({_MARK_MODIFIED_PUBLICATIONS}),
             gains AS (
-                SELECT id, resolution_mode,
+                SELECT id,
                        ARRAY(
                            SELECT k FROM jsonb_object_keys(coalesce(apres, '{{}}'::jsonb)) AS k
                            WHERE NOT coalesce(avant ? k, false)
@@ -179,19 +171,14 @@ def write_misplaced_neutralizations(
                        ) AS types
                 FROM modifiees
             )
-            SELECT id, types,
-                   coalesce(resolution_mode = '{ResolutionMode.IDENTIFIER.value}', false)
-                   AND NOT {pinned("gains.id")} AS a_detacher
+            SELECT id, types
             FROM gains
             WHERE cardinality(types) > 0
             ORDER BY id
         """).bindparams(bindparam("payload", type_=Jsonb)),
         {"payload": payload},
     ).all()
-    return MisplacedNeutralizations(
-        gained={r.id: list(r.types) for r in rows},
-        to_detach=[r.id for r in rows if r.a_detacher],
-    )
+    return {r.id: list(r.types) for r in rows}
 
 
 def release_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str]]) -> int:
@@ -205,9 +192,9 @@ def release_misplaced_groups(conn: Connection, gained: Mapping[int, Sequence[str
         return 0
     source_contribution_ids, id_types = zip(*pairs, strict=True)
     return conn.execute(
-        text("""
+        text(f"""
             UPDATE source_contribution_groups g
-            SET person_id = NULL, resolution_mode = NULL
+            SET {DETACHED_GROUP}
             FROM source_contribution_group_members gm
             JOIN unnest(CAST(:ids AS integer[]), CAST(:types AS text[])) AS m(source_contribution_id, id_type)
                 ON m.source_contribution_id = gm.source_contribution_id
@@ -244,10 +231,7 @@ def fetch_identifier_group_votes(conn: Connection, id_type: str) -> dict[str, di
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value, g.person_id,
                    count(DISTINCT g.id) AS votes
-            FROM source_contribution_groups g
-            JOIN source_contribution_group_members gm ON gm.group_id = g.id
-            JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            FROM {GROUP_MEMBERS}
             WHERE g.person_id IS NOT NULL AND {_bears_identifier(id_type)}
             GROUP BY 1, 2
         """),
@@ -263,41 +247,18 @@ def release_identifier_groups(conn: Connection, id_type: str, id_value: str, per
     """Retire leur personne aux groupes de `person_id` rattachés par le type d'identifiant dont un membre porte la valeur (`_bears_identifier`). Rend le nombre de groupes libérés."""
     return conn.execute(
         text(f"""
-            UPDATE source_contribution_groups g
-            SET person_id = NULL, resolution_mode = NULL
-            WHERE g.person_id = :person_id
-              AND g.resolution_mode::text = :id_type
-              AND EXISTS (
-                  SELECT 1
-                  FROM source_contribution_group_members gm
-                  JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-                  JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                  WHERE gm.group_id = g.id
-                    AND ci.identifiers->>:id_type = :id_value
-                    AND {_bears_identifier(id_type)}
-              )
+            UPDATE source_contribution_groups
+            SET {DETACHED_GROUP}
+            WHERE id IN (
+                SELECT g.id
+                FROM {GROUP_MEMBERS}
+                WHERE g.person_id = :person_id
+                  AND g.resolution_mode::text = :id_type
+                  AND ci.identifiers->>:id_type = :id_value
+                  AND {_bears_identifier(id_type)}
+            )
         """),
         {"person_id": person_id, "id_type": id_type, "id_value": id_value},
-    ).rowcount
-
-
-def null_identifier_source_contributions(
-    conn: Connection, id_type: str, id_value: str, old_owner_person_id: int
-) -> int:
-    """Après réattribution d'une valeur de l'ancien titulaire vers une autre personne, les contributions sources rattachées à l'ancien titulaire, résolues **par identifiant** (`resolution_mode = 'identifier'`), dont les informations du contributeur contiennent cette valeur, et non épinglées, repassent à NULL : la cascade les re-résout contre la carte corrigée. Les contributions sources nominales qui contiennent la valeur ne bougent pas (leur `person_id` ne dépend pas d'elle)."""
-    return conn.execute(
-        text(f"""
-            UPDATE source_contributions sc
-            SET {DETACHED_SOURCE_CONTRIBUTION}
-            FROM contributor_information ci
-            WHERE sc.contributor_information_id = ci.id
-              AND sc.person_id = :old_owner
-              AND sc.resolution_mode = '{ResolutionMode.IDENTIFIER.value}'
-              AND ci.identifiers->>:id_type = :id_value
-              AND NOT {_ID_TYPE_NEUTRALIZED}
-              AND NOT {pinned("sc.id")}
-        """),
-        {"old_owner": old_owner_person_id, "id_type": id_type, "id_value": id_value},
     ).rowcount
 
 
@@ -319,9 +280,9 @@ def requalify_misplaced_identifiers(
     conn: Connection,
     consensus: IdentifierConsensus,
 ) -> dict[str, int]:
-    """Neutralise les identifiants mal placés, libère les groupes rattachés par eux (`release_misplaced_groups`) et détache les contributions sources qu'ils ont pu rattacher.
+    """Neutralise les identifiants mal placés et libère les groupes rattachés par eux (`release_misplaced_groups`).
 
-    Retourne `{neutralized, released_groups, detached}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, de groupes qui perdent leur personne, et de contributions sources détachées pour que la cascade les re-résolve.
+    Retourne `{neutralized, released_groups}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, et de groupes qui perdent leur personne.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
@@ -329,17 +290,10 @@ def requalify_misplaced_identifiers(
             if identifier_misplaced(information.name, consensus.get((id_type, information.value))):
                 misplaced[information.contributor_information_id].append(id_type)
 
-    written = write_misplaced_neutralizations(conn, misplaced)
-    released_groups = release_misplaced_groups(conn, written.gained)
-    detached = (
-        PersonsStore(conn).detach_source_contributions(written.to_detach)
-        if written.to_detach
-        else 0
-    )
+    gained = write_misplaced_neutralizations(conn, misplaced)
     return {
-        "neutralized": len(written.gained),
-        "released_groups": released_groups,
-        "detached": detached,
+        "neutralized": len(gained),
+        "released_groups": release_misplaced_groups(conn, gained),
     }
 
 
@@ -401,9 +355,8 @@ def resolve_identifier_transfers(
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
         released = release_identifier_groups(conn, id_type, id_value, owner)
-        detached = null_identifier_source_contributions(conn, id_type, id_value, owner)
         logger.info(
-            "%sTransfert %s=%s : personne %d → %d (%s contre %d), %s %s, %s %s",
+            "%sTransfert %s=%s : personne %d → %d (%s contre %d), %s %s",
             BRANCH,
             id_type,
             id_value,
@@ -411,10 +364,8 @@ def resolve_identifier_transfers(
             target,
             quantity(conflict.votes[target], "voix", "voix"),
             conflict.votes.get(owner, 0),
-            quantity(released, "groupe"),
-            inflect(released, "libéré"),
-            quantity(detached, "contribution source", "contributions sources"),
-            inflect(detached, "détachée"),
+            quantity(released, "contribution"),
+            inflect(released, "libérée"),
         )
         transferred += 1
 
@@ -436,7 +387,7 @@ def arbitrate_identifier_conflicts(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
 
-    Retourne `{neutralized, released_groups, detached, transferred}`. Le commit est laissé au caller.
+    Retourne `{neutralized, released_groups, transferred}`. Le commit est laissé au caller.
     """
     step(logger, "Identifiants mal placés et conflits d'attribution")
     with waiting(BRANCH, logger) as line:
@@ -446,7 +397,7 @@ def arbitrate_identifier_conflicts(
             line.conclude(
                 f"{BRANCH}Identifiants mal placés neutralisés sur "
                 f"{quantity(requalified['neutralized'], 'contribution source', 'contributions sources')}"
-                f", {quantity(released_groups, 'groupe')} {inflect(released_groups, 'libéré')}"
+                f", {quantity(released_groups, 'contribution')} {inflect(released_groups, 'libérée')}"
             )
         else:
             line.erase()

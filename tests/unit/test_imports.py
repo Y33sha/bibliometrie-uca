@@ -28,7 +28,7 @@ MODULES = [
     "pipeline.ingestion.theses.normalize",
     "pipeline.transformation.publications.reconciliation",
     "pipeline.transformation.persons.identifier_arbitration",
-    "pipeline.transformation.persons.cascade",
+    "pipeline.transformation.persons.groups",
     "pipeline.transformation.persons.purge",
     "pipeline.transformation.persons.persons",
     "pipeline.transformation.structures.affiliations",

@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions sources (`source_contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`source_contribution_groups`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging
@@ -44,7 +44,7 @@ class ContributionRef(TypedDict):
 
 
 class DetachResult(TypedDict):
-    """Résultat de `detach_contributions` : compteurs de l'opération."""
+    """Résultat de `detach_contributions` : groupes détachés et formes de nom supprimées."""
 
     detached: int
     cleaned_forms: int
@@ -161,7 +161,7 @@ def add_identifier(
       n'attribue à la main ;
     - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
       promotion depuis les contributions sources (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
-      une personne que la cascade vient de créer ou de rapprocher.
+      une personne que la phase `persons` vient de rapprocher.
     """
     if source == IdentifierOrigin.MANUAL:
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
@@ -265,13 +265,12 @@ def update_name_form_status(
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris. Les groupes de la personne rattachés par le nom dont un membre porte la forme perdent la personne (`detach_groups_for_name_form`), et l'appartenance au périmètre de leurs publications est recalculée.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il détache aussi les groupes de la personne rattachés par le nom dont un membre contient la forme (`detach_groups_for_name_form`). Les groupes épinglés restent rattachés. L'appartenance au périmètre des publications des groupes détachés est recalculée.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        contribution_repo.null_person_id_for_name_form(person_id, name_form)
         publication_ids = contribution_repo.detach_groups_for_name_form(person_id, name_form)
         perimeter_recompute.refresh_publications(conn, publication_ids)
     emit_event(
@@ -296,9 +295,9 @@ def detach_contributions(
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
-    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement du groupe et de toutes les sources de la paire). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
+    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement du groupe de la personne). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Retourne {"detached": N, "cleaned_forms": K}.
+    Retourne {"detached": N, "cleaned_forms": K}, N groupes détachés.
     """
     publication_ids: set[int] = set()
     for a in contributions:

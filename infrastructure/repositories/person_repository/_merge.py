@@ -7,9 +7,7 @@ from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import merged_exclusion
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
-from infrastructure.repositories.contribution_repository import (
-    detach_rejected_source_contributions,
-)
+from infrastructure.repositories.contribution_repository import detach_rejected_groups
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     record_redirect,
@@ -19,6 +17,7 @@ from infrastructure.repositories.merge_steps import (
     without_decision_sql,
 )
 from infrastructure.repositories.person_repository import _name_forms
+from infrastructure.sql_fragments import DETACHED_GROUP
 
 
 def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) -> None:
@@ -70,8 +69,8 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
 def _merge_source_contribution_groups(conn: Connection, target_id: int, source_id: int) -> None:
     """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
-        text("""
-            UPDATE source_contribution_groups s SET person_id = NULL, resolution_mode = NULL
+        text(f"""
+            UPDATE source_contribution_groups s SET {DETACHED_GROUP}
             WHERE s.person_id = :s AND EXISTS (
                 SELECT 1 FROM source_contribution_groups t
                 WHERE t.person_id = :t AND t.publication_id = s.publication_id
@@ -104,7 +103,8 @@ def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
 
 # Ordre d'exécution : les rejets et les confirmations sont transférés avant que le rejet l'emporte (`merge_into`).
 MERGE_STEPS: dict[str, MergeStep] = {
-    "source_contributions": transfer("source_contributions", "person_id"),
+    # Colonne sans lecteur : la suppression de l'absorbée la vide (`ON DELETE SET NULL`).
+    "source_contributions": untouched("source_contributions", "person_id"),
     # Table sans lecteur : les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`).
     "contributions": untouched("contributions", "person_id"),
     "source_contribution_groups": MergeStep(
@@ -143,7 +143,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
-    detach_rejected_source_contributions(conn, target_id)
+    detach_rejected_groups(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
     record_redirect(conn, MergedEntity.PERSON, target_id, source_id)
 

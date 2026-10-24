@@ -26,15 +26,7 @@ class GroupMemberRow(TypedDict):
 class ContributionRepository(Protocol):
     """Contrat d'accès aux contributions et aux contributions sources."""
 
-    # ── source_contributions : lien personne ↔ contribution source ─────────────
-
-    def assign_orphan_source_contributions(
-        self,
-        person_id: int,
-        source_contribution_ids: list[int],
-    ) -> list[int]:
-        """Pose `person_id` sur les contributions sources orphelines du lot et retourne leurs ids. Les contributions sources déjà rattachées restent intactes."""
-        ...
+    # ── source_contributions ─────────────
 
     def find_publication_id_for_source_contribution(
         self,
@@ -43,15 +35,11 @@ class ContributionRepository(Protocol):
         """`publication_id` d'une contribution source, ou `None` si elle est absente ou rattachée à aucune publication."""
         ...
 
-    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Détache (person_id → NULL) les contributions sources d'une personne sous une forme de nom donnée, sauf celles que l'admin a épinglées sur elle. Retourne le nombre de contributions sources détachées."""
-        ...
+    # ── Contributions : groupes de contributions sources ─────────────
 
     def detach_groups_for_name_form(self, person_id: int, name_form: str) -> list[int]:
         """Retire la personne (et le mode de résolution) de ses groupes de contributions sources rattachés par le nom (`name`, `compatible_name`) dont un membre porte la forme de nom. Les groupes `manual` et ceux d'un autre mode restent rattachés. Retourne les `publication_id` distincts des groupes détachés."""
         ...
-
-    # ── Contributions : groupes de contributions sources ─────────────
 
     def find_groups(self, group_ids: list[int]) -> list[GroupRow]:
         """Les groupes (`id`, `person_id`, `publication_id`) de `source_contribution_groups` parmi `group_ids`. Les ids absents sont omis."""
@@ -78,7 +66,7 @@ class ContributionRepository(Protocol):
         ...
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        """Détache toutes les contributions sources et le groupe de la personne sur cette publication, où elle est rejetée, et retire leurs épinglages. Retourne le nombre de contributions sources détachées."""
+        """Retire la personne à son groupe de cette publication, où elle est rejetée, et retire les épinglages des contributions sources de la publication à elle. Rend le nombre de groupes détachés."""
         ...
 
     # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──

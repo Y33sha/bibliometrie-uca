@@ -877,16 +877,13 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "persons.resolve",
+        "persons.arbitrate_identifiers",
         "persons",
         reads=(
-            "confirmed_source_contributions",
             "contributor_information",
-            "source_contributions.person_id",
-            "source_contributions.resolution_mode",
             "source_contributions.neutralized_identifiers",
             "source_contributions.contributor_information_id",
-            "source_contributions.in_perimeter",
+            "source_contributions.source",
             "source_contributions.source_record_id",
             "source_records.publication_id",
             "source_contribution_groups.id",
@@ -894,30 +891,19 @@ TASKS: tuple[Task, ...] = (
             "source_contribution_groups.resolution_mode",
             "source_contribution_group_members",
             "person_identifiers",
-            "person_name_forms",
-            "persons",
-            "rejected_contributions",
         ),
         writes=(
-            "source_contributions.person_id",
-            "source_contributions.resolution_mode",
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
             "publication_contributions_queue",
             # Groupes rattachés par un identifiant neutralisé ou transféré.
             "source_contribution_groups.person_id",
             "source_contribution_groups.resolution_mode",
-            "persons",
             "person_identifiers",
-            "person_name_forms",
         ),
-        # Formes de nom peuplées par `populate_person_name_forms`, personnes supprimées par `purge`, contributions sources détachées par la tâche elle-même ; groupes rattachés par `resolve_groups` et vidés par `purge`.
+        # Identifiants attribués par `resolve_groups` et supprimés par `purge` ; groupes rattachés par `resolve_groups` et vidés par `purge`.
         previous_run=(
-            "person_name_forms",
-            "persons",
             "person_identifiers",
-            "source_contributions.person_id",
-            "source_contributions.resolution_mode",
             "source_contribution_groups.person_id",
             "source_contribution_groups.resolution_mode",
         ),
@@ -1002,8 +988,6 @@ TASKS: tuple[Task, ...] = (
             "persons.id",
             "person_name_forms.id",
         ),
-        # `normalize` et `persons` réécrivent en masse `source_contributions.person_id`.
-        maintenance=("ANALYZE source_contributions",),
     ),
     _task(
         "contributions.publications_in_perimeter",

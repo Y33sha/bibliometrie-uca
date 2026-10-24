@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les personnes : frontière transactionnelle de l'agrégat.
 
-Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des `source_contributions`, où le `person_id` matérialise le lien vers la personne.
+Couvre `persons`, `person_identifiers`, `person_name_forms`, et le rattachement des contributions (`source_contribution_groups`) aux personnes.
 """
 
 from sqlalchemy import Connection
@@ -170,7 +170,7 @@ def update_name_form_status(
     perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> NameFormStatusRow:
-    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les contributions sources et les groupes sous cette forme. Retourne la ligne {person_id, name_form, status}."""
+    """Met à jour le statut d'une forme de nom. `rejected` détache aussi les groupes rattachés par le nom sous cette forme. Retourne la ligne {person_id, name_form, status}."""
     row = persons_service.update_name_form_status(
         person_id,
         name_form,

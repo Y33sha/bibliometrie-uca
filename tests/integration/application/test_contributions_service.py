@@ -86,16 +86,13 @@ def _group_person(conn, group_id):
 
 
 class TestExcludeContribution:
-    """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache le groupe et toutes les sources de la paire (cœur partagé `reject_pair`)."""
+    """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache le groupe de la paire (cœur partagé `reject_pair`)."""
 
-    def test_rejects_and_detaches_group_and_source(self, sa_sync_conn, repo):
+    def test_rejects_and_detaches_group(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
+        _source_record(sa_sync_conn, publication_id)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        source_contribution_id = insert_source_contribution(
-            sa_sync_conn, source_record_id, person_id=person_id
-        )
 
         exclude_contribution(
             contribution_id,
@@ -116,12 +113,6 @@ class TestExcludeContribution:
             ).first()
             is not None
         )
-        # Vérité source détachée (zombie supprimé) — durabilité en amont
-        row = sa_sync_conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :id"),
-            {"id": source_contribution_id},
-        ).one()
-        assert row.person_id is None
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
@@ -150,18 +141,14 @@ class TestExcludeContribution:
             )
 
     def test_does_not_touch_other_contributions(self, sa_sync_conn, repo):
-        """Rejeter une contribution ne touche ni les autres paires ni leurs sources."""
+        """Rejeter une contribution ne touche pas les autres paires."""
         publication_id = _publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
+        _source_record(sa_sync_conn, publication_id)
 
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
         insert_contribution(sa_sync_conn, publication_id, person_id=p1)
         a2 = insert_contribution(sa_sync_conn, publication_id, person_id=p2)
-        insert_source_contribution(sa_sync_conn, source_record_id, person_id=p1)
-        sa2 = insert_source_contribution(
-            sa_sync_conn, source_record_id, author_position=1, person_id=p2
-        )
 
         exclude_contribution(
             group_id_of(sa_sync_conn, publication_id, p1),
@@ -170,36 +157,22 @@ class TestExcludeContribution:
             repo=repo,
         )
 
-        # a2 toujours rattachée
         assert _group_person(sa_sync_conn, a2) == (p2, "manual")
-        # sa2 intacte
-        row2 = sa_sync_conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :id"), {"id": sa2}
-        ).one()
-        assert row2.person_id == p2
 
 
 # ── reject_pair ───────────────────────────────────────────────
 
 
 class TestRejectPair:
-    """reject_pair : cœur partagé — store peuplé, groupe et TOUTES les sources de la paire détachés."""
+    """reject_pair : cœur partagé — store peuplé, groupe de la paire détaché."""
 
-    def test_detaches_group_and_all_sources_of_pair(self, sa_sync_conn, repo):
+    def test_detaches_group_of_pair(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        # Deux sources (hal + openalex) attestent la même paire.
-        source_record_hal = _source_record(sa_sync_conn, publication_id)
-        source_record_oa = _source_record(
-            sa_sync_conn, publication_id, source="openalex", source_id="oa-1"
-        )
-        source_contribution_hal = insert_source_contribution(
-            sa_sync_conn, source_record_hal, person_id=person_id
-        )
-        source_contribution_oa = insert_source_contribution(
-            sa_sync_conn, source_record_oa, source="openalex", person_id=person_id
-        )
+        # Deux sources (hal + openalex) donnent la publication.
+        _source_record(sa_sync_conn, publication_id)
+        _source_record(sa_sync_conn, publication_id, source="openalex", source_id="oa-1")
 
         result = reject_pair(
             publication_id,
@@ -209,7 +182,7 @@ class TestRejectPair:
             repo=repo,
         )
 
-        assert result == {"detached": 2}
+        assert result == {"detached": 1}
         # Store peuplé
         assert (
             sa_sync_conn.execute(
@@ -221,26 +194,15 @@ class TestRejectPair:
             ).first()
             is not None
         )
-        # Toutes les sources détachées
-        for source_contribution_id in (source_contribution_hal, source_contribution_oa):
-            assert (
-                sa_sync_conn.execute(
-                    text("SELECT person_id FROM source_contributions WHERE id = :i"),
-                    {"i": source_contribution_id},
-                ).scalar_one()
-                is None
-            )
         assert _group_person(sa_sync_conn, contribution_id) == (None, None)
 
-    def test_does_not_touch_other_persons_sources(self, sa_sync_conn, repo):
+    def test_does_not_touch_other_persons_groups(self, sa_sync_conn, repo):
         publication_id = _publication(sa_sync_conn)
-        source_record_id = _source_record(sa_sync_conn, publication_id)
+        _source_record(sa_sync_conn, publication_id)
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         p2 = insert_person(sa_sync_conn, "Martin", first_name="Sophie")
-        sa1 = insert_source_contribution(sa_sync_conn, source_record_id, person_id=p1)
-        sa2 = insert_source_contribution(
-            sa_sync_conn, source_record_id, author_position=1, person_id=p2
-        )
+        g1 = insert_contribution(sa_sync_conn, publication_id, person_id=p1)
+        g2 = insert_contribution(sa_sync_conn, publication_id, person_id=p2)
 
         reject_pair(
             publication_id,
@@ -250,18 +212,8 @@ class TestRejectPair:
             repo=repo,
         )
 
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": sa1}
-            ).scalar_one()
-            is None
-        )
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": sa2}
-            ).scalar_one()
-            == p2
-        )
+        assert _group_person(sa_sync_conn, g1) == (None, None)
+        assert _group_person(sa_sync_conn, g2) == (p2, "manual")
 
 
 # ── propagate_in_perimeter_for_addresses ───────────────────────────────
@@ -316,9 +268,7 @@ class TestPropagateUcaForAddresses:
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id, roles=["author"])
-        source_contribution_id = insert_source_contribution(
-            sa_sync_conn, source_record_id, person_id=person_id
-        )
+        source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
         add_group_member(
             sa_sync_conn,
             group_id_of(sa_sync_conn, publication_id, person_id),
@@ -379,7 +329,7 @@ class TestPropagateUcaForAddresses:
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         # source_contribution avec un flag in_perimeter déjà TRUE (état avant review)
         source_contribution_id = insert_source_contribution(
-            sa_sync_conn, source_record_id, person_id=person_id, in_perimeter=True
+            sa_sync_conn, source_record_id, in_perimeter=True
         )
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr_id, structure_id=uca_id, is_confirmed=False)
@@ -450,7 +400,7 @@ class TestHumanDecisionsOnGroups:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
+        insert_source_contribution(sa_sync_conn, source_record_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         group_id = group_id_of(sa_sync_conn, publication_id, person_id)
 
@@ -468,9 +418,7 @@ class TestHumanDecisionsOnGroups:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = insert_source_contribution(
-            sa_sync_conn, source_record_id, person_id=person_id
-        )
+        source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
         group_id = insert_group(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
@@ -484,9 +432,7 @@ class TestHumanDecisionsOnGroups:
         publication_id = _publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        source_contribution_id = insert_source_contribution(
-            sa_sync_conn, source_record_id, person_id=person_id
-        )
+        source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
         other_group = insert_group(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
@@ -510,7 +456,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = insert_publication(sa_sync_conn, in_perimeter=True)
         source_record_id = _source_record(sa_sync_conn, publication_id)
-        insert_source_contribution(sa_sync_conn, source_record_id, person_id=person_id)
+        insert_source_contribution(sa_sync_conn, source_record_id)
         insert_contribution(
             sa_sync_conn, publication_id, person_id=person_id, in_perimeter=True, roles=["author"]
         )

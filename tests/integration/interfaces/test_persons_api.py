@@ -39,7 +39,6 @@ def _seed_perimeter_group(
     source_record = seed_source_record(publication_id=publication)
     source_contribution = seed_source_contribution(
         source_record_id=source_record,
-        person_id=person_id,
         raw_author_name=raw_author_name,
         identifiers=identifiers,
     )

@@ -47,7 +47,7 @@ class TestGetPublicationDetail:
             sa_sync_conn, publication, source="hal", source_id="hal-1"
         )
         insert_contribution(sa_sync_conn, publication, person_id=pid)
-        source_contribution = insert_source_contribution(sa_sync_conn, source_record, person_id=pid)
+        source_contribution = insert_source_contribution(sa_sync_conn, source_record)
         add_group_member(
             sa_sync_conn,
             group_id_of(sa_sync_conn, publication, pid),
@@ -78,9 +78,9 @@ class TestGetPublicationDetail:
         insert_contribution(sa_sync_conn, publication, person_id=second, author_position=2)
         insert_contribution(sa_sync_conn, publication, person_id=first, author_position=1)
         # Contribution source HAL de la personne, hors de son groupe : sans effet sur les sources.
-        insert_source_contribution(sa_sync_conn, hal_record, person_id=first)
+        insert_source_contribution(sa_sync_conn, hal_record)
         openalex_contribution = insert_source_contribution(
-            sa_sync_conn, openalex_record, source="openalex", person_id=first
+            sa_sync_conn, openalex_record, source="openalex"
         )
         add_group_member(
             sa_sync_conn,

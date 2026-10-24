@@ -11,7 +11,7 @@ from domain.errors import NotFoundError
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin, PersonIdentifierType
 from infrastructure.db.scalars import row_int
-from infrastructure.sql_fragments import GROUP_MEMBERS, identifier_neutralized
+from infrastructure.sql_fragments import DETACHED_GROUP, GROUP_MEMBERS, identifier_neutralized
 
 
 def find_identifier(conn: Connection, id_type: str, id_value: str) -> IdentifierAttribution | None:
@@ -157,21 +157,19 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
 # Groupe de la personne rattaché par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'un de ses membres porte la valeur.
 _DETACH_GROUPS_OF_REJECTED_IDENTIFIERS_SQL = text(f"""
     WITH detached AS (
-        UPDATE source_contribution_groups g
-        SET person_id = NULL, resolution_mode = NULL
-        WHERE g.person_id = :pid
-          AND EXISTS (
-              SELECT 1
-              FROM person_identifiers pi
-              JOIN source_contribution_group_members gm ON gm.group_id = g.id
-              JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-              JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-              WHERE pi.person_id = :pid
-                AND pi.status = '{AttributionStatus.REJECTED.value}'
-                AND pi.id_type = CAST(g.resolution_mode AS text)
-                AND ci.identifiers ->> pi.id_type = pi.id_value
-          )
-        RETURNING g.publication_id
+        UPDATE source_contribution_groups
+        SET {DETACHED_GROUP}
+        WHERE id IN (
+            SELECT g.id
+            FROM {GROUP_MEMBERS}
+            JOIN person_identifiers pi
+              ON pi.person_id = g.person_id
+             AND pi.id_type = CAST(g.resolution_mode AS text)
+             AND ci.identifiers ->> pi.id_type = pi.id_value
+            WHERE g.person_id = :pid
+              AND pi.status = '{AttributionStatus.REJECTED.value}'
+        )
+        RETURNING publication_id
     )
     SELECT DISTINCT publication_id FROM detached
 """)

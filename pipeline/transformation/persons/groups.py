@@ -24,6 +24,7 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
+    GROUP_MEMBERS,
     pinned,
     pinned_groups_sql,
     strong_identifier_source_contributions,
@@ -32,10 +33,10 @@ from infrastructure.sql_fragments import (
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
 from pipeline.transformation.persons.store import (
-    PersonsStore,
     fetch_identifier_to_person_map,
     fetch_name_form_map,
     fetch_name_form_status_map,
+    fetch_namesakes,
     fetch_rejected_person_ids_by_publication,
 )
 
@@ -43,9 +44,7 @@ _CANDIDATES_SQL = " UNION ".join(
     [
         f"""
         SELECT g.id AS group_id
-        FROM source_contribution_groups g
-        JOIN source_contribution_group_members gm ON gm.group_id = g.id
-        JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+        FROM {GROUP_MEMBERS}
         WHERE g.person_id IS NULL AND (sc.in_perimeter OR {pinned("sc.id")})
         """,
         *(
@@ -76,11 +75,8 @@ _MEMBERS_SQL = f"""
            sc.in_perimeter, sc.roles,
            (SELECT ca.person_id FROM confirmed_source_contributions ca
             WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
-    FROM ({_CANDIDATES_SQL}) c
-    JOIN source_contribution_groups g ON g.id = c.group_id
-    JOIN source_contribution_group_members gm ON gm.group_id = g.id
-    JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+    FROM {GROUP_MEMBERS}
+    JOIN ({_CANDIDATES_SQL}) c ON c.group_id = g.id
     ORDER BY g.id
 """
 
@@ -104,7 +100,7 @@ _WRITE_SQL = text("""
 def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
     """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit dont les groupes attestent plusieurs prénoms pleins (`Namesake.conflicting`)."""
     namesakes: dict[str, list[Namesake]] = defaultdict(list)
-    for namesake in PersonsStore(conn).namesakes():
+    for namesake in fetch_namesakes(conn):
         namesakes[normalize_text(namesake.last_name)].append(
             namesake._replace(conflicting=namesake.person_id in conflicting)
         )

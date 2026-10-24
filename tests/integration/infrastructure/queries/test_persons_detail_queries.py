@@ -23,13 +23,13 @@ from tests.integration.helpers.sources import (
 _in_perimeter_contribution = partial(insert_contribution, in_perimeter=True)
 
 
-def _source_contribution(conn, publication_id, *, source="hal", roles=None, person_id=None):
+def _source_contribution(conn, publication_id, *, source="hal", roles=None):
     """Contribution source sur un enregistrement source de la publication, d'identifiant source unique."""
     source_record_id = insert_source_record(
         conn, publication_id, source=source, source_id=f"detail-{publication_id}-{source}"
     )
     return insert_source_contribution(
-        conn, source_record_id, source=source, roles=roles, person_id=person_id
+        conn, source_record_id, source=source, roles=roles
     ), source_record_id
 
 
@@ -109,14 +109,14 @@ class TestMemberReads:
         assert profile.theses_count == 1
 
     def test_addresses_come_from_group_members(self, sa_sync_conn):
-        """L'adresse d'un membre du groupe figure ; celle d'une contribution source rattachée à la personne hors de son groupe, non."""
+        """L'adresse d'un membre du groupe figure ; celle d'une contribution source hors des groupes de la personne, non."""
         person = insert_person(sa_sync_conn, "Adressee")
         publication = insert_publication(sa_sync_conn)
         other_publication = insert_publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
         member = _source_contribution(sa_sync_conn, publication)
         _join_group(sa_sync_conn, member, publication_id=publication, person_id=person)
-        outsider, _ = _source_contribution(sa_sync_conn, other_publication, person_id=person)
+        outsider, _ = _source_contribution(sa_sync_conn, other_publication)
         member_address = insert_address(sa_sync_conn, "Membre du groupe")
         insert_source_contribution_address(sa_sync_conn, member[0], address_id=member_address)
         insert_source_contribution_address(

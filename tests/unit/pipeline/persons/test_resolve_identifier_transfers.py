@@ -16,9 +16,10 @@ _OWNER, _OTHER, _THIRD = 1, 2, 3
 def _resolve(monkeypatch, votes: dict[int, int], status: str = "pending"):
     """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Rend les compteurs, le dépôt simulé et les accès SQL simulés."""
     queries = MagicMock()
-    for name in ("release_identifier_groups", "null_identifier_source_contributions"):
-        getattr(queries, name).return_value = 0
-        monkeypatch.setattr(identifier_arbitration, name, getattr(queries, name))
+    queries.release_identifier_groups.return_value = 0
+    monkeypatch.setattr(
+        identifier_arbitration, "release_identifier_groups", queries.release_identifier_groups
+    )
     repo = MagicMock()
     repo.find_identifier.return_value.person_id = _OWNER
     result = resolve_identifier_transfers(

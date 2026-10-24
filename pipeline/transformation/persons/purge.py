@@ -2,7 +2,7 @@
 
 La purge tourne après `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les groupes rattachés par cette forme perdent leur personne. La personne réduite, sans autre contribution du périmètre, est supprimée avec ses formes de nom : la forme réduite redevient univoque. Le groupe libéré rejoint la personne au prénom plein au run suivant.
 
-La purge voit l'ambiguïté née des créations du run courant. La convergence se fait donc en deux runs.
+La purge voit l'ambiguïté née des formes régénérées du run courant. La convergence se fait donc en deux runs.
 """
 
 from sqlalchemy import Connection, text
@@ -14,6 +14,7 @@ from domain.persons.identifiers import (
 )
 from infrastructure.repositories.person_repository import person_without_decision_sql
 from infrastructure.sql_fragments import (
+    DETACHED_GROUP,
     GROUP_MEMBERS,
     active_name_form,
     identifier_neutralized,
@@ -40,7 +41,7 @@ def reorphan_ambiguous_nominal(conn: Connection) -> int:
                   )
             )
             UPDATE source_contribution_groups g
-            SET person_id = NULL, resolution_mode = NULL
+            SET {DETACHED_GROUP}
             WHERE g.id IN (
                 SELECT c.id
                 FROM candidates c
@@ -87,7 +88,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
     # La clé étrangère des groupes vide seulement `person_id` : le mode de résolution est vidé avec lui.
     conn.execute(
         text(f"""
-            UPDATE source_contribution_groups g SET person_id = NULL, resolution_mode = NULL
+            UPDATE source_contribution_groups g SET {DETACHED_GROUP}
             FROM persons p WHERE g.person_id = p.id AND {deletable}
         """)
     )

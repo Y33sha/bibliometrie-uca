@@ -1,55 +1,28 @@
-"""Accès aux personnes et aux contributions sources que plusieurs tâches de la phase `persons` partagent."""
+"""Accès aux personnes que plusieurs tâches de la phase `persons` partagent."""
 
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.matching import (
-    IdentifiedPerson,
-    Namesake,
-)
+from domain.persons.matching import IdentifiedPerson, Namesake
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from infrastructure.sql_fragments import (
-    DETACHED_SOURCE_CONTRIBUTION,
-    REJECTED_PAIRS,
-    active_name_form,
-    pinned,
-)
+from infrastructure.sql_fragments import REJECTED_PAIRS, active_name_form
 
 
-class PersonsStore:
-    """Requêtes partagées de la phase `persons`, sur la connexion de la transaction."""
-
-    def __init__(self, conn: Connection) -> None:
-        self._conn = conn
-
-    def namesakes(self) -> list[Namesake]:
-        """Les personnes non exclues, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
-        rows = self._conn.execute(
-            text("""
-                SELECT id, last_name, COALESCE(first_name, '') AS first_name
-                FROM persons
-                WHERE exclusion IS NULL
-                ORDER BY id
-            """)
-        ).all()
-        return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
-
-    def detach_source_contributions(self, source_contribution_ids: list[int]) -> int:
-        """Sert aux liens cross-source devenus sans appui : une contribution source dont l'ancre ferme a disparu ce run et que la cascade n'a pas re-résolue."""
-        if not source_contribution_ids:
-            return 0
-        return self._conn.execute(
-            text(f"""
-                UPDATE source_contributions sc
-                SET {DETACHED_SOURCE_CONTRIBUTION}
-                WHERE sc.id = ANY(:ids) AND NOT {pinned("sc.id")}
-            """),
-            {"ids": source_contribution_ids},
-        ).rowcount
+def fetch_namesakes(conn: Connection) -> list[Namesake]:
+    """Les personnes non exclues, avec leur nom et prénom tels que saisis — matière du rattachement par initiales compatibles."""
+    rows = conn.execute(
+        text("""
+            SELECT id, last_name, COALESCE(first_name, '') AS first_name
+            FROM persons
+            WHERE exclusion IS NULL
+            ORDER BY id
+        """)
+    ).all()
+    return [Namesake(r.id, r.last_name, r.first_name) for r in rows]
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
+    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la décision d'un groupe corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,
@@ -101,7 +74,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
+    """Garde de matching : une paire `(publication, personne)` rejetée n'est jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.group_matching.decide_group`)."""
     rows = conn.execute(
         text(f"""
             SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids

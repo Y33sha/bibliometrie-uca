@@ -162,7 +162,7 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
         publication_year=2024,
         publication_id=publication_id,
     )
-    source_contribution_id = insert_source_contribution(conn, source_record_id, person_id=person_id)
+    source_contribution_id = insert_source_contribution(conn, source_record_id)
     conn.execute(
         text("""
             INSERT INTO source_contribution_group_members

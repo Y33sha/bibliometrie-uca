@@ -56,8 +56,8 @@ def active_name_form(form: str) -> str:
     )
 
 
-DETACHED_SOURCE_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE source_contributions` qui détache une contribution source de sa personne."""
+DETACHED_GROUP = "person_id = NULL, resolution_mode = NULL"
+"""Affectations d'un `UPDATE source_contribution_groups` qui retire sa personne à un groupe."""
 
 
 def diamond_journal_sql(journal: str = "j") -> str:
@@ -323,7 +323,7 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
     """
     release = f"""{target}
         UPDATE source_contribution_groups o
-        SET person_id = NULL, resolution_mode = NULL
+        SET {DETACHED_GROUP}
         FROM target t
         WHERE o.publication_id = t.publication_id AND o.person_id = t.person_id AND o.id <> t.id
     """

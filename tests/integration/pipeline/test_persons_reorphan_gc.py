@@ -1,15 +1,11 @@
-"""Purge de la phase personnes : re-orphelinage des groupes à forme de nom ambiguë, suppression des personnes sans contribution du périmètre. Détachement des contributions sources par lot et par identifiant."""
+"""Purge de la phase personnes : re-orphelinage des groupes à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
 
 from sqlalchemy import text
 
-from pipeline.transformation.persons.identifier_arbitration import (
-    null_identifier_source_contributions,
-)
 from pipeline.transformation.persons.purge import (
     delete_persons_out_of_perimeter,
     reorphan_ambiguous_nominal,
 )
-from pipeline.transformation.persons.store import PersonsStore
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
 from tests.integration.helpers.groups import group_person, insert_person_group
 from tests.integration.helpers.persons import (
@@ -23,7 +19,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def _source_contribution(conn, *, form, person_id, mode, identifiers=None, in_perimeter=True):
+def _source_contribution(conn, *, form):
     publication = insert_publication(conn, "t")
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -33,26 +29,16 @@ def _source_contribution(conn, *, form, person_id, mode, identifiers=None, in_pe
         source_record,
         raw_author_name=form,
         author_name_normalized=form,
-        identifiers=identifiers,
-        person_id=person_id,
-        in_perimeter=in_perimeter,
-        resolution_mode=mode,
+        in_perimeter=True,
     )
 
 
 def _group(conn, *, form, person_id, mode="name", in_perimeter=True):
     """Contribution source de forme `form`, seule dans son groupe, groupe rattaché à la personne `person_id` par le mode `mode`. Renvoie l'`id` du groupe."""
-    source_contribution = _source_contribution(conn, form=form, person_id=None, mode=None)
+    source_contribution = _source_contribution(conn, form=form)
     return insert_person_group(
         conn, source_contribution, person_id=person_id, mode=mode, in_perimeter=in_perimeter
     )
-
-
-def _row(conn, source_contribution_id):
-    return conn.execute(
-        text("SELECT person_id, resolution_mode FROM source_contributions WHERE id = :i"),
-        {"i": source_contribution_id},
-    ).one()
 
 
 def _person_exists(conn, person_id):
@@ -125,53 +111,6 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     assert group_person(conn, sans_rejet) == (None, None)  # deux candidats : forme ambiguë
 
 
-def test_detach_source_contributions_by_id_protects_confirmed(sa_sync_conn):
-    conn = sa_sync_conn
-    p = insert_person(conn, "Zhang", first_name="Wei")
-    cross = _source_contribution(conn, form="wei zhang", person_id=p, mode="cross_source")
-    nominal = _source_contribution(conn, form="wei zhang", person_id=p, mode="name")
-    pinned_cross = _source_contribution(conn, form="wei zhang", person_id=p, mode="cross_source")
-    insert_confirmed_source_contribution(conn, pinned_cross, person_id=p)
-
-    # Détache le lot demandé, mais jamais un épinglage admin.
-    assert PersonsStore(conn).detach_source_contributions([cross, pinned_cross]) == 1
-
-    assert _row(conn, cross) == (None, None)  # détachée
-    assert _row(conn, pinned_cross).person_id == p  # épinglée admin, protégée
-    assert _row(conn, nominal).person_id == p  # hors du lot, intacte
-
-
-def test_null_identifier_source_contributions_targets_old_owner_only(sa_sync_conn):
-    conn = sa_sync_conn
-    old = insert_person(conn, "Martin", first_name="Jean")
-    other = insert_person(conn, "Dupont", first_name="Marie")
-    ids = {"idref": "111"}
-    affected = _source_contribution(
-        conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids
-    )
-    nominal = _source_contribution(
-        conn, form="jean martin", person_id=old, mode="name", identifiers=ids
-    )
-    pinned = _source_contribution(
-        conn, form="jean martin", person_id=old, mode="identifier", identifiers=ids
-    )
-    insert_confirmed_source_contribution(conn, pinned, person_id=old)
-    other_owner = _source_contribution(
-        conn, form="marie dupont", person_id=other, mode="identifier", identifiers=ids
-    )
-    other_value = _source_contribution(
-        conn, form="jean martin", person_id=old, mode="identifier", identifiers={"idref": "222"}
-    )
-
-    assert null_identifier_source_contributions(conn, "idref", "111", old) == 1
-
-    assert _row(conn, affected) == (None, None)  # portée sur l'ancien propriétaire, identifiant
-    assert _row(conn, nominal).person_id == old  # nominale : ne dépend pas de la valeur
-    assert _row(conn, pinned).person_id == old  # épinglée admin
-    assert _row(conn, other_owner).person_id == other  # autre propriétaire
-    assert _row(conn, other_value).person_id == old  # autre valeur
-
-
 def test_une_personne_sans_groupe_du_perimetre_est_supprimee(sa_sync_conn):
     """Une personne rattachée seulement à des groupes hors périmètre est supprimée, et ses groupes perdent leur personne. Un groupe du périmètre, une fiche RH ou une décision humaine la conservent."""
     conn = sa_sync_conn
@@ -199,17 +138,6 @@ def test_une_personne_sans_groupe_du_perimetre_est_supprimee(sa_sync_conn):
     assert group_person(conn, rh_group)[0] == rh
 
 
-def test_une_contribution_source_hors_groupe_ne_conserve_pas_sa_personne(sa_sync_conn):
-    """Une contribution source du périmètre rattachée à la personne, hors de ses groupes, ne la conserve pas."""
-    conn = sa_sync_conn
-    person = insert_person(conn, "Ghost", first_name="G")
-    _source_contribution(conn, form="g ghost", person_id=person, mode="name")
-
-    delete_persons_out_of_perimeter(conn)
-
-    assert _person_exists(conn, person) is False
-
-
 def test_une_fiche_rh_ou_un_groupe_du_perimetre_conserve_la_personne(sa_sync_conn):
     conn = sa_sync_conn
     empty = insert_person(conn, "Ghost", first_name="G")
@@ -233,7 +161,7 @@ def test_une_decision_humaine_conserve_la_personne(sa_sync_conn):
     pinned = insert_person(conn, "Epingle", first_name="E")
     insert_confirmed_source_contribution(
         conn,
-        _source_contribution(conn, form="e epingle", person_id=None, mode=None),
+        _source_contribution(conn, form="e epingle"),
         person_id=pinned,
     )
     distinct_a = insert_person(conn, "Distinct", first_name="A")

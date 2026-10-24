@@ -26,13 +26,13 @@ def _fetch_pnf_for(conn, person_id):
     return [(r.name_form, list(r.sources)) for r in rows]
 
 
-def _source_contribution(conn, name_form, source, *, person_id=None):
-    """Contribution source de forme `name_form` venue de `source`, rattachée à la personne `person_id`."""
+def _source_contribution(conn, name_form, source):
+    """Contribution source de forme `name_form` venue de `source`."""
     source_record = insert_source_record(
         conn, insert_publication(conn, "t"), source=source, source_id=f"{source}-1"
     )
     return insert_source_contribution(
-        conn, source_record, source=source, author_name_normalized=name_form, person_id=person_id
+        conn, source_record, source=source, author_name_normalized=name_form
     )
 
 
@@ -86,15 +86,6 @@ class TestSyncFromRawForms:
         _sync(sa_sync_conn, [{"name_form": "dupond j", "person_id": pid, "source": "persons"}])
 
         assert ("dupond j", ["hal", "persons"]) in _fetch_pnf_for(sa_sync_conn, pid)
-
-    def test_ignores_source_contributions_outside_the_person_groups(self, sa_sync_conn):
-        """Une contribution source rattachée à la personne, hors de ses groupes, ne lui donne pas sa forme."""
-        pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        _source_contribution(sa_sync_conn, "dupond j", "hal", person_id=pid)
-
-        _sync(sa_sync_conn)
-
-        assert _fetch_pnf_for(sa_sync_conn, pid) == []
 
     def test_deletes_missing_form(self, sa_sync_conn):
         """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni portée par un membre des groupes de la personne) est supprimée."""

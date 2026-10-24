@@ -2,9 +2,16 @@
 
 from sqlalchemy import text
 
+from application.services.persons.core import create_person
+from infrastructure.repositories import person_repository
 from pipeline.transformation.persons.groups import resolve_groups
 from tests.integration.helpers.groups import insert_group
-from tests.integration.helpers.persons import insert_person, insert_person_identifier
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_identifier,
+    insert_person_name_form,
+    insert_rejected_contribution,
+)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -248,3 +255,92 @@ def test_le_prenom_reduit_est_complete_par_les_membres_des_groupes(sa_sync_conn)
         ).scalar_one()
         == "Jean"
     )
+
+
+class TestPersonIndex:
+    """L'index des personnes lu en base : attributions, formes de nom et verdicts, rejets."""
+
+    def test_une_forme_de_nom_unique_rattache_le_groupe_du_perimetre(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = create_person("Martin", "Pierre", repo=person_repository(conn))
+        group = _group(conn, insert_publication(conn), [("hal", "Pierre Martin", None, True)])
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (person, "name")
+
+    def test_un_nom_inverse_rattache_par_la_forme_de_nom(self, sa_sync_conn):
+        """Contribution source au nom et prénom inversés : sa forme « nom prénom » rejoint Pierre Martin."""
+        conn = sa_sync_conn
+        person = create_person("Martin", "Pierre", repo=person_repository(conn))
+        publication = insert_publication(conn)
+        source_record = insert_source_record(conn, publication, source="crossref")
+        inverted = insert_source_contribution(
+            conn,
+            source_record,
+            source="crossref",
+            raw_last_name="Pierre",
+            raw_first_name="Martin",
+            author_name_normalized="martin pierre",
+            in_perimeter=True,
+        )
+        group = insert_group(conn, publication, [(inverted, source_record)])
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (person, "name")
+
+    def test_une_attribution_rejetee_ne_rattache_pas(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="rejected")
+        group = _group(
+            conn, insert_publication(conn), [("openalex", "Jean Dupont", {"orcid": _ORCID}, False)]
+        )
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (None, None)
+
+    def test_une_forme_de_nom_rejetee_refuse_l_identifiant(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        insert_person_identifier(
+            conn, person, id_type="hal_person_id", id_value="111222", status="confirmed"
+        )
+        insert_person_name_form(
+            conn, person, name_form="jean dupond", sources=["hal"], status="rejected"
+        )
+        group = _group(
+            conn,
+            insert_publication(conn),
+            [("hal", "Jean Dupond", {"hal_person_id": "111222"}, True)],
+        )
+
+        resolve_groups(conn)
+
+        assert _person(conn, group)[0] != person
+
+    def test_une_paire_rejetee_bloque_le_rattachement_par_identifiant(self, sa_sync_conn):
+        conn = sa_sync_conn
+        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+        publication = insert_publication(conn)
+        group = _group(conn, publication, [("openalex", "Jean Dupont", {"orcid": _ORCID}, True)])
+        insert_rejected_contribution(conn, publication, person_id=person, ignore_conflict=True)
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (None, None)
+
+    def test_un_rejet_leve_l_ambiguite_d_une_forme_de_nom(self, sa_sync_conn):
+        conn = sa_sync_conn
+        rejected = create_person("Dupont", "Jean", repo=person_repository(conn))
+        kept = create_person("Dupont", "Jacques", repo=person_repository(conn))
+        publication = insert_publication(conn)
+        group = _group(conn, publication, [("openalex", "J Dupont", None, True)])
+        insert_rejected_contribution(conn, publication, person_id=rejected, ignore_conflict=True)
+
+        resolve_groups(conn)
+
+        assert _person(conn, group) == (kept, "name")

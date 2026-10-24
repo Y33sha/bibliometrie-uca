@@ -80,7 +80,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
-                   {contributor_display_name()} AS full_name, sc.roles, sc.person_id,
+                   {contributor_display_name()} AS full_name, sc.roles, g.person_id,
                    sc.in_perimeter, sc.collective, sc.countries,
                    (SELECT array_agg(structure_id ORDER BY structure_id)
                     FROM ({source_contribution_structure_ids("sc")}) ids) AS structure_ids,

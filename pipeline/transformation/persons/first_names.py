@@ -11,7 +11,8 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import attested_full_first_names
 from domain.persons.name_matching import first_name_initials
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.store import PersonsStore
+from infrastructure.sql_fragments import GROUP_MEMBERS
+from pipeline.transformation.persons.store import fetch_namesakes
 
 
 def fetch_linked_contributor_names(
@@ -21,11 +22,9 @@ def fetch_linked_contributor_names(
     if not person_ids:
         return {}
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT g.person_id, sc.raw_author_name, sc.raw_last_name, sc.raw_first_name
-            FROM source_contribution_groups g
-            JOIN source_contribution_group_members gm ON gm.group_id = g.id
-            JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+            FROM {GROUP_MEMBERS}
             WHERE g.person_id = ANY(:ids)
         """),
         {"ids": person_ids},
@@ -50,7 +49,7 @@ def complete_reduced_first_names(
 ) -> FirstNameCompletion:
     """Donne à chaque personne au prénom réduit le prénom plein que les membres de ses groupes attestent seul."""
     reduced = {}
-    for namesake in PersonsStore(conn).namesakes():
+    for namesake in fetch_namesakes(conn):
         initials = first_name_initials(namesake.first_name)
         if initials is not None:
             reduced[namesake.person_id] = (namesake, initials)

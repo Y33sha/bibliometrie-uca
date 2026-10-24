@@ -874,7 +874,7 @@ contributor_information = Table(
 
 
 # Arbitrages admin au grain de la contribution source : la paire (contribution source, personne) que la
-# cascade de la phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
+# phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
 confirmed_source_contributions = Table(
     "confirmed_source_contributions",
     metadata,
@@ -933,10 +933,9 @@ source_contributions = Table(
             "author_grouping."
         ),
     ),
+    # Colonnes sans écrivain : la personne et son mode de résolution sont portés par le
+    # groupe (`source_contribution_groups`).
     Column("person_id", Integer),
-    # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
-    # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des
-    # rattachements par la phase personnes.
     Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),

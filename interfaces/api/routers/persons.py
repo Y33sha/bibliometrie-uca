@@ -499,7 +499,7 @@ def update_name_form_status(
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    `rejected` pose un verrou durable. Les groupes de la personne rattachés par le nom sous cette forme perdent la personne, et l'appartenance au périmètre de leurs publications est recalculée. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
     row = person_commands.update_name_form_status(
         conn,

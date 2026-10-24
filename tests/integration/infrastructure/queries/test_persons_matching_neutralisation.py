@@ -1,18 +1,15 @@
-"""La cascade personnes ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
+"""Le rattachement des groupes ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
 
 from sqlalchemy import text
 
-from domain.persons.matching import ResolutionMode
 from infrastructure.db.queues import Queue
+from pipeline.transformation.persons.groups import load_candidate_groups
 from pipeline.transformation.persons.identifier_arbitration import (
-    MisplacedNeutralizations,
     fetch_identifier_votes,
     write_misplaced_neutralizations,
 )
-from pipeline.transformation.persons.loading import fetch_unlinked_contributions
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.groups import group_ungrouped
-from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -20,15 +17,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 _ORCID = "0000-0001-2345-6789"
 
 
-def _source_contribution(
-    conn,
-    neutralized,
-    *,
-    name="dupont jean",
-    source_id="c-neutralisation",
-    person_id=None,
-    resolution_mode=None,
-):
+def _source_contribution(conn, neutralized, *, name="dupont jean", source_id="c-neutralisation"):
     """Contribution source crossref du périmètre avec un ORCID et la carte `neutralized`. Retourne `(contribution source, informations du contributeur)`."""
     source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
@@ -40,9 +29,7 @@ def _source_contribution(
         raw_author_name="Jean Neutralisation",
         author_name_normalized=name,
         identifiers={"orcid": _ORCID},
-        person_id=person_id,
         in_perimeter=True,
-        resolution_mode=resolution_mode,
         neutralized_identifiers=neutralized,
     )
     return source_contribution_id, upsert_contributor_information(conn, name, {"orcid": _ORCID})
@@ -57,9 +44,14 @@ def _carte(conn, source_contribution_id):
 
 def _orcid_projete(conn):
     group_ungrouped(conn)
-    rows = fetch_unlinked_contributions(conn)
-    [row] = [r for r in rows if r.name.display() == "Jean Neutralisation"]
-    return row.identifiers.get("orcid")
+    [member] = [
+        m
+        for by_group in load_candidate_groups(conn).values()
+        for members in by_group.values()
+        for m in members
+        if m.name.display() == "Jean Neutralisation"
+    ]
+    return member.identifiers.get("orcid")
 
 
 def test_orcid_neutralise_absent_de_la_projection(sa_sync_conn):
@@ -87,26 +79,17 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
 
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
-    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand les informations du contributeur sont désignées, effacée sinon. Une contribution source résolue par identifiant qui la gagne est rendue pour détachement."""
+    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand les informations du contributeur sont désignées, effacée sinon. La contribution source qui la gagne est rendue avec les types gagnés."""
     source_contribution_id, contributor_information_id = _source_contribution(
-        sa_sync_conn,
-        None,
-        name="t dado",
-        source_id="c-requalification",
-        person_id=insert_person(sa_sync_conn, "Dado", first_name="T"),
-        resolution_mode=ResolutionMode.IDENTIFIER.value,
+        sa_sync_conn, None, name="t dado", source_id="c-requalification"
     )
 
     assert write_misplaced_neutralizations(
         sa_sync_conn, {contributor_information_id: ["orcid"]}
-    ) == MisplacedNeutralizations(
-        gained={source_contribution_id: ["orcid"]}, to_detach=[source_contribution_id]
-    )
+    ) == {source_contribution_id: ["orcid"]}
     assert _carte(sa_sync_conn, source_contribution_id) == {"orcid": "misplaced"}
 
-    assert write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
-        gained={}, to_detach=[]
-    )
+    assert write_misplaced_neutralizations(sa_sync_conn, {}) == {}
     assert _carte(sa_sync_conn, source_contribution_id) is None
 
 

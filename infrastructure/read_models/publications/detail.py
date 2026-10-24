@@ -192,9 +192,11 @@ def get_publication_detail(
 
     theses_rows = conn.execute(
         text(f"""
-            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, sc.person_id,
+            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, g.person_id,
                    sc.roles, sc.in_perimeter
             FROM source_contributions sc
+            LEFT JOIN source_contribution_group_members gm ON gm.source_contribution_id = sc.id
+            LEFT JOIN source_contribution_groups g ON g.id = gm.group_id
             WHERE sc.source_record_id = (
                 SELECT id FROM source_records
                 WHERE source = '{Source.THESES.value}' AND publication_id = :pid

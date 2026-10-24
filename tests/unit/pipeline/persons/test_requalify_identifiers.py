@@ -5,7 +5,6 @@ from unittest.mock import ANY, MagicMock
 from pipeline.transformation.persons import identifier_arbitration
 from pipeline.transformation.persons.identifier_arbitration import (
     ContributorInformationIdentifier,
-    MisplacedNeutralizations,
     compute_identifier_consensus,
     requalify_misplaced_identifiers,
 )
@@ -18,7 +17,6 @@ def _install(monkeypatch, queries: MagicMock) -> None:
         "fetch_contributor_information_identifiers",
         "write_misplaced_neutralizations",
         "release_misplaced_groups",
-        "PersonsStore",
     ):
         monkeypatch.setattr(identifier_arbitration, name, getattr(queries, name))
 
@@ -31,7 +29,7 @@ def test_consensus_retient_la_majorite_stricte(monkeypatch):
     assert compute_identifier_consensus(MagicMock()) == {("orcid", "X"): "s dahbi"}
 
 
-def test_identite_contredisant_le_consensus_neutralisee_groupes_liberes_et_detachee(monkeypatch):
+def test_identite_contredisant_le_consensus_neutralisee_et_groupes_liberes(monkeypatch):
     information = {
         "orcid": [
             ContributorInformationIdentifier(1, "dahbi s", "X"),
@@ -44,15 +42,11 @@ def test_identite_contredisant_le_consensus_neutralisee_groupes_liberes_et_detac
         information.get(id_type, [])
     )
     gained = {10: ["orcid"], 11: ["orcid"], 12: ["orcid"]}
-    queries.write_misplaced_neutralizations.return_value = MisplacedNeutralizations(
-        gained=gained, to_detach=[10]
-    )
+    queries.write_misplaced_neutralizations.return_value = gained
     queries.release_misplaced_groups.return_value = 2
-    queries.PersonsStore.return_value.detach_source_contributions.return_value = 1
 
     result = requalify_misplaced_identifiers(MagicMock(), {("orcid", "X"): "s dahbi"})
 
     queries.write_misplaced_neutralizations.assert_called_once_with(ANY, {2: ["orcid"]})
     queries.release_misplaced_groups.assert_called_once_with(ANY, gained)
-    queries.PersonsStore.return_value.detach_source_contributions.assert_called_once_with([10])
-    assert result == {"neutralized": 3, "released_groups": 2, "detached": 1}
+    assert result == {"neutralized": 3, "released_groups": 2}

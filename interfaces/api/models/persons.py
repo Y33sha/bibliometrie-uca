@@ -84,7 +84,7 @@ class NameFormStatusResponse(BaseModel):
 
 
 class DetachContributionsResponse(BaseModel):
-    """Décompte d'un détachement de contributions sources : contributions sources détachées, formes de nom nettoyées."""
+    """Décompte d'un détachement de contributions : groupes de contributions sources détachés de la personne, formes de nom nettoyées."""
 
     detached: int
     cleaned_forms: int

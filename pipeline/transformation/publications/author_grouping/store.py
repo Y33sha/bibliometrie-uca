@@ -10,6 +10,7 @@ from domain.publications.author_grouping import REPEATED_LIST_CASES
 from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
+    DETACHED_GROUP,
     corrected_by,
     in_clause,
     propagate_group_attributes_sql,
@@ -82,7 +83,7 @@ _DELETE_MEMBERSHIPS_SQL = text(
 _DELETE_GROUPS_SQL = text("DELETE FROM source_contribution_groups WHERE id = ANY(:ids)")
 
 _DETACH_GROUPS_SQL = text(
-    "UPDATE source_contribution_groups SET person_id = NULL, resolution_mode = NULL"
+    f"UPDATE source_contribution_groups SET {DETACHED_GROUP}"
     " WHERE id = ANY(:ids) AND person_id IS NOT NULL"
 )
 

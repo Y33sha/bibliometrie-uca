@@ -104,10 +104,8 @@ def insert_source_contribution(
     author_name_normalized: str | None = None,
     identifiers: dict[str, object] | None = None,
     contributor_information_id: int | None = None,
-    person_id: int | None = None,
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
-    resolution_mode: str | None = None,
     neutralized_identifiers: dict[str, object] | None = None,
     collective: bool = False,
 ) -> int:
@@ -133,17 +131,14 @@ def insert_source_contribution(
             "raw_author_name": raw_author_name,
             "raw_last_name": raw_last_name,
             "raw_first_name": raw_first_name,
-            "person_id": person_id,
             "perimeter_evidence": perimeter_evidence(in_perimeter),
             "roles": roles,
-            "resolution_mode": resolution_mode,
             "neutralized_identifiers": (
                 json.dumps(neutralized_identifiers) if neutralized_identifiers else None
             ),
             "collective": collective,
         },
         {
-            "resolution_mode": "resolution_mode",
             "neutralized_identifiers": "jsonb",
             "perimeter_evidence": PERIMETER_EVIDENCE_CAST,
         },
