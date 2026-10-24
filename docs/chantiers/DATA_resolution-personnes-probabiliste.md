@@ -4,7 +4,7 @@
 
 La résolution des personnes est une cascade de règles. Elle rattache chaque groupe de contributions sources à une personne existante, sans comparer les groupes entre eux. C'est la forme de ReCiter. La réconciliation des publications regroupe les enregistrements sources qui partagent une clé de confirmation.
 
-Ce chantier dépend du chantier [résolution des personnes par groupe](DATA_resolution-personnes.md), qui fournit le jeu d'évaluation.
+Ce chantier dépend du chantier [résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md), qui fournit le jeu d'évaluation.
 
 **Contrat de la résolution** : en entrée, les enregistrements sources et les contributions sources, plus les décisions humaines ; en sortie, une table de correspondance entre chaque enregistrement source ou groupe et son entité. Le contrat tient quel que soit l'algorithme.
 
@@ -20,7 +20,7 @@ La table des paires est du dérivé recalculable. C'est la sortie d'un modèle p
 
 ## Décisions
 
-- La méthode se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](DATA_alignement-auteurs.md).
+- La méthode se choisit d'après des essais hors pipeline, évalués sur les verdicts humains, comme dans le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md).
 
 ## Phasage
 

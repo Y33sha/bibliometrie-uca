@@ -6,9 +6,9 @@ La phase `author_grouping` réunit les contributions sources d'un même auteur d
 
 `source_contribution_groups` et `contributions` font double emploi : les deux tables relient un auteur d'une publication à une personne.
 
-L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la contribution source sans personne. Les affiliations fausses des sources, qui créent de fausses personnes du périmètre, relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
+L'affiliation sert seulement à délimiter le périmètre. Une forme de nom partagée par deux personnes laisse la contribution source sans personne. Les affiliations fausses des sources, qui créent de fausses personnes du périmètre, relèvent du chantier [vérification des affiliations](../DATA_verification-affiliations.md).
 
-La résolution probabiliste relève du chantier [résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md).
+La résolution probabiliste relève du chantier [résolution probabiliste des personnes](../DATA_resolution-personnes-probabiliste.md).
 
 ## Décisions
 
@@ -153,26 +153,4 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 - [x] Mise à jour de la documentation. aede75a00
 
-## Questions ouvertes
-
-- Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
-- Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
-- Recalcul immédiat des groupes invalidés par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs membres.
-
-## Audits qualité
-
-Contrôles des données de la résolution, hors du chemin de clôture du chantier.
-
-- Pouvoir de l'affiliation, le 2026-10-19 (`measure_affiliation.sql`), sur les 2 176 groupes au nom ambigu. Une clé spécifique est un laboratoire ou une équipe du référentiel, ou un laboratoire, une équipe ou un département HAL. Le profil d'un candidat réunit les clés de ses autres publications.
-  - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 groupes. Avec les clés spécifiques, un seul candidat concorde dans 1 631 groupes, plusieurs dans 392.
-  - Sur ces 1 631 groupes, le candidat désigné est la personne rattachée dans 1 151 groupes, une autre personne dans 7. 463 groupes sont sans personne, 10 rattachés à plusieurs personnes.
-  - Échantillon de 97 groupes à relire (`build_affiliation_review.py`).
-- Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
-- Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
-- Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la contribution source est souvent faux et la personne souvent juste.
-- Correction du stock : doubles rattachements (une personne rattachée à deux contributions sources d'un même enregistrement source), personnes qui ont les identifiants de deux personnes (Miriam Calvo Gomez porte l'ORCID de Marta Calvi sur 192 publications), ORCID en attente rattachés à une autre personne que leur titulaire.
-- Relecture des personnes supprimées par la purge et des contributions laissées sans personne parce que la personne est déjà dans la publication, comparées au gel du 2026-10-24.
-- Neutralisations d'identifiants. Partage : un auteur listé deux fois dans un enregistrement source, sous deux graphies, perd son identifiant sur les deux contributions sources (Polichtchouk et Polishchuk, même ORCID). Nom contraire au consensus : double emploi possible avec le contrôle de compatibilité des noms du rattachement par identifiant ; la neutralisation sert aussi l'arbitrage, le regroupement des auteurs et l'attribution des identifiants.
-- Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
-- Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
-- Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres groupes.
+Les audits de qualité et les questions ouvertes se poursuivent dans le chantier [qualité des contributions](../DATA_qualite-des-contributions.md).

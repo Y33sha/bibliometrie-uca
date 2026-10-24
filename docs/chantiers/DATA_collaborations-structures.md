@@ -77,7 +77,7 @@ Lecture par source :
 
 ### 3. Vue consolidée
 
-La consolidation par auteur dépend du chantier `DATA_alignement-auteurs.md` : 97 % des contributions sources hors périmètre n'ont pas de personne.
+La consolidation par auteur dépend du chantier `archived/2026-10-24_DATA_alignement-auteurs.md` : 97 % des contributions sources hors périmètre n'ont pas de personne.
 
 - [ ] Vue matérialisée des ROR par contribution source consolidée, rafraîchie par le pipeline.
 - [ ] Tests : ROR du périmètre exclus des ROR des sources ; ROR des structures résolues par `affiliations` inclus.

@@ -4,7 +4,7 @@
 
 ### En cours
 
-- [Résolution des personnes par groupe](DATA_resolution-personnes.md)
+- [Qualité des contributions](DATA_qualite-des-contributions.md)
 
 ### En pause
 
@@ -12,7 +12,6 @@
 
 ### Non commencé
 
-- [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
 - [Typage des tests et des scripts ponctuels](CODE_typage-des-tests.md)
@@ -28,6 +27,8 @@
 
 ## Chantiers archivés
 
+- 2026-10-24 — [Résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md)
+- 2026-10-24 — [Alignement des auteurs d'une publication](archived/2026-10-24_DATA_alignement-auteurs.md)
 - 2026-10-23 — [Cycle de vie des publications et des référentiels](archived/2026-10-23_CODE_cycle-de-vie-des-publications.md)
 - 2026-10-23 — [Une source, un adaptateur](archived/2026-10-23_CODE_adaptateur-par-source.md)
 - 2026-10-23 — [Conception du pipeline](archived/2026-10-23_CODE_conception-du-pipeline.md)

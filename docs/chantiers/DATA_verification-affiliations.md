@@ -4,7 +4,7 @@
 
 Une contribution source appartient au périmètre par ses indices (`perimeter_evidence`) : adresse, structure HAL, ROR, fiche RH, établissement de thèse. Chaque source donne ses indices pour sa propre contribution source. Une source attribue parfois à un auteur l'affiliation d'un autre auteur, ou une affiliation fausse. Une personne hors RH entrée dans le périmètre par une telle affiliation est une fausse personne du périmètre.
 
-Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les liens au périmètre établis par la seule contribution source scanR. Le lien était faux dans 12 cas sur 25 pour une structure, dans 10 cas sur 15 pour une adresse.
+Le chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md) a relu les liens au périmètre établis par la seule contribution source scanR. Le lien était faux dans 12 cas sur 25 pour une structure, dans 10 cas sur 15 pour une adresse.
 
 ## Décisions
 
@@ -60,7 +60,7 @@ Le chantier [alignement des auteurs](DATA_alignement-auteurs.md) a relu les lien
 ### Phase 3 — Règles
 
 - [ ] Règles de confirmation des indices de périmètre, choisies d'après les phases 1 et 2.
-- [ ] File d'administration des groupes aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes par groupe](DATA_resolution-personnes.md).
+- [ ] File d'administration des groupes aux affiliations conflictuelles. Elle dépend du chantier [résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md).
 
 ### Phase 4 — Fin de chantier
 

@@ -93,7 +93,7 @@ Les verdicts manuels sur les contributions sources ont deux ancrages :
 - L'alignement se fait par publication, avant la phase `persons`.
 - Un identifiant fort (ORCID, IdRef, idHAL) non neutralisé réunit deux contributions sources qui le partagent.
 - La méthode se choisit d'après une mesure du stock, faite hors pipeline.
-- `source_contribution_groups` réunit les contributions sources d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_contributions` dans le chantier de [résolution des personnes](DATA_resolution-personnes.md).
+- `source_contribution_groups` réunit les contributions sources d'un même auteur dans une publication : `publication_id`, `person_id`, `resolution_mode`, `reference_position` (position dans la liste la plus longue). `person_id` et `resolution_mode` quittent `source_contributions` dans le chantier de [résolution des personnes](2026-10-24_DATA_resolution-personnes.md).
 - `source_contribution_group_members` relie chaque contribution source à son groupe : `source_contribution_id` (clé primaire), `group_id`, `source_record_id`, `method`, `score`, `margin`.
   - `method` : `reference` (la contribution source fonde le groupe), `name`, `identifier`, `order`, `model`.
   - `score` et `margin`, en bits, pour `model` seulement : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité dans l'affectation hongroise.
@@ -244,24 +244,18 @@ Les verdicts manuels sur les contributions sources ont deux ancrages :
 
 Ces items exploitent les groupes ou les affinent. Aucun ne bloque la refonte de la résolution des personnes.
 
-- [ ] Désaccords d'affiliation entre sources pour un même auteur.
 - [x] Rang d'un groupe fondé par une liste plus courte : juste après le groupe de son voisin précédent dans cette liste, le 2026-10-22. Sur 3 000 publications, 1 107 liens passent du modèle à la règle. 316 contributions sources changent de groupe dans 16 grandes collaborations. Les homonymes reprennent leur ordre, mais le modèle lie aussi des voisins aux initiales incompatibles.
 - [x] Une paire seule dans un trou, de même patronyme et même initiale, se lie par l'ordre, le 2026-10-22. Sur 3 000 publications, 2 258 liens passent du modèle à l'ordre. 124 contributions sources changent de groupe dans 8 publications : une quinzaine de groupes corrigés, trois groupes d'homonymes mélangés (Li H, Wang Z).
 - [x] Poids du modèle du résidu réestimés après le changement de rang des groupes, le 2026-10-22 : poids en place gardés. Les poids réestimés séparent 3 des 83 liens justes de la relecture des liens du modèle, sans écarter de lien faux. D'un export à l'autre, le niveau « jw 0.8 » du patronyme varie de 3 bits.
 - [x] Le modèle du résidu écarte deux auteurs aux patronymes seulement proches et aux premières initiales différentes, sauf identifiant commun (`conflicting_initials`), le 2026-10-22. Sur les verdicts de la relecture encore en base, les 78 liens justes restent, les 6 liens faux sont écartés. Sur 3 000 publications, 398 liens du modèle disparaissent ; 40 relus, tous faux, surtout dans des listes WoS divergentes.
-- [ ] Revue des appariements : trois classes selon le score et la marge (lien, non-lien, lien possible). Une file de revue de l'UI admin confirme ou infirme les liens possibles.
-- [ ] Diagnostic de chaque liste avant l'alignement. Il nomme le défaut, écarte les contributions sources concernées et reste stocké pour la relecture et la mesure. Les signaux viennent de l'enregistrement source seul ; la comparaison avec les autres enregistrements sources de la publication sert de confirmation. Le diagnostic se calcule sur les contributions sources que la phase `author_grouping` charge déjà.
 - [x] Liste tronquée : elle reprend le début d'une liste plus longue de la même publication. Les enregistrements sources s'alignent de la plus longue à la plus courte, donc elle ne fonde pas les groupes.
-- [ ] Fusions erronées probables dans l'onglet Fusions suspectes. L'onglet retient une publication dont moins de la moitié des contributions sources ont un correspondant : un enregistrement source étranger minoritaire lui échappe (12 des 20 fusions erronées probables de l'échantillon du 2026-10-18). Critère à ajouter : un enregistrement source dont presque aucune contribution source n'a de correspondant.
 
 ### Phase 6 — Fin de chantier
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation. 12ede2eb8
 
 ## Questions ouvertes
 
-- **Ancrage des rattachements manuels.** Sur quoi ancrer un rattachement manuel pour qu'il survive à un changement d'identifiants de la contribution source : enregistrement source et position, enregistrement source et nom ?
-- **Contribution source sans correspondant** dans les autres enregistrements sources (liste partielle) : un auteur à une seule contribution source.
-- **ORCID d'OpenAlex sans DOI.** Sur des enregistrements sources OpenAlex sans DOI, `raw_orcid` donne deux fois un ORCID faux (Yannick Chevalier, Bruno Pereira). Provenance de `raw_orcid` hors Crossref à vérifier.
 - **Lecture anticipée des lots d'`author_grouping`.** Un thread lirait le lot suivant, sur sa propre connexion, pendant le calcul et l'écriture du lot en cours : environ 7 s gagnées par lot de grandes collaborations. Prérequis : supprimer une appartenance par couple (contribution source, groupe). Sinon, la publication de départ d'un enregistrement source déplacé, lue avant le commit du lot qui contient la publication d'arrivée, effacerait la nouvelle appartenance.
-- **Nom déclaré par IdRef et ORCID.** Les API d'IdRef et d'ORCID donnent le nom de la personne. Ce nom permettrait d'écarter les identifiants attribués à tort.
+
+Les autres suites de l'alignement se poursuivent dans le chantier [qualité des contributions](../DATA_qualite-des-contributions.md).

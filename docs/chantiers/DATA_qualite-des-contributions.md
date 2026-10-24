@@ -26,7 +26,6 @@ Un jeu d'évaluation tiré des verdicts humains existe depuis le 2026-10-19 (`bu
   - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 cas. Avec les clés spécifiques, un seul candidat concorde dans 1 631 cas, plusieurs dans 392.
   - Sur ces 1 631 cas, le candidat désigné est la personne rattachée dans 1 151, une autre personne dans 7. 463 contributions sont sans personne.
   - Échantillon de 97 cas à relire (`build_affiliation_review.py`).
-- [ ] Désaccords d'affiliation entre les contributions sources d'une même contribution. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
 
 ### Phase 3 — Alignement des listes d'auteurs
 
