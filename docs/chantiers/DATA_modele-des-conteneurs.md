@@ -51,7 +51,7 @@ Test de l'API Unpaywall sur 120 DOI du périmètre, tirés au hasard :
 
 ### Éditeur d'une publication
 
-Une publication a l'éditeur de sa revue : ni `publications` ni `source_records` n'ont de `publisher_id`. Quand une revue change d'éditeur, ses anciens articles passent au nouvel éditeur.
+Une publication a l'éditeur de sa revue : ni `publications` ni `source_records` n'ont de `publisher_id`. Quand une revue change d'éditeur, ses anciens articles passent au nouvel éditeur. L'enregistrement source garde le nom d'éditeur de la source dans `biblio.publisher`, sans le rattacher à `publishers`. Ce nom est présent dans tous les enregistrements Crossref et DataCite, 92 % des WoS, 64 % des ScanR, 56 % des HAL et 38 % des OpenAlex. Chez Crossref, c'est le membre actuel ; chez DataCite, souvent la plateforme (« arXiv »).
 
 Mesure sur une base proche de la production (`measure_journal_publisher_changes`) : 42 revues ont deux éditeurs de préfixe DOI sur des périodes disjointes, pour 719 publications. 315 d'entre elles ont un éditeur de préfixe différent de celui de la revue (*animal* : Cambridge jusqu'en 2020, Elsevier ensuite). L'ISSN rattache ces publications à la même revue, donc aucun doublon de revue n'apparaît.
 
@@ -146,6 +146,7 @@ Usages du type dans le code :
 ### Phase 4 — API et interface
 
 - [ ] Endpoints, pages et filtres.
+- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
 
 ### Phase 5 — Documentation
 
