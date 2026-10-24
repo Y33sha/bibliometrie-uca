@@ -37,7 +37,7 @@ Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'a
 Télécharge depuis theses.fr les thèses dont le NNT figure dans une autre source et qui sont absentes du staging theses.fr, par exemple une thèse soutenue dans un autre établissement. Code dans `pipeline/ingestion/theses/fetch_missing.py`.
 
 **Étape 3 — `fetch_missing_doi` : DOI manquants par source.**
-Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
 

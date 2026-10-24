@@ -70,7 +70,11 @@ def configuration(monkeypatch):
 
     def _poser(collections: dict[str, str], annees: list[int]) -> None:
         monkeypatch.setattr(harvest, "get_hal_collections", lambda conn: collections)
-        monkeypatch.setattr(common_harvest, "get_years", lambda conn, start_year=None: annees)
+        monkeypatch.setattr(
+            common_harvest,
+            "window_years",
+            lambda conn, *, start_year, year: [year] if year else annees,
+        )
 
     return _poser
 

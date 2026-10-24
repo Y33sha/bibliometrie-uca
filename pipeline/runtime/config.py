@@ -50,3 +50,8 @@ def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
     if start_year is not None and start_year <= current_year:
         return list(range(start_year, current_year + 1))
     return [current_year]
+
+
+def window_years(conn: Connection, *, start_year: int | None, year: int | None) -> list[int]:
+    """Années de la fenêtre du run : `year` (`--year`), sinon `[start_year … année courante]` (`get_years`)."""
+    return [year] if year else get_years(conn, start_year)

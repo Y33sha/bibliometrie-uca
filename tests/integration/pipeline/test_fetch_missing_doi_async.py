@@ -82,7 +82,9 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
 
     with (
         patch.object(
-            doi_search, "get_missing_dois", lambda conn, target, *, retry_after_days: dois
+            doi_search,
+            "get_missing_dois",
+            lambda conn, target, *, retry_after_days, years=None: dois,
         ),
         patch.object(doi_search, "record_failed_lookup", _record),
         patch.object(StagingStore, "stage", _stage),

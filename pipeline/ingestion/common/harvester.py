@@ -21,7 +21,7 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.observability.log import setup_logger
 from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
 from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
-from pipeline.runtime.config import get_years
+from pipeline.runtime.config import window_years
 from pipeline.runtime.context import PhaseContext
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
@@ -140,8 +140,8 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self._client = client
 
     def _years(self, window: HarvestWindow) -> list[int]:
-        """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`get_years`). Le mode incrémental garde cette plage."""
-        return [window.year] if window.year else get_years(self.conn, start_year=window.start_year)
+        """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`window_years`). Le mode incrémental garde cette plage."""
+        return window_years(self.conn, start_year=window.start_year, year=window.year)
 
     # ── Barre et bilan de la source ─────────────────────────────
 

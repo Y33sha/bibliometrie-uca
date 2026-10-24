@@ -21,7 +21,7 @@ from domain.config import ConfigKey
 from domain.sources.registry import ALL_SOURCES, Source, source_label
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.stale_refetch import refresh
-from pipeline.runtime.config import delay, get_years
+from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -31,8 +31,8 @@ from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 # Dépendances techniques du phasage, injectées par le composition-root.
 RefreshOne = Callable[[PhaseContext, str, "list[int] | None"], PhaseMetrics]
 """Nouvelle lecture des documents d'une source, bornée à `years`."""
-GetYearsForWindow = Callable[[PhaseContext, "int | None"], "list[int] | None"]
-"""`(ctx, start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
+GetYearsForWindow = Callable[[PhaseContext, "int | None", "int | None"], "list[int] | None"]
+"""`(ctx, start_year, year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,7 @@ class FetchStalePhase:
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
 
-        year = options.year
-        years = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
+        years = self.get_years_for_window(ctx, options.start_year, options.year)
 
         def task(source: str) -> TaskRun:
             return lambda ctx: self.refresh_one(ctx, source, years)
@@ -106,10 +105,12 @@ def build() -> Phase:
     )
 
 
-def _get_years_for_window(ctx: PhaseContext, start_year: int | None) -> list[int] | None:
-    """Années de la fenêtre du run, de `start_year` à l'année courante."""
+def _get_years_for_window(
+    ctx: PhaseContext, start_year: int | None, year: int | None
+) -> list[int] | None:
+    """Années de la fenêtre du run (`window_years`)."""
     with ctx.open_tx() as conn:
-        return get_years(conn, start_year)
+        return window_years(conn, start_year=start_year, year=year)
 
 
 def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:

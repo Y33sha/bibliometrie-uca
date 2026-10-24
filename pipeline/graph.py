@@ -210,9 +210,10 @@ TASKS: tuple[Task, ...] = (
         _task(
             f"fetch_missing.doi.{source}",
             "fetch_missing",
-            # DOI candidats de la vue `candidate_dois`, et agence d'enregistrement pour Crossref et DataCite.
+            # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
             reads=(
                 "source_records.doi",
+                "source_records.publication_year",
                 "publication_relations",
                 *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
             ),

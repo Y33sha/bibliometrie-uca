@@ -324,6 +324,29 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
         assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30) == ["10.1234/a"]
 
+    def test_fenetre_d_annees_par_les_enregistrements_sources_de_la_publication(self, sa_sync_conn):
+        """Un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre : OpenAlex date la publication de 2021, ScanR de 2022."""
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=True)
+        _source_record(
+            sa_sync_conn,
+            publication_id,
+            source="openalex",
+            source_id="W1",
+            doi="10.1234/a",
+            publication_year=2021,
+        )
+        _source_record(
+            sa_sync_conn, publication_id, source="scanr", source_id="S1", publication_year=2022
+        )
+
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2022]) == [
+            "10.1234/a"
+        ]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2021]) == [
+            "10.1234/a"
+        ]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2020]) == []
+
 
 class TestGetStaleSourceIds:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):

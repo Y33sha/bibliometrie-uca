@@ -13,7 +13,7 @@ def _run(contexte, mode: str, refreshed: list[str]) -> PhaseMetrics:
 
     return FetchStalePhase(
         refresh_one=refresh_one,
-        get_years_for_window=lambda _ctx, start_year: None,
+        get_years_for_window=lambda _ctx, start_year, year: None,
     ).run(contexte(mode=mode, sources={"openalex"}))
 
 

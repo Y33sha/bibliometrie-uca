@@ -49,8 +49,12 @@ class DoiSearch(Protocol):
         """Interroge l'API pour un lot de 1 à `batch_size` DOI."""
 
 
-def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) -> list[str]:
+def get_missing_dois(
+    conn: Connection, target: str, *, retry_after_days: int, years: list[int] | None = None
+) -> list[str]:
     """DOI présents dans les autres sources et absents de la cible.
+
+    `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an. `None` : aucune borne.
 
     Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_records.doi` (DOI primaire) ∪ `external_ids.related_dois` (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de `external_ids.arxiv_id` (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne chercher que les DOI de publications in-périmètre évite de rapatrier des documents hors périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
 
@@ -75,6 +79,16 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
     unknown_to_doi_org = pending_failed_lookup_sql(
         source_sql=f"'{DOI_ORG}'", id_type="doi", value_sql="c.doi"
     )
+    year_filter = (
+        """
+          AND EXISTS (
+                  SELECT 1 FROM source_records sr_year
+                  WHERE sr_year.publication_id = c.publication_id
+                    AND sr_year.publication_year = ANY(:years)
+              )"""
+        if years is not None
+        else ""
+    )
     query = f"""
         WITH deja_connus AS (
             SELECT sr.doi
@@ -96,10 +110,12 @@ def get_missing_dois(conn: Connection, target: str, *, retry_after_days: int) ->
               ){prefix_filter}
           AND NOT EXISTS (SELECT 1 FROM deja_connus k WHERE k.doi = c.doi)
           AND NOT {pending}
-          AND NOT {unknown_to_doi_org}
+          AND NOT {unknown_to_doi_org}{year_filter}
         ORDER BY c.doi
     """
-    params: dict[str, str | int] = {"target": target, "retry_after_days": retry_after_days}
+    params: dict[str, object] = {"target": target, "retry_after_days": retry_after_days}
+    if years is not None:
+        params["years"] = years
     if target_ra:
         params["target_ra"] = target_ra
     rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
@@ -114,15 +130,16 @@ async def fetch_missing_doi(
     *,
     retry_after_days: int,
     limit: int | None = None,
+    years: list[int] | None = None,
 ) -> PhaseMetrics:
     """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les enregistrements sources trouvés dans `staging`.
 
-    Un DOI confirmé absent est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution. Quand la source est l'agence d'enregistrement des DOI cherchés, ses DOI absents sont soumis à doi.org : un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`.
+    Un DOI confirmé absent est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution, `years` borne les candidats à la fenêtre d'années du run (`get_missing_dois`). Quand la source est l'agence d'enregistrement des DOI cherchés, ses DOI absents sont soumis à doi.org : un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`.
 
     Compteurs de `look_up`, et `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
     """
     source = search.source_key
-    dois = get_missing_dois(conn, source, retry_after_days=retry_after_days)
+    dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)
     if limit and len(dois) > limit:
         scoped_logger(log, source).info(
             "plafond de %d DOI par exécution, %d reportés aux suivantes", limit, len(dois) - limit

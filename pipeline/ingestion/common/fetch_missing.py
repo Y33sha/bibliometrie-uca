@@ -17,7 +17,7 @@ from domain.config import ConfigKey
 from domain.sources.registry import DOI_SEARCHABLE_SOURCES, Source
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.doi_search import fetch_missing_doi
-from pipeline.runtime.config import cap, delay
+from pipeline.runtime.config import cap, delay, window_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -184,9 +184,11 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
     doi_search = ADAPTERS[Source(target)].doi_search
     assert doi_search is not None, f"{target} : source interrogeable par DOI sans recherche"
     search = doi_search()
+    options = ctx.options
     with ctx.open_tx() as conn:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         limit = cap(conn, ConfigKey.FETCH_MISSING_MAX_PER_SOURCE)
+        years = window_years(conn, start_year=options.start_year, year=options.year)
         return asyncio.run(
             fetch_missing_doi(
                 conn,
@@ -194,5 +196,6 @@ def _run_fetch_missing_doi(ctx: PhaseContext, target: str) -> PhaseMetrics:
                 ctx.logger,
                 retry_after_days=retry_after_days,
                 limit=limit,
+                years=years,
             )
         )

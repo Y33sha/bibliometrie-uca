@@ -52,8 +52,10 @@ def configuration(monkeypatch):
             )
         monkeypatch.setattr(
             harvester,
-            "get_years",
-            lambda conn, start_year=None: [2024] if annees is None else annees,
+            "window_years",
+            lambda conn, *, start_year, year: (
+                [year] if year else [2024] if annees is None else annees
+            ),
         )
 
     return _poser
