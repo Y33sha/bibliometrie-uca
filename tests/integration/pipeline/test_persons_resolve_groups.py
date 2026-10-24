@@ -231,3 +231,20 @@ class TestIdentifierAttribution:
         resolve_groups(conn)
 
         assert not any(v == "0000-0001-5109-3700" for _, v, _, _ in _identifiers_of(conn, person))
+
+
+def test_le_prenom_reduit_est_complete_par_les_membres_des_groupes(sa_sync_conn):
+    conn = sa_sync_conn
+    person = insert_person(conn, "Martin", first_name="J.")
+    group = _group(conn, insert_publication(conn), [("hal", "Jean Martin", None, True)])
+    _attach(conn, group, person, "manual")
+
+    counts = resolve_groups(conn)
+
+    assert counts["first_names_completed"] == 1
+    assert (
+        conn.execute(
+            text("SELECT first_name FROM persons WHERE id = :p"), {"p": person}
+        ).scalar_one()
+        == "Jean"
+    )

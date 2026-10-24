@@ -152,14 +152,24 @@ def _martin_first_names(conn) -> list[str]:
 
 
 def _seed_person(conn, last_name, first_name, *, source_contributions=()):
-    """Personne existante, rattachée par son nom aux contributions sources `contributions sources` (ids)."""
+    """Personne existante, rattachée par son nom aux contributions sources `source_contributions` (ids) et à leurs groupes."""
     pid = create_person(last_name, first_name, repo=person_repository(conn))
+    group_ungrouped(conn)
     for source_contribution_id in source_contributions:
         conn.execute(
             text(
                 "UPDATE source_contributions SET person_id = :p, resolution_mode = 'name' "
                 "WHERE id = :s"
             ),
+            {"p": pid, "s": source_contribution_id},
+        )
+        conn.execute(
+            text("""
+                UPDATE source_contribution_groups g
+                SET person_id = :p, resolution_mode = 'name'
+                FROM source_contribution_group_members gm
+                WHERE gm.group_id = g.id AND gm.source_contribution_id = :s
+            """),
             {"p": pid, "s": source_contribution_id},
         )
     return pid

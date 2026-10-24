@@ -29,6 +29,7 @@ from infrastructure.sql_fragments import (
     strong_identifier_source_contributions,
     usable_identifier,
 )
+from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
 from pipeline.transformation.persons.store import (
     PersonsStore,
@@ -100,11 +101,13 @@ _WRITE_SQL = text("""
 """)
 
 
-def load_index(conn: Connection) -> PersonIndex:
-    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille."""
+def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
+    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit dont les groupes attestent plusieurs prénoms pleins (`Namesake.conflicting`)."""
     namesakes: dict[str, list[Namesake]] = defaultdict(list)
     for namesake in PersonsStore(conn).namesakes():
-        namesakes[normalize_text(namesake.last_name)].append(namesake)
+        namesakes[normalize_text(namesake.last_name)].append(
+            namesake._replace(conflicting=namesake.person_id in conflicting)
+        )
     return PersonIndex(
         identifiers={t: fetch_identifier_to_person_map(conn, t) for t in IDENTIFIER_ORDER},
         name_forms=fetch_name_form_map(conn),
@@ -199,12 +202,13 @@ def apply_pins(conn: Connection) -> int:
 
 
 def resolve_groups(conn: Connection) -> dict[str, int]:
-    """Applique les épinglages, puis décide et écrit la personne des groupes sans personne. Rend les compteurs par issue et par motif."""
+    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), puis décide et écrit la personne des groupes sans personne. Rend les compteurs par issue et par motif."""
     pinned = apply_pins(conn)
+    completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     groups = load_candidate_groups(conn)
     decisions = decide_groups(
         groups,
-        load_index(conn),
+        load_index(conn, completion.conflicting),
         fetch_rejected_person_ids_by_publication(conn),
         taken_persons(conn, groups),
     )
@@ -214,4 +218,10 @@ def resolve_groups(conn: Connection) -> dict[str, int]:
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()
     )
-    return {"pinned": pinned, "groups": len(decisions), "written": written, **counts}
+    return {
+        "pinned": pinned,
+        "first_names_completed": completion.completed,
+        "groups": len(decisions),
+        "written": written,
+        **counts,
+    }
