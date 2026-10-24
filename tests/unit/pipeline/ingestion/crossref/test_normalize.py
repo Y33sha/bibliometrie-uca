@@ -555,6 +555,7 @@ def _normalizer() -> CrossrefNormalizer:
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
+        location_store=MagicMock(),
     )
 
 

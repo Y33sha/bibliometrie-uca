@@ -17,6 +17,7 @@ from domain.journals.containers import ContainerDescription
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -68,7 +69,7 @@ class SourceNormalizer(ABC):
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
     - `minimal_metadata(row)` : abstrait, titre et année de l'enregistrement source
     - `parse(row)` : document lu dans la ligne, ou `None` pour un enregistrement refusé (défaut : le payload)
-    - `publisher(doc)`, `container_facts(doc)` : éditeur et conteneurs du document (défaut : aucun)
+    - `publisher(doc)`, `container_facts(doc)`, `locations(doc)` : éditeur, conteneurs et localisations du document (défaut : aucun)
     - `source_record(row, doc, containers)` : abstrait, enregistrement source à écrire
     - `author_block(doc)`, `author_records(block)` : abstraits, bloc auteurs et contributions sources qu'il donne
     - `preload_caches()` : pré-chargement optionnel
@@ -89,6 +90,7 @@ class SourceNormalizer(ABC):
         container_stores: ContainerStores,
         publisher_store: PublisherStore,
         contribution_store: SourceContributionStore,
+        location_store: LocationStore,
     ) -> None:
         self.conn = conn
         self.logger = logger
@@ -97,6 +99,7 @@ class SourceNormalizer(ABC):
         self._container_stores = container_stores
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
+        self._location_store = location_store
 
     # ── Analyse d'une ligne, propre à la source ─────────────────
 
@@ -115,6 +118,10 @@ class SourceNormalizer(ABC):
     def container_facts(self, doc: Document) -> ContainerDescription | None:  # noqa: ARG002
         """Revue, ou monographie et collection, qui contiennent le document. `None` : sans conteneur."""
         return None
+
+    def locations(self, doc: Document) -> list[LocationFacts]:  # noqa: ARG002
+        """Localisations du document."""
+        return []
 
     @abstractmethod
     def source_record(
@@ -135,7 +142,7 @@ class SourceNormalizer(ABC):
     def normalize_record(self, row: StagingRow) -> bool:
         """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend True, ou False pour un enregistrement refusé, sans rien écrire.
 
-        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, et ses contributions sources.
+        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
         """
         doc = self.parse(row)
         if doc is None:
@@ -159,6 +166,7 @@ class SourceNormalizer(ABC):
         source_record_id = self._record_store.upsert_source_record(
             replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
         )
+        self._location_store.replace_locations(source_record_id, self.locations(doc))
         sync_source_contributions(
             self._contribution_store,
             self.SOURCE,

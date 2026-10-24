@@ -12,6 +12,9 @@ from unittest.mock import MagicMock
 
 from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.platform import PlatformType
+from domain.publications.licenses import License
+from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.openalex import normalize as normalize_openalex
@@ -23,6 +26,7 @@ from pipeline.ingestion.openalex.normalize import (
     extract_locations_data,
     extract_topics,
     get_container_facts,
+    get_locations,
     get_publisher,
     openalex_source_record,
     reconstruct_abstract,
@@ -73,6 +77,68 @@ class TestExtractLocationsData:
         }
         _, ids = extract_locations_data(work)
         assert ids["related_dois"] == ["10.1/a", "10.2/b", "10.3/c"]
+
+
+# ── get_locations ────────────────────────────────────────────────
+
+
+class TestGetLocations:
+    def test_un_entrepot_donne_sa_plateforme_et_son_identifiant_oai(self):
+        work = {
+            "locations": [
+                {
+                    "id": "pmh:oai:HAL:hal-03608693v1",
+                    "landing_page_url": "https://hal.science/hal-03608693",
+                    "pdf_url": "https://hal.science/hal-03608693/document",
+                    "version": "submittedVersion",
+                    "license": "cc-by",
+                    "is_oa": True,
+                    "source": {
+                        "id": "https://openalex.org/S4306402512",
+                        "type": "repository",
+                        "display_name": "HAL (Le Centre pour la Communication Scientifique Directe)",
+                    },
+                }
+            ]
+        }
+        assert get_locations(work) == [
+            LocationFacts(
+                url="https://hal.science/hal-03608693",
+                pdf_url="https://hal.science/hal-03608693/document",
+                oai_id="oai:HAL:hal-03608693v1",
+                version="submittedVersion",
+                license=License.CC_BY,
+                is_oa=True,
+                platform=PlatformFacts(
+                    "S4306402512",
+                    "HAL (Le Centre pour la Communication Scientifique Directe)",
+                    PlatformType.REPOSITORY,
+                ),
+            )
+        ]
+
+    def test_une_revue_ne_donne_pas_de_plateforme(self):
+        work = {
+            "locations": [
+                {
+                    "id": "doi:10.1038/x",
+                    "landing_page_url": "https://doi.org/10.1038/x",
+                    "source": {"id": "https://openalex.org/S1", "type": "journal"},
+                }
+            ]
+        }
+        [location] = get_locations(work)
+        assert (location.platform, location.oai_id) == (None, None)
+
+    def test_fiche_du_doaj_et_localisation_sans_url_ecartees(self):
+        work = {
+            "locations": [
+                {"landing_page_url": "https://doaj.org/article/abc"},
+                {"landing_page_url": None, "pdf_url": None},
+                {"landing_page_url": None, "pdf_url": "https://arxiv.org/pdf/2103.11769"},
+            ]
+        }
+        assert [loc.url for loc in get_locations(work)] == ["https://arxiv.org/pdf/2103.11769"]
 
 
 # ── reconstruct_abstract ─────────────────────────────────────────
@@ -600,6 +666,7 @@ def _make_normalizer():
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=MagicMock(),
+        location_store=MagicMock(),
     )
 
 

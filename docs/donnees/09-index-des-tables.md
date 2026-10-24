@@ -93,6 +93,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `hr_records` | satellite des données RH (import CSV) | [persons](05-persons.md) |
 | `pipeline_phase_executions` | historique d'exécution des phases — technique | [ops](07-ref-et-ops.md) |
 | `place_name_forms` | formes de noms pour la détection des pays | [ref](07-ref-et-ops.md) |
+| `platforms` | lieux qui hébergent des publications | [publishing](04-publishing.md) |
 | `publication_relations` | relations sémantiques entre publications | [publications](03-publications.md) |
 | `publication_structures` | *vue matérialisée* : structures d'une publication | [publications](03-publications.md) |
 | `publication_subjects` | liaison publication ↔ sujet | [publications](03-publications.md) |
@@ -108,6 +109,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `source_contribution_rors` | ROR attribués par la source à une contribution source, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
 | `source_contribution_structures` | *vue matérialisée* : affiliations résolues d'une contribution source | [sources](02-sources.md) |
 | `source_contributions` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
+| `source_record_locations` | localisations d'un enregistrement source | [sources](02-sources.md) |
 | `source_records` | un enregistrement par document par source | [sources](02-sources.md) |
 | `staging` | ingestion brute par source, payload vidé après normalisation | [sources](02-sources.md) |
 | `structure_name_forms` | formes de noms pour la détection des structures | [structures](06-structures.md) |

@@ -23,6 +23,7 @@ from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.adapter import SourceAdapter
+from pipeline.ingestion.common.locations import LocationStore
 from pipeline.ingestion.common.normalizer import (
     NormalizeStats,
     SourceNormalizer,
@@ -218,6 +219,7 @@ def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]
                 container_stores=ContainerStores.of(conn),
                 publisher_store=PublisherStore(conn),
                 contribution_store=SourceContributionStore(conn),
+                location_store=LocationStore(conn),
             )
 
         return build

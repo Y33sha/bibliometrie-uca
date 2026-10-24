@@ -22,6 +22,7 @@ https://developers.openalex.org/
 
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, OA status, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Licence** : licence de la localisation principale (`primary_location`)
+- **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne. Les fiches du DOAJ, sans copie du texte, sont écartées.
 - **Auteurs** : nom tel qu'il apparaît dans la contribution source, drapeau corresponding, ORCID si présent. Le nom unifié de l'entité auteur OpenAlex est conservé séparément, utilisé uniquement pour vérifier que l'ORCID attribué par OA correspond bien à notre auteur (cf. Particularités).
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Journaux/éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur

@@ -273,6 +273,8 @@ TASKS: tuple[Task, ...] = (
                 "staging.processed",
                 "staging.raw_data",
                 "source_records",
+                "source_record_locations",
+                "platforms",
                 "source_contributions",
                 "source_contribution_addresses",
                 "source_contribution_rors",
@@ -291,6 +293,8 @@ TASKS: tuple[Task, ...] = (
             previous_run=(
                 "staging",
                 "source_records",
+                "source_record_locations",
+                "platforms",
                 "source_contributions",
                 "contributor_information",
                 "addresses",
@@ -309,9 +313,10 @@ TASKS: tuple[Task, ...] = (
             "source_records.staging_id",
             "source_records.publication_id",
         ),
-        # La suppression d'un enregistrement source emporte ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
+        # La suppression d'un enregistrement source emporte ses localisations, ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_records.id",
+            "source_record_locations",
             "source_record_keys_queue",
             "publication_contributions_queue",
             "source_contributions.id",

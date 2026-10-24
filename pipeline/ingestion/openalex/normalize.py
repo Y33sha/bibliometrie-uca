@@ -8,6 +8,7 @@ from domain.journals.containers import ContainerDescription
 from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.platform import PlatformType, is_catalog_record
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -26,6 +27,7 @@ from domain.types import (
     as_str,
     as_strs,
 )
+from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
@@ -97,6 +99,41 @@ def extract_locations_data(
     if related_dois:
         external_ids[ExternalIdType.RELATED_DOIS] = related_dois
     return urls, external_ids
+
+
+def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Localisations du work, hors fiches de catalogue. Une source de type `repository` donne la plateforme de la localisation."""
+    locations: list[LocationFacts] = []
+    for entry in as_sequence(work.get("locations")):
+        loc = as_mapping(entry)
+        pdf_url = as_str(loc.get("pdf_url"))
+        url = as_str(loc.get("landing_page_url")) or pdf_url
+        if not url or is_catalog_record(url):
+            continue
+        location_id = as_str(loc.get("id")) or ""
+        locations.append(
+            LocationFacts(
+                url=url,
+                pdf_url=pdf_url,
+                oai_id=location_id.removeprefix("pmh:") if location_id.startswith("pmh:") else None,
+                version=as_str(loc.get("version")),
+                license=normalize_license(as_str(loc.get("license"))),
+                is_oa=as_bool(loc.get("is_oa")),
+                platform=_repository(as_mapping(loc.get("source"))),
+            )
+        )
+    return locations
+
+
+def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
+    """Plateforme d'une source OpenAlex de type `repository`, nommée comme OpenAlex la nomme."""
+    if as_str(source.get("type")) != "repository":
+        return None
+    openalex_id = short_openalex_id(as_str(source.get("id")) or "")
+    name = as_str(source.get("display_name"))
+    return (
+        PlatformFacts(openalex_id, name, PlatformType.REPOSITORY) if openalex_id and name else None
+    )
 
 
 def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:
@@ -440,6 +477,9 @@ class OpenalexNormalizer(SourceNormalizer):
         if should_skip_publisher_journal(parse_primary_location(doc)):
             return None
         return get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

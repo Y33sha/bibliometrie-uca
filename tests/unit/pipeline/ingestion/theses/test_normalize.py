@@ -220,6 +220,7 @@ def _make_normalizer():
         container_stores=MagicMock(),
         publisher_store=MagicMock(),
         contribution_store=FakeSourceContributionStore(),
+        location_store=MagicMock(),
     )
 
 

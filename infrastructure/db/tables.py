@@ -43,6 +43,7 @@ from domain.merge import MergedEntity
 from domain.persons.group_matching import GroupMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
+from domain.platforms.platform import PLATFORM_TYPES
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
@@ -594,6 +595,8 @@ oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
+platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=False)
+
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
 doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
@@ -1087,15 +1090,23 @@ publications = Table(
     Column("doc_type", doc_type_enum, server_default="other"),
     Column("publication_year", SmallInteger, nullable=False),
     Column("doi", Text),
-    Column("doi_prefix", Text, Computed("split_part(doi, '/', 1)", persisted=True)),
+    Column(
+        "doi_prefix",
+        Text,
+        Computed("split_part(doi, '/', 1)", persisted=True),
+        comment="Préfixe du DOI, pour les jointures sur doi_prefixes.",
+    ),
     Column("oa_status", oa_type_enum, server_default="unknown"),
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
-    # Éditeur à la date de publication.
-    Column("publisher_id", Integer),
+    Column(
+        "publisher_id",
+        Integer,
+        comment="Éditeur à la date de publication : titulaire du préfixe du DOI Crossref, à défaut éditeur des enregistrements sources.",
+    ),
     Column("container_title", Text),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -1198,8 +1209,11 @@ source_records = Table(
     Column("impact", Jsonb),
     Column("journal_id", Integer),
     Column("monograph_id", Integer),
-    # Éditeur que nomme la source ; nul pour une production hébergée sans être publiée.
-    Column("publisher_id", Integer),
+    Column(
+        "publisher_id",
+        Integer,
+        comment="Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.",
+    ),
     Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
@@ -1265,6 +1279,45 @@ source_records = Table(
         name="source_records_corrections_is_object",
     ),
     schema="sources",
+)
+
+
+platforms = Table(
+    "platforms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("name_normalized", Text, nullable=False),
+    Column("platform_type", platform_type_enum, nullable=False, server_default="unknown"),
+    Column(
+        "openalex_id",
+        Text,
+        comment="Source OpenAlex de la plateforme, dont elle prend le nom.",
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("openalex_id", name="platforms_openalex_id_key"),
+    schema="publishing",
+    comment="Lieux qui hébergent des publications : entrepôts, serveurs de preprints, plateformes d'éditeurs.",
+)
+
+
+source_record_locations = Table(
+    "source_record_locations",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column("url", Text, primary_key=True),
+    Column("pdf_url", Text),
+    Column("oai_id", Text, comment="Identifiant OAI-PMH de la copie, que déclare l'entrepôt."),
+    Column(
+        "version",
+        Text,
+        comment="Version de la copie dans le vocabulaire de la source (submittedVersion, acceptedVersion, publishedVersion).",
+    ),
+    Column("license", license_type_enum),
+    Column("is_oa", Boolean),
+    Column("platform_id", Integer),
+    schema="sources",
+    comment="Localisations d'un enregistrement source, réécrites à chaque normalisation.",
 )
 
 
