@@ -27,13 +27,13 @@ from infrastructure.sql_fragments import (
     strong_identifier_source_contributions,
     usable_identifier,
 )
-from pipeline.transformation.persons.cascade import (
+from pipeline.transformation.persons.store import (
+    PersonsStore,
     fetch_identifier_to_person_map,
     fetch_name_form_map,
     fetch_name_form_status_map,
     fetch_rejected_person_ids_by_publication,
 )
-from pipeline.transformation.persons.store import PersonsStore
 
 _CANDIDATES_SQL = " UNION ".join(
     [

@@ -31,13 +31,11 @@ from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
 from domain.persons.identifiers import (
-    AttributionStatus,
     PersonIdentifierType,
 )
 from domain.persons.matching import (
     RESOLUTION_MODE_BY_REASON,
     UNDECIDABLE_NAME_FORM_REASONS,
-    IdentifiedPerson,
     MatchReason,
     NameFormDecision,
     Namesake,
@@ -49,15 +47,11 @@ from domain.persons.matching import (
     decide_person_match,
     trusted_identifier,
 )
-from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
+from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import first_name_initials, full_first_name_extends
 from domain.persons.person import validated_name
 from domain.sources.registry import require_known_source
 from infrastructure.repositories.person_repository import PgPersonRepository
-from infrastructure.sql_fragments import (
-    REJECTED_PAIRS,
-    active_name_form,
-)
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.runtime.observability.progress import track_progress, waiting
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
@@ -72,73 +66,13 @@ from pipeline.transformation.persons.metrics import CascadeResult, log_matching_
 from pipeline.transformation.persons.person_writes import (
     add_identifiers_from_contributions as add_identifiers,
 )
-from pipeline.transformation.persons.store import PersonsStore
-
-
-def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
-    rows = conn.execute(
-        text(f"""
-            SELECT pi.id_value, pi.person_id,
-                   p.last_name_normalized AS ln, p.first_name_normalized AS fn
-            FROM person_identifiers pi
-            JOIN persons p ON p.id = pi.person_id
-            WHERE pi.id_type = :id_type
-              AND pi.status != '{AttributionStatus.REJECTED.value}'
-        """),
-        {"id_type": id_type},
-    ).all()
-    return {r.id_value: IdentifiedPerson(r.person_id, r.ln or "", r.fn or "") for r in rows}
-
-
-def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
-    """Agrégation par `name_form` sur la table dénormalisée `(name_form, person_id, sources[], status)` : un dict trié par `person_id` croissant pour stabilité. Les liens `status = 'rejected'` sont exclus : une forme de nom rejetée pour une personne reste écartée du matching par nom (verrou de non-retour). Une forme dérivée du nom de la personne reste toujours active."""
-    rows = conn.execute(
-        text(f"""
-            SELECT name_form,
-                   array_agg(person_id ORDER BY person_id) AS person_ids
-            FROM person_name_forms
-            WHERE {active_name_form("person_name_forms")}
-            GROUP BY name_form
-        """)
-    ).all()
-    return {r.name_form: r.person_ids for r in rows}
-
-
-def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
-    """Sert à la corroboration du matching par identifiant : quand un identifiant résout vers une personne, le verdict du couple (forme de la contribution source, personne) tranche sans test de compatibilité de nom — `confirmed` corrobore, `rejected` refuse ; en l'absence de verdict, on retombe sur la comparaison par tokens.
-
-    Le verdict combine le statut admin et la provenance de la forme : une forme dérivée du nom de la personne (`'persons' ∈ sources`) corrobore toujours ; sinon un rejet admin refuse et une confirmation admin (`status = 'confirmed'`) corrobore. Les formes seulement `pending` et non dérivées du nom sont omises.
-    """
-    rows = conn.execute(
-        text(f"""
-            SELECT name_form, person_id,
-                   CASE WHEN '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
-                        THEN '{AttributionStatus.CONFIRMED.value}'
-                        WHEN status = '{AttributionStatus.REJECTED.value}'
-                        THEN '{AttributionStatus.REJECTED.value}'
-                        ELSE '{AttributionStatus.CONFIRMED.value}' END AS status
-            FROM person_name_forms
-            WHERE status = '{AttributionStatus.REJECTED.value}'
-               OR status = '{AttributionStatus.CONFIRMED.value}'
-               OR '{CANONICAL_NAME_FORM_SOURCE}' = ANY(sources)
-        """)
-    ).all()
-    return {(r.name_form, r.person_id): r.status for r in rows}
-
-
-def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Garde de matching : une paire `(publication, personne)` rejetée reste hors de portée de la cascade, jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.matching.decide_person_match` et `decide_name_form_outcome`)."""
-    rows = conn.execute(
-        text(f"""
-            SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids
-            FROM ({REJECTED_PAIRS}) rp
-            WHERE publication_id IS NOT NULL
-            GROUP BY publication_id
-        """)
-    ).all()
-    return {r.publication_id: frozenset(r.person_ids) for r in rows}
-
+from pipeline.transformation.persons.store import (
+    PersonsStore,
+    fetch_identifier_to_person_map,
+    fetch_name_form_map,
+    fetch_name_form_status_map,
+    fetch_rejected_person_ids_by_publication,
+)
 
 _LINK_CONTRIBUTION = text("""
     UPDATE source_contributions
