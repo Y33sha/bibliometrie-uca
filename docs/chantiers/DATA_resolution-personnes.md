@@ -151,7 +151,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 ### Phase 7 — Fin de chantier
 
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation. aede75a00
 
 ## Questions ouvertes
 
