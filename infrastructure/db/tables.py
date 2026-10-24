@@ -42,7 +42,6 @@ from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.merge import MergedEntity
 from domain.persons.group_matching import GroupMatchReason
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.doc_types import DOC_TYPES
@@ -597,12 +596,6 @@ license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
 perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
-resolution_mode_enum = PgEnum(
-    *ResolutionMode,
-    name="resolution_mode",
-    create_type=False,
-)
-
 doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
 
 
@@ -695,35 +688,7 @@ idref_structures = Table(
 )
 
 
-# ── Contributions (table consolidée + sources) ────────────────────────────────
-
-
-contributions = Table(
-    "contributions",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("publication_id", Integer, nullable=False),
-    Column("person_id", Integer, nullable=False),
-    Column("author_position", SmallInteger),
-    # Indices de l'entrée dans le périmètre ; `in_perimeter` en découle.
-    Column(
-        "perimeter_evidence",
-        ARRAY(perimeter_evidence_enum),
-        nullable=False,
-        server_default="{}",
-    ),
-    Column(
-        "in_perimeter",
-        Boolean,
-        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
-        nullable=False,
-    ),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("is_corresponding", Boolean),
-    Column("roles", ARRAY(Text)),
-    UniqueConstraint("publication_id", "person_id", name="contributions_publication_person_uq"),
-    schema="publications",
-)
+# ── Contributions (groupes et contributions sources) ──────────────────────────
 
 
 # `group_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
@@ -933,10 +898,6 @@ source_contributions = Table(
             "author_grouping."
         ),
     ),
-    # Colonnes sans écrivain : la personne et son mode de résolution sont portés par le
-    # groupe (`source_contribution_groups`).
-    Column("person_id", Integer),
-    Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute

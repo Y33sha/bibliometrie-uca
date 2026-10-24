@@ -61,7 +61,7 @@ $$;
 -- y compris quand une table en sort.
 
 GRANT INSERT, UPDATE, DELETE ON
-    structures.address_structures, publications.contributions, structures.perimeters, persons.person_name_forms,
+    structures.address_structures, structures.perimeters, persons.person_name_forms,
     persons.persons, persons.rejected_contributions, structures.structure_name_forms, structures.structures
 TO bibliometrie_app;
 

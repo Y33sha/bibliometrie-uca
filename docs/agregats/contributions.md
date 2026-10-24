@@ -11,7 +11,6 @@ Aucun objet de domaine ne lui correspond. Son vocabulaire de rôles et la corres
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `contributions` | Lien personne ↔ publication | `(publication_id, person_id)` unique, `author_position`, `roles`, `is_corresponding`, `in_perimeter` |
-| `source_contributions` | Contribution source relevée dans une source | `person_id`, `resolution_mode` |
 | `confirmed_source_contributions` | Contribution source épinglée par une décision humaine | `(source_contribution_id, person_id)` |
 | `rejected_contributions` | Paire écartée durablement | `(publication_id, person_id)` |
 | `group_structures` | Vue matérialisée : groupe de contributions sources ↔ structure | `(group_id, structure_id)` |

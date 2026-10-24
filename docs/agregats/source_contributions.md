@@ -10,7 +10,7 @@ Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce q
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `source_contributions` | La contribution source | `source`, `source_record_id`, `contributor_information_id`, `person_id`, `author_position`, `roles`, `is_corresponding`, `perimeter_evidence`, `in_perimeter`, `resolution_mode`, `raw_author_name`, `countries`, `neutralized_identifiers` |
+| `source_contributions` | La contribution source | `source`, `source_record_id`, `contributor_information_id`, `author_position`, `roles`, `is_corresponding`, `perimeter_evidence`, `in_perimeter`, `raw_author_name`, `countries`, `neutralized_identifiers` |
 | `contributor_information` | Informations du contributeur, dédoublonnées | `author_name_normalized`, `identifiers`, `key_hash` (calculé, unique) |
 | `source_contribution_addresses` | Lien entre une contribution source et ses adresses | `source_contribution_id`, `address_id` |
 | `source_contribution_structures` | Vue matérialisée : contribution source ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |

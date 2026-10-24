@@ -63,14 +63,6 @@ class MatchReason(StrEnum):
     CREATION_NOT_ALLOWED = "creation_not_allowed"
 
 
-class ResolutionMode(StrEnum):
-    """Valeurs de l'enum PostgreSQL `resolution_mode`, qui type la colonne `source_contributions.resolution_mode`. Aucun code n'écrit cette colonne : la personne et son mode de résolution sont portés par le groupe (`source_contribution_groups`)."""
-
-    IDENTIFIER = "identifier"
-    NAME = "name"
-    CROSS_SOURCE = "cross_source"
-
-
 class Namesake(NamedTuple):
     """Personne portant un nom de famille donné, telle que la voit le rattachement par initiales.
 
