@@ -1,5 +1,7 @@
 """Tâche `persons.resolve_groups` : rattachement des groupes sans personne, sur vraie base."""
 
+import logging
+
 from sqlalchemy import text
 
 from application.services.persons.core import create_person
@@ -57,7 +59,7 @@ def test_un_identifiant_d_un_membre_rattache_le_groupe_hors_perimetre(sa_sync_co
         [("crossref", "Jean Martin", {"orcid": _ORCID}, False), ("wos", "J. Martin", None, False)],
     )
 
-    resolve_groups(conn)
+    resolve_groups(conn, logging.getLogger("test"))
 
     assert _person(conn, group) == (person, "orcid")
 
@@ -75,7 +77,7 @@ class TestCreation:
         conn = sa_sync_conn
         group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
 
-        counts = resolve_groups(conn)
+        counts = resolve_groups(conn, logging.getLogger("test"))
 
         person, mode = _person(conn, group)
         assert mode == "name"
@@ -86,7 +88,7 @@ class TestCreation:
         conn = sa_sync_conn
         group = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, False)])
 
-        counts = resolve_groups(conn)
+        counts = resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (None, None)
         assert counts["created"] == 0
@@ -96,7 +98,7 @@ class TestCreation:
         first = _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
         second = _group(conn, insert_publication(conn), [("openalex", "Claire Durand", None, True)])
 
-        counts = resolve_groups(conn)
+        counts = resolve_groups(conn, logging.getLogger("test"))
 
         assert counts["created"] == 1
         assert _person(conn, first)[0] == _person(conn, second)[0] is not None
@@ -109,7 +111,7 @@ class TestCreation:
             [("hal", "C. Durand", None, True), ("openalex", "Claire Durand", None, True)],
         )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person_name(conn, _person(conn, group)[0]) == ("Durand", "Claire")
 
@@ -128,7 +130,7 @@ def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sy
     )
     repeated = _group(conn, publication, [("openalex", "Jean Martin", None, True)])
 
-    resolve_groups(conn)
+    resolve_groups(conn, logging.getLogger("test"))
 
     assert _person(conn, attached) == (person, "manual")
     assert _person(conn, repeated) == (None, None)
@@ -164,7 +166,7 @@ class TestPins:
         _attach(conn, group, by_name, "name")
         _pin_members(conn, group, pinned)
 
-        counts = resolve_groups(conn)
+        counts = resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (pinned, "manual")
         assert counts["pinned"] == 1
@@ -178,7 +180,7 @@ class TestPins:
         group = _group(conn, publication, [("hal", "J. Martin", None, True)])
         _pin_members(conn, group, person)
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (person, "manual")
         assert _person(conn, other)[0] != person
@@ -192,7 +194,7 @@ class TestPins:
         group = _group(conn, publication, [("hal", "J. Martin", None, True)])
         _pin_members(conn, group, person)
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, manual) == (person, "manual")
         assert _person(conn, group)[0] != person
@@ -227,7 +229,7 @@ class TestPins:
                 {"s": member, "p": person},
             )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (first, "name")
 
@@ -259,7 +261,7 @@ class TestIdentifierAttribution:
             ],
         )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (person, "orcid")
         assert ("idref", "123456789", "pending", "auto") in _identifiers_of(conn, person)
@@ -277,7 +279,7 @@ class TestIdentifierAttribution:
             ],
         )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert not any(v == "0000-0001-5109-3700" for _, v, _, _ in _identifiers_of(conn, person))
 
@@ -288,7 +290,7 @@ def test_le_prenom_reduit_est_complete_par_les_membres_des_groupes(sa_sync_conn)
     group = _group(conn, insert_publication(conn), [("hal", "Jean Martin", None, True)])
     _attach(conn, group, person, "manual")
 
-    counts = resolve_groups(conn)
+    counts = resolve_groups(conn, logging.getLogger("test"))
 
     assert counts["first_names_completed"] == 1
     assert (
@@ -307,7 +309,7 @@ class TestPersonIndex:
         person = create_person("Martin", "Pierre", repo=person_repository(conn))
         group = _group(conn, insert_publication(conn), [("hal", "Pierre Martin", None, True)])
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (person, "name")
 
@@ -328,7 +330,7 @@ class TestPersonIndex:
         )
         group = insert_group(conn, publication, [(inverted, source_record)])
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (person, "name")
 
@@ -340,7 +342,7 @@ class TestPersonIndex:
             conn, insert_publication(conn), [("openalex", "Jean Dupont", {"orcid": _ORCID}, False)]
         )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (None, None)
 
@@ -359,7 +361,7 @@ class TestPersonIndex:
             [("hal", "Jean Dupond", {"hal_person_id": "111222"}, True)],
         )
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group)[0] != person
 
@@ -371,7 +373,7 @@ class TestPersonIndex:
         group = _group(conn, publication, [("openalex", "Jean Dupont", {"orcid": _ORCID}, True)])
         insert_rejected_contribution(conn, publication, person_id=person, ignore_conflict=True)
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (None, None)
 
@@ -383,6 +385,20 @@ class TestPersonIndex:
         group = _group(conn, publication, [("openalex", "J Dupont", None, True)])
         insert_rejected_contribution(conn, publication, person_id=rejected, ignore_conflict=True)
 
-        resolve_groups(conn)
+        resolve_groups(conn, logging.getLogger("test"))
 
         assert _person(conn, group) == (kept, "name")
+
+
+def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync_conn, caplog):
+    conn = sa_sync_conn
+    person = insert_person(conn, "Martin", first_name="Jean")
+    insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
+    _group(conn, insert_publication(conn), [("crossref", "Jean Martin", {"orcid": _ORCID}, True)])
+    _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+
+    with caplog.at_level(logging.INFO):
+        resolve_groups(conn, logging.getLogger("test"))
+
+    assert "  ├─ 1 contribution identifiée : 1 par ORCID" in caplog.messages
+    assert "  └─ 1 personne créée" in caplog.messages

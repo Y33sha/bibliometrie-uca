@@ -36,6 +36,15 @@ from infrastructure.sql_fragments import (
     strong_identifier_source_contributions,
     usable_identifier,
 )
+from pipeline.runtime.observability.log_format import (
+    BRANCH,
+    LAST_BRANCH,
+    inflect,
+    quantity,
+    step,
+)
+from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
+from pipeline.runtime.observability.progress import Progress, track_progress, waiting
 from pipeline.transformation.persons.first_names import complete_reduced_first_names
 from pipeline.transformation.persons.person_writes import add_identifiers_from_contributions
 from pipeline.transformation.persons.store import (
@@ -148,8 +157,9 @@ def decide_groups(
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
     taken: dict[int, frozenset[int]],
+    progress: Progress | None = None,
 ) -> dict[int, GroupDecision]:
-    """Décision de chaque groupe, une personne au plus par publication."""
+    """Décision de chaque groupe, une personne au plus par publication. `progress` avance d'un groupe décidé et retient les groupes rattachés."""
     decisions: dict[int, GroupDecision] = {}
     for publication_id, by_group in groups.items():
         rejected_here = rejected.get(publication_id, frozenset())
@@ -157,7 +167,13 @@ def decide_groups(
             group_id: (decide_group(members, index, rejected_here), len(members))
             for group_id, members in by_group.items()
         }
-        decisions |= settle_publication(decided, taken.get(publication_id, frozenset()))
+        settled = settle_publication(decided, taken.get(publication_id, frozenset()))
+        if progress is not None:
+            for decision in settled.values():
+                progress.advance()
+                if decision.outcome == GroupOutcome.MATCH:
+                    progress.keep()
+        decisions |= settled
     return decisions
 
 
@@ -203,8 +219,9 @@ def create_persons(
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
     taken: dict[int, frozenset[int]],
+    progress: Progress | None = None,
 ) -> int:
-    """Traite un à un les groupes dont la décision est une création, contre l'index tenu à jour : un groupe que désigne une personne créée plus tôt dans le passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à un autre groupe de la publication n'est pas reprise. Met `decisions` à jour et rend le nombre de personnes créées."""
+    """Traite un à un les groupes dont la décision est une création, contre l'index tenu à jour : un groupe que désigne une personne créée plus tôt dans le passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à un autre groupe de la publication n'est pas reprise. Met `decisions` à jour et rend le nombre de personnes créées. `progress` avance d'un groupe traité et retient les personnes créées."""
     repo = PgPersonRepository(conn)
     created = 0
     for publication_id in sorted(groups):
@@ -218,6 +235,8 @@ def create_persons(
             if decisions[group_id].outcome != GroupOutcome.CREATE:
                 continue
             members = by_group[group_id]
+            if progress is not None:
+                progress.advance()
             decision = decide_group(members, index, rejected.get(publication_id, frozenset()))
             if decision.outcome == GroupOutcome.CREATE:
                 try:
@@ -234,6 +253,8 @@ def create_persons(
                     {k: v for attributed in identifiers for k, v in attributed.items()},
                 )
                 created += 1
+                if progress is not None:
+                    progress.keep()
                 decision = GroupDecision(
                     GroupOutcome.CREATE,
                     person_id,
@@ -273,18 +294,89 @@ def apply_pins(conn: Connection) -> int:
     return conn.execute(text(attach)).rowcount
 
 
-def resolve_groups(conn: Connection) -> dict[str, int]:
+# Libellés des modes de rattachement dans le journal.
+_MODE_LABELS: dict[GroupMatchReason, str] = {
+    GroupMatchReason.MANUAL: "épinglage",
+    GroupMatchReason.ORCID: "ORCID",
+    GroupMatchReason.HAL_PERSON_ID: "compte HAL",
+    GroupMatchReason.IDREF: "IdRef",
+    GroupMatchReason.NAME: "forme de nom",
+    GroupMatchReason.COMPATIBLE_NAME: "initiales compatibles",
+}
+
+
+def _log_identified(
+    logger: ScopedOrPlainLogger, decisions: dict[int, GroupDecision], pinned: int
+) -> None:
+    """Contributions identifiées, par mode de rattachement. Les épinglages appliqués avant la décision comptent avec le mode `manual`."""
+    by_mode: Counter[GroupMatchReason] = Counter(
+        d.reason
+        for d in decisions.values()
+        if d.outcome == GroupOutcome.MATCH and isinstance(d.reason, GroupMatchReason)
+    )
+    by_mode[GroupMatchReason.MANUAL] += pinned
+    detail = ", ".join(
+        f"{count} par {label}" for mode, label in _MODE_LABELS.items() if (count := by_mode[mode])
+    )
+    total = sum(by_mode.values())
+    logger.info(
+        "%s%s %s%s",
+        BRANCH,
+        quantity(total, "contribution"),
+        inflect(total, "identifiée"),
+        f" : {detail}" if detail else "",
+    )
+
+
+def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
     """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide et écrit la personne des groupes sans personne, puis crée les personnes des groupes du périmètre au nom inconnu (`create_persons`). Rend les compteurs par issue et par motif."""
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
-    groups = load_candidate_groups(conn)
-    index = load_index(conn, completion.conflicting)
-    rejected = fetch_rejected_person_ids_by_publication(conn)
-    taken = taken_persons(conn, groups)
-    decisions = decide_groups(groups, index, rejected, taken)
+    logger.info(
+        "%s%s d'après les contributions",
+        BRANCH,
+        quantity(completion.completed, "prénom complété", "prénoms complétés"),
+    )
+    # Le chargement dure : la ligne d'attente évite que l'étape reste muette.
+    with waiting(f"{BRANCH}chargement des contributions", logger) as line:
+        groups = load_candidate_groups(conn)
+        index = load_index(conn, completion.conflicting)
+        rejected = fetch_rejected_person_ids_by_publication(conn)
+        taken = taken_persons(conn, groups)
+        total = sum(len(by_group) for by_group in groups.values())
+        line.conclude(f"{BRANCH}{quantity(total, 'contribution')} à examiner")
+    with track_progress(total, BRANCH.rstrip(), logger, count_kept=True) as progress:
+        decisions = decide_groups(groups, index, rejected, taken, progress)
     written = write_decisions(conn, decisions)
     attribute_identifiers(conn, groups, decisions)
-    created = create_persons(conn, groups, decisions, index, rejected, taken)
+    _log_identified(logger, decisions, pinned)
+
+    step(logger, "Création de nouvelles personnes")
+    unidentified = [
+        d
+        for d in decisions.values()
+        if d.outcome != GroupOutcome.MATCH and d.reason != GroupSkipReason.OUT_OF_PERIMETER
+    ]
+    to_create = sum(1 for d in unidentified if d.outcome == GroupOutcome.CREATE)
+    undecidable = sum(
+        1
+        for d in unidentified
+        if d.outcome == GroupOutcome.SKIP and d.reason != GroupSkipReason.CREATION_NOT_ALLOWED
+    )
+    logger.info(
+        "%s%s du périmètre %s",
+        BRANCH,
+        quantity(len(unidentified), "contribution"),
+        inflect(len(unidentified), "non identifiée"),
+    )
+    logger.info(
+        "%s%s (nom ambigu, noms ou identifiants en conflit, candidats rejetés)",
+        BRANCH,
+        quantity(undecidable, "indécidable"),
+    )
+    with track_progress(to_create, BRANCH.rstrip(), logger, count_kept=True) as progress:
+        created = create_persons(conn, groups, decisions, index, rejected, taken, progress)
+    logger.info("%s%s %s", LAST_BRANCH, quantity(created, "personne"), inflect(created, "créée"))
     counts: Counter[str] = Counter(
         f"{d.outcome}:{d.reason}" if d.reason is not None else str(d.outcome)
         for d in decisions.values()

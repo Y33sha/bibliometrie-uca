@@ -340,7 +340,7 @@ def resolve_identifier_transfers(
     # Un conflit dont l'attribution est confirmée par l'admin est tranché : seuls les autres comptent.
     pending = [c for c in conflicts if c.owner_status == AttributionStatus.PENDING]
     if not pending:
-        nothing_to_do(logger)
+        nothing_to_do(logger, "Conflits d'attribution")
         return {"conflicts": len(conflicts), "pending": 0, "transferred": 0}
 
     transferred = 0

@@ -20,7 +20,7 @@ from sqlalchemy import Connection
 
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, quantity
+from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.task_runner import TaskStep, run_tasks
@@ -43,7 +43,7 @@ class PersonsPhase:
                 "persons.arbitrate_identifiers": TaskStep(self._arbitrate_identifiers),
                 "persons.resolve_groups": TaskStep(
                     self._resolve_groups,
-                    section="Rattachement des contributions",
+                    section="Identification des contributions",
                 ),
                 "persons.populate_person_name_forms": TaskStep(
                     self._populate,
@@ -66,15 +66,8 @@ class PersonsPhase:
         return PhaseMetrics(extras=counts)
 
     def _resolve_groups(self, ctx: PhaseContext) -> PhaseMetrics:
-        with (
-            ctx.open_tx() as conn,
-            waiting(f"{LAST_BRANCH}décision des contributions sans personne", ctx.logger) as line,
-        ):
-            counts = resolve_groups(conn)
-            line.conclude(
-                f"{LAST_BRANCH}{quantity(counts['written'], 'contribution rattachée', 'contributions rattachées')}"
-                f" sur {quantity(counts['groups'], 'contribution décidée', 'contributions décidées')}"
-            )
+        with ctx.open_tx() as conn:
+            counts = resolve_groups(conn, ctx.logger)
         return PhaseMetrics(extras=counts)
 
     def _populate(self, ctx: PhaseContext) -> PhaseMetrics:

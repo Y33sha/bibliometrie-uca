@@ -47,9 +47,9 @@ def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
     logger.info(line, *args)
 
 
-def nothing_to_do(logger: ScopedOrPlainLogger) -> None:
-    """Ferme une sous-étape qui n'a rien à traiter."""
-    logger.info("%sRien à faire", LAST_BRANCH)
+def nothing_to_do(logger: ScopedOrPlainLogger, subject: str | None = None) -> None:
+    """Ferme une sous-étape qui n'a rien à traiter. `subject` nomme la sous-étape quand l'étape en compte plusieurs."""
+    logger.info("%s%s", LAST_BRANCH, f"{subject} : rien à faire" if subject else "Rien à faire")
 
 
 def inflect(n: int, singular: str, plural: str | None = None) -> str:

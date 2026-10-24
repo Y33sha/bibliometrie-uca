@@ -55,7 +55,7 @@ def _setup(conn) -> dict[str, int]:
 
 def _run(conn) -> None:
     arbitrate_identifier_conflicts(conn, logging.getLogger("test"), repo=PgPersonRepository(conn))
-    resolve_groups(conn)
+    resolve_groups(conn, logging.getLogger("test"))
     populate(conn)
     purge(conn)
 
