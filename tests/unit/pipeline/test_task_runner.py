@@ -15,7 +15,6 @@ def test_des_etapes_qui_ne_couvrent_pas_les_taches_de_la_phase_sont_refusees(con
 def test_l_executeur_mesure_la_duree_des_seules_taches_executees(contexte):
     """Une tâche exécutée reçoit sa durée. Une tâche écartée par sa condition garde `duration_s` à `None`."""
     steps = {
-        "countries.ror": TaskStep(lambda _ctx: PhaseMetrics()),
         "countries.detect": TaskStep(lambda _ctx: PhaseMetrics()),
         "countries.resolve": TaskStep(lambda _ctx: PhaseMetrics(), when=lambda _ctx: False),
         "countries.refresh_publication_countries": TaskStep(lambda _ctx: PhaseMetrics()),

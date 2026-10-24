@@ -12,14 +12,6 @@ from pipeline.transformation.countries import countries as phase
 from pipeline.transformation.countries.countries import AddressCountryStatus
 
 
-class _FakeStore:
-    def __init__(self, conn) -> None:
-        pass
-
-    def add_ror(self) -> int:
-        return 2
-
-
 class _FakeCountryQueries:
     """Rend les bilans successifs posés à la construction : l'initial, puis le final."""
 
@@ -30,12 +22,11 @@ class _FakeCountryQueries:
         return self._bilans.pop(0)
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Remplace les accès SQL de la phase : bilans, candidats ROR, résolution."""
+        """Remplace les accès SQL de la phase : bilans, résolution."""
         monkeypatch.setattr(
             phase, "count_address_country_status", self.count_address_country_status
         )
         monkeypatch.setattr(phase, "resolve_queued_addresses", lambda conn: 3)
-        monkeypatch.setattr(phase, "CountryCandidatesStore", _FakeStore)
 
 
 def _bilan(total: int, with_country: int) -> AddressCountryStatus:
@@ -77,7 +68,7 @@ def test_cumule_les_metriques_des_sous_etapes(contexte, sous_etapes, monkeypatch
 
     metrics = phase.CountriesPhase().run(contexte(mode="daily"))
 
-    assert metrics.new == 12  # 2 (ROR) + 4 (nom de pays) + 6 (nom de lieu)
+    assert metrics.new == 10  # 4 (nom de pays) + 6 (nom de lieu)
     assert metrics.updated == 3  # adresses dont la résolution change le pays
     assert sous_etapes["refresh"] is True
 
@@ -95,4 +86,4 @@ def test_chaque_sous_etape_dans_sa_transaction(open_tx, contexte, sous_etapes, m
 
     phase.CountriesPhase().run(contexte(mode="daily"))
 
-    assert open_tx.transactions == 7  # deux bilans + cinq sous-étapes
+    assert open_tx.transactions == 6  # deux bilans + quatre sous-étapes

@@ -2972,7 +2972,7 @@ export interface components {
          * @description Moyen qui propose un pays pour une adresse.
          * @enum {string}
          */
-        CountryDetectionMethod: "manual" | "country_name" | "ror" | "source_openalex" | "institution" | "city" | "source_scanr";
+        CountryDetectionMethod: "manual" | "country_name" | "source_openalex" | "institution" | "city" | "source_scanr";
         /**
          * CountryOut
          * @description Pays du référentiel : code ISO à deux lettres et libellé.

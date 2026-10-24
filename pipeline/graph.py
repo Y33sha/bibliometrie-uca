@@ -343,8 +343,6 @@ TASKS: tuple[Task, ...] = (
             "ror_dump_imports",
             # Dépendants d'une organisation qui change de pays.
             "source_contribution_countries_queue",
-            "address_country_candidates",
-            "address_candidates_queue",
         ),
         previous_run=("ror_dump_imports",),
         network="zenodo",
@@ -1122,12 +1120,6 @@ TASKS: tuple[Task, ...] = (
         ),
         writes=("subjects.usage_count", "subject_cooccurrences"),
         previous_run=("subjects",),
-    ),
-    _task(
-        "countries.ror",
-        "countries",
-        reads=("source_contribution_rors", "ror_organizations", "countries", "addresses.id"),
-        writes=("address_country_candidates", "address_candidates_queue"),
     ),
     _task(
         "countries.detect",

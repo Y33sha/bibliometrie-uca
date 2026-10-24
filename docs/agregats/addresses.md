@@ -23,7 +23,7 @@ Une adresse est unique par `md5(normalized_text)`, un rattachement par `(address
 | Phase | Ce qu'elle écrit |
 |---|---|
 | `normalize` | `addresses`, `source_contribution_addresses`, candidats des sources |
-| `affiliations` | `address_structures` ; après un changement de pays dans le référentiel ROR, marquage des adresses concernées dans `address_candidates_queue` |
+| `affiliations` | `address_structures` |
 | `publications` | `addresses.publication_count` |
 | `countries` | candidats des autres moyens, `addresses.countries` |
 
@@ -41,7 +41,6 @@ La résolution compare l'état détecté à l'état enregistré et n'écrit que 
 
 Tâches de `pipeline/transformation/countries/countries.py` :
 
-- `countries.ror` : pays des organisations ROR rattachées à l'affiliation ;
 - `countries.detect` : nom de pays en fin d'adresse, noms d'institutions et de villes. Pour une adresse de la file `address_candidates_queue`, chaque moyen recalcule ses candidats ;
 - `countries.resolve` : la fonction de préséance du domaine (`domain/country_detection.py`) compose `addresses.countries` à partir des candidats, pour les adresses de `address_candidates_queue`. Les adresses dont le pays change entrent dans `address_countries_queue`.
 
@@ -63,7 +62,7 @@ Routeur `interfaces/api/routers/addresses.py`, commandes transactionnelles dans 
 
 ## Lecture par le pipeline
 
-La résolution lit `addresses(id, normalized_text)` et `structure_name_forms`. La détection de pays lit `addresses`, `place_name_forms` et `source_contribution_rors`. Le recompte de `publication_count`, en fin de phase `publications`, joint la table de liaison aux contributions sources et à leurs enregistrements sources.
+La résolution lit `addresses(id, normalized_text)` et `structure_name_forms`. La détection de pays lit `addresses` et `place_name_forms`. Le recompte de `publication_count`, en fin de phase `publications`, joint la table de liaison aux contributions sources et à leurs enregistrements sources.
 
 ## Lecture par l'API
 

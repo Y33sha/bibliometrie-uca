@@ -13,7 +13,6 @@ class CountryDetectionMethod(StrEnum):
 
     MANUAL = "manual"
     COUNTRY_NAME = "country_name"
-    ROR = "ror"
     SOURCE_OPENALEX = "source_openalex"
     INSTITUTION = "institution"
     CITY = "city"
@@ -26,14 +25,14 @@ SOURCE_COUNTRY_METHODS: dict[str, CountryDetectionMethod] = {
     "openalex": CountryDetectionMethod.SOURCE_OPENALEX,
 }
 
-# Moyens par rang de préséance, d'après une revue à la main des désaccords. Un groupe compte pour un seul moyen : le pays OpenAlex dérive en général du ROR.
-_PRECEDENCE: tuple[frozenset[CountryDetectionMethod], ...] = (
-    frozenset({CountryDetectionMethod.MANUAL}),
-    frozenset({CountryDetectionMethod.COUNTRY_NAME}),
-    frozenset({CountryDetectionMethod.ROR, CountryDetectionMethod.SOURCE_OPENALEX}),
-    frozenset({CountryDetectionMethod.INSTITUTION}),
-    frozenset({CountryDetectionMethod.CITY}),
-    frozenset({CountryDetectionMethod.SOURCE_SCANR}),
+# Moyens par rang de préséance, d'après une revue à la main des désaccords.
+_PRECEDENCE: tuple[CountryDetectionMethod, ...] = (
+    CountryDetectionMethod.MANUAL,
+    CountryDetectionMethod.COUNTRY_NAME,
+    CountryDetectionMethod.SOURCE_OPENALEX,
+    CountryDetectionMethod.INSTITUTION,
+    CountryDetectionMethod.CITY,
+    CountryDetectionMethod.SOURCE_SCANR,
 )
 
 # Nombre de moyens qui, d'accord sur un autre pays, l'emportent sur le premier moyen.
@@ -47,10 +46,7 @@ def retained_countries(
 
     Le premier moyen qui propose un pays l'emporte. `manual` l'emporte toujours. Un autre premier moyen cède quand deux autres moyens proposent un même autre pays et qu'aucun ne soutient le sien.
     """
-    proposals = [
-        frozenset(code for method in group for code in candidates.get(method, ()))
-        for group in _PRECEDENCE
-    ]
+    proposals = [frozenset(candidates.get(method, ())) for method in _PRECEDENCE]
     first = next((rank for rank, codes in enumerate(proposals) if codes), None)
     if first is None:
         return frozenset()
