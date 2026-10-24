@@ -117,6 +117,7 @@ Usages du type dans le code :
   - `publisher_id` sur `source_records` et `publications`, écrit par l'agrégation : le titulaire du préfixe pour un DOI Crossref, à défaut l'éditeur que donnent les sources ;
   - `doi_prefix`, colonne générée de `publications`, pour les jointures sur `doi_prefixes`.
 - L'éditeur d'une série est celui de ses publications les plus récentes. Une publication a donc l'éditeur à la date de sa publication.
+- Une production hébergée sans être publiée n'a pas d'éditeur : preprint, jeu de données, dépôt. La plateforme qui l'héberge n'en est pas l'éditeur, comme le CCSD pour HAL.
 
 ## Phasage
 
@@ -128,25 +129,33 @@ Usages du type dans le code :
 - [x] Répartition des entrées de `journals` par type, et des publications rattachées.
 - [x] Usages de chaque nature : normalisation, rattachement par préfixe DOI, enrichissements, statut open access, APC, interface.
 
-### Phase 2 — Modèle
+### Phase 2 — Éditeur des publications
 
-- [ ] Entités, noms et relations des trois natures.
-- [ ] Migration du schéma.
+- [ ] Migration : `publications.doi_prefix`, colonne générée ; `publisher_id` sur `source_records` et `publications`.
+- [ ] Normalisation : l'enregistrement source reçoit l'éditeur de `biblio.publisher`, trouvé ou créé par ses formes de nom. Pas d'éditeur pour les types `preprint`, `dataset`, `software`, `report`, `thesis`, `ongoing_thesis`, `hdr`, `memoir`, `poster`, `conference` et `patent`, ni pour un enregistrement DataCite sans série ni monographie.
+- [ ] Agrégation : la publication reçoit le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur non nul dans l'ordre de priorité des sources. Pas d'éditeur pour les mêmes types.
+- [ ] Suppression des éditeurs vides et fusion d'éditeurs : prise en compte des éditeurs des enregistrements sources et des publications.
+- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
+- [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
 
-### Phase 3 — Pipeline
+### Phase 3 — Plateformes et localisations
 
-- [ ] Normalisation et rattachement des conteneurs selon leur nature.
-- [ ] Enrichissements limités à la nature qu'ils décrivent.
-- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
-- [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
-- [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
+- [ ] Migration : `platforms`, `platform_domains`, localisations des enregistrements sources.
+- [ ] Moissonnage des localisations d'Unpaywall, avec archivage des réponses.
+- [ ] Localisations de Crossref (`resource`, `link`) et d'OpenAlex.
+- [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
+- [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
 - [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
+- [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
 - [x] Vérification Unpaywall : DOI DataCite écartés (`e1d7daeb6`).
 
-### Phase 4 — API et interface
+### Phase 4 — Séries
 
+- [ ] Renommage de `journals` en `serials`, et de `monographs.journal_id` en `serial_id`.
+- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
+- [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
+- [ ] Enrichissements limités à la nature qu'ils décrivent.
 - [ ] Endpoints, pages et filtres.
-- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
 
 ### Phase 5 — Documentation
 
