@@ -30,6 +30,13 @@ Trois sources décrivent les localisations d'un document :
 - Crossref donne la cible de résolution du DOI (`resource.primary.URL`) et les URL du texte intégral (`link`). La normalisation ne les lit pas.
 - Unpaywall donne les localisations en open access. Le pipeline lit seulement son statut open access.
 
+Localisations OpenAlex du raw store local : 105 586 works, 322 036 localisations.
+
+- 97 % des localisations ont un lieu. OpenAlex range parmi les entrepôts des index (DOAJ) et des agrégateurs (Europe PMC).
+- 40 % des works réunissent plusieurs versions.
+- Les localisations d'entrepôt sont presque toutes en `submittedVersion` (200 949 sur 258 875), y compris dans HAL pour des articles publiés, et dans Cairn, qui héberge des versions publiées. Leur version est donc peu fiable.
+- Sur 6 080 localisations arXiv en `submittedVersion` d'une publication autre qu'un preprint, 5 051 désignent un preprint qui n'a pas de publication propre. 1 029 désignent une autre publication, dont 437 preprints, dont 390 reliés à l'article par `is_preprint_of`.
+
 ### Éditeur d'une publication
 
 Une publication a l'éditeur de sa revue : ni `publications` ni `source_records` n'ont de `publisher_id`. Quand une revue change d'éditeur, ses anciens articles passent au nouvel éditeur.
@@ -95,6 +102,7 @@ Usages du type dans le code :
 
 - [x] Revues qui changent d'éditeur, d'après le préfixe DOI de leurs publications (`f02277482`).
 - [x] Membre qui détient les DOI Crossref et domaine de résolution, sur le raw store.
+- [x] Localisations OpenAlex par lieu et par version, sur le raw store.
 - [x] Répartition des entrées de `journals` par type, et des publications rattachées.
 - [x] Usages de chaque nature : normalisation, rattachement par préfixe DOI, enrichissements, statut open access, APC, interface.
 
@@ -126,7 +134,7 @@ Usages du type dans le code :
 - Place de `media`, et sort de `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
 - **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
-- **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer.
+- **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
 - **Éditeur d'une publication.** Une colonne `publisher_id` sur `source_records` et `publications`, remplie par le membre Crossref, à défaut par l'agrégation des sources. Le membre donne l'éditeur actuel, le titulaire du préfixe l'éditeur d'origine, le domaine l'hébergeur : lequel retenir ? Le membre qui détient les DOI récents d'une revue corrigerait aussi l'éditeur de la revue.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
 - **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` en désigne une seule : laquelle ?
