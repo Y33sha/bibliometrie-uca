@@ -99,11 +99,13 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
 
     assert write_misplaced_neutralizations(
         sa_sync_conn, {contributor_information_id: ["orcid"]}
-    ) == MisplacedNeutralizations(neutralized=1, to_detach=[source_contribution_id])
+    ) == MisplacedNeutralizations(
+        gained={source_contribution_id: ["orcid"]}, to_detach=[source_contribution_id]
+    )
     assert _carte(sa_sync_conn, source_contribution_id) == {"orcid": "misplaced"}
 
     assert write_misplaced_neutralizations(sa_sync_conn, {}) == MisplacedNeutralizations(
-        neutralized=0, to_detach=[]
+        gained={}, to_detach=[]
     )
     assert _carte(sa_sync_conn, source_contribution_id) is None
 
