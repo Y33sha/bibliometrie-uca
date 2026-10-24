@@ -134,8 +134,8 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 #### Étape C — Bascule des écrivains
 
-- [ ] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion et exclusion de personnes. Le rejet d'un couple retire la personne du groupe ; l'attribution et l'épinglage la posent sur le groupe sans personne (4e1e81472).
-- [ ] Invalidation des rattachements au rejet d'un identifiant ou d'une forme de nom. Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
+- [x] Décisions humaines propagées au groupe : épinglage, attribution d'un orphelin, détachement, rejet, statut d'une forme de nom, fusion. L'exclusion d'une personne laisse ses groupes ; le périmètre des publications l'écarte. Le périmètre des publications touchées est recalculé aussitôt. 4e1e81472 250e73ff4 bc94685f2
+- [x] Invalidation des rattachements au rejet d'un identifiant ou d'une forme de nom. bc94685f2 Au 2026-10-20, 836 contributions sources non épinglées de 39 personnes sont rattachées par un identifiant rejeté pour leur personne, sans autre identifiant valide. Elles ancrent 2 223 rattachements entre sources.
 - [x] La cascade par groupe écrit seulement le groupe. a6e809b3d
 - [ ] La phase `contributions` cesse de construire la table `contributions`.
 - [ ] `source_contributions.person_id` figé et comparé aux groupes sur plusieurs runs. L'ancienne cascade cesse de créer des personnes.
