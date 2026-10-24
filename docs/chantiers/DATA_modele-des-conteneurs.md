@@ -35,7 +35,19 @@ Localisations OpenAlex du raw store local : 105 586 works, 322 036 localisations
 - 97 % des localisations ont un lieu. OpenAlex range parmi les entrepôts des index (DOAJ) et des agrégateurs (Europe PMC).
 - 40 % des works réunissent plusieurs versions.
 - Les localisations d'entrepôt sont presque toutes en `submittedVersion` (200 949 sur 258 875), y compris dans HAL pour des articles publiés, et dans Cairn, qui héberge des versions publiées. Leur version est donc peu fiable.
-- Sur 6 080 localisations arXiv en `submittedVersion` d'une publication autre qu'un preprint, 5 051 désignent un preprint qui n'a pas de publication propre. 1 029 désignent une autre publication, dont 437 preprints, dont 390 reliés à l'article par `is_preprint_of`.
+- Sur 6 080 localisations arXiv en `submittedVersion` d'une publication autre qu'un preprint, 5 051 désignent un preprint qui n'a pas de publication propre.
+
+Publications qui partagent un identifiant arXiv sans être typées preprint : 189 paires. Dans 135 paires, l'une des deux a un DOI arXiv. Les autres réunissent une communication et un article (27), un erratum ou un addendum et son article (6), un jeu de données et son article (5), deux publications de même type (16). Parmi ces dernières, des copies d'entrepôt restent séparées de leur article (Apollo `10.17863`, DESY `10.3204`), et des identifiants arXiv sont attribués à tort.
+
+2 352 des 4 357 enregistrements DataCite arXiv sont typés `article`, d'après leur type brut. Aucun n'est rattaché à ArXiv.org, donc la correction `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` ne s'applique pas. 184 des 1 148 publications à DOI arXiv ont un autre type que `preprint`.
+
+Test de l'API Unpaywall sur 120 DOI du périmètre, tirés au hasard :
+
+- les 104 DOI Crossref ont une réponse, les 16 DOI DataCite aucune ;
+- Unpaywall donne seulement les localisations en open access : 25 DOI n'en ont aucune ;
+- une localisation comporte le type d'hébergeur (`publisher` ou `repository`), la version, la licence, l'URL de la page et du PDF, la date d'ouverture, et pour un entrepôt son institution et son identifiant (`endpoint_id`, présent sur 367 localisations d'entrepôt sur 396) ;
+- les versions suivent la répartition d'OpenAlex : 330 localisations d'entrepôt sur 396 sont en `submittedVersion`, PubMed Central compris ;
+- la date de publication est au jour pour 86 DOI, au 1er janvier pour 18.
 
 ### Éditeur d'une publication
 
@@ -95,6 +107,15 @@ Usages du type dans le code :
   - publication isolée : monographie, livre ou volume d'actes, rattachée ou non à une série ;
   - localisation : entrepôt, serveur de prépublications, plateforme.
 - Les localisations sortent de `journals`.
+- Schéma :
+  - `publishers` et `doi_prefixes`, inchangées. Le titulaire d'un préfixe est l'éditeur d'origine de ses DOI ;
+  - `serials`, à la place de `journals` : revues, collections d'ouvrages, séries d'actes, médias. Les ISSN, les formes de nom, les espaces de noms DOI, le DOAJ, les APC et le modèle open access y restent. Aucune colonne d'éditeur ;
+  - `monographs` : livres et volumes d'actes, rattachés à leur série (`serial_id`) ;
+  - `platforms` : lieux qui hébergent des publications, à savoir entrepôts, serveurs de preprints, plateformes d'éditeurs, index et agrégateurs. Type, identifiant d'entrepôt Unpaywall (`endpoint_id`), source OpenAlex ;
+  - `platform_domains` : domaine → plateforme, plateforme nullable ;
+  - localisations d'un enregistrement source : URL de la page, URL du PDF, plateforme nullable, version, licence, date d'ouverture. L'agrégation les réunit par publication ;
+  - `publisher_id` sur `source_records` et `publications`.
+- L'éditeur d'une série est celui de ses publications les plus récentes. Une publication a donc l'éditeur à la date de sa publication.
 
 ## Phasage
 
@@ -118,6 +139,7 @@ Usages du type dans le code :
 - [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
 - [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
 - [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
+- [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
 
 ### Phase 4 — API et interface
 
@@ -129,13 +151,14 @@ Usages du type dans le code :
 
 ## Questions ouvertes
 
-- Noms des trois entités, en anglais dans le code et en français dans l'interface.
+- Noms des entités dans l'interface.
 - Une publication peut-elle avoir à la fois une série, une monographie et une ou plusieurs localisations ?
-- Place de `media`, et sort de `unknown`.
+- Sort des entrées `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
 - **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
 - **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
-- **Éditeur d'une publication.** Une colonne `publisher_id` sur `source_records` et `publications`, remplie par le membre Crossref, à défaut par l'agrégation des sources. Le membre donne l'éditeur actuel, le titulaire du préfixe l'éditeur d'origine, le domaine l'hébergeur : lequel retenir ? Le membre qui détient les DOI récents d'une revue corrigerait aussi l'éditeur de la revue.
+- **Éditeur d'une publication.** Quelle règle remplit l'éditeur à la date de publication ? Le titulaire du préfixe donne l'éditeur d'origine, le membre Crossref l'éditeur actuel, le domaine l'hébergeur. À défaut de DOI Crossref, l'agrégation des sources.
+- **Maintenance des référentiels.** Chaque table a son régime : recalcul à chaque run, mise à jour incrémentale par file d'attente, ou valeur posée une fois (typage OpenAlex, `doi_prefixes`). Comment rafraîchir une valeur posée une fois ? `doi_prefixes` attribue à Hindawi un préfixe dont Wiley détient les DOI.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
 - **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` en désigne une seule : laquelle ?
 - **Ouvrage en plusieurs volumes** (« Current Developments in Biotechnology and Bioengineering »). Chaque volume est-il une monographie, et qu'est-ce qui les relie ?
