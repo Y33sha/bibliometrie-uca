@@ -212,9 +212,13 @@ class TestChangementsJournalises:
         with caplog.at_level(logging.INFO, logger=logger.name):
             _log_changes(RelationsRebuild(4569, [("is_preprint_of", 8)], removed=4), logger)
 
-        assert "8 nouvelles relations entre publications" in caplog.text
-        assert "préprint/article" in caplog.text
-        assert "4 relations retirées" in caplog.text
+        assert caplog.messages[-5:] == [
+            "▶ Relations entre publications",
+            "  ├─ 8 nouvelles relations, dont",
+            "  │",
+            "  │  8 préprint/article",
+            "  └─ 4 relations retirées",
+        ]
         assert "is_preprint_of" not in caplog.text
 
     def test_une_reconstruction_a_l_identique_ne_dit_rien_de_plus(self, caplog):

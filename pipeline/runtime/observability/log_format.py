@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from domain.sources.registry import SOURCE_LABELS, source_label
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 
@@ -35,6 +37,23 @@ def source_branch(source: str, scope: str | None = None) -> str:
     if scope is None:
         return label
     return f"{label} {scope:<{_SCOPE_WIDTH}}"
+
+
+def breakdown(
+    logger: ScopedOrPlainLogger,
+    header: str,
+    rows: Iterable[tuple[int, str]],
+    *,
+    last: bool = True,
+) -> None:
+    """Ligne de branche `header`, puis, après une ligne vide, une ligne par `(nombre, libellé)`, nombres alignés à droite. Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail."""
+    rows = list(rows)
+    margin = " " * len(LAST_BRANCH) if last else BRANCH_CONTINUATION
+    logger.info("%s%s", LAST_BRANCH if last else BRANCH, header)
+    logger.info("%s", margin.rstrip())
+    width = max((len(str(count)) for count, _ in rows), default=0)
+    for count, label in rows:
+        logger.info("%s%s %s", margin, str(count).rjust(width), label)
 
 
 def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:

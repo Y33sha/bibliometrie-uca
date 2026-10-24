@@ -40,6 +40,7 @@ from infrastructure.sql_fragments import (
 from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
+    breakdown,
     inflect,
     quantity,
     step,
@@ -359,13 +360,11 @@ def _log_identified(
     )
     by_mode[GroupMatchReason.MANUAL] += pinned
     total = sum(by_mode.values())
-    logger.info(
-        "%s%s %s, dont", LAST_BRANCH, quantity(total, "contribution"), inflect(total, "identifiée")
+    breakdown(
+        logger,
+        f"{quantity(total, 'contribution')} {inflect(total, 'identifiée')}, dont",
+        ((by_mode[mode], label) for mode, label in _MODE_LABELS.items()),
     )
-    width = max(len(str(by_mode[mode])) for mode in _MODE_LABELS)
-    logger.info("")
-    for mode, label in _MODE_LABELS.items():
-        logger.info("     %s %s", str(by_mode[mode]).rjust(width), label)
 
 
 def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
