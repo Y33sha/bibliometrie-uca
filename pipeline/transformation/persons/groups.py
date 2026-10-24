@@ -396,17 +396,15 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
     _log_identified(logger, decisions, pinned)
 
     step(logger, "Création de nouvelles personnes")
+    # Contributions du périmètre sans personne, hors rôles qui n'autorisent pas la création.
     unidentified = [
         d
         for d in decisions.values()
-        if d.outcome != GroupOutcome.MATCH and d.reason != GroupSkipReason.OUT_OF_PERIMETER
+        if d.outcome != GroupOutcome.MATCH
+        and d.reason not in (GroupSkipReason.OUT_OF_PERIMETER, GroupSkipReason.CREATION_NOT_ALLOWED)
     ]
     to_create = sum(1 for d in unidentified if d.outcome == GroupOutcome.CREATE)
-    undecidable = sum(
-        1
-        for d in unidentified
-        if d.outcome == GroupOutcome.SKIP and d.reason != GroupSkipReason.CREATION_NOT_ALLOWED
-    )
+    undecidable = len(unidentified) - to_create
     logger.info(
         "%s%s du périmètre %s",
         BRANCH,

@@ -404,6 +404,30 @@ def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync
     assert "  └─ 1 personne créée" in caplog.messages
 
 
+def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_conn, caplog):
+    """Un membre du jury au nom inconnu reste sans personne sans être compté ; un auteur au nom inconnu fonde une personne."""
+    conn = sa_sync_conn
+    publication = insert_publication(conn)
+    source_record = insert_source_record(conn, publication, source="theses", source_id="these-1")
+    jury = insert_source_contribution(
+        conn,
+        source_record,
+        source="theses",
+        raw_author_name="Paul Durand",
+        author_name_normalized="paul durand",
+        in_perimeter=True,
+        roles=["jury_member"],
+    )
+    insert_group(conn, publication, [(jury, source_record)])
+    _group(conn, insert_publication(conn), [("hal", "Claire Durand", None, True)])
+
+    with caplog.at_level(logging.INFO):
+        resolve_groups(conn, logging.getLogger("test"))
+
+    assert "  ├─ 1 contribution du périmètre non identifiée" in caplog.messages
+    assert "  ├─ 0 indécidable" in caplog.messages
+
+
 class TestResolutionQueue:
     """Un groupe en file garde sa personne jusqu'à sa redécision, qui ne l'écrit que si elle change."""
 
