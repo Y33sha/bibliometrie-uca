@@ -1,119 +1,140 @@
-"""Transfert d'identifiant par consensus — canal identifiant ordre-indépendant.
-
-Une valeur d'identifiant captée par un premier arrivé au nom minoritaire est recalée, par le
-**balayage frontal des conflits** en tête de phase, sur la personne que soutient la majorité
-des porteurs ; un porteur étranger minoritaire, lui, ne vole pas l'identifiant du propriétaire
-majoritaire. Le balayage lit le snapshot du run précédent : la capture se forme au run 1,
-elle est recalée au run 2 (convergence multi-run).
-
-Ces tests n'appellent que `run()` (pas `populate`, qui committe et casserait le rollback
-de la fixture) : l'isolation transactionnelle est préservée.
-"""
+"""Arbitrage des identifiants de personne au niveau des groupes, sur vraie base : vote des groupes sur les conflits d'attribution, libération des groupes après un transfert ou une neutralisation `misplaced`."""
 
 import logging
 
 from sqlalchemy import text
 
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.cascade import run_cascade
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from tests.integration.helpers.groups import group_ungrouped
+from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 _LOG = logging.getLogger("test")
-_IDREF = "109964128"  # IdRef réel (valide au regard du value object)
+_ORCID = "0000-0002-1825-0097"
 
 
-def _seed(conn, *, source_contribution_id, raw_name, name_norm, idref):
-    """Publication + contribution source in-périmètre non rattachée, avec les informations du contributeur
-    `(name_norm, {idref})`. `source_contribution_id` fixe l'ordre de traitement (`ORDER BY sa.id`)."""
-    insert_publication(conn, f"publication {source_contribution_id}", row_id=source_contribution_id)
-    insert_source_record(
-        conn,
-        source_contribution_id,
-        source_id=f"hal-{source_contribution_id}",
-        title=f"publication {source_contribution_id}",
-        row_id=source_contribution_id,
-        publication_year=2024,
-        doc_type="article",
+def _group(conn, person, mode, *, name="jean martin", source="crossref", orcid=_ORCID):
+    """Groupe d'une contribution source, seul auteur d'une publication, rattaché à `person` par `mode`. La contribution source contient l'ORCID `orcid`."""
+    publication = insert_publication(conn)
+    source_record = insert_source_record(
+        conn, publication, source=source, source_id=f"{source}-{publication}"
     )
-    insert_source_contribution(
+    source_contribution = insert_source_contribution(
         conn,
-        source_contribution_id,
-        row_id=source_contribution_id,
-        raw_author_name=raw_name,
-        author_name_normalized=name_norm,
-        identifiers={"idref": idref},
-        in_perimeter=True,
+        source_record,
+        source=source,
+        raw_author_name=name,
+        author_name_normalized=name,
+        identifiers={"orcid": orcid},
     )
+    group = insert_group(conn, publication, [(source_contribution, source_record)])
+    conn.execute(
+        text(
+            "UPDATE source_contribution_groups"
+            " SET person_id = :p, resolution_mode = CAST(:m AS group_resolution_mode) WHERE id = :g"
+        ),
+        {"p": person, "g": group, "m": mode},
+    )
+    return group
 
 
-def _run(conn):
-    """Arbitrage des conflits d'identifiant (transfert par consensus) puis la cascade."""
-    group_ungrouped(conn)
-    arbitrate_identifier_conflicts(conn, _LOG, repo=PgPersonRepository(conn))
-    run_cascade(conn, _LOG, repo=PgPersonRepository(conn))
+def _groups(conn, count, person, mode, **kwargs):
+    return [_group(conn, person, mode, **kwargs) for _ in range(count)]
 
 
-def _idref_owner_name(conn, idref):
-    """(nom, prénom) normalisés de la personne à qui l'IdRef est attribué."""
+def _arbitrate(conn):
+    return arbitrate_identifier_conflicts(conn, _LOG, repo=PgPersonRepository(conn))
+
+
+def _orcid_owner(conn):
     return conn.execute(
-        text("""
-            SELECT p.last_name_normalized AS ln, p.first_name_normalized AS fn
-            FROM person_identifiers pi
-            JOIN persons p ON p.id = pi.person_id
-            WHERE pi.id_type = 'idref' AND pi.id_value = :v
-        """),
-        {"v": idref},
-    ).one()
+        text("SELECT person_id FROM person_identifiers WHERE id_type = 'orcid' AND id_value = :v"),
+        {"v": _ORCID},
+    ).scalar_one()
 
 
-def test_captured_identifier_recales_on_majority(sa_sync_conn):
-    """Capture : « hervé chanal » (id bas, traité en premier) capte l'IdRef ; trois « hélène
-    chanal » suivent. Le run 1 forme la capture (IdRef sur hervé) ; le run 2, par balayage
-    frontal du snapshot, transfère l'IdRef à la personne majoritaire."""
-    _seed(
-        sa_sync_conn,
-        source_contribution_id=96001,
-        raw_name="Herve Chanal",
-        name_norm="herve chanal",
-        idref=_IDREF,
+def _person_of(conn, group):
+    return tuple(
+        conn.execute(
+            text("SELECT person_id, resolution_mode FROM source_contribution_groups WHERE id = :g"),
+            {"g": group},
+        ).one()
     )
-    for source_contribution_id in (96002, 96003, 96004):
-        _seed(
-            sa_sync_conn,
-            source_contribution_id=source_contribution_id,
-            raw_name="Helene Chanal",
-            name_norm="helene chanal",
-            idref=_IDREF,
-        )
-    _run(sa_sync_conn)  # capture : IdRef sur « hervé chanal »
-    _run(sa_sync_conn)  # balayage frontal : recalage sur la majorité
-    owner = _idref_owner_name(sa_sync_conn, _IDREF)
-    assert (owner.ln, owner.fn) == ("chanal", "helene")
 
 
-def test_foreign_bearer_does_not_steal(sa_sync_conn):
-    """Porteur étranger : trois « jean martin » (majorité) portent l'IdRef, un « pierre
-    dupont » (minorité, contamination) aussi. Le consensus désigne le propriétaire → pas de
-    transfert, l'IdRef reste sur « jean martin »."""
-    for source_contribution_id in (96011, 96012, 96013):
-        _seed(
-            sa_sync_conn,
-            source_contribution_id=source_contribution_id,
-            raw_name="Jean Martin",
-            name_norm="jean martin",
-            idref=_IDREF,
-        )
-    _seed(
-        sa_sync_conn,
-        source_contribution_id=96014,
-        raw_name="Pierre Dupont",
-        name_norm="pierre dupont",
-        idref=_IDREF,
-    )
-    _run(sa_sync_conn)
-    _run(sa_sync_conn)  # deux passes : le balayage frontal confirme le propriétaire
-    owner = _idref_owner_name(sa_sync_conn, _IDREF)
-    assert (owner.ln, owner.fn) == ("martin", "jean")
+def _persons(conn, owner_name=("Martin", "Jean"), other_name=("Martin", "Jeanne")):
+    """Titulaire de l'ORCID en `pending`, et une autre personne."""
+    owner = insert_person(conn, owner_name[0], first_name=owner_name[1])
+    other = insert_person(conn, other_name[0], first_name=other_name[1])
+    insert_person_identifier(conn, owner, id_type="orcid", id_value=_ORCID, status="pending")
+    return owner, other
+
+
+class TestConflicts:
+    def test_la_majorite_des_voix_transfere_et_libere_les_groupes_du_titulaire(self, sa_sync_conn):
+        """Le titulaire a quatre voix (deux groupes rattachés par l'ORCID, un groupe manuel, un groupe rattaché par IdRef), l'autre personne cinq : l'ORCID passe à l'autre personne. Seuls les groupes du titulaire rattachés par l'ORCID perdent leur personne."""
+        conn = sa_sync_conn
+        owner, other = _persons(conn)
+        by_orcid = _groups(conn, 2, owner, "orcid")
+        manual = _group(conn, owner, "manual")
+        by_idref = _group(conn, owner, "idref")
+        _groups(conn, 5, other, "name")
+
+        assert _arbitrate(conn)["transferred"] == 1
+
+        assert _orcid_owner(conn) == other
+        assert [_person_of(conn, g) for g in by_orcid] == [(None, None), (None, None)]
+        assert _person_of(conn, manual) == (owner, "manual")
+        assert _person_of(conn, by_idref) == (owner, "idref")
+
+    def test_les_groupes_rattaches_par_l_identifiant_votent(self, sa_sync_conn):
+        """Trois groupes du titulaire rattachés par l'ORCID contre un groupe de l'autre personne rattaché par le nom : le titulaire garde l'ORCID. Un rattachement par identifiant suppose que le nom corrobore la personne."""
+        conn = sa_sync_conn
+        owner, other = _persons(conn)
+        _groups(conn, 3, owner, "orcid")
+        _group(conn, other, "name")
+
+        assert _arbitrate(conn)["transferred"] == 0
+
+        assert _orcid_owner(conn) == owner
+
+    def test_la_majorite_du_titulaire_garde_l_identifiant(self, sa_sync_conn):
+        conn = sa_sync_conn
+        owner, other = _persons(conn)
+        _groups(conn, 2, owner, "name")
+        by_orcid = _group(conn, owner, "orcid")
+        _group(conn, other, "name")
+
+        assert _arbitrate(conn)["transferred"] == 0
+
+        assert _orcid_owner(conn) == owner
+        assert _person_of(conn, by_orcid) == (owner, "orcid")
+
+    def test_un_orcid_d_une_source_non_fiable_ne_vote_pas(self, sa_sync_conn):
+        conn = sa_sync_conn
+        owner, other = _persons(conn)
+        _groups(conn, 3, other, "name", source="wos")
+
+        assert _arbitrate(conn)["transferred"] == 0
+
+        assert _orcid_owner(conn) == owner
+
+
+def test_un_groupe_rattache_par_un_identifiant_mal_place_perd_sa_personne(sa_sync_conn):
+    """Quatre « jean martin » portent l'ORCID, trois « pierre dupont » aussi : leur ORCID est mal placé. Le groupe de « pierre dupont » rattaché par l'ORCID perd sa personne ; les groupes manuel et rattaché par le nom la gardent."""
+    conn = sa_sync_conn
+    martin = insert_person(conn, "Martin", first_name="Jean")
+    dupont = insert_person(conn, "Dupont", first_name="Pierre")
+    _groups(conn, 4, martin, "name")
+    by_orcid = _group(conn, dupont, "orcid", name="pierre dupont")
+    manual = _group(conn, dupont, "manual", name="pierre dupont")
+    by_name = _group(conn, dupont, "name", name="pierre dupont")
+
+    result = _arbitrate(conn)
+
+    assert (result["neutralized"], result["released_groups"]) == (3, 1)
+    assert _person_of(conn, by_orcid) == (None, None)
+    assert _person_of(conn, manual) == (dupont, "manual")
+    assert _person_of(conn, by_name) == (dupont, "name")

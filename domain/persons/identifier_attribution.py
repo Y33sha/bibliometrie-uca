@@ -58,7 +58,7 @@ class IdentifierAttribution:
     def transfer_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
         """Transfère une attribution `pending` vers une autre personne.
 
-        Réservé à l'arbitrage automatique par consensus du canal identifiant : une valeur captée par le premier arrivé (statut `pending`) est déplacée vers la personne que soutient la majorité des porteurs. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).
+        Réservé à l'arbitrage automatique des conflits d'attribution : une valeur `pending` est déplacée vers la personne que désigne la majorité des groupes qui la portent. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).
 
         Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève `CannotAttributeConflict` sinon.
         """
@@ -66,7 +66,7 @@ class IdentifierAttribution:
             raise CannotAttributeConflict(
                 f"Impossible de transférer l'identifiant {self.id_type}={self.id_value!r} "
                 f"depuis le statut {self.status.value!r} ; seul un identifiant pending est "
-                "transférable par consensus.",
+                "transférable.",
             )
         self.person_id = new_person_id
         self.source = source

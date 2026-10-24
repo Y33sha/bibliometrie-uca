@@ -25,14 +25,6 @@ class IdentifiedPerson(NamedTuple):
     first_name: str
 
 
-class PersonNameForms(NamedTuple):
-    """Nom normalisé d'une personne et ses formes de nom confirmées, pour l'arbitrage des transferts d'identifiant."""
-
-    last_name: str
-    first_name: str
-    confirmed_forms: list[str]
-
-
 # TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
 # (`decide_match_by_identifier(idref, idref_map)`), alors que l'IdRef ScanR provient
 # du même bloc `denormalized` que son ORCID exclu. Asymétrie possiblement défendable
@@ -327,32 +319,12 @@ def decide_match_by_identifier(
     return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
 
 
-def form_matches_person(
-    form: str,
-    last_name: str,
-    first_name: str,
-    confirmed_forms: Iterable[str] = (),
-) -> bool:
-    """La forme de nom `form` désigne-t-elle la personne ?
-
-    Vrai si `form` est compatible (`names_compatible`, comparaison par tokens) avec le nom-prénom de la personne, ou avec l'une de ses formes de nom **confirmées** (un nom validé par un humain que le nom-prénom canonique ne recouvre pas, changement de nom inclus).
-
-    Sert à arbitrer un conflit d'attribution d'identifiant : la forme majoritaire des contributions sources qui contiennent une valeur (le *consensus*, agrégat ordre-indépendant fourni par le caller) est confrontée au propriétaire actuel et au candidat en conflit — l'identifiant se transfère vers le candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire.
-    """
-    if names_compatible(form, "", last_name, first_name):
-        return True
-    return any(names_compatible(form, "", cf, "") for cf in confirmed_forms)
-
-
-def consensus_name(votes: Mapping[str, int]) -> str | None:
-    """Consensus d'une valeur d'identifiant : le nom qui porte strictement plus de voix que chacun des autres.
-
-    `votes` compte les contributions sources qui contiennent la valeur sous chaque nom normalisé. `None` en cas d'égalité en tête ou sans aucune voix.
-    """
+def strict_majority[K](votes: Mapping[K, int]) -> K | None:
+    """Clé qui porte strictement plus de voix que chacune des autres. `None` en cas d'égalité en tête ou sans aucune voix."""
     if not votes:
         return None
     best, *others = sorted(votes.values(), reverse=True)
-    if others and others[0] == best:
+    if best <= 0 or (others and others[0] == best):
         return None
     return max(votes, key=votes.__getitem__)
 

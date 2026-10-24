@@ -9,14 +9,13 @@ from domain.persons.matching import (
     attested_full_first_names,
     compatible_namesakes,
     compatible_persons,
-    consensus_name,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
-    form_matches_person,
     full_namesakes,
     identifier_misplaced,
+    strict_majority,
     trusted_identifier,
 )
 
@@ -40,24 +39,30 @@ class TestTrustedIdentifier:
         assert trusted_identifier("hal_person_id", "hal")
 
 
-class TestConsensusName:
+class TestStrictMajority:
     def test_strict_majority(self):
-        assert consensus_name({"martin p": 2, "dupont j": 1}) == "martin p"
+        assert strict_majority({"martin p": 2, "dupont j": 1}) == "martin p"
 
     def test_relative_majority(self):
-        assert consensus_name({"a": 35, "b": 33, "c": 32}) == "a"
+        assert strict_majority({"a": 35, "b": 33, "c": 32}) == "a"
 
     def test_single_vote(self):
-        assert consensus_name({"martin p": 1}) == "martin p"
+        assert strict_majority({"martin p": 1}) == "martin p"
 
     def test_tie_at_the_top(self):
-        assert consensus_name({"aubert p": 1, "dupont j": 1}) is None
+        assert strict_majority({"aubert p": 1, "dupont j": 1}) is None
 
     def test_tie_below_the_top(self):
-        assert consensus_name({"a": 3, "b": 1, "c": 1}) == "a"
+        assert strict_majority({"a": 3, "b": 1, "c": 1}) == "a"
 
     def test_no_vote(self):
-        assert consensus_name({}) is None
+        assert strict_majority({}) is None
+
+    def test_keys_without_votes(self):
+        assert strict_majority({1: 0}) is None
+
+    def test_any_keys(self):
+        assert strict_majority({1: 0, 2: 1}) == 2
 
 
 class TestIdentifierMisplaced:
@@ -72,41 +77,6 @@ class TestIdentifierMisplaced:
 
     def test_no_consensus(self):
         assert not identifier_misplaced("t dado", None)
-
-
-class TestFormMatchesPerson:
-    def test_matches_canonical_name(self):
-        assert form_matches_person("helene chanal", "chanal", "helene")
-
-    def test_matches_via_confirmed_form(self):
-        # Le consensus colle à une forme confirmée, que le nom-prénom canonique ne recouvre pas.
-        assert form_matches_person(
-            "pierre michel llorca", "llorca", "pm", confirmed_forms=["pierre michel llorca"]
-        )
-
-    def test_homonym_does_not_match(self):
-        # Même patronyme, prénoms distincts : « hervé » ≠ « hélène ».
-        assert not form_matches_person("herve chanal", "chanal", "helene")
-
-    def test_unrelated_confirmed_form_does_not_match(self):
-        assert not form_matches_person(
-            "helene chanal", "chanal", "herve", confirmed_forms=["herve chanal"]
-        )
-
-    def test_family_name_alone_matches(self):
-        assert form_matches_person("martin", "martin", "jean")
-
-    def test_first_name_of_another_person_does_not_match(self):
-        """Le prénom commun ne suffit pas : le patronyme de la forme doit aussi correspondre."""
-        assert not form_matches_person("pierre durand", "martin", "pierre")
-
-    def test_confirmed_form_longer_than_the_form(self):
-        assert form_matches_person("dupont", "martin", "jean", confirmed_forms=["marie dupont"])
-
-    def test_form_longer_than_the_confirmed_form(self):
-        assert form_matches_person(
-            "marie jeanne dupont", "martin", "paul", confirmed_forms=["marie dupont"]
-        )
 
 
 class TestDecideCrossSourceMatch:
