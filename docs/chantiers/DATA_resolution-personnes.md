@@ -140,7 +140,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [x] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement. f0a7cb791
 - [x] Scripts ponctuels qui écrivent ces colonnes supprimés. eac158104
 - [x] `source_contribution_groups` renommée `contributions`, `source_contribution_group_members` renommée `aligned_source_contributions`, avec la colonne `contribution_id`, la vue `contribution_structures`, les files et l'énumération `resolution_mode`. 37282716e
-- [ ] Phase `contributions` dissoute : ses tâches (périmètre des publications, vues des structures, purge des publications, référentiels vides, compteurs) rejoignent les phases antérieures, au plus tôt selon leurs dépendances.
+- [x] Phase `contributions` renommée `finalize` : ses tâches (périmètre des publications, vues des structures, purge des publications, référentiels vides, compteurs) dépendent toutes des rattachements de la phase `persons`, donc aucune ne remonte plus tôt. 472177bb1
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
@@ -157,6 +157,7 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 ## Questions ouvertes
 
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
+- Périmètre des publications : il réunit les indices des seules contributions rattachées à une personne non exclue. Une erreur d'affiliation relève de la contribution source, pas de la personne.
 - Recalcul immédiat des groupes invalidés par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs membres.
 
 ## Audits qualité
