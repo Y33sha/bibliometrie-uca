@@ -43,6 +43,14 @@ def delete_persons(conn: Connection, *, apply: bool) -> list[int]:
         log.info("%d : %s / %s", r.id, r.last_name, r.first_name)
     ids = [r.id for r in rows]
     if apply and ids:
+        # Les groupes de la personne perdent personne et mode avant sa suppression : la clé étrangère vide seulement `person_id`.
+        conn.execute(
+            text(
+                "UPDATE source_contribution_groups SET person_id = NULL, resolution_mode = NULL"
+                " WHERE person_id = ANY(:ids)"
+            ),
+            {"ids": ids},
+        )
         conn.execute(text("DELETE FROM persons WHERE id = ANY(:ids)"), {"ids": ids})
     return ids
 
