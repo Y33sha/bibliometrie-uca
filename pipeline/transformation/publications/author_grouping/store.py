@@ -191,7 +191,7 @@ class SourceContributionGroupStore:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_group_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes réécrits."""
+        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_group_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes mis à jour."""
         queue = Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(

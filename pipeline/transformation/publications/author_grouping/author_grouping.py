@@ -341,11 +341,11 @@ class AuthorGroupingPhase:
                 queued, updated = SourceContributionGroupStore(conn).propagate_attributes()
                 line.conclude(
                     f"{LAST_BRANCH}{quantity(queued, 'groupe examiné', 'groupes examinés')},"
-                    f" {quantity(updated, 'groupe réécrit', 'groupes réécrits')}"
+                    f" {quantity(updated, 'groupe mis à jour', 'groupes mis à jour')}"
                     f" en {time.perf_counter() - t0:.1f} s"
                 )
             metrics = PhaseMetrics(seen=queued, updated=updated)
-            metrics.report = quantity(updated, "groupe réécrit", "groupes réécrits")
+            metrics.report = quantity(updated, "groupe mis à jour", "groupes mis à jour")
             return metrics
 
         by_task = run_tasks(
