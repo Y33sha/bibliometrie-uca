@@ -38,7 +38,6 @@ from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
     inflect,
-    nothing_to_do,
     quantity,
     step,
 )
@@ -281,7 +280,7 @@ def requalify_misplaced_identifiers(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés et marque pour la redécision de leur personne les groupes rattachés par eux (`mark_misplaced_groups`).
 
-    Retourne `{neutralized, marked_groups}` : le nombre de contributions sources qui gagnent un identifiant neutralisé, et de groupes marqués pour la redécision de leur personne.
+    Retourne `{neutralized, marked_groups}` : le nombre d'identifiants neutralisés, et de groupes marqués pour la redécision de leur personne.
     """
     misplaced: dict[int, list[str]] = defaultdict(list)
     for id_type in PERSON_IDENTIFIER_TYPES:
@@ -291,7 +290,7 @@ def requalify_misplaced_identifiers(
 
     gained = write_misplaced_neutralizations(conn, misplaced)
     return {
-        "neutralized": len(gained),
+        "neutralized": sum(len(id_types) for id_types in gained.values()),
         "marked_groups": mark_misplaced_groups(conn, gained),
     }
 
@@ -338,10 +337,6 @@ def resolve_identifier_transfers(
     """
     # Un conflit dont l'attribution est confirmée par l'admin est tranché : seuls les autres comptent.
     pending = [c for c in conflicts if c.owner_status == AttributionStatus.PENDING]
-    if not pending:
-        nothing_to_do(logger, "Conflits d'attribution")
-        return {"conflicts": len(conflicts), "pending": 0, "transferred": 0}
-
     transferred = 0
     for conflict in pending:
         id_type, id_value, owner = conflict.id_type, conflict.id_value, conflict.owner_person_id
@@ -354,9 +349,8 @@ def resolve_identifier_transfers(
         ident.transfer_to(target, source=IdentifierOrigin.AUTO)
         repo.update_identifier(ident)
         mark_identifier_groups(conn, id_type, id_value, owner)
-        logger.info(
-            "%sTransfert %s=%s : personne %d → %d (%s contre %d)",
-            BRANCH,
+        logger.debug(
+            "Transfert %s=%s : personne %d → %d (%s contre %d)",
             id_type,
             id_value,
             owner,
@@ -365,14 +359,6 @@ def resolve_identifier_transfers(
             conflict.votes.get(owner, 0),
         )
         transferred += 1
-
-    logger.info(
-        "%s%s à arbitrer → %s %s",
-        LAST_BRANCH,
-        quantity(len(pending), "conflit"),
-        quantity(transferred, "identifiant"),
-        inflect(transferred, "transféré"),
-    )
     return {"conflicts": len(conflicts), "pending": len(pending), "transferred": transferred}
 
 
@@ -386,19 +372,30 @@ def arbitrate_identifier_conflicts(
 
     Retourne `{neutralized, marked_groups, transferred}`. Le commit est laissé au caller.
     """
-    step(logger, "Identifiants mal placés et conflits d'attribution")
+    step(logger, "Conflits d'identifiants")
     with waiting(BRANCH, logger) as line:
         requalified = requalify_misplaced_identifiers(conn, compute_identifier_consensus(conn))
-        if requalified["neutralized"]:
-            line.conclude(
-                f"{BRANCH}Identifiants mal placés neutralisés sur "
-                f"{quantity(requalified['neutralized'], 'contribution source', 'contributions sources')}"
+        neutralized = requalified["neutralized"]
+        line.conclude(
+            f"{BRANCH}Identifiants portés sous le nom d'une autre personne : "
+            + (
+                f"{quantity(neutralized, 'identifiant')} {inflect(neutralized, 'neutralisé')}"
+                if neutralized
+                else "rien à faire"
             )
-        else:
-            line.erase()
-    with waiting(BRANCH, logger) as line:
-        conflicts = detect_identifier_conflicts(conn)
-        line.erase()
-    transferred = resolve_identifier_transfers(conn, conflicts, repo=repo, logger=logger)
+        )
+    with waiting(LAST_BRANCH, logger) as line:
+        transferred = resolve_identifier_transfers(
+            conn, detect_identifier_conflicts(conn), repo=repo, logger=logger
+        )
+        line.conclude(
+            f"{LAST_BRANCH}Conflits d'attribution : "
+            + (
+                f"{quantity(transferred['transferred'], 'identifiant')} "
+                f"{inflect(transferred['transferred'], 'transféré')} à la personne majoritaire"
+                if transferred["pending"]
+                else "rien à faire"
+            )
+        )
 
     return {**requalified, "transferred": transferred["transferred"]}

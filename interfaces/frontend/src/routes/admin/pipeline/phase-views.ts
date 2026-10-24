@@ -210,7 +210,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "skip:creation_not_allowed", label: "Contributions sans personne (rôles de jury seuls)" },
       { key: "skip:out_of_perimeter", label: "Contributions sans personne (hors périmètre)" },
       { key: "first_names_completed", label: "Prénoms complétés" },
-      { key: "identifiers_neutralized", label: "Contributions sources à identifiant mal placé" },
+      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
       { key: "identifiers_transferred", label: "Identifiants transférés" },
       { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
       { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },

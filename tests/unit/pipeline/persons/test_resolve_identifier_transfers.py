@@ -55,10 +55,8 @@ def test_sans_voix_rien_ne_transfere(monkeypatch):
     assert result["transferred"] == 0
 
 
-def test_un_titulaire_confirme_n_est_jamais_transfere(monkeypatch, caplog):
-    """Un conflit confirmé par l'admin est tranché : l'étape se ferme sur « Conflits d'attribution : rien à faire »."""
-    with caplog.at_level(logging.INFO):
-        result, repo, queries = _resolve(monkeypatch, {_OWNER: 0, _OTHER: 5}, status="confirmed")
+def test_un_titulaire_confirme_n_est_jamais_transfere(monkeypatch):
+    """Un conflit confirmé par l'admin est tranché : il ne compte pas parmi les conflits à arbitrer."""
+    result, repo, queries = _resolve(monkeypatch, {_OWNER: 0, _OTHER: 5}, status="confirmed")
     assert result == {"conflicts": 1, "pending": 0, "transferred": 0}
     repo.find_identifier.assert_not_called()
-    assert caplog.messages == ["  └─ Conflits d'attribution : rien à faire"]
