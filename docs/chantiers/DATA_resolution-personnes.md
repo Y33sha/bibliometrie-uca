@@ -65,11 +65,6 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
   | aucun signal, périmètre | 6 015 | 6 014 |
 
   - Les identifiants et les formes de nom en base viennent en partie des rattachements, donc la mesure sous-estime les conflits.
-- [ ] Pouvoir de l'affiliation, le 2026-10-19 (`measure_affiliation.sql`), sur les 2 176 groupes au nom ambigu. Une clé spécifique est un laboratoire ou une équipe du référentiel, ou un laboratoire, une équipe ou un département HAL. Le profil d'un candidat réunit les clés de ses autres publications.
-  - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 groupes. Avec les clés spécifiques, un seul candidat concorde dans 1 631 groupes, plusieurs dans 392.
-  - Sur ces 1 631 groupes, le candidat désigné est la personne rattachée dans 1 151 groupes, une autre personne dans 7. 463 groupes sont sans personne, 10 rattachés à plusieurs personnes.
-  - Échantillon de 97 groupes à relire (`build_affiliation_review.py`).
-- [ ] Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la contribution source est souvent faux et la personne souvent juste. Échantillon relu à la main.
 
 ### Phase 2 — Audit des consommateurs
 
@@ -107,10 +102,8 @@ La résolution probabiliste relève du chantier [résolution probabiliste des pe
   - Conflits actuels tranchés : membres rattachés à deux personnes par l'ancrage entre sources ; la décision suit l'identifiant ou l'épinglage.
   - Rattachements gagnés : nom complet d'un membre hors périmètre dans un groupe que l'adresse OpenAlex d'un autre membre met dans le périmètre.
   - Essai écarté : refuser un identifiant quand un membre de même nom de famille, au prénom complet, contredit sa personne. Un refus juste sur deux : diminutifs (Bob et Robert), translittérations (Kuleshov), fautes de source.
-- [ ] Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
 - [x] Une personne par groupe au plus, par construction.
 - [x] Dans une publication, un groupe par personne au plus (`settle_publication`), y compris face aux groupes déjà rattachés. 8bd161212 a6e809b3d 1 527 couples (publication, personne) portés par plusieurs groupes : 779 auteurs répétés dans une liste (Fauchon aux positions 0, 1, 14 et 15 chez OpenAlex), 748 personnes qui portent les identifiants de deux chercheurs (Manea et Manna).
-- [ ] Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
 
 ### Phase 5 — Migration du schéma
 
@@ -146,22 +139,18 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 - [ ] Écarts entre les groupes et les rattachements figés (`contributions`, `source_contributions.person_id`) mesurés ; décisions humaines contradictoires recherchées et tranchées.
 - [ ] Suppression de `contributions`, de `source_contributions.person_id` et `resolution_mode`, de leurs index et de leurs statistiques. Perte : la personne de chaque contribution source et le mode de son rattachement.
 - [x] Scripts ponctuels qui écrivent ces colonnes supprimés. eac158104
-- [ ] `source_contribution_groups` renommée `contributions`.
+- [ ] `source_contribution_groups` renommée `contributions`, `source_contribution_group_members` renommée `aligned_source_contributions`.
 - [ ] Phase `contributions` dissoute : ses tâches (périmètre des publications, vues des structures, purge des publications, référentiels vides, compteurs) rejoignent les phases antérieures, au plus tôt selon leurs dépendances.
 
 ### Phase 6 — Règles de la résolution dans le domaine
 
 - [x] Une entrée de domaine rend la décision complète d'un groupe (`decide_group`). Elle lit un index de personnes en mémoire et renvoie les refus de corroboration. 02f69c43b
-- [ ] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes.
+- [x] L'index est mis à jour après chaque écriture (formes de nom, homonymes par nom de famille), quand la cascade des groupes crée des personnes. 6f2e8b723
 - [x] `PersonMatchDecision` disparaît avec l'ancienne cascade ; `decide_group` garde `NameFormDecision`. eac158104
 - [x] Règles assemblées par `pipeline/transformation/persons/cascade.py`, reprises par `decide_group` : ORCID des seules sources à dépôt par l'auteur (`trusted_identifier`), personnes rejetées pour la publication, nom seul sans effet hors périmètre. 02f69c43b
 - [ ] Verdict d'une forme de nom calculé en Python sur `AttributionStatus` ; `fetch_name_form_status_map` rend les faits bruts.
 
-### Phase 7 — Correction du stock
-
-- [ ] Doubles rattachements (une personne rattachée à deux contributions sources d'un même enregistrement source), personnes qui ont les identifiants de deux personnes, ORCID en attente rattachés à une autre personne que leur titulaire (21 groupes dans la relecture du 2026-10-19).
-
-### Phase 8 — Fin de chantier
+### Phase 7 — Fin de chantier
 
 - [ ] Mise à jour de la documentation.
 
@@ -169,7 +158,21 @@ Les étapes A à C sont réversibles : `contributions` et `source_contributions.
 
 - Scénarios qui changent la personne d'un groupe sans décision humaine : lesquels, et faut-il les autoriser ?
 - Recalcul immédiat des groupes invalidés par une décision de l'administration, exposé par le pipeline (`pipeline/public.py`) sur un index réduit aux valeurs de leurs membres.
-- Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md). Le conflit se calcule à la demande, ou se lit sur un `person_id` dénormalisé sur `source_contributions`.
+
+## Audits qualité
+
+Contrôles des données de la résolution, hors du chemin de clôture du chantier.
+
+- Pouvoir de l'affiliation, le 2026-10-19 (`measure_affiliation.sql`), sur les 2 176 groupes au nom ambigu. Une clé spécifique est un laboratoire ou une équipe du référentiel, ou un laboratoire, une équipe ou un département HAL. Le profil d'un candidat réunit les clés de ses autres publications.
+  - Avec toutes les clés, établissements et ROR compris, plusieurs candidats concordent dans 1 725 groupes. Avec les clés spécifiques, un seul candidat concorde dans 1 631 groupes, plusieurs dans 392.
+  - Sur ces 1 631 groupes, le candidat désigné est la personne rattachée dans 1 151 groupes, une autre personne dans 7. 463 groupes sont sans personne, 10 rattachés à plusieurs personnes.
+  - Échantillon de 97 groupes à relire (`build_affiliation_review.py`).
+- Critère d'affiliation : les structures du groupe confrontées à celles des autres publications de chaque candidat. Il départage les homonymes et les identifiants contradictoires.
+- Évaluation des variantes sur le jeu de la phase 1, dans `data/experiments/resolution-personnes/` (non versionné).
+- Rattachements par identifiant dont l'identifiant est rejeté ou absent chez la personne : 2 232 au 2026-10-18, dont 885 rejetés. L'identifiant de la contribution source est souvent faux et la personne souvent juste.
+- Correction du stock : doubles rattachements (une personne rattachée à deux contributions sources d'un même enregistrement source), personnes qui ont les identifiants de deux personnes (Miriam Calvo Gomez porte l'ORCID de Marta Calvi sur 192 publications), ORCID en attente rattachés à une autre personne que leur titulaire.
+- Relecture des personnes supprimées par la purge et des contributions laissées sans personne parce que la personne est déjà dans la publication, comparées au gel du 2026-10-24.
+- Neutralisations d'identifiants. Partage : un auteur listé deux fois dans un enregistrement source, sous deux graphies, perd son identifiant sur les deux contributions sources (Polichtchouk et Polishchuk, même ORCID). Nom contraire au consensus : double emploi possible avec le contrôle de compatibilité des noms du rattachement par identifiant ; la neutralisation sert aussi l'arbitrage, le regroupement des auteurs et l'attribution des identifiants.
+- Erreurs des sources révélées par un groupe : groupement, nom, identifiant, affiliation. Des contributions sources d'un même groupe qui désigneraient seules des personnes différentes signalent une erreur. Il faut un outil de repérage dans l'administration, comme pour les fusions douteuses de publications. Les affiliations conflictuelles relèvent du chantier [vérification des affiliations](DATA_verification-affiliations.md).
 - Scission d'un groupe par une décision humaine, quand deux de ses contributions sources désignent deux personnes.
-- Nom de `source_contribution_group_members` quand `source_contribution_groups` prend le nom `contributions`.
 - Deux idées de ReCiter : enregistrer ce qui a concordé et pas seulement la règle ; réutiliser les confirmations et les rejets d'une personne comme indices pour ses autres groupes.
