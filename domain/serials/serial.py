@@ -5,11 +5,13 @@ Clé surrogate : `id`. Identifiant naturel : `title`, via la normalisation de `s
 `SERIAL_TYPES` reste synchronisé avec l'enum SQL `serial_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from enum import StrEnum
+from typing import TypedDict, Unpack
 
-from domain.serials.issns import SerialIssn
+from domain.serials.issns import SerialIssn, validate_serial_issns
 
 
 class SerialType(StrEnum):
@@ -72,6 +74,17 @@ class ManualField(StrEnum):
     ISSNS = "issns"
 
 
+class SerialEdit(TypedDict, total=False):
+    """Saisie de l'administration sur une revue. Une clé absente désigne un champ non fourni ; `None` efface la valeur."""
+
+    title: str
+    issns: Iterable[SerialIssn]
+    serial_type: SerialType
+    oa_model: OaModel | None
+    is_academic: bool
+    apc_amount_eur: Decimal | None
+
+
 @dataclass(slots=True)
 class Serial:
     """Publication en série (aggregate root)."""
@@ -88,3 +101,39 @@ class Serial:
     serial_type: SerialType = SerialType.UNKNOWN
     is_academic: bool = True
     manual_fields: frozenset[ManualField] = frozenset()
+
+    def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
+        """Applique une saisie de l'administration. Rend les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`.
+
+        Les ISSN sont normalisés et validés (`validate_serial_issns`). L'APC est saisi en euros et arrondi au centime, comme la colonne.
+        """
+        before = self._manual_values()
+        if "title" in changes:
+            self.title = changes["title"]
+        if "issns" in changes:
+            self.issns = validate_serial_issns(changes["issns"])
+        if "serial_type" in changes:
+            self.serial_type = changes["serial_type"]
+        if "oa_model" in changes:
+            self.oa_model = changes["oa_model"]
+        if "is_academic" in changes:
+            self.is_academic = changes["is_academic"]
+        if "apc_amount_eur" in changes:
+            amount = changes["apc_amount_eur"]
+            self.apc_amount = None if amount is None else amount.quantize(Decimal("0.01"))
+        after = self._manual_values()
+        changed = frozenset(name for name in before if before[name] != after[name])
+        if ManualField.APC in changed:
+            self.apc_currency = None if self.apc_amount is None else "EUR"
+        self.manual_fields |= changed
+        return changed
+
+    def _manual_values(self) -> dict[ManualField, object]:
+        """Valeur de chaque champ que l'administration peut saisir."""
+        return {
+            ManualField.TITLE: self.title,
+            ManualField.ISSNS: list(self.issns),
+            ManualField.SERIAL_TYPE: self.serial_type,
+            ManualField.OA_MODEL: self.oa_model,
+            ManualField.APC: self.apc_amount,
+        }

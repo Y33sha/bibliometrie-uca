@@ -15,11 +15,8 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
 from application.services._merge import load_merge_pair
 from domain.errors import NotFoundError, ValidationError
-from domain.serials.issns import (
-    SerialIssn,
-    validate_serial_issns,
-)
-from domain.serials.serial import ManualField
+from domain.serials.issns import SerialIssn
+from domain.serials.serial import ManualField, SerialEdit
 
 
 def update_serial(
@@ -29,11 +26,9 @@ def update_serial(
     repo: SerialRepository,
     audit_repo: AuditRepository | None = None,
 ) -> bool:
-    """Charge la revue, applique les champs explicitement fournis, persiste. Retourne `True` si le `serial_type` ou le `oa_model` a effectivement changé : le command handler rejoue alors les corrections des publications de la revue.
+    """Charge la revue, applique les champs explicitement fournis (`Serial.edit`), persiste. Retourne `True` si le `serial_type` ou le `oa_model` a effectivement changé : le command handler rejoue alors les corrections des publications de la revue.
 
-    L'événement d'audit contient seulement les champs soumis.
-
-    Les ISSN fournis deviennent les ISSN de la revue ; `validate_serial_issns` les normalise. Un titre, des ISSN, un type, un modèle OA ou un APC modifiés deviennent des champs saisis à la main (`ManualField`), que le pipeline laisse en l'état. L'APC saisi est en euros.
+    Un `null` sur un champ obligatoire (titre, type, caractère académique) vaut champ non fourni. L'événement d'audit contient seulement les champs soumis.
 
     Lève `ValidationError` si aucun champ n'est fourni ou si les ISSN sont invalides, `NotFoundError` si la revue n'existe pas.
     """
@@ -44,42 +39,36 @@ def update_serial(
     if serial is None:
         raise NotFoundError(f"Revue {serial_id} introuvable")
 
-    old_title = serial.title
-    old_issns = list(serial.issns)
-    old_type = serial.serial_type
-    old_oa_model = serial.oa_model
-    old_apc_amount = serial.apc_amount
-    champs = update.model_dump(exclude_unset=True, mode="json")
-    # Les champs de `SerialUpdate` ont les noms des attributs de l'agrégat.
-    for field_name in update.model_fields_set:
-        if field_name == "issns":
-            serial.issns = validate_serial_issns(
-                SerialIssn(**row.model_dump()) for row in update.issns or []
-            )
-        elif field_name == "apc_amount":
-            # Montant au centime, comme la colonne : la comparaison à l'ancien montant reste exacte.
-            serial.apc_amount = (
-                Decimal(str(update.apc_amount)).quantize(Decimal("0.01"))
-                if update.apc_amount is not None
-                else None
-            )
-        else:
-            setattr(serial, field_name, getattr(update, field_name))
-    if serial.title != old_title:
-        serial.manual_fields |= {ManualField.TITLE}
-    if serial.issns != old_issns:
-        serial.manual_fields |= {ManualField.ISSNS}
-    if serial.serial_type != old_type:
-        serial.manual_fields |= {ManualField.SERIAL_TYPE}
-    if serial.oa_model != old_oa_model:
-        serial.manual_fields |= {ManualField.OA_MODEL}
-    if serial.apc_amount != old_apc_amount:
-        # Le formulaire saisit l'APC en euros.
-        serial.apc_currency = "EUR" if serial.apc_amount is not None else None
-        serial.manual_fields |= {ManualField.APC}
+    changed = serial.edit(**_serial_edit(update))
     repo.save(serial)
-    emit_event(audit_repo, "serial.updated", "serial", serial_id, champs)
-    return serial.serial_type != old_type or serial.oa_model != old_oa_model
+    emit_event(
+        audit_repo,
+        "serial.updated",
+        "serial",
+        serial_id,
+        update.model_dump(exclude_unset=True, mode="json"),
+    )
+    return bool(changed & {ManualField.SERIAL_TYPE, ManualField.OA_MODEL})
+
+
+def _serial_edit(update: SerialUpdate) -> SerialEdit:
+    """Champs fournis de `update`, sous la forme que l'agrégat reçoit."""
+    provided = update.model_fields_set
+    changes = SerialEdit()
+    if "title" in provided and update.title is not None:
+        changes["title"] = update.title
+    if "issns" in provided:
+        changes["issns"] = [SerialIssn(**row.model_dump()) for row in update.issns or []]
+    if "serial_type" in provided and update.serial_type is not None:
+        changes["serial_type"] = update.serial_type
+    if "oa_model" in provided:
+        changes["oa_model"] = update.oa_model
+    if "is_academic" in provided and update.is_academic is not None:
+        changes["is_academic"] = update.is_academic
+    if "apc_amount" in provided:
+        amount = update.apc_amount
+        changes["apc_amount_eur"] = None if amount is None else Decimal(str(amount))
+    return changes
 
 
 def merge_serials(
