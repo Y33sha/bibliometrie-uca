@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
@@ -59,7 +60,7 @@
   <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
 </svelte:head>
 
-<a href={resolve('subjects')} class="back">← Retour à la liste</a>
+<Breadcrumb trail={[{ label: "Sujets", href: resolve("subjects") }]} current={data?.subject.label} />
 
   {#if error}
     <div class="error">Sujet introuvable.</div>
@@ -108,15 +109,6 @@
   {/if}
 
 <style>
-  .back {
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 0.9rem;
-    margin-bottom: 8px;
-  }
-  .back:hover {
-    text-decoration: underline;
-  }
   .graph-wrapper {
     width: 100%;
   }

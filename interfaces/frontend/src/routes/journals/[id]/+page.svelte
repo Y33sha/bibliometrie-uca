@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -33,8 +34,6 @@
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
 	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
 	let error = $state(false);
-	let canGoBack = $state(false);
-
 	let dashboard = $state<SerialDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
@@ -99,9 +98,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack =
-			(window as any).navigation?.canGoBack ??
-			document.referrer.startsWith(window.location.origin);
 		const labelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
 			serialTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		});
@@ -120,10 +116,7 @@
 	<title>{pageTitle(journal?.title ?? 'Revue')}</title>
 </svelte:head>
 
-{#if canGoBack}
-	<!-- svelte-ignore a11y_invalid_attribute -->
-	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+	<Breadcrumb trail={[{ label: 'Revues', href: resolve('journals') }]} current={journal?.title} />
 
 {#if error}
 	<div class="no-results">Revue introuvable</div>

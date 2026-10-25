@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -20,8 +21,6 @@
 	import type { components } from '#lib/api/schema.js';
 
 	const personId = $derived(page.params.id);
-	let canGoBack = $state(false);
-
 	// --- Types ---
 	type Person = components['schemas']['PersonProfileCore'];
 	type Identifier = components['schemas']['PersonIdentifierOut'];
@@ -134,7 +133,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		auth.check().then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		if (personId) await loadProfile(personId);
 	});
@@ -145,10 +143,7 @@
 	<title>{pageTitle(displayName || 'Personne')}</title>
 </svelte:head>
 
-{#if canGoBack}
-<!-- svelte-ignore a11y_invalid_attribute -->
-<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+<Breadcrumb trail={[{ label: 'Chercheurs', href: resolve('persons') }]} current={displayName} />
 
 {#if error}
 	<div class="no-results">Personne introuvable</div>

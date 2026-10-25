@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -15,12 +16,7 @@
 
 	let monograph = $state<Monograph | null>(null);
 	let error = $state(false);
-	let canGoBack = $state(false);
-
 	onMount(async () => {
-		canGoBack =
-			(window as any).navigation?.canGoBack ??
-			document.referrer.startsWith(window.location.origin);
 		try {
 			monograph = await apiDetail<Monograph>(`/api/monographs/${monographId}`);
 		} catch {
@@ -33,10 +29,7 @@
 	<title>{pageTitle(titleText(monograph?.title) || 'Monographie')}</title>
 </svelte:head>
 
-{#if canGoBack}
-	<!-- svelte-ignore a11y_invalid_attribute -->
-	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+	<Breadcrumb trail={[{ label: 'Monographies', href: resolve('monographs') }]} current={titleText(monograph?.title)} />
 
 {#if error}
 	<div class="no-results">Monographie introuvable</div>

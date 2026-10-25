@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
@@ -252,7 +253,10 @@
 <svelte:window onclick={handleOutsideClick} />
 
 <div class="page-feedback">
-  <p class="back-link"><a href={resolve(currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : 'admin/addresses')}>← Affiliations des adresses</a></p>
+  <Breadcrumb
+    trail={[{ label: "Affiliations", href: resolve(currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses") }]}
+    current="Qualité de la détection"
+  />
   <h2>Qualité de la détection</h2>
 
   <!-- Stats row -->
@@ -456,10 +460,6 @@
   }
 
   /* Help text */
-  .back-link {
-    margin: 0 0 4px;
-    font-size: 0.85rem;
-  }
 
   /* Toolbar */
   .toolbar {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount, onDestroy } from "svelte";
@@ -415,7 +416,7 @@
   <title>{pageTitle("Admin - Structure")}</title>
 </svelte:head>
 
-<p class="back-link"><a href={resolve('admin/structures')}>← Retour aux structures</a></p>
+<Breadcrumb trail={[{ label: "Structures", href: resolve("admin/structures") }]} current={detail?.structure.acronym || detail?.structure.name} />
 
 {#if !detail}
   <p class="loading">Chargement…</p>
@@ -539,10 +540,6 @@
 {/if}
 
 <style>
-  .back-link {
-    margin: 0 0 4px;
-    font-size: 0.85rem;
-  }
   .loading {
     color: var(--muted);
   }

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import { resolve } from '$app/paths';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -22,8 +24,6 @@
 	import PartnersTab from './PartnersTab.svelte';
 
 	const labId = $derived(page.params.id);
-	let canGoBack = $state(false);
-
 	// --- Types ---
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureOut'];
@@ -116,8 +116,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
-
 		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl(page.url.searchParams);
 		if (restored.addrPage) addresses.page = restored.addrPage as number;
@@ -145,10 +143,7 @@
 	<title>{pageTitle(lab ? structureLabel(lab) : 'Laboratoire')}</title>
 </svelte:head>
 
-{#if canGoBack}
-<!-- svelte-ignore a11y_invalid_attribute -->
-<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+<Breadcrumb trail={[{ label: 'Labos', href: resolve('laboratories') }]} current={lab?.acronym || lab?.name} />
 
 {#if error}
 	<div class="no-results">Laboratoire introuvable</div>

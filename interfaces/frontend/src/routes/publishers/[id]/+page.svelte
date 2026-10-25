@@ -1,4 +1,6 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import { resolve } from '$app/paths';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
@@ -31,8 +33,6 @@
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
-	let canGoBack = $state(false);
-
 	let dashboard = $state<PublisherDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
@@ -88,9 +88,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack =
-			(window as any).navigation?.canGoBack ??
-			document.referrer.startsWith(window.location.origin);
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
@@ -102,10 +99,7 @@
 	<title>{pageTitle(publisher?.name ?? 'Éditeur')}</title>
 </svelte:head>
 
-{#if canGoBack}
-	<!-- svelte-ignore a11y_invalid_attribute -->
-	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+	<Breadcrumb trail={[{ label: 'Éditeurs', href: resolve('publishers') }]} current={publisher?.name} />
 
 {#if error}
 	<div class="no-results">Éditeur introuvable</div>

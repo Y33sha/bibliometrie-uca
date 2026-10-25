@@ -1,7 +1,8 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
+  import { resolve } from "$app/paths";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
-  import { onMount } from "svelte";
   import { apiDetail } from "#lib/api/index.js";
   import { titleText } from "#lib/utils.js";
   import PublicationAbstract from "#lib/components/PublicationAbstract.svelte";
@@ -14,8 +15,6 @@
   import SubjectsBlock from "./SubjectsBlock.svelte";
 
   const publicationId = $derived(page.params.id);
-  let canGoBack = $state(false);
-
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
 
@@ -56,28 +55,13 @@
     });
   });
 
-  onMount(() => {
-    canGoBack =
-      (window as any).navigation?.canGoBack ??
-      document.referrer.startsWith(window.location.origin);
-  });
 </script>
 
 <svelte:head>
   <title>{pageTitle(titleText(pub?.title).slice(0, 80) || "Publication")}</title>
 </svelte:head>
 
-{#if canGoBack}
-  <!-- svelte-ignore a11y_invalid_attribute -->
-  <a
-    href="#"
-    class="back-link"
-    onclick={(e) => {
-      e.preventDefault();
-      history.back();
-    }}>&larr; Retour</a
-  >
-{/if}
+<Breadcrumb trail={[{ label: "Publications", href: resolve("publications") }]} current={titleText(pub?.title)} />
 
 {#if error}
   <div class="publication-header"><div class="no-results">Publication introuvable</div></div>
