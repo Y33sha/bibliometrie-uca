@@ -2,13 +2,19 @@
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType, is_catalog_record
-from domain.platforms.registry import known_platform_of_source
+from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
-from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
+from domain.publications.identifiers import (
+    clean_doi,
+    extract_doi_from_url,
+    extract_hal_id_from_url,
+    normalize_pmcid,
+)
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -113,6 +119,9 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
         if not url or is_catalog_record(url):
             continue
         location_id = as_str(loc.get("id")) or ""
+        platform = _repository(as_mapping(loc.get("source")))
+        if platform and platform.openalex_id in PUBMED_CENTRAL.openalex_ids:
+            url, platform = _pmc_copy(url, pdf_url, platform)
         locations.append(
             LocationFacts(
                 url=url,
@@ -121,10 +130,21 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
                 version=as_str(loc.get("version")),
                 license=normalize_license(as_str(loc.get("license"))),
                 is_oa=as_bool(loc.get("is_oa")),
-                platform=_repository(as_mapping(loc.get("source"))),
+                platform=platform,
             )
         )
     return locations
+
+
+def _pmc_copy(
+    url: str, pdf_url: str | None, platform: PlatformFacts
+) -> tuple[str, PlatformFacts | None]:
+    """Adresse et plateforme d'une copie que OpenAlex range sous PubMed Central. Une page PubMed n'est pas une copie sur PMC : l'adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF, à défaut la copie perd sa plateforme."""
+    if urlsplit(url).hostname != "pubmed.ncbi.nlm.nih.gov":
+        return url, platform
+    if pmcid := normalize_pmcid(pdf_url):
+        return PMC_ARTICLE_URL.format(pmcid), platform
+    return url, None
 
 
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:

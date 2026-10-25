@@ -75,9 +75,12 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _publisher_platform("Université de Bordeaux", {"10.20870"}),
 )
 
+PMC_ARTICLE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/"
+"""Page d'un article de PubMed Central, à compléter par son PMCID."""
+
 IDENTIFIER_COPIES: tuple[tuple[ExternalIdType, str, KnownPlatform], ...] = (
     (ExternalIdType.ARXIV_ID, "https://arxiv.org/abs/{}", ARXIV),
-    (ExternalIdType.PMCID, "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/", PUBMED_CENTRAL),
+    (ExternalIdType.PMCID, PMC_ARTICLE_URL, PUBMED_CENTRAL),
 )
 """Copie ouverte que désigne un identifiant de document : type d'identifiant, URL à compléter par sa valeur, plateforme."""
 

@@ -19,7 +19,7 @@ from pipeline.runtime.observability.log_format import inflect
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.store import SerialStore
 
-LABEL = "Type des revues sur OpenAlex"
+LABEL = "Type des publications en série sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50

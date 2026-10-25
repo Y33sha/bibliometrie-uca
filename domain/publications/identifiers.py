@@ -230,7 +230,9 @@ class NNT(NormalizedIdentifier):
 # ── PMID / PMCID (PubMed) ──────────────────────────────────────────
 
 _PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
-_PMC_URL_RE = re.compile(r"ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)")
+_PMC_URL_RE = re.compile(
+    r"(?:ncbi\.nlm\.nih\.gov/pmc|pmc\.ncbi\.nlm\.nih\.gov)/articles/(?:PMC)?(\d+)"
+)
 _PMCID_BARE_RE = re.compile(r"^(?:PMC)?(\d+)$", re.IGNORECASE)
 
 

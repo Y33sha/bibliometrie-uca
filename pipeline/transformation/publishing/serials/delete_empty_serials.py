@@ -13,7 +13,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_label import serial_label
 from pipeline.transformation.publishing.serials.store import SerialSummary
 
-LABEL = "Revues vides"
+LABEL = "Publications en série vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _EMPTY_SERIALS = text(f"""

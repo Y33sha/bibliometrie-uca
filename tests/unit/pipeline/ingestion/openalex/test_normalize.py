@@ -132,6 +132,30 @@ class TestGetLocations:
             )
         ]
 
+    def test_une_page_pubmed_rangee_sous_pmc_devient_la_page_pmc(self):
+        source = {
+            "id": "https://openalex.org/S2764455111",
+            "type": "repository",
+            "display_name": "PubMed Central",
+        }
+        work = {
+            "locations": [
+                {
+                    "landing_page_url": "https://pubmed.ncbi.nlm.nih.gov/41760695/",
+                    "pdf_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12988236/pdf/a.pdf",
+                    "source": source,
+                },
+                {"landing_page_url": "https://pubmed.ncbi.nlm.nih.gov/1/", "source": source},
+            ]
+        }
+        with_pdf, without_pdf = get_locations(work)
+        assert with_pdf.url == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12988236/"
+        assert with_pdf.platform is not None
+        assert (without_pdf.url, without_pdf.platform) == (
+            "https://pubmed.ncbi.nlm.nih.gov/1/",
+            None,
+        )
+
     def test_une_revue_ne_donne_pas_de_plateforme(self):
         work = {
             "locations": [

@@ -200,30 +200,34 @@ def build() -> Phase:
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
                 "enrich_serials_from_openalex": TaskStep(
                     _run_enrich_serials_from_openalex,
-                    "Revues",
+                    "Publications en série",
                     enrich_serials_from_openalex.LABEL,
                     threshold=3,
                 ),
                 "check_serials_in_sudoc": TaskStep(
                     _run_check_serials_in_sudoc,
-                    "Revues",
+                    "Publications en série",
                     check_serials_in_sudoc.LABEL,
                     threshold=3,
                 ),
                 "merge_duplicate_serials": TaskStep(
-                    _run_merge_duplicate_serials, "Revues", merge_duplicate_serials.LABEL
+                    _run_merge_duplicate_serials,
+                    "Publications en série",
+                    merge_duplicate_serials.LABEL,
                 ),
                 "type_proceedings_serials": TaskStep(
-                    _run_type_proceedings_serials, "Revues", type_proceedings_serials.LABEL
+                    _run_type_proceedings_serials,
+                    "Publications en série",
+                    type_proceedings_serials.LABEL,
                 ),
                 "learn_serial_doi_namespaces": TaskStep(
                     _run_learn_serial_doi_namespaces,
-                    "Revues",
+                    "Publications en série",
                     learn_serial_doi_namespaces.LABEL,
                 ),
                 "enrich_serials_from_doaj": TaskStep(
                     _run_enrich_serials_from_doaj,
-                    "Revues",
+                    "Publications en série",
                     enrich_serials_from_doaj.LABEL,
                 ),
                 "merge_duplicate_monographs": TaskStep(

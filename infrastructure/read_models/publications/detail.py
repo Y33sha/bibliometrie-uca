@@ -16,7 +16,7 @@ from application.ports.read_models.publications_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.platforms.registry import HAL
-from domain.publications.access import Copy, access
+from domain.publications.access import Access, Copy, access
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.external_ids import ExternalIdType
@@ -251,8 +251,7 @@ def get_publication_detail(
     subjects = get_publication_subjects(conn, publication_id)
     relations = get_publication_relations(conn, publication_id)
     external_identifiers = get_publication_external_identifiers(conn, publication_id)
-    copies, hal_with_copy = get_publication_copies(conn, publication_id)
-    publication_access = access(copies)
+    publication_access = access(get_publication_copies(conn, publication_id))
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -293,7 +292,7 @@ def get_publication_detail(
         relations=relations,
         access_url=publication_access.url,
         access=[AccessLinkOut(label=a.label, url=a.url) for a in publication_access.links],
-        referenced_by=_referenced_by(sources, hal_with_copy),
+        referenced_by=_referenced_by(sources, publication_access),
         external_identifiers=external_identifiers,
     )
 
@@ -307,14 +306,17 @@ _EXTERNAL_IDENTIFIER_KEYS = (
 # Sources dont l'enregistrement est la page du DOI, déjà affiché.
 _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
 
+# Sources qui sont aussi une plateforme.
+_SOURCE_PLATFORMS: dict[str, str] = {Source.HAL: HAL.name}
 
-def get_publication_copies(conn: Connection, publication_id: int) -> tuple[list[Copy], set[str]]:
-    """Localisations des enregistrements sources de la publication, hors formes secondaires, et identifiants des enregistrements HAL dont la copie est ouverte. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
+
+def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
+    """Localisations des enregistrements sources de la publication, hors formes secondaires. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text(f"""
             SELECT l.url, l.version, l.is_oa, pl.name AS platform,
                    (sr.source = 'hal' AND pl.openalex_id = ANY(:hal_ids)) AS described_by_platform,
-                   sr.id AS arrival, sr.source_id
+                   sr.id AS arrival
             FROM source_record_locations l
             JOIN source_records sr ON sr.id = l.source_record_id
             LEFT JOIN platforms pl ON pl.id = l.platform_id
@@ -327,7 +329,7 @@ def get_publication_copies(conn: Connection, publication_id: int) -> tuple[list[
             "convergence_cases": list(CONVERGENCE_CASES),
         },
     ).all()
-    copies = [
+    return [
         Copy(
             url=r.url,
             version=r.version,
@@ -338,18 +340,15 @@ def get_publication_copies(conn: Connection, publication_id: int) -> tuple[list[
         )
         for r in rows
     ]
-    return copies, {r.source_id for r in rows if r.described_by_platform and r.is_oa}
 
 
-def _referenced_by(
-    sources: list[SourceRecordOut], hal_with_copy: set[str]
-) -> list[SourceRecordOut]:
-    """Sources qui référencent la publication sans en donner de copie."""
+def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[SourceRecordOut]:
+    """Sources qui référencent la publication sans en donner de copie : une source dont la plateforme figure parmi les liens d'accès en est retirée."""
+    platforms = {link.label for link in access.links}
     return [
         s
         for s in sources
-        if s.source not in _DOI_SOURCES
-        and not (s.source == Source.HAL and s.source_id in hal_with_copy)
+        if s.source not in _DOI_SOURCES and _SOURCE_PLATFORMS.get(s.source) not in platforms
     ]
 
 

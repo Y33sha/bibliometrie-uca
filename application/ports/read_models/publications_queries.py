@@ -360,7 +360,7 @@ class PublicationDetailResponse(BaseModel):
     access: list[AccessLinkOut]
     """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
     referenced_by: list[SourceRecordOut]
-    """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand son dépôt a un fichier ouvert."""
+    """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand HAL figure parmi les liens d'accès."""
     external_identifiers: list[ExternalIdentifierOut]
 
 

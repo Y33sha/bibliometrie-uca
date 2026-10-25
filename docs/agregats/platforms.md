@@ -15,7 +15,7 @@ Une localisation est une copie d'un document : une page, éventuellement un PDF,
 
 **Localisations (`normalize`).** Les localisations d'un enregistrement source se réécrivent à chaque normalisation (`pipeline/ingestion/common/locations.py`) :
 
-- OpenAlex donne chaque copie du document, avec sa version, sa licence et son ouverture. Une copie sur une source OpenAlex de type `repository` reçoit sa plateforme.
+- OpenAlex donne chaque copie du document, avec sa version, sa licence et son ouverture. Une copie sur une source OpenAlex de type `repository` reçoit sa plateforme. OpenAlex range parfois sous PubMed Central une page PubMed : son adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF, à défaut la copie perd sa plateforme.
 - Crossref donne la page vers laquelle résout le DOI, avec la licence de la version éditeur.
 - HAL donne la page du dépôt et le fichier déposé, sur la plateforme HAL. La copie est ouverte quand un fichier est déposé, hors embargo actif.
 - Pour toutes les sources, l'identifiant arXiv et le PMCID d'un enregistrement donnent une copie ouverte, sans version, sur arXiv et PubMed Central (`domain/platforms/registry.py`, `IDENTIFIER_COPIES`).
@@ -37,6 +37,6 @@ Le détail d'une publication (`GET /api/publications/{id}`) donne ses copies d'a
 - une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source ;
 - la meilleure copie est l'adresse d'accès ; les liens d'accès donnent la meilleure copie de chaque plateforme, sauf la copie désignée par le DOI, affiché à part.
 
-Le détail donne aussi les sources qui référencent la publication sans en donner de copie : toutes sauf Crossref et DataCite, que couvre le DOI, et HAL quand sa copie est ouverte.
+Le détail donne aussi les sources qui référencent la publication sans en donner de copie : toutes sauf Crossref et DataCite, que couvre le DOI, et HAL quand HAL figure parmi les liens d'accès.
 
 Les adresses des copies sont les seules adresses affichées dont l'hôte vient des données : le serveur en vérifie seulement le schéma (`interfaces/frontend/src/lib/external-links.test.ts`).

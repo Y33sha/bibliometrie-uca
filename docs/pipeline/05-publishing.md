@@ -4,7 +4,7 @@
 
 La phase `publishing` complète les référentiels d'éditeurs, de publications en série et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents. Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des publications en série. Elle cherche auprès de sources externes leur type et leurs frais de publication. Elle fusionne les doublons et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [finalize](10-finalize.md), après les dernières suppressions de publications. Le `serial_type` qu'elle pose nourrit la correction `serial_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
 
-Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : éditeurs, revues, monographies. Chaque sous-étape y tient une ligne de bilan.
+Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : éditeurs, publications en série, monographies. Chaque sous-étape y tient une ligne de bilan.
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
@@ -22,7 +22,7 @@ Deux sous-étapes, une par agence d'enregistrement, interrogent `/prefixes/{pref
 
 2. **`resolve_datacite_publishers`** — interroge DataCite, qui rend le provider, avec l'entrepôt (Zenodo, NAKALA…) qui a déposé les DOI. Sont repris les préfixes d'agence DataCite que DataCite n'a pas vus, et les préfixes d'agence `unknown` que Crossref n'a pas trouvés.
 
-## Revues
+## Publications en série
 
 3. **`enrich_serials_from_openalex`** — lit les [sources OpenAlex](../sources/03-openalex.md) pour renseigner le type, le montant et la devise des frais de publication (APC). Sans APC dans OpenAlex, le montant et la devise de la revue restent inchangés. Sont reprises les revues qui ont un `openalex_id` et dont le type est inconnu (`serial_type = 'unknown'`).
 
