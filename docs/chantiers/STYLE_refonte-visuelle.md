@@ -29,7 +29,7 @@ Le modèle visuel de départ est la page d'administration « Configuration du pi
 - **Les graphiques lisent leurs couleurs dans les variables CSS**, par `cssColor()`.
 - **Palette open access agrégée** (ouvert, sous embargo, fermé, indéterminé) commune à toute l'application. Ouvert en vert, embargo en ambre, fermé en gris foncé, indéterminé en gris clair. Pas de rouge. Les voies (diamond, gold, hybrid, bronze, green) gardent leurs couleurs propres.
 - **Police auto-hébergée** dans `static/fonts/` comme Ubuntu, désignée par `--font`. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) sur toute la page.
-- **Filtres de liste sur deux niveaux** : le bouton de filtre porte le nombre de valeurs choisies, la barre « Filtres actifs » détaille ces valeurs avec une croix par filtre. On ajoute ou retire une valeur depuis le bouton sans supprimer le filtre.
+- **Filtres de liste sur deux niveaux** : le bouton de filtre affiche le nombre de valeurs choisies, la barre « Filtres actifs » détaille ces valeurs avec une croix par filtre. On ajoute ou retire une valeur depuis le bouton sans supprimer le filtre.
 - **Un seul style de titre de section** : petites capitales par CSS (`text-transform: uppercase`), texte source en casse normale.
 - **Un seul rayon d'arrondi** (`--radius`), 999 px pour les pastilles.
 - **Un seul style d'onglets** pour `TabNav` et `HubTabs`.
