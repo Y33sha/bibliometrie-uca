@@ -419,6 +419,23 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.container_title is None
 
+    def test_conteneur_sans_revue(self):
+        """Une source de congrès sans revue identifiée donne le titre du conteneur ; une archive non."""
+        conference = {"display_name": "ICRA 2024", "type": "conference"}
+        archive = {
+            "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+            "type": "repository",
+        }
+        titles = [
+            openalex_source_record(
+                {"title": "T", "primary_location": {"source": source}},
+                staging_id=1,
+                containers=_NO_CONTAINERS,
+            ).container_title
+            for source in (conference, archive)
+        ]
+        assert titles == ["ICRA 2024", None]
+
 
 # ── openalex_source_record (cas limites) ─────────────────────────
 

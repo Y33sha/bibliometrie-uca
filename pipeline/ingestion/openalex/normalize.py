@@ -283,7 +283,7 @@ def openalex_source_record(  # noqa: C901
 ) -> SourceRecordUpsert:
     """Enregistrement source OpenAlex d'un work.
 
-    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale.
+    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale, quand cette source peut être une revue (`names_serial`).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
@@ -350,8 +350,11 @@ def openalex_source_record(  # noqa: C901
         raw_doc_type=as_str(work.get("type")),
         serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
+        # Une archive, un entrepôt ou une plateforme d'ebooks héberge le work sans le contenir.
         container_title=(
-            primary.source_display_name if primary and not containers.serial_id else None
+            primary.source_display_name
+            if primary and names_serial(primary) and not containers.serial_id
+            else None
         ),
         raw_language=as_str(work.get("language")),
         biblio=biblio_json,
