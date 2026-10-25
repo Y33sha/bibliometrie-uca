@@ -109,9 +109,14 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
   | Écart au meilleur libellé de la publication au même niveau | 0,71 / 0,71 / 0,71 / 0,69 |
 
   Meilleurs points de fonctionnement, tous niveaux : écart ≤ −0,03, précision 70 %, rappel 32 % ; rang dans la moitié basse du niveau, précision 59 %, rappel 35 %. À précision égale, le rappel dépasse celui du vote (20 %). Le modèle `BAAI/bge-m3`, deux fois plus gros, ne fait pas mieux (AUC du rang : 0,77 / 0,77 / 0,77 / 0,75). Le libellé seul, quelques mots, décrit mal un sujet : les centroïdes devraient faire mieux
-- [ ] Choix du modèle et de l'exécution (question ouverte « Specter2 »)
-- [ ] Embeddings des publications liées aux topics de l'échantillon ; centroïde par topic
-- [ ] Similarité cosinus des liens de l'échantillon ; précision et rappel selon le seuil
+- [x] Prototype à centroïdes, `multilingual-e5-base` : centroïde de chaque libellé sur 20 autres publications qui le portent, de préférence en premier topic (7 326 publications encodées). Score : typicité, part des publications du libellé moins proches du centroïde que la publication évaluée.
+
+  | Score | AUC domain / field / subfield / topic |
+  |---|---|
+  | Similarité cosinus au centroïde | 0,79 / 0,67 / 0,63 / 0,59 |
+  | Typicité | 0,84 / 0,66 / 0,60 / 0,58 |
+
+  Les centroïdes font mieux que les libellés au grain domain, moins bien en dessous. Règle descendante sur la typicité : précision 47 %, rappel 52 %. Un topic aberrant est textuellement plausible : OpenAlex attribue ses topics d'après le titre et le résumé, et une similarité de texte reproduit son signal. L'incohérence se voit au grain domain
 - [ ] Coût d'un passage sur le stock et sur chaque run
 
 ### Phase 5 — Choix et mise en œuvre
