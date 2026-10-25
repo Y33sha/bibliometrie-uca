@@ -2,6 +2,9 @@ python -m interfaces.cli.oneshot.backfill_source_record_publishers
 python -m interfaces.cli.oneshot.apply_known_platforms
 run_pipeline --only publications
 python -m interfaces.cli.oneshot.detach_ebook_platforms
+python -m interfaces.cli.oneshot.apply_known_platforms
+python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store --sources hal,openalex
+run_pipeline --from normalize --sources hal,openalex --no-extras
 
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
@@ -27,6 +30,7 @@ python -m interfaces.cli.oneshot.detach_ebook_platforms
 * [ ] identifiants mal placés et neutralisés par le pipeline: auditer
 * [ ] récupérer date de publication complète au lieu de l'année seule
 * [ ] doublons dans journal_name_forms.form_normalized
+* [ ] "Additional file" sur figshare: comment regrouper les pièces liées à un même article?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -67,6 +71,7 @@ python -m interfaces.cli.oneshot.detach_ebook_platforms
 * 221243: pourquoi pas fusionné avec son hal-id?
 * 81408: openalex, source hal; mais pas de doc hal correpondant
 * 27059: Epidemiological impact ofNeisseria gonorrhoeaeandChlamydia trachomatisscreening in men having sex with men: a modelling study => normaliser toutes les balises en espaces puis supprimer les espaces doubles
+* "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
