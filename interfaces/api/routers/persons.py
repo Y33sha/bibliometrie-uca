@@ -28,7 +28,6 @@ from application.ports.read_models.persons_queries import (
     SharingPersonOut,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.persons import core as persons_service
@@ -37,7 +36,6 @@ from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
     DbConn,
-    audit_repo,
     contribution_repo,
     entity_detail,
     person_repo,
@@ -222,13 +220,12 @@ def name_duplicates(
 def mark_persons_distinct(
     body: MarkDistinctPersons,
     repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Marque deux personnes comme distinctes : les files de triage par nom et par identifiant écartent la paire.
 
     Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
     """
-    persons_service.mark_distinct(body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit)
+    persons_service.mark_distinct(body.person_id_a, body.person_id_b, repo=repo)
     return OkResponse()
 
 
@@ -240,7 +237,6 @@ def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
     repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
 
@@ -250,7 +246,6 @@ def update_identifier_status(
         ident_id,
         body.status,
         repo=repo,
-        audit_repo=audit,
     )
     return IdentifierStatusResponse(
         id=result.id, status=result.status, propagated=result.propagated
@@ -364,7 +359,6 @@ def add_person_identifier(
     data: AddIdentifier,
     queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
@@ -375,7 +369,6 @@ def add_person_identifier(
         data.id_type,
         data.id_value,
         repo=repo,
-        audit_repo=audit,
     )
     if result.outcome is AttributionOutcome.ALREADY_EXISTS:
         return AddIdentifierResponse(added=False, reason="already_exists")
@@ -397,7 +390,6 @@ def set_person_exclusion(
     conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Exclut une personne pour le motif donné, ou la retient avec `exclusion: null`.
 
@@ -409,7 +401,6 @@ def set_person_exclusion(
         conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
     )
     return OkResponse()
 
@@ -419,15 +410,12 @@ def update_person_name(
     person_id: int,
     body: UpdatePersonName,
     repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Modifie le nom/prénom d'une personne.
 
     Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
     """
-    persons_service.update_name(
-        person_id, body.last_name, body.first_name, repo=repo, audit_repo=audit
-    )
+    persons_service.update_name(person_id, body.last_name, body.first_name, repo=repo)
     return OkResponse()
 
 
@@ -436,15 +424,12 @@ def merge_persons(
     person_id: int,
     body: MergeRequest,
     repo: PersonRepository = Depends(person_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> MergeResponse:
     """Fusionne une autre personne (source) dans celle-ci (target).
 
     Si seule la source a une fiche RH, les rôles s'inversent : la réponse donne les rôles appliqués. Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si les deux ont une fiche RH (`merge_person`).
     """
-    target_id, source_id = persons_service.merge_person(
-        person_id, body.source_id, repo=repo, audit_repo=audit
-    )
+    target_id, source_id = persons_service.merge_person(person_id, body.source_id, repo=repo)
     return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
 
 
@@ -456,7 +441,6 @@ def detach_contributions(
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> DetachContributionsResponse:
     """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
     return DetachContributionsResponse.model_validate(
@@ -470,7 +454,6 @@ def detach_contributions(
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
-            audit_repo=audit,
         )
     )
 
@@ -481,7 +464,6 @@ def update_name_form_status(
     body: UpdateNameFormStatus,
     repo: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
@@ -493,6 +475,5 @@ def update_name_form_status(
         body.status,
         repo=repo,
         contribution_repo=contributions,
-        audit_repo=audit,
     )
     return NameFormStatusResponse(**row)

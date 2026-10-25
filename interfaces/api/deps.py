@@ -12,6 +12,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy import Connection
 
+from application.audit_log import record_pending_events
 from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
@@ -41,7 +42,6 @@ from application.ports.read_models.stats_queries import StatsQueries
 from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
@@ -153,7 +153,7 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 def db_conn(request: Request) -> Iterator[Connection]:
     """Connexion de la requête, servie aux routes par `DbConn`. Sa transaction est celle de la requête.
 
-    Une requête d'écriture qui aboutit est committée en sortie ; une exception l'annule. Cette sortie précède l'envoi de la réponse (`scope="function"`) : un GET ou une tâche de fond déclenchés ensuite lisent l'état committé. Les services ne committent pas ; le pipeline et les scripts committent eux-mêmes.
+    Une requête d'écriture qui aboutit est committée en sortie, avec les événements d'audit qu'elle a émis (`record_pending_events`) ; une exception l'annule. Cette sortie précède l'envoi de la réponse (`scope="function"`) : un GET ou une tâche de fond déclenchés ensuite lisent l'état committé. Les services ne committent pas ; le pipeline et les scripts committent eux-mêmes.
 
     Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion. Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`).
     """
@@ -164,6 +164,7 @@ def db_conn(request: Request) -> Iterator[Connection]:
             conn.rollback()
             raise
         if request.method not in READ_ONLY_METHODS:
+            record_pending_events(audit_repository(conn))
             conn.commit()
 
 
@@ -198,10 +199,6 @@ def hal_problems_queries(
     conn: DbConn,
 ) -> HalProblemsQueries:
     return PgHalProblemsQueries(conn)
-
-
-def audit_repo(conn: DbConn) -> AuditRepository:
-    return audit_repository(conn)
 
 
 def person_repo(conn: DbConn) -> PersonRepository:

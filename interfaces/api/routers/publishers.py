@@ -17,7 +17,6 @@ from application.ports.read_models.publishers_queries import (
     PublisherSort,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -28,7 +27,6 @@ from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     DbConn,
-    audit_repo,
     entity_detail,
     publication_count_recompute,
     publisher_queries,
@@ -152,13 +150,12 @@ def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
     repo: PublisherRepository = Depends(publisher_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Met à jour un éditeur, champ par champ.
 
     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
     """
-    publishers_service.update_publisher(publisher_id, update=body, repo=repo, audit_repo=audit)
+    publishers_service.update_publisher(publisher_id, update=body, repo=repo)
     return OkResponse()
 
 
@@ -173,7 +170,6 @@ def merge(
     conn: DbConn,
     publishers: PublisherRepository = Depends(publisher_repo),
     serials: SerialRepository = Depends(serial_repo),
-    audit: AuditRepository = Depends(audit_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
     publication_count_recompute: PublicationCountRecompute = Depends(publication_count_recompute),
 ) -> MergeResponse:
@@ -193,6 +189,5 @@ def merge(
         publication_count_recompute=publication_count_recompute,
         publisher_repo=publishers,
         serial_repo=serials,
-        audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

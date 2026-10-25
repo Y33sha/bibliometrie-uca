@@ -27,7 +27,6 @@ from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
-from application.ports.repositories.audit_repository import AuditRepository
 from application.services.addresses import (
     countries as countries_service,
     structure_links as structure_links_service,
@@ -36,7 +35,6 @@ from interfaces.api.deps import (
     DbConn,
     address_repo,
     addresses_queries,
-    audit_repo,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
     country_recompute,
@@ -144,7 +142,6 @@ def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
     addr_repo: AddressRepository = Depends(address_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> BatchUpdatedResponse:
     """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
     updated, changed = structure_links_service.batch_review_structure_link(
@@ -152,7 +149,6 @@ def batch_review(
         data.structure_id,
         data.is_confirmed,
         repo=addr_repo,
-        audit_repo=audit,
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -182,7 +178,6 @@ def review_address(
     bg: BackgroundTasks,
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
 
@@ -195,7 +190,6 @@ def review_address(
         action.structure_id,
         action.is_confirmed,
         repo=addr_repo,
-        audit_repo=audit,
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -237,7 +231,6 @@ def batch_set_country(
     conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
@@ -252,7 +245,6 @@ def batch_set_country(
         country_code_filter=body.country_code_filter,
         repo=addr_repo,
         country_recompute=recompute,
-        audit_repo=audit,
     )
     bg.add_task(bg_propagate_countries, modified_ids)
     return BatchCountryResponse(updated=len(modified_ids))
@@ -266,7 +258,6 @@ def set_address_country(
     conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
 
@@ -278,7 +269,6 @@ def set_address_country(
         body.countries,
         repo=addr_repo,
         country_recompute=recompute,
-        audit_repo=audit,
     )
     bg.add_task(bg_propagate_countries, affected)
     return OkResponse()

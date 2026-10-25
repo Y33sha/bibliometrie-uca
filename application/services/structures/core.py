@@ -9,7 +9,6 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
     NameFormUpdate,
@@ -55,7 +54,6 @@ def create_structure(
     hal_collection: str | None = None,
     api_ids: dict[str, str | list[str]] | None = None,
     repo: StructureRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
     """Crée une structure. Retourne la ligne insérée. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
     structure = Structure.create(
@@ -70,7 +68,6 @@ def create_structure(
     )
     structure.id = repo.add(structure)
     emit_event(
-        audit_repo,
         "structure.created",
         "structure",
         structure.id,
@@ -84,7 +81,6 @@ def update_structure(
     *,
     update: StructureUpdate,
     repo: StructureRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
     """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
 
@@ -100,7 +96,6 @@ def update_structure(
 
     repo.save(structure)
     emit_event(
-        audit_repo,
         "structure.updated",
         "structure",
         structure_id,
@@ -137,7 +132,6 @@ def delete_structure(
     repo: StructureRepository,
     perimeter_repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas.
 
@@ -149,7 +143,7 @@ def delete_structure(
     perimeter_repo.remove_structure_from_all_perimeters(structure_id)
     perimeter_structures.refresh(conn)
     # L'instantané garde ce que la cascade emporte : une suppression par erreur reste réparable à la main.
-    emit_event(audit_repo, "structure.deleted", "structure", structure_id, snapshot)
+    emit_event("structure.deleted", "structure", structure_id, snapshot)
 
 
 # ── structure_parents ────────────────────────────────────────────
@@ -162,7 +156,6 @@ def create_tutelle(
     conn: Connection,
     repo: StructureRepository,
     perimeter_structures: PerimeterStructures,
-    audit_repo: AuditRepository | None = None,
 ) -> StructureTutelleRow | None:
     """Crée une tutelle, puis recalcule la clôture des périmètres, dont une tutelle modifie la descente. Retourne la ligne insérée, ou None si elle existait déjà.
 
@@ -178,7 +171,6 @@ def create_tutelle(
     if row is not None:
         # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
         emit_event(
-            audit_repo,
             "structure_relation.created",
             "structure",
             parent_id,
@@ -193,7 +185,6 @@ def delete_tutelle(
     conn: Connection,
     repo: StructureRepository,
     perimeter_structures: PerimeterStructures,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime une tutelle, puis recalcule la clôture des périmètres. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_tutelle(tutelle_id)
@@ -201,7 +192,6 @@ def delete_tutelle(
         raise NotFoundError(f"Tutelle {tutelle_id} introuvable")
     perimeter_structures.refresh(conn)
     emit_event(
-        audit_repo,
         "structure_relation.deleted",
         "structure",
         row["parent_id"],
@@ -224,7 +214,6 @@ def create_name_form(
     is_excluding: bool = False,
     requires_context_of: list[int] | None = None,
     repo: StructureRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
     form_text_normalized = normalize_text(form_text)
@@ -237,7 +226,6 @@ def create_name_form(
         requires_context_of=requires_context_of,
     )
     emit_event(
-        audit_repo,
         "structure_name_form.created",
         "structure",
         structure_id,
@@ -251,7 +239,6 @@ def update_name_form(
     *,
     update: NameFormUpdate,
     repo: StructureRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> StructureNameFormRow:
     """Met à jour une forme de nom. Retourne la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
 
@@ -283,7 +270,6 @@ def update_name_form(
 
     row = repo.update_name_form_fields(form_id, update_fields)
     emit_event(
-        audit_repo,
         "structure_name_form.updated",
         "structure",
         existing["structure_id"],
@@ -296,14 +282,12 @@ def delete_name_form(
     form_id: int,
     *,
     repo: StructureRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_name_form(form_id)
     if not row:
         raise NotFoundError(f"Forme {form_id} introuvable")
     emit_event(
-        audit_repo,
         "structure_name_form.deleted",
         "structure",
         row["structure_id"],

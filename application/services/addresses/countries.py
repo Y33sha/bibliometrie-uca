@@ -13,7 +13,6 @@ from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
-from application.ports.repositories.audit_repository import AuditRepository
 from domain.errors import ValidationError
 from domain.types import JsonValue
 
@@ -34,7 +33,6 @@ def set_country(
     *,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Saisit à la main les pays d'une adresse, puis résout l'adresse. `countries=None` ou `[]` rend l'adresse aux moyens automatiques.
 
@@ -43,9 +41,7 @@ def set_country(
     _require_known_countries(countries or [], repo=repo)
     repo.set_manual_countries(address_id, countries)
     country_recompute.resolve_address_countries(conn, [address_id])
-    emit_event(
-        audit_repo, "address.country_set", "address", address_id, {"countries": countries or []}
-    )
+    emit_event("address.country_set", "address", address_id, {"countries": countries or []})
     return [address_id]
 
 
@@ -59,7 +55,6 @@ def batch_set_country(
     country_code_filter: str,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Ajoute un pays à des adresses, désignées par leurs identifiants ou, à défaut, par filtre (`batch_set_country_by_ids`, `batch_set_country_by_filter`).
 
@@ -91,7 +86,6 @@ def batch_set_country(
             "country_code_filter": country_code_filter,
         }
     emit_event(
-        audit_repo,
         "address.batch_country_set",
         "address",
         None,

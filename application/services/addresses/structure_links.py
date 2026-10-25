@@ -5,7 +5,6 @@ Ces opérations écrivent le lien et **retournent les adresses dont la contribut
 
 from application.audit_log import emit_event
 from application.ports.repositories.address_repository import AddressRepository
-from application.ports.repositories.audit_repository import AuditRepository
 
 
 def review_structure_link(
@@ -14,7 +13,6 @@ def review_structure_link(
     is_confirmed: bool | None,
     *,
     repo: AddressRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Insère ou met à jour le lien adresse ↔ structure (validation manuelle).
 
@@ -33,7 +31,6 @@ def review_structure_link(
 
     after = repo.which_contribute_to_perimeter([address_id], structure_id)
     emit_event(
-        audit_repo,
         "address.link_reviewed",
         "address",
         address_id,
@@ -48,7 +45,6 @@ def batch_review_structure_link(
     is_confirmed: bool | None,
     *,
     repo: AddressRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> tuple[int, list[int]]:
     """Comme `review_structure_link` mais sur un lot d'adresses.
 
@@ -69,7 +65,6 @@ def batch_review_structure_link(
 
     after = repo.which_contribute_to_perimeter(address_ids, structure_id)
     emit_event(
-        audit_repo,
         "address.batch_link_reviewed",
         "address",
         None,

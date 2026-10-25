@@ -10,7 +10,6 @@ from sqlalchemy import Connection
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
     PerimeterUpdate,
@@ -27,7 +26,6 @@ def create_perimeter(
     conn: Connection,
     repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
-    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Crée un périmètre avec ses structures racines, puis recalcule la clôture des périmètres. Retourne l'id créé.
 
@@ -39,7 +37,6 @@ def create_perimeter(
     perimeter_id = repo.add(perimeter)
     perimeter_structures.refresh(conn)
     emit_event(
-        audit_repo,
         "perimeter.created",
         "perimeter",
         perimeter_id,
@@ -59,7 +56,6 @@ def update_perimeter(
     conn: Connection,
     repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
 
@@ -81,7 +77,6 @@ def update_perimeter(
     repo.save(perimeter)
     perimeter_structures.refresh(conn)
     emit_event(
-        audit_repo,
         "perimeter.updated",
         "perimeter",
         perimeter_id,
@@ -98,7 +93,6 @@ def delete_perimeter(
     *,
     repo: PerimeterRepository,
     config: ConfigQueries,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
 
@@ -114,7 +108,6 @@ def delete_perimeter(
 
     repo.delete_perimeter(perimeter_id)
     emit_event(
-        audit_repo,
         "perimeter.deleted",
         "perimeter",
         perimeter_id,

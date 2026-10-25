@@ -9,12 +9,10 @@ from fastapi import APIRouter, Depends
 
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import core as config_service
 from interfaces.api.deps import (
     admin_user_or_none,
-    audit_repo,
     config_queries,
     config_repository,
     perimeters_queries,
@@ -47,13 +45,12 @@ def update_config(
     key: str,
     body: ConfigValueUpdate,
     config: ConfigRepository = Depends(config_repository),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif.
 
     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
     """
-    row = config_service.update_config_value(key, body.value, config=config, audit_repo=audit)
+    row = config_service.update_config_value(key, body.value, config=config)
     return ConfigItem(
         key=cast(str, row["key"]),
         value=row["value"],

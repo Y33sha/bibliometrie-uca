@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.perimeters_queries import PerimeterOut, PerimetersQueries
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
     PerimeterUpdate,
@@ -16,7 +15,6 @@ from application.ports.repositories.perimeter_repository import (
 from application.services.perimeters import core as perimeters_service
 from interfaces.api.deps import (
     DbConn,
-    audit_repo,
     config_queries,
     get_perimeter_structures,
     perimeter_repo,
@@ -48,7 +46,6 @@ def create_perimeter(
     conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
@@ -59,7 +56,6 @@ def create_perimeter(
         name=body.name,
         root_structure_ids=body.root_structure_ids,
         conn=conn,
-        audit_repo=audit,
         repo=repo,
         perimeter_structures=perimeter_structures,
     )
@@ -73,7 +69,6 @@ def update_perimeter(
     conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
@@ -85,7 +80,6 @@ def update_perimeter(
         conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
-        audit_repo=audit,
     )
     return OkResponse()
 
@@ -95,11 +89,10 @@ def delete_perimeter(
     perimeter_id: int,
     repo: PerimeterRepository = Depends(perimeter_repo),
     config: ConfigQueries = Depends(config_queries),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Supprime un périmètre.
 
     Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
     """
-    perimeters_service.delete_perimeter(perimeter_id, repo=repo, config=config, audit_repo=audit)
+    perimeters_service.delete_perimeter(perimeter_id, repo=repo, config=config)
     return OkResponse()

@@ -13,7 +13,6 @@ from application.ports.pipeline.publication_perimeter import PublicationPerimete
 from application.ports.pipeline.source_contribution_perimeter import (
     SourceContributionPerimeterRecompute,
 )
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import NotFoundError
@@ -26,7 +25,6 @@ def reject_pair(
     conn: Connection,
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Rejette durablement une paire (publication, personne) : enregistre que cette personne n'est pas l'auteur de cette publication.
 
@@ -43,7 +41,6 @@ def reject_pair(
     perimeter_recompute.refresh_publications(conn, [publication_id])
 
     emit_event(
-        audit_repo,
         "contribution.rejected",
         "publication",
         publication_id,
@@ -59,7 +56,6 @@ def exclude_contribution(
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
     person_repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Rejette une contribution désignée par son identifiant.
 
@@ -78,7 +74,6 @@ def exclude_contribution(
         conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
-        audit_repo=audit_repo,
     )
     person_repo.delete_orphan_name_forms_for_person(person_id)
 

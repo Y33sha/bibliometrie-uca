@@ -261,9 +261,8 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if not admin_user:
         return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
 
-    # Propager l'utilisateur dans le contexte async pour que emit_event()
-    # l'inclue dans les enregistrements audit_log, sans polluer les
-    # signatures des services métier.
+    # Session d'audit de la requête : les services y rangent leurs événements (`emit_event`),
+    # que `db_conn` écrit dans `audit_log` avant son commit.
     token_ctx = audit_log.set_current_user(admin_user)
     try:
         response = await call_next(request)

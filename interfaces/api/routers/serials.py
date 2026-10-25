@@ -22,7 +22,6 @@ from application.ports.read_models.serials_queries import (
     SerialSort,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
 from application.services.serials import core as serials_service
 from domain.merge import MergedEntity
@@ -34,7 +33,6 @@ from domain.serials.serial import (
 )
 from interfaces.api.deps import (
     DbConn,
-    audit_repo,
     entity_detail,
     serial_queries,
     serial_recompute,
@@ -283,7 +281,6 @@ def update_serial(
     body: SerialUpdate,
     conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
-    audit: AuditRepository = Depends(audit_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
 ) -> OkResponse:
     """Met à jour une revue, champ par champ.
@@ -297,7 +294,6 @@ def update_serial(
         update=body,
         conn=conn,
         repo=repo,
-        audit_repo=audit,
         recompute=recompute,
     )
     return OkResponse()
@@ -309,7 +305,6 @@ def merge(
     body: MergeRequest,
     conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
-    audit: AuditRepository = Depends(audit_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `serial_id`.
@@ -322,6 +317,5 @@ def merge(
         conn=conn,
         recompute=recompute,
         repo=repo,
-        audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=serial_id)

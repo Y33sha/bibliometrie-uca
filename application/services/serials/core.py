@@ -9,9 +9,8 @@ from decimal import Decimal
 
 from sqlalchemy import Connection
 
-from application.audit_log import emit_event
+from application.audit_log import discarded_events, emit_event
 from application.ports.pipeline.serial_recompute import SerialRecompute
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
 from application.services._merge import load_merge_pair
 from domain.errors import NotFoundError, ValidationError
@@ -26,7 +25,6 @@ def update_serial(
     conn: Connection,
     repo: SerialRepository,
     recompute: SerialRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Charge la revue, applique les champs explicitement fournis (`Serial.edit`), persiste. Si le `serial_type` ou le `oa_model` change effectivement, rejoue les corrections des publications de la revue : leur `doc_type` suit le type de la revue, leur statut diamant son modèle OA. Retourne le nombre de publications dont le `doc_type` change.
 
@@ -44,7 +42,6 @@ def update_serial(
     changed = serial.edit(**_serial_edit(update))
     repo.save(serial)
     emit_event(
-        audit_repo,
         "serial.updated",
         "serial",
         serial_id,
@@ -52,9 +49,7 @@ def update_serial(
     )
     if not changed & {ManualField.SERIAL_TYPE, ManualField.OA_MODEL}:
         return 0
-    return requalify_publications_for_serial(
-        serial_id, conn=conn, recompute=recompute, audit_repo=audit_repo
-    )
+    return requalify_publications_for_serial(serial_id, conn=conn, recompute=recompute)
 
 
 def preview_type_change_impact(
@@ -67,17 +62,18 @@ def preview_type_change_impact(
 ) -> int:
     """Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à `serial_type`.
 
-    Applique réellement l'édition (`update_serial`) dans un `SAVEPOINT` annulé : l'aperçu emprunte le chemin exact de l'édition, et aucune écriture ne survit. Lève `NotFoundError` sur une revue inconnue, comme l'édition simulée.
+    Applique réellement l'édition (`update_serial`) dans un `SAVEPOINT` annulé : l'aperçu emprunte le chemin exact de l'édition, et aucune écriture ne survit, ni aucun événement d'audit. Lève `NotFoundError` sur une revue inconnue, comme l'édition simulée.
     """
     savepoint = conn.begin_nested()
     try:
-        return update_serial(
-            serial_id,
-            update=SerialUpdate(serial_type=serial_type),
-            conn=conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        with discarded_events():
+            return update_serial(
+                serial_id,
+                update=SerialUpdate(serial_type=serial_type),
+                conn=conn,
+                repo=repo,
+                recompute=recompute,
+            )
     finally:
         savepoint.rollback()
 
@@ -109,7 +105,6 @@ def merge_serials(
     conn: Connection,
     repo: SerialRepository,
     recompute: SerialRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne la revue source dans la revue cible, par le pipeline, qui requalifie les publications absorbées.
 
@@ -117,7 +112,7 @@ def merge_serials(
     """
     load_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
     recompute.merge_serials(conn, target_id, source_id)
-    emit_event(audit_repo, "serial.merged", "serial", target_id, {"source_id": source_id})
+    emit_event("serial.merged", "serial", target_id, {"source_id": source_id})
 
 
 # ── Requalification des publications d'un journal après changement d'un champ éditable ──
@@ -128,7 +123,6 @@ def requalify_publications_for_serial(
     *,
     conn: Connection,
     recompute: SerialRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> int:
     """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `serial_type`.
 
@@ -139,7 +133,6 @@ def requalify_publications_for_serial(
     changed = recompute.requalify_publications(conn, serial_id)
     if changed > 0:
         emit_event(
-            audit_repo,
             "serial.type_requalified",
             "serial",
             serial_id,

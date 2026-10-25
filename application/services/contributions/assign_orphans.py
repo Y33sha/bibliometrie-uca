@@ -11,7 +11,6 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import (
     ContributionRepository,
     GroupRow,
@@ -38,7 +37,6 @@ def _resolve_rejection(
     publication_ids: list[int],
     *,
     contribution_repo: ContributionRepository,
-    audit_repo: AuditRepository | None,
     force: bool,
 ) -> None:
     """Pré-contrôle des paires rejetées avant une réassignation.
@@ -75,7 +73,6 @@ def _resolve_rejection(
     # La levée procède d'une confirmation unique : un événement, portant les publications dont
     # le rejet tombe, plutôt qu'un par paire.
     emit_event(
-        audit_repo,
         "contribution.unrejected",
         "person",
         person_id,
@@ -113,7 +110,6 @@ def assign_orphan_contribution(
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> None:
     """Attribue une contribution orpheline, le groupe `contribution_id` sans personne, à une personne.
@@ -140,7 +136,6 @@ def assign_orphan_contribution(
         person_id,
         [group["publication_id"]],
         contribution_repo=contribution_repo,
-        audit_repo=audit_repo,
         force=force,
     )
     _attach_groups(
@@ -153,7 +148,6 @@ def assign_orphan_contribution(
     )
 
     emit_event(
-        audit_repo,
         "contribution.assigned",
         "person",
         person_id,
@@ -170,7 +164,6 @@ def assign_orphan_contribution_to_new_person(
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> int:
     """Crée une personne (`PersonRepository.create`), puis lui attribue la contribution orpheline `contribution_id` (`assign_orphan_contribution`). Retourne l'id de la personne créée.
@@ -185,7 +178,6 @@ def assign_orphan_contribution_to_new_person(
         repo=repo,
         contribution_repo=contribution_repo,
         perimeter_recompute=perimeter_recompute,
-        audit_repo=audit_repo,
         force=force,
     )
     return person_id
@@ -199,7 +191,6 @@ def batch_assign_orphan_contributions(
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
     force: bool = False,
 ) -> int:
     """Attribue en lot plusieurs contributions orphelines, groupes sans personne, à une personne.
@@ -230,7 +221,6 @@ def batch_assign_orphan_contributions(
             person_id,
             sorted({g["publication_id"] for g in groups}),
             contribution_repo=contribution_repo,
-            audit_repo=audit_repo,
             force=force,
         )
         _attach_groups(
@@ -243,7 +233,6 @@ def batch_assign_orphan_contributions(
         )
 
     emit_event(
-        audit_repo,
         "contribution.batch_assigned",
         "person",
         person_id,

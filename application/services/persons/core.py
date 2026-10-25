@@ -10,7 +10,6 @@ from sqlalchemy import Connection
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import (
     NameFormStatusRow,
@@ -59,7 +58,6 @@ def set_exclusion(
     conn: Connection,
     repo: PersonRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Exclut une personne pour le motif `exclusion`, ou la retient si `exclusion` est `None`.
 
@@ -68,7 +66,6 @@ def set_exclusion(
     repo.set_exclusion(person_id, exclusion)
     perimeter_recompute.refresh_publications_of_person(conn, person_id)
     emit_event(
-        audit_repo,
         "person.exclusion",
         "person",
         person_id,
@@ -82,7 +79,6 @@ def update_name(
     first_name: str,
     *,
     repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
@@ -92,7 +88,6 @@ def update_name(
     """
     last_name, first_name = repo.rename(person_id, last_name, first_name)
     emit_event(
-        audit_repo,
         "person.name_updated",
         "person",
         person_id,
@@ -116,7 +111,6 @@ def add_identifier(
     id_value: str,
     *,
     repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
     """Attribue à la main un identifiant (ORCID, idHAL, IdRef) à une personne.
 
@@ -136,7 +130,6 @@ def add_identifier(
     if outcome is not AttributionOutcome.ALREADY_EXISTS:
         # Un appel répété ne change rien : seule une attribution effective est consignée.
         emit_event(
-            audit_repo,
             "person_identifier.added",
             "person",
             person_id,
@@ -165,7 +158,6 @@ def update_identifier_status(
     status: str,
     *,
     repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
@@ -180,7 +172,6 @@ def update_identifier_status(
     if status == AttributionStatus.REJECTED.value:
         repo.mark_groups_of_rejected_identifiers(row["person_id"])
     emit_event(
-        audit_repo,
         "person_identifier.status_changed",
         "person",
         row["person_id"],
@@ -199,7 +190,6 @@ def update_name_form_status(
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
@@ -211,7 +201,6 @@ def update_name_form_status(
     if status == "rejected":
         contribution_repo.mark_groups_for_name_form(person_id, name_form)
     emit_event(
-        audit_repo,
         "person_name_form.status_changed",
         "person",
         person_id,
@@ -228,7 +217,6 @@ def detach_contributions(
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
@@ -253,7 +241,6 @@ def detach_contributions(
             conn=conn,
             repo=contribution_repo,
             perimeter_recompute=perimeter_recompute,
-            audit_repo=audit_repo,
         )
 
     cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
@@ -272,7 +259,6 @@ def mark_distinct(
     person_id_b: int,
     *,
     repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent : l'événement d'audit n'est émis que si la paire vient d'être insérée.
 
@@ -283,7 +269,6 @@ def mark_distinct(
     inserted = repo.mark_distinct(person_id_a, person_id_b)
     if inserted:
         emit_event(
-            audit_repo,
             "person.marked_distinct",
             "person",
             inserted[0],
@@ -296,7 +281,6 @@ def merge_person(
     source_id: int,
     *,
     repo: PersonRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> tuple[int, int]:
     """Fusionne les personnes `target_id` et `source_id`, et retourne (id conservé, id absorbé).
 
@@ -309,5 +293,5 @@ def merge_person(
         target_id, source_id, with_rh=repo.ids_with_rh([target_id, source_id])
     )
     repo.merge_into(target_id, source_id)
-    emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})
+    emit_event("person.merged", "person", target_id, {"source_id": source_id})
     return target_id, source_id

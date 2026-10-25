@@ -17,13 +17,11 @@ from application.ports.read_models.contributions_queries import (
     OrphanCountResponse,
     OrphanFilters,
 )
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.contributions import assign_orphans, core as contributions_service
 from interfaces.api.deps import (
     DbConn,
-    audit_repo,
     contribution_repo,
     contributions_queries,
     person_repo,
@@ -91,7 +89,6 @@ def assign_orphan_contribution(
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
@@ -106,7 +103,6 @@ def assign_orphan_contribution(
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
-            audit_repo=audit,
             force=body.force,
         )
     else:
@@ -118,7 +114,6 @@ def assign_orphan_contribution(
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
-            audit_repo=audit,
             force=body.force,
         )
     return OrphanAssignResponse(person_id=person_id)
@@ -135,7 +130,6 @@ def batch_assign_orphan_contributions(
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions orphelines à une personne existante.
 
@@ -151,7 +145,6 @@ def batch_assign_orphan_contributions(
         repo=persons,
         contribution_repo=contributions,
         perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
         force=body.force,
     )
     return OrphanBatchAssignResponse(assigned=assigned)
@@ -167,7 +160,6 @@ def exclude_contribution(
     repo: ContributionRepository = Depends(contribution_repo),
     persons: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
@@ -179,6 +171,5 @@ def exclude_contribution(
         repo=repo,
         person_repo=persons,
         perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
     )
     return OkResponse()

@@ -1,4 +1,4 @@
-"""La transaction de la requête : `db_conn` committe une écriture qui aboutit, et une seule connexion sert toute la requête."""
+"""La transaction de la requête : `db_conn` committe une écriture qui aboutit avec ses événements d'audit, et une seule connexion sert toute la requête."""
 
 from collections.abc import Iterable, Iterator
 from types import SimpleNamespace
@@ -35,6 +35,8 @@ class _Connection:
 def connexion(monkeypatch) -> _Connection:
     conn = _Connection()
     monkeypatch.setattr(deps, "_open_connection", lambda request: conn)
+    monkeypatch.setattr(deps, "audit_repository", lambda c: c)
+    monkeypatch.setattr(deps, "record_pending_events", lambda c: c.gestes.append("audit"))
     return conn
 
 
@@ -42,12 +44,12 @@ def _requete(methode: str) -> Iterator:
     return deps.db_conn(SimpleNamespace(method=methode))
 
 
-def test_une_ecriture_qui_aboutit_est_committee(connexion):
+def test_une_ecriture_qui_aboutit_est_committee_avec_son_audit(connexion):
     gen = _requete("POST")
     next(gen)
     with pytest.raises(StopIteration):
         next(gen)
-    assert connexion.gestes == ["commit", "close"]
+    assert connexion.gestes == ["audit", "commit", "close"]
 
 
 def test_une_exception_annule_l_ecriture(connexion):

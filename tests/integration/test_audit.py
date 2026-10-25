@@ -1,18 +1,23 @@
-"""Tests du service d'audit (services/audit.py).
+"""Tests du journal d'audit (`application/audit_log.py`).
 
-Vérifie deux comportements essentiels :
-1. Hors contexte utilisateur (pipeline, scripts) → emit_event est no-op.
-2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
+Vérifie trois comportements :
+1. Hors requête d'administration (pipeline, scripts) → `emit_event` ne consigne rien.
+2. Dans une requête d'administration → l'événement rejoint la file de la requête, écrite dans `audit_log` avant le commit.
+3. Un événement émis dans un bloc `discarded_events` → écarté avec l'écriture annulée qu'il décrit.
 """
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from functools import partial
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from application.audit_log import (
+    discarded_events,
     emit_event,
     get_current_user,
+    record_pending_events,
     reset_current_user,
     set_current_user,
 )
@@ -25,6 +30,30 @@ from tests.integration.helpers.publications import insert_publication
 
 # Personne « X X » par défaut, normalisée par `lower`.
 _person = partial(insert_person, last_name="X", first_name="X", normalizer="lower")
+
+
+@contextmanager
+def _requete_admin(conn: Connection, user: str = "admin") -> Iterator[None]:
+    """Rejoue le cycle d'une requête d'administration : la session de l'utilisatrice, puis l'écriture de sa file d'événements, comme `db_conn` avant son commit."""
+    token = set_current_user(user)
+    try:
+        yield
+        record_pending_events(audit_repository(conn))
+    finally:
+        reset_current_user(token)
+
+
+def _count(conn: Connection) -> int:
+    return conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).scalar_one()
+
+
+def _last_event(conn: Connection):
+    return conn.execute(
+        text(
+            "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
+            "FROM audit_log ORDER BY id DESC LIMIT 1"
+        )
+    ).one()
 
 
 @pytest.fixture
@@ -64,76 +93,60 @@ class TestCurrentUserContext:
 
 class TestEmitEvent:
     def test_no_user_no_event(self, sa_sync_conn):
-        """Hors contexte utilisateur : emit_event ne persiste rien."""
-        emit_event(audit_repository(sa_sync_conn), "person.merged", "person", 1, {"source_id": 2})
-        n = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).scalar_one()
-        assert n == 0
+        """Hors requête d'administration : rien n'est consigné."""
+        emit_event("person.merged", "person", 1, {"source_id": 2})
+        record_pending_events(audit_repository(sa_sync_conn))
+        assert _count(sa_sync_conn) == 0
 
     def test_with_user_persists(self, sa_sync_conn):
-        token = set_current_user("admin")
-        try:
-            emit_event(
-                audit_repository(sa_sync_conn), "person.merged", "person", 1, {"source_id": 2}
-            )
-            row = sa_sync_conn.execute(
-                text(
-                    "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
-                    "FROM audit_log ORDER BY id DESC LIMIT 1"
-                )
-            ).one()
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            emit_event("person.merged", "person", 1, {"source_id": 2})
 
+        row = _last_event(sa_sync_conn)
         assert row.event_type == "person.merged"
         assert row.aggregate_type == "person"
         assert row.aggregate_id == 1
         assert row.payload == {"source_id": 2}
         assert row.user_id == "admin"
 
+    def test_written_only_when_recorded(self, sa_sync_conn):
+        """L'événement attend l'écriture de la file : une requête qui échoue n'en laisse aucun."""
+        token = set_current_user("admin")
+        try:
+            emit_event("person.merged", "person", 1)
+            assert _count(sa_sync_conn) == 0
+        finally:
+            reset_current_user(token)
+
     def test_accepts_null_aggregate_id(self, sa_sync_conn):
         """Cas d'une entité supprimée sans équivalent survivant."""
-        token = set_current_user("admin")
-        try:
-            emit_event(
-                audit_repository(sa_sync_conn),
-                "structure.deleted",
-                "structure",
-                None,
-                {"name": "X"},
-            )
-            agg_id = sa_sync_conn.execute(
-                text("SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1")
-            ).scalar_one()
-            assert agg_id is None
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            emit_event("structure.deleted", "structure", None, {"name": "X"})
+        assert _last_event(sa_sync_conn).aggregate_id is None
 
     def test_default_payload_is_empty_object(self, sa_sync_conn):
-        token = set_current_user("admin")
-        try:
-            emit_event(audit_repository(sa_sync_conn), "person.exclusion", "person", 42)
-            payload = sa_sync_conn.execute(
-                text("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
-            ).scalar_one()
-            assert payload == {}
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            emit_event("person.exclusion", "person", 42)
+        assert _last_event(sa_sync_conn).payload == {}
 
     def test_multiple_events_in_order(self, sa_sync_conn):
-        token = set_current_user("admin")
-        try:
-            repo = audit_repository(sa_sync_conn)
-            emit_event(repo, "a.b", "person", 1)
-            emit_event(repo, "c.d", "person", 2)
-            rows = sa_sync_conn.execute(text("SELECT event_type FROM audit_log ORDER BY id")).all()
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            emit_event("a.b", "person", 1)
+            emit_event("c.d", "person", 2)
+        rows = sa_sync_conn.execute(text("SELECT event_type FROM audit_log ORDER BY id")).all()
         assert [r.event_type for r in rows] == ["a.b", "c.d"]
+
+    def test_discarded_events_are_not_written(self, sa_sync_conn):
+        with _requete_admin(sa_sync_conn):
+            emit_event("a.b", "person", 1)
+            with discarded_events():
+                emit_event("c.d", "person", 2)
+        rows = sa_sync_conn.execute(text("SELECT event_type FROM audit_log ORDER BY id")).all()
+        assert [r.event_type for r in rows] == ["a.b"]
 
 
 class TestEndToEndServiceIntegration:
-    """Vérifie que les services destructifs émettent bien les événements
-    attendus quand un utilisateur est dans le contexte."""
+    """Vérifie que les services émettent les événements attendus dans une requête d'administration."""
 
     @pytest.fixture
     def sa_sync_conn(self, sa_sync_conn_owner):
@@ -143,47 +156,29 @@ class TestEndToEndServiceIntegration:
         """
         return sa_sync_conn_owner
 
-    def _last_event(self, conn):
-        return conn.execute(
-            text(
-                "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
-                "FROM audit_log ORDER BY id DESC LIMIT 1"
-            )
-        ).one()
-
     def test_set_exclusion_emits_event(self, sa_sync_conn):
         from application.services.persons.core import set_exclusion
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
         person_id = _person(sa_sync_conn)
-        token = set_current_user("admin")
-        try:
+        with _requete_admin(sa_sync_conn):
             set_exclusion(
                 person_id,
                 PersonExclusion.OUT_OF_PERIMETER,
                 conn=sa_sync_conn,
                 repo=person_repository(sa_sync_conn),
                 perimeter_recompute=PublicationPerimeterRecompute(),
-                audit_repo=audit_repository(sa_sync_conn),
             )
-        finally:
-            reset_current_user(token)
 
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT event_type, aggregate_id, payload, user_id "
-                "FROM audit_log ORDER BY id DESC LIMIT 1"
-            )
-        ).one()
+        row = _last_event(sa_sync_conn)
         assert row.event_type == "person.exclusion"
         assert row.aggregate_id == person_id
         assert row.payload == {"exclusion": "out_of_perimeter"}
         assert row.user_id == "admin"
 
     def test_set_exclusion_without_context_no_event(self, sa_sync_conn):
-        """Confirme que hors contexte (pipeline, script), rien n'est audité
-        même quand un service destructif est appelé."""
+        """Hors requête d'administration (pipeline, script), rien n'est consigné, même quand un service écrit."""
         from application.services.persons.core import set_exclusion
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
@@ -195,29 +190,22 @@ class TestEndToEndServiceIntegration:
             conn=sa_sync_conn,
             repo=person_repository(sa_sync_conn),
             perimeter_recompute=PublicationPerimeterRecompute(),
-            audit_repo=audit_repository(sa_sync_conn),
         )
-
-        n = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).scalar_one()
-        assert n == 0
+        record_pending_events(audit_repository(sa_sync_conn))
+        assert _count(sa_sync_conn) == 0
 
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
-        """mark_distinct est idempotent : un appel sur une paire déjà
-        marquée ne doit pas générer d'événement supplémentaire."""
+        """`mark_distinct` est idempotent : un appel sur une paire déjà marquée n'émet pas d'événement supplémentaire."""
         from application.services.persons.core import mark_distinct
         from infrastructure.repositories import person_repository
 
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         repo = person_repository(sa_sync_conn)
-        audit_repo_ = audit_repository(sa_sync_conn)
-        token = set_current_user("admin")
-        try:
-            mark_distinct(p1, p2, repo=repo, audit_repo=audit_repo_)
-            mark_distinct(p1, p2, repo=repo, audit_repo=audit_repo_)
-            mark_distinct(p2, p1, repo=repo, audit_repo=audit_repo_)
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            mark_distinct(p1, p2, repo=repo)
+            mark_distinct(p1, p2, repo=repo)
+            mark_distinct(p2, p1, repo=repo)
 
         n = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'")
@@ -230,24 +218,18 @@ class TestEndToEndServiceIntegration:
 
         target = _person(sa_sync_conn, last_name="A")
         source = _person(sa_sync_conn, last_name="B")
-        token = set_current_user("admin")
-        try:
-            merge_person(
-                target,
-                source,
-                repo=person_repository(sa_sync_conn),
-                audit_repo=audit_repository(sa_sync_conn),
-            )
-        finally:
-            reset_current_user(token)
+        with _requete_admin(sa_sync_conn):
+            merge_person(target, source, repo=person_repository(sa_sync_conn))
 
-        row = self._last_event(sa_sync_conn)
+        row = _last_event(sa_sync_conn)
         assert row.event_type == "person.merged"
         assert row.aggregate_id == target
         assert row.payload == {"source_id": source}
         assert row.user_id == "admin"
 
-    def test_name_form_confirm_emits_event(self, sa_sync_conn):
+    @pytest.mark.parametrize("status", ["confirmed", "rejected"])
+    def test_name_form_status_emits_event(self, sa_sync_conn, status):
+        """La confirmation comme le rejet d'une forme (action « détacher l'intrus ») émettent l'événement."""
         from application.services.persons.core import update_name_form_status
         from infrastructure.repositories import contribution_repository, person_repository
 
@@ -255,49 +237,19 @@ class TestEndToEndServiceIntegration:
         insert_person_name_form(
             sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
         )
-        token = set_current_user("admin")
-        try:
+        with _requete_admin(sa_sync_conn):
             update_name_form_status(
                 person_id,
                 "x x",
-                "confirmed",
+                status,
                 repo=person_repository(sa_sync_conn),
                 contribution_repo=contribution_repository(sa_sync_conn),
-                audit_repo=audit_repository(sa_sync_conn),
             )
-        finally:
-            reset_current_user(token)
 
-        row = self._last_event(sa_sync_conn)
+        row = _last_event(sa_sync_conn)
         assert row.event_type == "person_name_form.status_changed"
         assert row.aggregate_id == person_id
-        assert row.payload == {"name_form": "x x", "status": "confirmed"}
-
-    def test_name_form_reject_emits_event(self, sa_sync_conn):
-        """Le rejet d'une forme (action « détacher l'intrus ») émet l'événement."""
-        from application.services.persons.core import update_name_form_status
-        from infrastructure.repositories import contribution_repository, person_repository
-
-        person_id = _person(sa_sync_conn)
-        insert_person_name_form(
-            sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
-        )
-        token = set_current_user("admin")
-        try:
-            update_name_form_status(
-                person_id,
-                "x x",
-                "rejected",
-                repo=person_repository(sa_sync_conn),
-                contribution_repo=contribution_repository(sa_sync_conn),
-                audit_repo=audit_repository(sa_sync_conn),
-            )
-        finally:
-            reset_current_user(token)
-
-        row = self._last_event(sa_sync_conn)
-        assert row.event_type == "person_name_form.status_changed"
-        assert row.payload == {"name_form": "x x", "status": "rejected"}
+        assert row.payload == {"name_form": "x x", "status": status}
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
         """Le détachement d'une paire (publication, personne) émet l'événement."""
@@ -306,21 +258,36 @@ class TestEndToEndServiceIntegration:
 
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        token = set_current_user("admin")
-        try:
+        with _requete_admin(sa_sync_conn):
             reject_pair(
                 publication_id,
                 person_id,
                 conn=sa_sync_conn,
                 perimeter_recompute=PublicationPerimeterRecompute(),
                 repo=contribution_repository(sa_sync_conn),
-                audit_repo=audit_repository(sa_sync_conn),
             )
-        finally:
-            reset_current_user(token)
 
-        row = self._last_event(sa_sync_conn)
+        row = _last_event(sa_sync_conn)
         assert row.event_type == "contribution.rejected"
         assert row.aggregate_type == "publication"
         assert row.aggregate_id == publication_id
         assert row.payload == {"person_id": person_id}
+
+    def test_serial_type_preview_emits_nothing(self, sa_sync_conn):
+        """L'aperçu d'un changement de type annule son écriture : aucun événement n'en reste."""
+        from application.services.serials.core import preview_type_change_impact
+        from domain.serials.serial import SerialType
+        from infrastructure.repositories import serial_repository
+        from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
+        from tests.integration.helpers.serials import insert_serial
+
+        serial_id = insert_serial(sa_sync_conn, title="Revue X")
+        with _requete_admin(sa_sync_conn):
+            preview_type_change_impact(
+                serial_id,
+                serial_type=SerialType.MEDIA,
+                conn=sa_sync_conn,
+                repo=serial_repository(sa_sync_conn),
+                recompute=SerialRecompute(),
+            )
+        assert _count(sa_sync_conn) == 0

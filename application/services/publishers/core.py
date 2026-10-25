@@ -10,7 +10,6 @@ from sqlalchemy import Connection
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
 from application.ports.pipeline.serial_recompute import SerialRecompute
-from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
@@ -33,7 +32,6 @@ def update_publisher(
     *,
     update: PublisherUpdate,
     repo: PublisherRepository,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Charge l'éditeur, applique les champs explicitement fournis, persiste.
 
@@ -53,7 +51,7 @@ def update_publisher(
     for field_name, value in update.model_dump(exclude_unset=True).items():
         setattr(publisher, field_name, value)
     repo.save(publisher)
-    emit_event(audit_repo, "publisher.updated", "publisher", publisher_id, champs)
+    emit_event("publisher.updated", "publisher", publisher_id, champs)
 
 
 def merge_publishers(
@@ -65,7 +63,6 @@ def merge_publishers(
     serial_repo: SerialRepository,
     recompute: SerialRecompute,
     publication_count_recompute: PublicationCountRecompute,
-    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
 
@@ -99,11 +96,10 @@ def merge_publishers(
             conn=conn,
             repo=serial_repo,
             recompute=recompute,
-            audit_repo=audit_repo,
         )
 
     # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
     publisher_repo.merge_publisher_into(target_id, source_id)
     publication_count_recompute.refresh_publisher_publication_count(conn, target_id)
 
-    emit_event(audit_repo, "publisher.merged", "publisher", target_id, {"source_id": source_id})
+    emit_event("publisher.merged", "publisher", target_id, {"source_id": source_id})
