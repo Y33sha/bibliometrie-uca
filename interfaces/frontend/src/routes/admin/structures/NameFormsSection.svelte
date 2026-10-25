@@ -56,7 +56,7 @@
 <h3 class="section-title">Identification dans les publications</h3>
 
 <h3>
-  Formes de noms ({forms.length})
+  Formes de noms <span class="count-pill">{forms.length}</span>
   <button
     class="btn-help-icon"
     onclick={() => {
@@ -215,12 +215,19 @@
 
 <style>
   h3:not(.section-title) {
-    margin: 12px 0 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 8px;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  }
+  .count-pill {
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
   .btn-help-icon {
     background: none;
@@ -323,19 +330,26 @@
     color: white;
     border-color: var(--accent);
   }
+  /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {
     display: flex;
-    gap: 4px;
-    margin-top: 8px;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 10px 12px;
     align-items: center;
+    background: var(--surface);
+    border-radius: var(--radius);
   }
   .add-row input:not([type]) {
-    flex: 1;
-    padding: 4px 6px;
+    flex: 1 1 260px;
+    height: 34px;
+    padding: 0 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    background: var(--card);
     font-size: 0.85rem;
-    font-family: inherit;
+    font-family: var(--mono);
   }
   .checkbox-label {
     font-size: 0.8rem;

@@ -34,53 +34,32 @@
 
 <h3 class="section-title">Tutelles</h3>
 
-<!-- Tutelles -->
-<h3>
-  Tutelle{tutelles.length > 1 ? "s" : ""}
-  <button class="btn-add" onclick={() => onopenPicker("parent", structureId)}
-    >+</button
-  >
-</h3>
-<div>
-  {#if tutelles.length === 0}
-    <span class="none-text">Aucune</span>
-  {:else}
-    {#each tutelles as p (p.relation_id)}
-      <span class="tag tutelle">
-        <button class="tag-name" onclick={() => onselect(p.id)}>
-          {structureLabel(p)}
-        </button>
-        <button class="remove" onclick={() => ondeleteTutelle(p.relation_id)} title="Supprimer"
-          >x</button
-        >
-      </span>
-    {/each}
-  {/if}
+<div class="relations">
+  {@render relationRow("Tutelles", tutelles, "Aucune", "parent")}
+  {@render relationRow("Est tutelle de", tutellesDe, "Aucune structure", "child")}
 </div>
 
-<!-- Est tutelle de -->
-<h3>
-  Est tutelle de
-  <button class="btn-add" onclick={() => onopenPicker("child", structureId)}
-    >+</button
-  >
-</h3>
-<div>
-  {#if tutellesDe.length === 0}
-    <span class="none-text">Aucun</span>
-  {:else}
-    {#each tutellesDe as c (c.relation_id)}
-      <span class="tag tutelle">
-        <button class="tag-name" onclick={() => onselect(c.id)}>
-          {structureLabel(c)}
-        </button>
-        <button class="remove" onclick={() => ondeleteTutelle(c.relation_id)} title="Supprimer"
-          >x</button
-        >
-      </span>
-    {/each}
-  {/if}
-</div>
+{#snippet relationRow(label: string, related: RelatedStructure[], emptyText: string, direction: string)}
+  <span class="relation-label">{label}</span>
+  <div class="relation-values">
+    {#if related.length === 0}
+      <span class="none-text">{emptyText}</span>
+    {:else}
+      {#each related as r (r.relation_id)}
+        <span class="tag">
+          <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
+          <button
+            class="remove"
+            onclick={() => ondeleteTutelle(r.relation_id)}
+            title="Retirer {structureLabel(r)}"
+            aria-label="Retirer {structureLabel(r)}">×</button
+          >
+        </span>
+      {/each}
+    {/if}
+    <button class="btn-add" onclick={() => onopenPicker(direction, structureId)}>+ Ajouter</button>
+  </div>
+{/snippet}
 
 <!-- Relation picker -->
 {#if relationPickerOpen}
@@ -100,78 +79,76 @@
 {/if}
 
 <style>
+  .relations {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 12px 20px;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+  .relation-label {
+    color: var(--text-secondary);
+  }
+  .relation-values {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
   .tag {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.85rem;
-    padding: 2px 8px;
+    gap: 2px;
+    padding: 2px 3px 2px 10px;
     border-radius: var(--radius-pill);
-    margin: 2px;
-    background: var(--surface);
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 500;
   }
   .tag .tag-name {
-    cursor: pointer;
-    background: none;
-    border: none;
     padding: 0;
+    border: none;
+    background: none;
     font: inherit;
     color: inherit;
+    cursor: pointer;
   }
   .tag .tag-name:hover {
     text-decoration: underline;
   }
+  /* Croix grise, rouge au survol. */
   .tag .remove {
-    cursor: pointer;
-    color: var(--danger);
-    font-weight: bold;
-    font-size: 1rem;
-    line-height: 1;
-    background: none;
-    border: none;
+    width: 20px;
+    height: 20px;
     padding: 0;
-    font-family: inherit;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: none;
+    font: inherit;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
   }
   .tag .remove:hover {
+    background: var(--danger-light);
     color: var(--danger);
   }
-  .tag.tutelle {
-    background: #d4e8f0;
-    color: #2e6b8a;
-  }
   .none-text {
-    font-size: 0.85rem;
     color: var(--muted);
   }
   .btn-add {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--accent);
+    height: 28px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: none;
+    font: inherit;
     font-size: 0.85rem;
-    font-weight: bold;
+    font-weight: 500;
+    color: var(--accent);
     cursor: pointer;
-    margin-left: 6px;
-    vertical-align: middle;
-    line-height: 1;
-    padding: 0 0 1px 0;
   }
   .btn-add:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-  }
-  h3:not(.section-title) {
-    margin: 12px 0 6px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    background: var(--hover);
   }
 </style>

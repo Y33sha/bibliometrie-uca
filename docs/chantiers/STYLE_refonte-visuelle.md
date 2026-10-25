@@ -112,11 +112,12 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 7 — Pages d'administration
 
-- [ ] Configuration du pipeline : une liste par section, lignes séparées par des filets ; boutons « Modifier » sans bordure ; encart d'information en teal clair
-- [ ] Fiche structure : en-tête avec type en pastille, sigle en gras, nom complet, actions à droite ; « Éditer » en bouton discret, « Supprimer » en texte rouge sans fond
-- [ ] Fiche structure : suppression du titre « Tutelles » en double
-- [ ] Fiche structure : croix des pastilles de tutelles grises, rouges au survol
-- [ ] Fiche structure : formes de noms avec boutons crayon et croix sans bordure, visibles au survol ; formulaire d'ajout aligné sur les colonnes du tableau
+- [x] Boutons Modifier et Supprimer de l'administration en icônes sans bordure, crayon et corbeille, libellé en infobulle (`IconButton`) (0398a8dbd)
+- [x] Configuration du pipeline : une liste par section, lignes séparées par des filets ; encart d'information en teal clair
+- [x] Fiche structure : hors carte ; en-tête avec type en pastille, sigle en gras, nom complet, actions à droite
+- [x] Fiche structure : tutelles et « est tutelle de » en grille libellé / valeurs, sans titre en double
+- [x] Fiche structure : croix des pastilles de tutelles grises, rouges au survol ; bouton « + Ajouter » discret
+- [x] Fiche structure : formes de noms avec compteur en pastille, actions visibles au survol, formulaire d'ajout sur fond léger
 
 ### Étape 8 — Barre de navigation publique
 

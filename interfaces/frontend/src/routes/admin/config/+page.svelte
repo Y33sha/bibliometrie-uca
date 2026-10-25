@@ -476,10 +476,10 @@
     max-width: 800px;
   }
 
+  /* Une liste par section, réglages séparés par des filets. */
   .config-grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     max-width: 800px;
     margin: 0 auto 8px;
   }
@@ -487,13 +487,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 12px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    min-height: 44px;
+    padding: 4px 4px 4px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .config-row:last-child {
+    border-bottom: none;
   }
   .config-label {
-    font-weight: 600;
     font-size: 0.9rem;
     min-width: 180px;
   }

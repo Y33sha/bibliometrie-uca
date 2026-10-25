@@ -428,7 +428,7 @@
     <div class="detail-header">
       <span class="structure-type structure-type-{s.type}">{s.type}</span>
       <h2>
-        {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
+        {#if s.acronym}<strong>{s.acronym}</strong> <span class="name-separator">·</span> {s.name}{:else}{s.name}{/if}
       </h2>
       <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
       <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
@@ -438,7 +438,7 @@
     <div class="details-inline">
       {#if s.ror_id}
         <span class="detail-item">
-          <span class="detail-label">ROR</span>
+          <span class="field-label">ROR</span>
           <a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="id-badge"
             >{rorShortId(s.ror_id)}</a
           >
@@ -446,13 +446,13 @@
       {/if}
       {#if s.rnsr_id}
         <span class="detail-item">
-          <span class="detail-label">RNSR</span>
+          <span class="field-label">RNSR</span>
           <span>{s.rnsr_id}</span>
         </span>
       {/if}
       {#if s.hal_collection}
         <span class="detail-item">
-          <span class="detail-label">Collection HAL</span>
+          <span class="field-label">Collection HAL</span>
           <a
             href={halCollectionUrl(s.hal_collection)}
             target="_blank"
@@ -464,7 +464,7 @@
     </div>
     {#if s.api_ids && Object.keys(s.api_ids).length}
       <div class="api-ids-display">
-        <span class="detail-label">Paramètres requête API :</span>
+        <span class="field-label">Paramètres requête API :</span>
         {#each Object.entries(s.api_ids) as [src, ids]}
           <span class="api-id-item">
             <span class="api-id-source">{src}</span>
@@ -549,10 +549,7 @@
   }
 
   .panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
+    max-width: 1100px;
   }
   .panel h2 {
     margin: 0 0 10px;
@@ -572,7 +569,7 @@
     align-items: center;
     gap: 5px;
   }
-  .detail-label {
+  .field-label {
     color: var(--muted);
     font-weight: 500;
     font-size: 0.8rem;
@@ -588,7 +585,16 @@
   .detail-header h2 {
     flex: 1;
     margin: 0;
-    font-size: 1.3rem;
+    font-size: 1.6rem;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .detail-header h2 strong {
+    font-weight: 700;
+  }
+  .name-separator {
+    color: var(--muted);
   }
 
   .api-ids-display {
