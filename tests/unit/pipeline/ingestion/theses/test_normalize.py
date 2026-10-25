@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
+Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
 
 Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de DB.
 """
@@ -97,7 +97,6 @@ class TestBuildSourceMeta:
         assert meta is not None
         assert meta["date_soutenance"] == "2024-03-15"
         assert meta["date_inscription"] == "2020-09-10"
-        assert meta["discipline"] == "Informatique"
         assert meta["etablissement"] == "Université Clermont Auvergne (2021-...)"
         assert meta["ecoles_doctorales"] == [
             {"nom": "EDSPI", "ppn": "1234"},

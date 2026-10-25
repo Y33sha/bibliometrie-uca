@@ -226,7 +226,8 @@ def get_publication_detail(
     if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
         extras_row = conn.execute(
             text(f"""
-                SELECT sr.source_extras AS source_record_extras, p.source_extras AS publication_extras
+                SELECT sr.source_extras AS source_record_extras, sr.topics->>'discipline' AS discipline,
+                       p.source_extras AS publication_extras
                 FROM publications p
                 LEFT JOIN source_records sr
                        ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
@@ -239,7 +240,7 @@ def get_publication_detail(
             source_record_extras = extras_row.source_record_extras or {}
             publication_extras = extras_row.publication_extras or {}
             thesis_meta = ThesisMeta(
-                discipline=source_record_extras.get(SourceExtra.DISCIPLINE),
+                discipline=extras_row.discipline,
                 ecoles_doctorales=source_record_extras.get(SourceExtra.ECOLES_DOCTORALES),
                 partenaires=source_record_extras.get(SourceExtra.PARTENAIRES),
                 date_soutenance=source_record_extras.get(SourceExtra.DATE_SOUTENANCE)

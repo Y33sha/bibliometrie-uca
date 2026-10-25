@@ -479,7 +479,6 @@ class TestThesesBuildSourceMeta:
         assert meta == {
             "date_soutenance": "2023-03-15",
             "date_inscription": "2020-09-01",
-            "discipline": "Informatique",
             "ecoles_doctorales": [{"nom": "SPI", "ppn": "028"}],
             "partenaires": [
                 {"nom": "LIMOS", "type": "lab", "ppn": None},
@@ -492,8 +491,8 @@ class TestThesesBuildSourceMeta:
         assert _build_source_extras({}) is None
 
     def test_partial(self):
-        meta = _build_source_extras({"discipline": "Physique"})
-        assert meta == {"discipline": "Physique"}
+        meta = _build_source_extras({"etabSoutenanceN": "Université Clermont Auvergne"})
+        assert meta == {"etablissement": "Université Clermont Auvergne"}
 
     def test_filters_entries_without_nom(self):
         thesis = {

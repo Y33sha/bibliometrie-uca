@@ -9,7 +9,6 @@ Base locale au 2026-10-25 : 74 585 publications, 734 400 liens publication–suj
 - **Publications sans sujet** : 1 626.
 - **Sujet incohérent avec la revue** : signal inexploité. Les sujets DOAJ sont connus pour 2 325 revues sur 10 860 (`serials.doaj_payload`).
 - **Hiérarchie.** `subjects` porte un libellé, sans parent. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`.
-- **Discipline des thèses en double.** La fiche d'une thèse lit `source_extras.discipline`. L'extracteur de sujets lit la copie `topics.discipline`.
 
 ### Constats de l'exploration (corpus de 46 000 publications)
 
@@ -61,7 +60,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ### Discipline des thèses
 
-- [ ] L'extracteur de sujets lit la discipline dans `source_extras` ; le normalizer theses.fr cesse d'écrire `topics.discipline`
+- [x] Une seule copie de la discipline, `topics.discipline`, lue par l'extracteur de sujets et par la fiche de la thèse ; le normalizer theses.fr cesse d'écrire `source_extras.discipline`
 - [ ] Stock : renormalisation des enregistrements theses.fr depuis `staging`
 
 ### Phase 1 — Échantillon de référence

@@ -44,8 +44,6 @@ class SourceExtra(StrEnum):
     """Date de soutenance (theses.fr)."""
     DATE_INSCRIPTION = "date_inscription"
     """Date d'inscription (theses.fr)."""
-    DISCIPLINE = "discipline"
-    """Discipline (theses.fr)."""
     ETABLISSEMENT = "etablissement"
     """Établissement de soutenance (theses.fr)."""
     ETABLISSEMENT_PPN = "etablissement_ppn"

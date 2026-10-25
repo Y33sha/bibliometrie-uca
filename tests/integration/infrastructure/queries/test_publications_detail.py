@@ -135,14 +135,13 @@ class TestGetPublicationDetail:
             text("UPDATE publications SET source_extras = CAST(:m AS jsonb) WHERE id = :id"),
             {"m": json.dumps({"date_soutenance": "2023-05-10"}), "id": publication},
         )
-        # source_records theses avec source_extras
         insert_source_record(
             sa_sync_conn,
             publication,
             source="theses",
             source_id="t-1",
             title="Thèse",
-            source_extras={"discipline": "Informatique"},
+            topics={"discipline": "Informatique"},
         )
 
         detail = get_publication_detail(sa_sync_conn, publication)
