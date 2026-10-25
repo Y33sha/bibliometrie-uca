@@ -25,46 +25,6 @@ def strip_jats_tags(s: str) -> str:
     return _JATS_TAG_RE.sub("", s)
 
 
-def _indent(line: str) -> int:
-    return len(line) - len(line.lstrip())
-
-
-def _is_tex_formula(line: str) -> bool:
-    """La ligne est une formule LaTeX `$$…$$` seule."""
-    stripped = line.strip()
-    return len(stripped) > 4 and stripped.startswith("$$") and stripped.endswith("$$")
-
-
-def _flattened_mathml(line: str, depth: int) -> bool:
-    """Ligne vide, ou symbole isolé plus indenté que la formule."""
-    stripped = line.strip()
-    return not stripped or (len(stripped.split()) == 1 and _indent(line) > depth)
-
-
-def clean_crossref_title(title: str) -> str:
-    """Titre Crossref sans la version MathML de ses formules, espacement réduit à un espace simple.
-
-    Un éditeur dépose chaque formule d'un titre en deux versions : LaTeX (`$$…$$`) et MathML. Crossref rend le titre avec l'indentation du XML déposé et sans les balises MathML : la formule LaTeX occupe une ligne, et chaque symbole MathML une ligne plus indentée qu'elle, avant ou après. Ces lignes de symboles isolés sont retirées. L'interface affiche la formule LaTeX.
-    """
-    lines = title.split("\n")
-    dropped: set[int] = set()
-    for i, line in enumerate(lines):
-        if not _is_tex_formula(line):
-            continue
-        # Une formule en début de ligne n'a pas d'indentation : la ligne suivante porte celle du bloc.
-        depth = _indent(line) or (_indent(lines[i + 1]) if i + 1 < len(lines) else 0)
-        for step in (1, -1):
-            j = i + step
-            while (
-                0 <= j < len(lines)
-                and not _is_tex_formula(lines[j])
-                and _flattened_mathml(lines[j], depth)
-            ):
-                dropped.add(j)
-                j += step
-    return " ".join(" ".join(line for k, line in enumerate(lines) if k not in dropped).split())
-
-
 def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
     """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print > approved`.
 

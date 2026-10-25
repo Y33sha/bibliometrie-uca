@@ -116,6 +116,48 @@ def strip_markup(text: str) -> str:
     return text
 
 
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _is_tex_formula(line: str) -> bool:
+    """La ligne est une formule LaTeX `$$…$$` seule."""
+    stripped = line.strip()
+    return len(stripped) > 4 and stripped.startswith("$$") and stripped.endswith("$$")
+
+
+def _flattened_mathml(line: str, depth: int) -> bool:
+    """Ligne vide, ou symbole isolé plus indenté que la formule."""
+    stripped = line.strip()
+    return not stripped or (len(stripped.split()) == 1 and _indent(line) > depth)
+
+
+def drop_flattened_mathml(title: str) -> str:
+    """Titre sans la version MathML de ses formules, espacement réduit à un espace simple.
+
+    Un éditeur dépose chaque formule d'un titre en deux versions : LaTeX (`$$…$$`) et MathML. Crossref rend le titre avec l'indentation du XML déposé et sans les balises MathML : la formule LaTeX occupe une ligne, et chaque symbole MathML une ligne plus indentée qu'elle, avant ou après. ScanR recopie ce titre. Ces lignes de symboles isolés sont retirées. L'interface affiche la formule LaTeX.
+
+    Un titre déjà mis sur une ligne (OpenAlex) ne garde aucun repère : seul son espacement est réduit.
+    """
+    lines = title.split("\n")
+    dropped: set[int] = set()
+    for i, line in enumerate(lines):
+        if not _is_tex_formula(line):
+            continue
+        # Une formule en début de ligne n'a pas d'indentation : la ligne suivante porte celle du bloc.
+        depth = _indent(line) or (_indent(lines[i + 1]) if i + 1 < len(lines) else 0)
+        for step in (1, -1):
+            j = i + step
+            while (
+                0 <= j < len(lines)
+                and not _is_tex_formula(lines[j])
+                and _flattened_mathml(lines[j], depth)
+            ):
+                dropped.add(j)
+                j += step
+    return " ".join(" ".join(line for k, line in enumerate(lines) if k not in dropped).split())
+
+
 _GREEK_LETTERS = (
     "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho"
     " sigma tau upsilon phi chi psi omega"

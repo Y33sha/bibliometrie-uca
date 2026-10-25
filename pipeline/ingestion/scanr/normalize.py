@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 
 from domain.countries import normalize_country_code
+from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
@@ -52,10 +53,12 @@ def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str | None:
+    """Titre par défaut du document, nettoyé par `drop_flattened_mathml`."""
     title = doc.get("title")
-    if isinstance(title, Mapping):
-        return as_str(title.get("default"))
-    return as_str(title)
+    text = as_str(title.get("default")) if isinstance(title, Mapping) else as_str(title)
+    if not text:
+        return None
+    return drop_flattened_mathml(text) or None
 
 
 def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:

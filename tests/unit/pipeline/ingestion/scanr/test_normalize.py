@@ -264,6 +264,10 @@ class TestGetTitle:
     def test_titre_en_clair(self):
         assert get_title({"title": "Un titre"}) == "Un titre"
 
+    def test_titre_recopie_de_crossref_sans_mathml_aplati(self):
+        title = "Measurement of \n                $$\\tau $$\n                    τ\n              polarisation"
+        assert get_title({"title": {"default": title}}) == "Measurement of $$\\tau $$ polarisation"
+
 
 class TestEditeurEtConteneur:
     def test_sans_editeur_nomme_aucun_editeur(self):

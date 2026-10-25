@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
+from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
@@ -34,7 +35,6 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.crossref.payload import (
-    clean_crossref_title,
     crossref_issns,
     crossref_raw_doc_type,
     extract_crossref_conference,
@@ -58,10 +58,10 @@ def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_title(msg: Mapping[str, JsonValue]) -> str | None:
-    """Premier titre du payload, nettoyé par `clean_crossref_title`."""
+    """Premier titre du payload, nettoyé par `drop_flattened_mathml`."""
     titles = msg.get("title") or []
     first = titles[0] if isinstance(titles, list) and titles else titles
-    if isinstance(first, str) and (title := clean_crossref_title(first)):
+    if isinstance(first, str) and (title := drop_flattened_mathml(first)):
         return title
     return None
 
