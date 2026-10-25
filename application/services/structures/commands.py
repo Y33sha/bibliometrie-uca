@@ -9,13 +9,14 @@ from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
+    NameFormUpdate,
     StructureNameFormRow,
     StructureRepository,
     StructureRow,
     StructureTutelleRow,
+    StructureUpdate,
 )
 from application.services.structures import core as structures_service
-from domain.types import JsonValue
 
 # ── structures ────────────────────────────────────────────────────
 
@@ -55,13 +56,13 @@ def update_structure(
     conn: Connection,
     structure_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: StructureUpdate,
     repo: StructureRepository,
     audit_repo: AuditRepository,
 ) -> StructureRow:
     """Met à jour une structure (champs sélectifs). Retourne la ligne modifiée."""
     row = structures_service.update_structure(
-        structure_id, fields=fields, repo=repo, audit_repo=audit_repo
+        structure_id, update=update, repo=repo, audit_repo=audit_repo
     )
     conn.commit()
     return row
@@ -158,13 +159,13 @@ def update_name_form(
     conn: Connection,
     form_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: NameFormUpdate,
     repo: StructureRepository,
     audit_repo: AuditRepository,
 ) -> StructureNameFormRow:
     """Met à jour une forme de nom (champs sélectifs). Retourne la ligne modifiée."""
     row = structures_service.update_name_form(
-        form_id, fields=fields, repo=repo, audit_repo=audit_repo
+        form_id, update=update, repo=repo, audit_repo=audit_repo
     )
     conn.commit()
     return row

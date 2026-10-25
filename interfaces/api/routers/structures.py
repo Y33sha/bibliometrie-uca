@@ -23,7 +23,11 @@ from application.ports.read_models.structures_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
-from application.ports.repositories.structure_repository import StructureRepository
+from application.ports.repositories.structure_repository import (
+    NameFormUpdate,
+    StructureRepository,
+    StructureUpdate,
+)
 from application.services.structures import commands as structure_commands
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
@@ -39,10 +43,8 @@ from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabular
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
-    NameFormUpdate,
     StructureCreate,
     StructureTutelleCreateResponse,
-    StructureUpdate,
     TutelleCreate,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
@@ -189,11 +191,8 @@ def update_name_form(
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormOut:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
-    fields = data.model_dump(exclude_unset=True)
     return NameFormOut.model_validate(
-        structure_commands.update_name_form(
-            conn, form_id, fields=fields, repo=repo, audit_repo=audit
-        )
+        structure_commands.update_name_form(conn, form_id, update=data, repo=repo, audit_repo=audit)
     )
 
 
@@ -300,12 +299,11 @@ def update_structure(
 ) -> StructureOut:
     """Met à jour une structure, champ par champ.
 
-    Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une structure inconnue.
+    Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
     """
-    fields = data.model_dump(exclude_unset=True)
     return StructureOut.model_validate(
         structure_commands.update_structure(
-            conn, structure_id, fields=fields, repo=repo, audit_repo=audit
+            conn, structure_id, update=data, repo=repo, audit_repo=audit
         )
     )
 

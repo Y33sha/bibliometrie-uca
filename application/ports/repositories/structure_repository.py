@@ -3,8 +3,31 @@
 from datetime import datetime
 from typing import Protocol, TypedDict
 
-from domain.structures.structure import Structure
+from pydantic import BaseModel
+
+from domain.structures.structure import Structure, StructureType
 from domain.types import JsonValue
+
+
+class StructureUpdate(BaseModel):
+    """Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif."""
+
+    name: str | None = None
+    acronym: str | None = None
+    type: StructureType | None = None
+    ror_id: str | None = None
+    rnsr_id: str | None = None
+    hal_collection: str | None = None
+    api_ids: dict[str, str | list[str]] | None = None
+
+
+class NameFormUpdate(BaseModel):
+    """Champs éditables d'une forme de nom de structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface `requires_context_of`."""
+
+    form_text: str | None = None
+    is_word_boundary: bool | None = None
+    is_excluding: bool | None = None
+    requires_context_of: list[int] | None = None
 
 
 class StructureNameFormUpdateFields(TypedDict, total=False):

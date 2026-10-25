@@ -792,7 +792,7 @@ export interface paths {
          * Update Structure
          * @description Met à jour une structure, champ par champ.
          *
-         *     Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une structure inconnue.
+         *     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
          */
         put: operations["update_structure_api_structures__structure_id__put"];
         post?: never;
@@ -3777,7 +3777,10 @@ export interface components {
             /** Publication Count */
             publication_count: number;
         };
-        /** NameFormUpdate */
+        /**
+         * NameFormUpdate
+         * @description Champs éditables d'une forme de nom de structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface `requires_context_of`.
+         */
         NameFormUpdate: {
             /** Form Text */
             form_text?: string | null;
@@ -5462,7 +5465,10 @@ export interface components {
          * @enum {string}
          */
         StructureType: "universite" | "chu" | "ecole" | "labo" | "equipe" | "site" | "onr" | "admin" | "autre";
-        /** StructureUpdate */
+        /**
+         * StructureUpdate
+         * @description Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif.
+         */
         StructureUpdate: {
             /** Name */
             name?: string | null;

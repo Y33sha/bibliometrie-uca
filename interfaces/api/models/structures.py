@@ -1,4 +1,7 @@
-"""Modèles Pydantic du router des structures : corps des requêtes entrantes et réponses composées après mutation."""
+"""Modèles Pydantic du router des structures : corps des requêtes entrantes et réponses composées après mutation.
+
+Les contrats d'édition `StructureUpdate` et `NameFormUpdate` vivent dans le port `application/ports/repositories/structure_repository.py`.
+"""
 
 from pydantic import BaseModel
 
@@ -19,16 +22,6 @@ class StructureCreate(BaseModel):
     api_ids: dict[str, str | list[str]] | None = None
 
 
-class StructureUpdate(BaseModel):
-    name: str | None = None
-    acronym: str | None = None
-    type: StructureType | None = None
-    ror_id: str | None = None
-    rnsr_id: str | None = None
-    hal_collection: str | None = None
-    api_ids: dict[str, str | list[str]] | None = None
-
-
 class TutelleCreate(BaseModel):
     parent_id: int
     child_id: int
@@ -39,13 +32,6 @@ class NameFormCreate(BaseModel):
     form_text: str
     is_word_boundary: bool = False
     is_excluding: bool = False
-    requires_context_of: list[int] | None = None
-
-
-class NameFormUpdate(BaseModel):
-    form_text: str | None = None
-    is_word_boundary: bool | None = None
-    is_excluding: bool | None = None
     requires_context_of: list[int] | None = None
 
 

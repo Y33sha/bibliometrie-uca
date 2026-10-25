@@ -7,6 +7,7 @@ structure_name_forms.
 import pytest
 from sqlalchemy import text
 
+from application.ports.repositories.structure_repository import NameFormUpdate, StructureUpdate
 from application.services.structures.core import (
     create_name_form,
     create_structure,
@@ -147,18 +148,18 @@ class TestCreateStructure:
 class TestUpdateStructure:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_structure(999999, fields={"name": "X"}, repo=repo)
+            update_structure(999999, update=StructureUpdate(name="X"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         row = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         with pytest.raises(ValidationError, match="Aucun champ"):
-            update_structure(row["id"], fields={}, repo=repo)
+            update_structure(row["id"], update=StructureUpdate(), repo=repo)
 
     def test_updates_fields(self, sa_sync_conn, repo):
         row = create_structure(code="X", name="Ancien", structure_type="labo", repo=repo)
         updated = update_structure(
             row["id"],
-            fields={"name": "Nouveau", "acronym": "N"},
+            update=StructureUpdate(name="Nouveau", acronym="N"),
             repo=repo,
         )
         assert updated["name"] == "Nouveau"
@@ -172,19 +173,43 @@ class TestUpdateStructure:
             api_ids={"openalex": ["OLD"]},
             repo=repo,
         )
-        updated = update_structure(row["id"], fields={"api_ids": {"openalex": ["NEW"]}}, repo=repo)
+        updated = update_structure(
+            row["id"], update=StructureUpdate(api_ids={"openalex": ["NEW"]}), repo=repo
+        )
         assert updated["api_ids"] == {"openalex": ["NEW"]}
 
-    def test_none_fields_are_ignored(self, sa_sync_conn, repo):
-        """Les champs à None dans le dict ne sont pas appliqués."""
+    def test_null_name_is_ignored(self, sa_sync_conn, repo):
+        """Le nom est obligatoire : `null` vaut champ non fourni."""
         row = create_structure(code="X", name="Original", structure_type="labo", repo=repo)
         updated = update_structure(
             row["id"],
-            fields={"name": None, "acronym": "AC"},
+            update=StructureUpdate(name=None, acronym="AC"),
             repo=repo,
         )
-        assert updated["name"] == "Original"  # inchangé
+        assert updated["name"] == "Original"
         assert updated["acronym"] == "AC"
+
+    def test_null_clears_optional_fields(self, sa_sync_conn, repo):
+        """Le formulaire envoie `null` pour un acronyme, un ROR ou une collection HAL vidés."""
+        row = create_structure(
+            code="X",
+            name="X",
+            structure_type="labo",
+            acronym="LB",
+            ror_id="026tc4g97",
+            hal_collection="LIMOS",
+            repo=repo,
+        )
+        updated = update_structure(
+            row["id"],
+            update=StructureUpdate(name="X", acronym=None, ror_id=None, hal_collection=None),
+            repo=repo,
+        )
+        assert (updated["acronym"], updated["ror_id"], updated["hal_collection"]) == (
+            None,
+            None,
+            None,
+        )
 
     def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, repo):
         """Régression : éditer une structure en envoyant le ROR en URL complète
@@ -195,7 +220,7 @@ class TestUpdateStructure:
         )
         updated = update_structure(
             row["id"],
-            fields={"acronym": "X", "ror_id": "https://ror.org/026tc4g97"},
+            update=StructureUpdate(acronym="X", ror_id="https://ror.org/026tc4g97"),
             repo=repo,
         )
         assert updated["ror_id"] == "026tc4g97"
@@ -203,7 +228,7 @@ class TestUpdateStructure:
     def test_ror_id_invalid_raises(self, sa_sync_conn, repo):
         row = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         with pytest.raises(ValidationError, match="ror_id invalide"):
-            update_structure(row["id"], fields={"ror_id": "pas-un-ror"}, repo=repo)
+            update_structure(row["id"], update=StructureUpdate(ror_id="pas-un-ror"), repo=repo)
 
 
 class TestDeleteStructure:
@@ -343,18 +368,20 @@ class TestCreateNameForm:
 class TestUpdateNameForm:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_name_form(999999, fields={"form_text": "x"}, repo=repo)
+            update_name_form(999999, update=NameFormUpdate(form_text="x"), repo=repo)
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="x", repo=repo)
         with pytest.raises(ValidationError):
-            update_name_form(form["id"], fields={}, repo=repo)
+            update_name_form(form["id"], update=NameFormUpdate(), repo=repo)
 
     def test_updates_form_text_with_normalization(self, sa_sync_conn, repo):
         s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="old", repo=repo)
-        updated = update_name_form(form["id"], fields={"form_text": "École NEW"}, repo=repo)
+        updated = update_name_form(
+            form["id"], update=NameFormUpdate(form_text="École NEW"), repo=repo
+        )
         assert updated["form_text"] == "ecole new"
 
     def test_updates_flags(self, sa_sync_conn, repo):
@@ -362,7 +389,7 @@ class TestUpdateNameForm:
         form = create_name_form(structure_id=s["id"], form_text="x", repo=repo)
         updated = update_name_form(
             form["id"],
-            fields={"is_word_boundary": True, "is_excluding": True},
+            update=NameFormUpdate(is_word_boundary=True, is_excluding=True),
             repo=repo,
         )
         assert updated["is_word_boundary"] is True
@@ -372,7 +399,7 @@ class TestUpdateNameForm:
         s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="Institut Recherche", repo=repo)
         assert form["is_word_boundary"] is False  # forme longue
-        updated = update_name_form(form["id"], fields={"form_text": "IGCNC"}, repo=repo)
+        updated = update_name_form(form["id"], update=NameFormUpdate(form_text="IGCNC"), repo=repo)
         assert updated["is_word_boundary"] is True  # raccourcie → forcé
 
     def test_forces_word_boundary_on_unchanged_short_form(self, sa_sync_conn, repo):
@@ -384,7 +411,9 @@ class TestUpdateNameForm:
         s = create_structure(code="X", name="X", structure_type="labo", repo=repo)
         form = create_name_form(structure_id=s["id"], form_text="INRAE", repo=repo)
         assert form["is_word_boundary"] is True  # courte → forcé à la création
-        updated = update_name_form(form["id"], fields={"is_word_boundary": False}, repo=repo)
+        updated = update_name_form(
+            form["id"], update=NameFormUpdate(is_word_boundary=False), repo=repo
+        )
         assert updated["is_word_boundary"] is True
 
 

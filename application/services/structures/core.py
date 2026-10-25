@@ -8,25 +8,21 @@ from typing import cast
 from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.structure_repository import (
+    NameFormUpdate,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
     StructureRepository,
     StructureRow,
     StructureTutelleRow,
+    StructureUpdate,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.name_forms import is_short_form
-from domain.structures.structure import Structure
+from domain.structures.structure import Structure, StructureEdit
 from domain.structures.tutelles import check_can_create_tutelle
-from domain.types import JsonValue
 
 # ── structures : charger-muter-sauver l'agrégat ────────────────────
-
-
-def _as_str(value: JsonValue | None) -> str | None:
-    """Valeur de champ ramenée à `str | None` : les champs de structure (nom, acronyme, type, identifiants) sont textuels ; toute autre forme vaut « non fourni »."""
-    return value if isinstance(value, str) else None
 
 
 def _to_row(structure: Structure) -> StructureRow:
@@ -82,28 +78,19 @@ def create_structure(
 def update_structure(
     structure_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: StructureUpdate,
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> StructureRow:
-    """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste.
+    """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
 
-    Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ valide n'est fourni ou si une valeur est invalide.
+    Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ n'est fourni ou si une valeur est invalide.
     """
     structure = repo.find_by_id(structure_id)
     if structure is None:
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
-    api_ids = fields.get("api_ids")
-    applied = structure.apply(
-        name=_as_str(fields.get("name")),
-        acronym=_as_str(fields.get("acronym")),
-        structure_type=_as_str(fields.get("type")),
-        ror_id=_as_str(fields.get("ror_id")),
-        rnsr_id=_as_str(fields.get("rnsr_id")),
-        hal_collection=_as_str(fields.get("hal_collection")),
-        api_ids=cast("dict[str, str | list[str]]", api_ids) if isinstance(api_ids, dict) else None,
-    )
+    applied = structure.apply(**_structure_edit(update))
     if not applied:
         raise ValidationError("Aucun champ à mettre à jour")
 
@@ -116,6 +103,27 @@ def update_structure(
         {"fields": sorted(applied)},
     )
     return _to_row(structure)
+
+
+def _structure_edit(update: StructureUpdate) -> StructureEdit:
+    """Champs fournis de `update`, sous la forme que l'agrégat reçoit."""
+    provided = update.model_fields_set
+    changes = StructureEdit()
+    if "name" in provided and update.name is not None:
+        changes["name"] = update.name
+    if "type" in provided and update.type is not None:
+        changes["structure_type"] = update.type
+    if "acronym" in provided:
+        changes["acronym"] = update.acronym
+    if "ror_id" in provided:
+        changes["ror_id"] = update.ror_id
+    if "rnsr_id" in provided:
+        changes["rnsr_id"] = update.rnsr_id
+    if "hal_collection" in provided:
+        changes["hal_collection"] = update.hal_collection
+    if "api_ids" in provided:
+        changes["api_ids"] = update.api_ids
+    return changes
 
 
 def delete_structure(
@@ -226,33 +234,28 @@ def create_name_form(
 def update_name_form(
     form_id: int,
     *,
-    fields: dict[str, JsonValue],
+    update: NameFormUpdate,
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> StructureNameFormRow:
-    """Met à jour une forme de nom. Retourne la ligne modifiée.
+    """Met à jour une forme de nom. Retourne la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
 
-    Lève NotFoundError si la forme n'existe pas.
-    Lève ValidationError si `fields` ne contient aucun champ valide.
+    Lève NotFoundError si la forme n'existe pas, ValidationError si aucun champ n'est fourni.
     """
     existing = repo.find_name_form(form_id)
     if existing is None:
         raise NotFoundError(f"Forme {form_id} introuvable")
 
+    provided = update.model_fields_set
     update_fields: StructureNameFormUpdateFields = {}
-
-    form_text = fields.get("form_text")
-    if isinstance(form_text, str):
-        update_fields["form_text"] = normalize_text(form_text)
-    is_word_boundary = fields.get("is_word_boundary")
-    if isinstance(is_word_boundary, bool):
-        update_fields["is_word_boundary"] = is_word_boundary
-    is_excluding = fields.get("is_excluding")
-    if isinstance(is_excluding, bool):
-        update_fields["is_excluding"] = is_excluding
-    requires_context_of = fields.get("requires_context_of")
-    if isinstance(requires_context_of, list):
-        update_fields["requires_context_of"] = cast("list[int]", requires_context_of) or None
+    if "form_text" in provided and update.form_text is not None:
+        update_fields["form_text"] = normalize_text(update.form_text)
+    if "is_word_boundary" in provided and update.is_word_boundary is not None:
+        update_fields["is_word_boundary"] = update.is_word_boundary
+    if "is_excluding" in provided and update.is_excluding is not None:
+        update_fields["is_excluding"] = update.is_excluding
+    if "requires_context_of" in provided:
+        update_fields["requires_context_of"] = update.requires_context_of or None
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
