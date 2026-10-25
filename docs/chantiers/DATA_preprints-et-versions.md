@@ -25,7 +25,7 @@ Mesures du 2026-10-25, sur une base proche de la production :
 
 ### Phase 2 — Type des preprints arXiv
 
-- [ ] Type `preprint` d'après le préfixe DOI du serveur (liste fermée du chantier [Modèle des conteneurs](DATA_modele-des-conteneurs.md)), ou convergence avec l'article, selon le modèle retenu. 184 publications.
+- [ ] Type `preprint` d'après le préfixe DOI du serveur (liste fermée du chantier [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)), ou convergence avec l'article, selon le modèle retenu. 184 publications.
 
 ### Phase 3 — Statistiques
 

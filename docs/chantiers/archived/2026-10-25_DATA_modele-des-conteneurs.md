@@ -8,7 +8,7 @@ Le conteneur d'une publication est ce qui la publie ou l'héberge. Le schéma en
 - `publishing.monographs`, que référence `publications.monograph_id` : livres et volumes d'actes, avec ou sans ISBN, avec un `journal_id` vers leur collection ;
 - `publications.container_title`, un titre libre quand aucune des deux tables ne convient.
 
-Le chantier [Monographies](DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
+Le chantier [Monographies](../DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
 
 `journals` réunit encore des choses de natures différentes. Son type (`journal_type`) vaut :
 
@@ -92,9 +92,9 @@ Usages du type dans le code :
 
 ### Points des autres fiches que le modèle conditionne
 
-- [Conférences et actes](DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
-- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
-- [Monographies](DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
+- [Conférences et actes](../DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
+- [Revues divergentes selon les sources](../DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
+- [Monographies](../DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
 
 ## Décisions
 
@@ -171,7 +171,7 @@ Usages du type dans le code :
 
 ### Phase 6 — Documentation
 
-- [x] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`, dont la fiche [plateformes et localisations](../agregats/platforms.md).
+- [x] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`, dont la fiche [plateformes et localisations](../../agregats/platforms.md).
 
 ### Phase 7 — Défauts antérieurs au chantier
 
@@ -180,7 +180,7 @@ Usages du type dans le code :
 - [x] Entrées de type inconnu dont la majorité stricte des documents sont des articles, d'après le type donné par chaque source : typées revues (563 sur 773 entrées `unknown` de la base locale).
 - [x] Thèses ScanR : l'université de soutenance ne donne ni publication en série ni titre de conteneur. 1 452 enregistrements de thèses ScanR rattachés à 66 entrées, dont 60 n'ont pas d'autre usage.
 - [x] Stock : réhydratation et renormalisation de ScanR, puis phases `publications` et `finalize`.
-- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](DATA_preprints-et-versions.md).
+- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](../DATA_preprints-et-versions.md).
 
 ## Questions ouvertes
 

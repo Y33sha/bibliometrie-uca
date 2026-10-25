@@ -65,4 +65,4 @@ Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.p
 ## Questions ouvertes
 
 - Revue erronée sans enregistrement Crossref : quelle source fait foi ?
-- Éditeur d'une revue et d'une publication : fiche [Modèle des conteneurs](DATA_modele-des-conteneurs.md).
+- Éditeur d'une revue et d'une publication : fiche [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md).

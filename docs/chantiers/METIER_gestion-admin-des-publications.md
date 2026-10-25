@@ -65,7 +65,7 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 ### 4. Verdicts durables
 
 - [ ] Modèle de persistance des verdicts de scission et de fusion forcée, relu par la réconciliation.
-- [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet, liste des cas dans le signal « Rien de local hors HAL » des rapports par laboratoire.
+- [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet.
 
 ## Questions ouvertes
 
