@@ -82,7 +82,7 @@ Mesure du 2026-10-24, sur une base proche de la production :
 - **`ebook_platform`.** 38 entrées sur 39 sont des sources OpenAlex au nom d'un éditeur suivi de « eBooks » (« ENS Éditions eBooks »). Elles désignent un éditeur, pas un lieu.
 - **`unknown`.** 61 entrées sont les universités qui délivrent les thèses ScanR (« Université Clermont Auvergne (2021-...) », « Lyon », « Normandie »), avec l'ABES pour éditeur, soit 1 395 publications.
 - **`media`.** Ce sont des publications en série : *The Conversation France* (378), *Revue Politique et Parlementaire* (102), *Le Monde*.
-- **Deux codages des localisations.** Le type (`journal_type`) et le modèle open access `repository` se contredisent. Seuls bioRxiv, Research Square et ArXiv.org ont `oa_model = repository`. Les statistiques écartent leurs 227 publications (`STATS_BASE`), mais gardent celles de SSRN, de medRxiv et de Research Square typé `unknown`.
+- **Deux codages des localisations.** Le type (`journal_type`) et le modèle open access `repository` se contredisent. Seuls bioRxiv, Research Square et ArXiv.org ont `oa_model = repository`, contre SSRN, medRxiv et Research Square typé `unknown`.
 - **Localisations hors de `journals`.** 57 990 publications ont un identifiant HAL, 5 256 un PMCID, 5 051 un identifiant arXiv, 2 109 un NNT, 74 533 des URL. 22 726 publications ont seulement un `container_title` : colloque, livre ou archive.
 
 Usages du type dans le code :
@@ -90,7 +90,7 @@ Usages du type dans le code :
 - **Espaces de noms DOI** : aucun pour `repository`, `preprint_server`, `ebook_platform` et `book_series` (`domain/journals/doi_namespaces.py`).
 - **Typage** : l'enrichissement OpenAlex type seulement une entrée `unknown` (`repository`, `conference`, `book series`, `ebook platform`). `type_proceedings_journals` et `link_monographs_to_collections` posent `proceedings` et `book_series`. La vérification Sudoc traite `proceedings` et `book_series` comme des séries de volumes (`holds_volumes`).
 - **Corrections du type de document** : `media` donne `media`, `proceedings` donne `conference_paper`, `preprint_server` donne `preprint` (`domain/source_records/metadata_correction/rules.py`). La fusion de deux revues requalifie les publications absorbées d'après le type de la cible.
-- **Open access** : statuts attendus selon `oa_model`, types de document attendus selon `journal_type`, pour le tableau de bord d'une revue (`domain/journals/expected.py`) ; exclusion `oa_model = repository` des statistiques.
+- **Open access** : statuts attendus selon `oa_model`, types de document attendus selon `journal_type`, pour le tableau de bord d'une revue (`domain/journals/expected.py`).
 - **DOAJ et APC** : ils concernent en pratique les seules entrées `journal`. 2 266 sont dans le DOAJ et 3 725 ont des APC, contre 54 et 2 pour les autres types.
 - **Interface** : libellé du type, choix du type dans l'administration, liste des recueils d'actes probables.
 
@@ -155,7 +155,7 @@ Usages du type dans le code :
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
 - [ ] Préfixe DOI d'une plateforme (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources. Règle et oneshot de correction des publications (environ 4 650).
 - [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
-- [ ] Exclusion des statistiques : un seul critère, à la place de `oa_model = repository`.
+- [ ] Statistiques : exclusion des preprints ou non, en attente de la question « Preprint : publication distincte ou version déposée ? ».
 - [x] Vérification Unpaywall : DOI DataCite écartés (`e1d7daeb6`).
 
 ### Phase 4 — Séries
