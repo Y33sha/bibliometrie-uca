@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict q1uz21cMYjzb4F802UJtnbcgEmnPi9gdfMbZf3CRzHn1S91v64dELbn95KdENPD
+\restrict azLjXsbKaH5XmcItVIhFpcmDMeAaDFxxHqtrUbZezifLkZv3vzCznRSr41n9NmZ
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -231,22 +231,6 @@ CREATE TYPE public.issn_support AS ENUM (
 
 
 --
--- Name: journal_type; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.journal_type AS ENUM (
-    'journal',
-    'proceedings',
-    'repository',
-    'book_series',
-    'preprint_server',
-    'media',
-    'ebook_platform',
-    'unknown'
-);
-
-
---
 -- Name: license_type; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -290,7 +274,7 @@ CREATE TYPE public.lookup_source AS ENUM (
 
 CREATE TYPE public.merged_entity AS ENUM (
     'person',
-    'journal',
+    'serial',
     'publisher',
     'monograph',
     'publication'
@@ -346,6 +330,18 @@ CREATE TYPE public.perimeter_evidence AS ENUM (
 CREATE TYPE public.person_exclusion AS ENUM (
     'not_a_person',
     'out_of_perimeter'
+);
+
+
+--
+-- Name: platform_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.platform_type AS ENUM (
+    'repository',
+    'preprint_server',
+    'publisher_platform',
+    'unknown'
 );
 
 
@@ -428,6 +424,21 @@ CREATE TYPE public.ror_type AS ENUM (
     'healthcare',
     'nonprofit',
     'other'
+);
+
+
+--
+-- Name: serial_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.serial_type AS ENUM (
+    'journal',
+    'proceedings',
+    'repository',
+    'book_series',
+    'preprint_server',
+    'media',
+    'unknown'
 );
 
 
@@ -1128,7 +1139,7 @@ CREATE TABLE sources.source_records (
     hal_collections text[],
     external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
     urls text[],
-    journal_id integer,
+    serial_id integer,
     oa_status text,
     language text,
     container_title text,
@@ -1150,6 +1161,7 @@ CREATE TABLE sources.source_records (
     distinct_author_count integer DEFAULT 0 NOT NULL,
     raw_doc_type text,
     raw_language text,
+    publisher_id integer,
     CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
     CONSTRAINT source_records_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
@@ -1189,6 +1201,13 @@ COMMENT ON COLUMN sources.source_records.raw_doc_type IS 'Type de document donn�
 --
 
 COMMENT ON COLUMN sources.source_records.raw_language IS 'Langue donnée par la source, dans son vocabulaire.';
+
+
+--
+-- Name: COLUMN source_records.publisher_id; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.publisher_id IS 'Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.';
 
 
 --
@@ -1491,6 +1510,63 @@ CREATE MATERIALIZED VIEW publications.publication_structures AS
 
 
 --
+-- Name: ror_relations; Type: TABLE; Schema: ref; Owner: -
+--
+
+CREATE TABLE ref.ror_relations (
+    parent_ror_id text NOT NULL,
+    child_ror_id text NOT NULL,
+    CONSTRAINT ror_relations_no_self_reference CHECK ((parent_ror_id <> child_ror_id))
+);
+
+
+--
+-- Name: TABLE ror_relations; Type: COMMENT; Schema: ref; Owner: -
+--
+
+COMMENT ON TABLE ref.ror_relations IS 'Relations parent/enfant entre organisations du Research Organization Registry.';
+
+
+--
+-- Name: publication_rors; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
+--
+
+CREATE MATERIALIZED VIEW publications.publication_rors AS
+ WITH RECURSIVE cited AS (
+         SELECT c.publication_id,
+            r.ror_id
+           FROM (((publications.contributions c
+             JOIN publications.aligned_source_contributions m ON ((m.contribution_id = c.id)))
+             JOIN sources.source_contribution_rors r ON ((r.source_contribution_id = m.source_contribution_id)))
+             LEFT JOIN persons.persons pe ON ((pe.id = c.person_id)))
+          WHERE ((c.roles && ARRAY['author'::text]) AND (pe.exclusion IS DISTINCT FROM 'not_a_person'::public.person_exclusion))
+        UNION
+         SELECT ps.publication_id,
+            s.ror_id
+           FROM (publications.publication_structures ps
+             JOIN structures.structures s ON ((s.id = ps.structure_id)))
+          WHERE (s.ror_id IS NOT NULL)
+        ), lineage AS (
+         SELECT cited.publication_id,
+            cited.ror_id,
+            true AS cited
+           FROM cited
+        UNION
+         SELECT l.publication_id,
+            rr.parent_ror_id,
+            false
+           FROM (lineage l
+             JOIN ref.ror_relations rr ON ((rr.child_ror_id = l.ror_id)))
+        )
+ SELECT publication_id,
+    ror_id,
+    bool_or(cited) AS cited
+   FROM lineage
+  GROUP BY publication_id, ror_id
+  WITH NO DATA;
+
+
+--
 -- Name: publication_subjects; Type: TABLE; Schema: publications; Owner: -
 --
 
@@ -1515,7 +1591,7 @@ CREATE TABLE publications.publications (
     publication_year smallint NOT NULL,
     doi text,
     oa_status public.oa_type DEFAULT 'unknown'::public.oa_type,
-    journal_id integer,
+    serial_id integer,
     container_title text,
     language text,
     created_at timestamp with time zone DEFAULT now(),
@@ -1531,8 +1607,24 @@ CREATE TABLE publications.publications (
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
     in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
     corrections jsonb DEFAULT '{}'::jsonb NOT NULL,
+    publisher_id integer,
+    doi_prefix text GENERATED ALWAYS AS (split_part(doi, '/'::text, 1)) STORED,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
+
+
+--
+-- Name: COLUMN publications.publisher_id; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.publisher_id IS 'Éditeur à la date de publication : titulaire du préfixe du DOI Crossref, à défaut éditeur des enregistrements sources.';
+
+
+--
+-- Name: COLUMN publications.doi_prefix; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.doi_prefix IS 'Préfixe du DOI, pour les jointures sur doi_prefixes.';
 
 
 --
@@ -1645,7 +1737,7 @@ CREATE TABLE publishing.apc_payments (
     source_file text,
     remarks text,
     publication_id integer,
-    journal_id integer,
+    serial_id integer,
     publisher_id integer,
     created_at timestamp with time zone DEFAULT now(),
     budget_structure_id integer,
@@ -1702,180 +1794,6 @@ CREATE TABLE publishing.doi_prefixes (
 
 
 --
--- Name: journal_doi_namespaces; Type: TABLE; Schema: publishing; Owner: -
---
-
-CREATE TABLE publishing.journal_doi_namespaces (
-    namespace text NOT NULL,
-    journal_id integer NOT NULL,
-    dois integer NOT NULL,
-    share double precision NOT NULL
-);
-
-
---
--- Name: journal_issns; Type: TABLE; Schema: publishing; Owner: -
---
-
-CREATE TABLE publishing.journal_issns (
-    id integer NOT NULL,
-    issn text NOT NULL,
-    journal_id integer,
-    support public.issn_support,
-    linking boolean DEFAULT false NOT NULL,
-    status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
-    replaced_by text,
-    sudoc_checked_at timestamp with time zone
-);
-
-
---
--- Name: TABLE journal_issns; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON TABLE publishing.journal_issns IS 'ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base.';
-
-
---
--- Name: COLUMN journal_issns.issn; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.issn IS 'Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).';
-
-
---
--- Name: COLUMN journal_issns.support; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.support IS 'Support de l''ISSN. NULL : inconnu.';
-
-
---
--- Name: COLUMN journal_issns.linking; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.linking IS 'Vrai pour l''ISSN-L de la revue.';
-
-
---
--- Name: COLUMN journal_issns.status; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
-
-
---
--- Name: COLUMN journal_issns.replaced_by; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.replaced_by IS 'ISSN successeur : titre suivant, forme corrigée d''une valeur mal formée.';
-
-
---
--- Name: COLUMN journal_issns.sudoc_checked_at; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.journal_issns.sudoc_checked_at IS 'Date de la vérification de l''ISSN au Sudoc. NULL : jamais vérifié.';
-
-
---
--- Name: journal_issns_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
---
-
-CREATE SEQUENCE publishing.journal_issns_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: journal_issns_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
---
-
-ALTER SEQUENCE publishing.journal_issns_id_seq OWNED BY publishing.journal_issns.id;
-
-
---
--- Name: journal_name_forms; Type: TABLE; Schema: publishing; Owner: -
---
-
-CREATE TABLE publishing.journal_name_forms (
-    id integer NOT NULL,
-    journal_id integer NOT NULL,
-    form_normalized text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    publisher_id integer
-);
-
-
---
--- Name: journal_name_forms_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
---
-
-CREATE SEQUENCE publishing.journal_name_forms_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: journal_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
---
-
-ALTER SEQUENCE publishing.journal_name_forms_id_seq OWNED BY publishing.journal_name_forms.id;
-
-
---
--- Name: journals; Type: TABLE; Schema: publishing; Owner: -
---
-
-CREATE TABLE publishing.journals (
-    id integer NOT NULL,
-    title text NOT NULL,
-    title_normalized text NOT NULL,
-    publisher_id integer,
-    openalex_id text,
-    is_in_doaj boolean DEFAULT false,
-    apc_amount numeric(10,2),
-    apc_currency text DEFAULT 'EUR'::text,
-    oa_model public.oa_model,
-    created_at timestamp with time zone DEFAULT now(),
-    journal_type public.journal_type DEFAULT 'unknown'::public.journal_type,
-    is_academic boolean DEFAULT true,
-    doaj_payload jsonb,
-    doaj_imported_at timestamp with time zone,
-    publication_count integer DEFAULT 0 NOT NULL,
-    manual_fields text[] DEFAULT '{}'::text[] NOT NULL
-);
-
-
---
--- Name: journals_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
---
-
-CREATE SEQUENCE publishing.journals_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: journals_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
---
-
-ALTER SEQUENCE publishing.journals_id_seq OWNED BY publishing.journals.id;
-
-
---
 -- Name: monographs; Type: TABLE; Schema: publishing; Owner: -
 --
 
@@ -1887,7 +1805,7 @@ CREATE TABLE publishing.monographs (
     year integer,
     isbn text,
     publisher_id integer,
-    journal_id integer,
+    serial_id integer,
     created_at timestamp with time zone DEFAULT now(),
     eisbn text
 );
@@ -1908,10 +1826,10 @@ COMMENT ON COLUMN publishing.monographs.year IS 'Année de publication. Elle cla
 
 
 --
--- Name: COLUMN monographs.journal_id; Type: COMMENT; Schema: publishing; Owner: -
+-- Name: COLUMN monographs.serial_id; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.monographs.journal_id IS 'Collection dont la monographie fait partie, quand cette collection porte un ISSN.';
+COMMENT ON COLUMN publishing.monographs.serial_id IS 'Collection dont la monographie fait partie, quand cette collection porte un ISSN.';
 
 
 --
@@ -1932,6 +1850,54 @@ CREATE SEQUENCE publishing.monographs_id_seq
 --
 
 ALTER SEQUENCE publishing.monographs_id_seq OWNED BY publishing.monographs.id;
+
+
+--
+-- Name: platforms; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.platforms (
+    id integer NOT NULL,
+    name text NOT NULL,
+    name_normalized text NOT NULL,
+    platform_type public.platform_type DEFAULT 'unknown'::public.platform_type NOT NULL,
+    openalex_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE platforms; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON TABLE publishing.platforms IS 'Lieux qui hébergent des publications : entrepôts, serveurs de preprints, plateformes d''éditeurs.';
+
+
+--
+-- Name: COLUMN platforms.openalex_id; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.platforms.openalex_id IS 'Source OpenAlex de la plateforme, dont elle prend le nom.';
+
+
+--
+-- Name: platforms_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+--
+
+CREATE SEQUENCE publishing.platforms_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: platforms_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
+--
+
+ALTER SEQUENCE publishing.platforms_id_seq OWNED BY publishing.platforms.id;
 
 
 --
@@ -2000,6 +1966,180 @@ CREATE SEQUENCE publishing.publishers_id_seq
 --
 
 ALTER SEQUENCE publishing.publishers_id_seq OWNED BY publishing.publishers.id;
+
+
+--
+-- Name: serial_doi_namespaces; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serial_doi_namespaces (
+    namespace text NOT NULL,
+    serial_id integer NOT NULL,
+    dois integer NOT NULL,
+    share double precision NOT NULL
+);
+
+
+--
+-- Name: serial_issns; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serial_issns (
+    id integer NOT NULL,
+    issn text NOT NULL,
+    serial_id integer,
+    support public.issn_support,
+    linking boolean DEFAULT false NOT NULL,
+    status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
+    replaced_by text,
+    sudoc_checked_at timestamp with time zone
+);
+
+
+--
+-- Name: TABLE serial_issns; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON TABLE publishing.serial_issns IS 'ISSN des revues. Sans revue : ISSN vérifié au Sudoc, dont la publication est absente de la base.';
+
+
+--
+-- Name: COLUMN serial_issns.issn; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.issn IS 'Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).';
+
+
+--
+-- Name: COLUMN serial_issns.support; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.support IS 'Support de l''ISSN. NULL : inconnu.';
+
+
+--
+-- Name: COLUMN serial_issns.linking; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la revue.';
+
+
+--
+-- Name: COLUMN serial_issns.status; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
+
+
+--
+-- Name: COLUMN serial_issns.replaced_by; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.replaced_by IS 'ISSN successeur : titre suivant, forme corrigée d''une valeur mal formée.';
+
+
+--
+-- Name: COLUMN serial_issns.sudoc_checked_at; Type: COMMENT; Schema: publishing; Owner: -
+--
+
+COMMENT ON COLUMN publishing.serial_issns.sudoc_checked_at IS 'Date de la vérification de l''ISSN au Sudoc. NULL : jamais vérifié.';
+
+
+--
+-- Name: serial_issns_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+--
+
+CREATE SEQUENCE publishing.serial_issns_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: serial_issns_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
+--
+
+ALTER SEQUENCE publishing.serial_issns_id_seq OWNED BY publishing.serial_issns.id;
+
+
+--
+-- Name: serial_name_forms; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serial_name_forms (
+    id integer NOT NULL,
+    serial_id integer NOT NULL,
+    form_normalized text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    publisher_id integer
+);
+
+
+--
+-- Name: serial_name_forms_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+--
+
+CREATE SEQUENCE publishing.serial_name_forms_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: serial_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
+--
+
+ALTER SEQUENCE publishing.serial_name_forms_id_seq OWNED BY publishing.serial_name_forms.id;
+
+
+--
+-- Name: serials; Type: TABLE; Schema: publishing; Owner: -
+--
+
+CREATE TABLE publishing.serials (
+    id integer NOT NULL,
+    title text NOT NULL,
+    title_normalized text NOT NULL,
+    publisher_id integer,
+    openalex_id text,
+    is_in_doaj boolean DEFAULT false,
+    apc_amount numeric(10,2),
+    apc_currency text DEFAULT 'EUR'::text,
+    oa_model public.oa_model,
+    created_at timestamp with time zone DEFAULT now(),
+    serial_type public.serial_type DEFAULT 'unknown'::public.serial_type,
+    is_academic boolean DEFAULT true,
+    doaj_payload jsonb,
+    doaj_imported_at timestamp with time zone,
+    publication_count integer DEFAULT 0 NOT NULL,
+    manual_fields text[] DEFAULT '{}'::text[] NOT NULL
+);
+
+
+--
+-- Name: serials_id_seq; Type: SEQUENCE; Schema: publishing; Owner: -
+--
+
+CREATE SEQUENCE publishing.serials_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: serials_id_seq; Type: SEQUENCE OWNED BY; Schema: publishing; Owner: -
+--
+
+ALTER SEQUENCE publishing.serials_id_seq OWNED BY publishing.serials.id;
 
 
 --
@@ -2286,24 +2426,6 @@ COMMENT ON TABLE ref.ror_organizations IS 'Organisations du Research Organizatio
 
 
 --
--- Name: ror_relations; Type: TABLE; Schema: ref; Owner: -
---
-
-CREATE TABLE ref.ror_relations (
-    parent_ror_id text NOT NULL,
-    child_ror_id text NOT NULL,
-    CONSTRAINT ror_relations_no_self_reference CHECK ((parent_ror_id <> child_ror_id))
-);
-
-
---
--- Name: TABLE ror_relations; Type: COMMENT; Schema: ref; Owner: -
---
-
-COMMENT ON TABLE ref.ror_relations IS 'Relations parent/enfant entre organisations du Research Organization Registry.';
-
-
---
 -- Name: contributions; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
 --
 
@@ -2549,6 +2671,43 @@ CREATE SEQUENCE sources.source_contributions_id_seq
 --
 
 ALTER SEQUENCE sources.source_contributions_id_seq OWNED BY sources.source_contributions.id;
+
+
+--
+-- Name: source_record_locations; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_record_locations (
+    source_record_id integer NOT NULL,
+    url text NOT NULL,
+    pdf_url text,
+    oai_id text,
+    version text,
+    license public.license_type,
+    is_oa boolean,
+    platform_id integer
+);
+
+
+--
+-- Name: TABLE source_record_locations; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.source_record_locations IS 'Localisations d''un enregistrement source, réécrites à chaque normalisation.';
+
+
+--
+-- Name: COLUMN source_record_locations.oai_id; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_locations.oai_id IS 'Identifiant OAI-PMH de la copie, que déclare l''entrepôt.';
+
+
+--
+-- Name: COLUMN source_record_locations.version; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_locations.version IS 'Version de la copie dans le vocabulaire de la source (submittedVersion, acceptedVersion, publishedVersion).';
 
 
 --
@@ -2898,31 +3057,17 @@ ALTER TABLE ONLY publishing.apc_payments ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- Name: journal_issns id; Type: DEFAULT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_issns ALTER COLUMN id SET DEFAULT nextval('publishing.journal_issns_id_seq'::regclass);
-
-
---
--- Name: journal_name_forms id; Type: DEFAULT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_name_forms ALTER COLUMN id SET DEFAULT nextval('publishing.journal_name_forms_id_seq'::regclass);
-
-
---
--- Name: journals id; Type: DEFAULT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journals ALTER COLUMN id SET DEFAULT nextval('publishing.journals_id_seq'::regclass);
-
-
---
 -- Name: monographs id; Type: DEFAULT; Schema: publishing; Owner: -
 --
 
 ALTER TABLE ONLY publishing.monographs ALTER COLUMN id SET DEFAULT nextval('publishing.monographs_id_seq'::regclass);
+
+
+--
+-- Name: platforms id; Type: DEFAULT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.platforms ALTER COLUMN id SET DEFAULT nextval('publishing.platforms_id_seq'::regclass);
 
 
 --
@@ -2937,6 +3082,27 @@ ALTER TABLE ONLY publishing.publisher_name_forms ALTER COLUMN id SET DEFAULT nex
 --
 
 ALTER TABLE ONLY publishing.publishers ALTER COLUMN id SET DEFAULT nextval('publishing.publishers_id_seq'::regclass);
+
+
+--
+-- Name: serial_issns id; Type: DEFAULT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_issns ALTER COLUMN id SET DEFAULT nextval('publishing.serial_issns_id_seq'::regclass);
+
+
+--
+-- Name: serial_name_forms id; Type: DEFAULT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_name_forms ALTER COLUMN id SET DEFAULT nextval('publishing.serial_name_forms_id_seq'::regclass);
+
+
+--
+-- Name: serials id; Type: DEFAULT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serials ALTER COLUMN id SET DEFAULT nextval('publishing.serials_id_seq'::regclass);
 
 
 --
@@ -3248,46 +3414,6 @@ ALTER TABLE ONLY publishing.doi_prefixes
 
 
 --
--- Name: journal_doi_namespaces journal_doi_namespaces_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_doi_namespaces
-    ADD CONSTRAINT journal_doi_namespaces_pkey PRIMARY KEY (namespace);
-
-
---
--- Name: journal_issns journal_issns_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_issns
-    ADD CONSTRAINT journal_issns_pkey PRIMARY KEY (id);
-
-
---
--- Name: journal_name_forms journal_name_forms_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_name_forms
-    ADD CONSTRAINT journal_name_forms_pkey PRIMARY KEY (id);
-
-
---
--- Name: journals journals_openalex_id_key; Type: CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journals
-    ADD CONSTRAINT journals_openalex_id_key UNIQUE (openalex_id);
-
-
---
--- Name: journals journals_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journals
-    ADD CONSTRAINT journals_pkey PRIMARY KEY (id);
-
-
---
 -- Name: monographs monographs_eisbn_key; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
@@ -3309,6 +3435,22 @@ ALTER TABLE ONLY publishing.monographs
 
 ALTER TABLE ONLY publishing.monographs
     ADD CONSTRAINT monographs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: platforms platforms_openalex_id_key; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.platforms
+    ADD CONSTRAINT platforms_openalex_id_key UNIQUE (openalex_id);
+
+
+--
+-- Name: platforms platforms_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.platforms
+    ADD CONSTRAINT platforms_pkey PRIMARY KEY (id);
 
 
 --
@@ -3344,19 +3486,59 @@ ALTER TABLE ONLY publishing.publishers
 
 
 --
--- Name: journal_name_forms uq_jnl_nf_form_publisher; Type: CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_doi_namespaces serial_doi_namespaces_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.journal_name_forms
-    ADD CONSTRAINT uq_jnl_nf_form_publisher UNIQUE (form_normalized, publisher_id);
+ALTER TABLE ONLY publishing.serial_doi_namespaces
+    ADD CONSTRAINT serial_doi_namespaces_pkey PRIMARY KEY (namespace);
 
 
 --
--- Name: journal_issns uq_journal_issns_issn_journal; Type: CONSTRAINT; Schema: publishing; Owner: -
+-- Name: serial_issns serial_issns_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
 --
 
-ALTER TABLE ONLY publishing.journal_issns
-    ADD CONSTRAINT uq_journal_issns_issn_journal UNIQUE NULLS NOT DISTINCT (issn, journal_id);
+ALTER TABLE ONLY publishing.serial_issns
+    ADD CONSTRAINT serial_issns_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: serial_name_forms serial_name_forms_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_name_forms
+    ADD CONSTRAINT serial_name_forms_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: serials serials_openalex_id_key; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serials
+    ADD CONSTRAINT serials_openalex_id_key UNIQUE (openalex_id);
+
+
+--
+-- Name: serials serials_pkey; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serials
+    ADD CONSTRAINT serials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: serial_issns uq_serial_issns_issn_serial; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_issns
+    ADD CONSTRAINT uq_serial_issns_issn_serial UNIQUE NULLS NOT DISTINCT (issn, serial_id);
+
+
+--
+-- Name: serial_name_forms uq_serial_name_forms_form_publisher; Type: CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_name_forms
+    ADD CONSTRAINT uq_serial_name_forms_form_publisher UNIQUE (form_normalized, publisher_id);
 
 
 --
@@ -3573,6 +3755,14 @@ ALTER TABLE ONLY sources.source_contributions
 
 ALTER TABLE ONLY sources.source_contributions
     ADD CONSTRAINT source_contributions_record_position_key UNIQUE (source_record_id, author_position) DEFERRABLE;
+
+
+--
+-- Name: source_record_locations source_record_locations_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_locations
+    ADD CONSTRAINT source_record_locations_pkey PRIMARY KEY (source_record_id, url);
 
 
 --
@@ -3883,6 +4073,13 @@ CREATE INDEX idx_publication_relations_target_publication ON publications.public
 
 
 --
+-- Name: idx_publication_rors_ror; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publication_rors_ror ON publications.publication_rors USING btree (ror_id);
+
+
+--
 -- Name: idx_publication_structures_structure; Type: INDEX; Schema: publications; Owner: -
 --
 
@@ -3897,10 +4094,17 @@ CREATE INDEX idx_publications_countries ON publications.publications USING gin (
 
 
 --
--- Name: idx_publications_in_perimeter_journal; Type: INDEX; Schema: publications; Owner: -
+-- Name: idx_publications_doi_prefix; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE INDEX idx_publications_in_perimeter_journal ON publications.publications USING btree (journal_id) WHERE in_perimeter;
+CREATE INDEX idx_publications_doi_prefix ON publications.publications USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
+
+
+--
+-- Name: idx_publications_in_perimeter_serial; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_in_perimeter_serial ON publications.publications USING btree (serial_id) WHERE in_perimeter;
 
 
 --
@@ -3911,17 +4115,24 @@ CREATE INDEX idx_publications_in_perimeter_year ON publications.publications USI
 
 
 --
--- Name: idx_publications_journal; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_publications_journal ON publications.publications USING btree (journal_id);
-
-
---
 -- Name: idx_publications_monograph; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX idx_publications_monograph ON publications.publications USING btree (monograph_id) WHERE (monograph_id IS NOT NULL);
+
+
+--
+-- Name: idx_publications_publisher; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_publisher ON publications.publications USING btree (publisher_id) WHERE (publisher_id IS NOT NULL);
+
+
+--
+-- Name: idx_publications_serial; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_serial ON publications.publications USING btree (serial_id);
 
 
 --
@@ -3978,6 +4189,13 @@ CREATE INDEX ix_aligned_source_contributions_source_record_id ON publications.al
 --
 
 CREATE UNIQUE INDEX publication_author_alignment_pkey ON publications.publication_author_alignment USING btree (publication_id);
+
+
+--
+-- Name: publication_rors_pkey; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE UNIQUE INDEX publication_rors_pkey ON publications.publication_rors USING btree (publication_id, ror_id);
 
 
 --
@@ -4107,45 +4325,17 @@ CREATE INDEX idx_doi_prefixes_ra ON publishing.doi_prefixes USING btree (ra);
 
 
 --
--- Name: idx_jnl_nf_journal; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_jnl_nf_journal ON publishing.journal_name_forms USING btree (journal_id);
-
-
---
--- Name: idx_journal_issns_journal; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_journal_issns_journal ON publishing.journal_issns USING btree (journal_id);
-
-
---
--- Name: idx_journals_publisher; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_journals_publisher ON publishing.journals USING btree (publisher_id);
-
-
---
--- Name: idx_journals_titlenorm; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_journals_titlenorm ON publishing.journals USING btree (title_normalized);
-
-
---
--- Name: idx_monographs_journal; Type: INDEX; Schema: publishing; Owner: -
---
-
-CREATE INDEX idx_monographs_journal ON publishing.monographs USING btree (journal_id);
-
-
---
 -- Name: idx_monographs_publisher; Type: INDEX; Schema: publishing; Owner: -
 --
 
 CREATE INDEX idx_monographs_publisher ON publishing.monographs USING btree (publisher_id);
+
+
+--
+-- Name: idx_monographs_serial; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE INDEX idx_monographs_serial ON publishing.monographs USING btree (serial_id);
 
 
 --
@@ -4177,17 +4367,45 @@ CREATE INDEX idx_publishers_name_trgm ON publishing.publishers USING gin (name p
 
 
 --
--- Name: ix_journal_doi_namespaces_journal_id; Type: INDEX; Schema: publishing; Owner: -
+-- Name: idx_serial_issns_serial; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE INDEX ix_journal_doi_namespaces_journal_id ON publishing.journal_doi_namespaces USING btree (journal_id);
+CREATE INDEX idx_serial_issns_serial ON publishing.serial_issns USING btree (serial_id);
 
 
 --
--- Name: uq_journal_issns_linking; Type: INDEX; Schema: publishing; Owner: -
+-- Name: idx_serial_name_forms_serial; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE UNIQUE INDEX uq_journal_issns_linking ON publishing.journal_issns USING btree (journal_id) WHERE linking;
+CREATE INDEX idx_serial_name_forms_serial ON publishing.serial_name_forms USING btree (serial_id);
+
+
+--
+-- Name: idx_serials_publisher; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE INDEX idx_serials_publisher ON publishing.serials USING btree (publisher_id);
+
+
+--
+-- Name: idx_serials_titlenorm; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE INDEX idx_serials_titlenorm ON publishing.serials USING btree (title_normalized);
+
+
+--
+-- Name: ix_serial_doi_namespaces_serial_id; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE INDEX ix_serial_doi_namespaces_serial_id ON publishing.serial_doi_namespaces USING btree (serial_id);
+
+
+--
+-- Name: uq_serial_issns_linking; Type: INDEX; Schema: publishing; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_serial_issns_linking ON publishing.serial_issns USING btree (serial_id) WHERE linking;
 
 
 --
@@ -4289,6 +4507,13 @@ CREATE INDEX idx_source_contributions_in_perimeter ON sources.source_contributio
 
 
 --
+-- Name: idx_source_record_locations_platform; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_record_locations_platform ON sources.source_record_locations USING btree (platform_id) WHERE (platform_id IS NOT NULL);
+
+
+--
 -- Name: idx_source_records_countries; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4324,13 +4549,6 @@ CREATE INDEX idx_source_records_hal_collections ON sources.source_records USING 
 
 
 --
--- Name: idx_source_records_journal; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_journal ON sources.source_records USING btree (journal_id) WHERE (journal_id IS NOT NULL);
-
-
---
 -- Name: idx_source_records_metadata_block; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4363,6 +4581,20 @@ CREATE INDEX idx_source_records_pmid ON sources.source_records USING btree (((ex
 --
 
 CREATE INDEX idx_source_records_publication ON sources.source_records USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_records_publisher; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_records_publisher ON sources.source_records USING btree (publisher_id) WHERE (publisher_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_records_serial; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_records_serial ON sources.source_records USING btree (serial_id) WHERE (serial_id IS NOT NULL);
 
 
 --
@@ -4714,14 +4946,6 @@ ALTER TABLE ONLY publications.publications_detail
 
 
 --
--- Name: publications publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.publications
-    ADD CONSTRAINT publications_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id);
-
-
---
 -- Name: publications publications_monograph_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -4730,19 +4954,27 @@ ALTER TABLE ONLY publications.publications
 
 
 --
+-- Name: publications publications_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.publications
+    ADD CONSTRAINT publications_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
+
+
+--
+-- Name: publications publications_serial_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.publications
+    ADD CONSTRAINT publications_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id);
+
+
+--
 -- Name: apc_payments apc_payments_budget_structure_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
 ALTER TABLE ONLY publishing.apc_payments
     ADD CONSTRAINT apc_payments_budget_structure_id_fkey FOREIGN KEY (budget_structure_id) REFERENCES structures.structures(id) ON DELETE SET NULL;
-
-
---
--- Name: apc_payments apc_payments_journal_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.apc_payments
-    ADD CONSTRAINT apc_payments_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id) ON DELETE SET NULL;
 
 
 --
@@ -4770,59 +5002,19 @@ ALTER TABLE ONLY publishing.apc_payments
 
 
 --
+-- Name: apc_payments apc_payments_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.apc_payments
+    ADD CONSTRAINT apc_payments_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE SET NULL;
+
+
+--
 -- Name: doi_prefixes doi_prefixes_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
 ALTER TABLE ONLY publishing.doi_prefixes
     ADD CONSTRAINT doi_prefixes_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id) ON DELETE SET NULL;
-
-
---
--- Name: journal_doi_namespaces journal_doi_namespaces_journal_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_doi_namespaces
-    ADD CONSTRAINT journal_doi_namespaces_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id) ON DELETE CASCADE;
-
-
---
--- Name: journal_issns journal_issns_journal_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_issns
-    ADD CONSTRAINT journal_issns_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id) ON DELETE SET NULL;
-
-
---
--- Name: journal_name_forms journal_name_forms_journal_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_name_forms
-    ADD CONSTRAINT journal_name_forms_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id) ON DELETE CASCADE;
-
-
---
--- Name: journal_name_forms journal_name_forms_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journal_name_forms
-    ADD CONSTRAINT journal_name_forms_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
-
-
---
--- Name: journals journals_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.journals
-    ADD CONSTRAINT journals_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
-
-
---
--- Name: monographs monographs_journal_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
---
-
-ALTER TABLE ONLY publishing.monographs
-    ADD CONSTRAINT monographs_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id) ON DELETE SET NULL;
 
 
 --
@@ -4834,11 +5026,59 @@ ALTER TABLE ONLY publishing.monographs
 
 
 --
+-- Name: monographs monographs_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.monographs
+    ADD CONSTRAINT monographs_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE SET NULL;
+
+
+--
 -- Name: publisher_name_forms publisher_name_forms_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
 --
 
 ALTER TABLE ONLY publishing.publisher_name_forms
     ADD CONSTRAINT publisher_name_forms_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: serial_doi_namespaces serial_doi_namespaces_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_doi_namespaces
+    ADD CONSTRAINT serial_doi_namespaces_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE CASCADE;
+
+
+--
+-- Name: serial_issns serial_issns_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_issns
+    ADD CONSTRAINT serial_issns_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE SET NULL;
+
+
+--
+-- Name: serial_name_forms serial_name_forms_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_name_forms
+    ADD CONSTRAINT serial_name_forms_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
+
+
+--
+-- Name: serial_name_forms serial_name_forms_serial_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serial_name_forms
+    ADD CONSTRAINT serial_name_forms_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id) ON DELETE CASCADE;
+
+
+--
+-- Name: serials serials_publisher_id_fkey; Type: FK CONSTRAINT; Schema: publishing; Owner: -
+--
+
+ALTER TABLE ONLY publishing.serials
+    ADD CONSTRAINT serials_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
 
 
 --
@@ -4970,11 +5210,19 @@ ALTER TABLE ONLY sources.source_contributions
 
 
 --
--- Name: source_records source_records_journal_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+-- Name: source_record_locations source_record_locations_platform_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
-ALTER TABLE ONLY sources.source_records
-    ADD CONSTRAINT source_records_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES publishing.journals(id);
+ALTER TABLE ONLY sources.source_record_locations
+    ADD CONSTRAINT source_record_locations_platform_id_fkey FOREIGN KEY (platform_id) REFERENCES publishing.platforms(id);
+
+
+--
+-- Name: source_record_locations source_record_locations_source_record_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_locations
+    ADD CONSTRAINT source_record_locations_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
 
 
 --
@@ -4991,6 +5239,22 @@ ALTER TABLE ONLY sources.source_records
 
 ALTER TABLE ONLY sources.source_records
     ADD CONSTRAINT source_records_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES publications.publications(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_records source_records_publisher_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_records
+    ADD CONSTRAINT source_records_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES publishing.publishers(id);
+
+
+--
+-- Name: source_records source_records_serial_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_records
+    ADD CONSTRAINT source_records_serial_id_fkey FOREIGN KEY (serial_id) REFERENCES publishing.serials(id);
 
 
 --
@@ -5101,5 +5365,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict q1uz21cMYjzb4F802UJtnbcgEmnPi9gdfMbZf3CRzHn1S91v64dELbn95KdENPD
+\unrestrict azLjXsbKaH5XmcItVIhFpcmDMeAaDFxxHqtrUbZezifLkZv3vzCznRSr41n9NmZ
 
