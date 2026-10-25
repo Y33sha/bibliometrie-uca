@@ -19,12 +19,12 @@
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
-- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Revues divergentes selon les sources](archived/2026-10-25_DATA_revues-divergentes-entre-sources.md)
 - 2026-10-25 — [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)
 - 2026-10-24 — [Résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md)
 - 2026-10-24 — [Alignement des auteurs d'une publication](archived/2026-10-24_DATA_alignement-auteurs.md)

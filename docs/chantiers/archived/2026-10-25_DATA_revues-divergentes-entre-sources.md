@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Les enregistrements d'une même publication portent parfois des revues différentes selon leur source. Des échantillons examinés sur une base qui n'a reçu ni les fusions (phase 4) ni les règles sur les livres (phase 6) du chantier [Revues](archived/2026-09-22_DATA_revues-issn-et-doublons.md) montrent cinq causes :
+Les enregistrements d'une même publication portent parfois des revues différentes selon leur source. Des échantillons examinés sur une base qui n'a reçu ni les fusions (phase 4) ni les règles sur les livres (phase 6) du chantier [Revues](2026-09-22_DATA_revues-issn-et-doublons.md) montrent cinq causes :
 
 - **Doublon de revues.** Hors ISSN et titre communs, ce sont surtout des abréviations de titre sans espace : `Phys.Rev.Lett.`, `Eur.Phys.J.C`, `JINST`. C'est la forme des titres dans INSPIRE, la base bibliographique de la physique des hautes énergies. HAL et ScanR les portent sans ISSN ni éditeur, sur des dépôts des laboratoires de l'IN2P3. S'y ajoutent les titres successifs d'une même revue : *Progrès en Urologie* devenu *The French Journal of Urology*, *BMC Family Practice* devenu *BMC Primary Care*.
 - **Livre ou chapitre.** La plateforme de l'éditeur (OpenAlex, ScanR) s'oppose au titre du livre (Crossref).
@@ -38,31 +38,26 @@ Quand Crossref fournit une revue, la publication prend celle-là : Crossref pass
 
 - [x] Règle de fusion dans `publishing` : revues que les enregistrements d'une même publication portent, sous des titres compatibles (`compatible_titles`), et qui n'ont pas chacune des ISSN sans aucun en commun. Simulation sur la base locale : 104 fusions, aucune à tort.
 - [x] Titres successifs et suppléments : la vérification Sudoc range parmi les ISSN rejetés les titres précédents ou suivants de la même revue (`430`, `440`) et le supplément (`421`, `422`), liaison codée d'un côté ou de l'autre. Elle écarte les ISSN d'une autre publication : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Deux revues vérifiées fusionnent quand l'une porte parmi ses ISSN rejetés un ISSN que l'autre porte dans ses colonnes ; la revue dont le premier document est le plus tardif absorbe l'autre. Les ISSN de la revue absorbée hors des colonnes de l'autre rejoignent ses ISSN rejetés. Une migration remet toutes les revues à vérifier, pour reclasser leurs ISSN rejetés.
-- [ ] Titres successifs que le Sudoc ne lie pas (*Progrès en Urologie* et *The French Journal of Urology*) : signal à trouver, ou fusion manuelle.
-- [ ] Mots que l'abréviation omet (`Nucl.Instrum.Meth.A` pour *Nuclear Instruments and Methods in Physics Research Section A*) : hors de la règle, à examiner après la mesure en production.
 
-### 4. Enregistrements réunis à tort
+### 4. Revue erronée dans une source
 
-- [ ] Examen des cas relevés.
+- [x] Audit préalable (`audit_journals_against_crossref`) : écarts à Crossref par source, divergences sans Crossref, préprints DataCite. La publication prend la revue de Crossref, qui passe avant les autres sources ; l'enregistrement source garde la sienne. Le DOI d'un enregistrement peut être faux, ou désigner un autre article : corriger l'enregistrement d'après le DOI est hasardeux.
 
-### 5. Revue erronée dans une source
-
-- [x] Audit préalable (`audit_journals_against_crossref`) : écarts à Crossref par source, divergences sans Crossref, préprints DataCite.
-- [ ] Correction dans `metadata_correction` : l'enregistrement dont la revue diffère de celle de l'enregistrement Crossref de même DOI prend la revue de Crossref, avec trace dans `corrections`.
-
-### 6. Espaces de noms DOI des revues
+### 5. Espaces de noms DOI des revues
 
 Le segment qui suit le préfixe d'un DOI désigne souvent la revue (`10.1016/j.physletb.`, `10.1038/s41598-`). Un audit sur les 207 revues qui ont au moins 20 DOI Crossref montre que des espaces de noms propres à une revue couvrent au moins 90 % des DOI de 172 d'entre elles. Une revue en a souvent plusieurs : changement de convention (`srep` puis `s41598`), de plateforme (*Viatica*), d'éditeur (*animal*, de Cambridge à Elsevier). Les DOI construits sur un ISBN (`10.1007/978-3-030-…`) désignent une monographie, pas une revue. Quelques DOI sont opaques (APS récents, OpenEdition récents).
 
-- [x] Découpe et apprentissage (`domain/journals/doi_namespaces.py`) : un espace de noms est un préfixe de DOI coupé à une frontière de segment. Il inclut le séparateur qui le suit (`10.1016/j.ins.`, pour ne pas prendre `j.insmatheco`) ; sans séparateur, il exige un changement de nature à sa suite (`10.3390/nu` suivi d'un chiffre). Un ISSN reste entier (`10.1088/1748-0221/`). Le préfixe du déposant seul n'est pas un espace de noms. Un espace est retenu pour une revue s'il réunit un nombre minimal de DOI et qu'une part minimale d'entre eux porte cette revue, d'après les enregistrements de toutes les sources. Les DOI construits sur un ISBN sont écartés.
+- [x] Découpe et apprentissage (`domain/serials/doi_namespaces.py`) : un espace de noms est un préfixe de DOI coupé à une frontière de segment. Il inclut le séparateur qui le suit (`10.1016/j.ins.`, pour ne pas prendre `j.insmatheco`) ; sans séparateur, il exige un changement de nature à sa suite (`10.3390/nu` suivi d'un chiffre). Un ISSN reste entier (`10.1088/1748-0221/`). Le préfixe du déposant seul n'est pas un espace de noms. Un espace est retenu pour une revue s'il réunit un nombre minimal de DOI et qu'une part minimale d'entre eux porte cette revue, d'après les enregistrements de toutes les sources. Les DOI construits sur un ISBN sont écartés.
 - [x] Audit à blanc (`audit_journal_doi_namespaces`) : espaces retenus, enregistrements sans revue rattachables, paires de revues qui se partagent un espace, enregistrements dont la revue contredit l'espace de noms de leur DOI. Base locale, seuils de 5 DOI et 90 % : 1 706 espaces pour 1 649 revues ; 733 publications sans revue en recevraient une ; 381 enregistrements contredisent l'espace de noms, surtout des doublons de revues.
-- [x] Table `journal_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishing`. Les dépôts, serveurs de preprints, plateformes et collections de livres n'ont aucun espace de noms.
+- [x] Table `serial_doi_namespaces` : un espace de noms, une revue, plusieurs espaces par revue. Calcul dans `publishing`. Les dépôts, serveurs de preprints, plateformes et collections de livres n'ont aucun espace de noms.
 - [x] Revue manquante : un enregistrement sans revue reçoit celle de l'espace de noms de son DOI, dans `metadata_correction` (The Conversation : 277 publications sans revue).
-- [ ] Doublons : deux revues qui se partagent un espace de noms forment une paire candidate à la fusion.
+- [x] Doublons par espace de noms partagé : sur la base locale, 19 paires de revues se partagent un espace d'au moins 5 DOI sans qu'aucune y atteigne 90 %. Trois sont des doublons (*Progrès en Urologie* et *The French Journal of Urology*, titres parallèles de *ATeM* et de *Fabula*), les autres des revues distinctes d'un même éditeur aux DOI opaques. Pas de règle.
 - [x] Revue erronée, examen : onglet « Contredites par le DOI » de l'administration des revues. Il groupe par paire de revues les enregistrements dont la revue diffère de celle de l'espace de noms de leur DOI.
-- [ ] Revue erronée, correction automatique avec trace dans `corrections`, si l'examen montre qu'elle est sans risque.
 
 ## Questions ouvertes
 
+- Titres successifs que le Sudoc ne lie pas (*Progrès en Urologie* et *The French Journal of Urology*) : signal à trouver, ou fusion manuelle.
+- Mots que l'abréviation omet (`Nucl.Instrum.Meth.A` pour *Nuclear Instruments and Methods in Physics Research Section A*) : hors de la règle des titres compatibles.
+- Enregistrements réunis à tort dans une publication (*Annals of Forest Science* et *Peer Community In Forest and Wood Sciences*) : examen des cas relevés.
 - Revue erronée sans enregistrement Crossref : quelle source fait foi ?
-- Éditeur d'une revue et d'une publication : fiche [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md).
+- Éditeur d'une revue et d'une publication : fiche [Modèle des conteneurs](2026-10-25_DATA_modele-des-conteneurs.md).
