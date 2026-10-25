@@ -145,6 +145,7 @@
     }
   }
   .abstract-text {
+    max-width: 120ch;
     font-size: 1.02rem;
     line-height: 1.65;
     color: var(--text);
