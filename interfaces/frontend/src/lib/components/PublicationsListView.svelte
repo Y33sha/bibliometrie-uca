@@ -824,8 +824,6 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 6px 0;
-		padding-top: 8px;
-		border-top: 1px solid var(--border-subtle);
 	}
 	.filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 	.filter-group + .filter-group {

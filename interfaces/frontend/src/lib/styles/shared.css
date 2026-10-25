@@ -134,10 +134,11 @@
 	flex: 1;
 }
 
-/* Zone recherche et filtres d'une liste. Le fond de page masque les lignes qui défilent sous la barre collante. */
+/* Zone recherche et filtres d'une liste. Le fond de page masque les lignes qui défilent sous la barre collante ; un filet la sépare du tableau. */
 .toolbar-card {
 	padding: 10px 0;
 	background: var(--bg);
+	border-bottom: 1px solid var(--border);
 }
 
 /* Barre collante sous le menu supérieur */

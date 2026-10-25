@@ -71,8 +71,6 @@
 		align-items: center;
 		gap: 6px;
 		flex-wrap: wrap;
-		padding-top: 8px;
-		border-top: 1px solid var(--border-subtle);
 	}
 	.active-filters-label {
 		font-size: 0.9rem;
