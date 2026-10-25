@@ -1,12 +1,13 @@
 """Dépendances partagées des routers : factories DB, tâches de fond, réglages du serveur.
 
-`db_conn` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
+`DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories câblent les query services et les repositories.
 
 La session admin vit dans `session.py` ; ce module n'en expose que le nom d'utilisateur attendu, par `Depends(...)`.
 """
 
 import logging
 from collections.abc import Callable, Iterator
+from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy import Connection
@@ -51,7 +52,6 @@ from application.ports.repositories.structure_repository import StructureReposit
 from application.services.addresses import countries as countries_service
 from application.services.contributions.core import propagate_in_perimeter_for_addresses
 from domain.merge import MergedEntity
-from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.config import PgConfigQueries
@@ -151,154 +151,148 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 
 
 def db_conn(request: Request) -> Iterator[Connection]:
-    """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
+    """Connexion de la requête, servie aux routes par `DbConn`. Sa transaction est celle de la requête.
 
-    La persistance est la prérogative du service : son command handler appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
+    Une requête d'écriture qui aboutit est committée en sortie ; une exception l'annule. Cette sortie précède l'envoi de la réponse (`scope="function"`) : un GET ou une tâche de fond déclenchés ensuite lisent l'état committé. Les services ne committent pas ; le pipeline et les scripts committent eux-mêmes.
 
-    En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
-
-    Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`) : la base refuse alors l'écriture, là où le rollback de sortie ne rattrape que celle restée non committée.
+    Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion. Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`).
     """
     with _open_connection(request) as conn:
-        reset_dml_flag(conn)
         try:
             yield conn
         except Exception:
             conn.rollback()
             raise
-        if conn.in_transaction():
-            escaped_dml = has_uncommitted_dml(conn)
-            conn.rollback()
-            if escaped_dml:
-                logger.warning(
-                    "DML annulé : %s %s a émis une écriture qui n'est pas passée par un "
-                    "command handler committant ; le rollback de fin de db_conn l'a perdue.",
-                    request.method,
-                    request.url.path,
-                )
+        if request.method not in READ_ONLY_METHODS:
+            conn.commit()
+
+
+# Seule déclaration de la connexion de la requête. Une déclaration d'un autre scope ouvrirait une
+# seconde connexion, avec sa propre transaction.
+DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
 def subjects_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
 ) -> SubjectsQueries:
     return PgSubjectsQueries(conn)
 
 
-def contributions_queries(conn: Connection = Depends(db_conn)) -> ContributionsQueries:
+def contributions_queries(conn: DbConn) -> ContributionsQueries:
     return PgContributionsQueries(conn)
 
 
-def countries_queries(conn: Connection = Depends(db_conn)) -> CountriesQueries:
+def countries_queries(conn: DbConn) -> CountriesQueries:
     return PgCountriesQueries(conn)
 
 
-def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:
+def config_queries(conn: DbConn) -> ConfigQueries:
     return PgConfigQueries(conn)
 
 
-def config_repository(conn: Connection = Depends(db_conn)) -> ConfigRepository:
+def config_repository(conn: DbConn) -> ConfigRepository:
     return PgConfigRepository(conn)
 
 
 def hal_problems_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
 ) -> HalProblemsQueries:
     return PgHalProblemsQueries(conn)
 
 
-def audit_repo(conn: Connection = Depends(db_conn)) -> AuditRepository:
+def audit_repo(conn: DbConn) -> AuditRepository:
     return audit_repository(conn)
 
 
-def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:
+def person_repo(conn: DbConn) -> PersonRepository:
     return person_repository(conn)
 
 
-def serial_queries(conn: Connection = Depends(db_conn)) -> SerialQueries:
+def serial_queries(conn: DbConn) -> SerialQueries:
     return PgSerialQueries(conn)
 
 
-def serial_repo(conn: Connection = Depends(db_conn)) -> SerialRepository:
+def serial_repo(conn: DbConn) -> SerialRepository:
     return serial_repository(conn)
 
 
-def monograph_queries(conn: Connection = Depends(db_conn)) -> MonographQueries:
+def monograph_queries(conn: DbConn) -> MonographQueries:
     return PgMonographQueries(conn)
 
 
-def publisher_queries(conn: Connection = Depends(db_conn)) -> PublisherQueries:
+def publisher_queries(conn: DbConn) -> PublisherQueries:
     return PgPublisherQueries(conn)
 
 
-def publisher_repo(conn: Connection = Depends(db_conn)) -> PublisherRepository:
+def publisher_repo(conn: DbConn) -> PublisherRepository:
     return publisher_repository(conn)
 
 
-def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:
+def perimeter_repo(conn: DbConn) -> PerimeterRepository:
     return perimeter_repository(conn)
 
 
 def perimeters_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
 ) -> PerimetersQueries:
     return PgPerimetersQueries(conn)
 
 
-def feedback_queries(conn: Connection = Depends(db_conn)) -> FeedbackQueries:
+def feedback_queries(conn: DbConn) -> FeedbackQueries:
     return PgFeedbackQueries(conn)
 
 
-def stats_queries(conn: Connection = Depends(db_conn)) -> StatsQueries:
+def stats_queries(conn: DbConn) -> StatsQueries:
     return PgStatsQueries(conn)
 
 
-def entity_label_queries(conn: Connection = Depends(db_conn)) -> EntityLabelQueries:
+def entity_label_queries(conn: DbConn) -> EntityLabelQueries:
     return PgEntityLabelQueries(conn)
 
 
 def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], EntityDetail]:
     """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
 
-    def dependency(request: Request, conn: Connection = Depends(db_conn)) -> EntityDetail:
+    def dependency(request: Request, conn: DbConn) -> EntityDetail:
         return EntityDetail(entity, request, PgMergeRedirectQueries(conn))
 
     return dependency
 
 
-def structure_repo(conn: Connection = Depends(db_conn)) -> StructureRepository:
+def structure_repo(conn: DbConn) -> StructureRepository:
     return structure_repository(conn)
 
 
-def structures_queries(conn: Connection = Depends(db_conn)) -> StructuresQueries:
+def structures_queries(conn: DbConn) -> StructuresQueries:
     return PgStructuresQueries(conn)
 
 
 def publications_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     open_connection: Callable[[], Connection] = Depends(connection_factory),
 ) -> PublicationsQueries:
     return PgPublicationsQueries(conn, open_connection=open_connection)
 
 
-def contribution_repo(conn: Connection = Depends(db_conn)) -> ContributionRepository:
+def contribution_repo(conn: DbConn) -> ContributionRepository:
     return contribution_repository(conn)
 
 
-def address_repo(conn: Connection = Depends(db_conn)) -> AddressRepository:
+def address_repo(conn: DbConn) -> AddressRepository:
     return address_repository(conn)
 
 
-def persons_queries(conn: Connection = Depends(db_conn)) -> PersonsQueries:
+def persons_queries(conn: DbConn) -> PersonsQueries:
     return PgPersonsQueries(conn)
 
 
 def pipeline_runs_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
 ) -> PipelineRunsQueries:
     return PgPipelineRunsQueries(conn)
 
 
-def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
+def addresses_queries(conn: DbConn) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 

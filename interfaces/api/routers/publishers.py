@@ -4,7 +4,6 @@ Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.publication_count import PublicationCountRecompute
 from application.ports.pipeline.serial_recompute import SerialRecompute
@@ -28,8 +27,8 @@ from application.services.publishers import commands as publisher_commands
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
-    db_conn,
     entity_detail,
     publication_count_recompute,
     publisher_queries,
@@ -152,7 +151,7 @@ def get_publisher_subjects(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PublisherRepository = Depends(publisher_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -174,7 +173,7 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     publishers: PublisherRepository = Depends(publisher_repo),
     serials: SerialRepository = Depends(serial_repo),
     audit: AuditRepository = Depends(audit_repo),

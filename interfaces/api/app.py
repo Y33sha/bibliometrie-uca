@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 # ----- Lifespan -----
 #
 # Construit l'engine SQLAlchemy au démarrage et le libère à l'arrêt.
-# Les routes le consomment via `db_conn`.
+# Les routes le consomment via `DbConn`.
 
 
 @asynccontextmanager

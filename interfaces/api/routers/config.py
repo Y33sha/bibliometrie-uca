@@ -6,7 +6,6 @@ La table `config` porte les réglages d'exploitation : années couvertes, choix 
 from typing import cast
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
@@ -14,11 +13,11 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.services.config import commands as config_commands
 from interfaces.api.deps import (
+    DbConn,
     admin_user_or_none,
     audit_repo,
     config_queries,
     config_repository,
-    db_conn,
     perimeters_queries,
 )
 from interfaces.api.models import ConfigValueUpdate
@@ -48,7 +47,7 @@ def institution(queries: PerimetersQueries = Depends(perimeters_queries)) -> Ins
 def update_config(
     key: str,
     body: ConfigValueUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     config: ConfigRepository = Depends(config_repository),
     audit: AuditRepository = Depends(audit_repo),
 ) -> ConfigItem:

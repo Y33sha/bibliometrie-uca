@@ -6,7 +6,6 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.structures_queries import (
@@ -32,8 +31,8 @@ from application.services.structures import commands as structure_commands
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
-    db_conn,
     get_perimeter_structures,
     perimeter_repo,
     structure_repo,
@@ -75,7 +74,7 @@ def list_structures(
 @router.post("", response_model=StructureOut)
 def create_structure(
     data: StructureCreate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
@@ -103,7 +102,7 @@ def create_structure(
 @router.post("/tutelles", response_model=StructureTutelleCreateResponse)
 def create_tutelle(
     data: TutelleCreate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
@@ -128,7 +127,7 @@ def create_tutelle(
 @router.delete("/tutelles/{tutelle_id}", response_model=DeletedResponse)
 def delete_tutelle(
     tutelle_id: int,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
@@ -148,7 +147,7 @@ def delete_tutelle(
 @router.post("/name-forms", response_model=NameFormOut)
 def create_name_form(
     data: NameFormCreate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormOut:
@@ -186,7 +185,7 @@ def get_name_form(
 def update_name_form(
     form_id: int,
     data: NameFormUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormOut:
@@ -199,7 +198,7 @@ def update_name_form(
 @router.delete("/name-forms/{form_id}", response_model=DeletedResponse)
 def delete_name_form(
     form_id: int,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
@@ -293,7 +292,7 @@ def get_structure_deletion_impact(
 def update_structure(
     structure_id: int,
     data: StructureUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
@@ -311,7 +310,7 @@ def update_structure(
 @router.delete("/{structure_id}", response_model=DeletedResponse)
 def delete_structure(
     structure_id: int,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeters: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),

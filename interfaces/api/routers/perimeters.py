@@ -4,7 +4,6 @@ Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne
 """
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
@@ -16,9 +15,9 @@ from application.ports.repositories.perimeter_repository import (
 )
 from application.services.perimeters import commands as perimeter_commands
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
     config_queries,
-    db_conn,
     get_perimeter_structures,
     perimeter_repo,
     perimeters_queries,
@@ -46,7 +45,7 @@ def list_perimeters(
 @router.post("", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
@@ -71,7 +70,7 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
     audit: AuditRepository = Depends(audit_repo),
@@ -94,7 +93,7 @@ def update_perimeter(
 @router.delete("/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     config: ConfigQueries = Depends(config_queries),
     audit: AuditRepository = Depends(audit_repo),

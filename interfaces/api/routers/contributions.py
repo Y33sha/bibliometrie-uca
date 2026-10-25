@@ -6,7 +6,6 @@ Les routes sont groupées par sujet, et les chemins littéraux précèdent celui
 """
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.read_models.contributions_queries import (
@@ -21,10 +20,10 @@ from application.ports.repositories.contribution_repository import ContributionR
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.contributions import commands as contribution_commands
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
     contribution_repo,
     contributions_queries,
-    db_conn,
     person_repo,
     publication_perimeter_recompute,
 )
@@ -86,7 +85,7 @@ def orphan_contributions_facets(
 )
 def assign_orphan_contribution(
     body: AssignOrphanContribution,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -121,7 +120,7 @@ def assign_orphan_contribution(
 )
 def batch_assign_orphan_contributions(
     body: BatchAssignOrphanContributions,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -153,7 +152,7 @@ def batch_assign_orphan_contributions(
 @router.patch("/{contribution_id}/exclude", response_model=OkResponse)
 def exclude_contribution(
     contribution_id: int,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: ContributionRepository = Depends(contribution_repo),
     persons: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),

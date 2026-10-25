@@ -8,7 +8,6 @@ Les routes sont groupées par sujet, et dans chaque groupe les chemins littérau
 from typing import Annotated, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.read_models.addresses_queries import (
@@ -31,13 +30,13 @@ from application.ports.repositories.address_repository import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.services.addresses import commands as address_commands
 from interfaces.api.deps import (
+    DbConn,
     address_repo,
     addresses_queries,
     audit_repo,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
     country_recompute,
-    db_conn,
 )
 from interfaces.api.models import (
     AddressPublicationsResponse,
@@ -141,7 +140,7 @@ def address_stats(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> BatchUpdatedResponse:
@@ -180,7 +179,7 @@ def review_address(
     addr_id: int,
     action: ReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -236,7 +235,7 @@ def list_addresses_countries(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
     audit: AuditRepository = Depends(audit_repo),
@@ -265,7 +264,7 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
     audit: AuditRepository = Depends(audit_repo),

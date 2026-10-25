@@ -6,7 +6,6 @@ Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.read_models._common import EntityFacetResponse
@@ -34,8 +33,8 @@ from domain.serials.serial import (
     SERIAL_TYPES,
 )
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
-    db_conn,
     entity_detail,
     serial_queries,
     serial_recompute,
@@ -258,7 +257,7 @@ def get_serial_subjects(
 def get_type_change_impact(
     serial_id: int,
     body: SerialTypeChange,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
 ) -> SerialTypeChangeImpact:
@@ -282,7 +281,7 @@ def get_type_change_impact(
 def update_serial(
     serial_id: int,
     body: SerialUpdate,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
     audit: AuditRepository = Depends(audit_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
@@ -308,7 +307,7 @@ def update_serial(
 def merge(
     serial_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
     audit: AuditRepository = Depends(audit_repo),
     recompute: SerialRecompute = Depends(serial_recompute),

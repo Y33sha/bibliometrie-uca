@@ -6,7 +6,6 @@ L'ordre de déclaration porte une contrainte : les chemins littéraux — `/sear
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.read_models.persons_queries import (
@@ -37,9 +36,9 @@ from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
+    DbConn,
     audit_repo,
     contribution_repo,
-    db_conn,
     entity_detail,
     person_repo,
     persons_queries,
@@ -222,7 +221,7 @@ def name_duplicates(
 @router.post("/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
     body: MarkDistinctPersons,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -243,7 +242,7 @@ def mark_persons_distinct(
 def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
@@ -368,7 +367,7 @@ def name_form_contributions(
 def add_person_identifier(
     person_id: int,
     data: AddIdentifier,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -402,7 +401,7 @@ def add_person_identifier(
 def set_person_exclusion(
     person_id: int,
     body: SetPersonExclusion,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
@@ -426,7 +425,7 @@ def set_person_exclusion(
 def update_person_name(
     person_id: int,
     body: UpdatePersonName,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -444,7 +443,7 @@ def update_person_name(
 def merge_persons(
     person_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> MergeResponse:
@@ -462,7 +461,7 @@ def merge_persons(
 def detach_contributions(
     person_id: int,
     body: DetachContributions,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -489,7 +488,7 @@ def detach_contributions(
 def update_name_form_status(
     person_id: int,
     body: UpdateNameFormStatus,
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
