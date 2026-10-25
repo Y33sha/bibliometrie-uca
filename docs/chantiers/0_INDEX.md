@@ -4,10 +4,12 @@
 
 ### En cours
 
+- [Refonte visuelle du frontend](STYLE_refonte-visuelle.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 
 ### Non commencé
 
+- [Contenu des dashboards de structure et de personne](METIER_dashboards.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)

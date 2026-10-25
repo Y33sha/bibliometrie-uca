@@ -131,7 +131,6 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ## Questions ouvertes
 
-- Nombre de personnes dans les chiffres clés d'une structure : la réponse du dashboard ne le contient pas.
 - Police : Source Sans 3 ou Inter, à trancher après essai sur d'autres écrans. La police écartée sera supprimée de `static/fonts/` et de `app.html`.
 - Compteurs dans les onglets d'entité (« Publications 1 849 »). Sans objet pour le dashboard, sans intérêt pour les adresses et les collaborations. Pour les autres onglets, reste à choisir entre le total de l'entité et le total filtré. `TabNav` accepte déjà un compteur.
 - Mode sombre, une fois toutes les couleurs en variables.
