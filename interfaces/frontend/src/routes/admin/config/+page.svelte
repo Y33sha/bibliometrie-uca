@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
   import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
@@ -273,7 +274,7 @@
           {@render inlineEdit(key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
         {/if}
       </div>
     {/if}
@@ -287,7 +288,7 @@
           {@render inlineEdit(cap.key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(cap.key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
         {/if}
       </div>
     {/if}
@@ -307,7 +308,7 @@
           {@render inlineEdit(delay.key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(delay.key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
         {/if}
       </div>
     {/if}
@@ -343,8 +344,8 @@
         </td>
         <td class="num">{perim.structure_count}</td>
         <td class="perim-actions">
-          <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
-          <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
+          <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+          <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
         </td>
       </tr>
     {/each}

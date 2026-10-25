@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	import IconButton from '#lib/components/IconButton.svelte';
 	/** Un ISSN de la revue dans le formulaire d'édition. `replaced_by` repart tel que lu. */
 	export type EditedIssn = {
 		issn: string;
@@ -79,9 +80,7 @@
 						<td>{issnStatusLabels[row.status] ?? row.status}</td>
 						<td>{#if row.linking}<span class="badge-issnl">ISSN-L</span>{/if}</td>
 						<td class="actions">
-							<button type="button" class="icon-btn" title="Modifier l'ISSN" aria-label="Modifier l'ISSN {row.issn}" disabled={editing !== null} onclick={() => edit(index)}>
-								<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-							</button>
+							<IconButton icon="edit" label="Modifier l'ISSN {row.issn}" disabled={editing !== null} onclick={() => edit(index)} />
 						</td>
 					</tr>
 				{/if}
@@ -103,7 +102,4 @@
 	.linking { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 	.badge-issnl { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius); }
 	.muted { color: var(--muted); }
-	.icon-btn { background: none; border: none; cursor: pointer; padding: 3px; color: var(--muted); border-radius: var(--radius); }
-	.icon-btn:hover:not(:disabled) { color: var(--accent); background: var(--hover); }
-	.icon-btn:disabled { opacity: 0.4; cursor: default; }
 </style>

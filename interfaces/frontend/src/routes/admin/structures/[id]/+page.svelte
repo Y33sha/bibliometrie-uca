@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
@@ -429,8 +430,8 @@
       <h2>
         {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
       </h2>
-      <button class="btn btn-sm" onclick={openEditModal}>Éditer</button>
-      <button class="btn btn-danger btn-sm" onclick={deleteStructure}>Supprimer</button>
+      <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
+      <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
     </div>
 
     <h3 class="section-title">Détails</h3>

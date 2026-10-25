@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
@@ -132,44 +133,8 @@
             {/if}
           </td>
           <td class="row-actions" style="white-space:nowrap">
-            <button class="btn-icon" onclick={() => oneditForm(f)} title="Modifier">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path
-                  d="m15 5 4 4"
-                /></svg
-              >
-            </button>
-            <button
-              class="btn-icon btn-icon-danger"
-              onclick={() => ondeleteForm(f.id)}
-              title="Supprimer"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><line x1="18" y1="6" x2="6" y2="18" /><line
-                  x1="6"
-                  y1="6"
-                  x2="18"
-                  y2="18"
-                /></svg
-              >
-            </button>
+            <IconButton icon="edit" label="Modifier la forme" onclick={() => oneditForm(f)} />
+            <IconButton icon="delete" label="Supprimer la forme" onclick={() => ondeleteForm(f.id)} />
           </td>
         </tr>
       {/each}
@@ -335,28 +300,6 @@
   .sufficient-label {
     color: var(--success);
     font-size: 0.8rem;
-  }
-  .btn-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: none;
-    cursor: pointer;
-    color: var(--muted);
-  }
-  .btn-icon:hover {
-    background: var(--hover);
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .btn-icon-danger:hover {
-    color: var(--danger);
-    border-color: var(--danger);
   }
   .btn-add-tiny {
     display: inline-flex;

@@ -1524,6 +1524,34 @@ button.status-chip:hover {
 	filter: brightness(0.97);
 }
 /* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
+/* Bouton réduit à son icône (composant IconButton) : sans bordure, fond au survol, rouge au survol pour une suppression. */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius);
+	background: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+	vertical-align: middle;
+}
+.icon-btn:hover:not(:disabled) {
+	background: var(--hover);
+	color: var(--accent);
+}
+.icon-btn-danger:hover:not(:disabled) {
+	background: var(--danger-light);
+	color: var(--danger);
+}
+.icon-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
 .btn-icon-sm {
 	width: 22px;
 	height: 22px;

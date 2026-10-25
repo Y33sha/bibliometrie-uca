@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
@@ -149,9 +150,7 @@
         {#if person.has_rh}<RhCheck />{/if}
       </div>
       <div class="drawer-head-actions">
-        <button class="icon-btn" title="Modifier le nom" aria-label="Modifier le nom" onclick={startEdit}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-        </button>
+        <IconButton icon="edit" label="Modifier le nom" onclick={startEdit} />
         <select
           class="exclusion-select"
           class:excluded={!!person.exclusion}
@@ -336,20 +335,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-size: 0.9rem;
-  }
-  .icon-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 3px;
-    color: var(--muted);
-    display: inline-flex;
-    align-items: center;
-    border-radius: var(--radius);
-  }
-  .icon-btn:hover {
-    color: var(--accent);
-    background: var(--hover);
   }
   .exclusion-select {
     font-size: 0.8rem;
