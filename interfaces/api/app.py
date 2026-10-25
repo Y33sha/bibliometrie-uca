@@ -8,7 +8,6 @@ Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port 
 import logging
 import os
 import time
-import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -218,9 +217,7 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
-    logger.error(
-        "Erreur non gérée sur %s %s\n%s", request.method, request.url.path, traceback.format_exc()
-    )
+    logger.error("Erreur non gérée sur %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
 
 
