@@ -257,7 +257,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 	}
 	.publishers-table thead th {
 		background: var(--surface);
@@ -288,7 +288,7 @@
 		background: var(--border-subtle);
 		color: var(--muted);
 		padding: 1px 6px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		font-size: 0.75rem;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;

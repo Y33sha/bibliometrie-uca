@@ -323,7 +323,7 @@
 	.profile-header {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 20px 24px;
 		margin-bottom: 0;
 	}
@@ -341,7 +341,7 @@
 		display: inline-block;
 		padding: 2px 8px;
 		background: var(--border-subtle);
-		border-radius: 3px;
+		border-radius: var(--radius);
 		font-size: 0.85rem;
 		color: var(--muted);
 	}
@@ -351,7 +351,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 	}
 	.tab-content thead th {
 		background: var(--surface);

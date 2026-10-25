@@ -220,7 +220,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		font-size: 0.9rem;
 	}
 	.theses-table th {
@@ -285,7 +285,7 @@
 	.status-badge {
 		font-size: 0.75rem;
 		padding: 2px 6px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.status-badge.soutenue {
 		background: var(--success-light);

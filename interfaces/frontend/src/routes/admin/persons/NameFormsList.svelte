@@ -151,7 +151,7 @@
     color: var(--warning-text);
     background: var(--warning-light);
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
   }
   .rejected-forms {
     margin-top: 8px;

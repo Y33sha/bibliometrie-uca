@@ -183,7 +183,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		overflow: hidden;
 	}
 	.publication-table thead th {
@@ -200,7 +200,7 @@
 	.doi-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 10px 14px;
 	}
 	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }

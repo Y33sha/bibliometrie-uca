@@ -70,7 +70,7 @@
 		font-size: 0.78rem;
 		line-height: 1.4;
 		padding: 6px 10px;
-		border-radius: 5px;
+		border-radius: var(--radius);
 		max-width: 500px;
 		white-space: pre-line;
 		word-wrap: break-word;

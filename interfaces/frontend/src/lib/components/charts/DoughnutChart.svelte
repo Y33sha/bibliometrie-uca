@@ -26,7 +26,7 @@
 
 	// Palette neutre tournante pour les distributions sans couleur sémantique (doc_types, serial_types). Stable par position.
 	const PALETTE = [
-		'#3b6b9e',
+		'#2f8a8a',
 		'#2a7d4f',
 		'#b08900',
 		'#7c3aed',

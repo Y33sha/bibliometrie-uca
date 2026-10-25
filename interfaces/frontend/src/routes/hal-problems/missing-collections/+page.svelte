@@ -117,7 +117,7 @@
 	.lab-select {
 		padding: 6px 10px;
 		border: 2px solid var(--accent);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.9rem;
 		font-family: inherit;
 		font-weight: 600;
@@ -129,14 +129,14 @@
 	.publication-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 10px 14px;
 	}
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
 	.badge-hors-uca {
 		display: inline-block; padding: 1px 8px; background: var(--attention-light);
-		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: 3px; font-size: 0.78rem;
+		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
 		color: var(--attention); font-weight: 600; flex-shrink: 0;
 	}
 	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }

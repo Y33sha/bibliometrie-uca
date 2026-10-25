@@ -178,7 +178,7 @@
     font-size: 0.72rem;
     background: var(--accent-light);
     color: var(--accent);
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     padding: 1px 7px;
   }
   .actions {
@@ -190,7 +190,7 @@
     padding: 4px 10px;
     font-size: 0.8rem;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: var(--card);
     cursor: pointer;
     white-space: nowrap;
@@ -212,7 +212,7 @@
     color: var(--danger);
     background: var(--danger-light);
     padding: 6px 10px;
-    border-radius: 4px;
+    border-radius: var(--radius);
     margin-bottom: 10px;
   }
 </style>

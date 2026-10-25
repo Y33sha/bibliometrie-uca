@@ -411,7 +411,7 @@
   .signal {
     padding: 1px 6px;
     border: 1px solid;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-size: 0.78rem;
   }
 </style>

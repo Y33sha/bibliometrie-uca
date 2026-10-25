@@ -102,7 +102,7 @@
   .publication-header {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 20px 24px;
     margin-bottom: 16px;
   }
@@ -125,10 +125,10 @@
     font-weight: 600;
   }
   .doc-type-tag {
-    background: var(--section-heading);
+    background: var(--accent);
     color: #fff;
     padding: 3px 9px;
-    border-radius: 3px;
+    border-radius: var(--radius);
     font-size: 0.92rem;
     font-weight: 500;
   }
@@ -146,7 +146,7 @@
     gap: 10px;
     padding: 10px 14px;
     border-left: 4px solid;
-    border-radius: 4px;
+    border-radius: var(--radius);
     text-decoration: none;
   }
   /* Icône + type de relation forment un bloc « libellé » centré ensemble ; il s'aligne sur la première ligne du titre (via `align-items: baseline` du `.rel-item`) et y reste quand le titre passe sur plusieurs lignes. */

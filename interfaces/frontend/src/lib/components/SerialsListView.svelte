@@ -305,7 +305,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 	}
 	.journals-table thead th {
 		background: var(--surface);

@@ -52,7 +52,7 @@
   } = $props();
 </script>
 
-<h3 class="section-banner">Identification dans les publications</h3>
+<h3 class="section-title">Identification dans les publications</h3>
 
 <h3>
   Formes de noms ({forms.length})
@@ -249,7 +249,7 @@
 {/if}
 
 <style>
-  h3 {
+  h3:not(.section-title) {
     margin: 12px 0 6px;
     font-size: 0.95rem;
     font-weight: 600;
@@ -307,7 +307,7 @@
   .match-badge {
     font-size: 0.65rem;
     padding: 1px 5px;
-    border-radius: 8px;
+    border-radius: var(--radius);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -326,7 +326,7 @@
   .ctx-tag {
     font-size: 0.7rem;
     padding: 1px 5px;
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: var(--warning-light);
     color: var(--warning-text);
     display: inline-flex;
@@ -359,7 +359,7 @@
     height: 26px;
     padding: 0;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: none;
     cursor: pointer;
     color: var(--muted);
@@ -405,7 +405,7 @@
     flex: 1;
     padding: 4px 6px;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
     font-size: 0.85rem;
     font-family: inherit;
   }

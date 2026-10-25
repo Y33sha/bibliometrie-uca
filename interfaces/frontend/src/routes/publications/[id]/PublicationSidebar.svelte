@@ -181,7 +181,7 @@
   .detail-sidebar {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 16px;
     align-self: start;
     position: sticky;
@@ -194,7 +194,7 @@
     justify-content: center;
     gap: 6px;
     padding: 9px 12px;
-    background: var(--section-heading);
+    background: var(--accent);
     color: white;
     font-weight: 600;
     font-size: 0.95rem;
@@ -254,7 +254,7 @@
     align-items: center;
     gap: 8px;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: var(--surface);
     text-decoration: none;
   }

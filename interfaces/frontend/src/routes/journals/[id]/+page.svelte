@@ -274,7 +274,7 @@
 	.j-header {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 20px 24px;
 	}
 	.j-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
@@ -292,7 +292,7 @@
 	span.publisher-link { color: var(--muted); }
 	.type-tag {
 		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
+		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
 	}
 
 	.tab-content { margin-top: 16px; }
@@ -313,7 +313,7 @@
 	}
 	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
-		background: var(--surface); padding: 12px; border-radius: 4px;
+		background: var(--surface); padding: 12px; border-radius: var(--radius);
 		font-size: 0.8rem; max-height: 400px; overflow: auto;
 		white-space: pre-wrap; word-break: break-word;
 	}

@@ -130,7 +130,8 @@
   }
   :global(body) {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font);
+    font-variant-numeric: tabular-nums;
     font-size: 1rem;
     line-height: 1.5;
     color: var(--text);
@@ -145,7 +146,7 @@
     -webkit-appearance: none;
     padding: 6px 10px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: var(--card);
     font-family: inherit;
     font-size: 0.95rem;
@@ -268,7 +269,7 @@
     top: 46px;
     left: 0;
     background: var(--nav-public-menu);
-    border-radius: 0 0 5px 5px;
+    border-radius: 0 0 var(--radius) var(--radius);
     min-width: 150px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 100;

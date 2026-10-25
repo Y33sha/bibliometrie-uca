@@ -87,7 +87,7 @@
 	.m-header {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 20px 24px;
 		display: flex;
 		flex-direction: column;
@@ -106,7 +106,7 @@
 	.meta-label:first-child { margin-left: 0; }
 	.type-tag {
 		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
+		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
 	}
 	.m-publications { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }

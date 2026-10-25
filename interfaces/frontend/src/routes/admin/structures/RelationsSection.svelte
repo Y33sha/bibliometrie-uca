@@ -32,7 +32,7 @@
   } = $props();
 </script>
 
-<h3 class="section-banner">Tutelles</h3>
+<h3 class="section-title">Tutelles</h3>
 
 <!-- Tutelles -->
 <h3>
@@ -106,7 +106,7 @@
     gap: 4px;
     font-size: 0.85rem;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     margin: 2px;
     background: var(--surface);
   }
@@ -166,7 +166,7 @@
     color: white;
     border-color: var(--accent);
   }
-  h3 {
+  h3:not(.section-title) {
     margin: 12px 0 6px;
     font-size: 0.95rem;
     font-weight: 600;

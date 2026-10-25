@@ -85,7 +85,7 @@
 	.publication-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 10px 14px;
 	}
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

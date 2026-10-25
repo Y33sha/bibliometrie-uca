@@ -36,7 +36,7 @@
   .cell {
     width: 15px;
     height: 15px;
-    border-radius: 3px;
+    border-radius: var(--radius);
     border: 1.5px solid;
     flex: none;
   }

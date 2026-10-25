@@ -416,7 +416,7 @@
   .stat-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 12px 18px;
     text-align: center;
     flex: 1;
@@ -468,7 +468,7 @@
   .structure-filter {
     padding: 6px 10px;
     border: 1px solid var(--accent);
-    border-radius: 4px;
+    border-radius: var(--radius);
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--accent);
@@ -498,10 +498,10 @@
     font-family: inherit;
   }
   .tab-btn:first-child {
-    border-radius: 4px 0 0 4px;
+    border-radius: var(--radius) 0 0 var(--radius);
   }
   .tab-btn:last-child {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .tab-btn:not(:first-child) {
     border-left: none;
@@ -534,7 +534,7 @@
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
     margin: 1px 2px;
   }
@@ -564,7 +564,7 @@
     padding: 4px 8px;
     background: var(--warning-light);
     border: 1px solid color-mix(in srgb, var(--warning) 40%, white);
-    border-radius: 4px;
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -584,7 +584,7 @@
   .form-action {
     padding: 1px 6px;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
     background: var(--card);
     font-size: 0.7rem;
     cursor: pointer;
@@ -608,7 +608,7 @@
     z-index: 100;
     background: var(--card);
     border: 1px solid var(--accent);
-    border-radius: 5px;
+    border-radius: var(--radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     width: 320px;
   }
@@ -661,7 +661,7 @@
   .picker-shortcuts button {
     padding: 2px 8px;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
     background: var(--card);
     font-size: 0.8rem;
     cursor: pointer;

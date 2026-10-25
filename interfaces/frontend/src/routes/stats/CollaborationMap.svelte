@@ -146,7 +146,7 @@
 		min-height: 360px;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 16px;
 	}
 	.collab-caption {

@@ -166,7 +166,7 @@
 		justify-content: center;
 		width: 20px;
 		height: 20px;
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);

@@ -129,7 +129,7 @@
   .publication-header {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 20px 24px;
     margin-bottom: 16px;
   }
@@ -152,7 +152,7 @@
   .detail-body {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 8px 24px;
     margin-bottom: 16px;
   }

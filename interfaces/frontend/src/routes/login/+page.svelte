@@ -62,7 +62,7 @@
 	.login-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 8px;
+		border-radius: var(--radius);
 		padding: 32px 36px;
 		width: 340px;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -82,7 +82,7 @@
 		background: var(--danger-light);
 		color: var(--danger);
 		padding: 8px 12px;
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.95rem;
 		margin-bottom: 12px;
 		text-align: center;
@@ -102,7 +102,7 @@
 		width: 100%;
 		padding: 8px 10px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 1rem;
 		font-family: inherit;
 		background: var(--card);
@@ -110,7 +110,7 @@
 	input:focus {
 		outline: none;
 		border-color: var(--accent);
-		box-shadow: 0 0 0 2px rgba(59, 107, 158, 0.15);
+		box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-mid) 25%, transparent);
 	}
 	button {
 		width: 100%;
@@ -118,7 +118,7 @@
 		background: var(--accent);
 		color: white;
 		border: none;
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 1rem;
 		font-weight: 500;
 		cursor: pointer;

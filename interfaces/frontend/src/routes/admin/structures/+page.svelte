@@ -189,7 +189,7 @@
   .toolbar select {
     padding: 5px 8px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     font-size: 0.95rem;
     background: var(--card);
     font-family: inherit;
@@ -207,7 +207,7 @@
   .list {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   .empty {

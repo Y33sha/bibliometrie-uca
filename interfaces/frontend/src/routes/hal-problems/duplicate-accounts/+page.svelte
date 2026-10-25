@@ -110,7 +110,7 @@
     border-collapse: collapse;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   .publication-table thead th {
@@ -165,7 +165,7 @@
     color: var(--muted);
     background: var(--border-subtle);
     padding: 1px 6px;
-    border-radius: 3px;
+    border-radius: var(--radius);
   }
   .hal-secondary-id {
     font-size: 0.8rem;

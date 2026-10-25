@@ -53,7 +53,7 @@
 	button {
 		padding: 5px 12px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		background: var(--card);
 		cursor: pointer;
 		font-size: 0.95rem;

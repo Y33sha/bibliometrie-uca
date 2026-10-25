@@ -125,7 +125,7 @@
     width: 70px;
     padding: 4px 8px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     margin-left: 4px;
   }
   .total {
@@ -145,7 +145,7 @@
     border-collapse: collapse;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   th,

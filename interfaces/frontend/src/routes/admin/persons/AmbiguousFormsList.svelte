@@ -143,7 +143,7 @@
     font-size: 0.72rem;
     color: var(--danger);
     border: 1px solid var(--danger);
-    border-radius: 3px;
+    border-radius: var(--radius);
     padding: 0 5px;
   }
 </style>

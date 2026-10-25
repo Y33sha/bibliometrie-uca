@@ -57,7 +57,7 @@
   .tab-badge {
     background: var(--accent);
     color: white;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-size: 0.72rem;
     padding: 0 7px;
     font-weight: 600;

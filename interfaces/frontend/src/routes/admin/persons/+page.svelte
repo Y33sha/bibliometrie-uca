@@ -640,7 +640,7 @@
     margin-bottom: 12px;
     background: var(--attention-light);
     border: 1px solid color-mix(in srgb, var(--attention) 40%, white);
-    border-radius: 6px;
+    border-radius: var(--radius);
     color: var(--attention);
     font-size: 0.9rem;
     font-weight: 500;

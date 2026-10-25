@@ -54,7 +54,7 @@
 	}
 	.toast {
 		padding: 10px 14px;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		font-size: 0.9rem;
 		color: white;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);

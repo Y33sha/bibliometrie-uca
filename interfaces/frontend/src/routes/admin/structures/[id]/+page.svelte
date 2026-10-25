@@ -433,7 +433,7 @@
       <button class="btn btn-danger btn-sm" onclick={deleteStructure}>Supprimer</button>
     </div>
 
-    <h3 class="section-banner">Détails</h3>
+    <h3 class="section-title">Détails</h3>
     <div class="details-inline">
       {#if s.ror_id}
         <span class="detail-item">
@@ -550,7 +550,7 @@
   .panel {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 14px;
   }
   .panel h2 {

@@ -116,7 +116,7 @@
     align-items: flex-start;
     gap: 8px;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius);
   }
   .detach-item:hover {
     background: var(--hover);
@@ -170,7 +170,7 @@
     justify-content: space-between;
     gap: 8px;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius);
   }
   .other-person-row:hover {
     background: var(--hover);
@@ -186,7 +186,7 @@
     background: var(--accent);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius);
     cursor: pointer;
   }
   .btn-merge-modal:hover {
@@ -196,7 +196,7 @@
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
     margin: 1px 2px;
   }

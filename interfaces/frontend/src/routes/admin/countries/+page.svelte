@@ -280,21 +280,21 @@
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
-		background: var(--accent-light); border-radius: 6px; font-size: 0.9rem;
+		background: var(--accent-light); border-radius: var(--radius); font-size: 0.9rem;
 	}
-	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; }
+	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
 		padding: 2px 8px; background: var(--warning-light); color: var(--warning-text);
-		border: 1px dashed var(--warning); border-radius: 3px; cursor: pointer;
+		border: 1px dashed var(--warning); border-radius: var(--radius); cursor: pointer;
 		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
 	}
 	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table {
 		width: 100%; border-collapse: collapse; table-layout: fixed;
-		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
 	}
 	.addr-table thead th {
 		background: var(--surface); padding: 8px 10px; text-align: left;
@@ -311,7 +311,7 @@
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: var(--success-light);
-		border-radius: 3px; font-size: 0.78rem; color: var(--success); white-space: nowrap;
+		border-radius: var(--radius); font-size: 0.78rem; color: var(--success); white-space: nowrap;
 	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;
@@ -319,7 +319,7 @@
 	}
 	.tag-remove:hover { color: var(--danger); }
 	.add-country {
-		padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;
+		padding: 2px 4px; border: 1px solid var(--border); border-radius: var(--radius);
 		font-size: 0.75rem; width: 32px; color: var(--muted); cursor: pointer;
 	}
 </style>

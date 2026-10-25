@@ -94,16 +94,16 @@
 </fieldset>
 
 <style>
-	.issns { border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 8px 0; }
+	.issns { border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; margin: 8px 0; }
 	.issns table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
 	.issns th { font-size: 0.8rem; text-align: left; font-weight: normal; color: var(--muted); }
 	.issns td { padding: 3px 6px 3px 0; font-size: 0.9rem; }
 	.value { font-family: var(--mono); }
 	.actions { text-align: right; white-space: nowrap; }
 	.linking { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-	.badge-issnl { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px; }
+	.badge-issnl { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--radius); }
 	.muted { color: var(--muted); }
-	.icon-btn { background: none; border: none; cursor: pointer; padding: 3px; color: var(--muted); border-radius: 3px; }
+	.icon-btn { background: none; border: none; cursor: pointer; padding: 3px; color: var(--muted); border-radius: var(--radius); }
 	.icon-btn:hover:not(:disabled) { color: var(--accent); background: var(--hover); }
 	.icon-btn:disabled { opacity: 0.4; cursor: default; }
 </style>

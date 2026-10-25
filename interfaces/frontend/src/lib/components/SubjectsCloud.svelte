@@ -120,7 +120,7 @@
     width: 100%;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 4px;
     overflow: hidden;
   }

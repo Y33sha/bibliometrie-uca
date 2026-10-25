@@ -49,9 +49,9 @@
     align-items: center;
     gap: 5px;
     font-size: 0.8rem;
-    background: var(--section-heading-light);
-    border: 1px solid color-mix(in srgb, var(--section-heading) 25%, white);
-    border-radius: 4px;
+    background: var(--accent-light);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
+    border-radius: var(--radius);
     padding: 1px 7px;
     font-family: var(--mono);
   }
@@ -59,6 +59,6 @@
     text-transform: uppercase;
     font-size: 0.65rem;
     font-weight: 700;
-    color: var(--section-heading);
+    color: var(--accent);
   }
 </style>

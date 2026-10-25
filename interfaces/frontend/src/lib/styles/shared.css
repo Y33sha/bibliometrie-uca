@@ -7,36 +7,36 @@
 /* ── Variables ── */
 :root {
 	/* Texte */
-	--text: #2c2c2c;
-	--muted: #6b7280;
-	--text-faint: #bbb;        /* valeurs nulles ou absentes */
+	--text: #1d2433;
+	--text-secondary: #5b6474;
+	--muted: #6b7280;          /* texte discret */
+	--text-faint: #a3a9b3;     /* valeurs nulles ou absentes */
 
 	/* Surfaces et lignes */
-	--bg: #f8f7f4;             /* fond de page */
+	--bg: #fbfbfa;             /* fond de page */
 	--card: #ffffff;
-	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
-	--hover: #efede6;          /* survol des éléments cliquables (boutons, items de liste) */
-	--surface-hover: #fafaf8;  /* survol des lignes de tableau */
-	--border: #e5e5e0;
-	--border-subtle: #f0efec;  /* séparateurs légers */
+	--surface: #f4f5f7;        /* fonds de panneaux, en-têtes de tableau */
+	--hover: #eef1f2;          /* survol des éléments cliquables (boutons, items de liste) */
+	--surface-hover: #f7f8f9;  /* survol des lignes de tableau */
+	--border: #e3e6ea;
+	--border-subtle: #eef0f2;  /* séparateurs légers */
 
 	/* Accent */
-	--accent: #3b6b9e;
-	--accent-light: #e8f0f8;
-	--section-heading: #3d7a7c;       /* titres de section */
-	--section-heading-light: #e4efef; /* survol des tags du corps */
+	--accent: #1f5f5f;         /* texte, bouton plein, titres de section */
+	--accent-mid: #2f8a8a;     /* trait d'onglet actif, focus */
+	--accent-light: #e6f2f2;   /* fond de pastille, encart */
 
 	/* Barre de navigation */
-	--nav-public: #5b9ea0;
-	--nav-public-menu: #4a8c8e; /* sous-menus déroulants */
-	--nav-admin: #3d7a7c;
-	--nav-admin-menu: #4d8a8c;
+	--nav-public: #2f7f7f;
+	--nav-public-menu: #286e6e; /* sous-menus déroulants */
+	--nav-admin: #1f5f5f;
+	--nav-admin-menu: #2a6c6c;
 
 	/* États */
 	--success: #2a7d4f;
 	--success-light: #e6f4ec;
-	--danger: #c0392b;
-	--danger-light: #fbeaea;
+	--danger: #b42318;
+	--danger-light: #fbe9e7;
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
 	--warning-text: #856404;    /* assombri, lisible en texte sur fond clair */
@@ -47,11 +47,11 @@
 	--tooltip-bg: #333;
 
 	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
-	--open: #57b82e;       /* ouvert, toutes voies confondues */
-	--open-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
-	--embargoed: #b08900;
-	--closed: #555;
-	--unknown: #bbb;
+	--open: #2e9b4f;       /* ouvert, toutes voies confondues */
+	--open-text: #22743c;  /* assombri, lisible en texte sur fond clair */
+	--embargoed: #d29a1e;
+	--closed: #4b5260;
+	--unknown: #c9ced6;
 	--diamond: #d0d4fb;
 	--gold: #ffd700;
 	--hybrid: #b366f2;
@@ -61,10 +61,13 @@
 	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
 
 	/* Polices */
+	--font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
 
 	/* Gabarit */
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
+	--radius: 8px;
+	--radius-pill: 999px;
 }
 
 /* ── Liens ── */
@@ -90,7 +93,7 @@
 .toolbar input[type='text' i] {
 	padding: 6px 10px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.95rem;
 	font-family: inherit;
 }
@@ -98,7 +101,7 @@
 .toolbar select {
 	padding: 6px 10px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.95rem;
 	font-family: inherit;
 }
@@ -118,7 +121,7 @@
 	padding: 10px 14px;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 }
 
 /* Sticky toolbar variant */
@@ -139,7 +142,7 @@
 	gap: 4px;
 	padding: 6px 10px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	background: var(--card);
 	font-size: 0.95rem;
 	cursor: pointer;
@@ -163,7 +166,7 @@
 	min-width: 18px;
 	height: 18px;
 	padding: 0 5px;
-	border-radius: 9px;
+	border-radius: var(--radius-pill);
 	background: var(--accent);
 	color: white;
 	font-size: 0.8rem;
@@ -183,7 +186,7 @@
 	padding: 6px 0;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 	z-index: 100;
 }
@@ -193,7 +196,7 @@
 	margin: 2px 6px 6px;
 	padding: 5px 8px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.85rem;
 }
 .facet-options label {
@@ -257,7 +260,7 @@
 .export-btn {
 	padding: 4px 10px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	background: var(--card);
 	font-size: 0.85rem;
 	color: var(--muted);
@@ -277,24 +280,24 @@
 	border-collapse: collapse;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 	/* Pas d'overflow: hidden : clipperait les dropdowns positionnés en absolute. */
 }
 
 .data-table thead tr:first-child th:first-child {
-	border-radius: 6px 0 0 0;
+	border-radius: var(--radius) 0 0 0;
 }
 
 .data-table thead tr:first-child th:last-child {
-	border-radius: 0 6px 0 0;
+	border-radius: 0 var(--radius) 0 0;
 }
 
 .data-table tbody tr:last-child td:first-child {
-	border-radius: 0 0 0 6px;
+	border-radius: 0 0 0 var(--radius);
 }
 
 .data-table tbody tr:last-child td:last-child {
-	border-radius: 0 0 6px 0;
+	border-radius: 0 0 var(--radius) 0;
 }
 
 .data-table th {
@@ -411,7 +414,7 @@ th.sorted .sort-arrow {
 	width: 100%;
 	padding: 6px 8px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.95rem;
 	font-family: inherit;
 }
@@ -428,7 +431,7 @@ th.sorted .sort-arrow {
 	border-left: 1px solid var(--border);
 	border-right: 1px solid var(--border);
 	border-bottom: 1px solid var(--border);
-	border-radius: 0 0 6px 6px;
+	border-radius: 0 0 var(--radius) var(--radius);
 	margin-bottom: 16px;
 	overflow: hidden;
 }
@@ -480,7 +483,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--accent-light);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.8rem;
 	color: var(--accent);
 	text-decoration: none;
@@ -675,7 +678,7 @@ th.sorted .sort-arrow {
 .source-tag-label {
 	display: inline-block;
 	padding: 1px 5px;
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.7rem;
 	font-weight: 600;
 	margin-right: 2px;
@@ -706,7 +709,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	font-size: 0.8rem;
 	padding: 1px 7px;
-	border-radius: 10px;
+	border-radius: var(--radius-pill);
 	background: var(--accent-light);
 	color: var(--accent);
 	font-weight: 500;
@@ -722,7 +725,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	padding: 1px 6px;
 	background: var(--accent-light);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.8rem;
 	color: var(--accent);
 	font-weight: 500;
@@ -740,7 +743,7 @@ a.structure-tag:hover {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--border-subtle);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.8rem;
 	color: var(--muted);
 	white-space: nowrap;
@@ -750,7 +753,7 @@ a.structure-tag:hover {
 .structure-type {
 	font-size: 0.7rem;
 	padding: 1px 6px;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.3px;
@@ -784,13 +787,11 @@ a.structure-tag:hover {
 .dash-card {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 	padding: 16px;
 	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
 }
 .dash-card h3 {
-	font-size: 0.95rem;
-	font-weight: 600;
 	margin: 0 0 12px;
 }
 /* Part d'une modalité, sous un graphique en anneau. */
@@ -815,7 +816,7 @@ a.structure-tag:hover {
 }
 .triage-item {
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 	padding: 10px 12px;
 }
 /* Nom de personne cliquable, ouvre le drawer de la personne. */
@@ -841,7 +842,7 @@ a.structure-tag:hover {
 	font-size: 0.68rem;
 	color: var(--muted);
 	background: var(--surface);
-	border-radius: 8px;
+	border-radius: var(--radius);
 	padding: 0 6px;
 }
 
@@ -850,7 +851,7 @@ a.structure-tag:hover {
 	display: inline-block;
 	padding: 2px 8px;
 	background: #1a6fb5;
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.82rem;
 	color: white;
 	text-decoration: none;
@@ -866,7 +867,7 @@ a.structure-tag:hover {
 	padding: 1px 6px;
 	background: var(--success);
 	color: white;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	margin-left: 6px;
 	vertical-align: middle;
 	font-weight: 600;
@@ -877,14 +878,20 @@ a.badge-doaj:hover {
 	background: color-mix(in srgb, var(--success), black 20%);
 }
 
-/* ── Bandeau de section des fiches structure (administration) ── */
-.section-banner {
-	margin: 20px -14px 10px !important;
-	padding: 6px 14px !important;
-	background: var(--nav-public);
-	color: white !important;
-	font-size: 0.75rem !important;
-	border-radius: 3px;
+/* ── Titre de section : petites capitales en couleur d'accent ── */
+.section-title,
+.dash-card h3,
+.detail-label {
+	color: var(--accent);
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+.section-title {
+	margin: 24px 0 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
 }
 
 /* ── Meta badge (detail pages) ── */
@@ -892,7 +899,7 @@ a.badge-doaj:hover {
 	display: inline-block;
 	padding: 2px 8px;
 	background: var(--border-subtle);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.85rem;
 	color: var(--muted);
 	font-weight: 500;
@@ -947,7 +954,7 @@ a.badge-doaj:hover {
 	display: inline-block;
 	font-size: 0.7rem;
 	padding: 1px 6px;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	font-weight: 600;
 }
 
@@ -991,7 +998,7 @@ a.badge-doaj:hover {
 	display: inline-block;
 	font-size: 0.78rem;
 	padding: 2px 8px;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	font-weight: 600;
 }
 .access-open {
@@ -1012,7 +1019,7 @@ a.badge-doaj:hover {
 	display: inline-block;
 	font-size: 0.75rem;
 	padding: 1px 5px;
-	border-radius: 3px;
+	border-radius: var(--radius);
 	background: var(--success-light);
 	color: var(--success);
 	font-weight: 500;
@@ -1056,7 +1063,7 @@ a.badge-doaj:hover {
 .btn {
 	padding: 5px 12px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	background: var(--card);
 	cursor: pointer;
 	font-size: 0.85rem;
@@ -1233,7 +1240,7 @@ a.badge-doaj:hover {
 .info-box {
 	background: var(--accent-light);
 	border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
-	border-radius: 5px;
+	border-radius: var(--radius);
 	padding: 8px 14px;
 	font-size: 0.9rem;
 	color: var(--text);
@@ -1254,7 +1261,7 @@ a.badge-doaj:hover {
 
 .modal-content {
 	background: var(--card);
-	border-radius: 8px;
+	border-radius: var(--radius);
 	padding: 24px;
 	max-width: 700px;
 	width: 90%;
@@ -1286,9 +1293,6 @@ a.badge-doaj:hover {
 	padding-top: 4px;
 }
 .detail-label {
-	font-size: 0.98rem;
-	font-weight: 600;
-	color: var(--section-heading);
 	margin: 0 0 9px;
 }
 .detail-tags {
@@ -1302,7 +1306,7 @@ a.badge-doaj:hover {
 	align-items: center;
 	gap: 5px;
 	padding: 3px 10px;
-	border-radius: 12px;
+	border-radius: var(--radius-pill);
 	font-size: 0.85rem;
 	line-height: 1.35;
 	white-space: nowrap;
@@ -1311,14 +1315,14 @@ a.badge-doaj:hover {
 	text-decoration: none;
 }
 .detail-tags a:hover {
-	background: var(--section-heading-light);
-	color: var(--section-heading);
+	background: var(--accent-light);
+	color: var(--accent);
 }
 /* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre, plus petit, subordonné. */
 .detail-sublabel {
 	font-size: 0.8rem;
 	font-weight: 600;
-	color: var(--section-heading);
+	color: var(--accent);
 	margin: 12px 0 7px;
 }
 
@@ -1330,7 +1334,7 @@ a.badge-doaj:hover {
 	gap: 3px;
 	border: 1px solid var(--border);
 	background: var(--surface);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	padding: 2px 7px;
 	font-size: 0.8rem;
 	text-align: left;
@@ -1381,7 +1385,7 @@ button.status-chip:hover {
 	height: 22px;
 	padding: 0;
 	border: 1px solid var(--border);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	background: var(--card);
 	color: var(--muted);
 	cursor: pointer;

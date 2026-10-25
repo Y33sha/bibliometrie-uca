@@ -456,14 +456,6 @@
   }
   .section-title {
     margin: 24px auto 8px;
-    padding: 4px 10px;
-    background: none;
-    color: var(--section-heading);
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid var(--section-heading);
     max-width: 800px;
   }
   /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
@@ -497,7 +489,7 @@
     padding: 8px 12px;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 5px;
+    border-radius: var(--radius);
   }
   .config-label {
     font-weight: 600;
@@ -518,7 +510,7 @@
     font-size: 0.85rem;
     padding: 3px 6px;
     border: 1px solid var(--accent);
-    border-radius: 3px;
+    border-radius: var(--radius);
     flex: 1;
   }
   .config-actions-inline {
@@ -534,7 +526,7 @@
     border-collapse: collapse;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   .perimeters-table th,
@@ -596,7 +588,7 @@
     gap: 4px;
     font-size: 0.85rem;
     padding: 2px 8px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     background: var(--surface);
   }
 
@@ -611,7 +603,7 @@
   }
   .perim-search-results {
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     margin-top: 4px;
     max-height: 200px;
     overflow-y: auto;
@@ -636,7 +628,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
   }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {

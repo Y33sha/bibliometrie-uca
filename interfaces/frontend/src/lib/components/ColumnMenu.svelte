@@ -39,7 +39,7 @@
 	.col-menu-inner { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 	.column-menu-wrapper { position: relative; }
 	.column-menu-btn {
-		background: none; border: 1px solid var(--border); border-radius: 4px;
+		background: none; border: 1px solid var(--border); border-radius: var(--radius);
 		padding: 2px 8px; font-size: 1.1rem; cursor: pointer; color: var(--muted);
 		letter-spacing: 2px;
 	}
@@ -47,7 +47,7 @@
 	/* Au niveau des autres menus de la page (100), au-dessus de la barre de facettes collante (50). */
 	.column-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
 	.column-menu {
-		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 100;
 		min-width: 150px;
 	}

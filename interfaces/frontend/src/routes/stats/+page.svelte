@@ -715,7 +715,7 @@
 		background: var(--accent);
 		color: white;
 		text-decoration: none;
-		border-radius: 5px;
+		border-radius: var(--radius);
 		font-size: 0.95rem;
 		font-weight: 500;
 	}
@@ -740,7 +740,7 @@
 		font-size: 0.9rem;
 		padding: 5px 8px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		background: var(--card);
 	}
 	/* Séparateur vertical léger entre les groupes de contrôles du pivot. */
@@ -756,7 +756,7 @@
 		line-height: 1;
 		padding: 5px 9px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		background: var(--card);
 		color: var(--muted);
 		cursor: pointer;
@@ -776,7 +776,7 @@
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border-radius: 2px;
+		border-radius: var(--radius);
 		margin-right: 3px;
 		vertical-align: middle;
 	}
@@ -791,7 +791,7 @@
 	.chart-area {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 16px;
 		margin-bottom: 16px;
 		position: relative;
@@ -804,7 +804,7 @@
 		right: 8px;
 		padding: 4px 10px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		background: var(--card);
 		font-size: 0.85rem;
 		color: var(--muted);

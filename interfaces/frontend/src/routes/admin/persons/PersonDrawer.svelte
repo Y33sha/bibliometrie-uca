@@ -273,7 +273,7 @@
   .btn-merge-inline {
     padding: 2px 8px;
     border: 1px dashed var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: none;
     font-size: 0.8rem;
     cursor: pointer;
@@ -333,7 +333,7 @@
     width: 128px;
     padding: 4px 6px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     font-size: 0.9rem;
   }
   .icon-btn {
@@ -344,7 +344,7 @@
     color: var(--muted);
     display: inline-flex;
     align-items: center;
-    border-radius: 4px;
+    border-radius: var(--radius);
   }
   .icon-btn:hover {
     color: var(--accent);
@@ -421,7 +421,7 @@
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
   }
   .tag-excluded {

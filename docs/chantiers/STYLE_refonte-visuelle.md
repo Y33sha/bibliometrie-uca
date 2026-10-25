@@ -46,21 +46,21 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Supprimer les couleurs de repli des appels `var()` (719aad2d3)
 - [x] Factoriser les styles dupliqués : pastilles de type de structure, bandeau des fiches structure, encart d'information, lien HAL des pages Problèmes HAL, pastille DOAJ, pastille de structure, files de triage (composant `PersonPairsList` pour les paires de personnes), infobulle de `FacetDropdown` (composant `Tooltip`) (181901773)
 - [x] Factoriser les dashboards et leurs palettes : grille et cartes `.dash-*`, anneau open access des dashboards de structure et de personne (composant `OaDoughnut`, couleurs lues dans `--open`, `--embargoed`, `--closed`, `--unknown`), palette des sujets (`subjectColor`) (ea2657f5c)
-- [x] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; variables ajoutées : `--text-faint`, `--warning-text`, `--attention`, `--attention-light`, `--tooltip-bg`
-- [x] Teintes de survol des couleurs de rôle calculées par `color-mix()`
-- [x] Faire lire aux graphiques et aux statuts du pipeline leurs couleurs de rôle dans les variables (`cssColor()`)
+- [x] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; variables ajoutées : `--text-faint`, `--warning-text`, `--attention`, `--attention-light`, `--tooltip-bg` (59ee06448)
+- [x] Teintes de survol des couleurs de rôle calculées par `color-mix()` (59ee06448)
+- [x] Faire lire aux graphiques et aux statuts du pipeline leurs couleurs de rôle dans les variables (`cssColor()`) (59ee06448)
 
 ### Étape 1 — Fondations globales
 
-- [ ] Héberger Inter dans `static/fonts/` et l'appliquer au `body`
-- [ ] Chiffres tabulaires sur les tableaux et les chiffres clés
-- [ ] Passer `--accent` au teal foncé ; ajouter les nuances moyenne et claire ; fusionner `--section-heading` dans `--accent`
-- [ ] Supprimer le bleu restant (boutons pleins, barres de graphiques, pagination active, liens)
-- [ ] Trois niveaux de gris de texte : `--text` (principal), `--text-secondary`, `--muted` (discret)
-- [ ] Fond de page blanc cassé très léger
-- [ ] Palette open access agrégée : nouvelles valeurs de `--open`, `--embargoed`, `--closed`, `--unknown`
-- [ ] Style unique de titre de section ; suppression des bandeaux teal pleine largeur (fiche structure admin) et des titres gras dans des cartes (dashboard)
-- [ ] `--radius` unique, appliqué partout ; 999 px pour les pastilles
+- [x] Héberger Inter dans `static/fonts/` et l'appliquer au `body` (`--font`)
+- [x] Chiffres tabulaires sur toute la page
+- [x] Passer `--accent` au teal foncé ; ajouter les nuances moyenne (`--accent-mid`) et claire ; fusionner `--section-heading` dans `--accent`
+- [x] Supprimer le bleu restant (boutons pleins, barres de graphiques, pagination active, liens)
+- [x] Trois niveaux de gris de texte : `--text` (principal), `--text-secondary`, `--muted` (discret)
+- [x] Fond de page blanc cassé très léger ; surfaces et bordures en gris froids
+- [x] Palette open access agrégée : nouvelles valeurs de `--open`, `--embargoed`, `--closed`, `--unknown`
+- [x] Style unique de titre de section (`.section-title`, titres des cartes de dashboard, libellés de la fiche publication) ; suppression des bandeaux teal de la fiche structure admin
+- [x] `--radius` unique, appliqué partout ; `--radius-pill` pour les pastilles
 
 ### Étape 2 — En-tête d'entité et onglets
 
@@ -101,6 +101,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [ ] Publications par année : barres teal, axe vertical à partir de 0, année en cours distinguée (barre claire et mention « en cours »)
 - [ ] Open access en barre empilée horizontale, pourcentage d'ouvert en grand
 - [ ] Graphiques sans carte ni bordure, sous un titre de section
+- [ ] Police Inter dans les graphiques (Chart.js, nuage de sujets)
 
 ### Étape 6 — Page Statistiques
 
@@ -108,6 +109,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [ ] Graphique sans cadre ; « Export PNG » discret en haut à droite
 - [ ] Légende alignée à gauche au-dessus du graphique
 - [ ] Colonne de libellés plus large, libellé complet au survol
+- [ ] Carte des collaborations : dégradé teal au lieu de bleu
 
 ### Étape 7 — Pages d'administration
 

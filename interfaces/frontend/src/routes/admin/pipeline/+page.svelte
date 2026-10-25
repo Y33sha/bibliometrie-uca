@@ -110,7 +110,7 @@
     min-width: 0;
     padding: 16px;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius);
     background: var(--card);
   }
   .empty {

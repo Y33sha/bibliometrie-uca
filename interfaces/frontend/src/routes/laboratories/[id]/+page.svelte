@@ -342,7 +342,7 @@
 	.lab-header {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 20px 24px;
 		margin-bottom: 0;
 	}
@@ -366,7 +366,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé. Les coins arrondis restent visuellement corrects grâce à border-collapse. */
 	}
 	.tab-content thead th {
@@ -389,7 +389,7 @@
 	.status-tag {
 		display: inline-block;
 		padding: 2px 7px;
-		border-radius: 3px;
+		border-radius: var(--radius);
 		font-size: 0.8rem;
 		font-weight: 500;
 	}

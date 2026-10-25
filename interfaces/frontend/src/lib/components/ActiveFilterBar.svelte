@@ -86,7 +86,7 @@
 		max-width: 320px;
 		padding: 3px 8px 3px 10px;
 		border: 1px solid var(--accent);
-		border-radius: 12px;
+		border-radius: var(--radius-pill);
 		background: var(--accent-light);
 		font: inherit;
 		font-size: 0.85rem;

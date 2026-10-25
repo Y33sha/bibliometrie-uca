@@ -211,14 +211,14 @@
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }
 
-	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
+	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
 	.muted { color: var(--muted); }
 
 	.blocking-panel {
 		background: var(--warning-light); border: 1px solid var(--warning);
-		border-radius: 6px; padding: 12px 16px; margin: 12px 0;
+		border-radius: var(--radius); padding: 12px 16px; margin: 12px 0;
 	}
 	.blocking-header {
 		display: flex; justify-content: space-between; align-items: center;

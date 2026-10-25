@@ -806,7 +806,7 @@
 		background: var(--accent);
 		color: white;
 		text-decoration: none;
-		border-radius: 5px;
+		border-radius: var(--radius);
 		font-size: 0.9rem;
 		font-weight: 500;
 		white-space: nowrap;
@@ -819,7 +819,7 @@
 		gap: 4px;
 		padding: 6px 10px;
 		border: 1px dashed var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		background: none;
 		font: inherit;
 		font-size: 0.95rem;
@@ -852,7 +852,7 @@
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé (coins arrondis restent visuellement corrects grâce à border-collapse). */
 	}
 	.publication-table th {
@@ -879,7 +879,7 @@
 	.hal-badge {
 		display: inline-block;
 		padding: 2px 7px;
-		border-radius: 3px;
+		border-radius: var(--radius);
 		font-size: 0.8rem;
 		font-weight: 500;
 		white-space: nowrap;
@@ -897,7 +897,7 @@
 	.exclude-btn {
 		background: none; border: none; cursor: pointer;
 		color: var(--text-faint); font-size: 0.85rem; padding: 2px 4px;
-		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
+		border-radius: var(--radius); line-height: 1; transition: color 0.15s, background 0.15s;
 	}
 	.exclude-btn:hover { color: var(--danger); background: var(--danger-light); }
 </style>

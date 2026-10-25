@@ -228,7 +228,7 @@
 	.p-header {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 20px 24px;
 	}
 	.p-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
@@ -244,7 +244,7 @@
 	.id-badge { margin-right: 4px; }
 	.type-tag {
 		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
+		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
 		margin-right: 8px;
 	}
 
