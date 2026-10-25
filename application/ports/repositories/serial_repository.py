@@ -5,28 +5,13 @@ L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Les deux
 La méthode `find_shared_title_serial_pairs` vit ici : c'est une query sur la table `serials`, appelée par le service de fusion d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 """
 
-from typing import Protocol, TypedDict
+from typing import Protocol
 
 from pydantic import BaseModel
 
-from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
+from domain.publishers.merge import SharedTitlePair
+from domain.serials.issns import IssnStatus, IssnSupport
 from domain.serials.serial import OaModel, Serial, SerialType
-
-
-class SharedTitleSerialPair(TypedDict):
-    """Paire de revues homonymes entre deux éditeurs, et leurs identifiants normalisés.
-
-    Rendue par `find_shared_title_serial_pairs` : chaque ligne contient les deux revues et leurs ISSN. Le service détecte ainsi en une passe les conflits qui empêchent une fusion.
-    """
-
-    target_serial_id: int
-    target_title: str
-    source_serial_id: int
-    source_title: str
-    t_title: str
-    s_title: str
-    t_issns: list[SerialIssn]
-    s_issns: list[SerialIssn]
 
 
 class SerialIssnInput(BaseModel):
@@ -70,6 +55,6 @@ class SerialRepository(Protocol):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[SharedTitleSerialPair]:
-        """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`. Chaque ligne contient `target_serial_id`, `source_serial_id` et les six valeurs ISSN/eISSN/ISSN-L des deux côtés. Le service détecte ainsi les conflits d'ISSN en une seule requête."""
+    ) -> list[SharedTitlePair]:
+        """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`, avec leurs titres et leurs ISSN."""
         ...

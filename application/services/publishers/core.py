@@ -5,8 +5,6 @@ Agrégat distinct de Serial, servi par son propre port (`PublisherRepository`). 
 La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `SerialRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
 """
 
-from collections import Counter
-
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
@@ -21,14 +19,13 @@ from application.ports.repositories.serial_repository import SerialRepository
 from application.services._merge import load_merge_pair
 from application.services.serials.core import merge_serials
 from domain.errors import (
-    BlockingSerial,
     ConflictError,
     NotFoundError,
     PublisherMergeBlockedError,
     ValidationError,
 )
 from domain.publishers.members import crossref_member_conflict
-from domain.serials.issns import issn_conflict
+from domain.publishers.merge import split_shared_title_pairs
 
 
 def update_publisher(
@@ -87,46 +84,18 @@ def merge_publishers(
     ):
         raise ConflictError(f"Fusion refusée, {conflict} (cible / source)")
 
-    # 2. Détecter les journaux partageant un titre entre les deux éditeurs.
-    #    Collecter toutes les paires bloquantes en une passe pour lever
-    #    PublisherMergeBlockedError avec l'ensemble — l'UI les affiche
-    #    d'un coup.
-    pairs = serial_repo.find_shared_title_serial_pairs(target_id, source_id)
-    # Si un journal apparaît dans plusieurs paires, l'éditeur correspondant
-    # contient un doublon interne (2 journaux au même title_normalized). La
-    # fusion N→1 casserait (la source supprimée puis rechargée). On signale
-    # toutes les paires concernées comme bloquantes.
-    target_seen = Counter(p["target_serial_id"] for p in pairs)
-    source_seen = Counter(p["source_serial_id"] for p in pairs)
-    blockers: list[BlockingSerial] = []
-    mergeable_pairs = []
-    for pair in pairs:
-        reasons: list[str] = []
-        if target_seen[pair["target_serial_id"]] > 1:
-            reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
-        if source_seen[pair["source_serial_id"]] > 1:
-            reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
-        if conflict := issn_conflict(pair["t_issns"], pair["s_issns"]):
-            reasons.append(f"{conflict} (cible / source)")
-        if reasons:
-            blockers.append(
-                BlockingSerial(
-                    target_serial_id=pair["target_serial_id"],
-                    target_title=pair["t_title"],
-                    source_serial_id=pair["source_serial_id"],
-                    source_title=pair["s_title"],
-                    reason=" ; ".join(reasons),
-                )
-            )
-        else:
-            mergeable_pairs.append(pair)
+    # 2. Les revues homonymes des deux éditeurs fusionnent, sauf si une paire bloque. Toutes les
+    #    paires bloquantes partent ensemble dans l'erreur : l'UI les affiche d'un coup.
+    mergeable_pairs, blockers = split_shared_title_pairs(
+        serial_repo.find_shared_title_serial_pairs(target_id, source_id)
+    )
     if blockers:
         raise PublisherMergeBlockedError(blockers)
 
     for pair in mergeable_pairs:
         merge_serials(
-            pair["target_serial_id"],
-            pair["source_serial_id"],
+            pair.target_serial_id,
+            pair.source_serial_id,
             conn=conn,
             repo=serial_repo,
             recompute=recompute,
