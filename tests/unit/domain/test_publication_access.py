@@ -1,6 +1,6 @@
 """Liens d'accès d'une publication (`domain.publications.access`)."""
 
-from domain.publications.access import AccessLink, Copy, access_links
+from domain.publications.access import Access, AccessLink, Copy, access
 
 
 def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arrival=1) -> Copy:
@@ -15,7 +15,7 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
 
 
 def test_version_puis_ordre_d_arrivee():
-    links = access_links(
+    result = access(
         [
             _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1),
             _copy(
@@ -24,27 +24,30 @@ def test_version_puis_ordre_d_arrivee():
             _copy("https://doi.org/10.1/x", version="publishedVersion", arrival=2),
         ]
     )
-    assert links == [
-        AccessLink("doi.org", "https://doi.org/10.1/x"),
-        AccessLink("arXiv", "https://arxiv.org/abs/1"),
-        AccessLink("HAL", "https://hal.science/hal-1"),
-    ]
+    # La copie que désigne le DOI est l'adresse d'accès, sans figurer parmi les liens.
+    assert result == Access(
+        url="https://doi.org/10.1/x",
+        links=[
+            AccessLink("arXiv", "https://arxiv.org/abs/1"),
+            AccessLink("HAL", "https://hal.science/hal-1"),
+        ],
+    )
 
 
 def test_une_copie_par_plateforme():
-    links = access_links(
+    links = access(
         [
             _copy("https://arxiv.org/abs/1", platform="arXiv", arrival=1),
             _copy(
                 "https://arxiv.org/abs/1v2", version="submittedVersion", platform="arXiv", arrival=2
             ),
         ]
-    )
+    ).links
     assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2")]
 
 
 def test_les_copies_fermees_sont_ecartees():
-    assert access_links([_copy("https://pubmed.ncbi.nlm.nih.gov/1", is_oa=False)]) == []
+    assert access([_copy("https://pubmed.ncbi.nlm.nih.gov/1", is_oa=False)]) == Access(None, [])
 
 
 def test_hal_decide_de_l_ouverture_de_ses_notices():
@@ -53,4 +56,4 @@ def test_hal_decide_de_l_ouverture_de_ses_notices():
         _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
         _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),
     ]
-    assert access_links(copies) == []
+    assert access(copies) == Access(None, [])

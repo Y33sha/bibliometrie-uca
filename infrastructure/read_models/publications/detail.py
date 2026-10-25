@@ -16,7 +16,7 @@ from application.ports.read_models.publications_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.platforms.registry import HAL
-from domain.publications.access import Copy, access_links
+from domain.publications.access import Copy, access
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.external_ids import ExternalIdType
@@ -252,6 +252,7 @@ def get_publication_detail(
     relations = get_publication_relations(conn, publication_id)
     external_identifiers = get_publication_external_identifiers(conn, publication_id)
     copies, hal_with_copy = get_publication_copies(conn, publication_id)
+    publication_access = access(copies)
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -290,7 +291,8 @@ def get_publication_detail(
         subjects=subjects,
         keywords=keywords,
         relations=relations,
-        access=[AccessLinkOut(label=a.label, url=a.url) for a in access_links(copies)],
+        access_url=publication_access.url,
+        access=[AccessLinkOut(label=a.label, url=a.url) for a in publication_access.links],
         referenced_by=_referenced_by(sources, hal_with_copy),
         external_identifiers=external_identifiers,
     )

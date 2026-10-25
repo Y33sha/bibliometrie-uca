@@ -355,8 +355,10 @@ class PublicationDetailResponse(BaseModel):
     subjects: list[SubjectOut]
     keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
+    access_url: str | None
+    """Adresse de la meilleure copie ouverte."""
     access: list[AccessLinkOut]
-    """Copies ouvertes, la meilleure en tête."""
+    """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
     referenced_by: list[SourceRecordOut]
     """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand sa notice a un fichier ouvert."""
     external_identifiers: list[ExternalIdentifierOut]

@@ -4377,6 +4377,8 @@ export interface components {
             keywords: string[];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
+            /** Access Url */
+            access_url: string | null;
             /** Access */
             access: components["schemas"]["AccessLinkOut"][];
             /** Referenced By */
