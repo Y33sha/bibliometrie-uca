@@ -105,14 +105,14 @@ Usages du type dans le code :
 - Les localisations sortent de `journals`.
 - Schéma :
   - `publishers` et `doi_prefixes`, inchangées. Le titulaire d'un préfixe est l'éditeur d'origine de ses DOI ;
-  - `serials`, à la place de `journals` : revues, collections d'ouvrages, séries d'actes, médias. Les ISSN, les formes de nom, les espaces de noms DOI, le DOAJ, les APC et le modèle open access y restent. Aucune colonne d'éditeur ;
+  - `serials`, à la place de `journals` : revues, collections d'ouvrages, séries d'actes, médias. Les ISSN, les formes de nom, les espaces de noms DOI, le DOAJ, les APC et le modèle open access y restent. L'éditeur est une colonne dérivée, recalculée à chaque run : la liste des revues trie et filtre par éditeur ;
   - `monographs` : livres et volumes d'actes, rattachés à leur série (`serial_id`) ;
   - `platforms` : lieux qui hébergent des publications. Type (`repository`, `preprint_server`, `publisher_platform`, `unknown`), nom et identifiant de la source OpenAlex. Une archive et un entrepôt de données sont des `repository`, que le type de document distingue. Un document déposé sur un serveur de preprints est un preprint ; un entrepôt ne dit rien du type de ses documents ;
   - `platform_domains` : domaine → plateforme, plateforme nullable ;
   - `source_record_locations` : localisations d'un enregistrement source, réécrites à chaque normalisation. URL de la page et du PDF, identifiant OAI-PMH, version dans le vocabulaire de la source, licence, open access, plateforme nullable. OpenAlex les alimente, puis Crossref ;
   - `publisher_id` sur `source_records` et `publications`, écrit par l'agrégation : le titulaire du préfixe pour un DOI Crossref, à défaut l'éditeur que donnent les sources ;
   - `doi_prefix`, colonne générée de `publications`, pour les jointures sur `doi_prefixes`.
-- L'éditeur d'une série est celui de ses publications les plus récentes. Une publication a donc l'éditeur à la date de sa publication.
+- L'éditeur d'une série est celui de ses publications les plus récentes : le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. Une publication a donc l'éditeur à la date de sa publication. Une forme de nom de revue garde l'éditeur que nomme la source avec ce titre : c'est une observation, qui distingue deux revues homonymes.
 - Une production hébergée sans être publiée n'a pas d'éditeur : preprint, jeu de données, dépôt. La plateforme qui l'héberge n'en est pas l'éditeur, comme le CCSD pour HAL.
 - Une plateforme prend le nom et l'identifiant de sa source OpenAlex. Aucune plateforme n'est créée sans nom fiable : les noms d'institution d'Unpaywall sont erronés (« Asklepios Klinik St. Georg » pour l'archive de Göttingen).
 - Unpaywall donne seulement le verdict open access. OpenAlex couvre 99 % des publications à DOI Crossref, et donne aussi les copies fermées et le nom des entrepôts.
@@ -154,7 +154,8 @@ Usages du type dans le code :
 ### Phase 4 — Lectures de l'éditeur
 
 - [x] Éditeur d'une publication lu sur la publication : listes, détail, facette, filtres, tableaux croisés, page d'un éditeur et `publishers.publication_count`. Les enregistrements sources montrent l'éditeur que nomme leur source (`137b396ae`).
-- [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
+- [x] Éditeur d'une revue calculé d'après ses publications les plus récentes, dans `finalize` ; la création d'une revue ne le pose plus (`10e964608`).
+- [ ] Stock : phase `finalize`.
 
 ### Phase 5 — Séries
 
