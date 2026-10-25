@@ -29,6 +29,13 @@
     nnt: { label: "Thèses.fr", icon: asset('icons/theses.ico'), url: (v) => `https://theses.fr/${v}` },
   };
 
+  // Plateformes connues dont l'interface a l'icône, par leur nom (`domain/platforms/registry.py`).
+  const PLATFORM_ICONS: Record<string, string> = {
+    HAL: asset('icons/hal.ico'),
+    arXiv: asset('icons/arxiv.png'),
+    "PubMed Central": asset('icons/ncbi.png'),
+  };
+
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
     ...referencedBy.filter((s) => !sourceOrder().includes(s.source)),
@@ -81,9 +88,16 @@
   {#if access.length > 0}
     <div class="sidebar-block">
       <div class="detail-sublabel">Accès</div>
-      <div class="access-links">
+      <div class="sidebar-sources">
         {#each access as copy (copy.url)}
-          <a href={copy.url} target="_blank" rel="noopener noreferrer">{copy.label}</a>
+          <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
+            <span class="source-tag">
+              {#if PLATFORM_ICONS[copy.label]}
+                <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
+              {/if}
+            </span>
+            <span class="row-label">{copy.label}</span>
+          </a>
         {/each}
       </div>
     </div>
@@ -118,10 +132,10 @@
       target="_blank"
       rel="noopener"
       class="source-row"
-      title="{sourceLabel(s.source)} : {s.source_id}"
+      title={s.source_id}
     >
       <SourceTag source={s.source} />
-      <span class="source-id">{s.source_id}</span>
+      <span class="row-label">{sourceLabel(s.source)}</span>
     </a>
   {/snippet}
 
@@ -138,14 +152,14 @@
             target="_blank"
             rel="noopener"
             class="source-row"
-            title="{EXT_META[e.type]?.label ?? e.type} : {e.value}"
+            title={e.value}
           >
             <span class="source-tag">
               {#if EXT_META[e.type]?.icon}
                 <img src={EXT_META[e.type].icon} alt={EXT_META[e.type]?.label} />
               {/if}
             </span>
-            <span class="source-id">{e.value}</span>
+            <span class="row-label">{EXT_META[e.type]?.label ?? e.type}</span>
           </a>
         {/each}
       </div>
@@ -164,11 +178,6 @@
 </aside>
 
 <style>
-  .access-links {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
   .detail-sidebar {
     background: var(--card);
     border: 1px solid var(--border);
@@ -256,7 +265,7 @@
   .source-row:hover :global(.source-tag) {
     transform: scale(1.15);
   }
-  .source-id {
+  .row-label {
     font-size: 0.82rem;
     color: var(--text);
     overflow: hidden;
