@@ -7,12 +7,12 @@
 
   let { contributions }: { contributions: Contribution[] } = $props();
 
-  // Une personne par lien, dédupliquée (un même `person_id` peut apparaître sur deux contributions sources), ordre d'apparition conservé.
+  // Personnes des contributions du périmètre, une par lien, dédupliquées (un même `person_id` peut apparaître sur deux contributions sources), ordre d'apparition conservé.
   const persons = $derived.by(() => {
     const seen = new Set<number>();
     const out: Contribution[] = [];
     for (const a of contributions) {
-      if (a.person_id != null && !seen.has(a.person_id)) {
+      if (a.in_perimeter && a.person_id != null && !seen.has(a.person_id)) {
         seen.add(a.person_id);
         out.push(a);
       }
