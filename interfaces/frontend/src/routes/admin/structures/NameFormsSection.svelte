@@ -98,7 +98,7 @@
   <tbody>
     {#if forms.length === 0}
       <tr>
-        <td colspan="4" style="text-align:center;color:var(--text-muted)"> Aucune forme </td>
+        <td colspan="4" style="text-align:center;color:var(--muted)"> Aucune forme </td>
       </tr>
     {:else}
       {#each forms as f (f.id)}
@@ -261,7 +261,7 @@
     margin: 12px 0 6px;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -297,7 +297,7 @@
     text-align: left;
     padding: 5px 8px;
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--muted);
     border-bottom: 2px solid var(--border);
     font-weight: 600;
   }
@@ -314,7 +314,7 @@
     background: #fff3e0;
   }
   .form-text {
-    font-family: "SF Mono", Consolas, monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
   }
   .col-badge {
@@ -441,10 +441,10 @@
     font-size: 0.85rem;
   }
   .ctx-label-text {
-    color: var(--text-muted);
+    color: var(--muted);
   }
   .ctx-hint {
-    color: var(--text-muted);
+    color: var(--muted);
     font-size: 0.8rem;
     margin-left: 4px;
   }

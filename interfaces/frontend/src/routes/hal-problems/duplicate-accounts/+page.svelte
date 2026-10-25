@@ -151,7 +151,7 @@
   .hal-id {
     color: var(--accent);
     text-decoration: none;
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: 0.8rem;
   }
   .hal-id:hover {

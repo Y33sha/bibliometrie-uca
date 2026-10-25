@@ -528,7 +528,7 @@
 
   /* Table */
   .addr-text {
-    font-family: "SF Mono", "Consolas", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
     line-height: 1.4;
     word-break: break-word;
@@ -584,7 +584,7 @@
     color: var(--muted);
   }
   .form-text {
-    font-family: "SF Mono", "Consolas", monospace;
+    font-family: var(--mono);
     font-weight: 600;
     color: #8a6d10;
   }

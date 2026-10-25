@@ -159,7 +159,7 @@
   }
   th {
     font-weight: 600;
-    background: var(--bg-muted, #f9fafb);
+    background: var(--surface-hover);
     font-size: 0.85rem;
   }
   td.right,

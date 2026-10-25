@@ -521,7 +521,7 @@
   }
   .config-editor-inline {
     width: 80px;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
     padding: 3px 6px;
     border: 1px solid var(--accent);
@@ -576,7 +576,7 @@
     margin: 0;
   }
   .perim-code {
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: 0.8rem;
     color: var(--muted);
     white-space: nowrap;

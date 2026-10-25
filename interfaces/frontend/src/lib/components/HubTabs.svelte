@@ -31,7 +31,7 @@
   .hub-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid var(--border, #e0e0e0);
+    border-bottom: 1px solid var(--border);
     margin-bottom: 14px;
   }
   .hub-tab {
@@ -50,12 +50,12 @@
     color: #222;
   }
   .hub-tab.active {
-    color: var(--accent, #1976d2);
-    border-bottom-color: var(--accent, #1976d2);
+    color: var(--accent);
+    border-bottom-color: var(--accent);
     font-weight: 600;
   }
   .tab-badge {
-    background: var(--accent, #1976d2);
+    background: var(--accent);
     color: white;
     border-radius: 10px;
     font-size: 0.72rem;

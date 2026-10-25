@@ -174,7 +174,7 @@
     outline: none;
   }
   .picker-item.disabled {
-    color: var(--text-muted);
+    color: var(--muted);
     cursor: default;
   }
 </style>

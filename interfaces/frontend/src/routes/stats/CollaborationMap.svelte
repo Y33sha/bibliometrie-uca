@@ -150,7 +150,7 @@
 	}
 	.collab-caption {
 		text-align: center;
-		color: var(--text-muted, #666);
+		color: var(--muted);
 		font-size: 0.85rem;
 		margin-top: 0.5rem;
 	}

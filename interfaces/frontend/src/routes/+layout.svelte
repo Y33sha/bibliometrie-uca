@@ -136,28 +136,6 @@
     color: var(--text);
     background: var(--bg);
   }
-  :global(:root) {
-    --bg: #f8f7f4;
-    --card: #ffffff;
-    --text: #2c2c2c;
-    --muted: #6b7280;
-    --accent: #3b6b9e;
-    --border: #e5e5e0;
-    --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
-    --gold: #ffd700;
-    --diamond: #d0d4fb;
-    --hybrid: #b366f2;
-    --bronze: #cd7f32;
-    --bronze-text: #9a5a1e; /* bronze assombri, lisible en texte sur fond clair */
-    --green: #5ec62c;
-    --green-text: #3f7a28; /* voie green assombrie, lisible en texte sur fond clair */
-    --open: #57b82e; /* vert « accès ouvert » (indicateur générique) */
-    --open-text: #3f7a28; /* « accès ouvert » assombri, lisible en texte sur fond clair */
-    --embargoed: #b08900;
-    --closed: #555;
-    --unknown: #bbb;
-    --header-height: 46px; /* hauteur du menu supérieur fixe (sticky top:0) */
-  }
   :global(*, *::before, *::after) {
     box-sizing: border-box;
   }
@@ -187,7 +165,7 @@
     margin-right: 10px;
   }
   .site-header {
-    background: #5b9ea0;
+    background: var(--nav-public);
     color: white;
     padding: 0 24px;
     display: flex;
@@ -200,10 +178,10 @@
     z-index: 300;
   }
   .site-header.admin {
-    background: #3d7a7c;
+    background: var(--nav-admin);
   }
   .site-header.admin .nav-dropdown-menu {
-    background: #4d8a8c;
+    background: var(--nav-admin-menu);
   }
   .nav-toggle {
     display: none;
@@ -289,7 +267,7 @@
     position: absolute;
     top: 46px;
     left: 0;
-    background: #4a8c8e;
+    background: var(--nav-public-menu);
     border-radius: 0 0 5px 5px;
     min-width: 150px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -332,12 +310,12 @@
       align-items: stretch;
       height: auto;
       padding: 4px 0;
-      background: #5b9ea0;
+      background: var(--nav-public);
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
       z-index: 200;
     }
     .site-header.admin .site-nav {
-      background: #3d7a7c;
+      background: var(--nav-admin);
     }
     .site-nav.open {
       display: flex;

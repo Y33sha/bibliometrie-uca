@@ -149,7 +149,7 @@
   }
   .none-text {
     font-size: 0.85rem;
-    color: var(--text-muted);
+    color: var(--muted);
   }
   .btn-add {
     display: inline-flex;
@@ -178,7 +178,7 @@
     margin: 12px 0 6px;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--text-muted);
+    color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }

@@ -142,7 +142,7 @@
     color: var(--muted);
   }
   .error {
-    color: var(--danger, #dc2626);
+    color: var(--danger);
     font-style: italic;
   }
 </style>

@@ -98,7 +98,7 @@
 	.issns table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
 	.issns th { font-size: 0.8rem; text-align: left; font-weight: normal; color: var(--muted); }
 	.issns td { padding: 3px 6px 3px 0; font-size: 0.9rem; }
-	.value { font-family: var(--mono, monospace); }
+	.value { font-family: var(--mono); }
 	.actions { text-align: right; white-space: nowrap; }
 	.linking { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 	.badge-issnl { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px; }

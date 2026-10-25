@@ -1,25 +1,63 @@
 /* ============================================================
    Shared CSS — bibliometrie-uca
-   Classes used across multiple pages, extracted to avoid duplication.
-   Imported globally in +layout.svelte.
+   Variables CSS de l'application et classes communes à plusieurs pages.
+   Importé globalement dans +layout.svelte.
    ============================================================ */
 
-/* ── Semantic color variables (used by admin pages) ── */
+/* ── Variables ── */
 :root {
+	/* Texte */
+	--text: #2c2c2c;
+	--muted: #6b7280;
+
+	/* Surfaces et lignes */
+	--bg: #f8f7f4;             /* fond de page */
+	--card: #ffffff;
+	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
+	--hover: #efede6;          /* survol des éléments cliquables (boutons, items de liste) */
+	--surface-hover: #fafaf8;  /* survol des lignes de tableau */
+	--border: #e5e5e0;
+	--border-subtle: #f0efec;  /* séparateurs légers */
+
+	/* Accent */
+	--accent: #3b6b9e;
+	--accent-light: #e8f0f8;
+	--section-heading: #3d7a7c;       /* titres de section */
+	--section-heading-light: #e4efef; /* survol des tags du corps */
+
+	/* Barre de navigation */
+	--nav-public: #5b9ea0;
+	--nav-public-menu: #4a8c8e; /* sous-menus déroulants */
+	--nav-admin: #3d7a7c;
+	--nav-admin-menu: #4d8a8c;
+
+	/* États */
 	--success: #2a7d4f;
 	--success-light: #e6f4ec;
 	--danger: #c0392b;
 	--danger-light: #fbeaea;
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
-	--accent-light: #e8f0f8;
-	--text-muted: #777;
-	/* Neutres clairs (surfaces) — valeurs dominantes consolidées. */
-	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
-	--surface-hover: #fafaf8;  /* survol/zébrure des lignes */
-	--border-subtle: #f0efec;  /* séparateurs légers (border-bottom) */
-	--section-heading: #3d7a7c; /* teal foncé du menu — titres de section */
-	--section-heading-light: #e4efef; /* teal pâle — survol des tags du corps */
+
+	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
+	--open: #57b82e;       /* ouvert, toutes voies confondues */
+	--open-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
+	--embargoed: #b08900;
+	--closed: #555;
+	--unknown: #bbb;
+	--diamond: #d0d4fb;
+	--gold: #ffd700;
+	--hybrid: #b366f2;
+	--bronze: #cd7f32;
+	--bronze-text: #9a5a1e; /* assombri, lisible en texte sur fond clair */
+	--green: #5ec62c;
+	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
+
+	/* Polices */
+	--mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+
+	/* Gabarit */
+	--header-height: 46px; /* hauteur du menu supérieur fixe */
 }
 
 /* ── Liens ── */
@@ -605,7 +643,7 @@ th.sorted .sort-arrow {
 
 /* Lien DOI : l'icône seule, sans pastille, qui prend la couleur d'accent au survol. */
 .source-doi {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .source-doi:hover {
@@ -854,7 +892,7 @@ th.sorted .sort-arrow {
 	padding: 5px 12px;
 	border: 1px solid var(--border);
 	border-radius: 4px;
-	background: var(--card, white);
+	background: var(--card);
 	cursor: pointer;
 	font-size: 0.85rem;
 	font-family: inherit;
@@ -978,7 +1016,7 @@ th.sorted .sort-arrow {
 }
 
 .btn-distinct {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .btn-distinct:hover:not(:disabled) {
@@ -991,7 +1029,7 @@ th.sorted .sort-arrow {
 }
 
 .btn-skip {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .btn-skip:hover:not(:disabled) {

@@ -157,7 +157,7 @@
     gap: 4px;
   }
   .identifier-chip {
-    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
     font-size: 0.72rem;
   }
   /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */

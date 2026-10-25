@@ -273,7 +273,7 @@
   }
   .meta-value {
     font-size: 0.9rem;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -316,11 +316,11 @@
     background: var(--hover);
   }
   .ph-name {
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .num {
     text-align: right;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 0.8rem;
     white-space: nowrap;
   }
@@ -381,7 +381,7 @@
     color: var(--muted);
   }
   .summary-line .sv {
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .detail-lines {
     display: flex;
@@ -401,7 +401,7 @@
     text-transform: uppercase;
     font-size: 0.72rem;
     letter-spacing: 0.05em;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .signals {
     display: flex;

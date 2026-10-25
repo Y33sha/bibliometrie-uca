@@ -263,7 +263,7 @@
 	.monographs-table tbody tr:last-child { border-bottom: none; }
 	.monographs-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: top; }
 	.monographs-table td.num { text-align: right; white-space: nowrap; }
-	.isbn { font-family: var(--mono, monospace); font-size: 0.8rem; white-space: nowrap; }
+	.isbn { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); }
 	.search { width: 22rem; max-width: 100%; }
 </style>

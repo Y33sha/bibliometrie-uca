@@ -164,7 +164,7 @@
     gap: 10px;
   }
   .pair-block {
-    border: 1px solid var(--border, #e0e0e0);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 10px 12px;
   }
@@ -229,7 +229,7 @@
   .lab-badge {
     font-size: 0.72rem;
     background: #e8eef4;
-    color: var(--accent, #2563eb);
+    color: var(--accent);
     border-radius: 10px;
     padding: 1px 7px;
   }
@@ -241,9 +241,9 @@
   .act {
     padding: 4px 10px;
     font-size: 0.8rem;
-    border: 1px solid var(--border, #ccc);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    background: var(--card, #fff);
+    background: var(--card);
     cursor: pointer;
     white-space: nowrap;
     font-family: inherit;
@@ -253,16 +253,16 @@
     cursor: default;
   }
   .act.keep:hover:not(:disabled) {
-    background: var(--success-light, #e6f4ea);
-    border-color: var(--success, #34a853);
+    background: var(--success-light);
+    border-color: var(--success);
   }
   .act.distinct:hover:not(:disabled) {
     background: #fff3cd;
     border-color: #d4a017;
   }
   .error {
-    color: var(--danger, #c0392b);
-    background: var(--danger-light, #fdecea);
+    color: var(--danger);
+    background: var(--danger-light);
     padding: 6px 10px;
     border-radius: 4px;
     margin-bottom: 10px;

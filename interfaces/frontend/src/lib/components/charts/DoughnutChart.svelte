@@ -128,7 +128,7 @@
 		position: relative;
 	}
 	.empty {
-		color: var(--text-muted, #888);
+		color: var(--muted);
 		font-size: 0.9rem;
 		margin: 0;
 	}

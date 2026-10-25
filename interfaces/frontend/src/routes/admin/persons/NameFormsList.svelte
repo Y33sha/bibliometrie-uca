@@ -156,7 +156,7 @@
   .empty {
     font-size: 0.8rem;
     color: #8a6d10;
-    background: var(--warning-light, #fff3e0);
+    background: var(--warning-light);
     padding: 1px 7px;
     border-radius: 10px;
   }
@@ -174,7 +174,7 @@
     display: none;
   }
   .rejected-forms summary:hover {
-    color: var(--accent, #1976d2);
+    color: var(--accent);
   }
   .rejected-forms[open] summary {
     margin-bottom: 4px;

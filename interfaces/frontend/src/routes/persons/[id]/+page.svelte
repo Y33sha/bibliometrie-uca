@@ -346,7 +346,7 @@
 		font-size: 1rem;
 		font-weight: 600;
 		margin: 20px 0 8px;
-		color: var(--fg);
+		color: var(--text);
 	}
 	.thesis-role-heading:first-child { margin-top: 0; }
 	.profile-header {

@@ -127,7 +127,7 @@
     gap: 10px;
   }
   .form-block {
-    border: 1px solid var(--border, #e0e0e0);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 10px 12px;
   }
@@ -139,7 +139,7 @@
   }
   .form-name {
     font-weight: 600;
-    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
   }
   .form-count {
     font-size: 0.78rem;
@@ -180,8 +180,8 @@
   }
   .incompat-tag {
     font-size: 0.72rem;
-    color: var(--danger, #c0392b);
-    border: 1px solid var(--danger, #c0392b);
+    color: var(--danger);
+    border: 1px solid var(--danger);
     border-radius: 3px;
     padding: 0 5px;
   }

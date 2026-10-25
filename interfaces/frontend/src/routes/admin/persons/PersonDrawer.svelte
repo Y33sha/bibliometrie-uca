@@ -277,7 +277,7 @@
     background: none;
     font-size: 0.8rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--muted);
     font-family: inherit;
   }
   .btn-merge-inline:hover {
@@ -287,7 +287,7 @@
   }
   .merge-dept {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--muted);
     margin-left: 6px;
   }
   .person-head {
@@ -347,7 +347,7 @@
     border-radius: 4px;
   }
   .icon-btn:hover {
-    color: var(--accent, #1976d2);
+    color: var(--accent);
     background: #f0f0f0;
   }
   .exclusion-select {
@@ -356,7 +356,7 @@
     color: #555;
   }
   .exclusion-select.excluded {
-    color: var(--danger, #c0392b);
+    color: var(--danger);
   }
   .drawer-meta {
     display: flex;

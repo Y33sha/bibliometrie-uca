@@ -43,7 +43,7 @@
 		padding: 2px 8px; font-size: 1.1rem; cursor: pointer; color: var(--muted);
 		letter-spacing: 2px;
 	}
-	.column-menu-btn:hover { background: var(--hover); color: var(--fg); }
+	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
 	/* Au niveau des autres menus de la page (100), au-dessus de la barre de facettes collante (50). */
 	.column-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
 	.column-menu {

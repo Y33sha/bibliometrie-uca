@@ -93,12 +93,12 @@
     gap: 10px;
   }
   .row {
-    border: 1px solid var(--border, #e0e0e0);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 10px 12px;
   }
   .row.active {
-    border-color: var(--accent, #2563eb);
+    border-color: var(--accent);
   }
   .head {
     display: flex;
@@ -120,7 +120,7 @@
     overflow-wrap: anywhere;
   }
   .title:hover {
-    color: var(--accent, #2563eb);
+    color: var(--accent);
     text-decoration: underline;
   }
   .meta {
@@ -137,7 +137,7 @@
   }
   .share {
     font-weight: 600;
-    color: var(--danger, #c0392b);
+    color: var(--danger);
   }
   .source-records {
     display: flex;

@@ -181,7 +181,7 @@
   .comparison th,
   .comparison td {
     padding: 6px 10px;
-    border-bottom: 1px solid var(--border-subtle, #eee);
+    border-bottom: 1px solid var(--border-subtle);
     text-align: left;
     vertical-align: top;
   }
@@ -195,7 +195,7 @@
     z-index: 2;
     background: #fff;
     border-bottom: none;
-    box-shadow: inset 0 -2px 0 var(--border, #e0e0e0);
+    box-shadow: inset 0 -2px 0 var(--border);
     white-space: nowrap;
   }
   /* Colonnes des enregistrements sources : la marge gauche reçoit le numéro de position des auteurs. */
@@ -253,7 +253,7 @@
   }
   .section-row th,
   .section-row td {
-    border-bottom: 2px solid var(--border, #e0e0e0);
+    border-bottom: 2px solid var(--border);
     padding-top: 14px;
     color: #444;
   }

@@ -128,18 +128,18 @@
   }
   .run-id {
     font-weight: 600;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
   }
   .run-date {
     color: var(--muted);
     font-size: 0.8rem;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .run-duration {
     margin-left: auto;
     font-size: 0.8rem;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .run-sub {
     display: flex;
