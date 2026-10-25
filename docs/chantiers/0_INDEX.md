@@ -8,7 +8,6 @@
 
 ### En pause
 
-- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé
 
@@ -23,6 +22,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Gestion et dédoublonnage assistés de la base personnes](archived/2026-10-25_DATA_personnes-dedoublonnage-assiste.md)
 - 2026-10-25 — [Conférences et actes](archived/2026-10-25_DATA_conferences-et-actes.md)
 - 2026-10-25 — [Revues divergentes selon les sources](archived/2026-10-25_DATA_revues-divergentes-entre-sources.md)
 - 2026-10-25 — [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)

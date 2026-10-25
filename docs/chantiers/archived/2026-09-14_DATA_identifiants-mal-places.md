@@ -75,4 +75,4 @@ Aucune.
 ## Liens
 
 - [Gestion des publications dans l'administration](../METIER_gestion-admin-des-publications.md) — le volet qui confronte les enregistrements sources d'une publication.
-- [Gestion et dédoublonnage assistés de la base personnes](../DATA_personnes-dedoublonnage-assiste.md)
+- [Gestion et dédoublonnage assistés de la base personnes](2026-10-25_DATA_personnes-dedoublonnage-assiste.md)

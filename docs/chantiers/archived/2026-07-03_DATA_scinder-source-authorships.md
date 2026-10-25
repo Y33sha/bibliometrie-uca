@@ -111,4 +111,4 @@ Ce que la table d'identités débloque, une fois le refactor stable :
 - Phase personnes : `application/pipeline/persons/create_persons_from_source_authorships.py`.
 - Analogie structure : phase `affiliations`, `addresses` → `address_structures`.
 - Consommateur aval : [DATA_persons-cascade-ordre-independante](../DATA_persons-cascade-ordre-independante.md) — le grain identité produit ici porte le canal identifiant de la résolution des personnes.
-- Chantier lié : [DATA_personnes-dedoublonnage-assiste](../DATA_personnes-dedoublonnage-assiste.md).
+- Chantier lié : [DATA_personnes-dedoublonnage-assiste](2026-10-25_DATA_personnes-dedoublonnage-assiste.md).
