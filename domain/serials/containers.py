@@ -11,6 +11,7 @@ from domain.serials.series import ContainerLevel, container_level, series_title
 from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
 
+_ARTICLE = "article"
 _BOOK = "book"
 _BOOK_CHAPTER = "book_chapter"
 _CONFERENCE_PAPER = "conference_paper"
@@ -83,6 +84,13 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
     """Indique si la majorité stricte des documents d'une revue sont des articles de congrès (`conference_paper_share`)."""
     conference, total = conference_paper_share(records)
     return conference * 2 > total
+
+
+def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
+    """Indique si la majorité stricte des documents d'une revue sont des articles, d'après le type brut de chacun : `(source, type brut)`."""
+    records = list(records)
+    articles = sum(_ARTICLE in _doc_types(raw_doc_type, source) for source, raw_doc_type in records)
+    return articles * 2 > len(records)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

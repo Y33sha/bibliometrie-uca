@@ -6,6 +6,7 @@ from domain.serials.containers import (
     ContainerRole,
     conference_paper_share,
     container_role,
+    holds_mostly_articles,
     holds_mostly_conference_papers,
     is_book_or_chapter,
     is_conference,
@@ -66,6 +67,11 @@ def test_majorite_stricte_d_articles_de_congres():
 
 def test_moitie_d_articles_de_congres_insuffisante():
     assert not holds_mostly_conference_papers([("hal", "COMM"), ("hal", "ART")])
+
+
+def test_majorite_stricte_d_articles():
+    assert holds_mostly_articles([("hal", "ART"), ("scanr", "journal-article"), ("hal", "COUV")])
+    assert not holds_mostly_articles([("hal", "ART"), ("hal", "COUV")])
 
 
 def test_type_composite_compte_comme_article_de_congres():

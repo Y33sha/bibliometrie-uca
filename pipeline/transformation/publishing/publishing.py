@@ -3,7 +3,7 @@
 Trois groupes de sous-étapes, dans l'ordre :
 
 - **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente ; `merge_duplicate_publishers` : autres noms des titulaires de préfixe.
-- **Revues** — `enrich_serials_from_openalex` (type et frais de publication), `check_serials_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_serials`, `type_proceedings_serials`, `learn_serial_doi_namespaces`, `enrich_serials_from_doaj`.
+- **Revues** — `enrich_serials_from_openalex` (type et frais de publication), `check_serials_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_serials`, `type_proceedings_serials`, `type_journal_serials`, `learn_serial_doi_namespaces`, `enrich_serials_from_doaj`.
 - **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
 
 Contraintes d'ordre :
@@ -74,6 +74,7 @@ from pipeline.transformation.publishing.serials import (
     enrich_serials_from_openalex,
     learn_serial_doi_namespaces,
     merge_duplicate_serials,
+    type_journal_serials,
     type_proceedings_serials,
 )
 from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
@@ -92,6 +93,9 @@ from pipeline.transformation.publishing.serials.merge_duplicate_serials import (
     run_merge_duplicate_serials,
 )
 from pipeline.transformation.publishing.serials.serial_merge import merge_serials
+from pipeline.transformation.publishing.serials.type_journal_serials import (
+    run_type_journal_serials,
+)
 from pipeline.transformation.publishing.serials.type_proceedings_serials import (
     run_type_proceedings_serials,
 )
@@ -140,6 +144,11 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         "type_proceedings_serials",
         "revues typées recueils d'actes",
         lambda m: m.extras.get("serials_typed_proceedings", 0),
+    ),
+    (
+        "type_journal_serials",
+        "entrées typées revues",
+        lambda m: m.extras.get("serials_typed_journal", 0),
     ),
     (
         "learn_serial_doi_namespaces",
@@ -230,6 +239,11 @@ def build() -> Phase:
                     _run_type_proceedings_serials,
                     "Publications en série",
                     type_proceedings_serials.LABEL,
+                ),
+                "type_journal_serials": TaskStep(
+                    _run_type_journal_serials,
+                    "Publications en série",
+                    type_journal_serials.LABEL,
                 ),
                 "learn_serial_doi_namespaces": TaskStep(
                     _run_learn_serial_doi_namespaces,
@@ -358,6 +372,11 @@ def _run_type_proceedings_volumes(ctx: PhaseContext) -> PhaseMetrics:
 def _run_type_proceedings_serials(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
         return run_type_proceedings_serials(conn, ctx.logger)
+
+
+def _run_type_journal_serials(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+        return run_type_journal_serials(conn, ctx.logger)
 
 
 def _run_learn_serial_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:

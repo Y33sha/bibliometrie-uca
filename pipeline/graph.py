@@ -647,6 +647,29 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
+        "publishing.type_journal_serials",
+        "publishing",
+        reads=(
+            "serials.id",
+            "serials.title",
+            "serials.serial_type",
+            "serials.manual_fields",
+            "serial_issns",
+            "source_records.corrections",
+            "source_records.doc_type",
+            "source_records.serial_id",
+        ),
+        writes=("serials.serial_type",),
+        previous_run=(
+            "serials",
+            "serial_issns",
+            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            "source_records.corrections",
+            "source_records.doc_type",
+            "source_records.serial_id",
+        ),
+    ),
+    _task(
         "publishing.learn_serial_doi_namespaces",
         "publishing",
         reads=(
