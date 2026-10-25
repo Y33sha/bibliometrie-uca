@@ -58,7 +58,7 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](archiv
 
 Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md). La mesure du recouvrement porte sur les auteurs alignés.
 
-- [ ] Onglet « Recouvrement d'auteurs » et son compteur.
+- [x] Onglet « Fusions suspectes » et son compteur : publications dont moins de la moitié des auteurs se retrouvent d'un enregistrement source à l'autre (`1a77daf4d`).
 - [ ] Mesure de sa précision sur des cas relus.
 - [ ] Taille du groupe hors `dataset` et `software` : évaluer le signal.
 

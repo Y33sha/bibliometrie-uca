@@ -6,9 +6,6 @@
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 
-### En pause
-
-
 ### Non commencé
 
 - [Collaborations entre structures](DATA_collaborations-structures.md)
