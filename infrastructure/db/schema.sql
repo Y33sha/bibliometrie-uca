@@ -154,7 +154,8 @@ CREATE TYPE public.doc_type AS ENUM (
     'book_review',
     'data_paper',
     'proceedings',
-    'media'
+    'media',
+    'physical_object'
 );
 
 

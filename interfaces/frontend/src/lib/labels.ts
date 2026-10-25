@@ -29,7 +29,8 @@ export const docTypeSingular: Record<string, string> = {
 	book_review: 'Recension',
 	data_paper: 'Data paper',
 	proceedings: 'Proceedings',
-	media: 'Intervention média'
+	media: 'Intervention média',
+	physical_object: 'Objet physique'
 };
 
 /** Libellés FR (pluriel) des types de documents — cf. docTypeSingular. */
@@ -59,7 +60,8 @@ export const docTypePlural: Record<string, string> = {
 	book_review: 'Recensions',
 	data_paper: 'Data papers',
 	proceedings: 'Proceedings',
-	media: 'Interventions média'
+	media: 'Interventions média',
+	physical_object: 'Objets physiques'
 };
 
 /** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement l'enum `doc_type` ; l'ordre est celui d'affichage. Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
@@ -87,7 +89,8 @@ export const docTypeFamilies: { key: string; label: string; types: string[] }[] 
 			'editorial',
 			'letter',
 			'book_review',
-			'proceedings'
+			'proceedings',
+			'physical_object'
 		]
 	}
 ];

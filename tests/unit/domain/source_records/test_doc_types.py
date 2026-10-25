@@ -69,6 +69,9 @@ class TestMapDocType:
     def test_hal_undefined_sans_sous_type_vers_preprint(self):
         assert map_doc_type("UNDEFINED", source="hal") == "preprint"
 
+    def test_datacite_physicalobject_vers_physical_object(self):
+        assert map_doc_type("PhysicalObject", source="datacite") == "physical_object"
+
     def test_openalex_conference_paper_vers_conference_paper(self):
         assert map_doc_type("conference-paper", source="openalex") == "conference_paper"
 
