@@ -9,6 +9,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from application.ports.read_models._common import EntityFacetItem, EntityKind
+from infrastructure.read_models.filters import OWN_RORS_SQL
 from infrastructure.sql_fragments import has_author_role
 
 
@@ -25,7 +26,7 @@ class EntitySql(NamedTuple):
     id_type: str = "integer"
 
 
-# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), nommé par le référentiel ROR. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
+# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -63,6 +64,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         label="ro.name",
         join=(
             "JOIN publication_rors pr ON pr.publication_id = p.id "
+            f"AND pr.ror_id NOT IN ({OWN_RORS_SQL}) "
             "JOIN ror_organizations ro ON ro.ror_id = pr.ror_id"
         ),
         id_type="text",
@@ -89,14 +91,20 @@ def entity_facet_rows(
     binds: Mapping[str, object],
     search: str,
     limit: int,
+    own_structure_ids: list[int],
 ) -> list[EntityFacetItem]:
     """Entités `kind` les plus représentées parmi les publications `p` qui satisfont `where_sql`.
 
-    Le décompte porte sur les publications distinctes : la jointure d'un sujet rend une ligne par source. Un terme de recherche d'au moins deux caractères filtre les entités par nom.
+    Le décompte porte sur les publications distinctes : la jointure d'un sujet rend une ligne par source. Un terme de recherche d'au moins deux caractères filtre les entités par nom. Les organisations partenaires excluent les ROR propres aux structures `own_structure_ids`.
     """
     sql = ENTITY_SQL[kind]
     name_filter, name_binds = entity_name_clause(sql.label, search)
-    params: dict[str, object] = {**binds, **name_binds, "lim": limit}
+    params: dict[str, object] = {
+        **binds,
+        **name_binds,
+        "lim": limit,
+        "own_structure_ids": own_structure_ids,
+    }
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""

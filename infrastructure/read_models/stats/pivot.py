@@ -24,7 +24,12 @@ from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
 from domain.structures.structure import StructureType
-from infrastructure.read_models.filters import OA_OPEN_SQL, assemble_where
+from infrastructure.read_models.filters import (
+    OA_OPEN_SQL,
+    OWN_RORS_SQL,
+    assemble_where,
+    own_structure_ids,
+)
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 
 Cardinality = Literal["low", "high"]
@@ -163,7 +168,7 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql="jt.title",
             join_sql="JOIN serials jt ON jt.id = p.serial_id",
         ),
-        # Forte cardinalité : comparaison et facette (filtre par organisation partenaire, recherche serveur). Une publication compte dans chaque ROR de ses auteurs, ancêtres compris.
+        # Forte cardinalité : comparaison et facette (filtre par organisation partenaire, recherche serveur). Une publication compte dans chaque ROR de ses auteurs, ancêtres compris, hors les ROR propres aux laboratoires sélectionnés, ou à tout le périmètre sans sélection.
         Dimension(
             "partner",
             "Organisation partenaire",
@@ -174,6 +179,7 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql="pro.name",
             join_sql=(
                 "JOIN publication_rors ppr ON ppr.publication_id = p.id "
+                f"AND ppr.ror_id NOT IN ({OWN_RORS_SQL}) "
                 "JOIN ror_organizations pro ON pro.ror_id = ppr.ror_id"
             ),
         ),
@@ -277,7 +283,14 @@ def run_pivot(
         sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
 
     conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(text(sql), {**binds, "measure_apc_root_ids": perimeter_structure_ids}).all()
+    rows = conn.execute(
+        text(sql),
+        {
+            **binds,
+            "measure_apc_root_ids": perimeter_structure_ids,
+            "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+        },
+    ).all()
     return PivotResponse(
         measure=m.key,
         groups=[d.key for d in dims],

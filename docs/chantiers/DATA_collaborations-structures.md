@@ -54,7 +54,7 @@ Lecture par source :
 
 **ROR par publication.** La vue matérialisée `publication_rors (publication_id, ror_id, cited)` réunit les ROR de tous les auteurs d'une publication, périmètre compris : ceux que donnent les sources pour les contributions sources alignées, et ceux des structures que la phase `affiliations` reconnaît (`publication_structures`). Les contributions sans personne en sont ; celles d'une personne qui n'en est pas une (`not_a_person`) en sont exclues. Chaque ROR entre avec ses ancêtres de `ror_relations` : un établissement compte aussi les publications de ses laboratoires, et la lecture reste une jointure simple. `cited` distingue les ROR cités des ancêtres ajoutés. Distinguer les coauteurs relèverait d'une vue par contribution, hors de ce chantier.
 
-**Affichage.** Les organisations partenaires sont listées telles quelles, laboratoires et établissements mêlés. Le lecteur filtre par type, par pays et par période.
+**Affichage.** Les organisations partenaires sont listées telles quelles, laboratoires et établissements mêlés. Le lecteur filtre par type, par pays et par période. Elles excluent les ROR propres aux structures étudiées : ceux de ces structures, de leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont la structure de l'onglet, les laboratoires sélectionnés, ou sans sélection tout le périmètre.
 
 **Cohérence des référentiels.** Un rapport compare `structure_parents` à `ror_relations` dans les deux sens, par clôture transitive. Un parent ROR est couvert s'il est un ancêtre dans `structure_parents`. Une tutelle est couverte si son parent est un ancêtre dans le ROR. Chaque écart se corrige dans `structure_parents` ou se signale au ROR.
 
@@ -86,7 +86,7 @@ Lecture par source :
 
 - [x] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
 - [x] Facette « Organisation partenaire » dans la recherche de publications.
-- [x] Dimension « partenaire » dans le pivot des statistiques, filtrable. Elle compte tous les ROR des publications, périmètre compris.
+- [x] Dimension « partenaire » dans le pivot des statistiques, filtrable.
 - [ ] Export du réseau (CSV, GEXF) pour Gephi ou VOSviewer.
 
 ### 5. Mise à jour de la documentation

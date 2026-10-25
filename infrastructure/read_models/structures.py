@@ -25,32 +25,25 @@ from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
-from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
+from infrastructure.read_models.filters import (
+    OA_DASHBOARD_COLS_SQL,
+    OWN_RORS_SQL,
+    entity_subjects_sql,
+)
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
-# Liens publication–ROR des publications de la structure `:structure_id`, hors ses propres ROR : ceux de la structure et de ses tutelles (`structure_parents`), avec leurs ancêtres ROR.
-_PARTNER_LINKS = """
-    WITH RECURSIVE own_structures AS (
-        SELECT CAST(:structure_id AS integer) AS id
-        UNION
-        SELECT sp.parent_id FROM structure_parents sp JOIN own_structures o ON sp.child_id = o.id
-    ),
-    own_rors AS (
-        SELECT s.ror_id FROM structures s JOIN own_structures o ON o.id = s.id
-        WHERE s.ror_id IS NOT NULL
-        UNION
-        SELECT rr.parent_ror_id FROM ror_relations rr JOIN own_rors r ON rr.child_ror_id = r.ror_id
-    ),
-    links AS (
+# Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`).
+_PARTNER_LINKS = f"""
+    WITH links AS (
         SELECT pr.publication_id, pr.ror_id, p.publication_year
         FROM publication_structures ps
         JOIN publications p ON p.id = ps.publication_id
         JOIN publication_rors pr ON pr.publication_id = ps.publication_id
         WHERE ps.structure_id = :structure_id
-          AND pr.ror_id NOT IN (SELECT ror_id FROM own_rors)
+          AND pr.ror_id NOT IN ({OWN_RORS_SQL})
     )
 """
 
@@ -329,6 +322,7 @@ class PgStructuresQueries(StructuresQueries):
         """Organisations partenaires de la structure, les plus fréquentes en tête. Le décompte des options de pays et de types suit les autres filtres."""
         binds = {
             "structure_id": structure_id,
+            "own_structure_ids": [structure_id],
             "years": years,
             "countries": countries,
             "types": types,

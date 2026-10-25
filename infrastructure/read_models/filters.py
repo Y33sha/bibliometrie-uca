@@ -143,6 +143,28 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     )
 
 
+# ROR propres aux structures `:own_structure_ids` : ceux des structures et de leurs tutelles (`structure_parents`), avec leurs ancêtres ROR. Les organisations partenaires les excluent.
+OWN_RORS_SQL = """
+    WITH RECURSIVE own_structures AS (
+        SELECT unnest(CAST(:own_structure_ids AS integer[])) AS id
+        UNION
+        SELECT sp.parent_id FROM structure_parents sp JOIN own_structures o ON sp.child_id = o.id
+    ),
+    own_rors AS (
+        SELECT s.ror_id FROM structures s JOIN own_structures o ON o.id = s.id
+        WHERE s.ror_id IS NOT NULL
+        UNION
+        SELECT rr.parent_ror_id FROM ror_relations rr JOIN own_rors r ON rr.child_ror_id = r.ror_id
+    )
+    SELECT ror_id FROM own_rors
+"""
+
+
+def own_structure_ids(lab_ids: list[int], perimeter_structure_ids: list[int]) -> list[int]:
+    """Structures dont les ROR sont exclus des organisations partenaires : les laboratoires sélectionnés, sinon tout le périmètre."""
+    return lab_ids or perimeter_structure_ids
+
+
 def partner_clause(ror_ids: list[str]) -> WhereClause | None:
     """Filtre par organisation partenaire : un ROR des auteurs de la publication, ancêtres compris (`publication_rors`). Les valeurs se combinent en OR."""
     if not ror_ids:
