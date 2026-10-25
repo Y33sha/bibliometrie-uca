@@ -98,7 +98,7 @@
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
 							<div class="hal-row">
-								<a href={hd.record_url} target="_blank" rel="noopener" class="hal-badge">{hd.halid}</a>
+								<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
 								{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
 								<span class="author-count">{hd.author_count} aut.</span>
@@ -139,7 +139,7 @@
 								<div class="hal-list">
 									{#each pub.hal_docs as hd}
 										<div class="hal-row">
-											<a href={hd.record_url} target="_blank" rel="noopener" class="hal-badge">{hd.halid}</a>
+											<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
 											{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
 											<span class="author-count">{hd.author_count} aut.</span>
@@ -209,12 +209,6 @@
 	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.publication-link:hover { text-decoration: underline; }
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
-	.hal-badge {
-		display: inline-block; padding: 2px 8px; background: #1a6fb5;
-		border-radius: 4px; font-size: 0.82rem; color: #fff;
-		text-decoration: none; font-weight: 500;
-	}
-	.hal-badge:hover { background: #145a94; }
 	.author-count { font-size: 0.8rem; color: var(--muted); }
 	.container-title { font-size: 0.82rem; color: var(--muted); margin-top: 2px; font-style: italic; }
 </style>

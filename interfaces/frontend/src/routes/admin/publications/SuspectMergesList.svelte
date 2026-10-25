@@ -34,7 +34,7 @@
   const percent = (part: number, whole: number) => Math.round((100 * part) / whole);
 </script>
 
-<p class="intro">
+<p class="triage-intro">
   Publications dont <strong>moins de la moitié des auteurs</strong> se retrouvent d'un enregistrement source à
   l'autre&nbsp;: leurs listes d'auteurs ne se recouvrent pas, signe probable de deux œuvres réunies à
   tort. Pour chaque enregistrement source, le nombre de ses auteurs retrouvés dans un autre enregistrement source.
@@ -45,9 +45,9 @@
 {:else if list.items.length === 0 && !list.loading}
   <div class="empty">Aucune fusion suspecte.</div>
 {:else}
-  <div class="rows">
+  <div class="triage-list">
     {#each list.items as item (item.publication_id)}
-      <div class="row" class:active={item.publication_id === activePublicationId}>
+      <div class="triage-item" class:active={item.publication_id === activePublicationId}>
         <div class="head">
           <button class="title" onclick={() => onopenPublication(item.publication_id)}>
             <PublicationTitle titre={item.title} />
@@ -81,23 +81,7 @@
 {/if}
 
 <style>
-  .intro {
-    font-size: 0.85rem;
-    color: #555;
-    margin: 4px 0 14px;
-    max-width: 70ch;
-  }
-  .rows {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .row {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px 12px;
-  }
-  .row.active {
+  .triage-item.active {
     border-color: var(--accent);
   }
   .head {
@@ -125,14 +109,14 @@
   }
   .meta {
     font-size: 0.78rem;
-    color: #888;
+    color: var(--muted);
   }
   .stats {
     display: flex;
     flex-wrap: wrap;
     gap: 4px 14px;
     font-size: 0.8rem;
-    color: #555;
+    color: var(--muted);
     margin-top: 4px;
   }
   .share {
@@ -150,9 +134,5 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-  }
-  .empty {
-    padding: 20px;
-    color: #888;
   }
 </style>

@@ -294,13 +294,6 @@
 		background: var(--border-subtle); color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
 	}
-	.badge-doaj {
-		font-size: 0.7rem; padding: 2px 6px; background: var(--success);
-		color: white; border-radius: 8px; margin-left: 8px;
-		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
-		text-decoration: none;
-	}
-	a.badge-doaj:hover { background: #256528; }
 
 	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }

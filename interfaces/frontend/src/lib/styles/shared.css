@@ -710,6 +710,23 @@ th.sorted .sort-arrow {
 	background: #d0e4f4;
 }
 
+/* ── Pastille de structure (lien vers la page de la structure) ── */
+.structure-tag {
+	display: inline-block;
+	padding: 1px 6px;
+	background: var(--accent-light);
+	border-radius: 3px;
+	font-size: 0.8rem;
+	color: var(--accent);
+	font-weight: 500;
+	margin: 1px 3px 1px 0;
+	text-decoration: none;
+}
+a.structure-tag:hover {
+	background: color-mix(in srgb, var(--accent) 20%, white);
+	text-decoration: none;
+}
+
 /* ── Role / tutelle tag (neutral) ── */
 .role-tag,
 .tutelle-tag {
@@ -720,6 +737,113 @@ th.sorted .sort-arrow {
 	font-size: 0.8rem;
 	color: var(--muted);
 	white-space: nowrap;
+}
+
+/* ── Pastille de type de structure (`structure-type structure-type-{type}`) ── */
+.structure-type {
+	font-size: 0.7rem;
+	padding: 1px 6px;
+	border-radius: 8px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	white-space: nowrap;
+	background: #f0f0f0;
+	color: #555;
+}
+.structure-type-universite { background: #e8d4f0; color: #6b2e8a; }
+.structure-type-onr { background: #d4e8f0; color: #2e6b8a; }
+.structure-type-chu { background: #f0d4d4; color: #8a2e2e; }
+.structure-type-ecole { background: #f0e8d4; color: #8a6b2e; }
+.structure-type-labo { background: var(--accent-light); color: var(--accent); }
+.structure-type-site { background: var(--success-light); color: var(--success); }
+.structure-type-equipe { background: #d4f0ec; color: #2e8a7d; }
+.structure-type-admin { background: #dde3ea; color: #3d5266; }
+
+/* ── Files de triage (administration des référentiels) ── */
+.triage-intro {
+	font-size: 0.85rem;
+	color: var(--muted);
+	margin: 4px 0 14px;
+	max-width: 75ch;
+}
+.triage-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.triage-item {
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 10px 12px;
+}
+/* Nom de personne cliquable, ouvre le drawer de la personne. */
+.triage-person {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+}
+.triage-person:hover {
+	color: var(--accent);
+	text-decoration: underline;
+}
+.triage-person-last {
+	font-weight: 600;
+}
+
+/* Forme de nom dérivée du nom canonique de la personne. */
+.canonical-tag {
+	font-size: 0.68rem;
+	color: var(--muted);
+	background: var(--surface);
+	border-radius: 8px;
+	padding: 0 6px;
+}
+
+/* ── Lien vers la notice HAL (pages Problèmes HAL) ── */
+.hal-link-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	background: #1a6fb5;
+	border-radius: 4px;
+	font-size: 0.82rem;
+	color: white;
+	text-decoration: none;
+	font-weight: 500;
+}
+.hal-link-badge:hover {
+	background: color-mix(in srgb, #1a6fb5, black 20%);
+}
+
+/* ── Pastille DOAJ d'une revue ── */
+.badge-doaj {
+	font-size: 0.7rem;
+	padding: 1px 6px;
+	background: var(--success);
+	color: white;
+	border-radius: 8px;
+	margin-left: 6px;
+	vertical-align: middle;
+	font-weight: 600;
+	letter-spacing: 0.3px;
+	text-decoration: none;
+}
+a.badge-doaj:hover {
+	background: color-mix(in srgb, var(--success), black 20%);
+}
+
+/* ── Bandeau de section des fiches structure (administration) ── */
+.section-banner {
+	margin: 20px -14px 10px !important;
+	padding: 6px 14px !important;
+	background: var(--nav-public);
+	color: white !important;
+	font-size: 0.75rem !important;
+	border-radius: 3px;
 }
 
 /* ── Meta badge (detail pages) ── */
@@ -1064,15 +1188,15 @@ th.sorted .sort-arrow {
 	text-decoration: underline;
 }
 
-/* ── Info box (hal-problems, feedback) ── */
+/* ── Encart d'information ── */
 .info-box {
-	background: #f0f7ff;
-	border: 1px solid #c4daf4;
-	border-radius: 6px;
-	padding: 12px 16px;
+	background: var(--accent-light);
+	border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
+	border-radius: 5px;
+	padding: 8px 14px;
 	font-size: 0.9rem;
-	color: #2c5282;
-	margin-bottom: 16px;
+	color: var(--text);
+	margin-bottom: 12px;
 	line-height: 1.5;
 }
 

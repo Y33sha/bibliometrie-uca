@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { anchored } from '#lib/actions/anchored.js';
+	import Tooltip from '#lib/components/Tooltip.svelte';
 
 	export interface FacetOption {
 		value: string;
@@ -21,8 +22,6 @@
 	}
 
 	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, groups, onchange }: Props = $props();
-	let showTooltip = $state(false);
-	let tooltipTimer: ReturnType<typeof setTimeout>;
 
 	let open = $state(false);
 	let filterText = $state('');
@@ -103,13 +102,14 @@
 {/snippet}
 
 <div class="facet">
+	<!-- L'infobulle se masque quand le panneau est ouvert. -->
+	<Tooltip text={open ? '' : (tooltip ?? '')}>
 	<button
 		type="button"
 		class="facet-btn"
 		class:has-selection={selected.length > 0}
 		onclick={(e) => {
 			e.stopPropagation();
-			showTooltip = false;
 			if (open) {
 				open = false;
 				return;
@@ -120,12 +120,6 @@
 			open = true;
 			filterText = '';
 		}}
-		onmouseenter={() => {
-			if (tooltip && !open) {
-				showTooltip = true;
-			}
-		}}
-		onmouseleave={() => { showTooltip = false; }}
 	>
 		<span class="facet-label">{label}</span>
 		{#if selected.length > 0}
@@ -133,9 +127,7 @@
 		{/if}
 		<span class="facet-arrow">&#9662;</span>
 	</button>
-	{#if showTooltip && tooltip}
-		<div class="facet-tooltip" use:anchored={{ align: 'center', offset: 6 }}>{tooltip}</div>
-	{/if}
+	</Tooltip>
 
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -175,28 +167,6 @@
 
 <style>
 	/* Bouton, panneau et options : styles communs des facettes, dans shared.css. */
-	.facet-tooltip {
-		background: #333;
-		color: #fff;
-		font-size: 0.78rem;
-		line-height: 1.4;
-		padding: 6px 10px;
-		border-radius: 5px;
-		white-space: pre-line;
-		z-index: 200;
-		pointer-events: none;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-	}
-	.facet-tooltip::after {
-		content: '';
-		position: absolute;
-		bottom: 100%;
-		left: 50%;
-		transform: translateX(-50%);
-		border: 5px solid transparent;
-		border-bottom-color: #333;
-	}
-
 	.facet-group-label {
 		margin-top: 4px;
 		padding: 7px 12px 3px;

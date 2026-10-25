@@ -39,7 +39,7 @@
   <div class="chip-row">
     <span class="chip-controls">
       {#if isCanonical(nf)}
-        <span class="canonical" title="Forme dérivée du nom canonique">nom</span>
+        <span class="canonical-tag" title="Forme dérivée du nom canonique">nom</span>
       {:else}
         <button
           class="toggle-btn confirm"
@@ -145,13 +145,6 @@
     font-size: 0.72rem;
     color: #8a6d3b;
     white-space: nowrap;
-  }
-  .canonical {
-    font-size: 0.68rem;
-    color: #888;
-    background: #f0f0f0;
-    border-radius: 8px;
-    padding: 0 6px;
   }
   .empty {
     font-size: 0.8rem;

@@ -288,7 +288,7 @@
   {/if}
 
   <!-- Help text -->
-  <div class="help-text">
+  <div class="info-box">
     <strong>{helpText.title}</strong> &mdash; {helpText.body}
   </div>
 
@@ -459,16 +459,6 @@
   .back-link {
     margin: 0 0 4px;
     font-size: 0.85rem;
-  }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    font-size: 0.95rem;
-    color: #2c3e50;
-    line-height: 1.5;
   }
 
   /* Toolbar */

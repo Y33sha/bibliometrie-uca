@@ -296,7 +296,7 @@
 
 <!-- ═══ DÉLAIS ═══ -->
 <h3 class="section-title">Délais de réinterrogation</h3>
-<p class="help-text">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
+<p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
 <div class="config-grid">
   {#each DELAYS as delay (delay.key)}
     {@const item = configByKey(delay.key)}
@@ -318,7 +318,7 @@
 <h3 class="section-title">Périmètres</h3>
 
 <h4 class="subsection-title">Définition des périmètres</h4>
-<p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
+<p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
 <table class="perimeters-table">
   <thead>
     <tr>
@@ -471,16 +471,9 @@
     max-width: 800px;
     margin: 8px auto 0;
   }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 8px 12px;
-    margin: 4px auto 12px;
+  .info-box {
     max-width: 800px;
-    font-size: 0.85rem;
-    color: #2c3e50;
-    line-height: 1.5;
+    margin: 4px auto 12px;
   }
   .subsection-title {
     font-size: 0.85rem;

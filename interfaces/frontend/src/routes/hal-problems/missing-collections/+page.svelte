@@ -100,7 +100,7 @@
 				<div class="hal-list">
 					{#if pub.hal_links.length}
 						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-badge">{link.source_id}</a>
+							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
 						{/each}
 					{/if}
 					{#if pub.doi}
@@ -145,11 +145,5 @@
 		display: flex; flex-wrap: wrap; gap: 6px;
 		align-items: center; margin-top: 6px; padding-left: 20px;
 	}
-	.hal-badge {
-		display: inline-block; padding: 2px 8px; background: #1a6fb5;
-		border-radius: 4px; font-size: 0.82rem; color: #fff;
-		text-decoration: none; font-weight: 500;
-	}
-	.hal-badge:hover { background: #145a94; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 </style>

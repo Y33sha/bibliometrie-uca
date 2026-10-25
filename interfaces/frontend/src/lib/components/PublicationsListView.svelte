@@ -575,7 +575,7 @@
 </script>
 
 {#if showFilterBanner && subjectBannerText}
-	<div class="filter-banner">Filtre actif : {subjectBannerText}</div>
+	<div class="info-box">Filtre actif : {subjectBannerText}</div>
 {/if}
 
 <div class="toolbar-card toolbar-sticky publication-toolbar">
@@ -793,15 +793,6 @@
 <style>
 	.license-cell {
 		font-size: 0.8rem;
-	}
-	.filter-banner {
-		background: var(--accent-light);
-		border: 1px solid #c4d8ed;
-		border-radius: 5px;
-		padding: 8px 14px;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: #2c3e50;
 	}
 	/* Deux lignes : commandes (recherche extensible, compte, exports, lien stats) puis facettes. */
 	.publication-toolbar { display: flex; flex-direction: column; gap: 8px; }

@@ -32,7 +32,7 @@
   } = $props();
 </script>
 
-<h3 class="section-title">Tutelles</h3>
+<h3 class="section-banner">Tutelles</h3>
 
 <!-- Tutelles -->
 <h3>
@@ -93,21 +93,13 @@
     placeholder="Rechercher une structure…"
   >
     {#snippet item(rs)}
-      <span class="type-badge type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
+      <span class="structure-type structure-type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
       {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
     {/snippet}
   </Picker>
 {/if}
 
 <style>
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
   .tag {
     display: inline-flex;
     align-items: center;

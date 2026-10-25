@@ -150,7 +150,7 @@
         class:orphan={s.perimeter_ids.length === 0}
         href={resolve(`admin/structures/${s.id}`)}
       >
-        <span class="type-badge type-{s.type}">{s.type}</span>
+        <span class="structure-type structure-type-{s.type}">{s.type}</span>
         <span class="name">
           {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
         </span>
@@ -239,50 +239,5 @@
   }
   .struct-item .name {
     font-size: 0.95rem;
-  }
-  .type-badge {
-    font-size: 0.7rem;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-  }
-  :global(.type-universite) {
-    background: #e8d4f0;
-    color: #6b2e8a;
-  }
-  :global(.type-onr) {
-    background: #d4e8f0;
-    color: #2e6b8a;
-  }
-  :global(.type-chu) {
-    background: #f0d4d4;
-    color: #8a2e2e;
-  }
-  :global(.type-ecole) {
-    background: #f0e8d4;
-    color: #8a6b2e;
-  }
-  :global(.type-labo) {
-    background: var(--accent-light);
-    color: var(--accent);
-  }
-  :global(.type-site) {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  :global(.type-equipe) {
-    background: #d4f0ec;
-    color: #2e8a7d;
-  }
-  :global(.type-admin) {
-    background: #dde3ea;
-    color: #3d5266;
-  }
-  :global(.type-autre) {
-    background: #f0f0f0;
-    color: #555;
   }
 </style>

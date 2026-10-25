@@ -278,7 +278,7 @@
 								<tr>
 									<td>{#if t.author_person_id}<a href={resolve(`persons/${t.author_person_id}`)}>{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
 									<td><a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a></td>
-									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="structure-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}
@@ -311,7 +311,7 @@
 								<td>
 									{#if a.structures?.length}
 										{#each a.structures as s (s.id)}
-											<span class="struct-tag">{structureLabel(s)}</span>
+											<span class="structure-tag">{structureLabel(s)}</span>
 										{/each}
 									{/if}
 								</td>
@@ -396,27 +396,12 @@
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: var(--surface-hover); }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
+	.tab-content td a:not(.id-badge, .lab-tag, .structure-tag, .source-tag) { color: var(--accent); text-decoration: none; }
+	.tab-content td a:not(.id-badge, .lab-tag, .structure-tag, .source-tag):hover { text-decoration: underline; }
 
 	/* Theses tab utilise aussi .publication-table */
 	.publication-table td { vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
-	.struct-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		background: var(--accent-light);
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		font-weight: 500;
-		margin: 1px 2px;
-		text-decoration: none;
-	}
-	a.struct-tag:hover {
-		background: #d0e3f4;
-		text-decoration: none;
-	}
 </style>

@@ -425,7 +425,7 @@
   {@const s = detail.structure}
   <div class="panel">
     <div class="detail-header">
-      <span class="type-badge type-{s.type}">{s.type}</span>
+      <span class="structure-type structure-type-{s.type}">{s.type}</span>
       <h2>
         {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
       </h2>
@@ -433,7 +433,7 @@
       <button class="btn btn-danger btn-sm" onclick={deleteStructure}>Supprimer</button>
     </div>
 
-    <h3 class="section-title">Détails</h3>
+    <h3 class="section-banner">Détails</h3>
     <div class="details-inline">
       {#if s.ror_id}
         <span class="detail-item">
@@ -559,14 +559,6 @@
     font-weight: 600;
   }
 
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
   .details-inline {
     display: flex;
     flex-wrap: wrap;
@@ -585,43 +577,6 @@
     font-size: 0.8rem;
   }
 
-  .type-badge {
-    font-size: 0.7rem;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-  }
-  :global(.type-universite) {
-    background: #e8d4f0;
-    color: #6b2e8a;
-  }
-  :global(.type-onr) {
-    background: #d4e8f0;
-    color: #2e6b8a;
-  }
-  :global(.type-chu) {
-    background: #f0d4d4;
-    color: #8a2e2e;
-  }
-  :global(.type-ecole) {
-    background: #f0e8d4;
-    color: #8a6b2e;
-  }
-  :global(.type-labo) {
-    background: var(--accent-light);
-    color: var(--accent);
-  }
-  :global(.type-site) {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  :global(.type-autre) {
-    background: #f0f0f0;
-    color: #555;
-  }
 
   .detail-header {
     display: flex;

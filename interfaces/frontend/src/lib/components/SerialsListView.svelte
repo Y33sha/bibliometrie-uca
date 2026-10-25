@@ -339,17 +339,5 @@
 
 	.journal-link { font-weight: 500; }
 
-	.badge-doaj {
-		font-size: 0.7rem;
-		padding: 1px 5px;
-		background: var(--success);
-		color: white;
-		border-radius: 8px;
-		margin-left: 6px;
-		vertical-align: middle;
-		font-weight: 600;
-		text-decoration: none;
-	}
-	:global(a.badge-doaj:hover) { background: #256528; }
 	.actions { white-space: nowrap; position: relative; }
 </style>

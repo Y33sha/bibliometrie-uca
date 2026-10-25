@@ -23,7 +23,9 @@ Le modèle visuel de départ est la page d'administration « Configuration du pi
 
 - **Un seul niveau de contenant au maximum.** Les zones se séparent par l'espacement et les titres de section. Les cartes et bordures autour des zones de contenu disparaissent.
 - **Une seule couleur d'accent : le teal**, en trois nuances (foncée, moyenne, claire). Les valeurs sont plus foncées que le teal actuel, pour le contraste.
-- **Toutes les variables dans un seul `:root`**, dans `shared.css`. Les noms existants sont conservés quand la notion existe déjà (`--accent`, `--muted`, `--text`, `--border`…). Les composants n'ont aucune couleur en dur ni couleur de repli.
+- **Toutes les variables dans un seul `:root`**, dans `shared.css`. Les noms existants sont conservés quand la notion existe déjà (`--accent`, `--muted`, `--text`, `--border`…).
+- **Les couleurs de rôle passent par les variables** : texte, surfaces, bordures, accent, états. Une palette de catégories (sources, types de structure, voies open access, niveaux de relation) est définie une seule fois, dans une classe de `shared.css` ou un module TypeScript commun. Les teintes de survol se calculent depuis la variable avec `color-mix()`.
+- **Un style dupliqué entre composants est factorisé** dans `shared.css`, ou dans un module TypeScript commun pour les palettes de graphiques.
 - **Les graphiques lisent leurs couleurs dans les variables CSS**, sur le modèle d'`oaStatusColor()`.
 - **Palette open access agrégée** (ouvert, sous embargo, fermé, indéterminé) commune à toute l'application. Ouvert en vert, embargo en ambre, fermé en gris foncé, indéterminé en gris clair. Pas de rouge. Les voies (diamond, gold, hybrid, bronze, green) gardent leurs couleurs propres.
 - **Police Inter**, hébergée dans `static/fonts/` comme Ubuntu. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) dans les tableaux et les chiffres clés.
@@ -37,13 +39,16 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 0 — Variables CSS, sans changement visible
 
-- [x] Rassembler les deux blocs `:root` dans `shared.css`
-- [x] Remplacer les variables non définies par leur équivalent (`--fg` → `--text`, `--bg-muted` → `--surface-hover`) ; définir `--mono` et l'appliquer à toutes les polices à chasse fixe
-- [x] Fusionner `--text-muted` dans `--muted`
-- [x] Déclarer en variables les teals de la barre de navigation (`--nav-public`, `--nav-admin` et leurs sous-menus)
-- [x] Supprimer les couleurs de repli des appels `var()`
-- [ ] Remplacer les couleurs en dur des composants par la variable de même rôle (écarts de teinte faibles acceptés) ; créer une variable pour un rôle qui n'en a pas
-- [ ] Faire lire aux graphiques (`BarChart`, `DoughnutChart`, `SubjectsCloud`, dashboard de structure) leurs couleurs dans les variables, valeurs actuelles inchangées
+- [x] Rassembler les deux blocs `:root` dans `shared.css` (719aad2d3)
+- [x] Remplacer les variables non définies par leur équivalent (`--fg` → `--text`, `--bg-muted` → `--surface-hover`) ; définir `--mono` et l'appliquer à toutes les polices à chasse fixe (719aad2d3)
+- [x] Fusionner `--text-muted` dans `--muted` (719aad2d3)
+- [x] Déclarer en variables les teals de la barre de navigation (`--nav-public`, `--nav-admin` et leurs sous-menus) (719aad2d3)
+- [x] Supprimer les couleurs de repli des appels `var()` (719aad2d3)
+- [x] Factoriser les styles dupliqués : pastilles de type de structure, bandeau des fiches structure, encart d'information, lien HAL des pages Problèmes HAL, pastille DOAJ, pastille de structure, files de triage (composant `PersonPairsList` pour les paires de personnes), infobulle de `FacetDropdown` (composant `Tooltip`)
+- [ ] Factoriser les palettes de graphiques : open access agrégé des dashboards de structure et de personne, nuage de sujets (`SubjectsCloud`, `SubjectGraph`)
+- [ ] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; créer une variable pour un rôle qui n'en a pas
+- [ ] Teintes de survol calculées par `color-mix()`
+- [ ] Faire lire aux graphiques (`BarChart`, `DoughnutChart`, `SubjectsCloud`, dashboards) leurs couleurs dans les variables, valeurs actuelles inchangées
 
 ### Étape 1 — Fondations globales
 

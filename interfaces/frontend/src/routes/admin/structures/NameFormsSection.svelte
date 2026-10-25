@@ -52,7 +52,7 @@
   } = $props();
 </script>
 
-<h3 class="section-title">Identification dans les publications</h3>
+<h3 class="section-banner">Identification dans les publications</h3>
 
 <h3>
   Formes de noms ({forms.length})
@@ -82,7 +82,7 @@
   >
 </h3>
 {#if formsHelpOpen}
-  <p class="help-text">
+  <p class="info-box">
     Les formes de nom servent à identifier les affiliations des publications via les adresses
     associées aux publications. Les changements seront pris en compte à la prochaine exécution du
     pipeline. Pour une prise en compte immédiate, relancer à partir de l'étape
@@ -242,21 +242,13 @@
       </div>
     {/snippet}
     {#snippet item(cs)}
-      <span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
+      <span class="structure-type structure-type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
       {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
     {/snippet}
   </Picker>
 {/if}
 
 <style>
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
   h3 {
     margin: 12px 0 6px;
     font-size: 0.95rem;
@@ -277,16 +269,6 @@
   }
   .btn-help-icon:hover {
     color: var(--accent);
-  }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 8px 12px;
-    margin: 4px 0 8px;
-    font-size: 0.85rem;
-    color: #2c3e50;
-    line-height: 1.5;
   }
   .forms-table {
     width: 100%;
