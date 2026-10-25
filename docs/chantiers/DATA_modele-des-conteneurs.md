@@ -149,7 +149,7 @@ Usages du type dans le code :
 - [x] Migration : `platforms`, `source_record_locations` (`8d0a6ca00`).
 - [x] Normalisation OpenAlex : localisations, plateforme trouvée ou créée pour une source de type `repository` (`8d0a6ca00`).
 - [x] Stock : réhydratation du staging OpenAlex et renormalisation. 303 477 localisations sur 105 496 des 111 022 enregistrements OpenAlex, 1 366 plateformes.
-- [ ] Serveurs de preprints : règle sur les données (part des preprints parmi les documents d'une plateforme), à mesurer.
+- [ ] Serveurs de preprints, en attente de la question « Preprint : publication distincte ou version déposée ? ». La part de preprints par plateforme ne les sépare pas des entrepôts (bioRxiv 66 %, arXiv 24 %, OSF Preprints 22 %, Zenodo 9 %) ; l'attribution de DOI propres non plus (Zenodo, Figshare). Seule une liste fermée de serveurs tient.
 - [ ] Localisations de Crossref (`resource`, `link`).
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
@@ -176,7 +176,7 @@ Usages du type dans le code :
 - Une publication peut-elle avoir à la fois une série, une monographie et une ou plusieurs localisations ?
 - Sort des entrées `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
-- **Version d'un dépôt.** Une localisation d'une publication a une URL, une licence et une version : `submitted`, `accepted` ou `published`, comme chez OpenAlex et Unpaywall. La version `submitted` recoupe la relation `is_preprint_of` : comment éviter de dire deux fois la même chose ?
+- **Preprint : publication distincte ou version déposée ?** Un preprint forme aujourd'hui une publication distincte, reliée à l'article par `is_preprint_of` ; une version converge avec l'article seulement sous un même préfixe DOI. OpenAlex réunit au contraire preprint et article dans un même work, le preprint étant une localisation `submittedVersion`. Les localisations OpenAlex suivent donc ce second modèle : la copie arXiv figure parmi les localisations de l'article, alors que l'enregistrement DataCite arXiv forme sa propre publication. Adopter le modèle d'OpenAlex ferait converger les versions quel que soit le préfixe et remplacerait `is_preprint_of` par la version des localisations ; un preprint jamais publié resterait une publication de type preprint. Aujourd'hui, 1 468 preprints du périmètre ont leur article en base, et une statistique sans filtre de type compte les deux.
 - **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
 - **Maintenance des référentiels.** Chaque table a son régime : recalcul à chaque run, mise à jour incrémentale par file d'attente, ou valeur posée une fois (typage OpenAlex, `doi_prefixes`). Comment rafraîchir une valeur posée une fois ? `doi_prefixes` attribue à Hindawi un préfixe dont Wiley détient les DOI.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
