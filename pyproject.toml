@@ -48,7 +48,7 @@ dev = [
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
     "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/runtime/observability/progression.py)
     "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle des groupes d'auteurs
-    "duckdb==1.5.6",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
+    "duckdb==2.0.0",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
 ]
 
