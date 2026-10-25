@@ -163,6 +163,20 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql="jt.title",
             join_sql="JOIN serials jt ON jt.id = p.serial_id",
         ),
+        # Forte cardinalité : comparaison et facette (filtre par organisation partenaire, recherche serveur). Une publication compte dans chaque ROR de ses auteurs, ancêtres compris.
+        Dimension(
+            "partner",
+            "Organisation partenaire",
+            "high",
+            ordinal=False,
+            comparable=True,
+            filterable=True,
+            group_sql="pro.name",
+            join_sql=(
+                "JOIN publication_rors ppr ON ppr.publication_id = p.id "
+                "JOIN ror_organizations pro ON pro.ror_id = ppr.ror_id"
+            ),
+        ),
         Dimension("apc", "APC", "low", ordinal=False, comparable=False, filterable=True),
         # Licence de la version éditeur.
         Dimension(

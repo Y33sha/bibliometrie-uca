@@ -16,7 +16,7 @@ from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
-from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_vocabulary_csv
+from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_ror_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
@@ -27,6 +27,7 @@ def stats_filters(
     year: str = Query(""),
     publisher_id: str = Query(""),
     serial_id: str = Query(""),
+    partner_ror: str = Query(""),
     oa_status: str = Query(""),
     license_: str = Query("", alias="license"),
     has_apc: str = Query(""),
@@ -41,6 +42,7 @@ def stats_filters(
         years=parse_int_csv(year, param="year"),
         publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
         serial_ids=parse_int_csv(serial_id, param="serial_id"),
+        partner_rors=parse_ror_csv(partner_ror, param="partner_ror"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
         license=parse_vocabulary_csv(license_, allowed=LICENSE_FILTER_VALUES, param="license"),
         has_apc=parse_vocabulary_csv(has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
@@ -67,7 +69,7 @@ def stats_entity_facet(
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:
-    """Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+    """Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
     """

@@ -22,6 +22,7 @@ class StatsFilters:
     years: list[int] = field(default_factory=list)
     publisher_ids: list[int] = field(default_factory=list)
     serial_ids: list[int] = field(default_factory=list)
+    partner_rors: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
     license: list[str] = field(default_factory=list)
     has_apc: list[str] = field(default_factory=list)

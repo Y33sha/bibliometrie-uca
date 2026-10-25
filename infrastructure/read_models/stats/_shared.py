@@ -9,6 +9,7 @@ from infrastructure.read_models.filters import (
     lab_clause,
     license_clause,
     oa_clause,
+    partner_clause,
     year_clause,
 )
 
@@ -22,9 +23,9 @@ def stats_filter_clauses(
     filters: StatsFilters,
     skip: str = "",
 ) -> list[WhereClause | None]:
-    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, licence, APC, types, éditeur, revue). À assembler avec `assemble_where`.
+    """Clauses de filtrage communes aux agrégats stats (années, labos, accès, licence, APC, types, éditeur, revue, organisation partenaire). À assembler avec `assemble_where`.
 
-    `skip` omet une dimension (`year` / `lab` / `oa` / `license` / `apc` / `doc_type`) pour les facettes croisées, qui écartent leur propre filtre. Les filtres éditeur et revue s'appliquent toujours (la barre ne les facette jamais — ils passent par la recherche serveur).
+    `skip` omet une dimension (`year` / `lab` / `oa` / `license` / `apc` / `doc_type`) pour les facettes croisées, qui écartent leur propre filtre. Les filtres éditeur, revue et organisation partenaire s'appliquent toujours (la barre ne les facette jamais — ils passent par la recherche serveur).
     """
     out: list[WhereClause | None] = []
     if skip != "year":
@@ -52,4 +53,5 @@ def stats_filter_clauses(
                 "p.serial_id = ANY(:flt_serial_ids)", {"flt_serial_ids": filters.serial_ids}
             )
         )
+    out.append(partner_clause(filters.partner_rors))
     return out

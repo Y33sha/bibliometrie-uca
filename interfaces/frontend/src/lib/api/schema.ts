@@ -99,7 +99,7 @@ export interface paths {
         };
         /**
          * Stats Entity Facet
-         * @description Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+         * @description Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
          *
          *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
          */
@@ -5847,6 +5847,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5887,6 +5888,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5925,6 +5927,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5986,6 +5989,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;

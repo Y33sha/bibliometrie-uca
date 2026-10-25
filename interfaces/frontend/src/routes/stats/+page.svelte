@@ -43,6 +43,7 @@
 	// Facettes éditeur / revue : seul l'id (état canonique) ; le libellé de la pastille est résolu par EntityFilter.
 	let selectedSerialId = $state<string | null>(null);
 	let selectedPublisherId = $state<string | null>(null);
+	let selectedPartnerRor = $state<string | null>(null);
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -199,6 +200,7 @@
 		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
 		if (dim === 'publisher' && selectedPublisherId) { selectedPublisherId = null; cleared = true; }
 		if (dim === 'serial' && selectedSerialId) { selectedSerialId = null; cleared = true; }
+		if (dim === 'partner' && selectedPartnerRor) { selectedPartnerRor = null; cleared = true; }
 		syncUrl();
 		if (cleared) refresh();
 		else loadChart();
@@ -215,6 +217,7 @@
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
 		if (selectedSerialId) p.set('serial_id', selectedSerialId);
+		if (selectedPartnerRor) p.set('partner_ror', selectedPartnerRor);
 		return p;
 	}
 
@@ -245,6 +248,7 @@
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			serialId: { type: 'single', urlKey: 'serial_id' },
+			partnerRor: { type: 'single', urlKey: 'partner_ror' },
 			measure: { type: 'single', urlKey: 'measure', defaultValue: 'publication_count' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
@@ -265,6 +269,7 @@
 			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
 			serialId: selectedSerialId ?? '',
+			partnerRor: selectedPartnerRor ?? '',
 			measure,
 			primaryBy,
 			groupBy,
@@ -277,16 +282,9 @@
 
 	// --- Derived: publications link ---
 	const pubsUrl = $derived.by(() => {
-		const p = new URLSearchParams();
-		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
-		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (selectedLicenses.length) p.set('license', selectedLicenses.join(','));
+		// Les entités passent par leur identifiant ; la liste résout elle-même le libellé de la pastille.
+		const p = chartParams();
 		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
-		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
-		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
-		if (selectedSerialId) p.set('serial_id', selectedSerialId);
 		return resolve('publications') + '?' + paramsToQuery(p);
 	});
 
@@ -525,6 +523,10 @@
 		selectedSerialId = id;
 		onFilterChange();
 	}
+	function onPartnerFilter(ror: string | null) {
+		selectedPartnerRor = ror;
+		onFilterChange();
+	}
 
 	onMount(async () => {
 		// Restore state from URL params
@@ -539,6 +541,7 @@
 			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
 		if (restored.serialId) selectedSerialId = restored.serialId as string;
+		if (restored.partnerRor) selectedPartnerRor = restored.partnerRor as string;
 		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
@@ -655,6 +658,9 @@
 	{/if}
 	{#if facetKeys.has('publisher')}
 		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
+	{/if}
+	{#if facetKeys.has('partner')}
+		<EntityFilter label="Organisation partenaire" endpoint="/api/stats/facets" kind="partner" buildParams={chartParams} selected={selectedPartnerRor ? [selectedPartnerRor] : []} onchange={(ids) => onPartnerFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('license')}
 		<FacetDropdown label="Licence" options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />

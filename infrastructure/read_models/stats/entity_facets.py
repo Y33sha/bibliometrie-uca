@@ -1,4 +1,4 @@
-"""Facette d'entité contextuelle (éditeur, revue) pour le tableau de bord.
+"""Facette d'entité contextuelle (éditeur, revue, organisation partenaire) pour le tableau de bord.
 
 Renvoie les N premières entités par volume, calculées **sous les filtres actifs** (en sautant le filtre de la dimension demandée, pour qu'une sélection ne réduise pas ses propres options). Les autres filtres — dont l'autre entité — sont inclus : sélectionner une revue restreint donc les éditeurs proposés à celui de cette revue. Une recherche par nom borne la requête.
 """
@@ -28,6 +28,7 @@ def stats_entity_facet(
         filters,
         publisher_ids=[] if kind == "publisher" else filters.publisher_ids,
         serial_ids=[] if kind == "serial" else filters.serial_ids,
+        partner_rors=[] if kind == "partner" else filters.partner_rors,
     )
     where, binds = assemble_where(
         stats_filter_clauses(
