@@ -38,7 +38,7 @@ class TotalCountResponse(BaseModel):
 class EnumOption(BaseModel):
     """Une valeur d'enum exposée à l'interface : `{value, label_fr}`.
 
-    Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, journal_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+    Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, serial_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
     """
 
     value: str

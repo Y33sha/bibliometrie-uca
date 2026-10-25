@@ -11,8 +11,8 @@ from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_disappeared
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
-from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
+from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 

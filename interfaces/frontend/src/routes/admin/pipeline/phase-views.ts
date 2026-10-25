@@ -159,7 +159,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         { key: "corrected", label: "corrigées" },
       ],
       rows: [
-        { key: "journal_by_doi", label: "Rattachement journal (par DOI)" },
+        { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
         { key: "unary", label: "Corrections à l'unité" },
         { key: "cluster", label: "Corrections par grappe" },
       ],

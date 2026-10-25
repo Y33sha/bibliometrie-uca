@@ -1,8 +1,8 @@
 """Adapter PostgreSQL pour l'édition, l'enrichissement pays et la fusion de l'agrégat Publisher.
 
-Séparé de `journal_repository.py` (principe ISP). Le trouve-ou-crée, alimenté par le pipeline, vit dans `pipeline/transformation/publishing/publishers/publishers.py`. Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/`.
+Séparé de `serial_repository.py` (principe ISP). Le trouve-ou-crée, alimenté par le pipeline, vit dans `pipeline/transformation/publishing/publishers/publishers.py`. Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/`.
 
-La fusion d'éditeurs applique la règle de fusion de chaque donnée d'un éditeur (`publisher_merge`) ; la détection préalable des revues homonymes est dans `JournalRepository.find_shared_title_journal_pairs`, le service de fusion d'éditeurs orchestrant les deux.
+La fusion d'éditeurs applique la règle de fusion de chaque donnée d'un éditeur (`publisher_merge`) ; la détection préalable des revues homonymes est dans `SerialRepository.find_shared_title_serial_pairs`, le service de fusion d'éditeurs orchestrant les deux.
 """
 
 from typing import NamedTuple

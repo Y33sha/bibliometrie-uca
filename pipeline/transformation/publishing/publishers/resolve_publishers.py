@@ -211,7 +211,7 @@ def _store_publisher_metadata(
     datacite_client_symbol: str | None = None
 
     # Noms mis à plat une fois : servent de nom stocké et de base au nom normalisé (clé de
-    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_journal`).
+    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_serial`).
     if answer.crossref is not None:
         publisher_name_raw, crossref_member_id = answer.crossref
         publisher_name_raw = to_plain_text(publisher_name_raw)

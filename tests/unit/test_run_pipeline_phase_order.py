@@ -25,12 +25,13 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
         patch.object(finalize_phase, "refresh_publications_perimeter_evidence"),
         patch.object(finalize_phase, "refresh_contribution_structures"),
         patch.object(finalize_phase, "refresh_publication_structures"),
+        patch.object(finalize_phase, "refresh_serial_publishers", return_value=0),
         patch.object(
             finalize_phase, "recompute_address_publication_count", return_value=0
         ) as addresses,
         patch.object(
-            finalize_phase, "refresh_journal_publication_counts", return_value=0
-        ) as journals,
+            finalize_phase, "refresh_serial_publication_counts", return_value=0
+        ) as serials,
         patch.object(
             finalize_phase, "refresh_publisher_publication_counts", return_value=0
         ) as publishers,
@@ -46,7 +47,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
             )
         )
     addresses.assert_called_once()
-    journals.assert_called_once()
+    serials.assert_called_once()
     publishers.assert_called_once()
 
 

@@ -47,10 +47,10 @@ def test_les_taches_s_enchainent_dans_l_ordre_du_graphe(contexte):
 
 def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     fusion = PhaseMetrics()
-    fusion.add(seen=2, journals_merged=2)
+    fusion.add(seen=2, serials_merged=2)
     fusion.report = "2 revues fusionnées"
     with caplog.at_level(logging.INFO, logger="test"):
-        _run(contexte, merge_duplicate_journals=fusion)
+        _run(contexte, merge_duplicate_serials=fusion)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
     assert lignes[:3] == [
         "▶ Éditeurs",
@@ -74,7 +74,7 @@ def test_acces_non_configure_saute_les_taches_a_source(contexte, caplog):
     appels: list[str] = []
     with caplog.at_level(logging.INFO, logger="test"):
         metrics = _run(contexte, appels, credentials_missing="clé absente")
-    assert "enrich_journals_from_openalex" not in appels
-    assert "merge_duplicate_journals" in appels  # tâche sans source
+    assert "enrich_serials_from_openalex" not in appels
+    assert "merge_duplicate_serials" in appels  # tâche sans source
     assert "Type des revues sur OpenAlex : sautée, accès non configuré" in caplog.text
     assert {s["code"] for s in metrics.signals} == {"source_unconfigured"}

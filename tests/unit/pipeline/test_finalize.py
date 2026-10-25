@@ -46,9 +46,9 @@ def _patch_sql(counts: _Counts) -> list:
             ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
             ("refresh_contribution_structures", "structures des groupes", None),
             ("refresh_publication_structures", "structures des publications", None),
-            ("refresh_journal_publishers", "éditeur des revues", 4),
+            ("refresh_serial_publishers", "éditeur des revues", 4),
             ("recompute_address_publication_count", "adresses", 7),
-            ("refresh_journal_publication_counts", "revues", 3),
+            ("refresh_serial_publication_counts", "revues", 3),
             ("refresh_publisher_publication_counts", "éditeurs", 2),
         )
     ]
@@ -111,7 +111,7 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
             appels.append(nom)
             m = PhaseMetrics()
             if n:
-                m.add(journals_deleted=n)
+                m.add(serials_deleted=n)
                 m.report = f"{n} supprimées"
             return m
 
@@ -133,6 +133,6 @@ def test_referentiels_vides_supprimes_apres_la_purge(open_tx, contexte, caplog):
         ).run(contexte())
 
     assert appels == ["monographies", "revues", "éditeurs"]
-    assert rendu.extras["journals_deleted"] == 2
+    assert rendu.extras["serials_deleted"] == 2
     assert "  ├─ Revues vides : 2 supprimées" in caplog.messages
     assert "  └─ Éditeurs vides : rien à faire" in caplog.messages

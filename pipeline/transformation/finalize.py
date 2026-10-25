@@ -4,7 +4,7 @@ Tâches (`pipeline.graph`), chacune dans sa transaction :
 
 1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`.
 2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
-3. **éditeur des revues** — recalcule l'éditeur de chaque revue d'après ses publications (`journal_publishers`).
+3. **éditeur des revues** — recalcule l'éditeur de chaque revue d'après ses publications (`serial_publishers`).
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
 5. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
@@ -30,24 +30,24 @@ from pipeline.transformation.publications.lifecycle import purge_publications
 from pipeline.transformation.publications.publication_perimeter import (
     refresh_publications_perimeter_evidence,
 )
-from pipeline.transformation.publishing.journals import delete_empty_journals
-from pipeline.transformation.publishing.journals.delete_empty_journals import (
-    run_delete_empty_journals,
-)
-from pipeline.transformation.publishing.journals.journal_publishers import (
-    refresh_journal_publishers,
-)
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
     run_delete_empty_monographs,
 )
 from pipeline.transformation.publishing.publication_counts import (
-    refresh_journal_publication_counts,
     refresh_publisher_publication_counts,
+    refresh_serial_publication_counts,
 )
 from pipeline.transformation.publishing.publishers import delete_empty_publishers
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     run_delete_empty_publishers,
+)
+from pipeline.transformation.publishing.serials import delete_empty_serials
+from pipeline.transformation.publishing.serials.delete_empty_serials import (
+    run_delete_empty_serials,
+)
+from pipeline.transformation.publishing.serials.serial_publishers import (
+    refresh_serial_publishers,
 )
 from pipeline.transformation.structures.address_publication_count import (
     recompute_address_publication_count,
@@ -102,9 +102,9 @@ class FinalizePhase:
             metrics.details["purged"] = _purge_publications(ctx.open_tx)
             return metrics
 
-        def journal_publishers(ctx: PhaseContext) -> PhaseMetrics:
+        def serial_publishers(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                changed = refresh_journal_publishers(conn)
+                changed = refresh_serial_publishers(conn)
             metrics = PhaseMetrics()
             metrics.report = (
                 f"{quantity(changed, 'revue')} {inflect(changed, 'mise à jour', 'mises à jour')}"
@@ -133,8 +133,8 @@ class FinalizePhase:
                     structures, section=sync_section, label="Structures des liens"
                 ),
                 "finalize.purge_publications": TaskStep(purge),
-                "finalize.journal_publishers": TaskStep(
-                    journal_publishers, label="Éditeur des revues"
+                "finalize.serial_publishers": TaskStep(
+                    serial_publishers, label="Éditeur des revues"
                 ),
                 "finalize.delete_empty_containers": TaskStep(empty_containers),
                 "finalize.publication_counts": TaskStep(publication_counts),
@@ -205,9 +205,9 @@ def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger
 
     with waiting(f"{BRANCH}par revue", logger) as line:
         with open_tx() as conn:
-            journals = refresh_journal_publication_counts(conn)
+            serials = refresh_serial_publication_counts(conn)
         line.conclude(
-            f"{BRANCH}{quantity(journals, 'revue')} {inflect(journals, 'mise à jour', 'mises à jour')}"
+            f"{BRANCH}{quantity(serials, 'revue')} {inflect(serials, 'mise à jour', 'mises à jour')}"
         )
 
     with waiting(f"{LAST_BRANCH}par éditeur", logger) as line:
@@ -224,7 +224,7 @@ def build() -> Phase:
     return FinalizePhase(
         empty_containers=(
             (delete_empty_monographs.LABEL, _run_delete_empty_monographs),
-            (delete_empty_journals.LABEL, _run_delete_empty_journals),
+            (delete_empty_serials.LABEL, _run_delete_empty_serials),
             (delete_empty_publishers.LABEL, _run_delete_empty_publishers),
         ),
     )
@@ -235,9 +235,9 @@ def _run_delete_empty_monographs(ctx: PhaseContext) -> PhaseMetrics:
         return run_delete_empty_monographs(conn, ctx.logger)
 
 
-def _run_delete_empty_journals(ctx: PhaseContext) -> PhaseMetrics:
+def _run_delete_empty_serials(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_delete_empty_journals(conn, ctx.logger)
+        return run_delete_empty_serials(conn, ctx.logger)
 
 
 def _run_delete_empty_publishers(ctx: PhaseContext) -> PhaseMetrics:

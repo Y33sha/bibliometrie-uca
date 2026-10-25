@@ -45,7 +45,7 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "type",
         "year",
         "title",
-        "journal",
+        "serial",
         "publisher",
         "labs",
         "corr",
@@ -80,7 +80,7 @@ class PublicationFilters:
     lab_none: bool = False
     years: list[int] = field(default_factory=list)
     publisher_id: int | None = None
-    journal_id: int | None = None
+    serial_id: int | None = None
     monograph_id: int | None = None
     access: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
@@ -131,8 +131,8 @@ class PublicationListItem(BaseModel):
     doc_type: str
     oa_status: str
     license: str | None  # licence de la version éditeur
-    journal: str | None
-    journal_id: int | None
+    serial: str | None
+    serial_id: int | None
     publisher: str | None
     publisher_id: int | None
     hal_id: str | None
@@ -220,9 +220,9 @@ class PublicationDetailCore(BaseModel):
     language: str | None
     container_title: str | None
     abstract: str | None
-    journal_id: int | None
+    serial_id: int | None
     journal_title: str | None
-    journal_issns: list[str]
+    serial_issns: list[str]
     """ISSN actifs de la revue."""
     apc_amount: float | None
     apc_currency: str | None
@@ -354,7 +354,7 @@ class PublicationDetailResponse(BaseModel):
 class SourceRecordMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
-    `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+    `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
     """
 
     id: int
@@ -370,7 +370,7 @@ class SourceRecordMetadataOut(BaseModel):
     language_name: str | None
     language_raw: str | None
     oa_status: str | None
-    journal_id: int | None
+    serial_id: int | None
     journal_title: str | None
     journal_raw_title: str | None
     journal_raw_issn: str | None

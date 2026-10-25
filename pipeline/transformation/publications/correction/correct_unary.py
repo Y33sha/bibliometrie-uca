@@ -1,6 +1,6 @@
 """Phase `metadata_correction` — sous-étape unaire : chaque `source_record` corrigée par `correct_source_record`, la mise à jour persistée quand elle change quelque chose.
 
-Les journaux sont typés à ce stade : la phase tourne après `publishers_journals`. La correction repart des valeurs d'avant correction, si bien qu'un changement de `journal_type` qui (dé)clenche une règle est rattrapé au run suivant.
+Les journaux sont typés à ce stade : la phase tourne après `publishers_journals`. La correction repart des valeurs d'avant correction, si bien qu'un changement de `serial_type` qui (dé)clenche une règle est rattrapé au run suivant.
 """
 
 import logging

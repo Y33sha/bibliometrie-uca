@@ -9,7 +9,7 @@ from domain.merge import MergedEntity
 
 _NOT_FOUND = {
     MergedEntity.PERSON: "Personne introuvable",
-    MergedEntity.JOURNAL: "Revue introuvable",
+    MergedEntity.SERIAL: "Revue introuvable",
     MergedEntity.PUBLISHER: "Éditeur introuvable",
     MergedEntity.MONOGRAPH: "Monographie introuvable",
     MergedEntity.PUBLICATION: "Publication introuvable",

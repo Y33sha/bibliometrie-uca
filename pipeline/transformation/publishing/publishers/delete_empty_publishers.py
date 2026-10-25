@@ -16,10 +16,10 @@ LABEL = "Éditeurs vides"
 # Leurs propres formes de nom partent avec eux (`ON DELETE CASCADE`).
 _DELETE_EMPTY_PUBLISHERS = text("""
     DELETE FROM publishers p
-    WHERE NOT EXISTS (SELECT 1 FROM journals j WHERE j.publisher_id = p.id)
+    WHERE NOT EXISTS (SELECT 1 FROM serials j WHERE j.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM doi_prefixes d WHERE d.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM apc_payments a WHERE a.publisher_id = p.id)
-      AND NOT EXISTS (SELECT 1 FROM journal_name_forms f WHERE f.publisher_id = p.id)
+      AND NOT EXISTS (SELECT 1 FROM serial_name_forms f WHERE f.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM monographs m WHERE m.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM source_records sr WHERE sr.publisher_id = p.id)
       AND NOT EXISTS (SELECT 1 FROM publications pu WHERE pu.publisher_id = p.id)

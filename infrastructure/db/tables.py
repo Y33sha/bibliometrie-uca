@@ -37,8 +37,6 @@ from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
-from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
-from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.merge import MergedEntity
 from domain.persons.group_matching import GroupMatchReason
 from domain.persons.identifiers import AttributionStatus
@@ -50,6 +48,8 @@ from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
+from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
+from domain.serials.serial import OA_MODELS, SERIAL_TYPES
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -223,7 +223,7 @@ person_exclusion_enum = PgEnum(
     create_type=False,
 )
 
-journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
+serial_type_enum = PgEnum(*SERIAL_TYPES, name="serial_type", create_type=False)
 
 oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
 issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
@@ -378,8 +378,8 @@ ror_dump_imports = Table(
 )
 
 
-journals = Table(
-    "journals",
+serials = Table(
+    "serials",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("title", Text, nullable=False),
@@ -391,7 +391,7 @@ journals = Table(
     Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("journal_type", journal_type_enum, server_default="unknown"),
+    Column("serial_type", serial_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
@@ -399,15 +399,15 @@ journals = Table(
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_publications` / le tri / l'affichage.
     Column("publication_count", Integer, nullable=False, server_default="0"),
-    # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
+    # Champs saisis à la main (`domain.serials.journal.ManualField`) : le pipeline ne les écrit pas.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
-    UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
+    UniqueConstraint("openalex_id", name="serials_openalex_id_key"),
     schema="publishing",
 )
 
 
-journal_issns = Table(
-    "journal_issns",
+serial_issns = Table(
+    "serial_issns",
     metadata,
     Column("id", Integer, primary_key=True),
     Column(
@@ -416,7 +416,7 @@ journal_issns = Table(
         nullable=False,
         comment="Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).",
     ),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
         "linking",
@@ -447,8 +447,8 @@ journal_issns = Table(
     ),
     UniqueConstraint(
         "issn",
-        "journal_id",
-        name="uq_journal_issns_issn_journal",
+        "serial_id",
+        name="uq_serial_issns_issn_serial",
         postgresql_nulls_not_distinct=True,
     ),
     comment=(
@@ -458,24 +458,24 @@ journal_issns = Table(
 )
 
 
-journal_name_forms = Table(
-    "journal_name_forms",
+serial_name_forms = Table(
+    "serial_name_forms",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("journal_id", Integer, nullable=False),
+    Column("serial_id", Integer, nullable=False),
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
-    UniqueConstraint("form_normalized", "publisher_id", name="uq_jnl_nf_form_publisher"),
+    UniqueConstraint("form_normalized", "publisher_id", name="uq_serial_name_forms_form_publisher"),
     schema="publishing",
 )
 
 
-journal_doi_namespaces = Table(
-    "journal_doi_namespaces",
+serial_doi_namespaces = Table(
+    "serial_doi_namespaces",
     metadata,
     Column("namespace", Text, primary_key=True),
-    Column("journal_id", Integer, nullable=False),
+    Column("serial_id", Integer, nullable=False),
     Column("dois", Integer, nullable=False),
     Column("share", Float, nullable=False),
     schema="publishing",
@@ -504,7 +504,7 @@ monographs = Table(
     Column("eisbn", Text),
     Column("publisher_id", Integer),
     Column(
-        "journal_id",
+        "serial_id",
         Integer,
         comment="Collection dont la monographie fait partie, quand cette collection porte un ISSN.",
     ),
@@ -531,7 +531,7 @@ publishers = Table(
         server_default="unknown",
     ),
     # Compte matérialisé des publications in-perimeter de l'éditeur (= somme de ses
-    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.publication_count`.
+    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `serials.publication_count`.
     Column("publication_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     schema="publishing",
@@ -1100,7 +1100,7 @@ publications = Table(
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("monograph_id", Integer),
     Column(
         "publisher_id",
@@ -1142,7 +1142,7 @@ publications = Table(
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
     # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
-    # publication_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
+    # publication_count par éditeur/revue (jointure via serial_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
     # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
     # composantes ne produit jamais deux publications au même DOI (assignation à
@@ -1207,7 +1207,7 @@ source_records = Table(
     ),
     Column("urls", ARRAY(Text)),
     Column("impact", Jsonb),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("monograph_id", Integer),
     Column(
         "publisher_id",
@@ -1341,7 +1341,7 @@ distinct_persons = Table(
 # Relevés de paiements de frais de publication (Article Processing Charges) :
 # une ligne par paiement, importés depuis des exports comptables (colonnes à
 # plat ; `source_file` trace le fichier d'origine). `publication_id`,
-# `journal_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
+# `serial_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
 apc_payments = Table(
     "apc_payments",
     metadata,
@@ -1360,7 +1360,7 @@ apc_payments = Table(
     Column("source_file", Text),
     Column("remarks", Text),
     Column("publication_id", Integer),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("publisher_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),

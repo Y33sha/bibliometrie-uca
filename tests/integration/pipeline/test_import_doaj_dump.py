@@ -4,18 +4,18 @@ import logging
 
 from sqlalchemy import text
 
-from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
+from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     run_import_doaj_dump,
 )
-from tests.integration.helpers.journals import insert_journal, insert_journal_issn
+from tests.integration.helpers.serials import insert_serial, insert_serial_issn
 
 
-def _create_journal(conn, *, issn=None, eissn=None):
-    journal_id = insert_journal(conn, "J")
+def _create_serial(conn, *, issn=None, eissn=None):
+    serial_id = insert_serial(conn, "J")
     for value, support in ((issn, "print"), (eissn, "electronic")):
         if value:
-            insert_journal_issn(conn, journal_id, issn=value, support=support)
-    return journal_id
+            insert_serial_issn(conn, serial_id, issn=value, support=support)
+    return serial_id
 
 
 def _row(issn="", eissn="", **extra):
@@ -40,30 +40,30 @@ def _run(conn, rows, *, dry_run=False):
 
 def _is_in_doaj(conn, jid):
     return conn.execute(
-        text("SELECT is_in_doaj FROM journals WHERE id = :id"), {"id": jid}
+        text("SELECT is_in_doaj FROM serials WHERE id = :id"), {"id": jid}
     ).scalar_one()
 
 
 class TestImportDoajDump:
     def test_matches_by_issn_and_writes_payload(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, issn="0028-0836")
+        jid = _create_serial(sa_sync_conn, issn="0028-0836")
         stats = _run(sa_sync_conn, [_row(issn="0028-0836", **{"Journal title": "Foo"})])
         assert stats.matched == 1
         row = sa_sync_conn.execute(
-            text("SELECT is_in_doaj, doaj_payload FROM journals WHERE id = :id"), {"id": jid}
+            text("SELECT is_in_doaj, doaj_payload FROM serials WHERE id = :id"), {"id": jid}
         ).one()
         assert row.is_in_doaj is True
         assert row.doaj_payload["Journal title"] == "Foo"
 
     def test_matches_on_eissn_when_print_absent(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, eissn="1476-4687")
+        jid = _create_serial(sa_sync_conn, eissn="1476-4687")
         stats = _run(sa_sync_conn, [_row(eissn="1476-4687")])
         assert stats.matched == 1
         assert _is_in_doaj(sa_sync_conn, jid) is True
 
     def test_matches_on_normalized_issn(self, sa_sync_conn):
         """Un ISSN du dump est normalisé avant d'être comparé aux ISSN des revues."""
-        jid = _create_journal(sa_sync_conn, issn="0071-190X")
+        jid = _create_serial(sa_sync_conn, issn="0071-190X")
         stats = _run(sa_sync_conn, [_row(issn="0071190X")])
         assert stats.matched == 1
         assert _is_in_doaj(sa_sync_conn, jid) is True
@@ -72,21 +72,21 @@ class TestImportDoajDump:
         stats = _run(sa_sync_conn, [_row(issn="1234-5678")])  # clé de contrôle fausse
         assert stats.no_issn_rows == 1
 
-    def test_reset_clears_journals_absent_from_dump(self, sa_sync_conn):
+    def test_reset_clears_serials_absent_from_dump(self, sa_sync_conn):
         # Un journal marqué is_in_doaj mais absent du dump repasse à FALSE.
-        jid = _create_journal(sa_sync_conn, issn="0036-8075")
-        _create_journal(sa_sync_conn, issn="0028-0836")
+        jid = _create_serial(sa_sync_conn, issn="0036-8075")
+        _create_serial(sa_sync_conn, issn="0028-0836")
         sa_sync_conn.execute(
-            text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
+            text("UPDATE serials SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
         _run(sa_sync_conn, [_row(issn="0028-0836")])  # dump sans notre premier ISSN
         assert _is_in_doaj(sa_sync_conn, jid) is False
 
-    def test_dump_without_recognized_journal_changes_nothing(self, sa_sync_conn):
+    def test_dump_without_recognized_serial_changes_nothing(self, sa_sync_conn):
         """Aucune revue reconnue (format du dump changé, par exemple) : les revues restent en l'état."""
-        jid = _create_journal(sa_sync_conn, issn="0036-8075")
+        jid = _create_serial(sa_sync_conn, issn="0036-8075")
         sa_sync_conn.execute(
-            text("UPDATE journals SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
+            text("UPDATE serials SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
         stats = _run(sa_sync_conn, [{"Colonne renommée": "0036-8075"}])
         assert stats.matched == 0
@@ -98,7 +98,7 @@ class TestImportDoajDump:
         assert stats.matched == 0
 
     def test_dry_run_counts_but_writes_nothing(self, sa_sync_conn):
-        jid = _create_journal(sa_sync_conn, issn="0028-0836")
+        jid = _create_serial(sa_sync_conn, issn="0028-0836")
         stats = _run(sa_sync_conn, [_row(issn="0028-0836")], dry_run=True)
         assert stats.matched == 1  # compté
         assert _is_in_doaj(sa_sync_conn, jid) is False  # mais rien écrit

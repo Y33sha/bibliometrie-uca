@@ -1,8 +1,8 @@
 """Service Éditeurs — écritures sur l'agrégat Publisher, transaction-agnostiques.
 
-Agrégat distinct de Journal, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
+Agrégat distinct de Serial, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
 
-La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `JournalRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
+La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `SerialRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
 """
 
 from collections import Counter
@@ -10,25 +10,25 @@ from collections import Counter
 from sqlalchemy import Connection
 
 from application.audit_log import emit_event
-from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.pipeline.publication_count import PublicationCountRecompute
+from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
+from application.ports.repositories.serial_repository import SerialRepository
 from application.services._merge import load_merge_pair
-from application.services.journals.core import merge_journals
+from application.services.serials.core import merge_serials
 from domain.errors import (
-    BlockingJournal,
+    BlockingSerial,
     ConflictError,
     NotFoundError,
     PublisherMergeBlockedError,
     ValidationError,
 )
-from domain.journals.issns import issn_conflict
 from domain.publishers.members import crossref_member_conflict
+from domain.serials.issns import issn_conflict
 
 
 def update_publisher(
@@ -65,8 +65,8 @@ def merge_publishers(
     *,
     conn: Connection,
     publisher_repo: PublisherRepository,
-    journal_repo: JournalRepository,
-    recompute: JournalRecompute,
+    serial_repo: SerialRepository,
+    recompute: SerialRecompute,
     publication_count_recompute: PublicationCountRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
@@ -74,7 +74,7 @@ def merge_publishers(
 
     Deux invariants métier refusent la fusion (`ConflictError`), chacun sur un identifiant déclaré : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
 
-    La détection est côté `journal_repo` (requête sur `journals`), la fusion finale côté `publisher_repo` (transferts + delete).
+    La détection est côté `serial_repo` (requête sur `serials`), la fusion finale côté `publisher_repo` (transferts + delete).
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
     """
@@ -91,29 +91,29 @@ def merge_publishers(
     #    Collecter toutes les paires bloquantes en une passe pour lever
     #    PublisherMergeBlockedError avec l'ensemble — l'UI les affiche
     #    d'un coup.
-    pairs = journal_repo.find_shared_title_journal_pairs(target_id, source_id)
+    pairs = serial_repo.find_shared_title_serial_pairs(target_id, source_id)
     # Si un journal apparaît dans plusieurs paires, l'éditeur correspondant
     # contient un doublon interne (2 journaux au même title_normalized). La
     # fusion N→1 casserait (la source supprimée puis rechargée). On signale
     # toutes les paires concernées comme bloquantes.
-    target_seen = Counter(p["target_journal_id"] for p in pairs)
-    source_seen = Counter(p["source_journal_id"] for p in pairs)
-    blockers: list[BlockingJournal] = []
+    target_seen = Counter(p["target_serial_id"] for p in pairs)
+    source_seen = Counter(p["source_serial_id"] for p in pairs)
+    blockers: list[BlockingSerial] = []
     mergeable_pairs = []
     for pair in pairs:
         reasons: list[str] = []
-        if target_seen[pair["target_journal_id"]] > 1:
+        if target_seen[pair["target_serial_id"]] > 1:
             reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
-        if source_seen[pair["source_journal_id"]] > 1:
+        if source_seen[pair["source_serial_id"]] > 1:
             reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
         if conflict := issn_conflict(pair["t_issns"], pair["s_issns"]):
             reasons.append(f"{conflict} (cible / source)")
         if reasons:
             blockers.append(
-                BlockingJournal(
-                    target_journal_id=pair["target_journal_id"],
+                BlockingSerial(
+                    target_serial_id=pair["target_serial_id"],
                     target_title=pair["t_title"],
-                    source_journal_id=pair["source_journal_id"],
+                    source_serial_id=pair["source_serial_id"],
                     source_title=pair["s_title"],
                     reason=" ; ".join(reasons),
                 )
@@ -124,11 +124,11 @@ def merge_publishers(
         raise PublisherMergeBlockedError(blockers)
 
     for pair in mergeable_pairs:
-        merge_journals(
-            pair["target_journal_id"],
-            pair["source_journal_id"],
+        merge_serials(
+            pair["target_serial_id"],
+            pair["source_serial_id"],
             conn=conn,
-            repo=journal_repo,
+            repo=serial_repo,
             recompute=recompute,
             audit_repo=audit_repo,
         )

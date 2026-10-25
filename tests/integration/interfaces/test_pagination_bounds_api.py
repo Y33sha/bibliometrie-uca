@@ -18,7 +18,7 @@ class TestPlafondDeDecalage:
 
     def test_le_refus_vaut_pour_les_autres_listes(self, client):
         page = settings.max_pagination_offset // 50 + 2
-        for chemin in ("/api/journals", "/api/publishers", "/api/subjects", "/api/persons"):
+        for chemin in ("/api/serials", "/api/publishers", "/api/subjects", "/api/persons"):
             r = client.get(f"{chemin}?page={page}&per_page=50")
             assert r.status_code == 422, chemin
 

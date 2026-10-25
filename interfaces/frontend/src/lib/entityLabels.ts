@@ -7,7 +7,7 @@ import { titleCase } from '$lib/utils';
 
 type EntityLabelResponse = components['schemas']['EntityLabelResponse'];
 
-export type EntityKind = 'publisher' | 'journal' | 'person' | 'subject';
+export type EntityKind = 'publisher' | 'serial' | 'person' | 'subject';
 
 /** Libellé affiché. Un nom de personne passe par `titleCase`, certains étant enregistrés en majuscules. */
 export function displayEntityLabel(kind: EntityKind, label: string): string {

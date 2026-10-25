@@ -9,8 +9,8 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, Row, bindparam, func, text
 
-from domain.journals.doi_namespaces import DoiNamespace
 from domain.publications.doc_types import DocType
+from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CorrectionKey
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
 from domain.source_records.metadata_correction.shared_doi import (
@@ -53,22 +53,22 @@ class CorrectionUpdate(NamedTuple):
     corrected: CorrectedSourceRecord
 
 
-class JournalCorrectionRow(NamedTuple):
-    """Une `source_record` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `journal_id` courant et `corrections` (reconstruction du brut `journal_id` et garde « ne corriger que le manquant »)."""
+class SerialCorrectionRow(NamedTuple):
+    """Une `source_record` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `serial_id` courant et `corrections` (reconstruction du brut `serial_id` et garde « ne corriger que le manquant »)."""
 
     id: int
     source: str
     raw_doc_type: str | None
     doi: str | None
-    journal_id: int | None
+    serial_id: int | None
     corrections: dict[str, JsonValue]
 
 
-class JournalCorrectionUpdate(NamedTuple):
-    """Une mise à jour de rattachement : colonne `journal_id` (posée ou restaurée à NULL) + sidecar `corrections`. Produite par la sous-étape `journal_by_doi`, persistée via `persist_journal_corrections`."""
+class SerialCorrectionUpdate(NamedTuple):
+    """Une mise à jour de rattachement : colonne `serial_id` (posée ou restaurée à NULL) + sidecar `corrections`. Produite par la sous-étape `serial_by_doi`, persistée via `persist_serial_corrections`."""
 
     id: int
-    journal_id: int | None
+    serial_id: int | None
     corrections: dict[str, JsonValue]
 
 
@@ -122,8 +122,8 @@ _FACTS: dict[str, str] = {
     "title": "sr.title",
     "doc_type": "sr.doc_type",
     "doi": "sr.doi",
-    "journal_id": "sr.journal_id",
-    "journal_type": "j.journal_type::text",
+    "serial_id": "sr.serial_id",
+    "serial_type": "j.serial_type::text",
     "oa_status": "sr.oa_status",
     "oa_model": "j.oa_model",
     "urls": "sr.urls",
@@ -146,7 +146,7 @@ _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.external_ids, sr.corrections,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
-    LEFT JOIN journals j ON j.id = sr.journal_id
+    LEFT JOIN serials j ON j.id = sr.serial_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
     LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sr.doi, '/', 1)
     LEFT JOIN publishers rp ON rp.id = dp.publisher_id
@@ -216,18 +216,18 @@ class SourceRecordCorrectionStore:
         self._conn = conn
 
     def fetch_for_unary_correction(self) -> list[UnaryCorrectionRow]:
-        """Toutes les `source_records`, avec join `journals` et `corrections`.
+        """Toutes les `source_records`, avec join `serials` et `corrections`.
 
         Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_record` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
         """
         return _unary_rows(self._conn.execute(text(_SELECT)))
 
-    def fetch_for_unary_correction_by_journal(self, journal_id: int) -> list[UnaryCorrectionRow]:
-        """Les `source_records` rattachées à un journal (`journal_id = :jid`).
+    def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
+        """Les `source_records` rattachées à un journal (`serial_id = :jid`).
 
-        Recompute ciblé après un changement de `journal_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
+        Recompute ciblé après un changement de `serial_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
         return _unary_rows(
-            self._conn.execute(text(_SELECT + " WHERE sr.journal_id = :jid"), {"jid": journal_id})
+            self._conn.execute(text(_SELECT + " WHERE sr.serial_id = :jid"), {"jid": serial_id})
         )
 
     def fetch_for_unary_correction_by_hal_ids(self, hal_ids: list[str]) -> list[UnaryCorrectionRow]:
@@ -247,28 +247,28 @@ class SourceRecordCorrectionStore:
             self._conn, [{"id": u.id, **u.corrected._asdict()} for u in updates]
         )
 
-    def fetch_journal_doi_namespaces(self) -> list[DoiNamespace]:
-        """Le contenu de `journal_doi_namespaces`."""
+    def fetch_serial_doi_namespaces(self) -> list[DoiNamespace]:
+        """Le contenu de `serial_doi_namespaces`."""
         rows = self._conn.execute(
-            text("SELECT namespace, journal_id, dois, share FROM journal_doi_namespaces")
+            text("SELECT namespace, serial_id, dois, share FROM serial_doi_namespaces")
         )
         return rows_as(DoiNamespace, rows)
 
-    def fetch_journal_by_doi_candidates(self) -> list[JournalCorrectionRow]:
-        """`source_records` candidates au rattachement : orphelines à DOI (`journal_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`corrections ? 'journal_id'`, pour la ré-évaluation auto-cicatrisante)."""
+    def fetch_serial_by_doi_candidates(self) -> list[SerialCorrectionRow]:
+        """`source_records` candidates au rattachement : orphelines à DOI (`serial_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`corrections ? 'serial_id'`, pour la ré-évaluation auto-cicatrisante)."""
         rows = self._conn.execute(
             text(f"""
                 SELECT id, source::text AS source, raw_doc_type,
-                       doi, journal_id, corrections
+                       doi, serial_id, corrections
                 FROM source_records
-                WHERE (journal_id IS NULL AND doi IS NOT NULL)
-                   OR {corrected("journal_id", "source_records")}
+                WHERE (serial_id IS NULL AND doi IS NOT NULL)
+                   OR {corrected("serial_id", "source_records")}
             """)
         )
-        return rows_as(JournalCorrectionRow, rows)
+        return rows_as(SerialCorrectionRow, rows)
 
-    def persist_journal_corrections(self, updates: list[JournalCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `journal_id` + `corrections`, bump `updated_at`, marque pour la réconciliation (pour que la réconciliation rafraîchisse le `journal_id` de la publication — bien que `journal_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
+    def persist_serial_corrections(self, updates: list[SerialCorrectionUpdate]) -> int:
+        """UPDATE en lot de la colonne `serial_id` + `corrections`, bump `updated_at`, marque pour la réconciliation (pour que la réconciliation rafraîchisse le `serial_id` de la publication — bien que `serial_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:

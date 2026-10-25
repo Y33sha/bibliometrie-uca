@@ -8,20 +8,20 @@ from sqlalchemy import text
 
 from domain.dates import today
 from infrastructure.db.queues import Queue
-from pipeline.transformation.publications.correction import journal_by_doi
+from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
 from pipeline.transformation.publications.correction.correct_unary import compute_update
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from tests.integration.helpers.journals import (
-    insert_doi_prefix,
-    insert_journal,
-    insert_journal_doi_namespace,
-    insert_publisher,
-)
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
+from tests.integration.helpers.serials import (
+    insert_doi_prefix,
+    insert_publisher,
+    insert_serial,
+    insert_serial_doi_namespace,
+)
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de titre « T », OpenAlex par défaut.
@@ -33,11 +33,11 @@ _typed_source_record = partial(
 _source_record = partial(insert_source_record, source="openalex", title="Un titre")
 
 
-def _seed_journal(conn, journal_type: str, namespace: str | None = None) -> int:
-    journal_id = insert_journal(conn, "J", journal_type=journal_type)
+def _seed_serial(conn, serial_type: str, namespace: str | None = None) -> int:
+    serial_id = insert_serial(conn, "J", serial_type=serial_type)
     if namespace is not None:
-        insert_journal_doi_namespace(conn, namespace, journal_id=journal_id, dois=10, share=1.0)
-    return journal_id
+        insert_serial_doi_namespace(conn, namespace, serial_id=serial_id, dois=10, share=1.0)
+    return serial_id
 
 
 def _apply(conn) -> int:
@@ -47,55 +47,55 @@ def _apply(conn) -> int:
     return SourceRecordCorrectionStore(conn).persist_corrections(updates)
 
 
-def _apply_journal_by_doi(conn) -> int:
-    """Joue le sous-step journal_by_doi sans committer."""
-    namespaces = SourceRecordCorrectionStore(conn).fetch_journal_doi_namespaces()
-    rows = SourceRecordCorrectionStore(conn).fetch_journal_by_doi_candidates()
-    return SourceRecordCorrectionStore(conn).persist_journal_corrections(
-        journal_by_doi.compute_updates(rows, namespaces)
+def _apply_serial_by_doi(conn) -> int:
+    """Joue le sous-step serial_by_doi sans committer."""
+    namespaces = SourceRecordCorrectionStore(conn).fetch_serial_doi_namespaces()
+    rows = SourceRecordCorrectionStore(conn).fetch_serial_by_doi_candidates()
+    return SourceRecordCorrectionStore(conn).persist_serial_corrections(
+        serial_by_doi.compute_updates(rows, namespaces)
     )
 
 
-def test_journal_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
-    # The Conversation : DOI dans l'espace de noms d'une revue media, sans journal_id. journal_by_doi
+def test_serial_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
+    # The Conversation : DOI dans l'espace de noms d'une revue media, sans serial_id. serial_by_doi
     # pose la revue ; l'unaire qui suit (même run) la joint et reclasse preprint → media.
     conn = sa_sync_conn
-    media_journal = _seed_journal(conn, "media", namespace="10.64628/aak.")
+    media_serial = _seed_serial(conn, "media", namespace="10.64628/aak.")
     source_record = _source_record(
         conn, source_id="W_tc", doi="10.64628/aak.xyz", doc_type="preprint"
     )
 
-    assert _apply_journal_by_doi(conn) == 1
+    assert _apply_serial_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
+        text("SELECT serial_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
-    assert jid == media_journal
-    assert raw == {"journal_id": {"raw": None, "corrected_by": "JOURNAL_BY_DOI_NAMESPACE"}}
+    assert jid == media_serial
+    assert raw == {"serial_id": {"raw": None, "corrected_by": "SERIAL_BY_DOI_NAMESPACE"}}
 
     _apply(conn)
     doc_type, raw2 = _state(conn, source_record)
     assert doc_type == "media"
-    assert raw2["doc_type"] == {"raw": "preprint", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
-    # Le sous-step unaire préserve la clé possédée par journal_by_doi.
-    assert raw2["journal_id"] == {"raw": None, "corrected_by": "JOURNAL_BY_DOI_NAMESPACE"}
+    assert raw2["doc_type"] == {"raw": "preprint", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
+    # Le sous-step unaire préserve la clé possédée par serial_by_doi.
+    assert raw2["serial_id"] == {"raw": None, "corrected_by": "SERIAL_BY_DOI_NAMESPACE"}
 
 
-def test_journal_by_doi_idempotent_and_self_heals(sa_sync_conn):
+def test_serial_by_doi_idempotent_and_self_heals(sa_sync_conn):
     conn = sa_sync_conn
-    journal = _seed_journal(conn, "journal", namespace="10.5194/acp-")
+    serial = _seed_serial(conn, "journal", namespace="10.5194/acp-")
     source_record = _source_record(
         conn, source_id="W_acp", doi="10.5194/acp-20-1-2020", doc_type="article"
     )
 
-    assert _apply_journal_by_doi(conn) == 1
-    assert _apply_journal_by_doi(conn) == 0  # second run : rien ne change
+    assert _apply_serial_by_doi(conn) == 1
+    assert _apply_serial_by_doi(conn) == 0  # second run : rien ne change
 
     # L'espace de noms disparaît → restauration NULL, stash retiré.
-    conn.execute(text("DELETE FROM journal_doi_namespaces WHERE journal_id = :id"), {"id": journal})
-    assert _apply_journal_by_doi(conn) == 1
+    conn.execute(text("DELETE FROM serial_doi_namespaces WHERE serial_id = :id"), {"id": serial})
+    assert _apply_serial_by_doi(conn) == 1
     jid, raw = conn.execute(
-        text("SELECT journal_id, corrections FROM source_records WHERE id = :id"),
+        text("SELECT serial_id, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert jid is None
@@ -115,11 +115,11 @@ def _doi(conn, source_record_id: int) -> str | None:
     ).scalar_one()
 
 
-def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
+def test_serial_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     conn = sa_sync_conn
-    media_journal = _seed_journal(conn, "media")
+    media_serial = _seed_serial(conn, "media")
     media_source_record = _source_record(
-        conn, source_id="W_media", doc_type="article", journal_id=media_journal
+        conn, source_id="W_media", doc_type="article", serial_id=media_serial
     )
     theses_source_record = _source_record(
         conn, source_id="W_theses", doc_type="article", urls=["https://theses.fr/2020ABCD"]
@@ -132,7 +132,7 @@ def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     media_doc_type, media_raw = _state(conn, media_source_record)
     assert media_doc_type == "media"
     assert media_raw == {
-        "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+        "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
     theses_doc_type, theses_raw = _state(conn, theses_source_record)
@@ -167,8 +167,8 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
 
 def test_reversibility_invariant(sa_sync_conn):
     conn = sa_sync_conn
-    media_journal = _seed_journal(conn, "media")
-    _source_record(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
+    media_serial = _seed_serial(conn, "media")
+    _source_record(conn, source_id="W_media", doc_type="article", serial_id=media_serial)
     _apply(conn)
 
     # COALESCE(corrections->'doc_type'->>'raw', doc_type::text) reconstruit le brut d'origine.
@@ -183,8 +183,8 @@ def test_reversibility_invariant(sa_sync_conn):
 
 def test_idempotent_second_run_changes_nothing(sa_sync_conn):
     conn = sa_sync_conn
-    media_journal = _seed_journal(conn, "media")
-    _source_record(conn, source_id="W_media", doc_type="article", journal_id=media_journal)
+    media_serial = _seed_serial(conn, "media")
+    _source_record(conn, source_id="W_media", doc_type="article", serial_id=media_serial)
     _source_record(
         conn, source_id="W_theses", doc_type="article", urls=["https://theses.fr/2020ABCD"]
     )
@@ -193,19 +193,19 @@ def test_idempotent_second_run_changes_nothing(sa_sync_conn):
     assert _apply(conn) == 0  # rien à recorriger
 
 
-def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
+def test_self_heals_when_serial_no_longer_media(sa_sync_conn):
     conn = sa_sync_conn
-    media_journal = _seed_journal(conn, "media")
+    media_serial = _seed_serial(conn, "media")
     source_record = _source_record(
-        conn, source_id="W_media", doc_type="article", journal_id=media_journal
+        conn, source_id="W_media", doc_type="article", serial_id=media_serial
     )
     assert _apply(conn) == 1
     assert _state(conn, source_record)[0] == "media"
 
     # Le journal change de type : la règle ne s'applique plus, le brut doit revenir.
     conn.execute(
-        text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"),
-        {"id": media_journal},
+        text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"),
+        {"id": media_serial},
     )
     assert _apply(conn) == 1
     doc_type, raw = _state(conn, source_record)
@@ -213,9 +213,9 @@ def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
     assert raw == {}
 
 
-def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
+def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     conn = sa_sync_conn
-    jid = _seed_journal(conn, "journal")
+    jid = _seed_serial(conn, "journal")
     # DOI d'éditeur (préfixe ≠ registre de thèses) : signe la version publiée → la conflation
     # thèse↔article bascule en `article`. (Avec un DOI ABES ou sans DOI, le type resterait thèse.)
     source_record = insert_source_record(
@@ -225,7 +225,7 @@ def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
         title="T",
         doi="10.1016/j.ex.2020.01.001",
         doc_type="thesis",
-        journal_id=jid,
+        serial_id=jid,
         external_ids={"nnt": "2020CLFAC001", "hal_id": ["tel-01", "hal-99"]},
     )
 
@@ -236,8 +236,8 @@ def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
     ).one()
     assert row.doc_type == "article"  # mistype corrigé
     assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
-    assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
-    assert row.corrections["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
+    assert row.corrections["external_ids"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
     # Réversibilité : le brut external_ids est reconstructible.
     raw_nnt = conn.execute(
         text(
@@ -281,17 +281,17 @@ def _oa_status(conn, source_record_id: int) -> str:
 
 def test_diamond_follows_the_journal(sa_sync_conn):
     conn = sa_sync_conn
-    doaj_free = insert_journal(conn, "Sans frais", oa_model="full_oa", is_in_doaj=True)
+    doaj_free = insert_serial(conn, "Sans frais", oa_model="full_oa", is_in_doaj=True)
     conn.execute(
-        text("UPDATE journals SET doaj_payload = CAST(:p AS jsonb) WHERE id = :id"),
+        text("UPDATE serials SET doaj_payload = CAST(:p AS jsonb) WHERE id = :id"),
         {"p": json.dumps({"APC": "No", "Has other fees": "No"}), "id": doaj_free},
     )
-    marked = insert_journal(conn, "Marquée", oa_model="diamond")
-    paying = insert_journal(conn, "Payante", oa_model="full_oa")
-    gold_in_doaj = _source_record(conn, source_id="W-d1", oa_status="gold", journal_id=doaj_free)
-    gold_in_marked = _source_record(conn, source_id="W-d2", oa_status="gold", journal_id=marked)
+    marked = insert_serial(conn, "Marquée", oa_model="diamond")
+    paying = insert_serial(conn, "Payante", oa_model="full_oa")
+    gold_in_doaj = _source_record(conn, source_id="W-d1", oa_status="gold", serial_id=doaj_free)
+    gold_in_marked = _source_record(conn, source_id="W-d2", oa_status="gold", serial_id=marked)
     diamond_in_paying = _source_record(
-        conn, source_id="W-d3", oa_status="diamond", journal_id=paying
+        conn, source_id="W-d3", oa_status="diamond", serial_id=paying
     )
     diamond_without_journal = _source_record(conn, source_id="W-d4", oa_status="diamond")
 

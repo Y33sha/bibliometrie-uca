@@ -3,7 +3,7 @@
 Encapsule les règles d'agrégation : à partir des `source_records` attachées à une publication canonique (lues via `SourceRecord`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
-- **Scalaires nullable** (`title`, `doi`, `doc_type`, `publication_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
+- **Scalaires nullable** (`title`, `doi`, `doc_type`, `publication_year`, `serial_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `serial_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
 - **`oa_status`** : le statut le plus ouvert des sources, ou le verdict d'Unpaywall sur le DOI de la publication (`publication_oa_status` dans `metadata`).
 - **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
@@ -41,7 +41,7 @@ def refresh_from_sources(
     *,
     source_priority: tuple[str, ...],
     secondary_ids: frozenset[int] = frozenset(),
-    monograph_journals: Mapping[int, int | None] | None = None,
+    monograph_serials: Mapping[int, int | None] | None = None,
     unpaywall: Mapping[str, str] | None = None,
 ) -> None:
     """Recalcule l'état de `publication` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `publication` en place ; persistance via `repo.save(publication)` côté caller.
@@ -50,7 +50,7 @@ def refresh_from_sources(
 
     `secondary_ids` liste les `source_records` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
 
-    `monograph_journals` donne l'entrée de `journals` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `journal_id` prend celle de sa monographie.
+    `monograph_serials` donne l'entrée de `serials` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `serial_id` prend celle de sa monographie.
 
     `unpaywall` donne le verdict d'Unpaywall des DOI des sources que connaît Unpaywall.
 
@@ -76,14 +76,10 @@ def refresh_from_sources(
     new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
     publication.doi = DOI(new_doi_str) if new_doi_str else None
 
-    publication.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
+    publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
     publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
-    if (
-        publication.journal_id is None
-        and publication.monograph_id is not None
-        and monograph_journals
-    ):
-        publication.journal_id = monograph_journals.get(publication.monograph_id)
+    if publication.serial_id is None and publication.monograph_id is not None and monograph_serials:
+        publication.serial_id = monograph_serials.get(publication.monograph_id)
     publication.oa_status = publication_oa_status(
         sorted_sources,
         unpaywall.get(publication.doi.value) if publication.doi and unpaywall else None,

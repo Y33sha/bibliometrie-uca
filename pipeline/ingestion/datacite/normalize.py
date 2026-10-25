@@ -13,13 +13,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
@@ -87,7 +87,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume / issue / pages depuis `container` + publisher/journal bruts.
 
-    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
+    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/serials créés via `find_or_create_*`.
     """
     container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
@@ -224,9 +224,9 @@ def datacite_source_record(
         title=title,
         publication_year=publication_year,
         raw_doc_type=extract_datacite_doc_type_token(attributes),
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=container_title if not containers.journal_id else None,
+        container_title=container_title if not containers.serial_id else None,
         raw_language=get_language(attributes),
         biblio=get_biblio(attributes),
         abstract=get_abstract(attributes),

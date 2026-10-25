@@ -29,7 +29,7 @@ from infrastructure.sql_fragments import diamond_journal_sql
 
 EVOLUTION_YEARS = 5
 THESIS_YEARS = 10
-TOP_JOURNAL_MIN_ARTICLES = 2
+TOP_SERIAL_MIN_ARTICLES = 2
 TOP_COUNTRIES = 6
 
 type SqlRow = Row[tuple[object, ...]]
@@ -37,7 +37,7 @@ type SqlRow = Row[tuple[object, ...]]
 # Types comptés dans le taux d'open access.
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
 # Types parus dans une revue, pour les modèles de revues et les APC.
-JOURNAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
+SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
 CONFERENCE_TYPES = (DocType.CONFERENCE, DocType.CONFERENCE_PAPER, DocType.POSTER)
 OPEN_STATUSES = (OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN)
 
@@ -200,10 +200,10 @@ class OpenScienceReport:
         )
         return text_, current
 
-    def journal_models(self) -> str:
+    def serial_models(self) -> str:
         r = self._one(
             f"""
-            SELECT COUNT(*) AS total, COUNT(DISTINCT p.journal_id) AS journals,
+            SELECT COUNT(*) AS total, COUNT(DISTINCT p.serial_id) AS serials,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS}) AS full_oa,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND p.oa_status = ANY(:open)) AS full_oa_open,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND {DIAMOND_JOURNAL}) AS diamond,
@@ -213,10 +213,10 @@ class OpenScienceReport:
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription' AND p.oa_status = 'green') AS green,
                    COUNT(*) FILTER (WHERE j.oa_model IS NULL OR j.oa_model NOT IN ('full_oa', 'diamond', 'subscription')) AS unknown
             FROM ({LAB_PUBLICATIONS}) p
-            LEFT JOIN publishing.journals j ON j.id = p.journal_id
+            LEFT JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
             open=_values(OPEN_STATUSES),
         )
         sub_open = r.hybrid + r.bronze + r.green
@@ -235,7 +235,7 @@ class OpenScienceReport:
         if r.unknown:
             rows.append(("Modèle inconnu ou hors revue", r.unknown, "—"))
         return (
-            f"## Modèles de revues et APC\n\nPérimètre : {r.total} articles, revues de littérature, lettres et éditoriaux de {self.year}, parus dans {r.journals} revues.\n\n"
+            f"## Modèles de revues et APC\n\nPérimètre : {r.total} articles, revues de littérature, lettres et éditoriaux de {self.year}, parus dans {r.serials} revues.\n\n"
             + _table(["Modèle de la revue", "Articles", "Dont ouverts"], rows)
             + "\n\nRevue diamant : revue marquée diamant, ou revue du DOAJ sans APC ni autres frais."
         )
@@ -261,10 +261,10 @@ class OpenScienceReport:
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
-            JOIN publishing.journals j ON j.id = p.journal_id
+            JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types) AND p.oa_status IN ('gold', 'hybrid')
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
         )
         known = [r for r in catalogue if r.apc_amount is not None and r.apc_currency in EUR_RATES]
         total = sum(float(r.apc_amount) * EUR_RATES[r.apc_currency] for r in known)
@@ -279,20 +279,20 @@ class OpenScienceReport:
             f"L'auteur correspondant appartient au laboratoire pour {corresponding} de ces {len(catalogue)} articles."
         )
 
-    def journals(self) -> str:
+    def serials(self) -> str:
         rows = self._rows(
             f"""
             SELECT j.title, pb.name AS publisher, j.oa_model, {DIAMOND_JOURNAL} AS diamond,
                    j.apc_amount, j.apc_currency, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            JOIN publishing.journals j ON j.id = p.journal_id
+            JOIN publishing.serials j ON j.id = p.serial_id
             LEFT JOIN publishing.publishers pb ON pb.id = j.publisher_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             GROUP BY j.id, pb.name ORDER BY n DESC, j.title
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
         )
-        top = [r for r in rows if r.n >= TOP_JOURNAL_MIN_ARTICLES]
+        top = [r for r in rows if r.n >= TOP_SERIAL_MIN_ARTICLES]
         others = len(rows) - len(top)
 
         def model(r: SqlRow) -> str:
@@ -460,7 +460,7 @@ class OpenScienceReport:
             SELECT COALESCE(j.title, p.container_title, 'Entrepôt non renseigné') AS repository,
                    p.license::text AS license, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            LEFT JOIN publishing.journals j ON j.id = p.journal_id
+            LEFT JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'dataset'
             GROUP BY 1, 2 ORDER BY 3 DESC, 1, 2
             """,
@@ -610,8 +610,8 @@ class OpenScienceReport:
             self.synthesis(oa_current, orcid),
             self.typology(),
             oa_text,
-            self.journal_models() + "\n\n" + self.apc(),
-            self.journals(),
+            self.serial_models() + "\n\n" + self.apc(),
+            self.serials(),
             self.conferences(),
             self.books(),
             self.theses(),

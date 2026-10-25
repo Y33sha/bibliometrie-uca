@@ -18,10 +18,10 @@
 	// Liste de monographies réutilisable. Utilisée par :
 	// - `/monographs` et `/admin/monographs` (filtres reportés dans l'URL)
 	// - `/publishers/[id]?tab=monographs` (filtre `publisherId` fixe)
-	// - `/journals/[id]?tab=monographs` (filtre `journalId` fixe)
+	// - `/journals/[id]?tab=monographs` (filtre `serialId` fixe)
 	interface ExternalFilters {
 		publisherId?: number;
-		journalId?: number;
+		serialId?: number;
 	}
 
 	let {
@@ -39,8 +39,8 @@
 
 	// Éditeur ou collection imposés par la page : la colonne porte la même valeur sur toutes les lignes, et est masquée.
 	const publisherFixed = $derived(externalFilters?.publisherId != null);
-	const journalFixed = $derived(externalFilters?.journalId != null);
-	const columnCount = $derived(7 - Number(publisherFixed) - Number(journalFixed));
+	const serialFixed = $derived(externalFilters?.serialId != null);
+	const columnCount = $derived(7 - Number(publisherFixed) - Number(serialFixed));
 
 	const KIND_LABELS: Record<string, string> = { book: 'Livres', proceedings: "Volumes d'actes" };
 
@@ -48,7 +48,7 @@
 	let selectedKinds: string[] = $state([]);
 	let selectedYears: string[] = $state([]);
 	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
-	let selectedJournal: string[] = $state([]); // 0 ou 1 identifiant de collection
+	let selectedSerial: string[] = $state([]); // 0 ou 1 identifiant de collection
 	let currentSort = $state('publications_desc');
 
 	// Paramètres partagés par la liste et ses facettes : les décomptes suivent la recherche.
@@ -56,8 +56,8 @@
 		const params = new URLSearchParams();
 		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : selectedPublisher[0];
 		if (publisherId) params.set('publisher_id', publisherId);
-		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : selectedJournal[0];
-		if (journalId) params.set('journal_id', journalId);
+		const serialId = externalFilters?.serialId != null ? String(externalFilters.serialId) : selectedSerial[0];
+		if (serialId) params.set('serial_id', serialId);
 		if (selectedKinds.length) params.set('type', selectedKinds.join(','));
 		if (selectedYears.length) params.set('year', selectedYears.join(','));
 		const q = search.trim();
@@ -93,7 +93,7 @@
 			selectedKinds: { type: 'string_array', urlKey: 'type' },
 			selectedYears: { type: 'string_array', urlKey: 'year' },
 			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
-			selectedJournal: { type: 'string_array', urlKey: 'journal_id' },
+			selectedSerial: { type: 'string_array', urlKey: 'serial_id' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
@@ -106,7 +106,7 @@
 			selectedKinds,
 			selectedYears,
 			selectedPublisher,
-			selectedJournal,
+			selectedSerial,
 			search,
 			currentSort,
 			currentPage: monographs.page,
@@ -141,7 +141,7 @@
 			if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
 			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
-			if (restored.selectedJournal) selectedJournal = restored.selectedJournal as string[];
+			if (restored.selectedSerial) selectedSerial = restored.selectedSerial as string[];
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) monographs.page = restored.currentPage as number;
@@ -173,14 +173,14 @@
 			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
 		/>
 	{/if}
-	{#if !journalFixed}
+	{#if !serialFixed}
 		<EntityFilter
 			label="Collection"
 			endpoint="/api/monographs/facets"
-			kind="journal"
+			kind="serial"
 			buildParams={buildFilterParams}
-			selected={selectedJournal}
-			onchange={(ids) => { selectedJournal = ids; onFilterChange(); }}
+			selected={selectedSerial}
+			onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
 		/>
 	{/if}
 	<span class="count">{monographs.total.toLocaleString('fr-FR')} monographie{monographs.total > 1 ? 's' : ''}</span>
@@ -195,7 +195,7 @@
 				<th class="num sortable" onclick={() => setSort('year')}>Année {sortArrow('year')}</th>
 				<th>ISBN</th>
 				{#if !publisherFixed}<th>Éditeur</th>{/if}
-				{#if !journalFixed}<th>Collection</th>{/if}
+				{#if !serialFixed}<th>Collection</th>{/if}
 				<th class="num sortable" onclick={() => setSort('publications')}>Publis {sortArrow('publications')}</th>
 			</tr>
 		</thead>
@@ -211,9 +211,9 @@
 							{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.publisher_name}</a>{/if}
 						</td>
 					{/if}
-					{#if !journalFixed}
+					{#if !serialFixed}
 						<td>
-							{#if m.journal_id}<a href="{base}/journals/{m.journal_id}">{m.journal_title}</a>{/if}
+							{#if m.serial_id}<a href="{base}/journals/{m.serial_id}">{m.journal_title}</a>{/if}
 						</td>
 					{/if}
 					<td class="num">{m.publication_count.toLocaleString('fr-FR')}</td>

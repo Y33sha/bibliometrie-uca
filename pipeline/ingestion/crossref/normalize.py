@@ -10,12 +10,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription, ContainerRole, container_role
-from domain.journals.series import split_collection_and_volume
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
+from domain.serials.containers import ContainerDescription, ContainerRole, container_role
+from domain.serials.series import split_collection_and_volume
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
@@ -152,7 +152,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume, issue, pages, article-number + publisher/journal bruts.
 
-    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
+    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/serials créés via `find_or_create_*`.
     """
     issn_val, eissn_val = get_issns(msg)
     article_number = as_text(msg.get("article-number"))
@@ -320,9 +320,9 @@ def crossref_source_record(
         title=title,
         publication_year=publication_year,
         raw_doc_type=crossref_raw_doc_type(msg),
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=get_container_title(msg) if not containers.journal_id else None,
+        container_title=get_container_title(msg) if not containers.serial_id else None,
         raw_language=get_language(msg),
         biblio=get_biblio(msg),
         abstract=get_abstract(msg),

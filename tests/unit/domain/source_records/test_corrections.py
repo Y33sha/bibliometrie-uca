@@ -15,7 +15,7 @@ _VUE = _Vue(doc_type="article", doi="10.1/x")
 
 
 def test_un_champ_corrige_reprend_sa_valeur_source():
-    corrections = {"doc_type": stash_entry("thesis", "THESIS_WITH_JOURNAL_TO_ARTICLE")}
+    corrections = {"doc_type": stash_entry("thesis", "THESIS_WITH_SERIAL_TO_ARTICLE")}
     assert hydrate_raw_view(_VUE, corrections) == _Vue(doc_type="thesis", doi="10.1/x")
 
 
@@ -32,4 +32,4 @@ def test_une_entree_sans_valeur_source_est_ignoree():
 
 
 def test_un_champ_absent_de_la_vue_est_ignore():
-    assert hydrate_raw_view(_VUE, {"journal_id": stash_entry(42, "regle")}) is _VUE
+    assert hydrate_raw_view(_VUE, {"serial_id": stash_entry(42, "regle")}) is _VUE

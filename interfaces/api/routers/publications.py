@@ -62,7 +62,7 @@ class PublicationFilterParams:
     lab_id: Annotated[str, Query()] = ""
     year: Annotated[str, Query()] = ""
     publisher_id: Annotated[int | None, Query()] = None
-    journal_id: Annotated[int | None, Query()] = None
+    serial_id: Annotated[int | None, Query()] = None
     monograph_id: Annotated[int | None, Query()] = None
     person_id: Annotated[int | None, Query()] = None
     author_id: Annotated[int | None, Query()] = None
@@ -89,7 +89,7 @@ class PublicationFilterParams:
             lab_none=lab_none,
             years=parse_int_csv(self.year, param="year"),
             publisher_id=self.publisher_id,
-            journal_id=self.journal_id,
+            serial_id=self.serial_id,
             monograph_id=self.monograph_id,
             person_id=self.person_id,
             author_id=self.author_id,

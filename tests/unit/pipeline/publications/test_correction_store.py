@@ -8,7 +8,7 @@ from infrastructure.db.tables import source_records
 from pipeline.transformation.publications.correction.correction_store import (
     _UPDATE,
     DoiCorrectionUpdate,
-    JournalCorrectionUpdate,
+    SerialCorrectionUpdate,
     _persist_updates,
 )
 
@@ -23,7 +23,7 @@ def test_champs_des_mises_a_jour_sont_des_colonnes():
     columns = {c.name for c in source_records.c}
     for fields in (
         CorrectedSourceRecord._fields,
-        JournalCorrectionUpdate._fields[1:],
+        SerialCorrectionUpdate._fields[1:],
         DoiCorrectionUpdate._fields[1:],
     ):
         assert set(fields) <= columns

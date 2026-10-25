@@ -37,7 +37,7 @@
     ["coauthors", "co-auteurs"],
     ["shared_publications", "publis communes"],
     ["labs", "labos"],
-    ["journals", "revues"],
+    ["serials", "publications en série"],
   ];
 
   async function merge(targetId: number, sourceId: number) {

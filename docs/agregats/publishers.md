@@ -14,7 +14,7 @@ Un éditeur publie les revues et reçoit les frais de publication. Il se reconna
 
 Une forme de nom d'éditeur est unique dans toute la table, là où une forme de titre de revue n'est unique que pour un éditeur donné : deux éditeurs ne peuvent pas revendiquer la même forme de nom.
 
-Les tables `journals`, `monographs`, `source_records`, `publications`, `journal_name_forms` et `apc_payments` référencent un éditeur par leur colonne `publisher_id`.
+Les tables `serials`, `monographs`, `source_records`, `publications`, `serial_name_forms` et `apc_payments` référencent un éditeur par leur colonne `publisher_id`.
 
 ## Écriture par le pipeline
 

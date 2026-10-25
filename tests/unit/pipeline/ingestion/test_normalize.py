@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from domain.journals.containers import ContainerDescription
+from domain.serials.containers import ContainerDescription
 from pipeline.ingestion.common import normalizer as normalizer_module
 from pipeline.ingestion.common.normalizer import (
     Document,
@@ -375,7 +375,7 @@ _RECORD = SourceRecordUpsert(
     title="T",
     publication_year=2020,
     raw_doc_type=None,
-    journal_id=None,
+    serial_id=None,
     monograph_id=None,
     container_title=None,
     raw_language=None,

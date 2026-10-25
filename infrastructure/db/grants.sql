@@ -95,12 +95,12 @@ GRANT INSERT, UPDATE ON
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
-    publishing.journal_name_forms, publishing.journals, publications.publications, publishing.publisher_name_forms, publishing.publishers
+    publishing.serial_name_forms, publishing.serials, publications.publications, publishing.publisher_name_forms, publishing.publishers
 TO bibliometrie_app;
 
 -- Les ISSN d'une revue s'éditent à l'administration, et rejoignent la revue qui en absorbe une autre.
 GRANT INSERT, UPDATE, DELETE ON
-    publishing.journal_issns
+    publishing.serial_issns
 TO bibliometrie_app;
 
 GRANT INSERT ON

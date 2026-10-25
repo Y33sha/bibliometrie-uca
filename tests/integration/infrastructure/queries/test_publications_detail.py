@@ -11,9 +11,9 @@ from infrastructure.read_models.publications.detail import (
 )
 from tests.integration.helpers.contributions import group_id_of, insert_contribution
 from tests.integration.helpers.groups import add_group_member, insert_group
-from tests.integration.helpers.journals import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject

@@ -62,11 +62,11 @@ class TestPivotEngine:
         assert isinstance(res.rows, list)
         assert res.groups == ["lab"]
 
-    def test_group_by_publisher_and_journal_execute(self, sa_sync_conn):
+    def test_group_by_publisher_and_serial_execute(self, sa_sync_conn):
         # Éditeur et revue composent des requêtes valides (jointures internes). Smoke test : la
         # requête s'exécute et renvoie la forme attendue, sans dépendre de données peuplées.
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
-        for dim in ("publisher", "journal"):
+        for dim in ("publisher", "serial"):
             res = _piv(sa_sync_conn, "publication_count", [dim])
             assert res.groups == [dim]
 

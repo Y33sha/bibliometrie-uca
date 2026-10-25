@@ -1,8 +1,8 @@
 """Port PublisherRepository — édition, enrichissement pays et fusion de l'agrégat Publisher.
 
-Séparé de `JournalRepository` (principe ISP) : publishers et journals sont deux agrégats distincts, bien que liés par une FK. Un appelant limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
+Séparé de `SerialRepository` (principe ISP) : publishers et serials sont deux agrégats distincts, bien que liés par une FK. Un appelant limité aux publishers s'engage sur le seul contrat éditeurs, et inversement.
 
-La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`infrastructure/repositories/publisher_merge.py`). La détection des journaux à conflit avant fusion est exposée par `JournalRepository.find_shared_title_journal_pairs`, une query sur `journals`.
+La fusion d'éditeurs (`merge_publisher_into`) vit ici : sémantiquement c'est une opération atomique sur un éditeur qui touche par effet de bord les tables liées (`infrastructure/repositories/publisher_merge.py`). La détection des journaux à conflit avant fusion est exposée par `SerialRepository.find_shared_title_serial_pairs`, une query sur `serials`.
 """
 
 from typing import Protocol
@@ -53,5 +53,5 @@ class PublisherRepository(Protocol):
         ...
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne l'éditeur `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de l'éditeur, puis supprime la source. La fusion préalable des revues homonymes relève du service via `find_shared_title_journal_pairs`."""
+        """Fusionne l'éditeur `source_id` dans `target_id` : applique la règle de fusion de chaque donnée de l'éditeur, puis supprime la source. La fusion préalable des revues homonymes relève du service via `find_shared_title_serial_pairs`."""
         ...

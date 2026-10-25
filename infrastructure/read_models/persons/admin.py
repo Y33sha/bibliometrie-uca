@@ -386,11 +386,11 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
-    "journals": """
-        SELECT a.person_id AS person, p.journal_id AS val
+    "serials": """
+        SELECT a.person_id AS person, p.serial_id AS val
         FROM contributions a
         JOIN publications p ON p.id = a.publication_id
-        WHERE a.person_id = ANY(:ids) AND p.journal_id IS NOT NULL
+        WHERE a.person_id = ANY(:ids) AND p.serial_id IS NOT NULL
     """,
 }
 
@@ -438,7 +438,7 @@ def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, in
         key=lambda t: (
             t[2]["coauthors"] + t[2]["shared_publications"],
             t[2]["labs"],
-            t[2]["journals"],
+            t[2]["serials"],
         ),
         reverse=True,
     )
@@ -468,7 +468,7 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplic
                 coauthors=overlaps["coauthors"],
                 shared_publications=overlaps["shared_publications"],
                 labs=overlaps["labs"],
-                journals=overlaps["journals"],
+                serials=overlaps["serials"],
             ),
         )
         for id_a, id_b, overlaps in page_pairs

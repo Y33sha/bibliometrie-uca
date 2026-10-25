@@ -21,7 +21,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Normalisation
 
-- [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées (`source_records`, `source_contributions`). Extrait les signatures institutionnelles et les centralise dans la table `addresses`. Peuple les tables `publishers` et `journals`.
+- [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées (`source_records`, `source_contributions`). Extrait les signatures institutionnelles et les centralise dans la table `addresses`. Peuple les tables `publishers` et `serials`.
 
 ## Résolution des structures
 

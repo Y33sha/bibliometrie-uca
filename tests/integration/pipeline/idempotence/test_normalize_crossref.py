@@ -111,7 +111,7 @@ def _count_crossref(conn) -> dict[str, int]:
     counts["publications"] = conn.execute(
         text("SELECT COUNT(*) AS n FROM publications")
     ).scalar_one()
-    counts["journals"] = conn.execute(text("SELECT COUNT(*) AS n FROM journals")).scalar_one()
+    counts["serials"] = conn.execute(text("SELECT COUNT(*) AS n FROM serials")).scalar_one()
     counts["publishers"] = conn.execute(text("SELECT COUNT(*) AS n FROM publishers")).scalar_one()
     return counts
 

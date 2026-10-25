@@ -308,7 +308,7 @@ class OverlapCountsOut(BaseModel):
     coauthors: int
     shared_publications: int
     labs: int
-    journals: int
+    serials: int
 
 
 class NameDuplicatePairOut(BaseModel):

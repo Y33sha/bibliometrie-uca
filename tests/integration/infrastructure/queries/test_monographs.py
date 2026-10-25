@@ -11,8 +11,8 @@ from pipeline.transformation.publishing.monographs.delete_empty_monographs impor
     delete_empty_monographs,
 )
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
-    find_monograph_journal_candidates,
-    set_monograph_journal,
+    find_monograph_serial_candidates,
+    set_monograph_serial,
 )
 from pipeline.transformation.publishing.monographs.merge_duplicate_monographs import (
     find_monographs_sharing_a_title,
@@ -22,8 +22,8 @@ from pipeline.transformation.publishing.monographs.store import MonographStore
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
-from tests.integration.helpers.journals import insert_journal, insert_journal_issn, insert_publisher
 from tests.integration.helpers.redirects import redirect_of
+from tests.integration.helpers.serials import insert_publisher, insert_serial, insert_serial_issn
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de titre « Chapitre ».
@@ -45,7 +45,7 @@ def _create(repo, title="Livre", **fields):
         "isbn": None,
         "eisbn": None,
         "publisher_id": None,
-        "journal_id": None,
+        "serial_id": None,
     }
     defaults.update(fields)
     return repo.create_monograph(title=title, title_normalized=title.lower(), **defaults)
@@ -83,7 +83,7 @@ def test_enrichissement_complete_les_champs_vides(repo, sa_sync_conn):
         isbn=_PAPER,
         eisbn=None,
         publisher_id=None,
-        journal_id=None,
+        serial_id=None,
     )
     assert tuple(_row(sa_sync_conn, mid)) == (_PAPER, None, 2020, True)
 
@@ -111,36 +111,36 @@ def test_fusion_reporte_enregistrements_et_isbn(repo, sa_sync_conn):
     assert redirect_of(sa_sync_conn, MergedEntity.MONOGRAPH, source) == target
 
 
-def _journal(conn, title: str, issn: str | None = None) -> int:
-    journal_id = insert_journal(conn, title)
+def _serial(conn, title: str, issn: str | None = None) -> int:
+    serial_id = insert_serial(conn, title)
     if issn:
-        insert_journal_issn(conn, journal_id, issn=issn, support="print")
-    return journal_id
+        insert_serial_issn(conn, serial_id, issn=issn, support="print")
+    return serial_id
 
 
 def test_candidats_par_niveau_et_ecriture(repo, sa_sync_conn):
-    volume = _journal(sa_sync_conn, "NuFACT 2022")
-    collection = _journal(sa_sync_conn, "Lecture notes test", issn="2999-0101")
-    mid = _create(repo, "NuFACT 2022", journal_id=volume)
+    volume = _serial(sa_sync_conn, "NuFACT 2022")
+    collection = _serial(sa_sync_conn, "Lecture notes test", issn="2999-0101")
+    mid = _create(repo, "NuFACT 2022", serial_id=volume)
     _chapter(
-        sa_sync_conn, source="crossref", source_id="c-1", journal_id=collection, monograph_id=mid
+        sa_sync_conn, source="crossref", source_id="c-1", serial_id=collection, monograph_id=mid
     )
-    _chapter(sa_sync_conn, source="crossref", source_id="c-2", journal_id=volume, monograph_id=mid)
+    _chapter(sa_sync_conn, source="crossref", source_id="c-2", serial_id=volume, monograph_id=mid)
     _chapter(sa_sync_conn, source_id="c-3", monograph_id=mid)
 
-    candidates = {c.monograph_id: c for c in find_monograph_journal_candidates(sa_sync_conn)}
+    candidates = {c.monograph_id: c for c in find_monograph_serial_candidates(sa_sync_conn)}
     found = candidates[mid]
-    assert (found.journal_id, found.with_issn, found.without_issn) == (
+    assert (found.serial_id, found.with_issn, found.without_issn) == (
         volume,
         (collection,),
         (volume,),
     )
 
-    set_monograph_journal(sa_sync_conn, mid, collection)
-    journal_id = sa_sync_conn.execute(
-        text("SELECT journal_id FROM monographs WHERE id = :id"), {"id": mid}
+    set_monograph_serial(sa_sync_conn, mid, collection)
+    serial_id = sa_sync_conn.execute(
+        text("SELECT serial_id FROM monographs WHERE id = :id"), {"id": mid}
     ).scalar_one()
-    assert journal_id == collection
+    assert serial_id == collection
 
 
 def test_suppression_des_monographies_vides(repo, sa_sync_conn):
@@ -163,7 +163,7 @@ def test_isbn_d_une_autre_monographie_hors_des_colonnes(repo, sa_sync_conn):
         isbn=None,
         eisbn=_ELECTRONIC,
         publisher_id=None,
-        journal_id=None,
+        serial_id=None,
     )
     assert tuple(_row(sa_sync_conn, other))[:2] == (_PAPER, None)
     assert tuple(_row(sa_sync_conn, holder))[:2] == (None, _ELECTRONIC)
@@ -171,11 +171,11 @@ def test_isbn_d_une_autre_monographie_hors_des_colonnes(repo, sa_sync_conn):
 
 def test_nature_recalculee_dans_les_deux_sens(repo, sa_sync_conn):
     """Un volume LNCS marqué livre devient volume d'actes par sa collection ; un livre marqué volume d'actes sans aucun signal redevient livre."""
-    series = _journal(sa_sync_conn, "Lecture notes test proceedings")
+    series = _serial(sa_sync_conn, "Lecture notes test proceedings")
     sa_sync_conn.execute(
-        text("UPDATE journals SET journal_type = 'proceedings' WHERE id = :j"), {"j": series}
+        text("UPDATE serials SET serial_type = 'proceedings' WHERE id = :j"), {"j": series}
     )
-    lncs = _create(repo, "Fun with Algorithms", journal_id=series)
+    lncs = _create(repo, "Fun with Algorithms", serial_id=series)
     livre = _create(repo, "Un livre", proceedings=True)
     for source_id, mid in (("c-lncs", lncs), ("c-livre", livre)):
         _chapter(

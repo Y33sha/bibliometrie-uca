@@ -153,7 +153,8 @@ Voir [détails](sources/04-wos.md) sur l'API et les données récupérées.
 | Terme | Définition |
 |-------|-----------|
 | **Éditeur** (publisher) | Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences...). |
-| **Revue** (journal) | Périodique scientifique identifié par un ou plusieurs ISSN. Rattaché à un éditeur. |
+| **Publication en série** (serial) | Support de publication qui réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, dépôt, média. Rattachée à un éditeur. |
+| **Revue** (journal) | Publication en série périodique, identifiée par un ou plusieurs ISSN. |
 | **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe. Notion pertinente dans les disciplines STEM. |
 
 | Terme | Définition |

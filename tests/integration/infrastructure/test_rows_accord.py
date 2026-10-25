@@ -13,9 +13,9 @@ from sqlalchemy import text
 
 from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
-from infrastructure.repositories.journal_repository import PgJournalRepository
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
+from infrastructure.repositories.serial_repository import PgSerialRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
@@ -23,7 +23,7 @@ from pipeline.transformation.publications.consolidation import source_records_of
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from tests.integration.helpers.journals import insert_journal, insert_publisher
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.structures import (
     insert_perimeter,
     insert_structure,
@@ -39,18 +39,18 @@ class TestRelevesRendantUneListe:
 
     def test_les_candidates_d_une_revue_s_accordent(self, sa_sync_conn_owner):
         queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
-        assert queries.fetch_for_unary_correction_by_journal(1) == []
+        assert queries.fetch_for_unary_correction_by_serial(1) == []
 
     def test_les_depots_hal_d_origine_s_accordent(self, sa_sync_conn_owner):
         queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
         assert queries.fetch_for_unary_correction_by_hal_ids(["hal-01234567"]) == []
 
     def test_les_espaces_de_noms_doi_des_revues_s_accordent(self, sa_sync_conn_owner):
-        assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_journal_doi_namespaces() == []
+        assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_serial_doi_namespaces() == []
 
     def test_les_candidates_au_rattachement_par_doi_s_accordent(self, sa_sync_conn_owner):
         queries = SourceRecordCorrectionStore(sa_sync_conn_owner)
-        assert queries.fetch_journal_by_doi_candidates() == []
+        assert queries.fetch_serial_by_doi_candidates() == []
 
     def test_les_publications_sources_d_une_publication_s_accordent(self, sa_sync_conn_owner):
         assert source_records_of(sa_sync_conn_owner, 1) == []
@@ -79,8 +79,8 @@ class TestRelevesRendantUneLigne:
     """Relevés dont l'accord demande qu'une ligne existe."""
 
     def test_une_revue_s_accorde(self, sa_sync_conn_owner):
-        journal_id = insert_journal(sa_sync_conn_owner, "Revue")
-        assert PgJournalRepository(sa_sync_conn_owner).find_by_id(journal_id) is not None
+        serial_id = insert_serial(sa_sync_conn_owner, "Revue")
+        assert PgSerialRepository(sa_sync_conn_owner).find_by_id(serial_id) is not None
 
     def test_un_editeur_s_accorde(self, sa_sync_conn_owner):
         publisher_id = insert_publisher(sa_sync_conn_owner, "Éditeur", name_normalized="editeur")
@@ -101,8 +101,8 @@ class TestRelevesRendantUneLigne:
 TYPES_EXERCES = {
     "FacetOption",
     "DoiNamespace",
-    "JournalCorrectionRow",
-    "_JournalRow",
+    "SerialCorrectionRow",
+    "_SerialRow",
     "_PerimeterRow",
     "_PublisherRow",
     "SourceContributionRow",
@@ -167,7 +167,7 @@ def test_chaque_type_apparie_est_exerce_par_un_test():
 def test_un_releve_qui_ne_s_accorde_pas_leve(sa_sync_conn_owner, requete):
     """Le désaccord porte le nom du type visé et celui des colonnes en écart."""
     from infrastructure.db.rows import rows_as
-    from infrastructure.repositories.journal_repository import _JournalRow
+    from infrastructure.repositories.serial_repository import _SerialRow
 
-    with pytest.raises(TypeError, match="_JournalRow"):
-        rows_as(_JournalRow, sa_sync_conn_owner.execute(text(requete)))
+    with pytest.raises(TypeError, match="_SerialRow"):
+        rows_as(_SerialRow, sa_sync_conn_owner.execute(text(requete)))

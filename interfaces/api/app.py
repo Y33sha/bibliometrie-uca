@@ -57,13 +57,13 @@ from interfaces.api.routers import (  # noqa: E402
     entity_labels,
     feedback,
     hal_problems,
-    journals,
     monographs,
     perimeters,
     persons,
     pipeline_runs,
     publications,
     publishers,
+    serials,
     sources,
     stats,
     structures,
@@ -140,7 +140,7 @@ async def publisher_merge_blocked_handler(
     request: Request, exc: PublisherMergeBlockedError
 ) -> JSONResponse:
     body = PublisherMergeBlockedResponse.model_validate(
-        {"detail": str(exc), "blocking_journals": exc.blocking_journals}
+        {"detail": str(exc), "blocking_serials": exc.blocking_serials}
     )
     return JSONResponse(status_code=409, content=body.model_dump())
 
@@ -447,7 +447,7 @@ app.include_router(hal_problems.router)
 app.include_router(config.router)
 app.include_router(perimeters.router)
 app.include_router(publishers.router)
-app.include_router(journals.router)
+app.include_router(serials.router)
 app.include_router(monographs.router)
 app.include_router(pipeline_runs.router)
 app.include_router(subjects.router)

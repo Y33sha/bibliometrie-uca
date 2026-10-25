@@ -48,7 +48,7 @@ def create_all_publications(conn: Connection) -> None:
     cascade réimplémentée.
 
     Joue d'abord `metadata_correction` (unaire puis cluster), comme l'ordre réel
-    du pipeline : l'assignation lit le `doc_type`/`journal_id`/`oa_status` canonique
+    du pipeline : l'assignation lit le `doc_type`/`serial_id`/`oa_status` canonique
     corrigé écrit en place sur la `source_record`, elle ne re-mappe ni ne
     re-corrige. Sans cette passe, un enregistrement source porterait sa nomenclature source brute
     (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.

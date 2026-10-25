@@ -46,10 +46,10 @@ def stats_filter_clauses(
                 {"flt_publisher_ids": filters.publisher_ids},
             )
         )
-    if filters.journal_ids:
+    if filters.serial_ids:
         out.append(
             WhereClause(
-                "p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": filters.journal_ids}
+                "p.serial_id = ANY(:flt_serial_ids)", {"flt_serial_ids": filters.serial_ids}
             )
         )
     return out

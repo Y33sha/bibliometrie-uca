@@ -61,7 +61,7 @@
 		search: async (q, request) => {
 			const data = await request<{ publishers: Publisher[] }>(
 				// Les éditeurs les plus fournis en revues d'abord : la cible d'une fusion est rarement une variante isolée.
-				`/api/publishers?search=${encodeURIComponent(q)}&sort=journals_desc&per_page=10`,
+				`/api/publishers?search=${encodeURIComponent(q)}&sort=serials_desc&per_page=10`,
 			);
 			return data.publishers;
 		},
@@ -78,9 +78,9 @@
 		mergeSearch.clear();
 	}
 
-	type BlockingJournal = components['schemas']['BlockingJournalItem'];
+	type BlockingSerial = components['schemas']['BlockingSerialItem'];
 
-	let blockingJournals: BlockingJournal[] | null = $state(null);
+	let blockingSerials: BlockingSerial[] | null = $state(null);
 	let blockingDetail = $state('');
 
 	async function doMerge(sourceId: number) {
@@ -92,8 +92,8 @@
 		} catch (e: any) {
 			if (e instanceof ApiError) {
 				const body = e.detail as Partial<components['schemas']['PublisherMergeBlockedResponse']>;
-				if (body?.blocking_journals?.length) {
-					blockingJournals = body.blocking_journals;
+				if (body?.blocking_serials?.length) {
+					blockingSerials = body.blocking_serials;
 					blockingDetail = body.detail ?? '';
 					return;
 				}
@@ -105,7 +105,7 @@
 	}
 
 	function dismissBlocking() {
-		blockingJournals = null;
+		blockingSerials = null;
 		blockingDetail = '';
 	}
 
@@ -119,7 +119,7 @@
 
 <h2>Éditeurs</h2>
 
-{#if blockingJournals}
+{#if blockingSerials}
 	<div class="blocking-panel" role="alert">
 		<div class="blocking-header">
 			<strong>Fusion impossible</strong>
@@ -127,31 +127,31 @@
 		</div>
 		<p class="blocking-detail">{blockingDetail}</p>
 		<p class="muted">
-			Fusionner d'abord ces paires de revues côté <a href="{base}/admin/journals">admin Revues</a>,
+			Fusionner d'abord ces paires de publications en série dans l'<a href="{base}/admin/serials">administration des publications en série</a>,
 			puis relancer la fusion des éditeurs.
 		</p>
 		<table class="blocking-table">
 			<thead>
 				<tr>
-					<th>Revue (cible)</th>
-					<th>Revue (source)</th>
+					<th>Publication en série (cible)</th>
+					<th>Publication en série (source)</th>
 					<th>Raison</th>
 				</tr>
 			</thead>
 			<tbody>
-				{#each blockingJournals as bj (bj.target_journal_id + '_' + bj.source_journal_id)}
+				{#each blockingSerials as bj (bj.target_serial_id + '_' + bj.source_serial_id)}
 					<tr>
 						<td>
-							<a href="{base}/journals/{bj.target_journal_id}" target="_blank" rel="noopener">
+							<a href="{base}/journals/{bj.target_serial_id}" target="_blank" rel="noopener">
 								{bj.target_title}
 							</a>
-							<span class="muted">#{bj.target_journal_id}</span>
+							<span class="muted">#{bj.target_serial_id}</span>
 						</td>
 						<td>
-							<a href="{base}/journals/{bj.source_journal_id}" target="_blank" rel="noopener">
+							<a href="{base}/journals/{bj.source_serial_id}" target="_blank" rel="noopener">
 								{bj.source_title}
 							</a>
-							<span class="muted">#{bj.source_journal_id}</span>
+							<span class="muted">#{bj.source_serial_id}</span>
 						</td>
 						<td>{bj.reason}</td>
 					</tr>
@@ -161,7 +161,7 @@
 	</div>
 {/if}
 
-<PublishersListView {apiKey}>
+<PublishersListView {apiKey} serialsHeader="Publications en série">
 	{#snippet actionCell(pub: Publisher)}
 		{#if mergeTargetId === pub.id}
 			<Picker
@@ -177,7 +177,7 @@
 				onclose={closeMerge}
 			>
 				{#snippet item(r)}
-					{r.name} <span class="muted">({r.journal_count} revues, {r.publication_count} publis)</span>
+					{r.name} <span class="muted">({r.serial_count} publications en série, {r.publication_count} publis)</span>
 				{/snippet}
 			</Picker>
 		{:else}

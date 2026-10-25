@@ -4,11 +4,11 @@ Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause
 """
 
 from application.ports.repositories.address_repository import AddressCountryFilter
-from domain.journals.journal import OaModel
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
+from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
 from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES
@@ -60,12 +60,12 @@ DETACHED_GROUP = "person_id = NULL, resolution_mode = NULL"
 """Affectations d'un `UPDATE contributions` qui retire sa personne à un groupe."""
 
 
-def diamond_journal_sql(journal: str = "j") -> str:
+def diamond_journal_sql(serial: str = "j") -> str:
     """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
     return (
-        f"({journal}.oa_model = '{OaModel.DIAMOND.value}' OR ({journal}.is_in_doaj"
-        f" AND {journal}.doaj_payload->>'APC' = 'No'"
-        f" AND {journal}.doaj_payload->>'Has other fees' = 'No'))"
+        f"({serial}.oa_model = '{OaModel.DIAMOND.value}' OR ({serial}.is_in_doaj"
+        f" AND {serial}.doaj_payload->>'APC' = 'No'"
+        f" AND {serial}.doaj_payload->>'Has other fees' = 'No'))"
     )
 
 
@@ -337,11 +337,11 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
     return release, attach
 
 
-def active_issns(journal: str) -> str:
+def active_issns(serial: str) -> str:
     """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
     return f"""coalesce((
-        SELECT array_agg(i.issn ORDER BY i.id) FROM journal_issns i
-        WHERE i.journal_id = {journal} AND i.status = 'active'
+        SELECT array_agg(i.issn ORDER BY i.id) FROM serial_issns i
+        WHERE i.serial_id = {serial} AND i.status = 'active'
     ), ARRAY[]::text[])"""
 
 
@@ -364,6 +364,6 @@ def address_country_conditions(
     return conditions, params
 
 
-def has_active_issn(journal: str) -> str:
+def has_active_issn(serial: str) -> str:
     """Condition vraie quand la revue `journal` a un ISSN actif."""
-    return f"EXISTS (SELECT 1 FROM journal_issns i WHERE i.journal_id = {journal} AND i.status = 'active')"
+    return f"EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = {serial} AND i.status = 'active')"

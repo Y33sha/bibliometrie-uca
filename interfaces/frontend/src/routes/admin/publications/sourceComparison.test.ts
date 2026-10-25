@@ -27,7 +27,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		language_name: 'Anglais',
 		language_raw: null,
 		oa_status: 'green',
-		journal_id: null,
+		serial_id: null,
 		journal_title: null,
 		journal_raw_title: null,
 		journal_raw_issn: null,
@@ -103,27 +103,27 @@ describe('comparisonRows', () => {
 		const keys = comparisonRows([
 			record({ journal_raw_title: 'Revue', journal_raw_issn: '1234-5678' }),
 		]).map((r) => r.key);
-		const journal = keys.indexOf('journal');
-		expect(keys.slice(journal, journal + 2)).toEqual(['journal', 'issn']);
+		const serial = keys.indexOf('serial');
+		expect(keys.slice(serial, serial + 2)).toEqual(['serial', 'issn']);
 		expect(keys).not.toContain('eissn');
 		expect(keys).not.toContain('volume');
 	});
 
 	it('met en note le nom de revue donné par la source quand il diffère du référentiel', () => {
 		const rows = comparisonRows([
-			record({ journal_id: 7, journal_title: 'Nature', journal_raw_title: 'Nature (London)' }),
+			record({ serial_id: 7, journal_title: 'Nature', journal_raw_title: 'Nature (London)' }),
 		]);
-		expect(row(rows, 'journal').cells).toEqual([
-			{ text: 'Nature', link: { kind: 'journals', id: 7 }, note: 'Nature (London)' },
+		expect(row(rows, 'serial').cells).toEqual([
+			{ text: 'Nature', link: { kind: 'serials', id: 7 }, note: 'Nature (London)' },
 		]);
 	});
 
 	it('signale une revue rattachée à deux entrées différentes du référentiel', () => {
 		const rows = comparisonRows([
-			record({ journal_id: 7, journal_title: 'Nature' }),
-			record({ id: 2, journal_id: 8, journal_title: 'Nature' }),
+			record({ serial_id: 7, journal_title: 'Nature' }),
+			record({ id: 2, serial_id: 8, journal_title: 'Nature' }),
 		]);
-		expect(row(rows, 'journal').divergent).toBe(true);
+		expect(row(rows, 'serial').divergent).toBe(true);
 	});
 
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {

@@ -5,8 +5,8 @@ from sqlalchemy import text
 from pipeline.transformation.publishing.publishers.delete_empty_publishers import (
     delete_empty_publishers,
 )
-from tests.integration.helpers.journals import insert_publisher
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_publisher
 from tests.integration.helpers.sources import insert_source_record
 
 

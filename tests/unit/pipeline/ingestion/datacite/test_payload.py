@@ -228,7 +228,7 @@ class TestContainerNamesAJournal:
 
 
 class TestDocTypeMapping:
-    def test_journal_article(self):
+    def test_serial_article(self):
         assert map_doc_type("JournalArticle", "datacite") == "article"
 
     def test_working_paper_is_preprint(self):

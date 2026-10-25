@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
@@ -25,7 +25,7 @@ from pipeline.ingestion.scanr.normalize import (
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import staging_row
 
-_NO_CONTAINERS = Containers(journal_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
 
 
 class TestScanrSourceRecordLicense:
@@ -63,7 +63,7 @@ class TestScanrSourceRecordBiblio:
             {
                 "source": {
                     "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727", "1361-6463"],
+                    "serialIssns": ["0022-3727", "1361-6463"],
                 }
             },
         )
@@ -81,7 +81,7 @@ class TestScanrSourceRecordBiblio:
                 "source": {
                     "publisher": "Elsevier",
                     "title": "Journal of Physics",
-                    "journalIssns": ["0022-3727"],
+                    "serialIssns": ["0022-3727"],
                 }
             },
         )
@@ -278,10 +278,10 @@ class TestEditeurEtConteneur:
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
         facts = get_container_facts(
-            {"source": {"title": "J. Things", "journalIssns": ["1234-5679", "8765-4326"]}}
+            {"source": {"title": "J. Things", "serialIssns": ["1234-5679", "8765-4326"]}}
         )
         assert facts.journal_title == "J. Things"
-        assert facts.issns == (JournalIssn(issn="1234-5679"), JournalIssn(issn="8765-4326"))
+        assert facts.issns == (SerialIssn(issn="1234-5679"), SerialIssn(issn="8765-4326"))
 
     def test_communication_volume_du_congres(self):
         facts = get_container_facts(
@@ -308,7 +308,7 @@ class TestScanrSourceRecordMetadonnees:
         }
 
         record = scanr_source_record(
-            doc, 1, "doi10.1/a", Containers(journal_id=3, monograph_id=None)
+            doc, 1, "doi10.1/a", Containers(serial_id=3, monograph_id=None)
         )
 
         assert record.title == "Un titre"
@@ -456,7 +456,7 @@ class TestScanrNormalizer:
             "source": {"title": "Revue"},
         }
 
-        document = _normalizer().source_record(row, doc, Containers(journal_id=3, monograph_id=5))
+        document = _normalizer().source_record(row, doc, Containers(serial_id=3, monograph_id=5))
 
         assert (document.source, document.source_id, document.staging_id) == (
             "scanr",
@@ -464,7 +464,7 @@ class TestScanrNormalizer:
             42,
         )
         assert document.title == "Un titre"
-        assert (document.journal_id, document.monograph_id) == (3, 5)
+        assert (document.serial_id, document.monograph_id) == (3, 5)
         assert document.container_title is None
         assert document.external_ids == {"nnt": "2021CLFAC030"}
 

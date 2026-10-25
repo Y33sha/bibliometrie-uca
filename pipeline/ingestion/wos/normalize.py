@@ -3,12 +3,12 @@
 import logging
 from collections.abc import Mapping, Sequence
 
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole, map_role
 from domain.publications.identifiers import clean_doi, find_isbns
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
@@ -241,7 +241,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Numérotation, éditeur et revue tels que WoS les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # Numérotation, éditeur et revue tels que WoS les nomme, en parallèle des publishers/serials créés via find_or_create_*.
     page = at_path(publication_info, "page")
     issn_val = _get_api_issn(dynamic, "issn")
     eissn_val = _get_api_issn(dynamic, "eissn")
@@ -447,7 +447,7 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
 def wos_source_record(
     rec: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source WoS d'un record, identifié par son UT. Le titre de la source sert de `container_title` à défaut d'entrée de `journals`. Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses."""
+    """Enregistrement source WoS d'un record, identifié par son UT. Le titre de la source sert de `container_title` à défaut d'entrée de `serials`. Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses."""
     return SourceRecordUpsert(
         source="wos",
         source_id=as_str(rec.get("ut")) or "",
@@ -457,9 +457,9 @@ def wos_source_record(
         title=as_str(rec.get("title")) or "",
         publication_year=as_int(rec.get("publication_year")),
         raw_doc_type=as_str(rec.get("doc_type")),
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=as_str(rec.get("journal_title")) if not containers.journal_id else None,
+        container_title=as_str(rec.get("journal_title")) if not containers.serial_id else None,
         raw_language=as_str(rec.get("language")),
         biblio=dict(as_mapping(rec.get("biblio"))) or None,
         abstract=as_str(rec.get("abstract")),

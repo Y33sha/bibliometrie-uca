@@ -43,12 +43,12 @@ class CannotAttributeConflict(ConflictError):
         super().__init__(message)
 
 
-class BlockingJournal(TypedDict):
+class BlockingSerial(TypedDict):
     """Description structurée d'une paire de journaux qui bloque la fusion de deux éditeurs (cf. `PublisherMergeBlockedError`)."""
 
-    target_journal_id: int
+    target_serial_id: int
     target_title: str
-    source_journal_id: int
+    source_serial_id: int
     source_title: str
     reason: str  # explication lisible (ex: "ISSN différents : 0028-0836 vs 9999-9999")
 
@@ -56,11 +56,11 @@ class BlockingJournal(TypedDict):
 class PublisherMergeBlockedError(ConflictError):
     """Fusion d'éditeurs refusée : des paires de revues ne peuvent pas être fusionnées automatiquement (ex: ISSN divergents pour des revues partageant le même titre). L'utilisatrice doit traiter les paires bloquantes côté admin Revues d'abord, puis relancer la fusion.
 
-    `blocking_journals` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
+    `blocking_serials` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
 
-    def __init__(self, blocking_journals: list[BlockingJournal]) -> None:
-        self.blocking_journals = blocking_journals
-        n = len(blocking_journals)
+    def __init__(self, blocking_serials: list[BlockingSerial]) -> None:
+        self.blocking_serials = blocking_serials
+        n = len(blocking_serials)
         super().__init__(
             f"Fusion bloquée par {n} paire{'s' if n > 1 else ''} de revues à traiter manuellement"
         )

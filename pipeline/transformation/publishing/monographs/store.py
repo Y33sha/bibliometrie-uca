@@ -17,9 +17,9 @@ _FIND_BY_TITLE = text("""
 
 _CREATE = text("""
     INSERT INTO monographs
-        (title, title_normalized, proceedings, year, isbn, eisbn, publisher_id, journal_id)
+        (title, title_normalized, proceedings, year, isbn, eisbn, publisher_id, serial_id)
     VALUES
-        (:title, :title_normalized, :proceedings, :year, :isbn, :eisbn, :publisher_id, :journal_id)
+        (:title, :title_normalized, :proceedings, :year, :isbn, :eisbn, :publisher_id, :serial_id)
     RETURNING id
 """)
 
@@ -37,7 +37,7 @@ _ENRICH = text("""
             WHERE o.id <> m.id AND (o.isbn = :eisbn OR o.eisbn = :eisbn)
         ) THEN :eisbn END),
         publisher_id = COALESCE(m.publisher_id, :publisher_id),
-        journal_id = COALESCE(m.journal_id, :journal_id)
+        serial_id = COALESCE(m.serial_id, :serial_id)
     WHERE m.id = :id
 """)
 
@@ -67,7 +67,7 @@ class MonographStore:
         isbn: str | None,
         eisbn: str | None,
         publisher_id: int | None,
-        journal_id: int | None,
+        serial_id: int | None,
     ) -> int:
         """Insère une monographie et retourne son `id`."""
         return scalar_int(
@@ -81,7 +81,7 @@ class MonographStore:
                     "isbn": isbn,
                     "eisbn": eisbn,
                     "publisher_id": publisher_id,
-                    "journal_id": journal_id,
+                    "serial_id": serial_id,
                 },
             )
         )
@@ -95,7 +95,7 @@ class MonographStore:
         isbn: str | None,
         eisbn: str | None,
         publisher_id: int | None,
-        journal_id: int | None,
+        serial_id: int | None,
     ) -> None:
         """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste hors de ses colonnes. `proceedings` vrai fait d'un livre un volume d'actes."""
         self._conn.execute(
@@ -107,6 +107,6 @@ class MonographStore:
                 "isbn": isbn,
                 "eisbn": eisbn,
                 "publisher_id": publisher_id,
-                "journal_id": journal_id,
+                "serial_id": serial_id,
             },
         )

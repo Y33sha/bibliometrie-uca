@@ -9,9 +9,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
 from domain.publications.licenses import License
+from domain.serials.issns import IssnSupport, SerialIssn
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.crossref.normalize import (
@@ -304,7 +304,7 @@ class TestGetBiblio:
     def test_publisher_extracted(self):
         assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
 
-    def test_journal_built_from_container_title_and_issns(self):
+    def test_serial_built_from_container_title_and_issns(self):
         # Format `issn-type` permet de distinguer print/electronic ; la liste
         # `ISSN` plate ne sert qu'à hydrater `issn` (eissn reste None).
         msg = {
@@ -322,7 +322,7 @@ class TestGetBiblio:
             "eissn": "1361-6463",
         }
 
-    def test_journal_title_only_when_no_issns(self):
+    def test_serial_title_only_when_no_issns(self):
         assert get_biblio({"container-title": ["J. Phys."]}) == {
             "journal": {"title": "J. Phys."},
         }
@@ -451,8 +451,8 @@ class TestGetContainerFacts:
         )
         assert facts.journal_title == "J. Things"
         assert facts.issns == (
-            JournalIssn(issn="1234-5679", support=IssnSupport.PRINT),
-            JournalIssn(issn="8765-4326", support=IssnSupport.ELECTRONIC),
+            SerialIssn(issn="1234-5679", support=IssnSupport.PRINT),
+            SerialIssn(issn="8765-4326", support=IssnSupport.ELECTRONIC),
         )
 
     def test_chapitre_collection_puis_livre(self):
@@ -598,7 +598,7 @@ class TestCrossrefSourceRecord:
 
         document = crossref_source_record(msg, 42, Containers(None, 9))
 
-        assert (document.journal_id, document.monograph_id) == (None, 9)
+        assert (document.serial_id, document.monograph_id) == (None, 9)
         assert document.container_title == "J. Things"
 
     def test_titre_de_conteneur_porte_par_la_revue(self):
@@ -606,7 +606,7 @@ class TestCrossrefSourceRecord:
 
         document = crossref_source_record(msg, 42, Containers(7, None))
 
-        assert document.journal_id == 7
+        assert document.serial_id == 7
         assert document.container_title is None
 
 

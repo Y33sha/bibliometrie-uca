@@ -46,9 +46,9 @@ const TITRE_AFFICHE_BRUT = {
 /* Fichiers où `title` désigne autre chose qu'un titre de publication : revues, aide, boîtes de dialogue. */
 const TITRES_HORS_PUBLICATIONS = [
 	'src/lib/components/DialogHost.svelte',
-	'src/lib/components/JournalsListView.svelte',
+	'src/lib/components/SerialsListView.svelte',
 	'src/routes/journals/[[]id]/+page.svelte',
-	'src/routes/admin/journals/**',
+	'src/routes/admin/serials/**',
 	'src/routes/admin/feedback/+page.svelte'
 ];
 

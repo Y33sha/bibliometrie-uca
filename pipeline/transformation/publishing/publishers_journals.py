@@ -3,7 +3,7 @@
 Trois groupes de sous-étapes, dans l'ordre :
 
 - **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente.
-- **Revues** — `enrich_journals_from_openalex` (type et frais de publication), `check_journals_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_journals`, `type_proceedings_journals`, `learn_journal_doi_namespaces`, `enrich_journals_from_doaj`.
+- **Revues** — `enrich_serials_from_openalex` (type et frais de publication), `check_serials_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_serials`, `type_proceedings_serials`, `learn_serial_doi_namespaces`, `enrich_serials_from_doaj`.
 - **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
 
 Contraintes d'ordre :
@@ -13,7 +13,7 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
-`enrich_journals_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
+`enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 
 Chaque sous-étape est une tâche du graphe (`pipeline.graph`), exécutée par `pipeline.task_runner` dans l'ordre du graphe : une ligne du journal par tâche, sous le titre de sa section. Une tâche qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Ici, les étapes de chaque tâche et l'assemblage des métriques.
 """
@@ -34,39 +34,12 @@ from pipeline.ingestion.complements.doaj import downloaded_doaj_dump
 from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
-from pipeline.ingestion.openalex.journal_enrichment import fetch_sources_batch
+from pipeline.ingestion.openalex.serial_enrichment import fetch_sources_batch
 from pipeline.runtime.config import delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
-from pipeline.transformation.publishing.journals import (
-    check_journals_in_sudoc,
-    enrich_journals_from_doaj,
-    enrich_journals_from_openalex,
-    learn_journal_doi_namespaces,
-    merge_duplicate_journals,
-    type_proceedings_journals,
-)
-from pipeline.transformation.publishing.journals.check_journals_in_sudoc import (
-    run_check_journals_in_sudoc,
-)
-from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
-    run_enrich_journals_from_doaj,
-)
-from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
-    run_enrich_journals_from_openalex,
-)
-from pipeline.transformation.publishing.journals.journal_merge import merge_journals
-from pipeline.transformation.publishing.journals.learn_journal_doi_namespaces import (
-    run_learn_journal_doi_namespaces,
-)
-from pipeline.transformation.publishing.journals.merge_duplicate_journals import (
-    run_merge_duplicate_journals,
-)
-from pipeline.transformation.publishing.journals.type_proceedings_journals import (
-    run_type_proceedings_journals,
-)
 from pipeline.transformation.publishing.monographs import (
     link_monographs_to_collections,
     merge_duplicate_monographs,
@@ -87,6 +60,33 @@ from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_datacite_publishers,
 )
 from pipeline.transformation.publishing.publishers.store import PublisherStore
+from pipeline.transformation.publishing.serials import (
+    check_serials_in_sudoc,
+    enrich_serials_from_doaj,
+    enrich_serials_from_openalex,
+    learn_serial_doi_namespaces,
+    merge_duplicate_serials,
+    type_proceedings_serials,
+)
+from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
+    run_check_serials_in_sudoc,
+)
+from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
+    run_enrich_serials_from_doaj,
+)
+from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
+    run_enrich_serials_from_openalex,
+)
+from pipeline.transformation.publishing.serials.learn_serial_doi_namespaces import (
+    run_learn_serial_doi_namespaces,
+)
+from pipeline.transformation.publishing.serials.merge_duplicate_serials import (
+    run_merge_duplicate_serials,
+)
+from pipeline.transformation.publishing.serials.serial_merge import merge_serials
+from pipeline.transformation.publishing.serials.type_proceedings_serials import (
+    run_type_proceedings_serials,
+)
 
 _PHASE = "publishers_journals"
 
@@ -117,26 +117,26 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
         "préfixes DOI DataCite → éditeurs",
         lambda m: m.extras.get("publisher_matched", 0),
     ),
-    ("enrich_journals_from_openalex", "revues OpenAlex", lambda m: m.updated),
+    ("enrich_serials_from_openalex", "revues OpenAlex", lambda m: m.updated),
     (
-        "check_journals_in_sudoc",
+        "check_serials_in_sudoc",
         "revues vérifiées dans le Sudoc",
         lambda m: m.extras.get("sudoc_found", 0),
     ),
     (
-        "merge_duplicate_journals",
+        "merge_duplicate_serials",
         "groupes de revues en double",
-        lambda m: m.extras.get("journals_merged", 0),
+        lambda m: m.extras.get("serials_merged", 0),
     ),
     (
-        "type_proceedings_journals",
+        "type_proceedings_serials",
         "revues typées recueils d'actes",
-        lambda m: m.extras.get("journals_typed_proceedings", 0),
+        lambda m: m.extras.get("serials_typed_proceedings", 0),
     ),
     (
-        "learn_journal_doi_namespaces",
+        "learn_serial_doi_namespaces",
         "DOI → espaces de noms des revues",
-        lambda m: m.extras.get("journal_doi_namespaces", 0),
+        lambda m: m.extras.get("serial_doi_namespaces", 0),
     ),
     (
         "merge_duplicate_monographs",
@@ -175,7 +175,7 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     }
     # DOAJ : ligne à part (sous-étape conditionnelle, métrique propre).
     metrics.details["summary"] = {
-        "doaj_matched": by_step["enrich_journals_from_doaj"].extras.get("matched", 0)
+        "doaj_matched": by_step["enrich_serials_from_doaj"].extras.get("matched", 0)
     }
 
 
@@ -198,33 +198,33 @@ def build() -> Phase:
                     resolve_publishers.LABELS["DataCite"],
                 ),
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
-                "enrich_journals_from_openalex": TaskStep(
-                    _run_enrich_journals_from_openalex,
+                "enrich_serials_from_openalex": TaskStep(
+                    _run_enrich_serials_from_openalex,
                     "Revues",
-                    enrich_journals_from_openalex.LABEL,
+                    enrich_serials_from_openalex.LABEL,
                     threshold=3,
                 ),
-                "check_journals_in_sudoc": TaskStep(
-                    _run_check_journals_in_sudoc,
+                "check_serials_in_sudoc": TaskStep(
+                    _run_check_serials_in_sudoc,
                     "Revues",
-                    check_journals_in_sudoc.LABEL,
+                    check_serials_in_sudoc.LABEL,
                     threshold=3,
                 ),
-                "merge_duplicate_journals": TaskStep(
-                    _run_merge_duplicate_journals, "Revues", merge_duplicate_journals.LABEL
+                "merge_duplicate_serials": TaskStep(
+                    _run_merge_duplicate_serials, "Revues", merge_duplicate_serials.LABEL
                 ),
-                "type_proceedings_journals": TaskStep(
-                    _run_type_proceedings_journals, "Revues", type_proceedings_journals.LABEL
+                "type_proceedings_serials": TaskStep(
+                    _run_type_proceedings_serials, "Revues", type_proceedings_serials.LABEL
                 ),
-                "learn_journal_doi_namespaces": TaskStep(
-                    _run_learn_journal_doi_namespaces,
+                "learn_serial_doi_namespaces": TaskStep(
+                    _run_learn_serial_doi_namespaces,
                     "Revues",
-                    learn_journal_doi_namespaces.LABEL,
+                    learn_serial_doi_namespaces.LABEL,
                 ),
-                "enrich_journals_from_doaj": TaskStep(
-                    _run_enrich_journals_from_doaj,
+                "enrich_serials_from_doaj": TaskStep(
+                    _run_enrich_serials_from_doaj,
                     "Revues",
-                    enrich_journals_from_doaj.LABEL,
+                    enrich_serials_from_doaj.LABEL,
                 ),
                 "merge_duplicate_monographs": TaskStep(
                     _run_merge_duplicate_monographs,
@@ -272,12 +272,12 @@ def _run_resolve_datacite_publishers(
         )
 
 
-def _run_enrich_journals_from_openalex(
+def _run_enrich_serials_from_openalex(
     ctx: PhaseContext,
 ) -> PhaseMetrics:
     sources_api = API_BASE_URLS["openalex_sources"]
     with ctx.open_tx() as conn:
-        return run_enrich_journals_from_openalex(
+        return run_enrich_serials_from_openalex(
             conn,
             ctx.logger,
             fetch_batch=lambda oa_ids: fetch_sources_batch(
@@ -286,14 +286,14 @@ def _run_enrich_journals_from_openalex(
         )
 
 
-def _run_check_journals_in_sudoc(
+def _run_check_serials_in_sudoc(
     ctx: PhaseContext,
 ) -> PhaseMetrics:
     base_url = API_BASE_URLS["sudoc"]
     with ctx.open_tx() as conn:
         # `asyncio.run` transmet aux coroutines la ContextVar du circuit-breaker.
         return asyncio.run(
-            run_check_journals_in_sudoc(
+            run_check_serials_in_sudoc(
                 conn,
                 ctx.logger,
                 fetch_ppns=lambda client, issns: fetch_ppns(client, issns, base_url=base_url),
@@ -305,14 +305,14 @@ def _run_check_journals_in_sudoc(
         )
 
 
-def _run_merge_duplicate_journals(ctx: PhaseContext) -> PhaseMetrics:
+def _run_merge_duplicate_serials(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
 
         def merge(target_id: int, source_id: int) -> None:
-            merge_journals(conn, target_id, source_id)
+            merge_serials(conn, target_id, source_id)
             conn.commit()
 
-        return run_merge_duplicate_journals(conn, ctx.logger, merge=merge)
+        return run_merge_duplicate_serials(conn, ctx.logger, merge=merge)
 
 
 def _run_merge_duplicate_monographs(ctx: PhaseContext) -> PhaseMetrics:
@@ -330,20 +330,20 @@ def _run_type_proceedings_volumes(ctx: PhaseContext) -> PhaseMetrics:
         return run_type_proceedings_volumes(conn, ctx.logger)
 
 
-def _run_type_proceedings_journals(ctx: PhaseContext) -> PhaseMetrics:
+def _run_type_proceedings_serials(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_type_proceedings_journals(conn, ctx.logger)
+        return run_type_proceedings_serials(conn, ctx.logger)
 
 
-def _run_learn_journal_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:
+def _run_learn_serial_doi_namespaces(ctx: PhaseContext) -> PhaseMetrics:
     with ctx.open_tx() as conn:
-        return run_learn_journal_doi_namespaces(conn, ctx.logger)
+        return run_learn_serial_doi_namespaces(conn, ctx.logger)
 
 
-def _run_enrich_journals_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
+def _run_enrich_serials_from_doaj(ctx: PhaseContext) -> PhaseMetrics:
     user_agent = default_user_agent()
     with ctx.open_tx() as conn:
-        return run_enrich_journals_from_doaj(
+        return run_enrich_serials_from_doaj(
             conn,
             ctx.logger,
             refresh_after_days=delay(conn, ConfigKey.DOAJ_REFRESH_AFTER_DAYS),

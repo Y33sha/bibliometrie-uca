@@ -8,14 +8,14 @@ import pytest
 
 
 class TestStatsEntityFacet:
-    def test_journal(self, client):
-        r = client.get("/api/stats/facets/entities", params={"kind": "journal"})
+    def test_serial(self, client):
+        r = client.get("/api/stats/facets/entities", params={"kind": "serial"})
         assert r.status_code == 200
 
     def test_publisher_with_search_and_filters(self, client):
         r = client.get(
             "/api/stats/facets/entities",
-            params={"kind": "publisher", "entity_search": "els", "year": "2024", "journal_id": "1"},
+            params={"kind": "publisher", "entity_search": "els", "year": "2024", "serial_id": "1"},
         )
         assert r.status_code == 200
 

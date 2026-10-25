@@ -21,8 +21,8 @@ from pipeline.transformation.publications.consolidation import RefreshVerdict, r
 from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.journals import insert_doi_prefix, insert_publisher
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de 2024, de titre « Test ».

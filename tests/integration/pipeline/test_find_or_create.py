@@ -6,30 +6,30 @@ from types import SimpleNamespace
 import pytest
 from sqlalchemy import text
 
-from domain.journals.issns import source_issns
+from domain.serials.issns import source_issns
 from pipeline.transformation.publishing.find_or_create import (
-    find_or_create_journal,
     find_or_create_publisher,
+    find_or_create_serial,
 )
-from pipeline.transformation.publishing.journals.enrich_journals_from_openalex import (
-    update_journal_apc,
-)
-from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
-from tests.integration.helpers.journals import (
-    insert_journal_with_issns,
+from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
+    update_serial_apc,
+)
+from pipeline.transformation.publishing.serials.store import SerialStore
+from tests.integration.helpers.serials import (
     insert_publisher,
+    insert_serial_with_issns,
     issn_columns,
     mark_checked_in_sudoc,
 )
 
 # Revue « Nature » par défaut, sans devise d'APC.
-_journal = partial(insert_journal_with_issns, title="Nature", apc_currency=None)
+_serial = partial(insert_serial_with_issns, title="Nature", apc_currency=None)
 
 
 @pytest.fixture
 def gateway(sa_sync_conn):
-    return JournalStore(sa_sync_conn)
+    return SerialStore(sa_sync_conn)
 
 
 @pytest.fixture
@@ -43,9 +43,9 @@ def _fetch_one(conn, sql_text: str, **params):
 
 
 def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
-    """`find_or_create_journal` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
+    """`find_or_create_serial` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
     issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
-    return find_or_create_journal(title, issns=issns, **kwargs)
+    return find_or_create_serial(title, issns=issns, **kwargs)
 
 
 # ── find_or_create_publisher ───────────────────────────────────────
@@ -74,7 +74,7 @@ class TestFindOrCreatePublisher:
     def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
         self, sa_sync_conn, publisher_store
     ):
-        """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateJournal`)."""
+        """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateSerial`)."""
         premier = find_or_create_publisher("Taylor & Francis", repo=publisher_store)
         second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_store)
         assert second == premier
@@ -105,22 +105,22 @@ class TestFindOrCreatePublisher:
         assert row.openalex_id == "P123"
 
 
-# ── find_or_create_journal ─────────────────────────────────────────
+# ── find_or_create_serial ─────────────────────────────────────────
 
 
-class TestFindOrCreateJournal:
+class TestFindOrCreateSerial:
     def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
         assert _find_or_create(None, repo=gateway) is None
         assert _find_or_create("", repo=gateway) is None
 
-    def test_creates_new_journal(self, sa_sync_conn, gateway):
+    def test_creates_new_serial(self, sa_sync_conn, gateway):
         j_id = _find_or_create("Nature", issn="0028-0836", repo=gateway)
-        row = _fetch_one(sa_sync_conn, "SELECT title FROM journals WHERE id = :id", id=j_id)
+        row = _fetch_one(sa_sync_conn, "SELECT title FROM serials WHERE id = :id", id=j_id)
         row = SimpleNamespace(title=row.title, issn=issn_columns(sa_sync_conn, j_id).issn)
         assert row.title == "Nature"
         assert row.issn == "0028-0836"
 
-    def test_un_titre_encode_rejoint_le_meme_journal_que_le_titre_en_clair(
+    def test_un_titre_encode_rejoint_le_meme_serial_que_le_titre_en_clair(
         self, sa_sync_conn, gateway
     ):
         """Régression : le titre affiché et la clé de rapprochement dérivent de la même valeur.
@@ -135,29 +135,29 @@ class TestFindOrCreateJournal:
         assert second == premier
         row = _fetch_one(
             sa_sync_conn,
-            "SELECT title, title_normalized FROM journals WHERE id = :id",
+            "SELECT title, title_normalized FROM serials WHERE id = :id",
             id=premier,
         )
         assert row.title == "Wood & Fire Safety"
         assert "amp" not in row.title_normalized
 
     def test_finds_by_openalex_id(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, openalex_id="S137773608")
+        existing = _serial(sa_sync_conn, openalex_id="S137773608")
         found = _find_or_create("Nature Journal", openalex_id="S137773608", repo=gateway)
         assert found == existing
 
     def test_finds_by_issn(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, issn="0028-0836")
+        existing = _serial(sa_sync_conn, issn="0028-0836")
         found = _find_or_create("Nature Variant", issn="0028-0836", repo=gateway)
         assert found == existing
 
     def test_finds_by_eissn(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, eissn="1476-4687")
+        existing = _serial(sa_sync_conn, eissn="1476-4687")
         found = _find_or_create("Nature", eissn="1476-4687", repo=gateway)
         assert found == existing
 
     def test_finds_by_issnl(self, sa_sync_conn, gateway):
-        existing = _journal(sa_sync_conn, issnl="0028-0836")
+        existing = _serial(sa_sync_conn, issnl="0028-0836")
         found = _find_or_create("Other Title", issnl="0028-0836", repo=gateway)
         assert found == existing
 
@@ -165,14 +165,14 @@ class TestFindOrCreateJournal:
         _find_or_create("Nature", repo=gateway)
         found = _find_or_create("nature", repo=gateway)
         n = sa_sync_conn.execute(
-            text("SELECT COUNT(*) AS n FROM journals WHERE title_normalized = 'nature'")
+            text("SELECT COUNT(*) AS n FROM serials WHERE title_normalized = 'nature'")
         ).scalar_one()
         assert n == 1
         assert found is not None
 
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
         """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur du document s'enregistre avec la forme de nom, la revue n'en reçoit pas."""
-        existing = _journal(sa_sync_conn, issn="0028-0836")
+        existing = _serial(sa_sync_conn, issn="0028-0836")
         publisher_id = find_or_create_publisher("Springer", repo=publisher_store)
         _find_or_create(
             "Nature",
@@ -184,14 +184,14 @@ class TestFindOrCreateJournal:
         assert issn_columns(sa_sync_conn, existing).eissn == "1476-4687"
         assert (
             _fetch_one(
-                sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
+                sa_sync_conn, "SELECT publisher_id FROM serials WHERE id = :id", id=existing
             ).publisher_id
             is None
         )
         assert (
             _fetch_one(
                 sa_sync_conn,
-                "SELECT count(*) AS n FROM journal_name_forms WHERE journal_id = :id AND publisher_id = :p",
+                "SELECT count(*) AS n FROM serial_name_forms WHERE serial_id = :id AND publisher_id = :p",
                 id=existing,
                 p=publisher_id,
             ).n
@@ -233,7 +233,7 @@ class TestFindOrCreateJournal:
 
     def test_known_issn_is_not_copied_into_a_free_column(self, sa_sync_conn, gateway):
         """Une source qui donne comme ISSN papier l'ISSN électronique d'une revue vérifiée ne défait pas son rangement."""
-        j_id = _journal(sa_sync_conn, eissn="1476-4687")
+        j_id = _serial(sa_sync_conn, eissn="1476-4687")
         mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="1476-4687", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)
@@ -243,14 +243,14 @@ class TestFindOrCreateJournal:
 
     def test_issnl_value_can_fill_the_issn_column(self, sa_sync_conn, gateway):
         """Régression : l'ISSN-L est l'ISSN de l'un des supports, il peut donc aussi figurer dans `issn`."""
-        j_id = _journal(sa_sync_conn, issnl="0028-0836")
+        j_id = _serial(sa_sync_conn, issnl="0028-0836")
         _find_or_create("Nature", issn="0028-0836", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)
         assert (row.issn, row.issnl) == ("0028-0836", "0028-0836")
 
     def test_rejected_issn_is_not_copied_into_a_column(self, sa_sync_conn, gateway):
         """Un ISSN rejeté (ici un CD-ROM) retrouve la revue sans revenir dans une colonne."""
-        j_id = _journal(sa_sync_conn, issn="0305-1048", rejected=("1362-4954",))
+        j_id = _serial(sa_sync_conn, issn="0305-1048", rejected=("1362-4954",))
         mark_checked_in_sudoc(sa_sync_conn, j_id)
         found = _find_or_create("Other title", eissn="1362-4954", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)
@@ -258,16 +258,16 @@ class TestFindOrCreateJournal:
         assert row.eissn is None
         assert row.sudoc_checked_at is not None
 
-    def test_new_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn, eissn="1476-4687")
+    def test_new_issn_makes_the_serial_to_check_again(self, sa_sync_conn, gateway):
+        j_id = _serial(sa_sync_conn, eissn="1476-4687")
         mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="0028-0836", eissn="1476-4687", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)
         assert row.issn == "0028-0836"
         assert row.sudoc_checked_at is None
 
-    def test_new_rejected_issn_makes_the_journal_to_check_again(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn, issn="0028-0836")
+    def test_new_rejected_issn_makes_the_serial_to_check_again(self, sa_sync_conn, gateway):
+        j_id = _serial(sa_sync_conn, issn="0028-0836")
         mark_checked_in_sudoc(sa_sync_conn, j_id)
         _find_or_create("Nature", issn="0028-0836", eissn="1476-4688", repo=gateway)
         row = issn_columns(sa_sync_conn, j_id)
@@ -275,16 +275,16 @@ class TestFindOrCreateJournal:
         assert row.sudoc_checked_at is None
 
 
-# ── JournalStore.update_journal_apc ─────────────────────────────────────────────
+# ── SerialStore.update_serial_apc ─────────────────────────────────────────────
 
 
-class TestUpdateJournalApc:
+class TestUpdateSerialApc:
     def test_updates_fields(self, sa_sync_conn, gateway):
-        j_id = _journal(sa_sync_conn)
-        update_journal_apc(sa_sync_conn, j_id, apc_amount=3000.0, apc_currency="EUR")
+        j_id = _serial(sa_sync_conn)
+        update_serial_apc(sa_sync_conn, j_id, apc_amount=3000.0, apc_currency="EUR")
         row = _fetch_one(
             sa_sync_conn,
-            "SELECT apc_amount, apc_currency FROM journals WHERE id = :id",
+            "SELECT apc_amount, apc_currency FROM serials WHERE id = :id",
             id=j_id,
         )
         assert float(row.apc_amount) == 3000.0
@@ -293,11 +293,11 @@ class TestUpdateJournalApc:
     def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, gateway):
         """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
         DOAJ) n'est jamais touché par l'enrichissement APC."""
-        j_id = _journal(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
-        update_journal_apc(sa_sync_conn, j_id, apc_currency="EUR")
+        j_id = _serial(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
+        update_serial_apc(sa_sync_conn, j_id, apc_currency="EUR")
         row = _fetch_one(
             sa_sync_conn,
-            "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = :id",
+            "SELECT apc_amount, apc_currency, is_in_doaj FROM serials WHERE id = :id",
             id=j_id,
         )
         assert float(row.apc_amount) == 2000.0

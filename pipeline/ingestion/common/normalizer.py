@@ -13,8 +13,8 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
-from domain.journals.containers import ContainerDescription
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.serials.containers import ContainerDescription
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore

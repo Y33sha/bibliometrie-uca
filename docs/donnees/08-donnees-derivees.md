@@ -30,7 +30,7 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `contributions` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
 | `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
-| `publication_count` | `journals`, `publishers` | phase `contributions` |
+| `publication_count` | `serials`, `publishers` | phase `contributions` |
 | `publication_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
 

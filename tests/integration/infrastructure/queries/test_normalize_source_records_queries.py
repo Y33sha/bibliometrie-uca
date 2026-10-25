@@ -9,8 +9,8 @@ from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
     SourceRecordUpsert,
 )
-from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.queues import clear, queued
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».
@@ -201,9 +201,9 @@ class TestPublisher:
         ).scalar_one()
 
     def test_article_datacite_dans_une_revue(self, sa_sync_conn):
-        journal_id = insert_journal(sa_sync_conn, "Revue")
+        serial_id = insert_serial(sa_sync_conn, "Revue")
         assert (
-            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", journal_id=journal_id)
+            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", serial_id=serial_id)
             is not None
         )
 
@@ -211,7 +211,5 @@ class TestPublisher:
         assert self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle") is None
 
     def test_jeu_de_donnees(self, sa_sync_conn):
-        journal_id = insert_journal(sa_sync_conn, "Revue")
-        assert (
-            self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", journal_id=journal_id) is None
-        )
+        serial_id = insert_serial(sa_sync_conn, "Revue")
+        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", serial_id=serial_id) is None

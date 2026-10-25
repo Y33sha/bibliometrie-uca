@@ -13,7 +13,7 @@ def _source_record(**overrides) -> SourceRecord:
         "publication_year": 2020,
         "doc_type": "conference_paper",
         "doi": None,
-        "journal_id": None,
+        "serial_id": None,
         "monograph_id": None,
         "container_title": "Colloque de 2020",
         "language": None,
@@ -34,7 +34,7 @@ def _source_record(**overrides) -> SourceRecord:
 class TestAttestsPublication:
     def test_trace_en_base(self):
         assert attests_publication(_source_record(doi="10.1/x"))
-        assert attests_publication(_source_record(journal_id=3))
+        assert attests_publication(_source_record(serial_id=3))
         assert attests_publication(_source_record(monograph_id=4))
 
     def test_congres_declare_par_crossref(self):
@@ -93,9 +93,9 @@ class TestArbitrateConference:
     def test_resume_en_supplement_de_revue(self):
         sources = [
             _source_record(
-                source="crossref", doc_type="article", journal_id=7, doi="10.1182/blood-2020"
+                source="crossref", doc_type="article", serial_id=7, doi="10.1182/blood-2020"
             ),
-            _source_record(id=2, source="wos", doc_type="conference", journal_id=7),
+            _source_record(id=2, source="wos", doc_type="conference", serial_id=7),
         ]
         assert arbitrate_conference("article", sources) == "conference"
 

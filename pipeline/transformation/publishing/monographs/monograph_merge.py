@@ -40,7 +40,7 @@ def _merge_isbns(conn: Connection, target_id: int, source_id: int) -> None:
         isbn=source.isbn,
         eisbn=source.eisbn,
         publisher_id=None,
-        journal_id=None,
+        serial_id=None,
     )
 
 
@@ -53,7 +53,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "year": fill_empty("monographs", "year"),
     "isbns": MergeStep((("monographs", "isbn"), ("monographs", "eisbn")), _merge_isbns),
     "publisher": fill_empty("monographs", "publisher_id"),
-    "journal": fill_empty("monographs", "journal_id"),
+    "serial": fill_empty("monographs", "serial_id"),
 }
 
 

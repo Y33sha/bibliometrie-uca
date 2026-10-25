@@ -51,7 +51,7 @@ class SourceRecordUpsert:
     publication_year: int | None = None
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
-    journal_id: int | None = None
+    serial_id: int | None = None
     monograph_id: int | None = None
     publisher_id: int | None = None
     """Éditeur que nomme la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
@@ -141,7 +141,7 @@ class SourceRecordStore:
         if not source_record_has_publisher(
             params["doc_type"],
             row.source,
-            has_container=row.journal_id is not None or row.monograph_id is not None,
+            has_container=row.serial_id is not None or row.monograph_id is not None,
         ):
             params["publisher_id"] = None
         params["language"] = language_code(row.raw_language, self._forms())

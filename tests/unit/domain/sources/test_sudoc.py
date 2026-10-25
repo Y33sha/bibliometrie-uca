@@ -1,6 +1,6 @@
 """Tests de la lecture des notices Sudoc de publications en série (`domain.sources.sudoc`)."""
 
-from domain.journals.issns import IssnSupport
+from domain.serials.issns import IssnSupport
 from domain.sources.sudoc import MarcField, SudocSerialRecord, parse_sudoc_serial_record
 
 

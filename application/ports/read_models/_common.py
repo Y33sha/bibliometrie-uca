@@ -57,7 +57,7 @@ class FacetOption(BaseModel):
     count: int
 
 
-EntityKind = Literal["publisher", "journal", "person", "subject"]
+EntityKind = Literal["publisher", "serial", "person", "subject"]
 
 
 class EntityFacetItem(BaseModel):

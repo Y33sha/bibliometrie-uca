@@ -33,8 +33,8 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/contributions/orphans/batch-assign"): "contribution.batch_assigned",
     ("PATCH", "/api/contributions/{contribution_id}/exclude"): "contribution.rejected",
     ("PUT", "/api/config/{key}"): "config.updated",
-    ("PUT", "/api/journals/{journal_id}"): "journal.updated",
-    ("POST", "/api/journals/{journal_id}/merge"): "journal.merged",
+    ("PUT", "/api/serials/{serial_id}"): "serial.updated",
+    ("POST", "/api/serials/{serial_id}/merge"): "serial.merged",
     ("POST", "/api/perimeters"): "perimeter.created",
     ("PUT", "/api/perimeters/{perimeter_id}"): "perimeter.updated",
     ("DELETE", "/api/perimeters/{perimeter_id}"): "perimeter.deleted",
@@ -62,7 +62,7 @@ AUDITE: dict[tuple[str, str], str] = {
 EXEMPTES: dict[tuple[str, str], str] = {
     ("POST", "/api/auth/login"): "Ouverture de session : plafonnée par adresse, hors garde.",
     ("POST", "/api/auth/logout"): "Fermeture de session : ne touche à aucune donnée.",
-    ("POST", "/api/journals/{journal_id}/type-change-impact"): (
+    ("POST", "/api/serials/{serial_id}/type-change-impact"): (
         "Calcule l'ampleur d'un changement de type sans l'appliquer : l'écriture est annulée "
         "avec le point de reprise qui l'enveloppe, et rien ne subsiste à consigner."
     ),
@@ -123,7 +123,7 @@ def test_l_evenement_declare_est_emis_par_le_code(
 
 
 CONSEQUENCES: dict[str, str] = {
-    "journal.type_requalified": (
+    "serial.type_requalified": (
         "Ampleur de la requalification des publications, entraînée par un changement de type "
         "de revue : elle suit l'édition, personne ne la décide pour elle-même."
     ),

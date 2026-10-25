@@ -10,10 +10,10 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
-from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.publications.licenses import License
+from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
@@ -313,13 +313,13 @@ class TestContainerDescription:
         assert facts.oa_model == "repository"
         assert facts.openalex_id == "S1"
 
-    def test_journal_full_oa(self):
+    def test_serial_full_oa(self):
         work = {
             "primary_location": {"source": {"display_name": "OA", "type": "journal", "is_oa": True}}
         }
         assert get_container_facts(work).oa_model == "full_oa"
 
-    def test_journal_subscription(self):
+    def test_serial_subscription(self):
         work = {"primary_location": {"source": {"display_name": "Sub", "type": "journal"}}}
         assert get_container_facts(work).oa_model == "subscription"
 
@@ -336,9 +336,9 @@ class TestContainerDescription:
         }
         facts = get_container_facts(work)
         assert facts.issns == (
-            JournalIssn(issn="1111-1119", linking=True),
-            JournalIssn(issn="2222-2227"),
-            JournalIssn(issn="3333-3335"),
+            SerialIssn(issn="1111-1119", linking=True),
+            SerialIssn(issn="2222-2227"),
+            SerialIssn(issn="3333-3335"),
         )
 
     def test_collection_d_un_chapitre(self):
@@ -366,7 +366,7 @@ class TestContainerDescription:
 
 # ── openalex_source_record (métadonnées canoniques) ──────────────
 
-_NO_CONTAINERS = Containers(journal_id=None, monograph_id=None)
+_NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
 
 
 class TestOpenalexSourceRecordMetadata:
@@ -378,7 +378,7 @@ class TestOpenalexSourceRecordMetadata:
         assert record.publication_year == 2024
         assert record.doi is None
         assert "nnt" not in (record.external_ids or {})
-        assert record.journal_id is None
+        assert record.serial_id is None
 
     def test_display_name_fallback(self):
         record = openalex_source_record(
@@ -386,14 +386,14 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.title == "DN"
 
-    def test_with_journal_id_no_container_title(self):
-        """Si journal_id présent, container_title reste None (la revue identifie tout)."""
+    def test_with_serial_id_no_container_title(self):
+        """Si serial_id présent, container_title reste None (la revue identifie tout)."""
         work = {
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
         }
         record = openalex_source_record(
-            work, staging_id=1, containers=Containers(journal_id=42, monograph_id=None)
+            work, staging_id=1, containers=Containers(serial_id=42, monograph_id=None)
         )
         assert record.container_title is None
 
@@ -493,14 +493,14 @@ class TestOpenalexSourceRecord:
         }
 
     def test_biblio_skipped_when_primary_is_repository(self, monkeypatch):
-        """Si should_skip_publisher_journal renvoie True, publisher/journal absents de biblio."""
+        """Si should_skip_publisher_serial renvoie True, publisher/journal absents de biblio."""
 
         class _PrimaryStub:
             source_display_name = None
 
         monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
         monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
-        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
+        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_serial", lambda p: True)
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {"source": {"host_organization_name": "HAL"}},

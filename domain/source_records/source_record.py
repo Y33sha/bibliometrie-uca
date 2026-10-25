@@ -21,7 +21,7 @@ class SourceRecord:
     publication_year: int | None
     doc_type: str | None
     doi: str | None
-    journal_id: int | None
+    serial_id: int | None
     monograph_id: int | None
     container_title: str | None
     language: str | None

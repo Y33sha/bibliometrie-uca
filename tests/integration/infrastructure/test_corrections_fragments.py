@@ -10,7 +10,7 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_record
 
 _CORRECTIONS = {
-    "doc_type": stash_entry("thesis", MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE),
+    "doc_type": stash_entry("thesis", MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE),
     "doi": stash_entry("10.1/version", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
 }
 
@@ -41,7 +41,7 @@ def test_les_fragments_lisent_corrections_comme_raw_value(sa_sync_conn):
     assert _read(sa_sync_conn, corrected("language"), source_record) is False
     assert (
         _read(sa_sync_conn, corrected_by("doc_type"), source_record)
-        == MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE
+        == MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE
     )
     assert _read(sa_sync_conn, corrected_by("language"), source_record) is None
     assert _read(sa_sync_conn, stashed_raw("doc_type"), source_record) == "thesis"

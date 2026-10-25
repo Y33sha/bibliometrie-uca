@@ -4,7 +4,7 @@ Couvre :
 - GET /api/publishers (liste + search + sort variants + filtres)
 - GET /api/publishers/facets (3 dimensions avec comptes exclusifs)
 - GET /api/publishers/{id} (detail enrichi, 404)
-- GET /api/publishers/{id}/dashboard (journal_types + doc_types + oa_statuses, 404)
+- GET /api/publishers/{id}/dashboard (serial_types + doc_types + oa_statuses, 404)
 - GET /api/publishers/{id}/subjects (top sujets, exclusion sujets génériques)
 - PUT /api/publishers/{id} (update, auth requise)
 - POST /api/publishers/{id}/merge (fusion, auth requise, 404 target/source)
@@ -17,10 +17,10 @@ from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_doi_prefix,
     seed_in_perimeter_contributions,
-    seed_journal,
     seed_publication,
     seed_publication_subject,
     seed_publisher,
+    seed_serial,
     seed_subject,
     uniq,
 )
@@ -79,12 +79,12 @@ class TestListPublishers:
         r = client.get("/api/publishers", params={"sort": "name_desc"})
         assert r.status_code == 200
 
-    def test_sort_journals(self, client):
-        r = client.get("/api/publishers", params={"sort": "journals_asc"})
+    def test_sort_serials(self, client):
+        r = client.get("/api/publishers", params={"sort": "serials_asc"})
         assert r.status_code == 200
 
-    def test_sort_journals_desc(self, client):
-        r = client.get("/api/publishers", params={"sort": "journals_desc"})
+    def test_sort_serials_desc(self, client):
+        r = client.get("/api/publishers", params={"sort": "serials_desc"})
         assert r.status_code == 200
 
     def test_sort_publications(self, client):
@@ -123,8 +123,8 @@ class TestListPublishers:
         seed_publisher("OrphanPub")
         # Éditeur avec une revue et une publi → inclus.
         with_data = seed_publisher("WithPubsPub")
-        jid = seed_journal(publisher_id=with_data)
-        _publication("p1", journal_id=jid)
+        jid = seed_serial(publisher_id=with_data)
+        _publication("p1", serial_id=jid)
         seed_in_perimeter_contributions(jid)
         r = client.get("/api/publishers", params={"with_publications": "true", "per_page": 200})
         assert r.status_code == 200
@@ -176,9 +176,9 @@ class TestGetPublisher:
         # Le profil détaillé porte le type, les préfixes DOI et les décomptes.
         assert "publisher_type" in body
         assert "doi_prefixes" in body
-        assert "journal_count" in body
+        assert "serial_count" in body
         assert "publication_count" in body
-        assert body["journal_count"] == 0
+        assert body["serial_count"] == 0
         assert body["publication_count"] == 0
 
     def test_doi_prefixes_aggregated(self, client):
@@ -214,51 +214,51 @@ class TestPublisherDashboard:
         r = client.get("/api/publishers/999999999/dashboard")
         assert r.status_code == 404
 
-    def test_empty_distributions_for_publisher_without_journals(self, client):
+    def test_empty_distributions_for_publisher_without_serials(self, client):
         pid = seed_publisher()
         r = client.get(f"/api/publishers/{pid}/dashboard")
         assert r.status_code == 200
         body = r.json()
         assert body == {
             "total_publications": 0,
-            "journal_types": [],
+            "serial_types": [],
             "doc_types": [],
             "oa_statuses": [],
         }
 
-    def test_aggregates_journals_and_publications(self, client):
+    def test_aggregates_serials_and_publications(self, client):
         pid = seed_publisher()
-        j_journal = seed_journal(publisher_id=pid)
-        j_proc = seed_journal(publisher_id=pid)
+        j_serial = seed_serial(publisher_id=pid)
+        j_proc = seed_serial(publisher_id=pid)
         with owner_pool() as cur:
             cur.execute(
-                "UPDATE journals SET journal_type = 'journal' WHERE id = %s",
-                (j_journal,),
+                "UPDATE serials SET serial_type = 'journal' WHERE id = %s",
+                (j_serial,),
             )
             cur.execute(
-                "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s",
+                "UPDATE serials SET serial_type = 'proceedings' WHERE id = %s",
                 (j_proc,),
             )
             _publication(
-                "p1", doc_type="article", oa_status="gold", journal_id=j_journal, publisher_id=pid
+                "p1", doc_type="article", oa_status="gold", serial_id=j_serial, publisher_id=pid
             )
             _publication(
-                "p2", doc_type="article", oa_status="closed", journal_id=j_journal, publisher_id=pid
+                "p2", doc_type="article", oa_status="closed", serial_id=j_serial, publisher_id=pid
             )
             _publication(
                 "p3",
                 doc_type="conference_paper",
                 oa_status=None,
-                journal_id=j_proc,
+                serial_id=j_proc,
                 publisher_id=pid,
             )
-        seed_in_perimeter_contributions(j_journal)
+        seed_in_perimeter_contributions(j_serial)
         seed_in_perimeter_contributions(j_proc)
         r = client.get(f"/api/publishers/{pid}/dashboard")
         assert r.status_code == 200
         body = r.json()
         assert body["total_publications"] == 3
-        jt = {(j["journal_type"], j["count"]) for j in body["journal_types"]}
+        jt = {(j["serial_type"], j["count"]) for j in body["serial_types"]}
         assert jt == {("journal", 1), ("proceedings", 1)}
         dt = {(d["doc_type"], d["count"]) for d in body["doc_types"]}
         assert dt == {("article", 2), ("conference_paper", 1)}
@@ -278,10 +278,10 @@ class TestPublisherSubjects:
 
     def test_returns_top_subjects_excluding_generic(self, client):
         pid = seed_publisher()
-        jid = seed_journal(publisher_id=pid)
+        jid = seed_serial(publisher_id=pid)
         publication_ids = [
-            _publication("p1", journal_id=jid, publisher_id=pid),
-            _publication("p2", journal_id=jid, publisher_id=pid),
+            _publication("p1", serial_id=jid, publisher_id=pid),
+            _publication("p2", serial_id=jid, publisher_id=pid),
         ]
         specific_label = uniq("specific_subject")
         spec_id = seed_subject(specific_label, usage_count=100)

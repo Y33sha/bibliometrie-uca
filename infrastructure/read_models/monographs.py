@@ -26,14 +26,14 @@ from infrastructure.read_models.entity_facet import entity_name_clause
 
 _COLUMNS = """
     m.id, m.title, m.proceedings, m.year, m.isbn, m.eisbn,
-    m.publisher_id, p.name AS publisher_name, m.journal_id, j.title AS journal_title,
+    m.publisher_id, p.name AS publisher_name, m.serial_id, j.title AS journal_title,
     (SELECT count(*) FROM publications pu WHERE pu.monograph_id = m.id) AS publication_count
 """
 
 _FROM = """
     FROM monographs m
     LEFT JOIN publishers p ON p.id = m.publisher_id
-    LEFT JOIN journals j ON j.id = m.journal_id
+    LEFT JOIN serials j ON j.id = m.serial_id
 """
 
 _SORT_MAP: dict[MonographSort, str] = {
@@ -47,7 +47,7 @@ _SORT_MAP: dict[MonographSort, str] = {
 
 
 # Dimension filtrée de la liste, qu'une facette écarte de son propre décompte.
-type _Dimension = Literal["kind", "year", "publisher", "journal"]
+type _Dimension = Literal["kind", "year", "publisher", "serial"]
 
 
 def _where(
@@ -66,9 +66,9 @@ def _where(
     if filters.publisher_id is not None and skip != "publisher":
         parts.append("m.publisher_id = :publisher_id")
         binds["publisher_id"] = filters.publisher_id
-    if filters.journal_id is not None and skip != "journal":
-        parts.append("m.journal_id = :journal_id")
-        binds["journal_id"] = filters.journal_id
+    if filters.serial_id is not None and skip != "serial":
+        parts.append("m.serial_id = :serial_id")
+        binds["serial_id"] = filters.serial_id
     if filters.kinds and skip != "kind":
         parts.append("m.proceedings = ANY(:proceedings)")
         binds["proceedings"] = [kind == "proceedings" for kind in filters.kinds]
@@ -141,7 +141,7 @@ class PgMonographQueries(MonographQueries):
         self, *, kind: MonographEntityKind, search: str, filters: MonographFilters, limit: int = 20
     ) -> EntityFacetResponse:
         where, binds = _where(filters, skip=kind)
-        table = "publishers" if kind == "publisher" else "journals"
+        table = "publishers" if kind == "publisher" else "serials"
         label = "e.name" if kind == "publisher" else "e.title"
         name_filter, name_binds = entity_name_clause(label, search)
         rows = self._conn.execute(

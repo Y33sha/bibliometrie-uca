@@ -28,7 +28,7 @@ class MonographProceedingsFacts(NamedTuple):
 
 
 _PROCEEDINGS_FACTS = text(f"""
-    SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
+    SELECT m.id, m.title, m.proceedings, j.serial_type::text AS collection_type,
            coalesce(
                array_agg(sr.source::text ORDER BY sr.id) FILTER (WHERE sr.id IS NOT NULL), '{{}}'
            ) AS sources,
@@ -43,9 +43,9 @@ _PROCEEDINGS_FACTS = text(f"""
                '{{}}'
            ) AS declares
     FROM monographs m
-    LEFT JOIN journals j ON j.id = m.journal_id
+    LEFT JOIN serials j ON j.id = m.serial_id
     LEFT JOIN source_records sr ON sr.monograph_id = m.id
-    GROUP BY m.id, j.journal_type
+    GROUP BY m.id, j.serial_type
     ORDER BY m.id
 """)
 

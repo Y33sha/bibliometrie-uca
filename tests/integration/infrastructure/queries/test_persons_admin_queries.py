@@ -285,7 +285,7 @@ class TestNameDuplicates:
             pair.overlaps.coauthors,
             pair.overlaps.shared_publications,
             pair.overlaps.labs,
-            pair.overlaps.journals,
+            pair.overlaps.serials,
         ) == (0, 0, 0, 0)
 
     def test_compound_first_name_pairs_with_its_first_word(self, sa_sync_conn):

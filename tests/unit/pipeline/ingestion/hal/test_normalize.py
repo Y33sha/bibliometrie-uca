@@ -11,8 +11,8 @@ import logging
 from datetime import date
 from unittest.mock import MagicMock
 
-from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.serials.issns import IssnSupport, SerialIssn
 from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.normalizer import PublisherFacts
@@ -96,8 +96,8 @@ class TestContainerDescription:
         )
         assert (facts.raw_doc_type, facts.journal_title) == ("ART", "Nature")
         assert facts.issns == (
-            JournalIssn(issn="1234-5679", support=IssnSupport.PRINT),
-            JournalIssn(issn="2345-6787", support=IssnSupport.ELECTRONIC),
+            SerialIssn(issn="1234-5679", support=IssnSupport.PRINT),
+            SerialIssn(issn="2345-6787", support=IssnSupport.ELECTRONIC),
         )
 
     def test_chapitre_livre_et_isbn(self):
@@ -152,17 +152,17 @@ class TestCanonicalMetadata:
         record = _record({"title_s": ["T"], "producedDateY_i": 2024}, Containers(42, None))
         assert record.title == "T"
         assert record.publication_year == 2024
-        assert record.journal_id == 42
-        # Pas de container_title si journal_id présent.
+        assert record.serial_id == 42
+        # Pas de container_title si serial_id présent.
         assert record.container_title is None
 
-    def test_book_title_fallback_when_no_journal(self):
+    def test_book_title_fallback_when_no_serial(self):
         assert _record({"bookTitle_s": "Book"}).container_title == "Book"
 
     def test_conference_title_fallback(self):
         assert _record({"conferenceTitle_s": "Conf"}).container_title == "Conf"
 
-    def test_journal_title_fallback_when_no_journal(self):
+    def test_serial_title_fallback_when_no_serial(self):
         """Un chapitre sans ISSN n'a pas de revue : son titre de revue reste en container_title."""
         record = _record({"docType_s": "COUV", "journalTitle_s": "Handbook"})
         assert record.container_title == "Handbook"
@@ -384,15 +384,15 @@ class TestHalSourceRecord:
             },
             Containers(None, 8),
         )
-        assert captured.journal_id is None
+        assert captured.serial_id is None
         assert captured.monograph_id == 8
         assert captured.oa_status == "embargoed"
         assert captured.embargo_until == date(2999, 1, 1)
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 
-    def test_journal_id_from_containers(self):
-        assert self._call({}, Containers(7, None)).journal_id == 7
+    def test_serial_id_from_containers(self):
+        assert self._call({}, Containers(7, None)).serial_id == 7
 
 
 # `parse_tei_author_identifiers` est testé dans
@@ -579,4 +579,4 @@ class TestHalNormalizerClass:
         row = staging_row(staging_id=7, source_id="hal-7", raw={"title_s": ["T"]})
         record = _make_normalizer().source_record(row, row.raw_data, Containers(3, 4))
         assert (record.staging_id, record.source_id) == (7, "hal-7")
-        assert (record.journal_id, record.monograph_id) == (3, 4)
+        assert (record.serial_id, record.monograph_id) == (3, 4)

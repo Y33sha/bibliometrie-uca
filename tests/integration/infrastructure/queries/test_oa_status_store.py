@@ -3,8 +3,8 @@
 from sqlalchemy import text
 
 from pipeline.transformation.publications.oa_status import OaSignal, OaStatusStore
-from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests

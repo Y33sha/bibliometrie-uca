@@ -3,12 +3,12 @@
 from collections.abc import Mapping
 
 from domain.countries import normalize_country_code
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
@@ -62,12 +62,12 @@ def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
     return PublisherFacts(publisher_name) if publisher_name else None
 
 
-def _extract_journal_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
+def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
+    """Extrait (issn, eissn) depuis `source.serialIssns` (array ScanR).
 
     Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles entrées supplémentaires (alias, ISSN-L, variantes historiques) sont ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
     """
-    issns = as_sequence(source.get("journalIssns"))
+    issns = as_sequence(source.get("serialIssns"))
     issn = as_str(issns[0]) if len(issns) >= 1 else None
     eissn = as_str(issns[1]) if len(issns) >= 2 else None
     return issn, eissn
@@ -86,7 +86,7 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         collection_title=title,
         book_title=title if raw_type == "proceedings" else None,
         # ScanR ne donne pas le support de ses ISSN.
-        issns=source_issns(unknown=as_strs(source.get("journalIssns"))),
+        issns=source_issns(unknown=as_strs(source.get("serialIssns"))),
         year=as_int(doc.get("year")),
     )
 
@@ -175,9 +175,9 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/journals créés via find_or_create_*).
+    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/serials créés via find_or_create_*).
     source = as_mapping(doc.get("source"))
-    jissn, jeissn = _extract_journal_issns(source)
+    jissn, jeissn = _extract_serial_issns(source)
     biblio_json = compact_biblio(
         publisher=as_str(source.get("publisher")),
         journal_title=as_str(source.get("title")),
@@ -194,9 +194,9 @@ def scanr_source_record(  # noqa: C901
         title=get_title(doc) or "",
         publication_year=as_int(doc.get("year")),
         raw_doc_type=as_str(doc.get("type")),
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=as_str(source.get("title")) if not containers.journal_id else None,
+        container_title=as_str(source.get("title")) if not containers.serial_id else None,
         raw_language=None,
         biblio=biblio_json,
         abstract=abstract,

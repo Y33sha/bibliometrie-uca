@@ -75,7 +75,7 @@ def correct_source_record(
 
     raw_external_ids = raw_value(corrections, CorrectionKey.EXTERNAL_IDS, external_ids)
     new_external_ids = raw_external_ids
-    thesis_to_article = MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE
+    thesis_to_article = MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE
     if corrected.doc_type is not None and corrected.doc_type.rule == thesis_to_article:
         stripped = strip_dissertation_keys(raw_external_ids)
         if stripped != raw_external_ids:

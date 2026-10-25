@@ -65,7 +65,7 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 /**
  * GET du détail d'une entité, pour sa page. L'API redirige l'identifiant d'une entité absorbée par une fusion vers l'identifiant conservé : le navigateur recharge alors la page sur cet identifiant, dernier segment de l'URL, et la promesse reste en suspens.
  *
- * Usage : apiDetail('/api/journals/42'), depuis la page `/journals/42`.
+ * Usage : apiDetail('/api/serials/42'), depuis la page `/journals/42`.
  */
 export async function apiDetail<T>(url: string): Promise<T> {
 	const res = await fetch(base + url);

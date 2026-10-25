@@ -158,40 +158,40 @@ def seed_publisher(name: str | None = None, *, name_normalized: str | None = Non
     )
 
 
-def seed_journal(
+def seed_serial(
     title: str | None = None,
     *,
     title_normalized: str | None = None,
     publisher_id: int | None = None,
-    journal_type: str = "unknown",
+    serial_type: str = "unknown",
 ) -> int:
     """Revue de titre unique par défaut, normalisé par `normalize_text` sauf `title_normalized`. Le type par défaut est celui du schéma."""
     title = title or uniq("Journal")
     return _insert(
-        "INSERT INTO journals (title, title_normalized, publisher_id, journal_type) "
-        "VALUES (%s, %s, %s, CAST(%s AS journal_type)) RETURNING id",
+        "INSERT INTO serials (title, title_normalized, publisher_id, serial_type) "
+        "VALUES (%s, %s, %s, CAST(%s AS serial_type)) RETURNING id",
         (
             title,
             normalize_text(title) if title_normalized is None else title_normalized,
             publisher_id,
-            journal_type,
+            serial_type,
         ),
     )
 
 
-def seed_journal_issn(
-    journal_id: int,
+def seed_serial_issn(
+    serial_id: int,
     *,
     issn: str,
     support: str | None = None,
     linking: bool = False,
     status: str = "active",
 ) -> int:
-    """ISSN de la revue `journal_id`. Les valeurs par défaut sont celles du schéma."""
+    """ISSN de la revue `serial_id`. Les valeurs par défaut sont celles du schéma."""
     return _insert(
-        "INSERT INTO journal_issns (issn, journal_id, support, linking, status) "
+        "INSERT INTO serial_issns (issn, serial_id, support, linking, status) "
         "VALUES (%s, %s, CAST(%s AS issn_support), %s, CAST(%s AS issn_status)) RETURNING id",
-        (issn, journal_id, support, linking, status),
+        (issn, serial_id, support, linking, status),
     )
 
 
@@ -269,7 +269,7 @@ def seed_publication(
     normalize_title: bool = True,
     doc_type: str | None = "other",
     oa_status: str | None = "unknown",
-    journal_id: int | None = None,
+    serial_id: int | None = None,
     monograph_id: int | None = None,
     publisher_id: int | None = None,
     in_perimeter: bool = False,
@@ -277,7 +277,7 @@ def seed_publication(
     """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
     return _insert(
         "INSERT INTO publications (title, title_normalized, publication_year, doc_type, oa_status, "
-        "journal_id, monograph_id, publisher_id, perimeter_evidence) "
+        "serial_id, monograph_id, publisher_id, perimeter_evidence) "
         "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, %s, "
         "CAST(%s AS perimeter_evidence[])) "
         "RETURNING id",
@@ -287,7 +287,7 @@ def seed_publication(
             year,
             doc_type,
             oa_status,
-            journal_id,
+            serial_id,
             monograph_id,
             publisher_id,
             perimeter_evidence(in_perimeter) or [],
@@ -311,10 +311,10 @@ def seed_contribution(
     )
 
 
-def seed_in_perimeter_contributions(journal_id: int) -> None:
+def seed_in_perimeter_contributions(serial_id: int) -> None:
     """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
     with owner_pool() as cur:
-        cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
+        cur.execute("SELECT id FROM publications WHERE serial_id = %s", (serial_id,))
         publication_ids = [r["id"] for r in cur.fetchall()]
         for pid in publication_ids:
             person_id = seed_person(
@@ -330,20 +330,20 @@ def seed_in_perimeter_contributions(journal_id: int) -> None:
             "ON pe.id = a.person_id AND pe.exclusion IS NULL "
             "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
             "WHERE a.publication_id = p.id), '{}') "
-            "WHERE p.journal_id = %s",
-            (journal_id,),
+            "WHERE p.serial_id = %s",
+            (serial_id,),
         )
         cur.execute(
-            "UPDATE journals j SET publication_count = COALESCE((SELECT COUNT(*) "
-            "FROM publications p WHERE p.journal_id = j.id AND p.in_perimeter "
+            "UPDATE serials j SET publication_count = COALESCE((SELECT COUNT(*) "
+            "FROM publications p WHERE p.serial_id = j.id AND p.in_perimeter "
             "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
-            (journal_id,),
+            (serial_id,),
         )
         cur.execute(
             "UPDATE publishers pub SET publication_count = COALESCE((SELECT SUM(j.publication_count) "
-            "FROM journals j WHERE j.publisher_id = pub.id), 0) "
-            "WHERE pub.id = (SELECT publisher_id FROM journals WHERE id = %s)",
-            (journal_id,),
+            "FROM serials j WHERE j.publisher_id = pub.id), 0) "
+            "WHERE pub.id = (SELECT publisher_id FROM serials WHERE id = %s)",
+            (serial_id,),
         )
 
 
@@ -354,7 +354,7 @@ def seed_source_record(
     title: str = "T",
     publication_year: int | None = 2024,
     publication_id: int | None = None,
-    journal_id: int | None = None,
+    serial_id: int | None = None,
     doc_type: str | None = None,
     raw_doc_type: str | None = None,
     doi: str | None = None,
@@ -367,7 +367,7 @@ def seed_source_record(
         "title": title,
         "publication_year": publication_year,
         "publication_id": publication_id,
-        "journal_id": journal_id,
+        "serial_id": serial_id,
         "doc_type": doc_type,
         "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
         "doi": doi,
@@ -509,13 +509,13 @@ def seed_doi_prefix(
         )
 
 
-def seed_journal_doi_namespace(namespace: str, *, journal_id: int, dois: int, share: float) -> None:
-    """Espace de noms DOI `namespace` appris pour la revue `journal_id`."""
+def seed_serial_doi_namespace(namespace: str, *, serial_id: int, dois: int, share: float) -> None:
+    """Espace de noms DOI `namespace` appris pour la revue `serial_id`."""
     with owner_pool() as cur:
         cur.execute(
-            "INSERT INTO journal_doi_namespaces (namespace, journal_id, dois, share) "
+            "INSERT INTO serial_doi_namespaces (namespace, serial_id, dois, share) "
             "VALUES (%s, %s, %s, %s)",
-            (namespace, journal_id, dois, share),
+            (namespace, serial_id, dois, share),
         )
 
 

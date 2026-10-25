@@ -134,7 +134,7 @@ def theses_source_record(
         title=get_title(thesis) or "",
         publication_year=get_publication_year(thesis),
         raw_doc_type=derive_theses_doc_type(_defense_date(thesis)),
-        journal_id=None,
+        serial_id=None,
         monograph_id=None,
         container_title=None,
         raw_language=None,

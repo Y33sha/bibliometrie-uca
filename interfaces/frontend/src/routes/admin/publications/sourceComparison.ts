@@ -6,7 +6,7 @@ export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];
 
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
-export type CellLink = { kind: 'doi'; doi: string } | { kind: 'journals' | 'publishers'; id: number };
+export type CellLink = { kind: 'doi'; doi: string } | { kind: 'serials' | 'publishers'; id: number };
 
 /** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note le nom donné par la source quand il diffère du référentiel. `title` signale un titre de publication, rendu par `PublicationTitle`. */
 export interface ComparisonCell {
@@ -72,7 +72,7 @@ function referentialCell(
 	id: number | null,
 	name: string | null,
 	rawName: string | null,
-	kind: 'journals' | 'publishers',
+	kind: 'serials' | 'publishers',
 ): ComparisonCell {
 	if (id == null) return { text: rawName };
 	const note = rawName && name && normalized(rawName) !== normalized(name) ? rawName : undefined;
@@ -131,10 +131,10 @@ function fields(records: SourceRecord[]): Field[] {
 			compared: (r) => r.publication_year,
 		},
 		{
-			key: 'journal',
-			label: 'Revue',
-			cell: (r) => referentialCell(r.journal_id, r.journal_title, r.journal_raw_title, 'journals'),
-			compared: (r) => (r.journal_id != null ? `#${r.journal_id}` : r.journal_raw_title),
+			key: 'serial',
+			label: 'Publication en série',
+			cell: (r) => referentialCell(r.serial_id, r.journal_title, r.journal_raw_title, 'serials'),
+			compared: (r) => (r.serial_id != null ? `#${r.serial_id}` : r.journal_raw_title),
 		},
 		textField('issn', 'ISSN', (r) => r.journal_raw_issn),
 		textField('eissn', 'e-ISSN', (r) => r.journal_raw_eissn),

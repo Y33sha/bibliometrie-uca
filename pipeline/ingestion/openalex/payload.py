@@ -148,7 +148,7 @@ def is_hal_location(loc: OpenalexLocation) -> bool:
     return False
 
 
-def should_skip_publisher_journal(loc: OpenalexLocation | None) -> bool:
+def should_skip_publisher_serial(loc: OpenalexLocation | None) -> bool:
     """True si la primary_location désigne une plateforme : ni publisher ni journal ne sont cherchés pour ce work.
 
     Couvre HAL, theses.fr, tout autre repository (Zenodo, SPIRE, etc.) et les plateformes d'ebooks. `None` (pas de primary) → False (rare en pratique).

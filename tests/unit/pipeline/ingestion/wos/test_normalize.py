@@ -16,8 +16,8 @@ import logging
 from typing import Any
 from unittest.mock import MagicMock
 
-from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.serials.issns import IssnSupport, SerialIssn
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.wos.normalize import (
     WosNormalizer,
@@ -563,7 +563,7 @@ class TestExtractFromApi:
         rec = extract_from_api(raw, None)
         assert rec["publisher_name"] is None
 
-    def test_oa_status_from_journal_oas_gold(self):
+    def test_oa_status_from_serial_oas_gold(self):
         raw = _make_api_record(journal_oas_gold="Y")
         rec = extract_from_api(raw, None)
         assert rec["oa_status"] == "gold"
@@ -798,8 +798,8 @@ class TestGetContainerFacts:
         )
         assert facts.journal_title == "Nature"
         assert facts.issns == (
-            JournalIssn(issn="0028-0836", support=IssnSupport.PRINT),
-            JournalIssn(issn="1476-4687", support=IssnSupport.ELECTRONIC),
+            SerialIssn(issn="0028-0836", support=IssnSupport.PRINT),
+            SerialIssn(issn="1476-4687", support=IssnSupport.ELECTRONIC),
         )
 
     def test_chapitre_livre_de_la_source_et_isbn(self):
@@ -838,7 +838,7 @@ class TestWosSourceRecord:
         }
 
         row_arg = wos_source_record(
-            rec, staging_id=10, containers=Containers(journal_id=42, monograph_id=None)
+            rec, staging_id=10, containers=Containers(serial_id=42, monograph_id=None)
         )
 
         assert row_arg.source_id == "WOS:1"
@@ -846,7 +846,7 @@ class TestWosSourceRecord:
         assert row_arg.title == "T"
         assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
-        assert row_arg.journal_id == 42
+        assert row_arg.serial_id == 42
         assert row_arg.oa_status == "gold"
         assert row_arg.raw_language == "en"
         assert row_arg.abstract == "abs"
@@ -856,14 +856,14 @@ class TestWosSourceRecord:
     def test_none_values_propagate(self):
         rec = {"ut": "WOS:1", "title": "T", "doc_type": "other"}
         row_arg = wos_source_record(
-            rec, staging_id=5, containers=Containers(journal_id=None, monograph_id=None)
+            rec, staging_id=5, containers=Containers(serial_id=None, monograph_id=None)
         )
 
-        assert row_arg.journal_id is None
+        assert row_arg.serial_id is None
         assert row_arg.oa_status is None
         assert row_arg.doi is None
 
-    def test_container_title_absent_with_journal_id(self):
+    def test_container_title_absent_with_serial_id(self):
         rec = {
             "ut": "WOS:1",
             "title": "T",
@@ -875,14 +875,14 @@ class TestWosSourceRecord:
             "journal_title": "J Name",
         }
         row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(journal_id=42, monograph_id=None)
+            rec, staging_id=1, containers=Containers(serial_id=42, monograph_id=None)
         )
         assert row_arg.title == "T"
-        assert row_arg.journal_id == 42
+        assert row_arg.serial_id == 42
         assert row_arg.container_title is None
 
-    def test_container_title_falls_back_when_no_journal_id(self):
-        """Sans `journal_id` (titre non matché), `journal_title` devient le `container_title`."""
+    def test_container_title_falls_back_when_no_serial_id(self):
+        """Sans `serial_id` (titre non matché), `journal_title` devient le `container_title`."""
         rec = {
             "ut": "WOS:1",
             "title": "T",
@@ -894,7 +894,7 @@ class TestWosSourceRecord:
             "journal_title": "Container Title",
         }
         row_arg = wos_source_record(
-            rec, staging_id=1, containers=Containers(journal_id=None, monograph_id=None)
+            rec, staging_id=1, containers=Containers(serial_id=None, monograph_id=None)
         )
         assert row_arg.container_title == "Container Title"
 
@@ -1022,7 +1022,7 @@ class TestWosNormalizer:
         norm = _normalizer(logger)
         row = staging_row(staging_id=7, source_id="WOS:001", raw=_export_row())
         doc = norm.parse(row)
-        upsert = norm.source_record(row, doc, Containers(journal_id=22, monograph_id=33))
+        upsert = norm.source_record(row, doc, Containers(serial_id=22, monograph_id=33))
         assert (upsert.source_id, upsert.staging_id) == ("WOS:001", 7)
-        assert (upsert.journal_id, upsert.monograph_id) == (22, 33)
+        assert (upsert.serial_id, upsert.monograph_id) == (22, 33)
         assert upsert.container_title is None

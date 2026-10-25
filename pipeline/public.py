@@ -8,8 +8,8 @@ from pipeline.transformation.countries.refresh_publication_countries import Coun
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
-from pipeline.transformation.publishing.journals.journal_merge import JournalRecompute
 from pipeline.transformation.publishing.publication_counts import PublicationCountRecompute
+from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from pipeline.transformation.structures.perimeter_evidence import (
     SourceContributionPerimeterRecompute,
@@ -19,7 +19,7 @@ __all__ = [
     "PHASE_ORDER",
     "CountryRecompute",
     "SourceContributionPerimeterRecompute",
-    "JournalRecompute",
+    "SerialRecompute",
     "PerimeterStructures",
     "PublicationCountRecompute",
     "PublicationPerimeterRecompute",

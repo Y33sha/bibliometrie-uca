@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from sqlalchemy import text
 
 from interfaces.cli.maintenance import enrich_publishers as module
-from tests.integration.helpers.journals import insert_publisher
+from tests.integration.helpers.serials import insert_publisher
 
 
 def _country(conn, publisher_id):

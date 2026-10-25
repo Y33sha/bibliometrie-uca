@@ -1,6 +1,6 @@
-"""Compteurs `publication_count` (publications in-perimeter) sur `journals` + `publishers`.
+"""Compteurs `publication_count` (publications in-perimeter) sur `serials` + `publishers`.
 
-`journals.publication_count` = nombre de publications in-perimeter de la revue.
+`serials.publication_count` = nombre de publications in-perimeter de la revue.
 `publishers.publication_count` = nombre de publications in-perimeter de l'éditeur (`publications.publisher_id`).
 
 Les deux recalculs en masse tournent dans la phase `finalize`, après `in_perimeter`. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
@@ -9,17 +9,17 @@ Les deux recalculs en masse tournent dans la phase `finalize`, après `in_perime
 from sqlalchemy import Connection, text
 
 
-def refresh_journal_publication_count(conn: Connection, journal_id: int) -> None:
+def refresh_serial_publication_count(conn: Connection, serial_id: int) -> None:
     """Recalcule le `publication_count` d'une seule revue (fusion admin)."""
     conn.execute(
         text("""
-            UPDATE journals j SET publication_count = COALESCE((
+            UPDATE serials j SET publication_count = COALESCE((
                 SELECT COUNT(*) FROM publications p
-                WHERE p.journal_id = j.id AND p.in_perimeter
+                WHERE p.serial_id = j.id AND p.in_perimeter
             ), 0)
             WHERE j.id = :jid
         """),
-        {"jid": journal_id},
+        {"jid": serial_id},
     )
 
 
@@ -37,7 +37,7 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
     )
 
 
-def refresh_journal_publication_counts(conn: Connection) -> int:
+def refresh_serial_publication_counts(conn: Connection) -> int:
     """Recalcule le `publication_count` de chaque revue.
 
     Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
@@ -45,16 +45,16 @@ def refresh_journal_publication_counts(conn: Connection) -> int:
     return conn.execute(
         text("""
             WITH counts AS (
-                SELECT journal_id, COUNT(*) AS n
+                SELECT serial_id, COUNT(*) AS n
                 FROM publications
                 WHERE in_perimeter
-                  AND journal_id IS NOT NULL
-                GROUP BY journal_id
+                  AND serial_id IS NOT NULL
+                GROUP BY serial_id
             )
-            UPDATE journals j
+            UPDATE serials j
             SET publication_count = COALESCE(c.n, 0)
-            FROM journals j2
-            LEFT JOIN counts c ON c.journal_id = j2.id
+            FROM serials j2
+            LEFT JOIN counts c ON c.serial_id = j2.id
             WHERE j2.id = j.id AND j.publication_count IS DISTINCT FROM COALESCE(c.n, 0)
         """)
     ).rowcount

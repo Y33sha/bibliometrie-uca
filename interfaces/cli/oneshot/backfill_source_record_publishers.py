@@ -27,7 +27,7 @@ log = setup_logger("backfill_source_record_publishers", os.path.dirname(__file__
 _BATCH = 10_000
 
 _RECORDS = text("""
-    SELECT id, source::text AS source, doc_type::text AS doc_type, journal_id, monograph_id,
+    SELECT id, source::text AS source, doc_type::text AS doc_type, serial_id, monograph_id,
            biblio->>'publisher' AS name, publisher_id
     FROM source_records
     WHERE biblio ? 'publisher' OR publisher_id IS NOT NULL
@@ -47,7 +47,7 @@ def changes(conn: Connection) -> list[tuple[int, int | None]]:
     result: list[tuple[int, int | None]] = []
     for r in conn.execute(_RECORDS).all():
         wanted = None
-        has_container = r.journal_id is not None or r.monograph_id is not None
+        has_container = r.serial_id is not None or r.monograph_id is not None
         if r.name and source_record_has_publisher(
             r.doc_type, r.source, has_container=has_container
         ):

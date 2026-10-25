@@ -38,7 +38,7 @@ def run_collaborations(
     per_country = (
         "SELECT country AS code, COUNT(DISTINCT p.id) AS value "
         "FROM publications p "
-        "LEFT JOIN journals j ON j.id = p.journal_id "
+        "LEFT JOIN serials j ON j.id = p.serial_id "
         "CROSS JOIN LATERAL unnest(p.countries) AS country "
         f"WHERE {STATS_BASE} AND {where} AND country <> :domestic_country "
         "GROUP BY country ORDER BY value DESC"
@@ -51,7 +51,7 @@ def run_collaborations(
         "COUNT(DISTINCT p.id) FILTER "
         "(WHERE cardinality(array_remove(p.countries, :domestic_country)) > 0) AS international "
         "FROM publications p "
-        "LEFT JOIN journals j ON j.id = p.journal_id "
+        "LEFT JOIN serials j ON j.id = p.serial_id "
         f"WHERE {STATS_BASE} AND {where}"
     )
     agg = conn.execute(text(totals), binds).one()

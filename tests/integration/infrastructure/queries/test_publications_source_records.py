@@ -6,8 +6,8 @@ from sqlalchemy import text
 
 from infrastructure.read_models.publications.source_records import get_publication_sources
 from tests.integration.helpers.groups import insert_group
-from tests.integration.helpers.journals import insert_journal, insert_publisher
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import (
     add_source_contribution_ror,
@@ -19,8 +19,8 @@ from tests.integration.helpers.structures import (
 _source_record = partial(insert_source_record, title="Titre")
 
 
-def _create_journal(conn, title, publisher_name):
-    return insert_journal(conn, title, publisher_id=insert_publisher(conn, publisher_name))
+def _create_serial(conn, title, publisher_name):
+    return insert_serial(conn, title, publisher_id=insert_publisher(conn, publisher_name))
 
 
 def _records(conn, publication_id):
@@ -40,14 +40,14 @@ class TestGetPublicationSources:
         assert result.title == "Seule"
         assert result.source_records == []
 
-    def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
+    def test_serial_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        journal = _create_journal(sa_sync_conn, "Nature", "Springer")
+        journal = _create_serial(sa_sync_conn, "Nature", "Springer")
         _source_record(
             sa_sync_conn,
             publication,
             source_id="hal-1",
-            journal_id=journal,
+            serial_id=journal,
             publisher_id=insert_publisher(sa_sync_conn, "Springer Nature"),
             biblio={
                 "journal": {"title": "Nature (London)", "issn": "0028-0836", "eissn": "1476-4687"},
@@ -55,7 +55,7 @@ class TestGetPublicationSources:
             },
         )
         [record] = _records(sa_sync_conn, publication)
-        assert (record.journal_id, record.journal_title, record.journal_raw_title) == (
+        assert (record.serial_id, record.journal_title, record.journal_raw_title) == (
             journal,
             "Nature",
             "Nature (London)",

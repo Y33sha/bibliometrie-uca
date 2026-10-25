@@ -35,12 +35,11 @@ from interfaces.api.models.contributions import (
     SourceContributionRef,
 )
 from interfaces.api.models.errors import (
-    BlockingJournalItem,
+    BlockingSerialItem,
     PublisherMergeBlockedResponse,
     RejectedPairItem,
     RejectedPairsResponse,
 )
-from interfaces.api.models.journals import JournalTypeChange, JournalTypeChangeImpact
 from interfaces.api.models.perimeters import (
     PerimeterCreate,
 )
@@ -57,6 +56,7 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
+from interfaces.api.models.serials import SerialTypeChange, SerialTypeChangeImpact
 from interfaces.api.models.structures import (
     NameFormCreate,
     NameFormUpdate,
@@ -78,7 +78,7 @@ __all__ = [
     "BatchReviewAction",
     "BatchSetCountry",
     "BatchUpdatedResponse",
-    "BlockingJournalItem",
+    "BlockingSerialItem",
     "ConfigValueUpdate",
     "CreatePersonName",
     "CreatedIdResponse",
@@ -87,8 +87,8 @@ __all__ = [
     "DetachContributionsResponse",
     "EnumOption",
     "IdentifierStatusResponse",
-    "JournalTypeChange",
-    "JournalTypeChangeImpact",
+    "SerialTypeChange",
+    "SerialTypeChangeImpact",
     "LoginRequest",
     "MarkDistinctPersons",
     "MergeRequest",

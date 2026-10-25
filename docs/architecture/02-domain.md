@@ -16,7 +16,7 @@ Entités avec identité, comportement et invariants métier.
 - **`IdentifierAttribution`** (`domain/persons/`) est l'attribution d'un identifiant à une personne : un même couple `(id_type, id_value)` ne peut être attribué qu'à une seule. L'attribution porte un statut de confirmation (`confirmed`, `rejected`, `pending`, `authenticated`).
 - **`Structure`** (`domain/structures/`) est un établissement ou unité de recherche. Les relations de tutelle entre structures forment un graphe acyclique.
 - **`Perimeter`** (`domain/perimeters/`) est un ensemble de structures, défini par ses structures-racines et incluant tous leurs descendants.
-- **`Journal`** (`domain/journals/`) est un support de publication — revue, recueil de proceedings, serveur de preprints — rattaché à un `Publisher`.
+- **`Serial`** (`domain/serials/`) est une publication en série — revue, collection d'ouvrages, recueil d'actes, serveur de preprints — rattachée à un `Publisher`.
 - **`Publisher`** (`domain/publishers/`) est un éditeur.
 
 ## Value objects
@@ -48,4 +48,4 @@ L'hydratation sert là où le traitement porte sur une entité à la fois : les 
 Les traitements effectués en masse par le pipeline — résolution des affiliations, des publications et des personnes… — opèrent en SQL sur tout le corpus.
 
 - Chaque repository d'agrégat expose `find_by_id(id) -> Entity | None` qui charge l'*aggregate root*. Pour les agrégats riches (`Publication`, `Person`, `Structure`), les value objects internes — formes de nom, identifiants — sont chargés avec lui.
-- Les références entre agrégats sont **par id**, pas par objet : `Journal.publisher_id`, `Perimeter.root_structure_ids` — pas d'hydratation transitive.
+- Les références entre agrégats sont **par id**, pas par objet : `Serial.publisher_id`, `Perimeter.root_structure_ids` — pas d'hydratation transitive.

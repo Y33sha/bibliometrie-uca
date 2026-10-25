@@ -26,12 +26,12 @@ def test_phase_aggregates_substep_counters():
             publishers_journals, "_run_resolve_datacite_publishers", return_value=PhaseMetrics()
         ),
         patch.object(
-            publishers_journals, "_run_enrich_journals_from_openalex", return_value=openalex
+            publishers_journals, "_run_enrich_serials_from_openalex", return_value=openalex
         ),
         patch.object(
-            publishers_journals, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()
+            publishers_journals, "_run_check_serials_in_sudoc", return_value=PhaseMetrics()
         ),
-        patch.object(publishers_journals, "_run_enrich_journals_from_doaj", return_value=doaj),
+        patch.object(publishers_journals, "_run_enrich_serials_from_doaj", return_value=doaj),
     ):
         metrics = publishers_journals.build().run(
             phase_context(
@@ -64,14 +64,14 @@ def test_phase_propagates_substep_signals():
         ),
         patch.object(
             publishers_journals,
-            "_run_enrich_journals_from_openalex",
+            "_run_enrich_serials_from_openalex",
             return_value=PhaseMetrics(),
         ),
         patch.object(
-            publishers_journals, "_run_check_journals_in_sudoc", return_value=PhaseMetrics()
+            publishers_journals, "_run_check_serials_in_sudoc", return_value=PhaseMetrics()
         ),
         patch.object(
-            publishers_journals, "_run_enrich_journals_from_doaj", return_value=PhaseMetrics()
+            publishers_journals, "_run_enrich_serials_from_doaj", return_value=PhaseMetrics()
         ),
     ):
         metrics = publishers_journals.build().run(

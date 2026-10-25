@@ -107,8 +107,8 @@ def get_publication_detail(
                    p.oa_status::text AS oa_status,
                    p.license::text AS license, p.deposit_license::text AS deposit_license,
                    p.language, p.container_title, d.abstract, d.keywords,
-                   j.id AS journal_id, j.title AS journal_title,
-                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS journal_issns,
+                   j.id AS serial_id, j.title AS journal_title,
+                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
                    j.apc_amount, j.apc_currency,
                    j.oa_model,
                    m.id AS monograph_id, m.title AS monograph_title,
@@ -116,7 +116,7 @@ def get_publication_detail(
                    dp.ra AS doi_ra
             FROM publications p
             LEFT JOIN publications_detail d ON d.publication_id = p.id
-            LEFT JOIN journals j ON j.id = p.journal_id
+            LEFT JOIN serials j ON j.id = p.serial_id
             LEFT JOIN monographs m ON m.id = p.monograph_id
             LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
@@ -267,9 +267,9 @@ def get_publication_detail(
             language=publication_row.language,
             container_title=publication_row.container_title,
             abstract=publication_row.abstract,
-            journal_id=publication_row.journal_id,
+            serial_id=publication_row.serial_id,
             journal_title=publication_row.journal_title,
-            journal_issns=list(publication_row.journal_issns or []),
+            serial_issns=list(publication_row.serial_issns or []),
             apc_amount=publication_row.apc_amount,
             apc_currency=publication_row.apc_currency,
             oa_model=publication_row.oa_model,

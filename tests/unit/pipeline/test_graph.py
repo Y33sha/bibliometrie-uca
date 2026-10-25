@@ -74,8 +74,8 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
 
 def test_la_fusion_des_revues_suit_le_typage_openalex():
     """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
-    deps = dependencies(TASKS)["publishers_journals.merge_duplicate_journals"]
-    assert "publishers_journals.enrich_journals_from_openalex" in deps
+    deps = dependencies(TASKS)["publishers_journals.merge_duplicate_serials"]
+    assert "publishers_journals.enrich_serials_from_openalex" in deps
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():
@@ -104,7 +104,7 @@ def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
 def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publication():
     theses = next(n for n in TASKS if n.name == "normalize.theses")
     assert not any(
-        item.startswith(("journals", "publishers", "monographs")) for item in theses.writes
+        item.startswith(("serials", "publishers", "monographs")) for item in theses.writes
     )
 
 

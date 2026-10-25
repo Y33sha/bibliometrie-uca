@@ -10,7 +10,7 @@ def _facts(**overrides: object) -> MetadataForCorrection:
         "title": "Un titre",
         "doc_type": "article",
         "doi": None,
-        "journal_id": None,
+        "serial_id": None,
     }
     defaults.update(overrides)
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
@@ -23,13 +23,13 @@ def test_enregistrement_deja_corrige():
 def test_entrees_des_autres_sous_etapes_gardees():
     others = {
         CorrectionKey.DOI: stash_entry("10.1/x", "OUVRAGE_VS_CHAPITRE"),
-        CorrectionKey.JOURNAL_ID: stash_entry(None, "JOURNAL_BY_DOI_NAMESPACE"),
+        CorrectionKey.SERIAL_ID: stash_entry(None, "SERIAL_BY_DOI_NAMESPACE"),
     }
-    corrected = correct_source_record(_facts(journal_type="media"), {}, others)
+    corrected = correct_source_record(_facts(serial_type="media"), {}, others)
     assert corrected is not None
     assert corrected.corrections == {
         **others,
-        CorrectionKey.DOC_TYPE: stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+        CorrectionKey.DOC_TYPE: stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
     }
 
 
@@ -50,7 +50,7 @@ def test_correction_defaite_quand_la_regle_ne_s_applique_plus():
     corrected = correct_source_record(
         _facts(doc_type="media"),
         {},
-        {CorrectionKey.DOC_TYPE: stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA")},
+        {CorrectionKey.DOC_TYPE: stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA")},
     )
     assert corrected is not None
     assert (corrected.doc_type, corrected.corrections) == ("article", {})

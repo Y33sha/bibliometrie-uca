@@ -22,19 +22,19 @@ MonographSort = Literal[
 MONOGRAPH_KINDS = ("book", "proceedings")
 """Types de monographie : livre, volume d'actes."""
 
-MonographEntityKind = Literal["publisher", "journal"]
+MonographEntityKind = Literal["publisher", "serial"]
 """Entités qui filtrent la liste des monographies : l'éditeur, la collection."""
 
 
 @dataclass(frozen=True, slots=True)
 class MonographFilters:
-    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` et `years` retiennent les types et les années listés ; vides, ils retiennent tout. `publisher_id` et `journal_id` restreignent à un éditeur et à une collection."""
+    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` et `years` retiennent les types et les années listés ; vides, ils retiennent tout. `publisher_id` et `serial_id` restreignent à un éditeur et à une collection."""
 
     search: str = ""
     kinds: tuple[str, ...] = ()
     years: tuple[int, ...] = ()
     publisher_id: int | None = None
-    journal_id: int | None = None
+    serial_id: int | None = None
 
 
 class MonographListItem(BaseModel):
@@ -48,7 +48,7 @@ class MonographListItem(BaseModel):
     eisbn: str | None
     publisher_id: int | None
     publisher_name: str | None
-    journal_id: int | None
+    serial_id: int | None
     journal_title: str | None
     publication_count: int
 

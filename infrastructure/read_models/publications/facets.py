@@ -45,7 +45,6 @@ from infrastructure.read_models.filters import (
     hal_status_expression,
     in_perimeter_person_clause,
     institution_apc_payment_sql,
-    journal_id_clause,
     lab_clause,
     language_clause,
     license_clause,
@@ -55,6 +54,7 @@ from infrastructure.read_models.filters import (
     person_clause,
     publisher_id_clause,
     search_clause,
+    serial_id_clause,
     source_clause,
     subject_clause,
     year_clause,
@@ -124,8 +124,8 @@ class _PublicationFacetsBuilder:
             clauses.append(apc_clause(f.has_apc, self.perimeter_structure_ids))
         if skip != "publisher":
             clauses.append(publisher_id_clause(f.publisher_id))
-        if skip != "journal":
-            clauses.append(journal_id_clause(f.journal_id))
+        if skip != "serial":
+            clauses.append(serial_id_clause(f.serial_id))
         if skip != "country":
             clauses.append(country_clause(f.country_values))
         if skip != "language":

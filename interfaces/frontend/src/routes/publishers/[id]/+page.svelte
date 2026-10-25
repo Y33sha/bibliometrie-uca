@@ -7,7 +7,7 @@
 	import { docTypeSingular } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import SerialsListView from '$lib/components/SerialsListView.svelte';
 	import MonographsListView from '$lib/components/MonographsListView.svelte';
 	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import { oaStatusColor } from '$lib/components/charts/oaColors';
@@ -21,7 +21,7 @@
 
 	const publisherId = $derived(Number($page.params.id));
 
-	const validTabs = ['dashboard', 'journals', 'monographs', 'publications'];
+	const validTabs = ['dashboard', 'serials', 'monographs', 'publications'];
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
@@ -147,7 +147,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'journals', label: 'Revues' },
+			{ id: 'serials', label: 'Revues' },
 			{ id: 'monographs', label: 'Monographies' },
 			{ id: 'publications', label: 'Publications' }
 		]}
@@ -193,9 +193,9 @@
 	{/if}
 
 	<!-- Tab: Revues -->
-	{#if activeTab === 'journals'}
+	{#if activeTab === 'serials'}
 		<div class="tab-content">
-			<JournalsListView
+			<SerialsListView
 				apiKey={`publisher-${publisherId}-journals`}
 				externalFilters={{ publisherId }}
 				withPubs

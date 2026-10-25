@@ -9,7 +9,7 @@ L'éditeur d'un préfixe DOI Crossref est celui de `doi_prefixes`. Une revue cha
 - les titres normalisés que portent plusieurs revues d'éditeurs distincts.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_journal_publisher_changes [--min 2]
+    python -m interfaces.cli.oneshot.measure_serial_publisher_changes [--min 2]
 """
 
 from __future__ import annotations
@@ -22,52 +22,52 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger("measure_journal_publisher_changes", os.path.dirname(__file__))
+log = setup_logger("measure_serial_publisher_changes", os.path.dirname(__file__))
 
 _TABLES = (
     """
     CREATE TEMP TABLE prefix_publications AS
-    SELECT p.id, p.journal_id, p.publication_year AS year,
-           dp.publisher_id AS prefix_publisher_id, j.publisher_id AS journal_publisher_id
+    SELECT p.id, p.serial_id, p.publication_year AS year,
+           dp.publisher_id AS prefix_publisher_id, j.publisher_id AS serial_publisher_id
     FROM publications p
-    JOIN journals j ON j.id = p.journal_id
+    JOIN serials j ON j.id = p.serial_id
     JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1) AND dp.ra = 'Crossref'
     WHERE p.doi IS NOT NULL AND dp.publisher_id IS NOT NULL
     """,
     """
-    CREATE TEMP TABLE journal_prefix_publishers AS
-    SELECT journal_id, prefix_publisher_id, count(*) AS publications, min(year) AS first_year, max(year) AS last_year
+    CREATE TEMP TABLE serial_prefix_publishers AS
+    SELECT serial_id, prefix_publisher_id, count(*) AS publications, min(year) AS first_year, max(year) AS last_year
     FROM prefix_publications
     GROUP BY 1, 2
     HAVING count(*) >= :min
     """,
     """
-    CREATE TEMP TABLE changing_journals AS
-    SELECT DISTINCT a.journal_id
-    FROM journal_prefix_publishers a
-    JOIN journal_prefix_publishers b
-      ON b.journal_id = a.journal_id AND b.prefix_publisher_id > a.prefix_publisher_id
+    CREATE TEMP TABLE changing_serials AS
+    SELECT DISTINCT a.serial_id
+    FROM serial_prefix_publishers a
+    JOIN serial_prefix_publishers b
+      ON b.serial_id = a.serial_id AND b.prefix_publisher_id > a.prefix_publisher_id
     WHERE a.last_year < b.first_year OR b.last_year < a.first_year
     """,
 )
 
 _SUMMARY = """
-    SELECT (SELECT count(DISTINCT journal_id) FROM prefix_publications) AS journals,
-           (SELECT count(*) FROM changing_journals) AS changing,
+    SELECT (SELECT count(DISTINCT serial_id) FROM prefix_publications) AS serials,
+           (SELECT count(*) FROM changing_serials) AS changing,
            count(*) AS publications,
-           count(*) FILTER (WHERE prefix_publisher_id IS DISTINCT FROM journal_publisher_id) AS mismatched
+           count(*) FILTER (WHERE prefix_publisher_id IS DISTINCT FROM serial_publisher_id) AS mismatched
     FROM prefix_publications
-    WHERE journal_id IN (SELECT journal_id FROM changing_journals)
+    WHERE serial_id IN (SELECT serial_id FROM changing_serials)
 """
 
 _CHANGING = """
-    SELECT j.id, j.title, coalesce(jpub.name, '?') AS journal_publisher,
+    SELECT j.id, j.title, coalesce(jpub.name, '?') AS serial_publisher,
            string_agg(pub.name || ' ' || jp.publications || ' [' || jp.first_year || '-' || jp.last_year || ']',
                       ' | ' ORDER BY jp.first_year) AS prefix_publishers
-    FROM changing_journals c
-    JOIN journals j ON j.id = c.journal_id
+    FROM changing_serials c
+    JOIN serials j ON j.id = c.serial_id
     LEFT JOIN publishers jpub ON jpub.id = j.publisher_id
-    JOIN journal_prefix_publishers jp ON jp.journal_id = j.id
+    JOIN serial_prefix_publishers jp ON jp.serial_id = j.id
     JOIN publishers pub ON pub.id = jp.prefix_publisher_id
     GROUP BY j.id, j.title, jpub.name
     ORDER BY sum(jp.publications) DESC
@@ -75,18 +75,18 @@ _CHANGING = """
 
 _SAME_TITLE = """
     SELECT j.id, j.title, other.id, coalesce(opub.name, '?'), other.publication_count
-    FROM changing_journals c
-    JOIN journals j ON j.id = c.journal_id
-    JOIN journals other ON other.title_normalized = j.title_normalized AND other.id <> j.id
+    FROM changing_serials c
+    JOIN serials j ON j.id = c.serial_id
+    JOIN serials other ON other.title_normalized = j.title_normalized AND other.id <> j.id
     LEFT JOIN publishers opub ON opub.id = other.publisher_id
     ORDER BY j.title
 """
 
 _SHARED_TITLES = """
-    SELECT count(*) AS titles, sum(journals) AS journals
+    SELECT count(*) AS titles, sum(serials) AS serials
     FROM (
-        SELECT title_normalized, count(*) AS journals
-        FROM journals
+        SELECT title_normalized, count(*) AS serials
+        FROM serials
         GROUP BY 1
         HAVING count(DISTINCT publisher_id) > 1
     ) t
@@ -96,23 +96,23 @@ _SHARED_TITLES = """
 def report(conn: Connection, min_publications: int) -> None:
     for statement in _TABLES:
         conn.execute(text(statement), {"min": min_publications})
-    journals, changing, publications, mismatched = conn.execute(text(_SUMMARY)).one()
-    log.info("Revues à publications Crossref : %d", journals)
+    serials, changing, publications, mismatched = conn.execute(text(_SUMMARY)).one()
+    log.info("Revues à publications Crossref : %d", serials)
     log.info(
         "Revues qui changent d'éditeur : %d, %d publications, dont %d d'un éditeur de préfixe autre que celui de la revue",
         changing,
         publications or 0,
         mismatched or 0,
     )
-    for journal_id, title, journal_publisher, prefix_publishers in conn.execute(text(_CHANGING)):
-        log.info("  %d %s (%s) : %s", journal_id, title, journal_publisher, prefix_publishers)
+    for serial_id, title, serial_publisher, prefix_publishers in conn.execute(text(_CHANGING)):
+        log.info("  %d %s (%s) : %s", serial_id, title, serial_publisher, prefix_publishers)
 
     same_title = conn.execute(text(_SAME_TITLE)).all()
     log.info("Revues de même titre qu'une revue qui change d'éditeur : %d", len(same_title))
-    for journal_id, title, other_id, other_publisher, other_count in same_title:
+    for serial_id, title, other_id, other_publisher, other_count in same_title:
         log.info(
             "  %d %s ↔ %d (%s, %d publications)",
-            journal_id,
+            serial_id,
             title,
             other_id,
             other_publisher,

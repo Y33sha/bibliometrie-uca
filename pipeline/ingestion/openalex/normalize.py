@@ -4,15 +4,15 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 
 from domain.countries import normalize_country_code
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
-from domain.journals.journal import OaModel
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType, is_catalog_record
 from domain.platforms.registry import known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
+from domain.serials.serial import OaModel
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
@@ -48,7 +48,7 @@ from pipeline.ingestion.openalex.payload import (
     map_openalex_oa_status,
     parse_primary_location,
     short_openalex_id,
-    should_skip_publisher_journal,
+    should_skip_publisher_serial,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -285,12 +285,12 @@ def openalex_source_record(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/serials créés via find_or_create_*.
     # L'éditeur et la revue sont ignorés pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.), même critère que la création.
     raw_biblio = as_mapping(work.get("biblio"))
     source = (
         {}
-        if should_skip_publisher_journal(primary)
+        if should_skip_publisher_serial(primary)
         else as_mapping(as_mapping(work.get("primary_location")).get("source"))
     )
     issn_l = as_str(source.get("issn_l"))
@@ -319,7 +319,7 @@ def openalex_source_record(  # noqa: C901
 
     # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `source_extras`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
-    publisher_license = None if should_skip_publisher_journal(primary) else raw_license
+    publisher_license = None if should_skip_publisher_serial(primary) else raw_license
 
     return SourceRecordUpsert(
         source="openalex",
@@ -330,10 +330,10 @@ def openalex_source_record(  # noqa: C901
         title=get_title(work) or "",
         publication_year=get_publication_year(work),
         raw_doc_type=as_str(work.get("type")),
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
         container_title=(
-            primary.source_display_name if primary and not containers.journal_id else None
+            primary.source_display_name if primary and not containers.serial_id else None
         ),
         raw_language=as_str(work.get("language")),
         biblio=biblio_json,
@@ -473,12 +473,12 @@ class OpenalexNormalizer(SourceNormalizer):
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
-        if should_skip_publisher_journal(parse_primary_location(doc)):
+        if should_skip_publisher_serial(parse_primary_location(doc)):
             return None
         return get_publisher(doc)
 
     def container_facts(self, doc: Document) -> ContainerDescription | None:
-        if should_skip_publisher_journal(parse_primary_location(doc)):
+        if should_skip_publisher_serial(parse_primary_location(doc)):
             return None
         return get_container_facts(doc)
 

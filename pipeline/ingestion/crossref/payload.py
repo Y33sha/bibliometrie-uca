@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from domain.journals.issns import IssnSupport, JournalIssn, received_issns
+from domain.serials.issns import IssnSupport, SerialIssn, received_issns
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 
@@ -49,7 +49,7 @@ def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year:
 _ISSN_SUPPORTS = {"print": IssnSupport.PRINT, "electronic": IssnSupport.ELECTRONIC}
 
 
-def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[JournalIssn, ...]:
+def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[SerialIssn, ...]:
     """ISSN d'un enregistrement source Crossref. `issn-type` donne le support (papier ou en ligne) ; un ISSN de la liste `ISSN` absent de `issn-type` a un support inconnu."""
     typed = []
     for entry in as_sequence(msg.get("issn-type")):
@@ -57,8 +57,8 @@ def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[JournalIssn, ...]:
         support = _ISSN_SUPPORTS.get(as_str(issn_obj.get("type")) or "")
         value = as_str(issn_obj.get("value"))
         if support is not None and value:
-            typed.append(JournalIssn(issn=value, support=support))
-    plain = [JournalIssn(issn=value) for value in as_strs(msg.get("ISSN"))]
+            typed.append(SerialIssn(issn=value, support=support))
+    plain = [SerialIssn(issn=value) for value in as_strs(msg.get("ISSN"))]
     return received_issns([*typed, *plain])
 
 

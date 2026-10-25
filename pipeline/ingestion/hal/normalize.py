@@ -10,8 +10,6 @@ import defusedxml.ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
@@ -24,6 +22,8 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
@@ -191,7 +191,7 @@ def hal_source_record(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/serials créés via find_or_create_*.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
@@ -216,9 +216,9 @@ def hal_source_record(
         title=get_title(doc),
         publication_year=as_int(doc.get("producedDateY_i")),
         raw_doc_type=doc_type,
-        journal_id=containers.journal_id,
+        serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=get_container_title(doc) if not containers.journal_id else None,
+        container_title=get_container_title(doc) if not containers.serial_id else None,
         raw_language=hal_text_field(doc.get("language_s")),
         biblio=biblio_json,
         source_extras=extract_hal_source_extras(doc),

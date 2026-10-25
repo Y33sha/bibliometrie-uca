@@ -101,8 +101,8 @@ class TestPublicationsList:
         r = client.get("/api/publications", params={"publisher_id": 1})
         assert r.status_code == 200
 
-    def test_filter_by_journal(self, client):
-        r = client.get("/api/publications", params={"journal_id": 1})
+    def test_filter_by_serial(self, client):
+        r = client.get("/api/publications", params={"serial_id": 1})
         assert r.status_code == 200
 
     def test_filter_by_subject(self, client):
@@ -200,8 +200,8 @@ class TestPublicationsFacets:
         )
         assert r.status_code == 200
 
-    def test_entity_facet_journal(self, client):
-        r = client.get("/api/publications/facets/entities", params={"kind": "journal"})
+    def test_entity_facet_serial(self, client):
+        r = client.get("/api/publications/facets/entities", params={"kind": "serial"})
         assert r.status_code == 200
         assert "entities" in r.json()
 
@@ -209,7 +209,7 @@ class TestPublicationsFacets:
         # Facette éditeur sous filtres + recherche de nom + corrélation (revue sélectionnée).
         r = client.get(
             "/api/publications/facets/entities",
-            params={"kind": "publisher", "entity_search": "els", "year": "2024", "journal_id": "1"},
+            params={"kind": "publisher", "entity_search": "els", "year": "2024", "serial_id": "1"},
         )
         assert r.status_code == 200
 
@@ -278,7 +278,7 @@ class TestPublicationsExports:
         header = r.text.splitlines()[0].lstrip("﻿").split(",")
         assert "Éditeur" in header
         assert "Revue" not in header
-        r = client.get("/api/publications/export.csv", params={"columns": "journal"})
+        r = client.get("/api/publications/export.csv", params={"columns": "serial"})
         assert "Éditeur" not in r.text.splitlines()[0]
 
     def test_csv_export_hal_status_column(self, client):

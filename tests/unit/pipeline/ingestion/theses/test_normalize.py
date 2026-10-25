@@ -130,7 +130,7 @@ class TestThesesSourceRecord:
         assert record.publication_year is None
         assert record.external_ids is None
         assert record.oa_status == "closed"
-        assert record.journal_id is None
+        assert record.serial_id is None
 
     def test_nnt_normalized(self):
         record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
@@ -246,7 +246,7 @@ class TestThesesNormalizerClass:
         )
         assert (record.title, record.publication_year) == ("T", 2024)
         assert record.external_ids == {"nnt": "2024CLFAC001"}
-        assert record.journal_id is None
+        assert record.serial_id is None
 
     def test_contributions_sources_d_une_these(self):
         norm = _make_normalizer()

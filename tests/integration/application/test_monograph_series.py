@@ -5,12 +5,12 @@ import logging
 import pytest
 from sqlalchemy import text
 
-from pipeline.transformation.publishing.journals.delete_empty_journals import delete_empty_journals
 from pipeline.transformation.publishing.monographs.link_monographs_to_collections import (
     run_link_monographs_to_collections,
 )
 from pipeline.transformation.publishing.monographs.store import MonographStore
-from tests.integration.helpers.journals import insert_journal
+from pipeline.transformation.publishing.serials.delete_empty_serials import delete_empty_serials
+from tests.integration.helpers.serials import insert_serial
 from tests.integration.helpers.sources import insert_source_record
 
 
@@ -20,7 +20,7 @@ def repo(sa_sync_conn):
 
 
 def _volume(conn, repo, title: str, source_id: str) -> int:
-    journal_id = insert_journal(conn, title, journal_type="proceedings")
+    serial_id = insert_serial(conn, title, serial_type="proceedings")
     monograph_id = repo.create_monograph(
         title=title,
         title_normalized=title.lower(),
@@ -29,14 +29,14 @@ def _volume(conn, repo, title: str, source_id: str) -> int:
         isbn=None,
         eisbn=None,
         publisher_id=None,
-        journal_id=journal_id,
+        serial_id=serial_id,
     )
     insert_source_record(
         conn,
         source="crossref",
         source_id=source_id,
         title="Communication",
-        journal_id=journal_id,
+        serial_id=serial_id,
         monograph_id=monograph_id,
     )
     return monograph_id
@@ -51,19 +51,17 @@ def test_serie_creee_puis_retrouvee(sa_sync_conn, repo):
 
     rows = sa_sync_conn.execute(
         text(
-            "SELECT m.id, j.id AS series_id, j.title, j.journal_type::text AS journal_type"
-            " FROM monographs m JOIN journals j ON j.id = m.journal_id"
+            "SELECT m.id, j.id AS series_id, j.title, j.serial_type::text AS serial_type"
+            " FROM monographs m JOIN serials j ON j.id = m.serial_id"
             " WHERE m.id = ANY(:ids) ORDER BY m.id"
         ),
         {"ids": [first, second]},
     ).all()
-    assert {(r.title, r.journal_type) for r in rows} == {
-        ("Test Symposium on Series", "proceedings")
-    }
+    assert {(r.title, r.serial_type) for r in rows} == {("Test Symposium on Series", "proceedings")}
     assert rows[0].series_id == rows[1].series_id
 
     second_run = run_link_monographs_to_collections(sa_sync_conn, logger)
     assert second_run.extras.get("monographs_linked", 0) == 0
 
-    deleted = {j.id for j in delete_empty_journals(sa_sync_conn)}
+    deleted = {j.id for j in delete_empty_serials(sa_sync_conn)}
     assert rows[0].series_id not in deleted

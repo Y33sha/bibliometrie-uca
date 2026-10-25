@@ -5,8 +5,8 @@ Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs
 
 from unittest.mock import MagicMock
 
-from domain.journals.issns import JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.datacite.normalize import (
     DataciteNormalizer,
@@ -320,7 +320,7 @@ class TestContainers:
             },
         }
         facts = get_container_facts(attrs)
-        assert (facts.journal_title, facts.issns) == ("J. Things", (JournalIssn(issn="1234-5679"),))
+        assert (facts.journal_title, facts.issns) == ("J. Things", (SerialIssn(issn="1234-5679"),))
         assert (facts.collection_title, facts.book_title) == ("J. Things", None)
 
     def test_chapitre_livre_du_contenant(self):
@@ -419,9 +419,9 @@ class TestSourceRecord:
         sans_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, 8))
         avec_revue = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(3, None))
 
-        assert (sans_revue.journal_id, sans_revue.monograph_id) == (None, 8)
+        assert (sans_revue.serial_id, sans_revue.monograph_id) == (None, 8)
         assert sans_revue.container_title == "Une collection"
-        assert (avec_revue.journal_id, avec_revue.container_title) == (3, None)
+        assert (avec_revue.serial_id, avec_revue.container_title) == (3, None)
 
 
 class TestDoi:

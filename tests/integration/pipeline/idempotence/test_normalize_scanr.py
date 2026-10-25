@@ -18,7 +18,7 @@ SCANR_STAGING_DOCS = [
             "source": {
                 "title": "Journal of Volcanology",
                 "publisher": "Elsevier BV",
-                "journalIssns": ["0012-3456", "0012-3457"],
+                "serialIssns": ["0012-3456", "0012-3457"],
                 "isOa": False,
                 "isInDoaj": False,
             },
@@ -144,7 +144,7 @@ def _count_tables(conn) -> dict:
     from sqlalchemy import text
 
     counts = {}
-    for t in ("publications", "journals", "publishers"):
+    for t in ("publications", "serials", "publishers"):
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["scanr_contributions"] = conn.execute(
         text("SELECT COUNT(*) AS cnt FROM source_contributions WHERE source = 'scanr'")
@@ -264,7 +264,7 @@ class TestNormalizeScanrIdempotence:
         ).scalar_one()
         assert cnt == 4, "4 scanr_documents (3 originaux + 1 bis)"
 
-    def test_journal_dedup(self, sa_sync_conn):
+    def test_serial_dedup(self, sa_sync_conn):
         """Deux documents avec le même journal → un seul journal."""
         from sqlalchemy import text
 
@@ -272,7 +272,7 @@ class TestNormalizeScanrIdempotence:
         run_normalize_scanr(sa_sync_conn)
 
         cnt = sa_sync_conn.execute(
-            text("SELECT count(*) AS cnt FROM journals WHERE title_normalized LIKE '%volcanology%'")
+            text("SELECT count(*) AS cnt FROM serials WHERE title_normalized LIKE '%volcanology%'")
         ).scalar_one()
         assert cnt == 1
 

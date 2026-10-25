@@ -36,7 +36,7 @@ def _facets_sqls(
     year_sql = f"""
         SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
         FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         WHERE {STATS_BASE} AND {year_where}
           AND p.publication_year IS NOT NULL
         GROUP BY p.publication_year
@@ -49,7 +49,7 @@ def _facets_sqls(
                COUNT(DISTINCT p.id) AS n
         FROM publication_structures ps
         JOIN publications p ON p.id = ps.publication_id
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         JOIN structures s ON s.id = ps.structure_id
         WHERE {STATS_BASE} AND {lab_where}
           AND s.structure_type = '{StructureType.LABO.value}'
@@ -61,7 +61,7 @@ def _facets_sqls(
     oa_sql = f"""
         SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         WHERE {STATS_BASE} AND {oa_where}
           AND p.oa_status IS NOT NULL
         GROUP BY p.oa_status
@@ -75,7 +75,7 @@ def _facets_sqls(
             COUNT(DISTINCT p.id) FILTER (WHERE {paid}) AS apc_yes,
             COUNT(DISTINCT p.id) FILTER (WHERE NOT {paid}) AS apc_no
         FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         WHERE {STATS_BASE} AND {apc_where}
     """
 
@@ -83,7 +83,7 @@ def _facets_sqls(
     doc_type_sql = f"""
         SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         WHERE {STATS_BASE} AND {dt_where}
         GROUP BY p.doc_type
         ORDER BY n DESC
@@ -93,7 +93,7 @@ def _facets_sqls(
     license_sql = f"""
         SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
-        LEFT JOIN journals j ON j.id = p.journal_id
+        LEFT JOIN serials j ON j.id = p.serial_id
         WHERE {STATS_BASE} AND {license_where}
         GROUP BY 1
         ORDER BY n DESC

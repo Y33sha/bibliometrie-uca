@@ -7,9 +7,9 @@ import uuid
 
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
-    seed_journal,
     seed_person,
     seed_publisher,
+    seed_serial,
     seed_subject,
 )
 
@@ -17,14 +17,14 @@ from tests.integration.helpers.seeds import (
 class TestEntityLabels:
     def test_unknown_id(self, client):
         """Un id absent rend un libellé nul, non une erreur : la pastille reste sans nom."""
-        r = client.get("/api/entity-labels", params={"kind": "journal", "entity_id": 999999999})
+        r = client.get("/api/entity-labels", params={"kind": "serial", "entity_id": 999999999})
         assert r.status_code == 200
         assert r.json() == {"label": None}
 
-    def test_journal_reads_its_title(self, client):
+    def test_serial_reads_its_title(self, client):
         title = f"Revue {uuid.uuid4().hex[:8]}"
-        journal_id = seed_journal(title, title_normalized=title.lower())
-        r = client.get("/api/entity-labels", params={"kind": "journal", "entity_id": journal_id})
+        serial_id = seed_serial(title, title_normalized=title.lower())
+        r = client.get("/api/entity-labels", params={"kind": "serial", "entity_id": serial_id})
         assert r.json() == {"label": title}
 
     def test_publisher_reads_its_name(self, client):

@@ -18,8 +18,8 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from domain.journals.issns import IssnSupport
 from domain.publications.identifiers import ISSN
+from domain.serials.issns import IssnSupport
 
 
 @dataclass(frozen=True, slots=True)

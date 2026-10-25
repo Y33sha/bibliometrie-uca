@@ -5,14 +5,14 @@
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.pipeline.publication_count import PublicationCountRecompute
+from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
+from application.ports.repositories.serial_repository import SerialRepository
 from application.services.publishers import core as publishers_service
 
 
@@ -37,8 +37,8 @@ def merge_publishers(
     source_id: int,
     *,
     publisher_repo: PublisherRepository,
-    journal_repo: JournalRepository,
-    recompute: JournalRecompute,
+    serial_repo: SerialRepository,
+    recompute: SerialRecompute,
     publication_count_recompute: PublicationCountRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> None:
@@ -49,7 +49,7 @@ def merge_publishers(
         source_id,
         conn=conn,
         publisher_repo=publisher_repo,
-        journal_repo=journal_repo,
+        serial_repo=serial_repo,
         recompute=recompute,
         publication_count_recompute=publication_count_recompute,
         audit_repo=audit_repo,

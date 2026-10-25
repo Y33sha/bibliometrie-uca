@@ -59,7 +59,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         language_name=r.language_name,
         language_raw=r.language_raw,
         oa_status=r.oa_status,
-        journal_id=r.journal_id,
+        serial_id=r.serial_id,
         journal_title=r.journal_title,
         journal_raw_title=_text(raw_journal, JournalKey.TITLE),
         journal_raw_issn=_text(raw_journal, JournalKey.ISSN),
@@ -139,10 +139,10 @@ def get_publication_sources(
                    CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                         THEN sr.raw_language END AS language_raw,
                    sr.oa_status, sr.container_title, sr.biblio,
-                   j.id AS journal_id, j.title AS journal_title,
+                   j.id AS serial_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name
             FROM source_records sr
-            LEFT JOIN journals j ON j.id = sr.journal_id
+            LEFT JOIN serials j ON j.id = sr.serial_id
             LEFT JOIN publishers pub ON pub.id = sr.publisher_id
             LEFT JOIN languages lang ON lang.code = sr.language
             WHERE sr.publication_id = :pid

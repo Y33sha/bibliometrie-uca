@@ -278,7 +278,7 @@ class TestFirstDocTypeArbitration:
             publication_year=None,
             doc_type=doc_type,
             doi=None,
-            journal_id=None,
+            serial_id=None,
             monograph_id=None,
             container_title=None,
             language=None,
@@ -436,7 +436,7 @@ class TestThesesSourceRecordMetadata:
         assert record.doi == "10.1234/test"
         assert record.external_ids == {"nnt": "2023UCFA0069"}
         assert record.oa_status == "closed"
-        assert record.journal_id is None
+        assert record.serial_id is None
 
     def test_en_cours_falls_back_to_inscription(self):
         thesis = {

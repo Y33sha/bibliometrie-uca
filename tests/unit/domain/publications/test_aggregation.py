@@ -23,7 +23,7 @@ def _source_record(**overrides) -> SourceRecord:
         "publication_year": 2020,
         "doc_type": "dataset",
         "doi": "10.9001/set",
-        "journal_id": None,
+        "serial_id": None,
         "monograph_id": None,
         "container_title": None,
         "language": None,
@@ -147,7 +147,7 @@ class TestChampsAgreges:
             title="Blé <i>durum</i>",
             publication_year=2021,
             doi="10.1234/ABC",
-            journal_id=7,
+            serial_id=7,
             monograph_id=9,
             container_title="Revue d'agronomie",
             language="fr",
@@ -163,7 +163,7 @@ class TestChampsAgreges:
         assert publication.title_normalized == "ble durum"
         assert publication.publication_year == 2021
         assert publication.doi == DOI("10.1234/abc")
-        assert publication.journal_id == 7
+        assert publication.serial_id == 7
         assert publication.monograph_id == 9
         assert publication.container_title == "Revue d'agronomie"
         assert publication.language == "fr"
@@ -285,19 +285,19 @@ class TestCollectionDeLaMonographie:
             publication,
             [_source_record(monograph_id=9)],
             source_priority=_PRIORITY,
-            monograph_journals={9: 7},
+            monograph_serials={9: 7},
         )
-        assert (publication.monograph_id, publication.journal_id) == (9, 7)
+        assert (publication.monograph_id, publication.serial_id) == (9, 7)
 
     def test_revue_d_une_source_passe_avant_la_collection(self):
         publication = _publication()
         refresh_from_sources(
             publication,
-            [_source_record(monograph_id=9, journal_id=3)],
+            [_source_record(monograph_id=9, serial_id=3)],
             source_priority=_PRIORITY,
-            monograph_journals={9: 7},
+            monograph_serials={9: 7},
         )
-        assert publication.journal_id == 3
+        assert publication.serial_id == 3
 
 
 class TestAssignPublisher:

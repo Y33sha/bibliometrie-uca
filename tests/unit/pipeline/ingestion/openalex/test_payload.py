@@ -11,7 +11,7 @@ from pipeline.ingestion.openalex.payload import (
     map_openalex_oa_status,
     parse_primary_location,
     short_openalex_id,
-    should_skip_publisher_journal,
+    should_skip_publisher_serial,
 )
 
 
@@ -196,7 +196,7 @@ class TestIsRepositoryLocation:
     def test_repository(self):
         assert is_repository_location(_loc(source_type="repository"))
 
-    def test_journal(self):
+    def test_serial(self):
         assert not is_repository_location(_loc(source_type="journal"))
 
     def test_none(self):
@@ -238,36 +238,36 @@ class TestIsHalLocation:
         # Repository qui n'est pas HAL (Zenodo, SPIRE…) → False
         assert not is_hal_location(_loc(source_type="repository", source_display_name="Zenodo"))
 
-    def test_journal(self):
+    def test_serial(self):
         assert not is_hal_location(_loc(source_type="journal", source_display_name="Nature"))
 
     def test_none(self):
         assert not is_hal_location(_loc())
 
 
-class TestShouldSkipPublisherJournal:
+class TestShouldSkipPublisherSerial:
     def test_hal_skips(self):
-        assert should_skip_publisher_journal(
+        assert should_skip_publisher_serial(
             _loc(landing_page_url="https://hal.science/hal-04123456")
         )
 
     def test_theses_fr_skips(self):
-        assert should_skip_publisher_journal(_loc(source_display_name="theses.fr"))
+        assert should_skip_publisher_serial(_loc(source_display_name="theses.fr"))
 
     def test_repository_skips(self):
-        assert should_skip_publisher_journal(_loc(source_type="repository"))
+        assert should_skip_publisher_serial(_loc(source_type="repository"))
 
     def test_ebook_platform_skips(self):
-        assert should_skip_publisher_journal(_loc(source_type="ebook platform"))
+        assert should_skip_publisher_serial(_loc(source_type="ebook platform"))
 
-    def test_journal_does_not_skip(self):
-        assert not should_skip_publisher_journal(
+    def test_serial_does_not_skip(self):
+        assert not should_skip_publisher_serial(
             _loc(source_type="journal", source_display_name="Nature")
         )
 
     def test_none_does_not_skip(self):
         # Pas de primary → on ne sait pas, on ne skip pas (cas rare)
-        assert not should_skip_publisher_journal(None)
+        assert not should_skip_publisher_serial(None)
 
 
 class TestExtractNntFromLocation:

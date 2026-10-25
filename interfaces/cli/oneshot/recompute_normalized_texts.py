@@ -36,8 +36,8 @@ from pipeline.ingestion.common.source_contribution_store import (
     key_hash_sql,
 )
 from pipeline.ingestion.common.source_contributions import contributor_name_fields
-from pipeline.transformation.publishing.journals.store import JournalStore
 from pipeline.transformation.publishing.publishers.store import PublisherStore
+from pipeline.transformation.publishing.serials.store import SerialStore
 
 log = setup_logger("recompute_normalized_texts", os.path.dirname(__file__))
 
@@ -64,7 +64,7 @@ class _Column:
 _COLUMNS = (
     _Column("source_records", "id", "title", "title_normalized", normalized_title),
     _Column("publications", "id", "title", "title_normalized", normalize_text),
-    _Column("journals", "id", "title", "title_normalized", normalize_text),
+    _Column("serials", "id", "title", "title_normalized", normalize_text),
     _Column(
         "monographs", "id", "title", "title_normalized", lambda t: normalize_text(to_plain_text(t))
     ),
@@ -120,12 +120,12 @@ def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
 def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
     """Supprime les formes de noms de revues vides, ajoute les formes recalculées des titres de revues et des noms d'éditeurs. Retourne (formes vides, formes de revues, formes d'éditeurs) candidates."""
     empty = conn.execute(
-        text("SELECT count(*) FROM journal_name_forms WHERE form_normalized = ''")
+        text("SELECT count(*) FROM serial_name_forms WHERE form_normalized = ''")
     ).scalar_one()
-    journals = [
+    serials = [
         (r.id, form, r.publisher_id)
         for r in conn.execute(
-            text("SELECT id, title, publisher_id FROM journals WHERE title ~ :pattern"),
+            text("SELECT id, title, publisher_id FROM serials WHERE title ~ :pattern"),
             {"pattern": _NON_ASCII},
         )
         if (form := normalize_text(r.title))
@@ -138,14 +138,14 @@ def _add_name_forms(conn: Connection, *, apply: bool) -> tuple[int, int, int]:
         if (key := publisher_name_key(to_plain_text(r.name)))
     ]
     if apply:
-        conn.execute(text("DELETE FROM journal_name_forms WHERE form_normalized = ''"))
-        journal_gateway = JournalStore(conn)
-        for journal_id, form, publisher_id in journals:
-            journal_gateway.add_journal_name_form(journal_id, form, publisher_id)
+        conn.execute(text("DELETE FROM serial_name_forms WHERE form_normalized = ''"))
+        serial_gateway = SerialStore(conn)
+        for serial_id, form, publisher_id in serials:
+            serial_gateway.add_serial_name_form(serial_id, form, publisher_id)
         publisher_store = PublisherStore(conn)
         for publisher_id, key in publishers:
             publisher_store.add_publisher_name_form(publisher_id, key)
-    return empty, len(journals), len(publishers)
+    return empty, len(serials), len(publishers)
 
 
 _SOURCE_CONTRIBUTIONS_SQL = text("""
@@ -220,11 +220,11 @@ def main() -> int:
         for column in _COLUMNS:
             log.info("%s.%s…", column.table, column.target)
             log.info("  %d valeurs changées", _recompute_column(conn, column, apply=apply))
-        empty, journals, publishers = _add_name_forms(conn, apply=apply)
+        empty, serials, publishers = _add_name_forms(conn, apply=apply)
         log.info(
             "formes de noms : %d formes de revues vides, %d titres de revues et %d noms d'éditeurs non ASCII",
             empty,
-            journals,
+            serials,
             publishers,
         )
         log.info("contributions sources…")

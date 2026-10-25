@@ -435,10 +435,10 @@ def publisher_id_clause(publisher_id: int | None) -> WhereClause | None:
     return WhereClause("p.publisher_id = :flt_publisher_id", {"flt_publisher_id": publisher_id})
 
 
-def journal_id_clause(journal_id: int | None) -> WhereClause | None:
-    if not journal_id:
+def serial_id_clause(serial_id: int | None) -> WhereClause | None:
+    if not serial_id:
         return None
-    return WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id})
+    return WhereClause("p.serial_id = :flt_serial_id", {"flt_serial_id": serial_id})
 
 
 def monograph_id_clause(monograph_id: int | None) -> WhereClause | None:
