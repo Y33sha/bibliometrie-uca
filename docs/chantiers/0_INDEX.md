@@ -12,7 +12,7 @@
 - [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
-- [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
+- [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
