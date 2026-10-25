@@ -31,7 +31,7 @@ Le score n'est pas une mesure de pertinence. Un seuil bas écarte des topics lé
 
 Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
-**Classifieurs ISTEX.** La plateforme ISTEX TDM propose des web services de classification gratuits, appelables document par document. Aucun ne rend de score. Grain : domaine HAL, ou domain et field OpenAlex.
+**Classifieurs ISTEX.** La plateforme ISTEX TDM propose des web services de classification gratuits, appelables document par document. Aucun ne rend de score. Chacun propose une seule classe par document : il ne confirme pas le second domain d'une publication pluridisciplinaire. Les services reçoivent des lots `[{id, value}]`. Grain : domaine HAL, ou domain et field OpenAlex.
 
 | Service | Entrée | Sortie | Performance annoncée |
 |---|---|---|---|
@@ -77,7 +77,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 - [ ] Débit et limites d'usage de halClass et openAlexClass
 - [ ] Couverture : part des publications pourvues d'un résumé, d'un résumé anglais ; même mesure sur les publications sans sujet
-- [ ] Appels sur l'échantillon ; accord avec la qualification au grain domain et field
+- [ ] Appels sur l'échantillon (`evaluate_istex_classifiers`) ; accord avec la qualification au grain domain et field
 - [ ] Bilan : précision et rappel des rejets qui en découleraient, couverture, coût d'un passage sur le stock et sur chaque run
 
 ### Phase 3 — Vote des arbitres
@@ -86,6 +86,8 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [ ] Prototype SQL sur l'échantillon, cascade comprise ; précision et rappel
 - [ ] Couverture sans WoS : part des publications à plusieurs domains pourvues d'au moins un arbitre
 - [ ] Variante : classifieur ISTEX comme arbitre supplémentaire
+- [ ] Variante : profil de la revue (domains majoritaires de ses publications) et profil du laboratoire (domains les plus fréquents de ses publications) comme arbitres. Profils calculés sur les domaines HAL, les disciplines theses.fr et les sujets DOAJ, pas sur les sujets OpenAlex, dont les aberrations sont récurrentes. Seuil d'effectif ; une revue ou un laboratoire dont les domains sont dispersés ne vote pas
+- [ ] Bilan de chaque variante, seule puis cumulée avec les arbitres de la publication : précision, rappel, couverture des publications sans domaine HAL ni discipline theses.fr
 
 ### Phase 4 — Embeddings
 
