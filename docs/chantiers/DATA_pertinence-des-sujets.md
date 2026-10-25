@@ -46,11 +46,12 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - le rejet d'un domain s'étend aux field, subfield et topics qui en descendent sur la publication ;
 - précision mesurée sur 15 publications, WoS compris : 10 vrais positifs, 1 faux positif, 4 cas limites.
 
-**Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet.
+**Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet. Chaque libellé porte le chemin de tous ses ancêtres.
 
 ## Décisions
 
 - **Auditer avant de coder.** Les trois pistes sont évaluées sur un même échantillon qualifié à l'œil, de la moins coûteuse à la plus coûteuse : classifieurs ISTEX, vote des arbitres, embeddings. Le choix d'une piste ou d'une combinaison suit les bilans.
+- **Un libellé est inclus dans son parent.** Un libellé pertinent rend ses ancêtres pertinents. Un libellé aberrant rend ses descendants aberrants. La qualification de l'échantillon et chaque piste respectent cette inclusion.
 - **WoS est exclu des arbitres** : l'abonnement va être résilié.
 - **Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.**
 - **Affichage des rejets.** Les liens rejetés sont exclus des décomptes et des listes : `/subjects`, `/subjects/[id]`, nuages de sujets des personnes, structures, revues et éditeurs, filtre par sujet. La fiche `/publications/[id]` les affiche barrés et grisés, pour le contrôle visuel des rejets.
