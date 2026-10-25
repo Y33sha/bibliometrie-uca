@@ -5,11 +5,13 @@ from collections.abc import Mapping
 from domain.countries import normalize_country_code
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
+from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
+from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
@@ -71,6 +73,11 @@ def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, 
     issn = as_str(issns[0]) if len(issns) >= 1 else None
     eissn = as_str(issns[1]) if len(issns) >= 2 else None
     return issn, eissn
+
+
+def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
+    """Indique si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, qui n'est pas un conteneur."""
+    return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"]
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -180,7 +187,7 @@ def scanr_source_record(  # noqa: C901
     jissn, jeissn = _extract_serial_issns(source)
     biblio_json = compact_biblio(
         publisher=as_str(source.get("publisher")),
-        journal_title=as_str(source.get("title")),
+        journal_title=None if is_thesis(doc) else as_str(source.get("title")),
         journal_issn=jissn,
         journal_eissn=jeissn,
     )
@@ -196,7 +203,9 @@ def scanr_source_record(  # noqa: C901
         raw_doc_type=as_str(doc.get("type")),
         serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
-        container_title=as_str(source.get("title")) if not containers.serial_id else None,
+        container_title=(
+            as_str(source.get("title")) if not (containers.serial_id or is_thesis(doc)) else None
+        ),
         raw_language=None,
         biblio=biblio_json,
         abstract=abstract,
@@ -320,8 +329,8 @@ class ScanrNormalizer(SourceNormalizer):
     def publisher(self, doc: Document) -> PublisherFacts | None:
         return get_publisher(doc)
 
-    def container_facts(self, doc: Document) -> ContainerDescription:
-        return get_container_facts(doc)
+    def container_facts(self, doc: Document) -> ContainerDescription | None:
+        return None if is_thesis(doc) else get_container_facts(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

@@ -177,7 +177,8 @@ Usages du type dans le code :
 
 - [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
 - [ ] Titulaires de préfixe « Éditions Techniques [1987-1994] » et « Éditions du Juris-classeur [2009] » sur des revues LexisNexis : à examiner.
-- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `serials`.
+- [x] Thèses ScanR : l'université de soutenance ne donne ni publication en série ni titre de conteneur. 1 452 enregistrements de thèses ScanR rattachés à 66 entrées, dont 60 n'ont pas d'autre usage.
+- [ ] Stock : réhydratation et renormalisation de ScanR, puis phases `publications` et `finalize`.
 - Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](DATA_preprints-et-versions.md).
 
 ## Questions ouvertes

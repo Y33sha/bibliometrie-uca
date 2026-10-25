@@ -297,6 +297,23 @@ class TestEditeurEtConteneur:
         assert facts.book_title is None
 
 
+class TestThese:
+    """La source d'une thèse ScanR est l'université de soutenance, pas un conteneur."""
+
+    _DOC = {
+        "type": "thesis",
+        "source": {"title": "Université Clermont Auvergne (2021-...)", "publisher": "ABES"},
+    }
+
+    def test_aucun_conteneur(self):
+        assert _normalizer().container_facts(self._DOC) is None
+
+    def test_ni_titre_de_conteneur_ni_revue_dans_la_biblio(self):
+        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", _NO_CONTAINERS)
+        assert captured.container_title is None
+        assert captured.biblio == {"publisher": "ABES"}
+
+
 class TestScanrSourceRecordMetadonnees:
     def test_metadonnees_d_un_article(self):
         doc = {
