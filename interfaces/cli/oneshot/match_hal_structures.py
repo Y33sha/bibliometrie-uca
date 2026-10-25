@@ -55,7 +55,7 @@ _CANDIDATES = text(f"""
         GROUP BY 1
     ),
     perimeter AS ({_PERIMETER})
-    SELECT DISTINCT h.hal_structure_id, h.name AS hal_name, h.status::text AS status, c.signatures,
+    SELECT DISTINCT h.hal_structure_id, h.name AS hal_name, h.status::text AS status, c.source_contributions,
            s.id AS structure_id, s.code, 'adresse' AS voie
     FROM hal_structures h
     JOIN cited c ON c.hal_structure_id = h.hal_structure_id
@@ -66,7 +66,7 @@ _CANDIDATES = text(f"""
       AND ast.is_confirmed IS DISTINCT FROM false
       AND (ast.matched_form_id IS NOT NULL OR ast.is_confirmed)
       AND s.id IN (SELECT structure_id FROM perimeter)
-    ORDER BY s.code, c.signatures DESC
+    ORDER BY s.code, c.source_contributions DESC
 """)
 
 
