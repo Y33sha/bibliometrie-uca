@@ -111,12 +111,8 @@
 					<td>
 						<IdentifiersCell identifiers={p.identifiers} />
 					</td>
-					<td>
-						{#if p.role_title}
-							<span class="role-tag">{p.role_title}</span>
-						{/if}
-					</td>
-					<td class="muted-cell">{p.department_name || ''}</td>
+					<td class="secondary-cell">{p.role_title || ''}</td>
+					<td class="secondary-cell">{p.department_name || ''}</td>
 					{#each countColumns as col (col.sortKey)}
 						<td class="num">{col.value(p)}</td>
 					{/each}
@@ -135,5 +131,5 @@
 	tr.excluded:hover { opacity: 0.7; }
 	tr.excluded .person-link { text-decoration: line-through; }
 	.person-last { font-weight: 600; }
-	.muted-cell { font-size: 0.9rem; color: var(--muted); }
+	.secondary-cell { font-size: 0.9rem; color: var(--text-secondary); }
 </style>

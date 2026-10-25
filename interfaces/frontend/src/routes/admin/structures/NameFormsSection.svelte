@@ -131,7 +131,7 @@
               <button class="btn-add-tiny" onclick={() => onopenCtxPicker(f.id)}> + </button>
             {/if}
           </td>
-          <td style="white-space:nowrap">
+          <td class="row-actions" style="white-space:nowrap">
             <button class="btn-icon" onclick={() => oneditForm(f)} title="Modifier">
               <svg
                 width="14"

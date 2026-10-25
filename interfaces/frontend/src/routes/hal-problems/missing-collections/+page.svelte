@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular } from '#lib/labels.js';
+	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
@@ -93,7 +93,7 @@
 			<div class="publication-card">
 				<div class="publication-meta-line">
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
 					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>

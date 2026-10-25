@@ -147,6 +147,12 @@ export const docTypeGroupedColors: Record<string, string> = {
 	misc: '#cfd3d6'
 };
 
+/** Couleur d'un `doc_type` : celle de sa clé de groupement dans la page Statistiques. Les types de la famille « publications » gardent leur couleur propre, les autres prennent celle de leur famille. */
+export function docTypeColor(docType: string): string {
+	const family = docTypeFamilyOf[docType] ?? 'misc';
+	return docTypeGroupedColors[family === 'publications' ? docType : family] ?? docTypeGroupedColors.misc;
+}
+
 /** Libellés FR des types de relation entre publications, lus depuis la publication courante (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
 export const relationTypeLabel: Record<string, string> = {
 	is_preprint_of: 'Préprint de',

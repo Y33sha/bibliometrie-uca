@@ -230,7 +230,7 @@
 				</td>
 				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions">{@render actionCell(p)}</td>{/if}
+				{#if actionCell}<td class="actions row-actions">{@render actionCell(p)}</td>{/if}
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}

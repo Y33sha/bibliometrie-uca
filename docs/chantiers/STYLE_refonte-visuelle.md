@@ -87,12 +87,11 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Tableaux sans cadre ; séparateurs de lignes très pâles, fond au survol de la ligne
 - [x] Liens des tableaux en couleur d'accent, soulignés au survol ; titre ou nom principal en semi-gras (`.entity-link`, `.publication-title`)
 - [x] Colonnes numériques alignées à droite
-- [ ] Pastilles réservées aux valeurs à code couleur (type de document, mode de correspondance)
-- [ ] Boutons d'action par ligne en icônes sans bordure, visibles au survol de la ligne
-- [ ] Publications : type de document en pastille, une teinte par type ; icônes de la colonne « Liens » de taille et d'espacement homogènes
-- [ ] Personnes : marque discrète sur les personnes non vérifiées, à la place de la coche sur chaque ligne
-- [ ] Personnes : un emplacement fixe par identifiant (ORCID, IdRef, HAL…), toujours dans le même ordre, rond vide pâle pour un identifiant absent
-- [ ] Personnes : fonction en texte simple, sans troncature
+- [x] Pastilles réservées aux valeurs à code couleur : type de document, statut open access, statut HAL ; structures et fonctions en texte simple
+- [x] Boutons d'action secondaires par ligne (modifier, supprimer, exclure) visibles au survol de la ligne ou au focus, sur les écrans à pointeur (`.row-actions`)
+- [x] Publications : type de document en pastille, teinte du type dans la page Statistiques (`docTypeColor()`), aussi dans les pages Problèmes HAL
+- [x] Personnes : coche de présence dans l'extraction du SI RH allégée (sans pastille pleine)
+- [x] Personnes : fonction en texte simple, sans troncature
 
 ### Étape 5 — Dashboards
 

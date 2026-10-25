@@ -33,6 +33,7 @@
 	import { licenseLabels } from '#lib/licenses.js';
 	import {
 		docTypeSingular,
+		docTypeColor,
 		docTypePlural,
 		docTypeFamilies,
 		publicationsDocTypes,
@@ -661,7 +662,7 @@
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
 					{#if showAdminExclude}
-						<td class="exclude-cell">
+						<td class="exclude-cell row-actions">
 							{#if p.contribution_id != null}
 								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
 									onclick={() => onExcludeClick(p)}>✕</button>
@@ -669,7 +670,7 @@
 						</td>
 					{/if}
 					{#if col('type')}<td>
-						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
+						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					<td><a href={resolve(`publications/${p.id}`)} class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>

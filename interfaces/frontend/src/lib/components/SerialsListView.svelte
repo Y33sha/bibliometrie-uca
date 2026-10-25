@@ -273,7 +273,7 @@
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
 				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions">{@render actionCell(j)}</td>{/if}
+				{#if actionCell}<td class="actions row-actions">{@render actionCell(j)}</td>{/if}
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}

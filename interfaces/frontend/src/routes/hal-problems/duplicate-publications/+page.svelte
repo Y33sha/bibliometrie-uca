@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular } from '#lib/labels.js';
+	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
@@ -92,7 +92,7 @@
 				<div class="doi-card">
 					<div class="publication-meta-line">
 						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
-						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
+						{#if pair.publication.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pair.publication.doc_type)}">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
 						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-title"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
@@ -133,7 +133,7 @@
 								<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 								<div class="publication-meta-line">
 									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+									{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
 								</div>
 								<div class="hal-list">

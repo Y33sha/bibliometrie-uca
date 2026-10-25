@@ -352,6 +352,29 @@
 	background: var(--surface-hover);
 }
 
+/* Actions secondaires d'une ligne (modifier, supprimer, exclure) : visibles au survol de la ligne ou au focus clavier, sur les écrans à pointeur. */
+@media (hover: hover) {
+	.data-table .row-actions > * {
+		opacity: 0;
+		transition: opacity 0.1s;
+	}
+	.data-table tr:hover .row-actions > *,
+	.data-table .row-actions:focus-within > * {
+		opacity: 1;
+	}
+}
+
+/* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
+.data-table .lab-tag {
+	padding: 0;
+	margin-right: 6px;
+	background: none;
+}
+.data-table .lab-tag:hover {
+	background: none;
+	text-decoration: underline;
+}
+
 .num {
 	text-align: right;
 	font-variant-numeric: tabular-nums;
@@ -859,8 +882,7 @@ a.structure-tag:hover {
 	text-decoration: none;
 }
 
-/* ── Role / tutelle tag (neutral) ── */
-.role-tag,
+/* ── Tutelle tag (neutral) ── */
 .tutelle-tag {
 	display: inline-block;
 	padding: 2px 7px;
@@ -1159,25 +1181,24 @@ a.badge-doaj:hover {
 }
 
 /* ── Type label ── */
-.type-label {
-	font-size: 0.8rem;
-	color: var(--muted);
+/* Pastille de type de document, teintée par `--type-color` (`docTypeColor()`). */
+.type-pill {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--type-color) 16%, white);
+	color: color-mix(in srgb, var(--type-color), black 45%);
+	font-size: 0.75rem;
+	font-weight: 600;
+	white-space: nowrap;
 }
 
-/* ── RH checkmark ── */
+/* ── Coche : personne présente dans l'extraction du SI RH ── */
 .rh-check {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 15px;
-	height: 15px;
-	border-radius: 50%;
-	background: var(--accent);
-	color: white;
-	font-size: 0.7rem;
-	font-weight: 700;
 	margin-left: 4px;
-	vertical-align: middle;
+	color: var(--accent-mid);
+	font-size: 0.8rem;
+	font-weight: 600;
 	line-height: 1;
 }
 
