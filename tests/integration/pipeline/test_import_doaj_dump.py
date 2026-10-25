@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     run_import_doaj_dump,
+    type_doaj_serials_as_journals,
 )
 from tests.integration.helpers.serials import insert_serial, insert_serial_issn
 
@@ -102,3 +103,28 @@ class TestImportDoajDump:
         stats = _run(sa_sync_conn, [_row(issn="0028-0836")], dry_run=True)
         assert stats.matched == 1  # compté
         assert _is_in_doaj(sa_sync_conn, jid) is False  # mais rien écrit
+
+
+class TestTypeDoajSerialsAsJournals:
+    def test_unknown_serial_in_doaj_becomes_journal(self, sa_sync_conn):
+        unknown = insert_serial(sa_sync_conn, "U", serial_type="unknown", is_in_doaj=True)
+        absent = insert_serial(sa_sync_conn, "A", serial_type="unknown", is_in_doaj=False)
+        typed = insert_serial(sa_sync_conn, "P", serial_type="proceedings", is_in_doaj=True)
+        manual = insert_serial(sa_sync_conn, "M", serial_type="unknown", is_in_doaj=True)
+        sa_sync_conn.execute(
+            text("UPDATE serials SET manual_fields = ARRAY['serial_type'] WHERE id = :id"),
+            {"id": manual},
+        )
+        assert type_doaj_serials_as_journals(sa_sync_conn) == 1
+        types = dict(
+            sa_sync_conn.execute(
+                text("SELECT id, serial_type::text FROM serials WHERE id = ANY(:ids)"),
+                {"ids": [unknown, absent, typed, manual]},
+            ).all()
+        )
+        assert types == {
+            unknown: "journal",
+            absent: "unknown",
+            typed: "proceedings",
+            manual: "unknown",
+        }

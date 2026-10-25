@@ -13,8 +13,9 @@ from pipeline.transformation.publishing.serials import enrich_serials_from_doaj 
 
 
 class _FakeSerialRepo:
-    def __init__(self, last_import_at: datetime | None) -> None:
+    def __init__(self, last_import_at: datetime | None, typed: int = 0) -> None:
         self.last_import_at = last_import_at
+        self.typed = typed
         self.updated: list[int] = []
 
     def doaj_last_import_at(self) -> datetime | None:
@@ -28,6 +29,9 @@ class _FakeSerialRepo:
 
     def update_serial_doaj(self, serial_id, *, payload, imported_at, is_in_doaj) -> None:
         self.updated.append(serial_id)
+
+    def type_doaj_serials_as_journals(self) -> int:
+        return self.typed
 
 
 @contextlib.contextmanager
@@ -45,6 +49,9 @@ def _bound(repo):
         mp.setattr(step, "reset_is_in_doaj", lambda conn, *a, **k: repo.reset_is_in_doaj(*a, **k))
         mp.setattr(
             step, "update_serial_doaj", lambda conn, *a, **k: repo.update_serial_doaj(*a, **k)
+        )
+        mp.setattr(
+            step, "type_doaj_serials_as_journals", lambda conn: repo.type_doaj_serials_as_journals()
         )
         yield
 
@@ -71,6 +78,13 @@ def test_recent_import_skips_download():
     repo = _FakeSerialRepo(datetime.now(UTC) - timedelta(days=10))
     extras, downloads = _run(repo)
     assert extras == {"skipped": 1}
+    assert downloads == []
+
+
+def test_doaj_serials_typed_even_without_download():
+    """Le typage suit le dernier import, téléchargé ou non à ce run."""
+    extras, downloads = _run(_FakeSerialRepo(datetime.now(UTC) - timedelta(days=10), typed=2))
+    assert extras == {"skipped": 1, "serials_typed_journal": 2}
     assert downloads == []
 
 

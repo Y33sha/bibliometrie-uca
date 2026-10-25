@@ -149,7 +149,7 @@ Usages du type dans le code :
 - [x] Liste fermée des plateformes connues, dans le domaine (`domain/platforms/registry.py`) : serveurs de preprints et plateformes d'éditeurs. Une plateforme prend le type de la liste, à défaut entrepôt. Le bilan Science ouverte la lit (`b72bc40b1`).
 - [x] Préfixe DOI d'une plateforme d'éditeurs : ni son titulaire ni un enregistrement source qui le nomme ne donnent l'éditeur de la publication, qui vient des autres sources (`b72bc40b1`).
 - [x] Stock : oneshot `apply_known_platforms`, puis phase `publications`. 23 serveurs de preprints. Sur 4 834 publications à préfixe de plateforme d'éditeurs, 4 240 ont un éditeur, aucune la plateforme ; 584 articles de revue restent sans éditeur (OpenEdition 316, Cairn 238). « OpenEdition Journals » (109 publications) est une variante de nom d'OpenEdition, que la fusion de la phase 7 résout.
-- [ ] Entrées de `serials` de type `repository` et `preprint_server` converties en plateformes.
+- [ ] Entrées de `serials` de type `repository` et `preprint_server` converties en plateformes ; valeur `repository` du modèle open access retirée.
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex, quand un usage le demande.
 
 ### Phase 4 — Lectures de l'éditeur
@@ -163,8 +163,8 @@ Usages du type dans le code :
 - [x] Renommage de `journals` en `serials`, et de `monographs.journal_id` en `serial_id` (`f73c03b0e`, `947a58f45`). La migration réécrit les valeurs stockées : saisies manuelles, redirections, audit, corrections, métriques de l'historique des phases.
 - [x] Phase `publishers_journals` renommée `publishing`, du nom du schéma et du paquet qui portent ses référentiels (`e8655117a`).
 - [x] Plateformes d'ebooks. Un titre « … eBooks », nom qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur et que ScanR reprend comme revue, n'est le titre d'aucun conteneur. Une localisation principale OpenAlex sur une plateforme d'ebooks donne l'éditeur de son organisation hôte (`d153cf532`). Type `ebook_platform` retiré (`48fbf4cf0`).
-- [ ] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`. L'éditeur OpenAlex des enregistrements existants attend la prochaine renormalisation d'OpenAlex : 12 des 1 743 publications concernées n'ont pas d'éditeur.
-- [ ] Enrichissements limités à la nature qu'ils décrivent.
+- [ ] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`. Un enregistrement OpenAlex reçoit l'éditeur de sa plateforme d'ebooks à sa prochaine normalisation, sans réhydratation dédiée : seules 12 des 1 743 publications concernées n'ont pas d'éditeur, les autres le tiennent de leur DOI ou des autres sources.
+- [x] Une entrée de type inconnu présente dans le DOAJ devient une revue : 52 entrées `unknown` y sont. Les autres enrichissements touchent seulement des revues, sauf une dizaine d'entrées.
 - [ ] Endpoints, pages et filtres.
 
 ### Phase 6 — Documentation

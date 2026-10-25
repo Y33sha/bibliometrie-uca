@@ -635,8 +635,20 @@ TASKS: tuple[Task, ...] = (
     _task(
         "publishing.enrich_serials_from_doaj",
         "publishing",
-        reads=("serial_issns", "serials.doaj_imported_at", "config"),
-        writes=("serials.is_in_doaj", "serials.doaj_payload", "serials.doaj_imported_at"),
+        reads=(
+            "serial_issns",
+            "serials.doaj_imported_at",
+            "serials.is_in_doaj",
+            "serials.serial_type",
+            "serials.manual_fields",
+            "config",
+        ),
+        writes=(
+            "serials.is_in_doaj",
+            "serials.doaj_payload",
+            "serials.doaj_imported_at",
+            "serials.serial_type",
+        ),
         previous_run=("serial_issns", "serials"),
         network="doaj",
     ),
