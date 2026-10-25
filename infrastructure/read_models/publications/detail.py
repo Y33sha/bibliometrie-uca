@@ -3,6 +3,7 @@
 from sqlalchemy import Connection, text
 
 from application.ports.read_models.publications_queries import (
+    AccessLinkOut,
     ConsolidatedContributionOut,
     ExternalIdentifierOut,
     PublicationDetailCore,
@@ -14,6 +15,8 @@ from application.ports.read_models.publications_queries import (
     ThesisMeta,
 )
 from application.ports.read_models.subjects_queries import SubjectOut
+from domain.platforms.registry import HAL
+from domain.publications.access import Copy, access_links
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.external_ids import ExternalIdType
@@ -248,6 +251,7 @@ def get_publication_detail(
     subjects = get_publication_subjects(conn, publication_id)
     relations = get_publication_relations(conn, publication_id)
     external_identifiers = get_publication_external_identifiers(conn, publication_id)
+    copies, hal_with_copy = get_publication_copies(conn, publication_id)
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -286,17 +290,65 @@ def get_publication_detail(
         subjects=subjects,
         keywords=keywords,
         relations=relations,
+        access=[AccessLinkOut(label=a.label, url=a.url) for a in access_links(copies)],
+        referenced_by=_referenced_by(sources, hal_with_copy),
         external_identifiers=external_identifiers,
     )
 
 
-# Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
+# Identifiants de bases qui référencent la publication, exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher). arXiv et PMCID désignent des copies, qui sont des localisations.
 _EXTERNAL_IDENTIFIER_KEYS = (
-    ("arxiv", ExternalIdType.ARXIV_ID),
     ("pmid", ExternalIdType.PMID),
-    ("pmcid", ExternalIdType.PMCID),
     ("nnt", ExternalIdType.NNT),
 )
+
+# Sources dont l'enregistrement est la page du DOI, déjà affiché.
+_DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
+
+
+def get_publication_copies(conn: Connection, publication_id: int) -> tuple[list[Copy], set[str]]:
+    """Localisations des enregistrements sources de la publication, hors formes secondaires, et identifiants des enregistrements HAL dont la notice est ouverte. La notice qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
+    rows = conn.execute(
+        text(f"""
+            SELECT l.url, l.version, l.is_oa, pl.name AS platform,
+                   (sr.source = 'hal' AND pl.openalex_id = ANY(:hal_ids)) AS described_by_platform,
+                   sr.id AS arrival, sr.source_id
+            FROM source_record_locations l
+            JOIN source_records sr ON sr.id = l.source_record_id
+            LEFT JOIN platforms pl ON pl.id = l.platform_id
+            WHERE sr.publication_id = :pid
+              AND NOT COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
+        """),
+        {
+            "pid": publication_id,
+            "hal_ids": list(HAL.openalex_ids),
+            "convergence_cases": list(CONVERGENCE_CASES),
+        },
+    ).all()
+    copies = [
+        Copy(
+            url=r.url,
+            version=r.version,
+            is_oa=r.is_oa,
+            platform=r.platform,
+            described_by_platform=r.described_by_platform,
+            arrival=r.arrival,
+        )
+        for r in rows
+    ]
+    return copies, {r.source_id for r in rows if r.described_by_platform and r.is_oa}
+
+
+def _referenced_by(
+    sources: list[SourceRecordOut], hal_with_copy: set[str]
+) -> list[SourceRecordOut]:
+    """Sources qui référencent la publication sans en donner de copie."""
+    return [
+        s
+        for s in sources
+        if s.source not in _DOI_SOURCES
+        and not (s.source == Source.HAL and s.source_id in hal_with_copy)
+    ]
 
 
 def get_publication_external_identifiers(

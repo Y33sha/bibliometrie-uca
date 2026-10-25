@@ -4,11 +4,13 @@ import json
 
 from sqlalchemy import text
 
+from domain.platforms.registry import ARXIV, HAL
 from infrastructure.read_models.publications.detail import (
     get_publication_detail,
     get_publication_external_identifiers,
     get_publication_subjects,
 )
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore, known_platform_facts
 from tests.integration.helpers.contributions import group_id_of, insert_contribution
 from tests.integration.helpers.groups import add_group_member, insert_group
 from tests.integration.helpers.persons import insert_person
@@ -216,6 +218,46 @@ class TestGetPublicationDetail:
         assert detail.structures[str(lab_id)].name == "Labo X"
 
 
+class TestAccessAndReferences:
+    def test_copies_ouvertes_et_sources_qui_referencent(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn, doi="10.1/abc")
+        hal = insert_source_record(sa_sync_conn, publication, source="hal", source_id="hal-1")
+        openalex = insert_source_record(
+            sa_sync_conn, publication, source="openalex", source_id="W1"
+        )
+        insert_source_record(sa_sync_conn, publication, source="crossref", source_id="10.1/abc")
+        store = LocationStore(sa_sync_conn)
+        store.replace_locations(
+            hal,
+            [
+                LocationFacts(
+                    "https://hal.science/hal-1", is_oa=True, platform=known_platform_facts(HAL)
+                )
+            ],
+        )
+        store.replace_locations(
+            openalex,
+            [
+                LocationFacts("https://doi.org/10.1/abc", version="publishedVersion", is_oa=False),
+                LocationFacts(
+                    "https://arxiv.org/abs/2401.001",
+                    version="submittedVersion",
+                    is_oa=True,
+                    platform=known_platform_facts(ARXIV),
+                ),
+            ],
+        )
+
+        detail = get_publication_detail(sa_sync_conn, publication)
+        assert detail is not None
+        assert [(a.label, a.url) for a in detail.access] == [
+            ("arXiv", "https://arxiv.org/abs/2401.001"),
+            ("HAL", "https://hal.science/hal-1"),
+        ]
+        # Crossref est couvert par le DOI, HAL donne une copie : seul OpenAlex référence.
+        assert [s.source for s in detail.referenced_by] == ["openalex"]
+
+
 class TestGetPublicationExternalIdentifiers:
     def test_aggregates_and_dedups(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -230,11 +272,8 @@ class TestGetPublicationExternalIdentifiers:
         insert_source_record(sa_sync_conn, publication, external_ids={"pmid": "123"})
 
         ids = get_publication_external_identifiers(sa_sync_conn, publication)
-        # Ordre = `_EXTERNAL_IDENTIFIER_KEYS` (arxiv avant pmid), une seule entrée par valeur.
-        assert [(i.type, i.value) for i in ids] == [
-            ("arxiv", "2401.001"),
-            ("pmid", "123"),
-        ]
+        # Une seule entrée par valeur ; l'identifiant arXiv désigne une copie, pas une référence.
+        assert [(i.type, i.value) for i in ids] == [("pmid", "123")]
 
     def test_nnt_omitted_when_covered_by_theses_source(self, sa_sync_conn):
         # Le `source_id` de la source `theses` *est* le NNT : le lien source theses.fr couvre

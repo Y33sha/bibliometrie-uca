@@ -254,10 +254,17 @@ class SourceRecordOut(BaseModel):
 
 
 class ExternalIdentifierOut(BaseModel):
-    """Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar."""
+    """Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar."""
 
-    type: str  # "arxiv" | "pmid" | "pmcid" | "nnt"
+    type: str  # "pmid" | "nnt"
     value: str
+
+
+class AccessLinkOut(BaseModel):
+    """Copie ouverte d'une publication, nommée par sa plateforme (`domain.publications.access`)."""
+
+    label: str
+    url: str
 
 
 class ConsolidatedContributionOut(BaseModel):
@@ -348,6 +355,10 @@ class PublicationDetailResponse(BaseModel):
     subjects: list[SubjectOut]
     keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
+    access: list[AccessLinkOut]
+    """Copies ouvertes, la meilleure en tête."""
+    referenced_by: list[SourceRecordOut]
+    """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand sa notice a un fichier ouvert."""
     external_identifiers: list[ExternalIdentifierOut]
 
 

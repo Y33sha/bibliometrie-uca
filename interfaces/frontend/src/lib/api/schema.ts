@@ -2562,6 +2562,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessLinkOut
+         * @description Copie ouverte d'une publication, nommée par sa plateforme (`domain.publications.access`).
+         */
+        AccessLinkOut: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+        };
         /** AddIdentifier */
         AddIdentifier: {
             id_type: components["schemas"]["PersonIdentifierType"];
@@ -3157,7 +3167,7 @@ export interface components {
         };
         /**
          * ExternalIdentifierOut
-         * @description Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar.
+         * @description Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar.
          */
         ExternalIdentifierOut: {
             /** Type */
@@ -4367,6 +4377,10 @@ export interface components {
             keywords: string[];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
+            /** Access */
+            access: components["schemas"]["AccessLinkOut"][];
+            /** Referenced By */
+            referenced_by: components["schemas"]["SourceRecordOut"][];
             /** External Identifiers */
             external_identifiers: components["schemas"]["ExternalIdentifierOut"][];
         };
