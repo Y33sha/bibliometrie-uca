@@ -48,11 +48,10 @@
   ]);
 
   // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
-  const primarySources = $derived(orderedSources.filter((s) => !s.is_secondary));
-
-  // Le NNT mène à la même fiche theses.fr que l'enregistrement source theses : il n'est listé qu'en son absence.
-  const shownExternalIds = $derived(
-    externalIds.filter((e) => !(e.type === "nnt" && referencedBy.some((s) => s.source === "theses"))),
+  // L'enregistrement source theses mène à la même fiche theses.fr que le NNT, identifiant de la thèse : seul le NNT est listé quand il existe.
+  const hasNnt = $derived(externalIds.some((e) => e.type === "nnt"));
+  const primarySources = $derived(
+    orderedSources.filter((s) => !s.is_secondary && !(hasNnt && s.source === "theses")),
   );
   const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
@@ -158,14 +157,14 @@
     </a>
   {/snippet}
 
-  {#if orderedSources.length > 0 || shownExternalIds.length > 0}
+  {#if orderedSources.length > 0 || externalIds.length > 0}
     <div class="sidebar-block">
       <h2 class="sidebar-title">Référencé dans</h2>
       <div class="sidebar-sources">
         {#each primarySources as s (s.source + s.source_id)}
           {@render sourceRow(s)}
         {/each}
-        {#each shownExternalIds as e (e.type + e.value)}
+        {#each externalIds as e (e.type + e.value)}
           <a
             href={EXT_META[e.type] ? EXT_META[e.type].url(e.value) : "#"}
             target="_blank"
