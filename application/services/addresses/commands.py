@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les adresses : frontière transactionnelle de l'agrégat.
 
-Les briques d'écriture agnostiques vivent dans `structures.py` et `countries.py`. Les propagations potentiellement massives (`in_perimeter`, pays → publications) ne sont pas faites ici : le handler retourne les identifiants d'adresses concernés, que le routeur passe en tâche de fond. Le commit précède ces tâches, qui lisent l'état persisté.
+Les briques d'écriture agnostiques vivent dans `structure_links.py` et `countries.py`. Les propagations potentiellement massives (`in_perimeter`, pays → publications) ne sont pas faites ici : le handler retourne les identifiants d'adresses concernés, que le routeur passe en tâche de fond. Le commit précède ces tâches, qui lisent l'état persisté.
 """
 
 from sqlalchemy import Connection
