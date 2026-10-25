@@ -80,10 +80,10 @@
 {:else if !pub}
   <div class="loading">Chargement…</div>
 {:else}
-  <PublicationHeader {pub} relations={data!.relations} />
-
   <div class="detail-layout">
     <div class="detail-main">
+      <PublicationHeader {pub} relations={data!.relations} />
+
       {#if thesesAuth.length || thesisMeta}
         <ThesisBlock
           {thesesAuth}
@@ -129,7 +129,7 @@
 {/if}
 
 <style>
-  /* Deux colonnes : contenu à gauche, accès et sources à droite. Replie en une colonne (encadré sous le contenu) en dessous de 860px. */
+  /* Deux colonnes dès le haut de la page : en-tête et contenu à gauche, accès et sources à droite. Replie en une colonne (encadré sous le contenu) en dessous de 860px. */
   .detail-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
