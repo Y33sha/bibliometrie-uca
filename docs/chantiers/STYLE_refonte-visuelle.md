@@ -67,7 +67,6 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] En-tête hors carte (classes `entity-*` partagées par les pages structure, personne, revue, éditeur, monographie, sujet) : titre 28–32 px posé sur le fond, sigle en gris à côté
 - [x] Identifiants (ROR, HAL, tutelles) en pastilles à fond clair, libellé en petites capitales grises
 - [x] Un seul style d'onglets pour `TabNav` et `HubTabs` : alignés à gauche, sans fond ni bordures latérales, onglet actif en texte foncé semi-gras souligné d'un trait de 2–3 px, filet fin sous l'ensemble
-- [ ] Compteur discret dans les onglets d'entité (« Publications 1 849 »)
 - [x] Contenu de l'onglet directement sous les onglets, sans carte
 
 ### Étape 3 — Recherche, filtres et menus
@@ -132,6 +131,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ## Questions ouvertes
 
+- Compteurs dans les onglets d'entité (« Publications 1 849 »). Sans objet pour le dashboard, sans intérêt pour les adresses et les collaborations. Pour les autres onglets, reste à choisir entre le total de l'entité et le total filtré. `TabNav` accepte déjà un compteur.
 - Mode sombre, une fois toutes les couleurs en variables.
 
 ## Annexe — valeurs de départ

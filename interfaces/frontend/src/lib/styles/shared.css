@@ -488,15 +488,16 @@ th.sorted .sort-arrow {
 	display: flex;
 	gap: 28px;
 	margin: 28px 0 24px;
-	border-bottom: 1px solid var(--border);
+	/* Filet en ombre interne : le trait de l'onglet actif le recouvre sans déborder du conteneur. */
+	box-shadow: inset 0 -1px 0 var(--border);
 	overflow-x: auto;
+	overflow-y: hidden;
 }
 .tab {
 	display: inline-flex;
 	align-items: baseline;
 	gap: 6px;
 	padding: 10px 0;
-	margin-bottom: -1px;
 	border: none;
 	border-bottom: 3px solid transparent;
 	background: none;
