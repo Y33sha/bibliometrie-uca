@@ -19,9 +19,9 @@
 
 <style>
 	.key-figures {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-		gap: 24px 32px;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 24px 56px;
 		margin-bottom: 36px;
 	}
 	.key-figure-value {

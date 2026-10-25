@@ -232,10 +232,6 @@
 						<h3>Open access</h3>
 						<OaBar oa={dashOa} />
 					</div>
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectBars subjects={dashSubjects} />
-					</div>
 					<div class="dash-card">
 						<h3>Collaborations internationales (articles)</h3>
 						<DoughnutChart segments={collabSegments} />
@@ -254,6 +250,10 @@
 							datasetLabel="Articles"
 							horizontal
 						/>
+					</div>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>
 			{/if}
