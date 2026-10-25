@@ -15,10 +15,10 @@ router = APIRouter(prefix="/api/entity-labels", tags=["entity-labels"])
 @router.get("", response_model=EntityLabelResponse)
 def resolve_entity_label(
     kind: EntityKind = Query(...),
-    entity_id: int = Query(...),
+    entity_id: str = Query(...),
     queries: EntityLabelQueries = Depends(entity_label_queries),
 ) -> EntityLabelResponse:
-    """Libellé d'une revue ou d'un éditeur par son identifiant.
+    """Libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
 
     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection. Le libellé étant le même sous tous les jeux de filtres, la lecture est unique quel que soit le contexte qui affiche la facette.
     """

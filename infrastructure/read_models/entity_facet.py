@@ -21,9 +21,11 @@ class EntitySql(NamedTuple):
     label: str
     # Jointure depuis `publications p` vers l'entité.
     join: str
+    # Type SQL de l'identifiant, pour lire un libellé à partir de l'identifiant reçu en texte.
+    id_type: str = "integer"
 
 
-# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
+# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), nommé par le référentiel ROR. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -54,6 +56,16 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
             "JOIN publication_subjects ps ON ps.publication_id = p.id "
             "JOIN subjects s ON s.id = ps.subject_id"
         ),
+    ),
+    "partner": EntitySql(
+        table="ror_organizations ro",
+        id="ro.ror_id",
+        label="ro.name",
+        join=(
+            "JOIN publication_rors pr ON pr.publication_id = p.id "
+            "JOIN ror_organizations ro ON ro.ror_id = pr.ror_id"
+        ),
+        id_type="text",
     ),
 }
 

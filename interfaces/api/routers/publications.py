@@ -37,6 +37,7 @@ from interfaces.api.filters import (
     TOGGLE_VALUES,
     parse_int_csv,
     parse_lab_id,
+    parse_ror_csv,
     parse_str_csv,
     parse_vocabulary_csv,
 )
@@ -79,6 +80,7 @@ class PublicationFilterParams:
     language: Annotated[str, Query()] = ""
     hal_status: Annotated[str, Query()] = ""
     in_perimeter: Annotated[str, Query()] = ""
+    partner_ror: Annotated[str, Query()] = ""
 
     def to_filters(self) -> PublicationFilters:
         """Traduit la query string en filtres du port."""
@@ -118,6 +120,7 @@ class PublicationFilterParams:
             in_perimeter=parse_vocabulary_csv(
                 self.in_perimeter, allowed=TOGGLE_VALUES, param="in_perimeter"
             ),
+            partner_rors=parse_ror_csv(self.partner_ror, param="partner_ror"),
         )
 
 

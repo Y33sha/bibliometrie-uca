@@ -97,6 +97,7 @@ class PublicationFilters:
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
     subject_ids: list[int] = field(default_factory=list)
+    partner_rors: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

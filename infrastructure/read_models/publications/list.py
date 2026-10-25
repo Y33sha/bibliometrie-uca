@@ -41,6 +41,7 @@ from infrastructure.read_models.filters import (
     monograph_id_clause,
     no_lab_clause,
     oa_clause,
+    partner_clause,
     person_clause,
     publisher_id_clause,
     search_clause,
@@ -96,6 +97,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         language_clause(filters.language_codes),
         subject_clause(filters.subject_ids),
         author_clause(filters.author_id),
+        partner_clause(filters.partner_rors),
     ]
     return out
 

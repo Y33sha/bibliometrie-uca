@@ -5,6 +5,7 @@ from sqlalchemy import Connection, Row, text
 from application.ports.read_models._common import DashboardOa, PublicationYearCount
 from application.ports.read_models.structures_queries import (
     NameFormOut,
+    PartnerFacetOption,
     RelatedStructureOut,
     StructureAddressesResponse,
     StructureAddressOut,
@@ -14,6 +15,8 @@ from application.ports.read_models.structures_queries import (
     StructureDetailResponse,
     StructureListItem,
     StructureOut,
+    StructurePartner,
+    StructurePartnersResponse,
     StructuresQueries,
     StructureTopCountry,
 )
@@ -21,11 +24,49 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
+from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
 from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
+
+# Liens publication–ROR des publications de la structure `:structure_id`, hors ses propres ROR : ceux de la structure et de ses tutelles (`structure_parents`), avec leurs ancêtres ROR.
+_PARTNER_LINKS = """
+    WITH RECURSIVE own_structures AS (
+        SELECT CAST(:structure_id AS integer) AS id
+        UNION
+        SELECT sp.parent_id FROM structure_parents sp JOIN own_structures o ON sp.child_id = o.id
+    ),
+    own_rors AS (
+        SELECT s.ror_id FROM structures s JOIN own_structures o ON o.id = s.id
+        WHERE s.ror_id IS NOT NULL
+        UNION
+        SELECT rr.parent_ror_id FROM ror_relations rr JOIN own_rors r ON rr.child_ror_id = r.ror_id
+    ),
+    links AS (
+        SELECT pr.publication_id, pr.ror_id
+        FROM publication_structures ps
+        JOIN publications p ON p.id = ps.publication_id
+        JOIN publication_rors pr ON pr.publication_id = ps.publication_id
+        WHERE ps.structure_id = :structure_id
+          AND pr.ror_id NOT IN (SELECT ror_id FROM own_rors)
+          AND (CAST(:years AS integer[]) = '{}' OR p.publication_year = ANY(:years))
+    )
+"""
+
+
+def _ror_type_label(value: str) -> str:
+    try:
+        return ROR_TYPE_LABELS_FR[RorType(value)]
+    except ValueError:
+        return value
+
+
+_PARTNER_COUNTRY = "(CAST(:countries AS text[]) = '{}' OR ro.country_code = ANY(:countries))"
+_PARTNER_TYPE = (
+    "(CAST(:types AS text[]) = '{}' OR CAST(ro.types AS text[]) && CAST(:types AS text[]))"
+)
 
 # Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par `contribution_structures`, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
 AUTHOR_SOURCE_CONTRIBUTION = f"""
@@ -274,6 +315,87 @@ class PgStructuresQueries(StructuresQueries):
             {"structure_id": structure_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
+
+    def get_structure_partners(
+        self,
+        structure_id: int,
+        *,
+        years: list[int],
+        countries: list[str],
+        types: list[str],
+        page: int,
+        per_page: int,
+    ) -> StructurePartnersResponse:
+        """Organisations partenaires de la structure, les plus fréquentes en tête. Le décompte des options de pays et de types suit les autres filtres."""
+        binds = {
+            "structure_id": structure_id,
+            "years": years,
+            "countries": countries,
+            "types": types,
+            "lim": per_page,
+            "off": (page - 1) * per_page,
+        }
+        rows = self._conn.execute(
+            text(f"""{_PARTNER_LINKS}
+                SELECT l.ror_id, ro.name, ro.country_code, c.name AS country_name,
+                       COALESCE(CAST(ro.types AS text[]), '{{}}') AS types,
+                       COUNT(DISTINCT l.publication_id) AS n, COUNT(*) OVER () AS total
+                FROM links l
+                LEFT JOIN ror_organizations ro ON ro.ror_id = l.ror_id
+                LEFT JOIN countries c ON c.code = ro.country_code
+                WHERE {_PARTNER_COUNTRY} AND {_PARTNER_TYPE}
+                GROUP BY l.ror_id, ro.name, ro.country_code, c.name, ro.types
+                ORDER BY n DESC, ro.name NULLS LAST, l.ror_id
+                LIMIT :lim OFFSET :off
+            """),  # noqa: S608 — fragments du module, sans entrée externe
+            binds,
+        ).all()
+        countries_rows = self._conn.execute(
+            text(f"""{_PARTNER_LINKS}
+                SELECT ro.country_code AS value, COALESCE(c.name, ro.country_code) AS label,
+                       COUNT(DISTINCT l.ror_id) AS n
+                FROM links l
+                JOIN ror_organizations ro ON ro.ror_id = l.ror_id
+                LEFT JOIN countries c ON c.code = ro.country_code
+                WHERE ro.country_code IS NOT NULL AND {_PARTNER_TYPE}
+                GROUP BY ro.country_code, c.name
+                ORDER BY n DESC, label
+            """),  # noqa: S608
+            binds,
+        ).all()
+        types_rows = self._conn.execute(
+            text(f"""{_PARTNER_LINKS}
+                SELECT t AS value, COUNT(DISTINCT l.ror_id) AS n
+                FROM links l
+                JOIN ror_organizations ro ON ro.ror_id = l.ror_id
+                CROSS JOIN LATERAL unnest(CAST(ro.types AS text[])) AS t
+                WHERE {_PARTNER_COUNTRY}
+                GROUP BY t
+                ORDER BY n DESC, t
+            """),  # noqa: S608
+            binds,
+        ).all()
+        return StructurePartnersResponse(
+            total=rows[0].total if rows else 0,
+            partners=[
+                StructurePartner(
+                    ror_id=r.ror_id,
+                    name=r.name,
+                    country_code=r.country_code,
+                    country_name=r.country_name,
+                    types=list(r.types),
+                    publications=r.n,
+                )
+                for r in rows
+            ],
+            countries=[
+                PartnerFacetOption(value=r.value, label=r.label, count=r.n) for r in countries_rows
+            ],
+            types=[
+                PartnerFacetOption(value=r.value, label=_ror_type_label(r.value), count=r.n)
+                for r in types_rows
+            ],
+        )
 
     def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse:
         """Agrégats d'une structure : publications par année sur sept ans, répartition des statuts d'accès ouvert, part de collaboration internationale et pays les plus fréquents."""

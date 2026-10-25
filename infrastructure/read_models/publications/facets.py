@@ -51,6 +51,7 @@ from infrastructure.read_models.filters import (
     monograph_id_clause,
     no_lab_clause,
     oa_clause,
+    partner_clause,
     person_clause,
     publisher_id_clause,
     search_clause,
@@ -138,6 +139,8 @@ class _PublicationFacetsBuilder:
             clauses.append(subject_clause(f.subject_ids))
         if skip != "person":
             clauses.append(author_clause(f.author_id))
+        if skip != "partner":
+            clauses.append(partner_clause(f.partner_rors))
         return assemble_where(clauses)
 
     # ── Facettes ────────────────────────────────────────────────

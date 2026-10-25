@@ -7,6 +7,8 @@ from collections.abc import Collection
 
 from fastapi import HTTPException
 
+from domain.structures.identifiers import RorId
+
 
 def parse_str_csv(s: str) -> list[str]:
     """Parse une chaîne CSV de strings."""
@@ -39,6 +41,22 @@ def parse_int_csv(s: str, *, param: str) -> list[int]:
     Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la validation de FastAPI : sans ce contrôle, une valeur non numérique remonte en `ValueError` jusqu'au filet qui traduit les erreurs non gérées, et une requête malformée se rend en 500. Le refus prend le code de la validation native, comme celui d'une valeur hors vocabulaire.
     """
     return parse_ints(parse_str_csv(s), param=param)
+
+
+def parse_ror_csv(s: str, *, param: str) -> list[str]:
+    """Découpe une liste de ROR séparés par des virgules, sous leur forme courte, et refuse ce qui n'en est pas un."""
+    rors: list[str] = []
+    intrus: list[str] = []
+    for value in parse_str_csv(s):
+        if (ror := RorId.try_parse(value)) is None:
+            intrus.append(value)
+        else:
+            rors.append(str(ror))
+    if intrus:
+        raise HTTPException(
+            status_code=422, detail=f"ROR invalides pour `{param}` : {', '.join(intrus)}."
+        )
+    return rors
 
 
 def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:

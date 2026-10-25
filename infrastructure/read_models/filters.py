@@ -143,6 +143,19 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     )
 
 
+def partner_clause(ror_ids: list[str]) -> WhereClause | None:
+    """Filtre par organisation partenaire : un ROR des auteurs de la publication, ancêtres compris (`publication_rors`). Les valeurs se combinent en OR."""
+    if not ror_ids:
+        return None
+    return WhereClause(
+        """EXISTS (
+            SELECT 1 FROM publication_rors pr
+            WHERE pr.publication_id = p.id AND pr.ror_id = ANY(:flt_partner_rors)
+        )""",
+        {"flt_partner_rors": ror_ids},
+    )
+
+
 def license_clause(values: list[str]) -> WhereClause | None:
     """Filtre par licence de la version éditeur. `NO_LICENSE` retient les publications sans licence connue ; les valeurs se combinent en OR."""
     if not values:
