@@ -330,7 +330,7 @@ def main() -> None:
     conn = get_sync_engine().connect()
     try:
         inserted = import_persons(conn, records, export_date=args.export_date)
-        log.info("\n=== Terminé : %s personnes insérées ===", inserted)
+        log.info("=== Terminé : %s personnes insérées ===", inserted)
 
         total = scalar_int(conn.execute(text("SELECT COUNT(*) AS n FROM persons")))
         log.info("  Total en base : %s personnes", total)

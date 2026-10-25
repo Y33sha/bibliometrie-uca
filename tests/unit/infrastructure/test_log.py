@@ -230,6 +230,45 @@ class TestMakeFormatter:
         line = fmt.format(record)
         assert "hello" in line and "INFO" in line and not line.startswith("{")
 
+    def test_text_escapes_line_breaks_of_the_message(self, monkeypatch):
+        from infrastructure.observability.log import _make_formatter
+
+        monkeypatch.setenv("LOG_FORMAT", "text")
+        record = logging.LogRecord(
+            name="t",
+            level=logging.INFO,
+            pathname="",
+            lineno=0,
+            msg="chemin %s",
+            args=("/a\r\n2026-01-01 [INFO] faux",),
+            exc_info=None,
+        )
+        line = _make_formatter().format(record)
+        assert "\n" not in line and "\r" not in line
+        assert line.endswith("chemin /a\\r\\n2026-01-01 [INFO] faux")
+
+    def test_text_keeps_the_lines_of_a_traceback(self, monkeypatch):
+        from infrastructure.observability.log import _make_formatter
+
+        monkeypatch.setenv("LOG_FORMAT", "text")
+        try:
+            raise ValueError("boom")
+        except ValueError:
+            import sys as _sys
+
+            exc_info = _sys.exc_info()
+        record = logging.LogRecord(
+            name="t",
+            level=logging.ERROR,
+            pathname="",
+            lineno=0,
+            msg="échec",
+            args=None,
+            exc_info=exc_info,
+        )
+        line = _make_formatter().format(record)
+        assert "\nTraceback" in line and line.rstrip().endswith("ValueError: boom")
+
 
 class TestMakeConsoleFormatter:
     """Le terminal reçoit le message seul ; une sortie qui se relit plus tard porte le reste."""
