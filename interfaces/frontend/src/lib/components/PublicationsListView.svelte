@@ -397,6 +397,7 @@
 		if (publisherId) p.set('publisher_id', publisherId);
 		const serialId = fixedId(externalFilters?.serialId) ?? entity.serial.join(',');
 		if (serialId) p.set('serial_id', serialId);
+		if (entity.partner.length) p.set('partner_ror', entity.partner.join(','));
 		return resolve('stats') + '?' + paramsToQuery(p);
 	});
 
