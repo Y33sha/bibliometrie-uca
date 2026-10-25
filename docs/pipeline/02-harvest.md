@@ -39,7 +39,7 @@ Les deux recherches tournent en parallèle. Dans HAL, en mode full, les thèses 
 **Étape 3 — `fetch_missing.doi.<source>` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
-Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
+Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
 
 Sélection des DOI dans `pipeline/ingestion/common/doi_search.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`. Les recherches de `fetch_missing`, `fetch_stale` et `fetch_truncated` partagent la boucle de `pipeline/ingestion/common/lookup.py`.
 

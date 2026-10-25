@@ -106,7 +106,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  publishers_journals: {
+  publishing: {
     summary: [{ key: "doaj_matched", label: "DOAJ — journaux taggés" }],
     tables: [
       {

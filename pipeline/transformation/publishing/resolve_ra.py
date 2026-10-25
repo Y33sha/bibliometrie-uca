@@ -1,8 +1,8 @@
-"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, après `affiliations` et avant `publishers_journals`.
+"""Phase `resolve_ra` : résolution préfixe DOI → Registration Agency, après `affiliations` et avant `publishing`.
 
 Soumet à `doi.org/ra` les préfixes valides (`DoiPrefix`) de tous les DOI connus absents de `doi_prefixes`, et insère `(prefix, ra)`. Un préfixe que doi.org ne connaît pas est inséré avec `ra='unknown'`. Un préfixe sans réponse, faute de requête aboutie, reste à résoudre.
 
-La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishers_journals` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe reste à résoudre.
+La Registration Agency dit laquelle des deux API connaît un DOI, Crossref ou DataCite. La phase `publishing` rattache ensuite les préfixes à leur éditeur via les API `/prefixes`. Au run suivant, `fetch_missing` adresse chaque DOI à la bonne API et laisse attendre ceux dont le préfixe reste à résoudre.
 
 La requête à `doi.org/ra` est injectée par le câblage de la phase.
 """

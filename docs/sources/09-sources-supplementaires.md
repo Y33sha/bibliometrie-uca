@@ -34,7 +34,7 @@ Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l
 
 https://www.sudoc.fr/ — catalogue collectif des bibliothèques de l'enseignement supérieur (ABES)
 
-Source de référence des ISSN des revues. Consommée par `check_serials_in_sudoc`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
+Source de référence des ISSN des revues. Consommée par `check_serials_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Services utilisés
 
@@ -55,7 +55,7 @@ La notice elle-même n'est pas conservée. Ses informations sont écrites dans `
 
 https://doaj.org/ — Directory of Open Access Journals
 
-Source d'enrichissement des revues : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par `enrich_serials_from_doaj`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
+Source d'enrichissement des revues : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Dump utilisé
 

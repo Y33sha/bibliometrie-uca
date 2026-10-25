@@ -416,7 +416,7 @@ def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dic
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS
+# PUBLISHERS & SERIALS
 # =============================================================
 
 

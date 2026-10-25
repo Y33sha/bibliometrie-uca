@@ -22,7 +22,7 @@ Les tables `serials`, `monographs`, `source_records`, `publications`, `serial_na
 
 **Éditeur des publications (`publications`).** Le recalcul d'une publication lui donne l'éditeur de la date de publication : le titulaire du préfixe de son DOI Crossref, à défaut l'éditeur de ses enregistrements sources. Une plateforme d'éditeurs qui enregistre les DOI des revues qu'elle diffuse en est exclue (fiche [publications](publications.md)).
 
-**Résolution par préfixe de DOI (`publishers_journals`).** Une sous-étape par agence d'enregistrement, Crossref puis DataCite, interroge l'API de l'agence sur les préfixes qu'elle n'a pas vus. Elle enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom, comme dans `normalize`, et renseigne `doi_prefixes.publisher_id`. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Un préfixe dont l'API est indisponible est repris au run suivant.
+**Résolution par préfixe de DOI (`publishing`).** Une sous-étape par agence d'enregistrement, Crossref puis DataCite, interroge l'API de l'agence sur les préfixes qu'elle n'a pas vus. Elle enregistre les métadonnées obtenues, reconnaît ou crée l'éditeur par sa forme de nom, comme dans `normalize`, et renseigne `doi_prefixes.publisher_id`. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Un préfixe dont l'API est indisponible est repris au run suivant.
 
 **Enrichissement du pays, hors pipeline.** `interfaces/cli/maintenance/enrich_publishers.py` renseigne le pays depuis OpenAlex, et seulement là où il est absent : une valeur saisie à la main est conservée.
 

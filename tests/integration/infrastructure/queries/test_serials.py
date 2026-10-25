@@ -1,4 +1,4 @@
-"""Tests d'intégration du SQL des revues : store et étapes de `publishers_journals`."""
+"""Tests d'intégration du SQL des revues : store et étapes de `publishing`."""
 
 from __future__ import annotations
 

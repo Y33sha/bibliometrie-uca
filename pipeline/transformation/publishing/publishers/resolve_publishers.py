@@ -1,4 +1,4 @@
-"""Volet publisher de `publishers_journals` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
+"""Volet publisher de `publishing` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
 
 L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue que Crossref ne connaît pas. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), corrige l'agence d'un préfixe inconnu qu'elle trouve, puis reconnaît ou crée l'éditeur contre `publisher_name_forms` et l'attache. Un préfixe dont l'API a répondu est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Un préfixe dont l'API est indisponible reste en attente du run suivant.
 

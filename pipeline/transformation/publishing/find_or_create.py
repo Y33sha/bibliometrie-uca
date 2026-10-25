@@ -272,7 +272,7 @@ def find_or_create_containers(
 ) -> Containers:
     """Trouve ou crée les conteneurs d'un document, d'après `determine_container_type`.
 
-    Le document reçoit sa série comme entrée de `serials`, et son volume comme monographie, reliée à cette série. La série d'un volume a toujours un ISSN. L'étape de rattachement de `publishers_journals` reconnaît les séries sans ISSN.
+    Le document reçoit sa série comme entrée de `serials`, et son volume comme monographie, reliée à cette série. La série d'un volume a toujours un ISSN. L'étape de rattachement de `publishing` reconnaît les séries sans ISSN.
     """
     series, volume = determine_container_type(description)
     serial_id = _find_series(series, publisher_id, stores) if series else None

@@ -72,7 +72,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Rattachement des enregistrements : `source_records.monograph_id`, agrégé dans `publications.monograph_id`.
 - [x] Trouve-ou-crée d'une monographie (`application/services/monographs/core.py`).
 - [x] Normalisation, sans rien retirer : l'enregistrement garde son `journal_id` selon la règle en place, et reçoit en outre sa monographie, dont le `journal_id` désigne la même entrée de `journals`. Chaque source décrit le conteneur du document (`ContainerFacts`). Crossref : `container-title` porte `[collection, livre]` pour un chapitre, le volume d'actes en tête pour un article de congrès. HAL : `bookTitle_s` ; le congrès (`conferenceTitle_s`) ne désigne pas un volume, une communication le nomme avec ou sans actes publiés. OpenAlex : source `conference` pour le volume, `book series` ou `journal` pour la collection. WoS : titre de la source, hors ISSN. ScanR : congrès d'une communication. DataCite : conteneur sans ISSN.
-- [x] Sous-étape `delete_empty_monographs` de `publishers_journals`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.
+- [x] Sous-étape `delete_empty_monographs` de `publishing`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.
 - [x] Audit de 2026 : 161 monographies, correspondance un pour un avec `journals` (6 entrées). 15 titres en double, presque tous parce que HAL ne donne pas l'éditeur.
 - [x] Rapprochement par titre dans le domaine (`choose_monograph`) : un éditeur absent ne sépare pas deux monographies ; la monographie du même éditeur passe avant celle sans éditeur.
 - [x] Sous-étape `merge_duplicate_monographs` : une monographie rejoint la seule monographie compatible de son titre (`duplicate_monographs`). Simulation : 12 fusions sur 24 titres en double. Les autres opposent des éditeurs en double (Quæ et Quae, Peter Lang et Peter Lang Verlag, Garnier et Classiques Garnier, Springer et ses filiales) ou des volumes de même titre à ISBN distincts.
@@ -121,7 +121,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
     - série sans ISSN créée pour un volume : « Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence » (ordinal en toutes lettres) ;
     - revue recréée sous un nouvel id : « Aristotle's Generation of Animals ».
 - [x] Instantané des articles de congrès après la phase `publications`, comparé à celui d'avant : volumes dans `journals` 65 → 23, en monographie 1 133 → 1 261 ; 9 892 articles sans série ni volume. Les 23 restants : enregistrements Crossref absents du raw store, jamais renormalisés ; articles OpenAlex dont le type brut gardé dans `raw_metadata` est périmé (10 891 enregistrements OpenAlex sur 23 890 dont le type est corrigé).
-- [x] Oneshot sur les 2 424 enregistrements absents du raw store (`move_volumes_to_monographs`), puis `publishers_journals` et `publications`. 24 enregistrements changent de conteneurs. Un second run laisse tout en l'état.
+- [x] Oneshot sur les 2 424 enregistrements absents du raw store (`move_volumes_to_monographs`), puis `publishing` et `publications`. 24 enregistrements changent de conteneurs. Un second run laisse tout en l'état.
 - [x] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
 - [x] Mesure finale, comparée au premier instantané : 12 802 articles, 632 séries (545 à ISSN, 87 sans), volumes en monographie 1 133 → 1 268, dans `journals` 65 → 11 ; 9 830 articles sans série ni volume. Les 11 restants : 6 conteneurs OpenAlex sans année (« Winter Simulation Conference », « Symposium on Discrete Algorithms »), qui relèvent de la question « Niveau d'un conteneur sans ISSN » ; 5 revues HAL sans ISSN (« Questio »).
 
@@ -143,7 +143,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 11. Documentation
 
-- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishers-journals.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
+- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishing.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
 
 ## Questions ouvertes
 

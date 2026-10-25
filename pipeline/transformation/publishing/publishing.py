@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `publishers_journals` : enrichissement des référentiels d'éditeurs, de revues et de monographies.
+"""Orchestrateur de la phase `publishing` : enrichissement des référentiels d'éditeurs, de revues et de monographies.
 
 Trois groupes de sous-étapes, dans l'ordre :
 
@@ -88,11 +88,11 @@ from pipeline.transformation.publishing.serials.type_proceedings_serials import 
     run_type_proceedings_serials,
 )
 
-_PHASE = "publishers_journals"
+_PHASE = "publishing"
 
 
 @dataclass(frozen=True)
-class PublishersJournalsPhase:
+class PublishingPhase:
     """`steps` associe à chaque tâche de la phase son étape (`TaskStep`)."""
 
     steps: Mapping[str, TaskStep]
@@ -183,7 +183,7 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
 
 
 def build() -> Phase:
-    return PublishersJournalsPhase(
+    return PublishingPhase(
         {
             f"{_PHASE}.{name}": step
             for name, step in {

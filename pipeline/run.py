@@ -65,7 +65,7 @@ from pipeline.transformation.publications import oa_status, publications, relati
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
-from pipeline.transformation.publishing import publishers_journals, resolve_ra
+from pipeline.transformation.publishing import publishing, resolve_ra
 from pipeline.transformation.structures import affiliations
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
@@ -91,7 +91,7 @@ _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "fetch_truncated": fetch_truncated.build,
     "normalize": normalize.build,
     "affiliations": affiliations.build,
-    "publishers_journals": publishers_journals.build,
+    "publishing": publishing.build,
     "metadata_correction": metadata_correction.build,
     "publications": publications.build,
     "author_grouping": author_grouping.build,

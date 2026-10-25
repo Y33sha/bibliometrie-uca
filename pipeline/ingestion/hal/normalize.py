@@ -59,7 +59,7 @@ def get_title(doc: Mapping[str, JsonValue]) -> str:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS
+# PUBLISHERS & SERIALS
 # =============================================================
 
 

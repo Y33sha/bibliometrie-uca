@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — type en recueil d'actes les revues qui en sont.
+"""Sous-étape de la phase `publishing` — type en recueil d'actes les revues qui en sont.
 
 Trois règles de `domain/serials/containers.py` désignent un recueil d'actes :
 

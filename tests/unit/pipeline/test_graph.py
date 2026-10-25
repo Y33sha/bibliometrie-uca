@@ -74,8 +74,8 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
 
 def test_la_fusion_des_revues_suit_le_typage_openalex():
     """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
-    deps = dependencies(TASKS)["publishers_journals.merge_duplicate_serials"]
-    assert "publishers_journals.enrich_serials_from_openalex" in deps
+    deps = dependencies(TASKS)["publishing.merge_duplicate_serials"]
+    assert "publishing.enrich_serials_from_openalex" in deps
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():

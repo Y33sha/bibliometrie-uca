@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — enrichit les revues à partir de l'API OpenAlex Sources.
+"""Sous-étape de la phase `publishing` — enrichit les revues à partir de l'API OpenAlex Sources.
 
 Champs mis à jour :
 - `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)

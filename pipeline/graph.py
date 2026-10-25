@@ -141,7 +141,7 @@ def order_violations(tasks: Sequence[Task]) -> list[tuple[str, str, str]]:
     )
 
 
-# Référentiels que la normalisation trouve ou crée, et que `publishers_journals` fusionne et supprime.
+# Référentiels que la normalisation trouve ou crée, et que `publishing` fusionne et supprime.
 _CONTAINERS = (
     "publishers",
     "publisher_name_forms",
@@ -289,7 +289,7 @@ TASKS: tuple[Task, ...] = (
                 "contribution_attributes_queue",
                 *_containers(source),
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishers_journals` fusionne et supprime, et les groupes écrits par `author_grouping`.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishing` fusionne et supprime, et les groupes écrits par `author_grouping`.
             previous_run=(
                 "staging",
                 "source_records",
@@ -457,8 +457,8 @@ TASKS: tuple[Task, ...] = (
         network="doi.org",
     ),
     _task(
-        "publishers_journals.resolve_crossref_publishers",
-        "publishers_journals",
+        "publishing.resolve_crossref_publishers",
+        "publishing",
         reads=(
             "doi_prefixes.id",
             "doi_prefixes.ra",
@@ -489,8 +489,8 @@ TASKS: tuple[Task, ...] = (
         network="crossref",
     ),
     _task(
-        "publishers_journals.resolve_datacite_publishers",
-        "publishers_journals",
+        "publishing.resolve_datacite_publishers",
+        "publishing",
         reads=(
             "doi_prefixes.id",
             "doi_prefixes.ra",
@@ -517,8 +517,8 @@ TASKS: tuple[Task, ...] = (
         network="datacite",
     ),
     _task(
-        "publishers_journals.enrich_serials_from_openalex",
-        "publishers_journals",
+        "publishing.enrich_serials_from_openalex",
+        "publishing",
         reads=(
             "serials.id",
             "serials.openalex_id",
@@ -530,8 +530,8 @@ TASKS: tuple[Task, ...] = (
         network="openalex",
     ),
     _task(
-        "publishers_journals.check_serials_in_sudoc",
-        "publishers_journals",
+        "publishing.check_serials_in_sudoc",
+        "publishing",
         reads=(
             "serials.id",
             "serials.title",
@@ -551,8 +551,8 @@ TASKS: tuple[Task, ...] = (
         network="sudoc",
     ),
     _task(
-        "publishers_journals.merge_duplicate_serials",
-        "publishers_journals",
+        "publishing.merge_duplicate_serials",
+        "publishing",
         reads=(
             "serial_issns",
             "serials.id",
@@ -598,8 +598,8 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "publishers_journals.type_proceedings_serials",
-        "publishers_journals",
+        "publishing.type_proceedings_serials",
+        "publishing",
         reads=(
             "serials.id",
             "serials.title",
@@ -621,8 +621,8 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "publishers_journals.learn_serial_doi_namespaces",
-        "publishers_journals",
+        "publishing.learn_serial_doi_namespaces",
+        "publishing",
         reads=(
             "source_records.doi",
             "source_records.serial_id",
@@ -633,23 +633,23 @@ TASKS: tuple[Task, ...] = (
         previous_run=("source_records", "serials"),
     ),
     _task(
-        "publishers_journals.enrich_serials_from_doaj",
-        "publishers_journals",
+        "publishing.enrich_serials_from_doaj",
+        "publishing",
         reads=("serial_issns", "serials.doaj_imported_at", "config"),
         writes=("serials.is_in_doaj", "serials.doaj_payload", "serials.doaj_imported_at"),
         previous_run=("serial_issns", "serials"),
         network="doaj",
     ),
     _task(
-        "publishers_journals.merge_duplicate_monographs",
-        "publishers_journals",
+        "publishing.merge_duplicate_monographs",
+        "publishing",
         reads=("monographs.id", "monographs.title_normalized"),
         writes=("monographs.id", "source_records.monograph_id", "publications.monograph_id"),
         previous_run=("monographs",),
     ),
     _task(
-        "publishers_journals.link_monographs_to_collections",
-        "publishers_journals",
+        "publishing.link_monographs_to_collections",
+        "publishing",
         reads=(
             "monographs",
             "source_records.monograph_id",
@@ -665,8 +665,8 @@ TASKS: tuple[Task, ...] = (
         previous_run=("monographs", "source_records.serial_id", "serial_issns"),
     ),
     _task(
-        "publishers_journals.type_proceedings_volumes",
-        "publishers_journals",
+        "publishing.type_proceedings_volumes",
+        "publishing",
         reads=(
             "monographs.id",
             "monographs.serial_id",
@@ -1246,7 +1246,7 @@ PHASE_LABELS: dict[str, str] = {
     "fetch_truncated": "Re-téléchargement des documents OpenAlex tronqués à 100 auteurs",
     "normalize": "Normalisation des données brutes",
     "affiliations": "Résolution des affiliations par contribution source",
-    "publishers_journals": "Enrichissement des référentiels d'éditeurs et revues",
+    "publishing": "Référentiels de l'édition",
     "metadata_correction": "Correction des métadonnées de publication",
     "publications": "Dédoublonnage des publications",
     "author_grouping": "Alignement des auteurs des enregistrements sources d'une même publication",

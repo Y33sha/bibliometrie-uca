@@ -29,8 +29,8 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des publications
 
-- [Identification des agences d'enregistrement des DOI](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
-- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ).
+- [Identification des agences d'enregistrement des DOI](05-publishing.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
+- [Référentiels de l'édition](05-publishing.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ).
 - [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_records` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera la résolution. Les métadonnées brutes sont conservées, avec l'identifiant de la règle qui les a corrigées.
 - [Publications](07-publications.md) : peuple et maintient le référentiel `publications` à partir des `source_records`. Regroupe celles qui désignent le même document, crée une publication pour chaque document du périmètre, et fusionne ou scinde les publications existantes selon ce regroupement.
 

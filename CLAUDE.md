@@ -51,7 +51,7 @@
 
 ## Phases du pipeline
 
-A jour au 2026-10-11
+A jour au 2026-10-25
 
 `harvest` — Moissonnage HAL/OpenAlex/WoS/ScanR/theses/DataCite
 `harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
@@ -61,7 +61,7 @@ A jour au 2026-10-11
 `normalize` — Normalisation staging → source_records, source_contributions, addresses
 `affiliations` — Résolution adresses → structures UCA
 `resolve_ra` — Résolution Registration Agency des DOI
-`publishers_journals` — Enrichissement journals (DOI, APC, DOAJ)
+`publishing` — Référentiels de l'édition : éditeurs, publications en série, monographies (DOI, APC, DOAJ)
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
 `persons` — Création personnes

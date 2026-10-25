@@ -1,8 +1,8 @@
 """Table `doi_prefixes` : agence d'enregistrement (Registration Agency) et éditeur de chaque préfixe DOI.
 
-Peuplée en deux temps : la phase `resolve_ra` insère `(prefix, ra)` ; le volet publisher de la phase `publishers_journals` interroge l'API `/prefixes` de Crossref, puis celle de DataCite, renseigne les métadonnées et attache l'éditeur. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Pour un préfixe DataCite, le nom et le symbole du client DataCite (repository) occupent des colonnes dédiées (`client_name_*`, `datacite_client_symbol`) ; le provider DataCite occupe les colonnes `publisher_*`, comme l'éditeur Crossref.
+Peuplée en deux temps : la phase `resolve_ra` insère `(prefix, ra)` ; le volet publisher de la phase `publishing` interroge l'API `/prefixes` de Crossref, puis celle de DataCite, renseigne les métadonnées et attache l'éditeur. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Pour un préfixe DataCite, le nom et le symbole du client DataCite (repository) occupent des colonnes dédiées (`client_name_*`, `datacite_client_symbol`) ; le provider DataCite occupe les colonnes `publisher_*`, comme l'éditeur Crossref.
 
-Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishers_journals` (attache de l'éditeur Crossref / repository DataCite).
+Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishing` (attache de l'éditeur Crossref / repository DataCite).
 """
 
 from typing import Literal, NamedTuple

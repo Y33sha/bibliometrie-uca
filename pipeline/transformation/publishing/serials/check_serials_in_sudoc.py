@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — vérifie les ISSN des revues dans le Sudoc.
+"""Sous-étape de la phase `publishing` — vérifie les ISSN des revues dans le Sudoc.
 
 Sont reprises les revues dont un ISSN n'est pas vérifié, les revues dont un enregistrement a un ISSN absent de leurs ISSN, et les séries d'actes ou collections de livres à ISSN dont le titre a la forme d'un volume. Celles-ci reçoivent leur titre de série (`reference_series_title`) : le titre de la notice Sudoc, à défaut le titre sans ses marques d'édition. Le Sudoc donne la notice de chacun de leurs ISSN, des corrections possibles de leurs valeurs mal formées, et des ISSN d'autre support que ces notices désignent. `domain.serials.issn_check` en tire le support et le statut de chaque ISSN, les ISSN à écarter et les corrections. Chaque ISSN reçoit la date de la vérification.
 

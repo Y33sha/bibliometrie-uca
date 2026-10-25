@@ -11,7 +11,7 @@ Une publication en série (`serial`) est un support de publication : revue, coll
 | `serials` | La revue | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `serial_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `publication_count` |
 | `serial_issns` | ISSN des revues ; sans revue, ISSN vérifié d'une publication absente de la base | `issn`, `serial_id`, `support`, `linking` (ISSN-L), `status`, `replaced_by`, `sudoc_checked_at`, unicité `(issn, serial_id)` |
 | `serial_name_forms` | Formes de nom permettant de reconnaître une revue par son titre | `serial_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
-| `serial_doi_namespaces` | Espaces de noms DOI qui désignent une revue, recalculés par `publishers_journals` | `namespace` (clé), `serial_id`, `dois`, `share` (part des DOI de l'espace qui portent la revue) |
+| `serial_doi_namespaces` | Espaces de noms DOI qui désignent une revue, recalculés par `publishing` | `namespace` (clé), `serial_id`, `dois`, `share` (part des DOI de l'espace qui portent la revue) |
 
 Les tables qui référencent une revue ont des politiques de suppression différentes : `serial_name_forms` et `serial_doi_namespaces` disparaissent avec elle, `apc_payments.serial_id` repasse à nul, tandis que `publications.serial_id` et `source_records.serial_id` n'autorisent aucune suppression tant qu'ils pointent dessus.
 
@@ -19,7 +19,7 @@ Les tables qui référencent une revue ont des politiques de suppression différ
 
 **Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_serial` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie successivement l'`openalex_id`, puis les ISSN (`find_serial_by_issn_any`), puis le titre (`find_serial_by_name_form`, qui préfère les revues à ISSN en ligne), et crée la revue en dernier recours avec sa forme de nom. La recherche par titre se limite aux formes de l'éditeur du document ou sans éditeur, et la forme de nom enregistre cet éditeur. `enrich_serial` complète au passage les champs vides, sans jamais écraser une valeur existante, et la revue reçoit les ISSN qu'elle ne porte pas. L'enregistrement source reçoit le `serial_id` de la revue trouvée ou créée. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
 
-**Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Chaque sous-étape porte ses requêtes. `SerialStore` (`pipeline/transformation/publishing/serials/store.py`) regroupe la recherche, la création et l'enrichissement des revues.
+**Enrichissement du référentiel (`publishing`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Chaque sous-étape porte ses requêtes. `SerialStore` (`pipeline/transformation/publishing/serials/store.py`) regroupe la recherche, la création et l'enrichissement des revues.
 
 ## Écriture par l'API — édition manuelle
 

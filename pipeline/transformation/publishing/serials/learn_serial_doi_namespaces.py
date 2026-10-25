@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — calcule les espaces de noms DOI des revues.
+"""Sous-étape de la phase `publishing` — calcule les espaces de noms DOI des revues.
 
 Les couples (DOI, revue) des enregistrements de toutes les sources désignent les espaces de noms (`domain/serials/doi_namespaces.py`). La table `serial_doi_namespaces` est recalculée en entier à chaque passage.
 """

@@ -51,7 +51,7 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
     publishers.assert_called_once()
 
 
-def test_resolve_ra_runs_after_normalize_before_publishers_journals():
-    """La RA des DOI normalisés dans le run est résolue avant que `publishers_journals` rattache les préfixes à leur éditeur."""
+def test_resolve_ra_runs_after_normalize_before_publishing():
+    """La RA des DOI normalisés dans le run est résolue avant que `publishing` rattache les préfixes à leur éditeur."""
     names = [n for n, _ in run_pipeline.PHASES]
-    assert names.index("normalize") < names.index("resolve_ra") < names.index("publishers_journals")
+    assert names.index("normalize") < names.index("resolve_ra") < names.index("publishing")

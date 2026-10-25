@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — fusionne les revues en double.
+"""Sous-étape de la phase `publishing` — fusionne les revues en double.
 
 Cinq règles désignent la même publication :
 

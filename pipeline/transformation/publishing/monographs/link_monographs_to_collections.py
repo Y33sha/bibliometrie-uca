@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — rattache chaque monographie à sa collection.
+"""Sous-étape de la phase `publishing` — rattache chaque monographie à sa collection.
 
 Les monographies sans collection à ISSN se regroupent en séries (`group_series`, `domain/serials/series.py`) : même clé de série, même éditeur, au moins deux volumes. Chaque série a son entrée dans `serials`, sans ISSN, typée série d'actes ou collection de livres selon ses volumes. `choose_monograph_serial` (`domain/monographs/collection.py`) choisit ensuite l'entrée de chaque monographie : sa collection à ISSN, à défaut sa série sans ISSN, à défaut le volume lui-même, à défaut aucune. Une monographie en conflit reste en l'état, signalée. Le calcul se refait à chaque run, d'après les enregistrements.
 """

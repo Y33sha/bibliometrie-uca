@@ -1,16 +1,14 @@
-"""Tests de l'enchaînement de la phase `publishers_journals`, exécutée tâche par tâche dans l'ordre du graphe."""
+"""Tests de l'enchaînement de la phase `publishing`, exécutée tâche par tâche dans l'ordre du graphe."""
 
 import dataclasses
 import logging
 
 from pipeline.graph import TASKS
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.transformation.publishing import publishers_journals
-from pipeline.transformation.publishing.publishers_journals import PublishersJournalsPhase
+from pipeline.transformation.publishing import publishing
+from pipeline.transformation.publishing.publishing import PublishingPhase
 
-_CHAMPS = tuple(
-    n.name.removeprefix("publishers_journals.") for n in TASKS if n.phase == "publishers_journals"
-)
+_CHAMPS = tuple(n.name.removeprefix("publishing.") for n in TASKS if n.phase == "publishing")
 
 
 def _run(
@@ -31,10 +29,10 @@ def _run(
         return run
 
     steps = {
-        name: dataclasses.replace(step, run=runner(name.removeprefix("publishers_journals.")))
-        for name, step in publishers_journals.build().steps.items()
+        name: dataclasses.replace(step, run=runner(name.removeprefix("publishing.")))
+        for name, step in publishing.build().steps.items()
     }
-    return PublishersJournalsPhase(steps).run(
+    return PublishingPhase(steps).run(
         contexte(credentials_missing=lambda _source: credentials_missing)
     )
 

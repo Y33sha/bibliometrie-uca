@@ -187,7 +187,7 @@ def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS
+# PUBLISHERS & SERIALS
 # =============================================================
 
 

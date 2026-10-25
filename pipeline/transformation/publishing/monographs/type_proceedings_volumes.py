@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — recalcule la nature des monographies, volume d'actes ou livre.
+"""Sous-étape de la phase `publishing` — recalcule la nature des monographies, volume d'actes ou livre.
 
 La nature se recalcule à chaque run d'après les enregistrements, la collection et le titre de la monographie (`is_proceedings_volume`) : elle suit les enregistrements quand ils changent, dans un sens comme dans l'autre. La sous-étape suit le typage des collections, dont elle lit le type.
 """
