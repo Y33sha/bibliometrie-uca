@@ -432,13 +432,7 @@ def subject_clause(subject_ids: list[int]) -> WhereClause | None:
 def publisher_id_clause(publisher_id: int | None) -> WhereClause | None:
     if not publisher_id:
         return None
-    return WhereClause(
-        """EXISTS (
-            SELECT 1 FROM journals j2
-            WHERE j2.id = p.journal_id AND j2.publisher_id = :flt_publisher_id
-        )""",
-        {"flt_publisher_id": publisher_id},
-    )
+    return WhereClause("p.publisher_id = :flt_publisher_id", {"flt_publisher_id": publisher_id})
 
 
 def journal_id_clause(journal_id: int | None) -> WhereClause | None:

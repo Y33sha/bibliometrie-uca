@@ -23,7 +23,7 @@ class EntitySql(NamedTuple):
     join: str
 
 
-# La revue sort de `publications.journal_id`, l'éditeur de la revue. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
+# La revue sort de `publications.journal_id`, l'éditeur de `publications.publisher_id`. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "journal": EntitySql(
         table="journals j",
@@ -35,7 +35,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
         table="publishers pub",
         id="pub.id",
         label="pub.name",
-        join="JOIN journals j ON j.id = p.journal_id JOIN publishers pub ON pub.id = j.publisher_id",
+        join="JOIN publishers pub ON pub.id = p.publisher_id",
     ),
     "person": EntitySql(
         table="persons pe",

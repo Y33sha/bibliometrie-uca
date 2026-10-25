@@ -239,9 +239,19 @@ class TestPublisherDashboard:
                 "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s",
                 (j_proc,),
             )
-            _publication("p1", doc_type="article", oa_status="gold", journal_id=j_journal)
-            _publication("p2", doc_type="article", oa_status="closed", journal_id=j_journal)
-            _publication("p3", doc_type="conference_paper", oa_status=None, journal_id=j_proc)
+            _publication(
+                "p1", doc_type="article", oa_status="gold", journal_id=j_journal, publisher_id=pid
+            )
+            _publication(
+                "p2", doc_type="article", oa_status="closed", journal_id=j_journal, publisher_id=pid
+            )
+            _publication(
+                "p3",
+                doc_type="conference_paper",
+                oa_status=None,
+                journal_id=j_proc,
+                publisher_id=pid,
+            )
         seed_in_perimeter_contributions(j_journal)
         seed_in_perimeter_contributions(j_proc)
         r = client.get(f"/api/publishers/{pid}/dashboard")
@@ -269,7 +279,10 @@ class TestPublisherSubjects:
     def test_returns_top_subjects_excluding_generic(self, client):
         pid = seed_publisher()
         jid = seed_journal(publisher_id=pid)
-        publication_ids = [_publication("p1", journal_id=jid), _publication("p2", journal_id=jid)]
+        publication_ids = [
+            _publication("p1", journal_id=jid, publisher_id=pid),
+            _publication("p2", journal_id=jid, publisher_id=pid),
+        ]
         specific_label = uniq("specific_subject")
         spec_id = seed_subject(specific_label, usage_count=100)
         generic_label = uniq("generic_subject")

@@ -259,7 +259,7 @@ def list_publications(
                 ) AS apc_details
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS},
@@ -483,7 +483,7 @@ def export_publications_csv(
                 ) AS labs
             FROM publications p
             LEFT JOIN journals j ON j.id = p.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS}

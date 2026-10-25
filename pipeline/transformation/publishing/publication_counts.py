@@ -1,9 +1,9 @@
 """Compteurs `publication_count` (publications in-perimeter) sur `journals` + `publishers`.
 
 `journals.publication_count` = nombre de publications in-perimeter de la revue.
-`publishers.publication_count` = somme des `publication_count` de ses revues.
+`publishers.publication_count` = nombre de publications in-perimeter de l'éditeur (`publications.publisher_id`).
 
-Les deux recalculs en masse tournent dans la phase `contributions`, après `in_perimeter`, les éditeurs après les revues dont ils somment le compteur. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
+Les deux recalculs en masse tournent dans la phase `finalize`, après `in_perimeter`. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
 """
 
 from sqlalchemy import Connection, text
@@ -24,11 +24,12 @@ def refresh_journal_publication_count(conn: Connection, journal_id: int) -> None
 
 
 def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> None:
-    """Recalcule le `publication_count` d'un seul éditeur (= somme de ses revues)."""
+    """Recalcule le `publication_count` d'un seul éditeur (fusion admin)."""
     conn.execute(
         text("""
             UPDATE publishers p SET publication_count = COALESCE((
-                SELECT SUM(j.publication_count) FROM journals j WHERE j.publisher_id = p.id
+                SELECT COUNT(*) FROM publications pu
+                WHERE pu.publisher_id = p.id AND pu.in_perimeter
             ), 0)
             WHERE p.id = :pid
         """),
@@ -60,16 +61,14 @@ def refresh_journal_publication_counts(conn: Connection) -> int:
 
 
 def refresh_publisher_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque éditeur, somme de celui de ses revues.
-
-    À appeler après `refresh_journal_publication_counts`, dont il lit le résultat. Rend le nombre de lignes changées.
-    """
+    """Recalcule le `publication_count` de chaque éditeur. Rend le nombre de lignes changées."""
     return conn.execute(
         text("""
             WITH counts AS (
-                SELECT publisher_id, SUM(publication_count) AS n
-                FROM journals
-                WHERE publisher_id IS NOT NULL
+                SELECT publisher_id, COUNT(*) AS n
+                FROM publications
+                WHERE in_perimeter
+                  AND publisher_id IS NOT NULL
                 GROUP BY publisher_id
             )
             UPDATE publishers p
@@ -85,5 +84,5 @@ class PublicationCountRecompute:
     """Recalcul ciblé du `publication_count` d'un éditeur, exposé à l'API par `pipeline/public.py`."""
 
     def refresh_publisher_publication_count(self, conn: Connection, publisher_id: int) -> None:
-        """Recalcule le `publication_count` de l'éditeur, somme de celui de ses revues."""
+        """Recalcule le `publication_count` de l'éditeur."""
         refresh_publisher_publication_count(conn, publisher_id)

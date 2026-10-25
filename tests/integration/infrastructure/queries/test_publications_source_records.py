@@ -42,12 +42,13 @@ class TestGetPublicationSources:
 
     def test_journal_and_publisher_from_referential_and_from_source(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        journal = _create_journal(sa_sync_conn, "Nature", "Springer Nature")
+        journal = _create_journal(sa_sync_conn, "Nature", "Springer")
         _source_record(
             sa_sync_conn,
             publication,
             source_id="hal-1",
             journal_id=journal,
+            publisher_id=insert_publisher(sa_sync_conn, "Springer Nature"),
             biblio={
                 "journal": {"title": "Nature (London)", "issn": "0028-0836", "eissn": "1476-4687"},
                 "publisher": "Nature Publishing Group",

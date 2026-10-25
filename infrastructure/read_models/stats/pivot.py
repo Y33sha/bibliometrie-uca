@@ -150,7 +150,7 @@ DIMENSIONS: dict[str, Dimension] = {
             comparable=True,
             filterable=True,
             group_sql="pub.name",
-            join_sql="JOIN publishers pub ON pub.id = j.publisher_id",
+            join_sql="JOIN publishers pub ON pub.id = p.publisher_id",
         ),
         # Forte cardinalité : comparaison et facette (filtre par revue, recherche serveur). Jointure interne : exclut les publications sans revue.
         Dimension(

@@ -118,7 +118,7 @@ def get_publication_detail(
             LEFT JOIN publications_detail d ON d.publication_id = p.id
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN monographs m ON m.id = p.monograph_id
-            LEFT JOIN publishers pub ON pub.id = COALESCE(j.publisher_id, m.publisher_id)
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
             WHERE p.id = :pid
         """),

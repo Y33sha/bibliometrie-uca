@@ -1903,7 +1903,7 @@ export interface paths {
          * Get Publisher Dashboard
          * @description Agrégats de l'onglet tableau de bord de la page d'un éditeur.
          *
-         *     Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
+         *     Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
          */
         get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
         put?: never;
@@ -4757,7 +4757,7 @@ export interface components {
          * PublisherDashboardResponse
          * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
          *
-         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
          */
         PublisherDashboardResponse: {
             /** Total Publications */
@@ -5083,7 +5083,7 @@ export interface components {
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
         SourceRecordMetadataOut: {
             /** Id */

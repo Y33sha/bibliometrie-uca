@@ -271,13 +271,14 @@ def seed_publication(
     oa_status: str | None = "unknown",
     journal_id: int | None = None,
     monograph_id: int | None = None,
+    publisher_id: int | None = None,
     in_perimeter: bool = False,
 ) -> int:
     """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
     return _insert(
         "INSERT INTO publications (title, title_normalized, publication_year, doc_type, oa_status, "
-        "journal_id, monograph_id, perimeter_evidence) "
-        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, "
+        "journal_id, monograph_id, publisher_id, perimeter_evidence) "
+        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, %s, "
         "CAST(%s AS perimeter_evidence[])) "
         "RETURNING id",
         (
@@ -288,6 +289,7 @@ def seed_publication(
             oa_status,
             journal_id,
             monograph_id,
+            publisher_id,
             perimeter_evidence(in_perimeter) or [],
         ),
     )

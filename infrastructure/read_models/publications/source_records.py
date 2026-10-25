@@ -143,7 +143,7 @@ def get_publication_sources(
                    pub.id AS publisher_id, pub.name AS publisher_name
             FROM source_records sr
             LEFT JOIN journals j ON j.id = sr.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN publishers pub ON pub.id = sr.publisher_id
             LEFT JOIN languages lang ON lang.code = sr.language
             WHERE sr.publication_id = :pid
             ORDER BY sr.source, sr.source_id

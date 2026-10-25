@@ -127,7 +127,7 @@ def get_publisher_dashboard(
 ) -> PublisherDashboardResponse:
     """Agrégats de l'onglet tableau de bord de la page d'un éditeur.
 
-    Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
+    Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
     """
     result = queries.get_publisher_dashboard(publisher_id)
     if result is None:

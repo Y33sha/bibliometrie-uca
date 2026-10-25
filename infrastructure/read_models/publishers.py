@@ -218,8 +218,7 @@ class PgPublisherQueries(PublisherQueries):
             text(f"""
                 SELECT p.doc_type, COUNT(*) AS n
                 FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                WHERE j.publisher_id = :id
+                WHERE p.publisher_id = :id
                   AND {publication_in_perimeter("p")}
                 GROUP BY p.doc_type
                 ORDER BY n DESC, p.doc_type NULLS LAST
@@ -230,8 +229,7 @@ class PgPublisherQueries(PublisherQueries):
             text(f"""
                 SELECT p.oa_status, COUNT(*) AS n
                 FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                WHERE j.publisher_id = :id
+                WHERE p.publisher_id = :id
                   AND {publication_in_perimeter("p")}
                 GROUP BY p.oa_status
                 ORDER BY n DESC, p.oa_status NULLS LAST
@@ -250,17 +248,12 @@ class PgPublisherQueries(PublisherQueries):
         )
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Sujets des publications de l'éditeur, les plus fréquents d'abord, atteintes par ses revues.
+        """Sujets des publications de l'éditeur, les plus fréquents d'abord.
 
         Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
-            text(
-                entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM journals j "
-                    "WHERE j.id = p.journal_id AND j.publisher_id = :id)"
-                )
-            ),
+            text(entity_subjects_sql("p.publisher_id = :id")),
             {"id": publisher_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]

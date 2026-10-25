@@ -1075,11 +1075,11 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.journal_id",
             "journals.id",
-            "journals.publisher_id",
             "publishers.id",
             "publications.id",
             "publications.in_perimeter",
             "publications.journal_id",
+            "publications.publisher_id",
         ),
         writes=(
             "addresses.publication_count",

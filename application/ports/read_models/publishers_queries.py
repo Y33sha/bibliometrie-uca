@@ -101,7 +101,7 @@ class PublishersFacetsResponse(BaseModel):
 class PublisherDashboardResponse(BaseModel):
     """GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
 
-    `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+    `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
     """
 
     total_publications: int

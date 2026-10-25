@@ -23,16 +23,16 @@ class TestGetPublicationDetail:
     def test_returns_none_for_missing(self, sa_sync_conn):
         assert get_publication_detail(sa_sync_conn, 999_999) is None
 
-    def test_monographie_et_son_editeur(self, sa_sync_conn):
-        """Une publication sans revue prend l'éditeur de sa monographie."""
+    def test_monographie_et_l_editeur_de_la_publication(self, sa_sync_conn):
+        """Le détail donne la monographie et l'éditeur de la publication."""
         publisher = insert_publisher(sa_sync_conn, "Dykinson")
         monograph = insert_monograph(
             sa_sync_conn, "Diplomacy", proceedings=True, publisher_id=publisher
         )
         publication = insert_publication(sa_sync_conn, doc_type="conference_paper")
         sa_sync_conn.execute(
-            text("UPDATE publications SET monograph_id = :m WHERE id = :id"),
-            {"m": monograph, "id": publication},
+            text("UPDATE publications SET monograph_id = :m, publisher_id = :p WHERE id = :id"),
+            {"m": monograph, "p": publisher, "id": publication},
         )
         detail = get_publication_detail(sa_sync_conn, publication)
         assert detail is not None
