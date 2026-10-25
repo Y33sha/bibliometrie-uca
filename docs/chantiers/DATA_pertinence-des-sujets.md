@@ -82,12 +82,20 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ### Phase 3 — Vote des arbitres
 
-- [ ] Correspondance des arbitres vers les domains OpenAlex : domaines HAL, disciplines theses.fr, premier niveau LCC des sujets DOAJ
-- [ ] Prototype SQL sur l'échantillon, cascade comprise ; précision et rappel
-- [ ] Couverture sans WoS : part des publications à plusieurs domains pourvues d'au moins un arbitre
+- [x] Correspondance des arbitres vers les domains OpenAlex : codes de domaine HAL, codes LCC des revues DOAJ, mots-clés des disciplines theses.fr (libellés libres, 471 distincts)
+- [x] Prototype sur l'échantillon, cascade comprise (`prototype_subject_vote`)
+- [x] Variante : profil de la revue (domains de ses autres publications) et profil des laboratoires (domains de leurs autres publications), calculés sur les domaines HAL, les disciplines theses.fr et les revues DOAJ. Un profil vote à partir de 20 publications, soutient les domains qui pèsent au moins 15 %, et s'abstient s'il soutient les quatre
+- [x] Bilan. Sur les 52 publications à plusieurs domains, l'échantillon compte 20 domains aberrants : les effectifs sont faibles.
+
+  | Arbitres | Publications où le vote s'applique | Domains rejetés : aberrants / pertinents / limites | Précision et rappel, tous niveaux |
+  |---|---|---|---|
+  | Publication (HAL, theses.fr, DOAJ) | 32 | 8 / 14 / 7 | 48 %, 23 % |
+  | Profil de la revue | 10 | 0 / 1 / 1 | 60 %, 3 % |
+  | Profil des laboratoires | 39 | 7 / 4 / 4 | 72 %, 17 % |
+  | Publication + laboratoires | 43 | 8 / 5 / 5 | 70 %, 20 % |
+
+  Les arbitres de la publication rejettent à tort surtout à la frontière Health/Life : un seul code HAL (`sdv`, `sdv.mhep`) soutient l'un des deux domains quand la publication relève des deux. Confondre Health et Life dans le vote n'améliore pas la précision. Le vote au grain domain plafonne bas : la plupart des aberrations sont des topics sous un domain correct.
 - [ ] Variante : classifieur ISTEX comme arbitre supplémentaire
-- [ ] Variante : profil de la revue (domains majoritaires de ses publications) et profil du laboratoire (domains les plus fréquents de ses publications) comme arbitres. Profils calculés sur les domaines HAL, les disciplines theses.fr et les sujets DOAJ, pas sur les sujets OpenAlex, dont les aberrations sont récurrentes. Seuil d'effectif ; une revue ou un laboratoire dont les domains sont dispersés ne vote pas
-- [ ] Bilan de chaque variante, seule puis cumulée avec les arbitres de la publication : précision, rappel, couverture des publications sans domaine HAL ni discipline theses.fr
 
 ### Phase 4 — Embeddings
 
