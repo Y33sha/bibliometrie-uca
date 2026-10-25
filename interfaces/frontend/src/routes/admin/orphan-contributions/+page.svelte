@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RhCheck from '#lib/components/RhCheck.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -272,7 +273,7 @@
 				{#each batchSearch.results as r (r.id)}
 					<button class="result-btn" onclick={() => batchAssign(r.id)}>
 						<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-						{#if r.has_rh}<span class="rh-check">✓</span>{/if}
+						{#if r.has_rh}<RhCheck />{/if}
 						<span class="result-hint">{r.department_name || `#${r.id}`}</span>
 					</button>
 				{/each}
@@ -335,7 +336,7 @@
 										{#each assignSearch.results as r (r.id)}
 											<button class="result-btn" onclick={() => assign(o, r.id)}>
 												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-												{#if r.has_rh}<span class="rh-check">✓</span>{/if}
+												{#if r.has_rh}<RhCheck />{/if}
 												<span class="result-hint">{r.department_name || `#${r.id}`}</span>
 											</button>
 										{/each}

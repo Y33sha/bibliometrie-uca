@@ -1,4 +1,5 @@
 <script lang="ts">
+	import RhCheck from '#lib/components/RhCheck.svelte';
 	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import { institution } from '#lib/institution.svelte.js';
@@ -106,7 +107,7 @@
 								{titleCase(p.first_name)}
 							</a>
 						{/if}
-						{#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+						{#if p.has_rh}<RhCheck />{/if}
 					</td>
 					<td>
 						<IdentifiersCell identifiers={p.identifiers} />

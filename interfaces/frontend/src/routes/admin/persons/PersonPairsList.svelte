@@ -1,4 +1,5 @@
 <script lang="ts" generics="Pair extends { person_a: CurationPerson; person_b: CurationPerson }">
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { untrack, type Snippet } from "svelte";
   import { ApiError, persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
@@ -138,7 +139,7 @@
       <span class="triage-person-last">{titleCase(p.last_name)}</span>
       {titleCase(p.first_name)}
     </button>
-    {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+    {#if p.has_rh}<RhCheck />{/if}
     <div class="meta">{p.contribution_count} publication{p.contribution_count !== 1 ? "s" : ""}</div>
     {#if p.labs.length}
       <div class="labs">

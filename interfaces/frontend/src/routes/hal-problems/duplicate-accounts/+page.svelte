@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
@@ -64,7 +65,7 @@
               {titleCase(p.first_name)}
               {titleCase(p.last_name)}
             </a>
-            {#if p.has_rh}<span class="rh-check" title="Fichier RH">&#10003;</span>{/if}
+            {#if p.has_rh}<RhCheck />{/if}
           </td>
           <td class="hal-accounts">
             {#each p.hal_accounts as ha}

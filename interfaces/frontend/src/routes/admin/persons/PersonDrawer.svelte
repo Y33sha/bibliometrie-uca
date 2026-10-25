@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
@@ -145,7 +146,7 @@
           <span class="drawer-last">{titleCase(person.last_name)}</span>
           {titleCase(person.first_name)}
         </a>
-        {#if person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+        {#if person.has_rh}<RhCheck />{/if}
       </div>
       <div class="drawer-head-actions">
         <button class="icon-btn" title="Modifier le nom" aria-label="Modifier le nom" onclick={startEdit}>
@@ -232,7 +233,7 @@
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
               </button>
-              {#if sp.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+              {#if sp.has_rh}<RhCheck />{/if}
               <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
                 {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
               </span>
@@ -260,7 +261,7 @@
             <strong>{r.last_name}</strong>
             {r.first_name}
             {#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
-            {#if r.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+            {#if r.has_rh}<RhCheck />{/if}
           {/snippet}
         </Picker>
       {:else}
