@@ -64,8 +64,6 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Lecture de ces champs par les normaliseurs de HAL, DataCite et WoS. Crossref range sous `eisbn` l'ISBN dont il déclare le support électronique, WoS celui de son identifiant `eisbn`. `find_isbns` extrait chaque motif d'ISBN d'une zone, et le value object valide à l'écriture.
 - [x] Stock : staging réhydraté depuis le raw store, puis toutes les sources renormalisées. La zone TEI de HAL demande d'extraire chaque motif d'ISBN : sur 4 421 valeurs, 182 portent deux ISBN, un EAN, un ISSN, une faute de frappe ou un suffixe de chapitre (`978-3-319-77273-8_16`). Mesure après coup (`audit_isbn_in_raw_store`) : parmi les 42 472 enregistrements de livre, chapitre ou communication, HAL porte un ISBN dans 20 % de ses enregistrements sources, DataCite dans 59 %, WoS dans 1 sur 314. La lecture donnerait encore un ISBN à 92 publications, portées par des enregistrements sources absents du raw store.
 - [x] Colonne `eisbn` de `monographs`, alimentée par les sources qui déclarent le support électronique.
-- [ ] Support inconnu : vérification dans le Sudoc, qui le donne en zone 182 (`n` papier, `c` électronique) et accepte plusieurs ISBN par requête. Sur un échantillon interrogé un à un, le Sudoc tient 11 des 12 ISBN venus de HAL et 12 des 12 venus de Crossref, contre 1 sur 12 pour ceux de DataCite.
-- Deuxième source écartée pour l'instant : la DNB, interrogeable en SRU sans clé, couvre les éditeurs allemands que le Sudoc rate — Springer, De Gruyter, Dagstuhl — et donne le support en zones 337 et 338. Open Library et Google Books ne conviennent pas : le premier couvre peu et se trompe de support, le second ne le donne pas.
 
 ### 3. Remplissage
 
@@ -76,7 +74,6 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Audit de 2026 : 161 monographies, correspondance un pour un avec `journals` (6 entrées). 15 titres en double, presque tous parce que HAL ne donne pas l'éditeur.
 - [x] Rapprochement par titre dans le domaine (`choose_monograph`) : un éditeur absent ne sépare pas deux monographies ; la monographie du même éditeur passe avant celle sans éditeur.
 - [x] Sous-étape `merge_duplicate_monographs` : une monographie rejoint la seule monographie compatible de son titre (`duplicate_monographs`). Simulation : 12 fusions sur 24 titres en double. Les autres opposent des éditeurs en double (Quæ et Quae, Peter Lang et Peter Lang Verlag, Garnier et Classiques Garnier, Springer et ses filiales) ou des volumes de même titre à ISBN distincts.
-- [ ] Volumes HAL : la plupart des documents typés `PROCEEDINGS` sont des communications. Trois signaux désignent un volume : seulement des éditeurs ou des contributeurs, un titre qui commence par « Actes », « Proceedings », « Book of abstracts » ou « Dossier », un titre égal à celui du conteneur. Ils retiennent 107 documents sur 350.
 - [x] DataCite : le filtre des conteneurs vaut pour `journal_id` seulement. Un livre prend l'ISBN de ses identifiants (`identifiers`, `alternateIdentifiers`). Les livres et chapitres Classiques Garnier (226) ont un conteneur sans titre, décrit par les seuls ISSN de la collection (`LISSN`, `EISSN`).
 - [x] Stock : renormalisation de toutes les sources, puis oneshot pour les enregistrements sources absents du raw store (phase 7).
 - [x] Mesure : 6 597 monographies, dont 3 541 à ISBN, 1 260 volumes d'actes et 1 140 rattachées à une série. 8 549 publications portent une monographie. Sans monographie : 14 livres, 126 chapitres, 10 912 communications. 324 titres portés par plusieurs monographies, pour 1 017 publications. Dans 103 groupes, chaque volume a son année. Les 221 autres réunissent au moins deux volumes d'une même année. La fusion les écarte sur des variantes de nom d'éditeur (Springer, Springer Nature Switzerland) ou des ISBN distincts.
@@ -103,7 +100,6 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Les ISSN d'une description de conteneur sont validés à sa construction ; `has_issn` lit les valeurs validées, les autres vont dans `rejected_issns`. Cas réel : l'ISBN des actes « Processing HRI 2017 » porté dans le champ ISSN.
 - [x] Deux titres de conteneur Crossref : le volume est le seul titre qui a la forme d'un volume, à défaut l'ordre tranche (`split_collection_and_volume`). Dans le raw store, aucun article de congrès ne porte le volume en tête : 50 l'ont en second, 8 ont deux titres de volume, 8 aucun.
 
-- [ ] Conférences sans ISSN : reconnaître les principales conférences par une liste fermée d'acronymes, pour regrouper leurs volumes en série même sans ISSN. Forme de la liste à trancher.
 
 ### 7. Stock
 
@@ -113,7 +109,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Audit de l'écart entre le calcul sur la base et la normalisation, sur 100 enregistrements sources du raw store par strate (`move_volumes_to_monographs --audit`). Articles de revue, conteneurs datés sans ISSN, livres et parties sans entrée de `journals` : aucun écart. Écarts restants : conteneur sans ISSN d'une partie (ScanR, HAL : 8 sur 100 entrées sans ISSN), monographie créée par l'ancienne lecture des titres Crossref (« Annals of Computer Science and Information Systems »), type brut OpenAlex dépassé.
 - [x] Instantané avant réhydratation (`snapshot_record_containers`, `snapshot_conference_papers`).
 - [x] Réhydratation du raw store et renormalisation du stock.
-- [ ] Audit avant/après : quantifier chaque type de problème. Comparaison par enregistrement, après normalisation (`snapshot_record_containers --compare`) :
+- [x] Audit avant/après : quantifier chaque type de problème. Comparaison par enregistrement, après normalisation (`snapshot_record_containers --compare`) :
     - changements attendus. 6 325 livres et chapitres gagnent une monographie, surtout chez HAL. 2 439 enregistrements quittent une entrée de `journals` sans ISSN qui décrit un volume ; 1 189 reçoivent une monographie (« ESAFORM 2021 », « LIPIcs, Volume 210, CP 2021 »). La lecture des deux titres Crossref corrige 46 monographies (« Planta Medica » devient « 67th International Congress… »). 112 revues corrigées (« Physical review / C C96(6) » devient « Physical review. C ») ;
     - collections à ISSN perdues (76) : l'enregistrement source est sans ISSN, alors que la base connaît la collection et son ISSN (« Goldschmidt Abstracts », « Gut » pour les communications IDDF). 26 articles OpenAlex perdent leur revue à ISSN, cause inconnue ;
     - titres non latins : « 淡江外語論叢 » créé deux fois (103320, 103324), « Детские чтения », « материалы конференции ». L'entrée 1614 « Παιδαγωγικά ρεύματα στο Αιγαίο » réunissait des documents sans rapport. Hypothèse : un titre dont la normalisation ne garde rien crée une entrée à chaque rencontre ;
@@ -128,25 +124,32 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 ### 8. Administration
 
 - [x] Page Monographies dans les référentiels de l'administration, en lecture seule.
-- [ ] Conversion d'une entrée de `journals` en monographie, et l'inverse. La décision survit à la renormalisation : le classement d'un titre la consulte avant ses règles.
 
 ### 9. Type contredit par la forme du DOI
 
-- [ ] Mesure : publications dont le DOI porte un ISBN et dont le type ne s'y accorde pas — ISBN seul hors de `book` et `proceedings`, ISBN suffixé hors de `book_chapter` et `conference_paper`. Causes et volumes.
+- [x] Mesure : publications dont le DOI porte un ISBN et dont le type ne s'y accorde pas — ISBN seul hors de `book` et `proceedings`, ISBN suffixé hors de `book_chapter` et `conference_paper`. Base locale : 2 455 publications ont un DOI à ISBN ; 2 192 ont un type accordé (1 302 chapitres, 636 articles de congrès, 254 livres). Les écarts n'appellent pas de règle générale :
+    - 118 articles à ISBN suffixé : numéros de revue à ISBN de Classiques Garnier (`10.15122/isbn.…p.0139`), working papers du FMI (`10.5089/….001`) ;
+    - 7 livres à ISBN suffixé : DOI de livre d'Oxford et d'Edinburgh University Press (`….001.0001`) ;
+    - 128 publications `other` à ISBN suffixé : chapitres Wiley (`10.1002/….chN`, 80), que Crossref, OpenAlex et ScanR typent tous `other`, et pages liminaires ou index (`.fmatter`, `.index`).
 
 ### 10. Correction du DOI des chapitres
 
-- [ ] Mesure : part des groupes corrigés dont les titres sont presque identiques, part de ceux dont le DOI partagé porte un ISBN suffixé.
-- [ ] Opposition livre/chapitre : exiger que les titres diffèrent.
-- [ ] Forme du DOI : un ISBN suffixé désigne un chapitre, donc aucune correction de divergence ne s'applique.
-- [ ] Comparaison des titres : tolérer les coquilles dans le test de distinction.
+- [x] Mesure : part des groupes corrigés dont les titres sont presque identiques, part de ceux dont le DOI partagé porte un ISBN suffixé. Base locale, 231 groupes corrigés :
+    - `OUVRAGE_VS_CHAPITRE`, 100 groupes : 57 DOI à ISBN seul, celui du livre, que le chapitre porte à tort ; 5 groupes aux titres presque identiques (similarité d'au moins 0,9), une même œuvre typée livre par une source et chapitre par une autre ;
+    - `CHAPITRES_TITRES_DIFFERENTS`, 131 groupes : 20 aux titres presque identiques (« conspiration » et « conjuration », troncatures), un même chapitre ; 36 DOI à ISBN suffixé, celui d'un chapitre, dont 26 aux titres différents : un enregistrement Crossref ou DataCite du chapitre, et des dépôts HAL d'autres chapitres qui portent son DOI.
+- [x] Opposition livre/chapitre : un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source ; il garde le DOI (`340c84def`).
+- Forme du DOI et coquilles dans le test de distinction : volumes négligeables (26 et 20 groupes), pas de règle.
 
 ### 11. Documentation
 
-- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishing.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
+- [x] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishing.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
 
 ## Questions ouvertes
 
+- **Support des ISBN.** Vérification dans le Sudoc, qui le donne en zone 182 (`n` papier, `c` électronique) et accepte plusieurs ISBN par requête. Sur un échantillon interrogé un à un, le Sudoc tient 11 des 12 ISBN venus de HAL et 12 des 12 venus de Crossref, contre 1 sur 12 pour ceux de DataCite.
+  Deuxième source écartée pour l'instant : la DNB, interrogeable en SRU sans clé, couvre les éditeurs allemands que le Sudoc rate — Springer, De Gruyter, Dagstuhl — et donne le support en zones 337 et 338. Open Library et Google Books ne conviennent pas : le premier couvre peu et se trompe de support, le second ne le donne pas.
+- **Conférences sans ISSN.** Reconnaître les principales conférences par une liste fermée d'acronymes, pour regrouper leurs volumes en série même sans ISSN. Forme de la liste à trancher.
+- **Écarts résiduels de l'audit avant/après** : collections à ISSN perdues quand l'enregistrement source est sans ISSN (76), cinq livres sans monographie, série sans ISSN créée pour un volume à ordinal en toutes lettres, revue recréée sous un nouvel identifiant.
 - **Niveau d'un conteneur sans ISSN.** Le conteneur sans ISSN d'un livre, d'un chapitre ou d'un article de congrès désigne tantôt le volume (« Silicon Photonics XIII », « Proceedings of the Thirty-Second International Joint Conference on Artificial Intelligence »), tantôt la série (« SPIE Proceedings »). Pistes :
     - Années différentes. Le conteneur est une monographie par défaut, promue en série quand ses enregistrements couvrent plusieurs années. Mesure sur les années des enregistrements. Deux années consécutives mêlent livres parus en ligne puis imprimés, ouvrages de référence enrichis au fil de l'eau, écarts entre sources, volumes parus l'année suivant le congrès (PoS(ICHEP2022)) et quelques séries (GECCO, IEOM). Des années non consécutives ou au moins trois années désignent presque toujours une série : AIP Conference Proceedings, AAAI, AAMAS, Winter Simulation Conference, sessions du congrès ERS. Un faux positif sur 19 : « Handbook of Labor, Human Resources and Population Economics ».
     - Chiffres romains (« Silicon Photonics XIII ») comme marque de volume dans `container_level`. Risque de confusion avec d'autres emplois.

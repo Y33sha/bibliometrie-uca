@@ -8,7 +8,7 @@ Le conteneur d'une publication est ce qui la publie ou l'héberge. Le schéma en
 - `publishing.monographs`, que référence `publications.monograph_id` : livres et volumes d'actes, avec ou sans ISBN, avec un `journal_id` vers leur collection ;
 - `publications.container_title`, un titre libre quand aucune des deux tables ne convient.
 
-Le chantier [Monographies](../DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
+Le chantier [Monographies](2026-10-25_DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
 
 `journals` réunit encore des choses de natures différentes. Son type (`journal_type`) vaut :
 
@@ -94,7 +94,7 @@ Usages du type dans le code :
 
 - [Conférences et actes](2026-10-25_DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
 - [Revues divergentes selon les sources](2026-10-25_DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
-- [Monographies](../DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
+- [Monographies](2026-10-25_DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
 
 ## Décisions
 

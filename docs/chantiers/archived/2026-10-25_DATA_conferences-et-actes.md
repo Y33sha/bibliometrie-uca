@@ -4,7 +4,7 @@
 
 Le type `conference_paper` regroupe tout ce qui relève d'une conférence : texte publié dans des actes, résumé, communication orale. Le chantier vise à distinguer le texte publié dans des actes (`conference_paper`) de la communication (type « conférence », à créer).
 
-Les volumes d'actes sont des monographies (`monographs.proceedings`), rattachées à leur série dans `journals` (chantier [Monographies](../DATA_monographies.md)).
+Les volumes d'actes sont des monographies (`monographs.proceedings`), rattachées à leur série dans `journals` (chantier [Monographies](2026-10-25_DATA_monographies.md)).
 
 ### Traces de publication
 
