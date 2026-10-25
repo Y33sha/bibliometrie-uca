@@ -5,12 +5,20 @@ import pytest
 from domain.serials.titles import (
     compatible_titles,
     names_a_dated_event,
+    names_ebook_platform,
     names_proceedings,
     nested_titles,
 )
 
 
 # Cas réels de la table serials.
+def test_plateforme_d_ebooks():
+    assert names_ebook_platform("ENS Éditions eBooks")
+    assert names_ebook_platform("éditions Quae eBooks")
+    assert not names_ebook_platform("Reti Medievali E-Book")
+    assert not names_ebook_platform("eBooks")
+
+
 def test_titre_d_actes():
     assert names_proceedings("Proceedings of the Samahang Pisika ng Pilipinas")
     assert names_proceedings(

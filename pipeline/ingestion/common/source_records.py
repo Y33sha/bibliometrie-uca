@@ -16,6 +16,7 @@ from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
 from domain.publishers.attribution import source_record_has_publisher
+from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import normalize_external_ids
 from domain.source_records.languages import language_code
@@ -56,6 +57,7 @@ class SourceRecordUpsert:
     publisher_id: int | None = None
     """Éditeur que nomme la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
+    """Titre libre du conteneur. L'écriture retire un titre de plateforme d'ebooks (`names_ebook_platform`)."""
     raw_language: str | None = None
     """Langue dans le vocabulaire de la source."""
     biblio: JsonValue = None
@@ -144,6 +146,8 @@ class SourceRecordStore:
             has_container=row.serial_id is not None or row.monograph_id is not None,
         ):
             params["publisher_id"] = None
+        if row.container_title and names_ebook_platform(row.container_title):
+            params["container_title"] = None
         params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
         return scalar_int(self._conn.execute(_UPSERT_SQL, params))

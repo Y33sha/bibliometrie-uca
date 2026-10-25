@@ -17,7 +17,7 @@ flowchart LR
 
 Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `serials`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
 
-Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. Les plateformes d'ebooks d'OpenAlex ne créent pas de revue.
+Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. OpenAlex nomme la plateforme d'ebooks d'un éditeur « *éditeur* eBooks », et ScanR reprend ce nom comme revue. Ce titre n'est celui d'aucun conteneur : il ne crée pas de revue et ne reste pas dans `container_title`. Une localisation principale OpenAlex sur une telle plateforme donne l'éditeur de son organisation hôte.
 
 Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations. Chaque identifiant prend sa forme canonique ; une valeur mal formée est écartée et journalisée.
 

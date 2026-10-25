@@ -14,8 +14,9 @@ from domain.normalize import normalize_text
 # « PoS(ICRC2021) ».
 _EVENT_YEAR = re.compile(r"(?<![\d\-–/])(?:1[89]\d\d|20\d\d)(?![\w\-–/(])")
 _YEAR_RANGE = re.compile(r"(\d{4})\s*[-–]\s*(\d{4})")
-_SERIAL = re.compile(r"\bjournal\b", re.IGNORECASE)
+_JOURNAL_WORD = re.compile(r"\bjournal\b", re.IGNORECASE)
 _PROCEEDINGS = re.compile(r"\bproceedings\b", re.IGNORECASE)
+_EBOOK_PLATFORM = re.compile(r"\seBooks$")
 _LEARNED_BODY = re.compile(r"\b(?:societ(?:y|ies)|academ(?:y|ies)|institutions?)\b", re.IGNORECASE)
 _LEGAL_PROCEEDINGS = re.compile(
     r"\b(?:criminal|civil|legal|judicial|court|insolvency|bankruptcy|arbitral|arbitration|administrative|disciplinary)\s+proceedings\b",
@@ -35,12 +36,17 @@ def names_proceedings(title: str) -> bool:
     )
 
 
+def names_ebook_platform(title: str) -> bool:
+    """Indique si le titre est celui qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur : « ENS Éditions eBooks ». Une plateforme d'ebooks n'est le conteneur d'aucun document."""
+    return bool(_EBOOK_PLATFORM.search(title))
+
+
 def names_a_dated_event(title: str) -> bool:
     """Indique si le titre nomme une édition datée : « NuFACT 2022 », « 2024 IEEE SENSORS », « Goldschmidt2023 abstracts ».
 
     Ne comptent pas : une période (« Poetry, 1960–2015 »), une année seule entre parenthèses (« 22 Seiten (2023). »), un titre qui contient le mot « journal » (« Journal of high energy physics 2018(7) »).
     """
-    if _SERIAL.search(title):
+    if _JOURNAL_WORD.search(title):
         return False
     title = _YEAR_RANGE.sub(lambda m: " " if m.group(1) < m.group(2) else m.group(0), title)
     return any(

@@ -46,9 +46,10 @@ from pipeline.ingestion.openalex.payload import (
     extract_nnt_from_location,
     is_theses_fr_location,
     map_openalex_oa_status,
+    names_publisher,
+    names_serial,
     parse_primary_location,
     short_openalex_id,
-    should_skip_publisher_serial,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -286,13 +287,11 @@ def openalex_source_record(  # noqa: C901
     is_retracted = bool(work.get("is_retracted"))
 
     # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/serials créés via find_or_create_*.
-    # L'éditeur et la revue sont ignorés pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.), même critère que la création.
+    # Mêmes critères que la création : l'éditeur et la revue sont ignorés pour une primary location qui héberge le work sans le publier (HAL, theses.fr, Zenodo, etc.), la revue pour une plateforme d'ebooks.
     raw_biblio = as_mapping(work.get("biblio"))
-    source = (
-        {}
-        if should_skip_publisher_serial(primary)
-        else as_mapping(as_mapping(work.get("primary_location")).get("source"))
-    )
+    primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    publisher_source = primary_source if names_publisher(primary) else {}
+    source = primary_source if names_serial(primary) else {}
     issn_l = as_str(source.get("issn_l"))
     issns = [i for e in as_sequence(source.get("issn")) if (i := as_str(e)) and i != issn_l]
     biblio_json = compact_biblio(
@@ -300,7 +299,7 @@ def openalex_source_record(  # noqa: C901
         issue=as_str(raw_biblio.get("issue")),
         first_page=as_str(raw_biblio.get("first_page")),
         last_page=as_str(raw_biblio.get("last_page")),
-        publisher=as_str(source.get("host_organization_name")),
+        publisher=as_str(publisher_source.get("host_organization_name")),
         journal_title=as_str(source.get("display_name")),
         journal_issn=issns[0] if issns else None,
         journal_eissn=issns[1] if len(issns) > 1 else None,
@@ -317,9 +316,9 @@ def openalex_source_record(  # noqa: C901
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `source_extras`, sans licence normalisée.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, entrepôt) garde sa forme brute dans `source_extras`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
-    publisher_license = None if should_skip_publisher_serial(primary) else raw_license
+    publisher_license = raw_license if names_publisher(primary) else None
 
     return SourceRecordUpsert(
         source="openalex",
@@ -473,12 +472,12 @@ class OpenalexNormalizer(SourceNormalizer):
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
-        if should_skip_publisher_serial(parse_primary_location(doc)):
+        if not names_publisher(parse_primary_location(doc)):
             return None
         return get_publisher(doc)
 
     def container_facts(self, doc: Document) -> ContainerDescription | None:
-        if should_skip_publisher_serial(parse_primary_location(doc)):
+        if not names_serial(parse_primary_location(doc)):
             return None
         return get_container_facts(doc)
 

@@ -9,9 +9,10 @@ from pipeline.ingestion.openalex.payload import (
     is_repository_location,
     is_theses_fr_location,
     map_openalex_oa_status,
+    names_publisher,
+    names_serial,
     parse_primary_location,
     short_openalex_id,
-    should_skip_publisher_serial,
 )
 
 
@@ -245,29 +246,38 @@ class TestIsHalLocation:
         assert not is_hal_location(_loc())
 
 
-class TestShouldSkipPublisherSerial:
-    def test_hal_skips(self):
-        assert should_skip_publisher_serial(
-            _loc(landing_page_url="https://hal.science/hal-04123456")
-        )
+class TestNamesPublisher:
+    def test_hal(self):
+        assert not names_publisher(_loc(landing_page_url="https://hal.science/hal-04123456"))
 
-    def test_theses_fr_skips(self):
-        assert should_skip_publisher_serial(_loc(source_display_name="theses.fr"))
+    def test_theses_fr(self):
+        assert not names_publisher(_loc(source_display_name="theses.fr"))
 
-    def test_repository_skips(self):
-        assert should_skip_publisher_serial(_loc(source_type="repository"))
+    def test_repository(self):
+        assert not names_publisher(_loc(source_type="repository"))
 
-    def test_ebook_platform_skips(self):
-        assert should_skip_publisher_serial(_loc(source_type="ebook platform"))
+    def test_ebook_platform(self):
+        assert names_publisher(_loc(source_type="ebook platform"))
 
-    def test_serial_does_not_skip(self):
-        assert not should_skip_publisher_serial(
-            _loc(source_type="journal", source_display_name="Nature")
-        )
+    def test_serial(self):
+        assert names_publisher(_loc(source_type="journal", source_display_name="Nature"))
 
-    def test_none_does_not_skip(self):
-        # Pas de primary → on ne sait pas, on ne skip pas (cas rare)
-        assert not should_skip_publisher_serial(None)
+    def test_none(self):
+        assert names_publisher(None)
+
+
+class TestNamesSerial:
+    def test_repository(self):
+        assert not names_serial(_loc(source_type="repository"))
+
+    def test_ebook_platform(self):
+        assert not names_serial(_loc(source_type="ebook platform"))
+
+    def test_serial(self):
+        assert names_serial(_loc(source_type="journal", source_display_name="Nature"))
+
+    def test_none(self):
+        assert names_serial(None)
 
 
 class TestExtractNntFromLocation:

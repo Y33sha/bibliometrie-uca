@@ -17,7 +17,6 @@ from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
-from pipeline.ingestion.openalex import normalize as normalize_openalex
 from pipeline.ingestion.openalex.normalize import (
     OpenalexNormalizer,
     _extract_openalex_orcid,
@@ -492,21 +491,36 @@ class TestOpenalexSourceRecord:
             },
         }
 
-    def test_biblio_skipped_when_primary_is_repository(self, monkeypatch):
-        """Si should_skip_publisher_serial renvoie True, publisher/journal absents de biblio."""
-
-        class _PrimaryStub:
-            source_display_name = None
-
-        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
-        monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
-        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_serial", lambda p: True)
+    def test_biblio_skipped_when_primary_is_repository(self):
+        """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""
         work = {
             "id": "https://openalex.org/W1",
-            "primary_location": {"source": {"host_organization_name": "HAL"}},
+            "primary_location": {
+                "source": {
+                    "type": "repository",
+                    "display_name": "Zenodo",
+                    "host_organization_name": "CERN",
+                }
+            },
         }
         captured = self._call(work)
         assert captured.biblio is None
+
+    def test_ebook_platform_names_publisher_only(self):
+        """Une plateforme d'ebooks donne l'éditeur, pas la revue."""
+        work = {
+            "id": "https://openalex.org/W1",
+            "primary_location": {
+                "source": {
+                    "id": "https://openalex.org/S4306463240",
+                    "type": "ebook platform",
+                    "display_name": "ENS Éditions eBooks",
+                    "host_organization_name": "École normale supérieure Editions",
+                }
+            },
+        }
+        captured = self._call(work)
+        assert captured.biblio == {"publisher": "École normale supérieure Editions"}
 
     def test_theses_fr_nnt_passed_through_to_external_ids(self):
         """Le NNT d'une localisation principale theses.fr va dans external_ids."""
