@@ -11,6 +11,7 @@ from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.registry import HAL
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
@@ -29,6 +30,7 @@ from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -121,6 +123,31 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
         hal_text_field(doc.get("linkExtId_s")),
         embargo_until,
     )
+
+
+# Nom que donne OpenAlex à sa source HAL : HAL et OpenAlex écrivent la même plateforme.
+_HAL_PLATFORM = PlatformFacts(
+    openalex_id=next(iter(HAL.openalex_ids)),
+    name="HAL (Le Centre pour la Communication Scientifique Directe)",
+    platform_type=HAL.platform_type,
+)
+
+
+def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """La notice HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence. La notice est ouverte quand un fichier est déposé ; l'embargo d'un fichier se lit sur l'enregistrement source (`embargo_until`)."""
+    uri = hal_text_field(doc.get("uri_s"))
+    if not uri:
+        return []
+    file_main = hal_text_field(doc.get("fileMain_s"))
+    return [
+        LocationFacts(
+            url=uri,
+            pdf_url=file_main,
+            license=normalize_license(hal_text_field(doc.get("licence_s"))),
+            is_oa=file_main is not None,
+            platform=_HAL_PLATFORM,
+        )
+    ]
 
 
 # =============================================================
@@ -550,6 +577,9 @@ class HalNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription:
         return get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

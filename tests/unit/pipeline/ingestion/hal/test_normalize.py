@@ -24,6 +24,7 @@ from pipeline.ingestion.hal.normalize import (
     build_hal_external_ids,
     extract_hal_author_block,
     get_container_facts,
+    get_locations,
     get_title,
     hal_source_record,
     page_range,
@@ -200,6 +201,29 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
     _record(doc)
     normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
     assert len(calls) == 1
+
+
+class TestGetLocations:
+    def test_notice_avec_fichier_ouverte(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-01",
+            "fileMain_s": "https://hal.science/hal-01/document",
+            "licence_s": "http://creativecommons.org/licenses/by/",
+        }
+        [location] = get_locations(doc)
+        assert (location.url, location.pdf_url, location.is_oa) == (
+            "https://hal.science/hal-01",
+            "https://hal.science/hal-01/document",
+            True,
+        )
+        assert location.platform.openalex_id == "S4306402512"
+
+    def test_notice_sans_fichier_fermee(self):
+        [location] = get_locations({"uri_s": "https://hal.science/hal-02"})
+        assert (location.pdf_url, location.is_oa) == (None, False)
+
+    def test_sans_notice(self):
+        assert get_locations({}) == []
 
 
 class TestParseTeiIsbns:

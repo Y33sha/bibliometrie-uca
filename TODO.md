@@ -44,6 +44,7 @@ python -m interfaces.cli.oneshot.detach_ebook_platforms
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
 * [ ] volet latéral pour Editeurs et Revues
+* [ ] détail des localisations de chaque publi
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne)

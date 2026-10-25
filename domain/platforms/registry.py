@@ -1,4 +1,4 @@
-"""Liste fermée des plateformes connues : serveurs de preprints et plateformes d'éditeurs.
+"""Liste fermée des plateformes connues : HAL, serveurs de preprints et plateformes d'éditeurs.
 
 Une plateforme d'éditeurs enregistre sous son propre préfixe DOI les articles des revues qu'elle diffuse : le titulaire du préfixe et le nom que Crossref donne à ces DOI sont alors la plateforme, pas l'éditeur. Un serveur de preprints se reconnaît par la source OpenAlex de ses localisations.
 
@@ -30,7 +30,11 @@ def _publisher_platform(name: str, prefixes: set[str]) -> KnownPlatform:
     return KnownPlatform(name, PlatformType.PUBLISHER_PLATFORM, frozenset(prefixes))
 
 
+HAL = KnownPlatform("HAL", PlatformType.REPOSITORY, openalex_ids=frozenset({"S4306402512"}))
+"""L'archive ouverte HAL, que HAL décrit lui-même et qu'OpenAlex décrit comme une de ses sources."""
+
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
+    HAL,
     _preprint_server("arXiv", {"10.48550"}, {"S4306400194", "S4393918464"}),
     _preprint_server("bioRxiv", {"10.1101", "10.64898"}, {"S4306402567"}),
     _preprint_server("medRxiv", {"10.1101", "10.64898"}, {"S3005729997"}),
