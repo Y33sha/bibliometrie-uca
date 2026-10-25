@@ -145,7 +145,8 @@
     }
   }
   .abstract-text {
-    max-width: 120ch;
+    /* Environ 120 caractères par ligne : en Source Sans 3, un caractère moyen est plus étroit que le « 0 » qui définit `ch`. */
+    max-width: 96ch;
     font-size: 1.02rem;
     line-height: 1.65;
     color: var(--text);
