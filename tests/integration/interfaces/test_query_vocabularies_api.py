@@ -43,6 +43,8 @@ class TestValeursAdmises:
             ("/api/publications", {"license": "cc-by,none"}),
             ("/api/publications/export.csv", {"columns": "title,year,serial"}),
             ("/api/stats/facets", {"has_apc": "no"}),
+            ("/api/structures", {"structure_type": "labo,equipe"}),
+            ("/api/structures/1/partners", {"type": "education,funder"}),
         ],
     )
     def test_passent(self, client, chemin, params):
