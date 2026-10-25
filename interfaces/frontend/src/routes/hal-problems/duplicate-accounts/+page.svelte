@@ -60,7 +60,7 @@
       {#each list.items as p}
         <tr>
           <td>
-            <a href={resolve(`persons/${p.person_id}`)} class="person-link">
+            <a href={resolve(`persons/${p.person_id}`)} class="entity-link">
               {titleCase(p.first_name)}
               {titleCase(p.last_name)}
             </a>
@@ -107,9 +107,6 @@
   }
   .data-table td {
     font-size: 0.9rem;
-  }
-  .person-link {
-    font-weight: 500;
   }
   .hal-accounts {
     display: flex;

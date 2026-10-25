@@ -83,10 +83,10 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 ### Étape 4 — Tableaux
 
 - [x] Factoriser : tableaux de liste sur `.data-table`, files de triage des revues sur `.triage-table`, colonnes triables et numériques dans `shared.css`, lien de titre `.publication-title` ; restent à part les tableaux de mise en page propre (run du pipeline, comparaison des sources, ISSN, blocages d'éditeurs)
-- [ ] En-têtes de colonnes sans fond, 11–12 px, gris, petites capitales
-- [ ] Séparateurs de lignes très pâles, fond au survol de la ligne
-- [ ] Liens des tableaux en couleur de texte principale, couleur d'accent au survol
-- [ ] Colonnes numériques alignées à droite
+- [x] En-têtes de colonnes sans fond, 11–12 px, gris, petites capitales
+- [x] Tableaux sans cadre ; séparateurs de lignes très pâles, fond au survol de la ligne
+- [x] Liens des tableaux en couleur de texte principale, couleur d'accent au survol (`.entity-link`, `.publication-title`, liens sans classe)
+- [x] Colonnes numériques alignées à droite
 - [ ] Pastilles réservées aux valeurs à code couleur (type de document, mode de correspondance)
 - [ ] Boutons d'action par ligne en icônes sans bordure, visibles au survol de la ligne
 - [ ] Publications : type de document en pastille, une teinte par type ; icônes de la colonne « Liens » de taille et d'espacement homogènes

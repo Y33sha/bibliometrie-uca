@@ -93,7 +93,7 @@
 						{#if onopen}
 							<button
 								type="button"
-								class="person-link"
+								class="entity-link person-link"
 								class:active={activeId === p.id}
 								onclick={() => onopen(p.id)}
 							>
@@ -101,7 +101,7 @@
 								{titleCase(p.first_name)}
 							</button>
 						{:else}
-							<a href={resolve(`persons/${p.id}`)} class="person-link">
+							<a href={resolve(`persons/${p.id}`)} class="entity-link person-link">
 								<span class="person-last">{titleCase(p.last_name)}</span>
 								{titleCase(p.first_name)}
 							</a>
@@ -130,9 +130,6 @@
 <style>
 	.persons-table { min-width: 620px; }
 	.persons-table td { vertical-align: middle; }
-	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.person-link:hover { text-decoration: underline; }
-	button.person-link { background: none; border: none; padding: 0; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
 	button.person-link.active { text-decoration: underline; }
 	tr.excluded { opacity: 0.45; }
 	tr.excluded:hover { opacity: 0.7; }

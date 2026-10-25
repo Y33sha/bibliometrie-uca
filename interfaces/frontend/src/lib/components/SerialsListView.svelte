@@ -251,7 +251,7 @@
 		{#each serials.items as j (j.id)}
 			<tr>
 				<td>
-					<a href={resolve(`journals/${j.id}`)} class="journal-link">{j.title}</a>
+					<a href={resolve(`journals/${j.id}`)} class="entity-link">{j.title}</a>
 					{#if j.is_in_doaj}
 						{#if j.doaj_url}
 							<a class="badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
@@ -264,7 +264,7 @@
 					<td class="muted">
 						{#if j.publisher_name}
 							{#if j.publisher_id}
-								<a href={resolve(`publishers/${j.publisher_id}`)} class="publisher-link">{j.publisher_name}</a>
+								<a href={resolve(`publishers/${j.publisher_id}`)}>{j.publisher_name}</a>
 							{:else}
 								{j.publisher_name}
 							{/if}
@@ -309,7 +309,6 @@
 	}
 	.muted { color: var(--muted); }
 
-	.journal-link { font-weight: 500; }
 
 	.actions { white-space: nowrap; position: relative; }
 </style>

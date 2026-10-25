@@ -208,7 +208,7 @@
 		{#each publishers.items as p (p.id)}
 			<tr>
 				<td>
-					<a href={resolve(`publishers/${p.id}`)} class="publisher-link">{p.name}</a>
+					<a href={resolve(`publishers/${p.id}`)} class="entity-link">{p.name}</a>
 					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
 						<a
 							class="crossref-link"
@@ -267,6 +267,5 @@
 		white-space: nowrap;
 	}
 
-	.publisher-link { font-weight: 500; }
 	.actions { white-space: nowrap; position: relative; }
 </style>
